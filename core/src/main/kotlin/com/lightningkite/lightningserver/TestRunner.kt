@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver
 
+import com.lightningkite.lightningserver.http.HttpRequest
+import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.services.data.TypedData
 import kotlinx.coroutines.flow.MutableSharedFlow
 
@@ -31,7 +33,7 @@ context(builder: TestSettings) public infix fun <RESULT> Locationed<PathSpec0, S
 public class TestRunner<SD: ServerDefinition>(
     override val server: SD,
     public val settings: TestSettings,
-) : ServerRunning {
+) : ServerRuntime {
     public constructor(
         server: SD,
         settings: context(TestSettings) SD.() -> Unit
@@ -76,7 +78,7 @@ public class TestRunner<SD: ServerDefinition>(
         }
 
         public val server: ServerSide = ServerSide()
-        public inner class ServerSide(): WebSocketConnection<PATH, STORAGE>, ServerRunning by this@TestRunner {
+        public inner class ServerSide(): WebSocketConnection<PATH, STORAGE>, ServerRuntime by this@TestRunner {
             private val changeQueue = ArrayList<(STORAGE)->STORAGE>()
             private val sub: suspend (WebSocketSubscriptionMessage<*, *>) -> Unit = {
                 handler.messageFromSubscription(this, it)
@@ -152,7 +154,7 @@ context(test: TestRunner<*>) public suspend fun <STORAGE> Locationed<PathSpec0, 
     sourceIp: String = "local",
 ): TestRunner<*>.TestWebSocket<PathSpec0, STORAGE> {
     val request = WebSocketConnectRequest(
-        PathServer(this.location),
+        ServerPath(this.location),
         queryParameters = queryParameters,
         headers = headers,
         domain = domain,
@@ -175,7 +177,7 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A> Locationed<PathSpec
     sourceIp: String = "local",
 ): TestRunner<*>.TestWebSocket<PathSpec1<A>, STORAGE> {
     val request = WebSocketConnectRequest(
-        PathServer(this.location, path1),
+        ServerPath(this.location, path1),
         queryParameters = queryParameters,
         headers = headers,
         domain = domain,
@@ -197,7 +199,7 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A, B> Locationed<PathS
     sourceIp: String = "local",
 ): TestRunner<*>.TestWebSocket<PathSpec2<A, B>, STORAGE> {
     val request = WebSocketConnectRequest(
-        PathServer(this.location, path1, path2),
+        ServerPath(this.location, path1, path2),
         queryParameters = queryParameters,
         headers = headers,
         domain = domain,
@@ -220,7 +222,7 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A, B, C> Locationed<Pa
     sourceIp: String = "local",
 ): TestRunner<*>.TestWebSocket<PathSpec3<A, B, C>, STORAGE> {
     val request = WebSocketConnectRequest(
-        PathServer(this.location, path1, path2, path3),
+        ServerPath(this.location, path1, path2, path3),
         queryParameters = queryParameters,
         headers = headers,
         domain = domain,
@@ -242,7 +244,7 @@ context(test: TestRunner<*>) public suspend fun Locationed<HttpEndpoint<PathSpec
 ): HttpResponse {
     return this.item.handle(
         test, HttpRequest(
-            PathServer(this.location.path),
+            ServerPath(this.location.path),
             method = this.location.method,
             queryParameters = queryParameters,
             headers = headers,
@@ -265,7 +267,7 @@ context(test: TestRunner<*>) public suspend fun <A> Locationed<HttpEndpoint<Path
 ): HttpResponse {
     return this.item.handle(
         test, HttpRequest(
-            PathServer(this.location.path, path1),
+            ServerPath(this.location.path, path1),
             method = this.location.method,
             queryParameters = queryParameters,
             headers = headers,
@@ -289,7 +291,7 @@ context(test: TestRunner<*>) public suspend fun <A, B> Locationed<HttpEndpoint<P
 ): HttpResponse {
     return this.item.handle(
         test, HttpRequest(
-            PathServer(this.location.path, path1, path2),
+            ServerPath(this.location.path, path1, path2),
             method = this.location.method,
             queryParameters = queryParameters,
             headers = headers,
@@ -314,7 +316,7 @@ context(test: TestRunner<*>) public suspend fun <A, B, C> Locationed<HttpEndpoin
 ): HttpResponse {
     return this.item.handle(
         test, HttpRequest(
-            PathServer(this.location.path, path1, path2, path3),
+            ServerPath(this.location.path, path1, path2, path3),
             method = this.location.method,
             queryParameters = queryParameters,
             headers = headers,

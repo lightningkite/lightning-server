@@ -3,7 +3,7 @@ package com.lightningkite.lightningserver.typed
 import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.ServerDefinition
-import com.lightningkite.lightningserver.ServerRunning
+import com.lightningkite.lightningserver.ServerRuntime
 import com.lightningkite.services.data.TypedData
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.SerializationStrategy
@@ -33,16 +33,16 @@ public object MediaTypeEncoderList: ServerDefinition.ExtensionKey<Map<MediaType,
 
 
 
-context(serverRunning: ServerRunning)
+context(serverRuntime: ServerRuntime)
 public suspend fun <T> TypedData.parse(serializer: DeserializationStrategy<T>): T {
-    val format = serverRunning.server.mediaTypeDecoders[mediaType]?.firstOrNull { it.accepts(mediaType.parameters) }
+    val format = serverRuntime.server.mediaTypeDecoders[mediaType]?.firstOrNull { it.accepts(mediaType.parameters) }
         ?: throw BadRequestException("No media type decoder found supporting $mediaType")
     return format(this, serializer)
 }
-context(serverRunning: ServerRunning)
+context(serverRuntime: ServerRuntime)
 public suspend fun <T> T.toHttpContent(accepts: List<MediaType>, serializer: SerializationStrategy<T>): TypedData {
     val (type, format) = accepts.firstNotNullOfOrNull {
-        serverRunning.server.mediaTypeEncoders[it]?.firstOrNull { it.accepts(it.mediaType.parameters) }?.let { f ->
+        serverRuntime.server.mediaTypeEncoders[it]?.firstOrNull { it.accepts(it.mediaType.parameters) }?.let { f ->
             it to f
         }
     } ?: throw BadRequestException("No media type decoder found supporting ${accepts.joinToString()}")

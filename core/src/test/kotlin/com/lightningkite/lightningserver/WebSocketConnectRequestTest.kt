@@ -13,7 +13,7 @@ import kotlin.test.Test
 class WebSocketConnectRequestTest {
     @Test fun serialization(): Unit = runBlocking {
         val r = WebSocketConnectRequest<PathSpec0>(
-            path = PathServer("a/b/c"),
+            path = ServerPath("a/b/c"),
             queryParameters = listOf("a" to "b", "c" to "d"),
             headers = HttpHeaders {
                 setCookie("test", "asdf")
@@ -24,7 +24,7 @@ class WebSocketConnectRequestTest {
             sourceIp = "127.0.0.1"
         )
         r.roundTripTest()
-        val s = object: ServerRunning {
+        val s = object: ServerRuntime {
             override val server: ServerDefinition = object: ServerDefinition() {
                 override val internalSerialization: Serialization = Serialization()
                 override val externalSerialization: Serialization = Serialization()
@@ -46,7 +46,7 @@ class WebSocketConnectRequestTest {
             get() = String.serializer()
 
         override suspend fun calculate(
-            serverRunning: ServerRunning,
+            serverRuntime: ServerRuntime,
             request: Request<*>
         ): String = "asdf"
 

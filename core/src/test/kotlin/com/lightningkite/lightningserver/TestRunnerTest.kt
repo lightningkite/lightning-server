@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver
 
+import com.lightningkite.lightningserver.http.HttpResponse
+import com.lightningkite.lightningserver.http.HttpStatus
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.builtins.serializer
 import kotlin.test.Test

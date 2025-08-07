@@ -38,7 +38,7 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
         val wrapped: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>,
         val channel: String,
         val handler: WebSocketHandler<PathSpec, T>
-    ) : WebSocketConnection<PathSpec, T>, ServerRunning by wrapped {
+    ) : WebSocketConnection<PathSpec, T>, ServerRuntime by wrapped {
         @Suppress("UNCHECKED_CAST")
         override val request: WebSocketConnectRequest<PathSpec> get() = wrapped.currentState.map.getValue(channel).request as WebSocketConnectRequest<PathSpec>
         override var currentState: T = wrapped.currentState.map.getValue(channel).storage.value(wrapped.server.internalSerialization.kotlinBytesFormat, handler.storageSerializer)
@@ -121,7 +121,7 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
         return wrapped
     }
 
-    override suspend fun willConnect(serverRunning: ServerRunning, request: WebSocketConnectRequest<PathSpec0>): MultiplexWebSocketHandlerState =
+    override suspend fun willConnect(serverRuntime: ServerRuntime, request: WebSocketConnectRequest<PathSpec0>): MultiplexWebSocketHandlerState =
         MultiplexWebSocketHandlerState(
             map = mapOf(),
         )
@@ -149,7 +149,7 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
                     @Suppress("UNCHECKED_CAST")
                     otherHandler as WebSocketHandler<PathSpec, Any?>
                     val r = WebSocketConnectRequest<PathSpec>(
-                        path = PathServer<PathSpec>(message.path, match),
+                        path = ServerPath<PathSpec>(message.path, match),
                         queryParameters = connection.request.queryParameters + (message.queryParams?.entries?.flatMap { it.value.map { v -> it.key to v } } ?: listOf()),
                         headers = connection.request.headers,
                         domain = connection.request.domain,

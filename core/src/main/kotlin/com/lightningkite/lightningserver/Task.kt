@@ -5,21 +5,27 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
-public interface TaskHandler<Input> {
+public interface Task<Input> {
     public val serializer: KSerializer<Input>
     public val timeout: Duration get() = 30.seconds
-    public suspend fun execute(serverRunning: ServerRunning, input: Input)
+
+    context(server: ServerRuntime)
+    public suspend fun execute(input: Input)
+
+
 }
 
-public fun <INPUT> ServerDefinitionBuilder<*>.taskHandler(
+public fun <INPUT> ServerDefinitionBuilder<*>.task(
     input: KSerializer<INPUT>,
     timeout: Duration = 5.minutes,
-    handler: suspend ServerRunning.(INPUT) -> Unit
-): TaskHandler<INPUT> =
-    object : TaskHandler<INPUT> {
+    handler: suspend ServerRuntime.(INPUT) -> Unit
+): Task<INPUT> =
+    object : Task<INPUT> {
         override val timeout: Duration = timeout
         override val serializer: KSerializer<INPUT> = input
-        override suspend fun execute(serverRunning: ServerRunning, input: INPUT) {
-            return handler(serverRunning, input)
+
+        context(server: ServerRuntime)
+        override suspend fun execute(input: INPUT) {
+            return handler(server, input)
         }
     }

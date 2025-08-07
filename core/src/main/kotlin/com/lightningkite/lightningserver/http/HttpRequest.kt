@@ -1,12 +1,17 @@
-package com.lightningkite.lightningserver
+package com.lightningkite.lightningserver.http
 
+import com.lightningkite.lightningserver.HttpHeaders
+import com.lightningkite.lightningserver.KeyedSerializableCache
+import com.lightningkite.lightningserver.ServerPath
+import com.lightningkite.lightningserver.PathSpec
+import com.lightningkite.lightningserver.Request
 import com.lightningkite.services.data.TypedData
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 
 @Serializable
-public class HttpRequest<PATH: PathSpec>(
-    override val path: PathServer<PATH>,
+public data class HttpRequest<PATH: PathSpec>(
+    override val path: ServerPath<PATH>,
     override val queryParameters: List<Pair<String, String>>,
     override val headers: HttpHeaders,
     override val domain: String,

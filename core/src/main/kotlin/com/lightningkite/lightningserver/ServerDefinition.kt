@@ -1,6 +1,10 @@
 package com.lightningkite.lightningserver
 
 import com.lightningkite.MediaType
+import com.lightningkite.lightningserver.http.HttpInterceptor
+import com.lightningkite.lightningserver.http.HttpMethod
+import com.lightningkite.lightningserver.http.HttpRequest
+import com.lightningkite.lightningserver.http.HttpResponse
 import kotlinx.serialization.KSerializer
 import com.lightningkite.services.data.*
 import com.lightningkite.services.*
@@ -13,8 +17,8 @@ public abstract class ServerDefinition(allowIndexing: Boolean = false) : ServerD
 
     public val handlers: PathSpecMap<ServerPathHandlers> get() = _requestables
     private val _requestables: MutablePathSpecMap<ServerPathHandlersMutable> = MutablePathSpecMap()
-    public lateinit var httpNotFound: (serverRunning: ServerRunning, HttpRequest<*>) -> HttpResponse
-    public lateinit var httpException: (serverRunning: ServerRunning, Exception, HttpRequest<*>) -> HttpResponse
+    public lateinit var httpNotFound: (serverRuntime: ServerRuntime, HttpRequest<*>) -> HttpResponse
+    public lateinit var httpException: (serverRuntime: ServerRuntime, Exception, HttpRequest<*>) -> HttpResponse
 
     public val httpInterceptors: List<HttpInterceptor> get() = _interceptors
     private var _interceptors = emptyList<HttpInterceptor>()
@@ -24,21 +28,21 @@ public abstract class ServerDefinition(allowIndexing: Boolean = false) : ServerD
             _fullAction =
                 value.fold<HttpInterceptor, HttpInterceptor>(object : HttpInterceptor {
                     override suspend fun handle(
-                        serverRunning: ServerRunning,
+                        serverRuntime: ServerRuntime,
                         request: HttpRequest<*>,
-                        cont: suspend (serverRunning: ServerRunning, HttpRequest<*>) -> HttpResponse
+                        cont: suspend (serverRuntime: ServerRuntime, HttpRequest<*>) -> HttpResponse
                     ): HttpResponse {
-                        return cont(serverRunning, request)
+                        return cont(serverRuntime, request)
                     }
                 }) { total, wrapper ->
                     object : HttpInterceptor {
                         override suspend fun handle(
-                            serverRunning: ServerRunning,
+                            serverRuntime: ServerRuntime,
                             request: HttpRequest<*>,
-                            cont: suspend (serverRunning: ServerRunning, HttpRequest<*>) -> HttpResponse
+                            cont: suspend (serverRuntime: ServerRuntime, HttpRequest<*>) -> HttpResponse
                         ): HttpResponse {
-                            return total.handle(serverRunning, request) {
-                                wrapper.handle(serverRunning, it, cont)
+                            return total.handle(serverRuntime, request) {
+                                wrapper.handle(serverRuntime, it, cont)
                             }
                         }
                     }
@@ -63,8 +67,8 @@ public abstract class ServerDefinition(allowIndexing: Boolean = false) : ServerD
         }
     private var _wsFullInterceptor: WebSocketHandlerInterceptor = WebSocketHandlerInterceptor.None
 
-    public val tasks: Map<PathSpec0, TaskHandler<*>> get() = _tasks
-    private val _tasks: MutableMap<PathSpec0, TaskHandler<*>> = HashMap()
+    public val tasks: Map<PathSpec0, Task<*>> get() = _tasks
+    private val _tasks: MutableMap<PathSpec0, Task<*>> = HashMap()
     public val schedules: Map<PathSpec0, ScheduledTaskHandler> get() = _schedules
     private val _schedules: MutableMap<PathSpec0, ScheduledTaskHandler> = HashMap()
     public val webSocketTopics: PathSpecMap<WebSocketTopic<*, *>> get() = _webSocketTopics
@@ -95,7 +99,7 @@ public abstract class ServerDefinition(allowIndexing: Boolean = false) : ServerD
         return Locationed(this, other.also { _requestables.getOrPut(path) { ServerPathHandlersMutable() }.websocket })
     }
 
-    override fun PathSpec0.bind(other: TaskHandler<*>): Locationed<PathSpec0, TaskHandler<*>> =
+    override fun PathSpec0.bind(other: Task<*>): Locationed<PathSpec0, Task<*>> =
         Locationed(this, other.also { _tasks.put(this, it) })
 
     override fun PathSpec0.bind(other: ScheduledTaskHandler): Locationed<PathSpec0, ScheduledTaskHandler> =
@@ -156,7 +160,7 @@ public class ServerSetting<Serializable, Goal>(
     public val default: Serializable,
     public val optional: Boolean = false,
     public val description: String? = null,
-    public val getter: ServerRunning.(name: String, value: Serializable) -> Goal,
+    public val getter: ServerRuntime.(name: String, value: Serializable) -> Goal,
 )
 
 public interface ServerDefinitionBuilder<Path : PathSpec> {
@@ -164,7 +168,7 @@ public interface ServerDefinitionBuilder<Path : PathSpec> {
     public infix fun <PATH : PathSpec> HttpEndpoint<PATH>.bind(other: HttpHandler<PATH>): Locationed<HttpEndpoint<PATH>, HttpHandler<PATH>>
     public infix fun <PATH : PathSpec, STORAGE> PATH.bind(other: WebSocketHandler<PATH, STORAGE>): Locationed<PATH, WebSocketHandler<PATH, STORAGE>>
     public fun <PATH : PathSpec, T> PATH.topic(type: KSerializer<T>): WebSocketTopic<PATH, T>
-    public infix fun PathSpec0.bind(other: TaskHandler<*>): Locationed<PathSpec0, TaskHandler<*>>
+    public infix fun PathSpec0.bind(other: Task<*>): Locationed<PathSpec0, Task<*>>
     public infix fun PathSpec0.bind(other: ScheduledTaskHandler): Locationed<PathSpec0, ScheduledTaskHandler>
     public infix fun <PATH : PathSpec, T : ServerDefinitionPart<PATH>> PATH.bind(constructor: (PATH, passOnTo: ServerDefinitionBuilder<Path>) -> T): T =
         constructor(this, this@ServerDefinitionBuilder)
@@ -178,7 +182,7 @@ public fun <Setting, Result> ServerDefinitionBuilder<PathSpec0>.setting(
     serializer: KSerializer<Setting>,
     optional: Boolean = false,
     description: String? = null,
-    getter: ServerRunning.(Setting) -> Result,
+    getter: ServerRuntime.(Setting) -> Result,
 ): Locationed<PathSpec0, ServerSetting<Setting, Result>> = path.path(name).setting(
     ServerSetting(
         default = default,
@@ -210,7 +214,7 @@ public inline fun <reified Setting, Result> ServerDefinitionBuilder<PathSpec0>.s
     default: Setting,
     optional: Boolean = false,
     description: String? = null,
-    noinline getter: ServerRunning.(name: String, value: Setting) -> Result,
+    noinline getter: ServerRuntime.(name: String, value: Setting) -> Result,
 ): Locationed<PathSpec0, ServerSetting<Setting, Result>> = path.path(name).setting(
     ServerSetting(
         default = default,

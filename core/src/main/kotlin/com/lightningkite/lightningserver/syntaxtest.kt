@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver
 
 import com.lightningkite.MediaType
+import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.services.data.TypedData
 import kotlinx.serialization.builtins.serializer
 import java.io.File

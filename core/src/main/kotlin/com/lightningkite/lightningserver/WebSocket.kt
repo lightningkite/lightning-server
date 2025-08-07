@@ -32,14 +32,14 @@ public fun <T, A, B, C> WebSocketTopic<PathSpec3<A, B, C>, T>.request(path1: A, 
 public data class WebSocketSubscriptionRequest<PATH: PathSpec, T>(
     val topic: WebSocketTopic<PATH, T>,
     override val rawPathArguments: List<Any?>,
-): PathSpecResolvable<PATH> {
+): ConcretePath<PATH> {
     override val pathSpec: PATH get() = topic.pathSpec
 }
 public data class WebSocketSubscriptionMessage<PATH: PathSpec, T>(
     val topic: WebSocketTopic<PATH, T>,
     override val rawPathArguments: List<Any?>,
     val value: T
-): PathSpecResolvable<PATH> {
+): ConcretePath<PATH> {
     override val pathSpec: PATH get() = topic.pathSpec
 }
 
@@ -71,7 +71,7 @@ public val WebSocketFrame.text: String
 
 @Serializable
 public data class WebSocketConnectRequest<PATH: PathSpec>(
-    override val path: PathServer<PATH>,
+    override val path: ServerPath<PATH>,
     override val queryParameters: List<Pair<String, String>> = listOf(),
     override val headers: HttpHeaders = HttpHeaders.EMPTY,
     override val domain: String = "",
@@ -81,7 +81,7 @@ public data class WebSocketConnectRequest<PATH: PathSpec>(
 ) : Request<PATH>() {
 }
 
-public interface WebSocketConnection<PATH: PathSpec, STORAGE>: ServerRunning {
+public interface WebSocketConnection<PATH: PathSpec, STORAGE>: ServerRuntime {
     public val request: WebSocketConnectRequest<PATH>
     public val currentState: STORAGE
     public suspend fun repullState(): STORAGE

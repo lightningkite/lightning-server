@@ -4,19 +4,19 @@ import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.ForbiddenException
 import com.lightningkite.lightningserver.HttpHandler
 import com.lightningkite.lightningserver.HttpHeader
-import com.lightningkite.lightningserver.HttpMethod
-import com.lightningkite.lightningserver.HttpRequest
-import com.lightningkite.lightningserver.HttpResponse
-import com.lightningkite.lightningserver.HttpStatus
+import com.lightningkite.lightningserver.http.HttpMethod
+import com.lightningkite.lightningserver.http.HttpRequest
+import com.lightningkite.lightningserver.http.HttpResponse
+import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.KeyedSerializableCache
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.PathSpec
 import com.lightningkite.lightningserver.PathSpec0
-import com.lightningkite.lightningserver.PathSpecResolvable
+import com.lightningkite.lightningserver.ConcretePath
 import com.lightningkite.lightningserver.Request
 import com.lightningkite.lightningserver.ServerDefinition
-import com.lightningkite.lightningserver.ServerRunning
-import com.lightningkite.services.database.Description
+import com.lightningkite.lightningserver.ServerRuntime
+import com.lightningkite.services.data.Description
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -25,7 +25,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.NothingSerializer
 import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.decodeFromString
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
@@ -41,16 +40,16 @@ public interface ApiHttpHandler<PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT>:
     public val errorCases: List<LSError>
     public val examples: List<ApiExample<INPUT, OUTPUT>>
     public val belongsToInterface: ApiClientSideInterface? get() = null
-    public suspend fun ServerRunningWithAuth<USER, PATH>.handle(input: INPUT): OUTPUT
+    public suspend fun ServerRuntimeWithAuth<USER, PATH>.handle(input: INPUT): OUTPUT
 
-    override suspend fun handle(serverRunning: ServerRunning, request: HttpRequest<PATH>): HttpResponse = with(serverRunning) {
+    override suspend fun handle(serverRuntime: ServerRuntime, request: HttpRequest<PATH>): HttpResponse = with(serverRuntime) {
         val auth = request.authChecked<USER>(authOptions)
         @Suppress("UNCHECKED_CAST") val input: INPUT = when (request.method) {
-            HttpMethod.GET, HttpMethod.HEAD -> serverRunning.formDataFormat.decodeFromList(inputType, request.queryParameters)
+            HttpMethod.GET, HttpMethod.HEAD -> serverRuntime.server.externalSerialization.formDataFormat.decodeFromList(inputType, request.queryParameters)
             else -> if (inputType == Unit.serializer()) Unit as INPUT else request.body?.parse(inputType) ?: throw BadRequestException("No request body provided")
         }
-        serverRunning.server.validators.validateOrThrow(inputType, input)
-        val runner = object: ServerRunningWithAuth<USER, PATH>, ServerRunning by serverRunning, PathSpecResolvable<PATH> by request.resolvable {
+        serverRuntime.server.validators.validateOrThrow(inputType, input)
+        val runner = object: ServerRuntimeWithAuth<USER, PATH>, ServerRuntime by serverRuntime, ConcretePath<PATH> by request.pathInContext {
             override val request: Request<PATH>
                 get() = request
             override val authOrNull: RequestAuth<USER & Any, *>?
@@ -62,6 +61,10 @@ public interface ApiHttpHandler<PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT>:
             status = successCode
         )
     }
+}
+
+private fun <USER: HasId<*>?> Request<*>.authChecked(authOptions: AuthOptions<USER>): RequestAuth<USER & Any, *>? {
+    TODO()
 }
 
 public class ApiClientSideInterface(
@@ -134,16 +137,16 @@ public class RequestAuth<USER: HasId<ID>, ID: Comparable<ID>>(
         @OptIn(ExperimentalSerializationApi::class)
         @Suppress("UNCHECKED_CAST")
         override val serializer: KSerializer<RequestAuth<*, *>?> = serializer(NothingSerializer(), NothingSerializer()).nullable as KSerializer<RequestAuth<*, *>?>
-        override suspend fun calculate(serverRunning: ServerRunning, request: Request<*>): RequestAuth<*, *>? {
-            for (reader in serverRunning.server.principalTypes) {
+        override suspend fun calculate(serverRuntime: ServerRuntime, request: Request<*>): RequestAuth<*, *>? {
+            for (reader in serverRuntime.server.principalTypes) {
                 @Suppress("UNCHECKED_CAST")
                 reader as PrincipalType<HasId<Comparable<Any?>>, Comparable<Any?>>
-                return reader.get(serverRunning, request)?.let { it ->
+                return reader.get(serverRuntime, request)?.let { it ->
                     request.headers[HttpHeader.XMasquerade]?.root?.let { m ->
                         val otherType = m.substringBefore('/')
-                        val otherHandler = serverRunning.server.principalTypes.find { it.name == otherType }
+                        val otherHandler = serverRuntime.server.principalTypes.find { it.name == otherType }
                             ?: throw BadRequestException("No subject type ${otherType} known")
-                        @Suppress("UNCHECKED_CAST") val otherId = serverRunning.stringArrayFormat.decodeFromString(otherHandler.idSerializer, m.substringAfter('/')) as Comparable<Any?>
+                        @Suppress("UNCHECKED_CAST") val otherId = serverRuntime.server.externalSerialization.stringArrayFormat.decodeFromString(otherHandler.idSerializer, m.substringAfter('/')) as Comparable<Any?>
                         @Suppress("UNCHECKED_CAST")
                         if (reader.permitMasquerade(
                                 otherHandler as PrincipalType<HasId<Comparable<Any?>>, Comparable<Any?>>,
@@ -190,7 +193,7 @@ internal data class RequestAuthSerializable(
     }
 }
 
-public interface ServerRunningWithAuth<USER: HasId<*>?, PATH: PathSpec>: ServerRunning, PathSpecResolvable<PATH> {
+public interface ServerRuntimeWithAuth<USER: HasId<*>?, PATH: PathSpec>: ServerRuntime, ConcretePath<PATH> {
     public val request: Request<PATH>
     public val authOrNull: RequestAuth<USER & Any, *>?
 }
@@ -200,10 +203,10 @@ public interface PrincipalType<SUBJECT: HasId<ID>, ID: Comparable<ID>> {
     public val name: String get() = subjectSerializer.descriptor.serialName
     public val cacheTypes: Collection<CacheKey<*, *, *>>
     public val subjectCacheExpiration: Duration get() = 5.minutes
-    public suspend fun get(serverRunning: ServerRunning, request: Request<*>): RequestAuth<SUBJECT, ID>? = null
+    public suspend fun get(serverRuntime: ServerRuntime, request: Request<*>): RequestAuth<SUBJECT, ID>? = null
 
     public val subjectSerializer: KSerializer<SUBJECT>
-    public suspend fun fetch(serverRunning: ServerRunning, id: ID): RequestAuth<SUBJECT, ID>?
+    public suspend fun fetch(serverRuntime: ServerRuntime, id: ID): RequestAuth<SUBJECT, ID>?
 
     public suspend fun permitMasquerade(
         other: PrincipalType<*, *>,
@@ -214,7 +217,7 @@ public interface PrincipalType<SUBJECT: HasId<ID>, ID: Comparable<ID>> {
     public interface CacheKey<SUBJECT: HasId<ID>, ID: Comparable<ID>, T> {
         public val id: String
         public val serializer: KSerializer<T>
-        public suspend fun calculate(serverRunning: ServerRunning, auth: RequestAuth<SUBJECT, ID>): T
+        public suspend fun calculate(serverRuntime: ServerRuntime, auth: RequestAuth<SUBJECT, ID>): T
         public val expireAfter: Duration? get() = null
     }
 }
@@ -225,7 +228,7 @@ public class AuthOption<SUBJECT: HasId<ID>, ID: Comparable<ID>>(
     public val scopes: Set<String>? = setOf("*"),
     public val maxAge: Duration? = null,
     public val limitationDescription: String? = null,
-    public val additionalRequirement: suspend ServerRunning.(Request<*>) -> Boolean = { _ -> true }
+    public val additionalRequirement: suspend ServerRuntime.(Request<*>) -> Boolean = { _ -> true }
 ) {
     override fun toString(): String = "$type $scopes $maxAge"
 }

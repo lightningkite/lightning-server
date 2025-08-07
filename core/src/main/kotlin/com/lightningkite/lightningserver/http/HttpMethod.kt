@@ -1,4 +1,4 @@
-package com.lightningkite.lightningserver
+package com.lightningkite.lightningserver.http
 
 import kotlinx.serialization.Serializable
 

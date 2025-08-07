@@ -1,10 +1,7 @@
 package com.lightningkite.lightningserver
 
-import com.lightningkite.MediaType
-import com.lightningkite.services.data.TypedData
+import com.lightningkite.lightningserver.http.HttpStatus
 import kotlinx.serialization.Serializable
-import kotlin.code
-import kotlin.toString
 
 @Serializable
 public data class LSError(

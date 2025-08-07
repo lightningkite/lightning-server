@@ -17,7 +17,7 @@ internal class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryP
     class ConnectionWrapped<T>(
         val wrapped: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>,
         val handler: WebSocketHandler<PathSpec, T>
-    ) : WebSocketConnection<PathSpec, T>, ServerRunning by wrapped {
+    ) : WebSocketConnection<PathSpec, T>, ServerRuntime by wrapped {
         @Suppress("UNCHECKED_CAST")
         override val request: WebSocketConnectRequest<PathSpec>
             get() = wrapped.currentState.request as WebSocketConnectRequest<PathSpec>
@@ -90,11 +90,11 @@ internal class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryP
 
 
     override suspend fun willConnect(
-        serverRunning: ServerRunning,
+        serverRuntime: ServerRuntime,
         request: WebSocketConnectRequest<PathSpec0>
     ): QueryParamWebSocketHandlerData {
         val rawPath = request.headers["x-path"]?.root ?: request.queryParameter("path")?.substringBefore('?') ?: "/"
-        val match = serverRunning.server.handlers.match(serverRunning.server.externalSerialization.stringArrayFormat, rawPath)
+        val match = serverRuntime.server.handlers.match(serverRuntime.server.externalSerialization.stringArrayFormat, rawPath)
             ?: throw NotFoundException("No web socket handler found for '$rawPath' - ${request.queryParameter("path")}")
         val request = run {
             val fixedQueryParameters = request.queryParameters.mapNotNull {
@@ -107,7 +107,7 @@ internal class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryP
                 } else it
             }
             WebSocketConnectRequest<PathSpec>(
-                path = PathServer<PathSpec>(rawPath, match),
+                path = ServerPath<PathSpec>(rawPath, match),
                 queryParameters = fixedQueryParameters,
                 headers = request.headers,
                 domain = request.domain,
@@ -116,7 +116,7 @@ internal class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryP
                 cache = request.cache,
             )
         }
-        val otherHandler = serverRunning.server.handlers[match.pathSpec]?.websocket
+        val otherHandler = serverRuntime.server.handlers[match.pathSpec]?.websocket
             ?: throw NotFoundException("No web socket handler found for '$rawPath'")
         @Suppress("UNCHECKED_CAST")
         otherHandler as WebSocketHandler<PathSpec, *>
@@ -129,13 +129,13 @@ internal class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryP
 //                    null /*TODO*/
 //                )
 //            ) {
-            otherHandler.willConnect(serverRunning, request)
+            otherHandler.willConnect(serverRuntime, request)
 //            }
 
         @Suppress("UNCHECKED_CAST")
         return QueryParamWebSocketHandlerData(
             request,
-            AnonType(serverRunning.server.internalSerialization.kotlinBytesFormat, startData, otherHandler.storageSerializer as KSerializer<Any?>)
+            AnonType(serverRuntime.server.internalSerialization.kotlinBytesFormat, startData, otherHandler.storageSerializer as KSerializer<Any?>)
         )
     }
 

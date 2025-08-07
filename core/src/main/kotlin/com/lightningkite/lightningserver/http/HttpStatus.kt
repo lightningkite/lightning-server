@@ -1,4 +1,4 @@
-package com.lightningkite.lightningserver
+package com.lightningkite.lightningserver.http
 
 @JvmInline
 public value class HttpStatus(public val code: Int) {

@@ -4,7 +4,7 @@ import com.lightningkite.services.MetricSink
 import com.lightningkite.services.SettingContext
 import kotlinx.serialization.modules.SerializersModule
 
-public fun ServerRunning.settingContext(name: String): SettingContext = object: SettingContext {
+public fun ServerRuntime.settingContext(name: String): SettingContext = object: SettingContext {
     override val name: String get() = name
     override val serializersModule: SerializersModule get() = this@settingContext.server.internalSerialization.serializersModule
     override val metricSink: MetricSink get() = TODO()

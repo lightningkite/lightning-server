@@ -2,18 +2,33 @@ package com.lightningkite.lightningserver
 
 import com.lightningkite.services.data.StringArrayFormat
 
-public interface PathSpecMap<out V> {
-    public operator fun get(path: PathSpec): V?
+public interface PathSpecMap<out V> : Map<PathSpec, V> {
     public fun match(format: StringArrayFormat, pathParts: List<String>, endingSlash: Boolean): Match<V>?
     public fun match(format: StringArrayFormat, string: String): Match<V>? = match(format, string.split('/').filter { it.isNotEmpty() }, string.endsWith('/'))
-    public fun asSequence(): Sequence<Pair<PathSpec, V>>
+    public fun asSequence(): Sequence<Entry<V>>
+
+    public data class Entry<out V>(
+        override val key: PathSpec,
+        override val value: V
+    ) : Map.Entry<PathSpec, V> {
+        public fun toLocationed(): Locationed<PathSpec, V> = Locationed(key, value)
+    }
 
     public class Match<out V>(
         override val pathSpec: PathSpec,
         override val rawPathArguments: List<Any?>,
         override val wildcard: List<String>?,
         public val value: V?
-    ): PathSpecResolvable<PathSpec>
+    ): ConcretePath<PathSpec>
+
+    override fun containsKey(key: PathSpec): Boolean = get(key) != null
+    override fun containsValue(value: @UnsafeVariance V): Boolean = asSequence().any { it.value == value }
+
+    override val entries: Set<Map.Entry<PathSpec, V>> get() = asSequence().toSet()
+    override val keys: Set<PathSpec> get() = asSequence().map { it.key }.toSet()
+    override val values: Collection<V> get() = asSequence().map { it.value }.toList()
+    override val size: Int get() = asSequence().count()
+    override fun isEmpty(): Boolean = asSequence().none()
 }
 
 public class MutablePathSpecMap<V>(): PathSpecMap<V> {
@@ -64,6 +79,8 @@ public class MutablePathSpecMap<V>(): PathSpecMap<V> {
         }
     }
 
+    public operator fun set(path: PathSpec, value: V): Unit = put(path, value)
+
     public fun getOrPut(path: PathSpec, generate: ()->V): V {
         var current = root
         for(segment in path.segments) {
@@ -97,39 +114,50 @@ public class MutablePathSpecMap<V>(): PathSpecMap<V> {
         }
     }
 
-    override fun get(path: PathSpec): V? {
+    override fun get(key: PathSpec): V? {
         var current = root
-        for(segment in path.segments) {
+        for(segment in key.segments) {
             current = when(segment) {
                 is PathSpec.Segment.Constant -> current.thenConstant[segment.value] ?: return null
                 is PathSpec.Segment.Wildcard<*> -> current.thenWildcard ?: return null
             }
         }
-        return when(path.after) {
+        return when(key.after) {
             PathSpec.Afterwards.None -> current.pathValue
             PathSpec.Afterwards.TrailingSlash -> current.trailingSlashValue
             PathSpec.Afterwards.TrailingSegments -> current.chainedWildcardValue
         }
     }
 
-    override fun asSequence(): Sequence<Pair<PathSpec, V>> = sequence {
-        suspend fun SequenceScope<Pair<PathSpec, V>>.traverse(node: Node) {
-            node.pathValue?.let { yield(node.path!! to it) }
-            node.trailingSlashValue?.let { yield(node.trailingSlash!! to it) }
-            node.chainedWildcardValue?.let { yield(node.chainedWildcard!! to it) }
+    override fun asSequence(): Sequence<PathSpecMap.Entry<V>> = sequence {
+        suspend fun SequenceScope<PathSpecMap.Entry<V>>.entry(path: PathSpec, value: V) = yield(PathSpecMap.Entry(path, value))
+
+        suspend fun SequenceScope<PathSpecMap.Entry<V>>.traverse(node: Node) {
+            node.pathValue?.let { entry(node.path!!, it) }
+            node.trailingSlashValue?.let { entry(node.trailingSlash!!, it) }
+            node.chainedWildcardValue?.let { entry(node.chainedWildcard!!, it) }
+
+            node.thenConstant.values.forEach { traverse(it) }
+            node.thenWildcard?.let { traverse(it) }
         }
+
         traverse(root)
     }
 
     public override fun match(format: StringArrayFormat, pathParts: List<String>, endingSlash: Boolean): PathSpecMap.Match<V>? {
         if (pathParts.isEmpty())
             return (root.path ?: root.trailingSlash ?: root.chainedWildcard)?.let {
-                PathSpecMap.Match<V>(PathSpec.root, listOf(), if (it.after == PathSpec.Afterwards.TrailingSegments) listOf() else null, root[it.after])
+                PathSpecMap.Match<V>(
+                    pathSpec = PathSpec.root,
+                    rawPathArguments = emptyList(),
+                    wildcard = if (it.after == PathSpec.Afterwards.TrailingSegments) emptyList() else null,
+                    value = root[it.after]
+                )
             }
 
         val wildcards = ArrayList<String>()
         var current = root
-        val soFar = arrayListOf<Node>()
+        val soFar = ArrayList<Node>()
         var beyond = false
         for (part in pathParts) {
             soFar.add(current)
@@ -161,38 +189,40 @@ public class MutablePathSpecMap<V>(): PathSpecMap<V> {
                     )
                 }
             }.firstOrNull()
-        } else if (endingSlash) {
-//            println("Pulling trailingSlash")
-            current.trailingSlash?.let { spec ->
-                PathSpecMap.Match<V>(
-                    pathSpec = spec,
-                    rawPathArguments = wildcards.zip(spec.wildcards) { v, s -> format.decodeFromString(s.serializer, v) },
-                    wildcard = null,
-                    value = current.trailingSlashValue,
-                )
-            }
         } else {
-//            println("Pulling path")
-            current.path?.let { it ->
-                PathSpecMap.Match<V>(
-                    pathSpec = it,
-                    rawPathArguments = wildcards.zip(it.wildcards) { v, s -> format.decodeFromString(s.serializer, v) },
-                    wildcard = null,
-                    value = current.pathValue
-                )
-            }
-        } ?: run {
-//            println("Searching for wildcard ending")
-            soFar.asReversed().asSequence().mapNotNull {
-                it.chainedWildcard?.let { spec ->
+            if (endingSlash) {
+        //            println("Pulling trailingSlash")
+                current.trailingSlash?.let { spec ->
                     PathSpecMap.Match<V>(
                         pathSpec = spec,
                         rawPathArguments = wildcards.zip(spec.wildcards) { v, s -> format.decodeFromString(s.serializer, v) },
-                        wildcard = pathParts.drop(spec.segments.size),
-                        value = it.chainedWildcardValue
+                        wildcard = null,
+                        value = current.trailingSlashValue,
                     )
                 }
-            }.firstOrNull()
+            } else {
+        //            println("Pulling path")
+                current.path?.let { it ->
+                    PathSpecMap.Match<V>(
+                        pathSpec = it,
+                        rawPathArguments = wildcards.zip(it.wildcards) { v, s -> format.decodeFromString(s.serializer, v) },
+                        wildcard = null,
+                        value = current.pathValue
+                    )
+                }
+            } ?: run {
+        //            println("Searching for wildcard ending")
+                soFar.asReversed().asSequence().mapNotNull {
+                    it.chainedWildcard?.let { spec ->
+                        PathSpecMap.Match<V>(
+                            pathSpec = spec,
+                            rawPathArguments = wildcards.zip(spec.wildcards) { v, s -> format.decodeFromString(s.serializer, v) },
+                            wildcard = pathParts.drop(spec.segments.size),
+                            value = it.chainedWildcardValue
+                        )
+                    }
+                }.firstOrNull()
+            }
         }
     }
 }

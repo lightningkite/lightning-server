@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver
 
+import com.lightningkite.lightningserver.http.HttpMethod
 
 
 public class HttpEndpoint<Path : PathSpec>(public val path: Path, public val method: HttpMethod)

@@ -4,19 +4,23 @@ import kotlinx.serialization.KSerializer
 
 public interface WebSocketHandler<PATH: PathSpec, STORAGE> {
     public val storageSerializer: KSerializer<STORAGE>
-    public suspend fun willConnect(serverRunning: ServerRunning, request: WebSocketConnectRequest<PATH>): STORAGE
+    public suspend fun willConnect(serverRuntime: ServerRuntime, request: WebSocketConnectRequest<PATH>): STORAGE
     public suspend fun didConnect(connection: WebSocketConnection<PATH, STORAGE>)
     public suspend fun messageFromClient(connection: WebSocketConnection<PATH, STORAGE>, frame: WebSocketFrame)
     public suspend fun messageFromSubscription(connection: WebSocketConnection<PATH, STORAGE>, topic: WebSocketSubscriptionMessage<*, *>)
+//    public val subscriptionHandlers: PathSpecMap<>
     public suspend fun disconnect(connection: WebSocketConnection<PATH, STORAGE>, reason: WebSocketClose)
 }
+
+
+
 @InternalLightningServerApi public suspend fun <PATH: PathSpec, STORAGE> WebSocketConnection<PATH, STORAGE>.didConnectNoOp(): Unit = Unit
 @InternalLightningServerApi public suspend fun <PATH: PathSpec, STORAGE> WebSocketConnection<PATH, STORAGE>.messageFromClientNoOp(frame: WebSocketFrame): Unit = Unit
 @InternalLightningServerApi public suspend fun <PATH: PathSpec, STORAGE> WebSocketConnection<PATH, STORAGE>.disconnectNoOp(reason: WebSocketClose): Unit = Unit
 
 public inline fun <PATH: PathSpec, STORAGE> ServerDefinitionBuilder<*>.webSocketHandler(
     storageSerializer: KSerializer<STORAGE>,
-    crossinline willConnect: suspend ServerRunning.(request: WebSocketConnectRequest<PATH>) -> STORAGE,
+    crossinline willConnect: suspend ServerRuntime.(request: WebSocketConnectRequest<PATH>) -> STORAGE,
     crossinline didConnect: suspend WebSocketConnection<PATH, STORAGE>.() -> Unit = WebSocketConnection<PATH, STORAGE>::didConnectNoOp,
     crossinline messageFromClient: suspend WebSocketConnection<PATH, STORAGE>.(frame: WebSocketFrame) -> Unit = WebSocketConnection<PATH, STORAGE>::messageFromClientNoOp,
     crossinline topicHandlers: TopicHandlersBuilder<PATH, STORAGE>.()->Unit = {},
@@ -24,7 +28,7 @@ public inline fun <PATH: PathSpec, STORAGE> ServerDefinitionBuilder<*>.webSocket
 ): WebSocketHandler<PATH, STORAGE> =
     object : WebSocketHandler<PATH, STORAGE> {
         override val storageSerializer: KSerializer<STORAGE> = storageSerializer
-        override suspend fun willConnect(serverRunning: ServerRunning, request: WebSocketConnectRequest<PATH>): STORAGE = willConnect(serverRunning, request)
+        override suspend fun willConnect(serverRuntime: ServerRuntime, request: WebSocketConnectRequest<PATH>): STORAGE = willConnect(serverRuntime, request)
         override suspend fun didConnect(connection: WebSocketConnection<PATH, STORAGE>) {
             didConnect(connection)
         }

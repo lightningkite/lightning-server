@@ -16,7 +16,7 @@ public class KeyedSerializableCache {
     public interface Key<T> {
         public val id: String
         public val serializer: KSerializer<T>
-        public suspend fun calculate(serverRunning: ServerRunning, request: Request<*>): T
+        public suspend fun calculate(serverRuntime: ServerRuntime, request: Request<*>): T
         public val expireAfter: Duration? get() = null
     }
 
@@ -24,17 +24,17 @@ public class KeyedSerializableCache {
     internal var cacheQuickAccess: Map<String, ByteArray>? = null
     internal var cacheUpdated: Boolean = false
         private set
-    internal var serverRunning: ServerRunning? = null
-    internal suspend fun <T> get(serverRunning: ServerRunning, request: Request<*>, key: Key<T>): T {
-        this.serverRunning = serverRunning
+    internal var serverRuntime: ServerRuntime? = null
+    internal suspend fun <T> get(serverRuntime: ServerRuntime, request: Request<*>, key: Key<T>): T {
+        this.serverRuntime = serverRuntime
         @Suppress("UNCHECKED_CAST")
         if (cache.containsKey(key)) return cache[key] as T
         val calculated: T = if(cacheQuickAccess?.containsKey(key.id) == true) {
-            serverRunning.server.internalSerialization.kotlinBytesFormat.decodeFromByteArray(
+            serverRuntime.server.internalSerialization.kotlinBytesFormat.decodeFromByteArray(
                 key.serializer,
                 cacheQuickAccess!![key.id]!!
             )
-        } else key.calculate(serverRunning, request)
+        } else key.calculate(serverRuntime, request)
         cache[key] = calculated
         cacheUpdated = true
         return calculated
@@ -46,7 +46,7 @@ public class KeyedSerializableCache {
         for((key, value) in cache) {
             key as Key<Any?>
             newMap[key.id] =
-                serverRunning!!.server.internalSerialization.kotlinBytesFormat.encodeToByteArray(key.serializer, value)
+                serverRuntime!!.server.internalSerialization.kotlinBytesFormat.encodeToByteArray(key.serializer, value)
         }
         return newMap.toMap()
     }
