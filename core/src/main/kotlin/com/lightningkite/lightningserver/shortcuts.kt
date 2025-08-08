@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver
 
 import com.lightningkite.MediaType
-import com.lightningkite.lightningserver.definition.generalServerSettings
+import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpResponse
@@ -20,25 +20,25 @@ import kotlinx.io.writeString
 context(serverRuntime: ServerRuntime)
 public fun HttpResponse.Companion.redirectToGet(to: String, headers: HttpHeaders = HttpHeaders.EMPTY): HttpResponse = HttpResponse(
     status = HttpStatus.SeeOther,
-    headers = headers.copy { set(HttpHeader.Location, serverRuntime.server.generalServerSettings().absolutePathAdjustment(to)) },
+    headers = headers.copy { set(HttpHeader.Location, generalSettings().absolutePathAdjustment(to)) },
 )
 
 context(serverRuntime: ServerRuntime)
 public fun HttpResponse.Companion.pathMoved(to: String, headers: HttpHeaders = HttpHeaders.EMPTY): HttpResponse = HttpResponse(
     status = HttpStatus.TemporaryRedirect,
-    headers = headers.copy { set(HttpHeader.Location, serverRuntime.server.generalServerSettings().absolutePathAdjustment(to)) },
+    headers = headers.copy { set(HttpHeader.Location, generalSettings().absolutePathAdjustment(to)) },
 )
 
 context(serverRuntime: ServerRuntime)
 public fun HttpResponse.Companion.pathMovedOld(to: String, headers: HttpHeaders = HttpHeaders.EMPTY): HttpResponse = HttpResponse(
     status = HttpStatus.Found,
-    headers = headers.copy { set(HttpHeader.Location, serverRuntime.server.generalServerSettings().absolutePathAdjustment(to)) },
+    headers = headers.copy { set(HttpHeader.Location, generalSettings().absolutePathAdjustment(to)) },
 )
 
 context(serverRuntime: ServerRuntime)
 public fun HttpResponse.Companion.pathMovedPermanently(to: String, headers: HttpHeaders = HttpHeaders.EMPTY): HttpResponse = HttpResponse(
     status = HttpStatus.PermanentRedirect,
-    headers = headers.copy { set(HttpHeader.Location, serverRuntime.server.generalServerSettings().absolutePathAdjustment(to)) },
+    headers = headers.copy { set(HttpHeader.Location, generalSettings().absolutePathAdjustment(to)) },
 )
 
 public fun HttpResponse.Companion.html(

@@ -1,8 +1,6 @@
 package com.lightningkite.lightningserver.pathing
 
-import com.lightningkite.lightningserver.ServerPathEndpoints
-import com.lightningkite.lightningserver.ServerRuntime
-import com.lightningkite.lightningserver.ServerPathHandlers
+import com.lightningkite.lightningserver.definition.ServerPathEndpoints
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable

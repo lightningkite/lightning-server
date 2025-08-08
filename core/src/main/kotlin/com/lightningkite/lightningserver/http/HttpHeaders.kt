@@ -1,7 +1,6 @@
 package com.lightningkite.lightningserver.http
 
 import com.lightningkite.MediaType
-import com.lightningkite.lightningserver.HttpHeaderValue
 import kotlinx.serialization.Serializable
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter

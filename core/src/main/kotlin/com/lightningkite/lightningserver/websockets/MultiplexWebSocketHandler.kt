@@ -1,23 +1,17 @@
-package com.lightningkite.lightningserver
+package com.lightningkite.lightningserver.websockets
 
+import com.lightningkite.lightningserver.AnonType
+import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.ServerPath
 import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.websockets.WebSocketClose
-import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
-import com.lightningkite.lightningserver.websockets.WebSocketConnection
-import com.lightningkite.lightningserver.websockets.WebSocketFrame
-import com.lightningkite.lightningserver.websockets.WebSocketHandler
-import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
-import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
-import com.lightningkite.lightningserver.websockets.send
-import com.lightningkite.lightningserver.websockets.text
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
+import kotlin.collections.iterator
 import kotlin.collections.plus
 
 @Serializable
@@ -196,7 +190,7 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
                 message.end -> {
                     val info = connection.currentState.map[message.channel]!!
                     val match = with(connection) { info.request.path.match }
-                    val otherHandler = match.value ?: throw NotFoundException("No web socket handler found for '${match.pathSpec}'")
+                    val otherHandler = match.value ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${match.pathSpec}'")
                     @Suppress("UNCHECKED_CAST")
                     otherHandler as WebSocketHandler<PathSpec, Any?>
                     connection.withWrapped(otherHandler, channel) { otherHandler.disconnect(it, WebSocketClose.NORMAL) }
@@ -216,7 +210,7 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
                 message.data != null -> {
                     val info = connection.currentState.map[message.channel]!!
                     val match = with(connection) { info.request.path.match }
-                    val otherHandler = match.value ?: throw NotFoundException("No web socket handler found for '${match.pathSpec}'")
+                    val otherHandler = match.value ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${match.pathSpec}'")
                     @Suppress("UNCHECKED_CAST")
                     otherHandler as WebSocketHandler<PathSpec, Any?>
                     val textFrame = WebSocketFrame.Text(message.data!!)
@@ -236,7 +230,7 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
             connection.currentState.map[channel]?.let { info ->
                 val info = connection.currentState.map[message.channel]!!
                 val match = with(connection) { info.request.path.match }
-                val otherHandler = match.value ?: throw NotFoundException("No web socket handler found for '${match.pathSpec}'")
+                val otherHandler = match.value ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${match.pathSpec}'")
                 @Suppress("UNCHECKED_CAST")
                 otherHandler as WebSocketHandler<PathSpec, Any?>
                 connection.withWrapped(otherHandler, channel) {
@@ -254,7 +248,7 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
         for ((channel, info) in currentState.map) {
             if (info.topics.contains(topic.path(externalSerialization.stringArrayFormat))) {
                 val match = with(connection) { info.request.path.match }
-                val otherHandler = match.value ?: throw NotFoundException("No web socket handler found for '${match.pathSpec}'")
+                val otherHandler = match.value ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${match.pathSpec}'")
                 @Suppress("UNCHECKED_CAST")
                 otherHandler as WebSocketHandler<PathSpec, Any?>
                 connection.withWrapped(otherHandler, channel) {
@@ -268,7 +262,7 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
         with(connection) {
             currentState.map.entries.forEach { (channel, info) ->
                 val match = with(connection) { info.request.path.match }
-                val otherHandler = match.value ?: throw NotFoundException("No web socket handler found for '${match.pathSpec}'")
+                val otherHandler = match.value ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${match.pathSpec}'")
                 @Suppress("UNCHECKED_CAST")
                 otherHandler as WebSocketHandler<PathSpec, Any?>
                 connection.withWrapped(otherHandler, channel) {

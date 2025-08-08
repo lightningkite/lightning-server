@@ -1,5 +1,8 @@
 package com.lightningkite.lightningserver
 
+import com.lightningkite.lightningserver.definition.SecretBasis
+import com.lightningkite.lightningserver.definition.encryptor
+import com.lightningkite.lightningserver.definition.hasher
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals

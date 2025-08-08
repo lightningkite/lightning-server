@@ -1,8 +1,6 @@
 package com.lightningkite.lightningserver.http
 
-import com.lightningkite.lightningserver.ServerDefinitionBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.ServerRuntime
 import com.lightningkite.lightningserver.pathing.PathSpec
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -12,7 +10,7 @@ public interface HttpHandler<PATH : PathSpec> {
     public suspend fun handle(serverRuntime: ServerRuntime, request: HttpRequest<PATH>): HttpResponse
 }
 
-public fun <PATH : PathSpec> httpHandler(
+public fun <PATH : PathSpec> HttpHandler(
     timeout: Duration = 30.seconds,
     handler: suspend ServerRuntime.(HttpRequest<PATH>) -> HttpResponse
 ): HttpHandler<PATH> = object : HttpHandler<PATH> {

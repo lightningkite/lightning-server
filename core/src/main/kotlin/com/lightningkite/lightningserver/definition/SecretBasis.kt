@@ -1,5 +1,6 @@
-package com.lightningkite.lightningserver
+package com.lightningkite.lightningserver.definition
 
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import kotlin.io.encoding.Base64
 import kotlin.random.Random
 import kotlinx.serialization.*
@@ -7,7 +8,6 @@ import javax.crypto.Mac
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 import javax.crypto.spec.IvParameterSpec
-import java.security.MessageDigest
 
 /**
  * A secure basis for cryptographic operations.
@@ -33,7 +33,7 @@ import java.security.MessageDigest
     /**
      * Creates a new SecretBasis with random bytes.
      */
-    public constructor():this(Base64.encode(Random.nextBytes(BYTES)))
+    public constructor() : this(Base64.encode(Random.nextBytes(BYTES)))
     
     /**
      * Gets the bytes representation of this SecretBasis.

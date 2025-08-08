@@ -1,4 +1,4 @@
-package com.lightningkite.lightningserver
+package com.lightningkite.lightningserver.http
 
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -42,7 +42,7 @@ public data class HttpHeaderValue(
 
 public object HttpHeaderValueSerializer : KSerializer<HttpHeaderValue> {
     override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("com.lightningkite.lightningserver.HttpHeaderValue", PrimitiveKind.STRING)
+        PrimitiveSerialDescriptor("com.lightningkite.lightningserver.http.HttpHeaderValue", PrimitiveKind.STRING)
 
     override fun serialize(encoder: Encoder, value: HttpHeaderValue): Unit = encoder.encodeString(value.toHttpString())
     override fun deserialize(decoder: Decoder): HttpHeaderValue = HttpHeaderValue.parse(decoder.decodeString())

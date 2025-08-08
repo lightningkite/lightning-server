@@ -1,8 +1,6 @@
 package com.lightningkite.lightningserver.http
 
-import com.lightningkite.lightningserver.Locationed
-import com.lightningkite.lightningserver.definition.DuplicateRegistrationError
-import com.lightningkite.lightningserver.definition.Registry
+import com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationError
 import com.lightningkite.lightningserver.pathing.MutablePathSpecMap
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpecMap
@@ -16,7 +14,7 @@ public class HttpBuilder {
     public fun <PATH : PathSpec> register(
         endpoint: HttpEndpoint<PATH>,
         handler: HttpHandler<PATH>
-    ): Locationed<HttpEndpoint<PATH>, HttpHandler<PATH>> {
+    ) {
         val methodsMap = _handlers.getOrPut(endpoint.path, ::HashMap)
 
         methodsMap[endpoint.method]?.let {
@@ -24,7 +22,5 @@ public class HttpBuilder {
         }
 
         methodsMap[endpoint.method] = handler
-
-        return Locationed(endpoint, handler)
     }
 }

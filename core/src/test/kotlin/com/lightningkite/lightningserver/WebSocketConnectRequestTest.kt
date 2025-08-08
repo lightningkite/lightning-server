@@ -1,11 +1,12 @@
 package com.lightningkite.lightningserver
 
-import com.lightningkite.lightningserver.definition.ServerDefinition
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.ServerPath
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.test
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.services.data.KotlinBytesFormat
 import kotlinx.coroutines.runBlocking
@@ -31,9 +32,7 @@ class WebSocketConnectRequestTest {
             sourceIp = "127.0.0.1"
         )
         r.roundTripTest()
-        object: OldServerDefinition() {
-
-        }.test(
+        object: ServerBuilder() {}.test(
             settings = {}
         ) {
             r[CacheKey]

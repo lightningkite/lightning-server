@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.pathing
 
-import com.lightningkite.lightningserver.Locationed
+import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.services.data.StringArrayFormat
 
 public interface PathSpecMap<out V> : Map<PathSpec, V> {

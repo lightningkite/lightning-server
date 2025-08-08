@@ -12,7 +12,7 @@ public interface ScheduledTask {
     public suspend fun execute()
 }
 
-public fun ServerDefinitionBuilder<*>.schedule(
+public fun ScheduledTask(
     schedule: Schedule,
     timeout: Duration = 5.minutes,
     handler: suspend ServerRuntime.() -> Unit
@@ -25,3 +25,9 @@ public fun ServerDefinitionBuilder<*>.schedule(
             handler(server)
         }
     }
+
+public fun schedule(
+    schedule: Schedule,
+    timeout: Duration = 5.minutes,
+    handler: suspend ServerRuntime.() -> Unit
+): ScheduledTask = ScheduledTask(schedule, timeout, handler)

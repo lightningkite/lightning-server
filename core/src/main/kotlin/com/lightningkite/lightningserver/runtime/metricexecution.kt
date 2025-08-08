@@ -1,4 +1,4 @@
-package com.lightningkite.lightningserver
+package com.lightningkite.lightningserver.runtime
 
 import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpHandler
@@ -8,7 +8,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.ScheduledTask
 import com.lightningkite.lightningserver.Task
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketConnection

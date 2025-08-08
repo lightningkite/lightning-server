@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.http
 
-import com.lightningkite.lightningserver.ServerRuntime
 import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 
 public interface HttpInterceptor {
     public suspend fun handle(serverRuntime: ServerRuntime, request: HttpRequest<*>, cont: suspend ServerRuntime.(HttpRequest<*>) -> HttpResponse): HttpResponse

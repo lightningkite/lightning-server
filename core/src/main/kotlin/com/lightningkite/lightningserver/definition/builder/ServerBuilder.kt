@@ -1,9 +1,12 @@
-package com.lightningkite.lightningserver.definition
+package com.lightningkite.lightningserver.definition.builder
 
 import com.lightningkite.lightningserver.ScheduledTask
-import com.lightningkite.lightningserver.ServerPathEndpoints
-import com.lightningkite.lightningserver.ServerSetting
 import com.lightningkite.lightningserver.Task
+import com.lightningkite.lightningserver.definition.Extensions
+import com.lightningkite.lightningserver.definition.MutableExtensions
+import com.lightningkite.lightningserver.definition.ServerDefinition
+import com.lightningkite.lightningserver.definition.ServerPathEndpoints
+import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.http.HttpBuilder
 import com.lightningkite.lightningserver.http.intercept
 import com.lightningkite.lightningserver.pathing.MutablePathSpecMap
@@ -14,14 +17,15 @@ import com.lightningkite.lightningserver.websockets.WebSocketTopic
 import com.lightningkite.lightningserver.websockets.WebSocketsBuilder
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.plus
 
 public abstract class ServerBuilder {
     public open val internalSerialization: SerializersModule get() = EmptySerializersModule()
     public open val externalSerialization: SerializersModule get() = EmptySerializersModule()
 
-    public val path: PathSpec0 = PathSpec.root
+    public val path: PathSpec0 = PathSpec.Companion.root
 
-    public val settings: Registry<PathSpec0, ServerSetting<*, *>> = Registry()
+    public val settings: ListRegistry<ServerSetting<*, *>> = ListRegistry()
 
     public val http: HttpBuilder = HttpBuilder()
     public val websockets: WebSocketsBuilder = WebSocketsBuilder()
@@ -31,8 +35,7 @@ public abstract class ServerBuilder {
 
     public val extensions: MutableExtensions = MutableExtensions()
 
-    public val imports: Registry<PathSpec0, ServerDefinition> = Registry()
-    public val modules: Registry<PathSpec0, ServerBuilder> = Registry()
+    public val modules: Registry<PathSpec0, ServerDefinition> = Registry()
 
 
     public fun build(): ServerDefinition = object : ServerDefinition {
@@ -61,15 +64,19 @@ public abstract class ServerBuilder {
                 }
             }
 
-        private val source = this@ServerBuilder
+        private val source get() = this@ServerBuilder
 
-        override val settings: Map<PathSpec0, ServerSetting<*, *>> = source.settings
+        override val settings: List<ServerSetting<*, *>> = source.settings
         override val schedules: Map<PathSpec0, ScheduledTask> = source.schedules
         override val tasks: Map<PathSpec0, Task<*>> = source.tasks
         override val webSocketTopics: PathSpecMap<WebSocketTopic<*, *>> = source.websockets.topics.registered
         override val extensions: Extensions = source.extensions
+        override val modules: Map<PathSpec0, ServerDefinition> = source.modules
 
-        override val modules: Map<PathSpec0, ServerDefinition> =
-            source.imports + source.modules.mapValues { (_, builder) -> builder.build() }
+        override val internalSerializersModule: SerializersModule =
+            modules.values.fold(source.internalSerialization) { acc, module -> acc + module.internalSerializersModule }
+
+        override val externalSerializersModule: SerializersModule =
+            modules.values.fold(source.externalSerialization) { acc, module -> acc + module.externalSerializersModule }
     }
 }

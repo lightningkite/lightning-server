@@ -1,7 +1,6 @@
 package com.lightningkite.lightningserver.websockets
 
 import com.lightningkite.lightningserver.InternalLightningServerApi
-import com.lightningkite.lightningserver.ServerDefinitionBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.pathing.PathSpec
 import kotlinx.serialization.KSerializer
@@ -24,7 +23,7 @@ public suspend fun <PATH: PathSpec, STORAGE> WebSocketConnection<PATH, STORAGE>.
 @InternalLightningServerApi
 public suspend fun <PATH: PathSpec, STORAGE> WebSocketConnection<PATH, STORAGE>.disconnectNoOp(reason: WebSocketClose): Unit = Unit
 
-public inline fun <PATH: PathSpec, STORAGE> ServerDefinitionBuilder<*>.webSocketHandler(
+public inline fun <PATH: PathSpec, STORAGE> webSocketHandler(
     storageSerializer: KSerializer<STORAGE>,
     crossinline willConnect: suspend ServerRuntime.(request: WebSocketConnectRequest<PATH>) -> STORAGE,
     crossinline didConnect: suspend WebSocketConnection<PATH, STORAGE>.() -> Unit = WebSocketConnection<PATH, STORAGE>::didConnectNoOp,

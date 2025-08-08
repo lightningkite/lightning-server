@@ -1,16 +1,11 @@
-package com.lightningkite.lightningserver
+package com.lightningkite.lightningserver.websockets
 
+import com.lightningkite.lightningserver.AnonType
+import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.ServerPath
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.websockets.WebSocketClose
-import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
-import com.lightningkite.lightningserver.websockets.WebSocketConnection
-import com.lightningkite.lightningserver.websockets.WebSocketFrame
-import com.lightningkite.lightningserver.websockets.WebSocketHandler
-import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
-import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 
@@ -128,7 +123,7 @@ internal class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryP
             )
         }
         val otherHandler = serverRuntime.server.endpoints[match.pathSpec]?.websocket
-            ?: throw NotFoundException("No web socket handler found for '$rawPath'")
+            ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '$rawPath'")
         @Suppress("UNCHECKED_CAST")
         otherHandler as WebSocketHandler<PathSpec, *>
         val startData =
@@ -155,7 +150,7 @@ internal class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryP
     ) {
         val innerRequest = connection.currentState.request
         val otherHandler = with(connection) { innerRequest.path.match.value?.websocket }
-            ?: throw NotFoundException("No web socket handler found for '${innerRequest.path.asString}'")
+            ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${innerRequest.path.asString}'")
         @Suppress("UNCHECKED_CAST")
         otherHandler as WebSocketHandler<PathSpec, Any?>
         connection.withWrapped(otherHandler) { otherHandler.didConnect(it) }
@@ -167,7 +162,7 @@ internal class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryP
     ) {
         val innerRequest = connection.currentState.request
         val otherHandler = with(connection) { innerRequest.path.match.value?.websocket }
-            ?: throw NotFoundException("No web socket handler found for '${innerRequest.path.asString}'")
+            ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${innerRequest.path.asString}'")
         @Suppress("UNCHECKED_CAST")
         otherHandler as WebSocketHandler<PathSpec, Any?>
         connection.withWrapped(otherHandler) { otherHandler.messageFromClient(it, frame) }
@@ -179,7 +174,7 @@ internal class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryP
     ) {
         val innerRequest = connection.currentState.request
         val otherHandler = with(connection) { innerRequest.path.match.value?.websocket }
-            ?: throw NotFoundException("No web socket handler found for '${innerRequest.path.asString}'")
+            ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${innerRequest.path.asString}'")
         @Suppress("UNCHECKED_CAST")
         otherHandler as WebSocketHandler<PathSpec, Any?>
         connection.withWrapped(otherHandler) { otherHandler.messageFromSubscription(it, topic) }
@@ -191,7 +186,7 @@ internal class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryP
     ) {
         val innerRequest = connection.currentState.request
         val otherHandler = with(connection) { innerRequest.path.match.value?.websocket }
-            ?: throw NotFoundException("No web socket handler found for '${innerRequest.path.asString}'")
+            ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${innerRequest.path.asString}'")
         @Suppress("UNCHECKED_CAST")
         otherHandler as WebSocketHandler<PathSpec, Any?>
         connection.withWrapped(otherHandler) { otherHandler.disconnect(it, reason) }

@@ -1,11 +1,19 @@
 package com.lightningkite.lightningserver
 
+import com.lightningkite.lightningserver.definition.GeneralServerSettings
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.definition.builder.bind
+import com.lightningkite.lightningserver.definition.builder.topic
+import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.http.httpHandler
+import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.pathing.first
+import com.lightningkite.lightningserver.runtime.TestRunner
 import com.lightningkite.lightningserver.runtime.send
+import com.lightningkite.lightningserver.runtime.set
+import com.lightningkite.lightningserver.runtime.test
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.lightningserver.websockets.subscribe
@@ -18,12 +26,12 @@ import kotlin.test.assertEquals
 
 class TestRunnerTest {
 
-    object D1 : OldServerDefinition() {
+    object D1 : ServerBuilder() {
 
-        val testEndpoint = path.path("test").get bind httpHandler {
+        val testEndpoint = path.path("test").get bind HttpHandler {
             HttpResponse.plainText("Hello world!")
         }
-        val testEndpointWithArg = path.path("test").arg<String>("arg1").get bind httpHandler {
+        val testEndpointWithArg = path.path("test").arg<String>("arg1").get bind HttpHandler {
             HttpResponse.plainText("Hello, ${it.first}!")
         }
         val testWebsocketTopic = (path.path("broadcast")).topic(String.serializer())
@@ -49,14 +57,14 @@ class TestRunnerTest {
     }
 
     val test = TestRunner(D1, settings = {
-        generalServerSettings set GeneralServerSettings()
+        generalSettings set GeneralServerSettings()
     })
 
     @Test
     fun test() {
         D1.test(
             settings = {
-                generalServerSettings set GeneralServerSettings()
+                generalSettings set GeneralServerSettings()
             }
         ) {
             runBlocking {

@@ -4,15 +4,16 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.data.StringArrayFormat
 import kotlinx.serialization.KSerializer
 
-
 public interface HasContextualPath<PATH: PathSpec> {
-    context(serverRuntime: ServerRuntime) public val pathInContext: ConcretePath<PATH>
+    context(server: ServerRuntime) public val pathInContext: ConcretePath<PATH>
 }
+
 public interface ConcretePath<PATH: PathSpec> {
     public val pathSpec: PATH
     public val rawPathArguments: List<Any?>
     public val wildcard: List<String>? get() = null
 }
+
 public fun ConcretePath<*>.pathSegments(stringArrayFormat: StringArrayFormat): List<String> {
     var index = 0
     return pathSpec.segments.map {
@@ -34,8 +35,6 @@ public fun ConcretePath<*>.path(stringArrayFormat: StringArrayFormat): String = 
     if(pathSpec.after != PathSpec.Afterwards.TrailingSlash)
         deleteAt(lastIndex)
 }
-
-
 
 @Suppress("UNCHECKED_CAST")
 @get:JvmName("first1")

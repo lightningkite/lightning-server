@@ -1,6 +1,9 @@
-package com.lightningkite.lightningserver
+package com.lightningkite.lightningserver.runtime
 
+import com.lightningkite.lightningserver.Task
 import com.lightningkite.lightningserver.definition.*
+import com.lightningkite.lightningserver.definition.Locationed
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpHeaders
@@ -12,10 +15,6 @@ import com.lightningkite.lightningserver.pathing.PathSpec1
 import com.lightningkite.lightningserver.pathing.PathSpec2
 import com.lightningkite.lightningserver.pathing.PathSpec3
 import com.lightningkite.lightningserver.pathing.ServerPath
-import com.lightningkite.lightningserver.runtime.Serialization
-import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
-import com.lightningkite.lightningserver.runtime.invoke
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketConnection
@@ -26,7 +25,7 @@ import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
 import com.lightningkite.services.data.TypedData
 import kotlinx.coroutines.flow.MutableSharedFlow
 
-public inline fun <SD: ServerDefinition> SD.test(
+public inline fun <SD: ServerBuilder> SD.test(
     settings: context(TestSettings) SD.() -> Unit,
     action: context(TestRunner<SD>) SD.()->Unit
 ) {
@@ -35,42 +34,43 @@ public inline fun <SD: ServerDefinition> SD.test(
 }
 
 public class TestSettings() {
-    public val serializable: MutableMap<Locationed<PathSpec0, ServerSetting<*, *>>, Any?> = HashMap()
-    public val goal: MutableMap<Locationed<PathSpec0, ServerSetting<*, *>>, Any?> = HashMap()
-    public infix fun <SERIALIZABLE> Locationed<PathSpec0, ServerSetting<SERIALIZABLE, *>>.set(value: SERIALIZABLE) {
+    public val serializable: MutableMap<ServerSetting<*, *>, Any?> = HashMap()
+    public val goal: MutableMap<ServerSetting<*, *>, Any?> = HashMap()
+    public infix fun <SERIALIZABLE> ServerSetting<SERIALIZABLE, *>.set(value: SERIALIZABLE) {
         serializable[this] = value as Any?
     }
-    public infix fun <RESULT> Locationed<PathSpec0, ServerSetting<*, RESULT>>.setStatic(value: RESULT) {
+    public infix fun <RESULT> ServerSetting<*, RESULT>.setStatic(value: RESULT) {
         goal[this] = value as Any?
     }
 }
-context(builder: TestSettings) public infix fun <SERIALIZABLE> Locationed<PathSpec0, ServerSetting<SERIALIZABLE, *>>.set(value: SERIALIZABLE) {
+context(builder: TestSettings)
+public infix fun <SERIALIZABLE> ServerSetting<SERIALIZABLE, *>.set(value: SERIALIZABLE) {
     with(builder) { this@set set value }
 }
-context(builder: TestSettings) public infix fun <RESULT> Locationed<PathSpec0, ServerSetting<*, RESULT>>.setStatic(value: RESULT) {
+
+context(builder: TestSettings)
+public infix fun <RESULT> ServerSetting<*, RESULT>.setStatic(value: RESULT) {
     with(builder) { this@setStatic setStatic value }
 }
 
-public class TestRunner<SD: ServerDefinition>(
-    override val server: SD,
+public class TestRunner<S: ServerBuilder>(
+    public val serverBuilder: S,
     public val settings: TestSettings,
-) : ServerRuntimeBase() {
+) : ServerRuntimeBase(serverBuilder.build()) {
+
     public constructor(
-        server: SD,
-        settings: context(TestSettings) SD.() -> Unit
+        server: S,
+        settings: context(TestSettings) S.() -> Unit
     ): this(server, with(server) { TestSettings().apply { settings() } })
 
-    override val externalSerialization: Serialization = Serialization(server.externalSerializersModule)
-    override val internalSerialization: Serialization = Serialization(server.internalSerializersModule)
-
-    private val settingsCache = HashMap<Locationed<PathSpec0, ServerSetting<*, *>>, Any?>()
+    private val settingsCache = HashMap<ServerSetting<*, *>, Any?>()
 
     @Suppress("UNCHECKED_CAST")
-    override fun <SERIALIZABLE, GOAL> Locationed<PathSpec0, ServerSetting<SERIALIZABLE, GOAL>>.invoke(): GOAL {
+    override fun <SERIALIZABLE, GOAL> ServerSetting<SERIALIZABLE, GOAL>.invoke(): GOAL {
         return settingsCache.getOrPut(this) {
             (settings.goal[this] as? GOAL) ?: run {
                 val value = settings.serializable.getValue(this) as SERIALIZABLE
-                val result: GOAL = this.item.getter(this@TestRunner, this.location.toString(), value)
+                val result: GOAL = this.get(value)
                 result
             }
         } as GOAL
@@ -172,11 +172,12 @@ context(test: TestRunner<*>) public suspend fun <PATH: PathSpec, T> sendWebSocke
     test.sendWebSocketSubscriptionMessage(message)
 }
 
-context(test: TestRunner<*>) public suspend fun <STORAGE> Locationed<PathSpec0, WebSocketHandler<PathSpec0, STORAGE>>.test(
+context(test: TestRunner<*>)
+public suspend fun <STORAGE> Locationed<PathSpec0, WebSocketHandler<PathSpec0, STORAGE>>.test(
     queryParameters: List<Pair<String, String>> = listOf(),
     headers: HttpHeaders = HttpHeaders.EMPTY,
-    domain: String = test.server.generalServerSettings().publicUrl.substringAfter("://").substringBefore("/"),
-    protocol: String = test.server.generalServerSettings().publicUrl.substringBefore("://"),
+    domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
+    protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
 ): TestRunner<*>.TestWebSocket<PathSpec0, STORAGE> {
     val request = WebSocketConnectRequest(
@@ -198,8 +199,8 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A> Locationed<PathSpec
     path1: A,
     queryParameters: List<Pair<String, String>> = listOf(),
     headers: HttpHeaders = HttpHeaders.EMPTY,
-    domain: String = test.server.generalServerSettings().publicUrl.substringAfter("://").substringBefore("/"),
-    protocol: String = test.server.generalServerSettings().publicUrl.substringBefore("://"),
+    domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
+    protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
 ): TestRunner<*>.TestWebSocket<PathSpec1<A>, STORAGE> {
     val request = WebSocketConnectRequest(
@@ -220,8 +221,8 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A, B> Locationed<PathS
     path2: B,
     queryParameters: List<Pair<String, String>> = listOf(),
     headers: HttpHeaders = HttpHeaders.EMPTY,
-    domain: String = test.server.generalServerSettings().publicUrl.substringAfter("://").substringBefore("/"),
-    protocol: String = test.server.generalServerSettings().publicUrl.substringBefore("://"),
+    domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
+    protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
 ): TestRunner<*>.TestWebSocket<PathSpec2<A, B>, STORAGE> {
     val request = WebSocketConnectRequest(
@@ -243,8 +244,8 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A, B, C> Locationed<Pa
     path3: C,
     queryParameters: List<Pair<String, String>> = listOf(),
     headers: HttpHeaders = HttpHeaders.EMPTY,
-    domain: String = test.server.generalServerSettings().publicUrl.substringAfter("://").substringBefore("/"),
-    protocol: String = test.server.generalServerSettings().publicUrl.substringBefore("://"),
+    domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
+    protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
 ): TestRunner<*>.TestWebSocket<PathSpec3<A, B, C>, STORAGE> {
     val request = WebSocketConnectRequest(
@@ -263,8 +264,8 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A, B, C> Locationed<Pa
 context(test: TestRunner<*>) public suspend fun Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>>.test(
     queryParameters: List<Pair<String, String>> = listOf(),
     headers: HttpHeaders = HttpHeaders.EMPTY,
-    domain: String = test.server.generalServerSettings().publicUrl.substringAfter("://").substringBefore("/"),
-    protocol: String = test.server.generalServerSettings().publicUrl.substringBefore("://"),
+    domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
+    protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
     body: TypedData? = null,
 ): HttpResponse {
@@ -286,8 +287,8 @@ context(test: TestRunner<*>) public suspend fun <A> Locationed<HttpEndpoint<Path
     path1: A,
     queryParameters: List<Pair<String, String>> = listOf(),
     headers: HttpHeaders = HttpHeaders.EMPTY,
-    domain: String = test.server.generalServerSettings().publicUrl.substringAfter("://").substringBefore("/"),
-    protocol: String = test.server.generalServerSettings().publicUrl.substringBefore("://"),
+    domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
+    protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
     body: TypedData? = null,
 ): HttpResponse {
@@ -310,8 +311,8 @@ context(test: TestRunner<*>) public suspend fun <A, B> Locationed<HttpEndpoint<P
     path2: B,
     queryParameters: List<Pair<String, String>> = listOf(),
     headers: HttpHeaders = HttpHeaders.EMPTY,
-    domain: String = test.server.generalServerSettings().publicUrl.substringAfter("://").substringBefore("/"),
-    protocol: String = test.server.generalServerSettings().publicUrl.substringBefore("://"),
+    domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
+    protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
     body: TypedData? = null,
 ): HttpResponse {
@@ -335,8 +336,8 @@ context(test: TestRunner<*>) public suspend fun <A, B, C> Locationed<HttpEndpoin
     path3: C,
     queryParameters: List<Pair<String, String>> = listOf(),
     headers: HttpHeaders = HttpHeaders.EMPTY,
-    domain: String = test.server.generalServerSettings().publicUrl.substringAfter("://").substringBefore("/"),
-    protocol: String = test.server.generalServerSettings().publicUrl.substringBefore("://"),
+    domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
+    protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
     body: TypedData? = null,
 ): HttpResponse {

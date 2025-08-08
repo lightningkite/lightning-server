@@ -14,7 +14,7 @@ public interface Task<Input> {
     public suspend fun execute(input: Input)
 }
 
-public fun <INPUT> ServerDefinitionBuilder<*>.task(
+public fun <INPUT> Task(
     input: KSerializer<INPUT>,
     timeout: Duration = 5.minutes,
     handler: suspend ServerRuntime.(INPUT) -> Unit
