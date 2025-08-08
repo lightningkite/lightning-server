@@ -14,6 +14,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec3
 import com.lightningkite.lightningserver.pathing.ServerPath
 import com.lightningkite.lightningserver.runtime.Serialization
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
 import com.lightningkite.lightningserver.runtime.invoke
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
@@ -53,7 +54,7 @@ context(builder: TestSettings) public infix fun <RESULT> Locationed<PathSpec0, S
 public class TestRunner<SD: ServerDefinition>(
     override val server: SD,
     public val settings: TestSettings,
-) : ServerRuntime {
+) : ServerRuntimeBase() {
     public constructor(
         server: SD,
         settings: context(TestSettings) SD.() -> Unit
@@ -82,6 +83,9 @@ public class TestRunner<SD: ServerDefinition>(
         }
     }
 
+    override suspend fun <T> Locationed<PathSpec0, Task<T>>.invoke(input: T) {
+        this.item.execute(input)
+    }
 
     public inner class TestWebSocket<PATH: PathSpec, STORAGE>(
         private val handler: WebSocketHandler<PATH, STORAGE>,

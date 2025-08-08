@@ -53,7 +53,7 @@ proguard = "7.7.0"
 scrimage = "4.3.3"
 sentry = "8.17.0"
 serializationLibs = "1.9.0"
-serviceAbstractions = "0.0.1-8"
+serviceAbstractions = "0.0.1-9"
 shadow = "8.1.1"
 vanniktechMavenPublish = "0.34.0"
 versionCatalogUpdate = "1.0.0"
@@ -147,6 +147,8 @@ serviceAbstractionsBasis = { module = "com.lightningkite.services:basis", versio
 serviceAbstractionsData = { module = "com.lightningkite.services:data", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsDatabase = { module = "com.lightningkite.services:database", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsSBSL = { module = "com.lightningkite.services:should-be-standard-library", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsCache = { module = "com.lightningkite.services:cache", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsPubsub = { module = "com.lightningkite.services:pubsub", version = { ref = "serviceAbstractions" } }
 webauthn4jCore = { module = "com.webauthn4j:webauthn4j-core", version = { ref = "webauthn4jCore" } }
 xmlUtilJvm = { module = "io.github.pdvrieze.xmlutil:serialization-jvm", version = { ref = "xmlUtilJvm" } }
 

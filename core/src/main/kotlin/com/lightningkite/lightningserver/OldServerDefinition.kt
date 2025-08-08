@@ -261,7 +261,7 @@ public inline fun <reified S : Setting<Result>, Result> ServerDefinitionBuilder<
         serializer = serializerOrContextual(),
         optional = optional,
         description = description,
-        getter = { name, it -> it(settingContext(name)) },
+        getter = { name, it -> it(this) },
     )
 )
 
