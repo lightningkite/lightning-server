@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver
 
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ByteArraySerializer
@@ -30,7 +31,7 @@ public class KeyedSerializableCache {
         @Suppress("UNCHECKED_CAST")
         if (cache.containsKey(key)) return cache[key] as T
         val calculated: T = if(cacheQuickAccess?.containsKey(key.id) == true) {
-            serverRuntime.server.internalSerialization.kotlinBytesFormat.decodeFromByteArray(
+            serverRuntime.internalSerialization.kotlinBytesFormat.decodeFromByteArray(
                 key.serializer,
                 cacheQuickAccess!![key.id]!!
             )
@@ -46,7 +47,7 @@ public class KeyedSerializableCache {
         for((key, value) in cache) {
             key as Key<Any?>
             newMap[key.id] =
-                serverRuntime!!.server.internalSerialization.kotlinBytesFormat.encodeToByteArray(key.serializer, value)
+                serverRuntime!!.internalSerialization.kotlinBytesFormat.encodeToByteArray(key.serializer, value)
         }
         return newMap.toMap()
     }

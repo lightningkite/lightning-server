@@ -30,6 +30,7 @@ pluginManagement {
 }
 
 include(":core")
+include(":engine-local")
 include(":typed")
 include(":auth")
 include(":upload-files")

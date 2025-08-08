@@ -10,17 +10,11 @@ plugins {
 }
 
 dependencies {
-    api(libs.kotlinXIO)
-    api(libs.kotlinXJson)
-    api(libs.serializationProperties)
-    api(libs.serviceAbstractionsData)
-    api(libs.serviceAbstractionsBasis)
-    api(libs.serviceAbstractionsSBSL)
-    api(libs.kotlinHtmlJvm)
-    
-    // Multiplatform cryptography libraries
-    api(libs.kotlinxCryptoCore)
-    api(libs.kotlinxCryptoOptimal)
+    api(project(":core"))
+    api(libs.serviceAbstractionsDatabase)
+    api(libs.serviceAbstractionsCache)
+    api(libs.serviceAbstractionsPubsub)
+    api(libs.kotlinReflect)
 }
 
 ksp {

@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver
 
+import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpHeaders
@@ -11,6 +12,10 @@ import com.lightningkite.lightningserver.pathing.PathSpec1
 import com.lightningkite.lightningserver.pathing.PathSpec2
 import com.lightningkite.lightningserver.pathing.PathSpec3
 import com.lightningkite.lightningserver.pathing.ServerPath
+import com.lightningkite.lightningserver.runtime.Serialization
+import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
+import com.lightningkite.lightningserver.runtime.invoke
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketConnection
@@ -49,12 +54,14 @@ context(builder: TestSettings) public infix fun <RESULT> Locationed<PathSpec0, S
 public class TestRunner<SD: ServerDefinition>(
     override val server: SD,
     public val settings: TestSettings,
-) : ServerRuntime {
+) : ServerRuntimeBase() {
     public constructor(
         server: SD,
         settings: context(TestSettings) SD.() -> Unit
     ): this(server, with(server) { TestSettings().apply { settings() } })
 
+    override val externalSerialization: Serialization = Serialization(server.externalSerializersModule)
+    override val internalSerialization: Serialization = Serialization(server.internalSerializersModule)
 
     private val settingsCache = HashMap<Locationed<PathSpec0, ServerSetting<*, *>>, Any?>()
 
@@ -76,6 +83,9 @@ public class TestRunner<SD: ServerDefinition>(
         }
     }
 
+    override suspend fun <T> Locationed<PathSpec0, Task<T>>.invoke(input: T) {
+        this.item.execute(input)
+    }
 
     public inner class TestWebSocket<PATH: PathSpec, STORAGE>(
         private val handler: WebSocketHandler<PATH, STORAGE>,

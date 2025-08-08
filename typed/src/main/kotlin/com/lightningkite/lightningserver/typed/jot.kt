@@ -14,8 +14,8 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.ConcretePath
 import com.lightningkite.lightningserver.Request
-import com.lightningkite.lightningserver.ServerDefinition
-import com.lightningkite.lightningserver.ServerRuntime
+import com.lightningkite.lightningserver.OldServerDefinition
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.data.Description
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.Contextual
@@ -45,7 +45,7 @@ public interface ApiHttpHandler<PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT>:
     override suspend fun handle(serverRuntime: ServerRuntime, request: HttpRequest<PATH>): HttpResponse = with(serverRuntime) {
         val auth = request.authChecked<USER>(authOptions)
         @Suppress("UNCHECKED_CAST") val input: INPUT = when (request.method) {
-            HttpMethod.GET, HttpMethod.HEAD -> serverRuntime.server.externalSerialization.formDataFormat.decodeFromList(inputType, request.queryParameters)
+            HttpMethod.GET, HttpMethod.HEAD -> serverRuntime.externalSerialization.formDataFormat.decodeFromList(inputType, request.queryParameters)
             else -> if (inputType == Unit.serializer()) Unit as INPUT else request.body?.parse(inputType) ?: throw BadRequestException("No request body provided")
         }
         serverRuntime.server.validators.validateOrThrow(inputType, input)
@@ -82,12 +82,12 @@ public data class ApiExample<INPUT, OUTPUT>(
     val notes: String? = null,
 )
 
-public val ServerDefinition.principalTypes: List<PrincipalType<*, *>>
+public val OldServerDefinition.principalTypes: List<PrincipalType<*, *>>
     get() = get(PrincipalTypesKey)!!
-public fun ServerDefinition.register(type: PrincipalType<*, *>) {
+public fun OldServerDefinition.register(type: PrincipalType<*, *>) {
     set(PrincipalTypesKey, (get(PrincipalTypesKey) ?: listOf()) + type)
 }
-public object PrincipalTypesKey: ServerDefinition.ExtensionKey<List<PrincipalType<*, *>>>
+public object PrincipalTypesKey: OldServerDefinition.ExtensionKey<List<PrincipalType<*, *>>>
 
 @Serializable
 public class PrincipalTypeAndId<USER: HasId<ID>, ID: Comparable<ID>>(
@@ -146,7 +146,7 @@ public class RequestAuth<USER: HasId<ID>, ID: Comparable<ID>>(
                         val otherType = m.substringBefore('/')
                         val otherHandler = serverRuntime.server.principalTypes.find { it.name == otherType }
                             ?: throw BadRequestException("No subject type ${otherType} known")
-                        @Suppress("UNCHECKED_CAST") val otherId = serverRuntime.server.externalSerialization.stringArrayFormat.decodeFromString(otherHandler.idSerializer, m.substringAfter('/')) as Comparable<Any?>
+                        @Suppress("UNCHECKED_CAST") val otherId = serverRuntime.externalSerialization.stringArrayFormat.decodeFromString(otherHandler.idSerializer, m.substringAfter('/')) as Comparable<Any?>
                         @Suppress("UNCHECKED_CAST")
                         if (reader.permitMasquerade(
                                 otherHandler as PrincipalType<HasId<Comparable<Any?>>, Comparable<Any?>>,

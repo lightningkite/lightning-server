@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.httpHandler
 import com.lightningkite.lightningserver.pathing.first
+import com.lightningkite.lightningserver.runtime.send
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.lightningserver.websockets.subscribe
@@ -17,9 +18,7 @@ import kotlin.test.assertEquals
 
 class TestRunnerTest {
 
-    object D1 : ServerDefinition() {
-        override val externalSerialization: Serialization = Serialization()
-        override val internalSerialization: Serialization = Serialization()
+    object D1 : OldServerDefinition() {
 
         val testEndpoint = path.path("test").get bind httpHandler {
             HttpResponse.plainText("Hello world!")
@@ -63,12 +62,12 @@ class TestRunnerTest {
             runBlocking {
                 val response = testEndpoint.test()
                 assertEquals(HttpStatus.OK, response.status)
-                assertEquals("Hello world!", response.body!!.text)
+                assertEquals("Hello world!", response.body!!.text())
             }
             runBlocking {
                 val response = testEndpointWithArg.test("Todd")
                 assertEquals(HttpStatus.OK, response.status)
-                assertEquals("Hello, Todd!", response.body!!.text)
+                assertEquals("Hello, Todd!", response.body!!.text())
             }
             runBlocking {
                 val socket = testWebsocket.test()
