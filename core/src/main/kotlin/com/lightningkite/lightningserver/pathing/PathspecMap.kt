@@ -1,5 +1,6 @@
-package com.lightningkite.lightningserver
+package com.lightningkite.lightningserver.pathing
 
+import com.lightningkite.lightningserver.Locationed
 import com.lightningkite.services.data.StringArrayFormat
 
 public interface PathSpecMap<out V> : Map<PathSpec, V> {
@@ -76,6 +77,12 @@ public class MutablePathSpecMap<V>(): PathSpecMap<V> {
                 current.chainedWildcard = path
                 current.chainedWildcardValue = value
             }
+        }
+    }
+
+    public fun putAll(prefix: PathSpec, map: PathSpecMap<V>) {
+        map.asSequence().forEach {
+            this.put(prefix + it.key, it.value)
         }
     }
 

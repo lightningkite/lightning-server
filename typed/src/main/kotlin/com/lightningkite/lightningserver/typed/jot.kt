@@ -2,17 +2,17 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.ForbiddenException
-import com.lightningkite.lightningserver.HttpHandler
-import com.lightningkite.lightningserver.HttpHeader
+import com.lightningkite.lightningserver.http.HttpHandler
+import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.KeyedSerializableCache
 import com.lightningkite.lightningserver.LSError
-import com.lightningkite.lightningserver.PathSpec
-import com.lightningkite.lightningserver.PathSpec0
-import com.lightningkite.lightningserver.ConcretePath
+import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.pathing.ConcretePath
 import com.lightningkite.lightningserver.Request
 import com.lightningkite.lightningserver.ServerDefinition
 import com.lightningkite.lightningserver.ServerRuntime

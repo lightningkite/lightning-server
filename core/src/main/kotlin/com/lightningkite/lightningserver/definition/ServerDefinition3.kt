@@ -1,13 +1,12 @@
 package com.lightningkite.lightningserver.definition
 
-import com.lightningkite.lightningserver.PathSpec
-import com.lightningkite.lightningserver.PathSpec0
-import com.lightningkite.lightningserver.PathSpecMap
+import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.pathing.PathSpecMap
 import com.lightningkite.lightningserver.Schedule
 import com.lightningkite.lightningserver.ServerPathHandlers
 import com.lightningkite.lightningserver.ServerSetting
 import com.lightningkite.lightningserver.Task
-import com.lightningkite.lightningserver.WebSocketTopic
+import com.lightningkite.lightningserver.websockets.WebSocketTopic
 
 public interface ServerDefinition {
     public val endpoints: PathSpecMap<ServerPathHandlers>
@@ -18,7 +17,6 @@ public interface ServerDefinition {
     public val extensions: Extensions
 
     public val modules: Map<PathSpec0, ServerDefinition>
-    //...
 }
 
 

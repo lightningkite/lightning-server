@@ -1,6 +1,6 @@
 @file:Suppress("ConstPropertyName")
 
-package com.lightningkite.lightningserver
+package com.lightningkite.lightningserver.http
 
 public object HttpHeader {
     // Permanently registered standard HTTP headers

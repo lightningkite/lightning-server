@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.MediaType
-import com.lightningkite.lightningserver.WebSocketFrame
+import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.services.data.Data
 import com.lightningkite.services.data.TypedData
 import kotlinx.io.Buffer

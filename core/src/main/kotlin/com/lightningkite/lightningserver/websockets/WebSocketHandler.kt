@@ -1,5 +1,9 @@
-package com.lightningkite.lightningserver
+package com.lightningkite.lightningserver.websockets
 
+import com.lightningkite.lightningserver.InternalLightningServerApi
+import com.lightningkite.lightningserver.ServerDefinitionBuilder
+import com.lightningkite.lightningserver.ServerRuntime
+import com.lightningkite.lightningserver.pathing.PathSpec
 import kotlinx.serialization.KSerializer
 
 public interface WebSocketHandler<PATH: PathSpec, STORAGE> {
@@ -8,15 +12,17 @@ public interface WebSocketHandler<PATH: PathSpec, STORAGE> {
     public suspend fun didConnect(connection: WebSocketConnection<PATH, STORAGE>)
     public suspend fun messageFromClient(connection: WebSocketConnection<PATH, STORAGE>, frame: WebSocketFrame)
     public suspend fun messageFromSubscription(connection: WebSocketConnection<PATH, STORAGE>, topic: WebSocketSubscriptionMessage<*, *>)
-//    public val subscriptionHandlers: PathSpecMap<>
     public suspend fun disconnect(connection: WebSocketConnection<PATH, STORAGE>, reason: WebSocketClose)
 }
 
+// BUILDER
 
-
-@InternalLightningServerApi public suspend fun <PATH: PathSpec, STORAGE> WebSocketConnection<PATH, STORAGE>.didConnectNoOp(): Unit = Unit
-@InternalLightningServerApi public suspend fun <PATH: PathSpec, STORAGE> WebSocketConnection<PATH, STORAGE>.messageFromClientNoOp(frame: WebSocketFrame): Unit = Unit
-@InternalLightningServerApi public suspend fun <PATH: PathSpec, STORAGE> WebSocketConnection<PATH, STORAGE>.disconnectNoOp(reason: WebSocketClose): Unit = Unit
+@InternalLightningServerApi
+public suspend fun <PATH: PathSpec, STORAGE> WebSocketConnection<PATH, STORAGE>.didConnectNoOp(): Unit = Unit
+@InternalLightningServerApi
+public suspend fun <PATH: PathSpec, STORAGE> WebSocketConnection<PATH, STORAGE>.messageFromClientNoOp(frame: WebSocketFrame): Unit = Unit
+@InternalLightningServerApi
+public suspend fun <PATH: PathSpec, STORAGE> WebSocketConnection<PATH, STORAGE>.disconnectNoOp(reason: WebSocketClose): Unit = Unit
 
 public inline fun <PATH: PathSpec, STORAGE> ServerDefinitionBuilder<*>.webSocketHandler(
     storageSerializer: KSerializer<STORAGE>,

@@ -1,10 +1,21 @@
 package com.lightningkite.lightningserver
 
 import com.lightningkite.MediaType
+import com.lightningkite.lightningserver.http.HttpEndpoint
+import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpInterceptor
 import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
+import com.lightningkite.lightningserver.http.get
+import com.lightningkite.lightningserver.http.httpHandler
+import com.lightningkite.lightningserver.pathing.MutablePathSpecMap
+import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.pathing.PathSpecMap
+import com.lightningkite.lightningserver.websockets.WebSocketHandler
+import com.lightningkite.lightningserver.websockets.WebSocketHandlerInterceptor
+import com.lightningkite.lightningserver.websockets.WebSocketTopic
 import kotlinx.serialization.KSerializer
 import com.lightningkite.services.data.*
 import com.lightningkite.services.*
@@ -96,7 +107,7 @@ public abstract class ServerDefinition(allowIndexing: Boolean = false) : ServerD
     }
 
     override fun <PATH : PathSpec, STORAGE> PATH.bind(other: WebSocketHandler<PATH, STORAGE>): Locationed<PATH, WebSocketHandler<PATH, STORAGE>> {
-        return Locationed(this, other.also { _requestables.getOrPut(path) { ServerPathHandlersMutable() }.websocket })
+        return Locationed(this, other.also { _requestables.getOrPut(path) { ServerPathHandlersMutable() }.websocket = it })
     }
 
     override fun PathSpec0.bind(other: Task<*>): Locationed<PathSpec0, Task<*>> =

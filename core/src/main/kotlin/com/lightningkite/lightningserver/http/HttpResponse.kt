@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.http
 
-import com.lightningkite.lightningserver.HttpHeaders
 import com.lightningkite.services.data.TypedData
 
 public data class HttpResponse(

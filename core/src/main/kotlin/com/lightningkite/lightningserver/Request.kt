@@ -1,5 +1,11 @@
 package com.lightningkite.lightningserver
 
+import com.lightningkite.lightningserver.http.HttpHeaders
+import com.lightningkite.lightningserver.pathing.ConcretePath
+import com.lightningkite.lightningserver.pathing.HasContextualPath
+import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.pathing.ServerPath
+
 
 public abstract class Request<PATH: PathSpec>: HasContextualPath<PATH> {
     public abstract val path: ServerPath<PATH>

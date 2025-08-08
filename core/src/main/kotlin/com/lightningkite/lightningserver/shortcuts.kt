@@ -1,6 +1,8 @@
 package com.lightningkite.lightningserver
 
 import com.lightningkite.MediaType
+import com.lightningkite.lightningserver.http.HttpHeader
+import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.services.data.TypedData

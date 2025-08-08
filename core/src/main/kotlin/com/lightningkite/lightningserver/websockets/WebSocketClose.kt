@@ -1,4 +1,4 @@
-package com.lightningkite.lightningserver
+package com.lightningkite.lightningserver.websockets
 
 public enum class WebSocketClose(public val code: Short) {
     NORMAL(1000),

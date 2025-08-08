@@ -1,6 +1,7 @@
-package com.lightningkite.lightningserver
+package com.lightningkite.lightningserver.http
 
 import com.lightningkite.MediaType
+import com.lightningkite.lightningserver.HttpHeaderValue
 import kotlinx.serialization.Serializable
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -56,7 +57,7 @@ public class HttpHeaders internal constructor (internal val normalizedEntries: M
     public class Builder() {
         private val entries = HashMap<String, ArrayList<HttpHeaderValue>>()
         public fun set(key: String, value: String) {
-            entries.getOrPut(key.lowercase()) { ArrayList() }.add(HttpHeaderValue.parse(value))
+            entries.getOrPut(key.lowercase()) { ArrayList() }.add(HttpHeaderValue.Companion.parse(value))
         }
 
         public fun set(key: String, value: HttpHeaderValue) {
@@ -122,5 +123,5 @@ public class HttpHeaders internal constructor (internal val normalizedEntries: M
     }
 }
 
-public fun HttpHeaders(vararg entry: Pair<String, String>): HttpHeaders = HttpHeaders(entry.groupBy { it.first.lowercase() }.mapValues { it.value.map { HttpHeaderValue.parse(it.second) }})
+public fun HttpHeaders(vararg entry: Pair<String, String>): HttpHeaders = HttpHeaders(entry.groupBy { it.first.lowercase() }.mapValues { it.value.map { HttpHeaderValue.Companion.parse(it.second) }})
 public inline fun HttpHeaders(setup: HttpHeaders.Builder.() -> Unit): HttpHeaders = HttpHeaders.Builder().apply(setup).build()

@@ -46,7 +46,7 @@ public class HttpInterceptors(interceptors: List<HttpInterceptor> = emptyList())
             .reduceOrNull { total, nextInterceptor -> total.then(nextInterceptor) }
             ?: HttpInterceptor.None
 
-    private var _interceptors = ArrayList(interceptors)
+    private val _interceptors = ArrayList(interceptors)
     public val interceptors: List<HttpInterceptor> get() = _interceptors
 
     override suspend fun handle(serverRuntime: ServerRuntime, request: HttpRequest<*>, cont: suspend ServerRuntime.(HttpRequest<*>) -> HttpResponse): HttpResponse =

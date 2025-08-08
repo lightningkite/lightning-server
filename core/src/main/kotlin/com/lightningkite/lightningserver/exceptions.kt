@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver
 
+import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpStatus
 import kotlinx.serialization.Serializable
 
