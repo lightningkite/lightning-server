@@ -26,8 +26,8 @@ public abstract class ServerDefinition(allowIndexing: Boolean = false) : ServerD
     public abstract val internalSerialization: Serialization
     public abstract val externalSerialization: Serialization
 
-    public val handlers: PathSpecMap<ServerPathHandlers> get() = _requestables
-    private val _requestables: MutablePathSpecMap<ServerPathHandlersMutable> = MutablePathSpecMap()
+    public val handlers: PathSpecMap<ServerPathEndpoints> get() = _requestables
+    private val _requestables: MutablePathSpecMap<MutableServerPathEndpoints> = MutablePathSpecMap()
     public lateinit var httpNotFound: (serverRuntime: ServerRuntime, HttpRequest<*>) -> HttpResponse
     public lateinit var httpException: (serverRuntime: ServerRuntime, Exception, HttpRequest<*>) -> HttpResponse
 
@@ -103,11 +103,11 @@ public abstract class ServerDefinition(allowIndexing: Boolean = false) : ServerD
     override fun <PATH : PathSpec> HttpEndpoint<PATH>.bind(other: HttpHandler<PATH>): Locationed<HttpEndpoint<PATH>, HttpHandler<PATH>> {
         return Locationed(
             this,
-            other.also { _requestables.getOrPut(path) { ServerPathHandlersMutable() }.http[method] = it })
+            other.also { _requestables.getOrPut(path) { MutableServerPathEndpoints() }.http[method] = it })
     }
 
     override fun <PATH : PathSpec, STORAGE> PATH.bind(other: WebSocketHandler<PATH, STORAGE>): Locationed<PATH, WebSocketHandler<PATH, STORAGE>> {
-        return Locationed(this, other.also { _requestables.getOrPut(path) { ServerPathHandlersMutable() }.websocket = it })
+        return Locationed(this, other.also { _requestables.getOrPut(path) { MutableServerPathEndpoints() }.websocket = it })
     }
 
     override fun PathSpec0.bind(other: Task<*>): Locationed<PathSpec0, Task<*>> =
@@ -156,13 +156,23 @@ public abstract class ServerDefinition(allowIndexing: Boolean = false) : ServerD
     }
 }
 
-public interface ServerPathHandlers {
+public interface ServerPathEndpoints {
     public val http: Map<HttpMethod, HttpHandler<*>>
     public val websocket: WebSocketHandler<*, *>?
 }
 
-public class ServerPathHandlersMutable : ServerPathHandlers {
-    override var http: MutableMap<HttpMethod, HttpHandler<*>> = HashMap()
+private data class ServerPathEndpointsData(
+    override val http: Map<HttpMethod, HttpHandler<*>>,
+    override val websocket: WebSocketHandler<*, *>?
+) : ServerPathEndpoints
+
+public fun ServerPathEndpoints(
+    http: Map<HttpMethod, HttpHandler<*>>,
+    websocket: WebSocketHandler<*, *>?
+): ServerPathEndpoints = ServerPathEndpointsData(http, websocket)
+
+public class MutableServerPathEndpoints : ServerPathEndpoints {
+    override val http: MutableMap<HttpMethod, HttpHandler<*>> = HashMap()
     override var websocket: WebSocketHandler<*, *>? = null
 }
 
@@ -273,6 +283,7 @@ public data class Locationed<out Location, out Item>(
     override val key: Location get() = location
     override val value: Item get() = item
 }
+
 
 public open class ServerDefinitionPart<Path : PathSpec>(
     override val path: Path,

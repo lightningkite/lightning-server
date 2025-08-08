@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.pathing
 
-import com.lightningkite.lightningserver.ServerPathHandlers
+import com.lightningkite.lightningserver.ServerPathEndpoints
 import com.lightningkite.lightningserver.ServerRuntime
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -80,10 +80,10 @@ public class ServerPath<PATH: PathSpec>(
     context(server: ServerRuntime)
     override val pathInContext: ConcretePath<PATH> get() = match as ConcretePath<PATH>
 
-    private var matchIfPresent: PathSpecMap.Match<ServerPathHandlers>? = null
+    private var matchIfPresent: PathSpecMap.Match<ServerPathEndpoints>? = null
 
     context(server: ServerRuntime)
-    public val match: PathSpecMap.Match<ServerPathHandlers> get() {
+    public val match: PathSpecMap.Match<ServerPathEndpoints> get() {
         if(this.matchIfPresent == null) {
             this.matchIfPresent =
                 server.server.handlers.match(server.server.externalSerialization.stringArrayFormat, asString)
@@ -94,7 +94,7 @@ public class ServerPath<PATH: PathSpec>(
 
     public constructor(
         asString: String,
-        match: PathSpecMap.Match<ServerPathHandlers>
+        match: PathSpecMap.Match<ServerPathEndpoints>
     ) : this(asString) {
         this.matchIfPresent = match
     }

@@ -10,7 +10,7 @@ import com.lightningkite.lightningserver.websockets.WebSocketTopic
 
 public interface ServerRuntime {
     public val server: ServerDefinition
-    public operator fun <SERIALIZABLE, GOAL> Locationed<PathSpec0, ServerSetting<SERIALIZABLE, GOAL>>.invoke(): GOAL
+    public operator fun <Setting, Result> Locationed<PathSpec0, ServerSetting<Setting, Result>>.invoke(): Result
     public suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>)
 }
 

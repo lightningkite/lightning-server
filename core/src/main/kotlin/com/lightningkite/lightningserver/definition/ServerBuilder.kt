@@ -1,77 +1,75 @@
 package com.lightningkite.lightningserver.definition
 
-import com.lightningkite.lightningserver.http.HttpEndpoint
-import com.lightningkite.lightningserver.http.HttpHandler
-import com.lightningkite.lightningserver.Locationed
+import com.lightningkite.lightningserver.ScheduledTask
+import com.lightningkite.lightningserver.ServerPathEndpoints
+import com.lightningkite.lightningserver.ServerSetting
+import com.lightningkite.lightningserver.Task
+import com.lightningkite.lightningserver.http.HttpBuilder
+import com.lightningkite.lightningserver.http.intercept
 import com.lightningkite.lightningserver.pathing.MutablePathSpecMap
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.PathSpecMap
-import com.lightningkite.lightningserver.Serialization
-import com.lightningkite.lightningserver.http.HttpInterceptors
-import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.websockets.WebSocketHandler
-import com.lightningkite.lightningserver.websockets.WebSocketHandlerInterceptors
+import com.lightningkite.lightningserver.pathing.PathSpecMap
+import com.lightningkite.lightningserver.websockets.WebSocketTopic
+import com.lightningkite.lightningserver.websockets.WebSocketsBuilder
+import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
 
 public abstract class ServerBuilder {
-    public abstract val internalSerialization: SerializersModule
-    public abstract val externalSerialization: SerializersModule
+    public open val internalSerialization: SerializersModule get() = EmptySerializersModule()
+    public open val externalSerialization: SerializersModule get() = EmptySerializersModule()
+
+    public val path: PathSpec0 = PathSpec.root
+
+    public val settings: Registry<PathSpec0, ServerSetting<*, *>> = Registry()
 
     public val http: HttpBuilder = HttpBuilder()
     public val websockets: WebSocketsBuilder = WebSocketsBuilder()
-}
 
-public class DuplicateRegistrationError(message: String) : Error(message)
+    public val schedules: Registry<PathSpec0, ScheduledTask> = Registry()
+    public val tasks: Registry<PathSpec0, Task<*>> = Registry()
 
-/**
- * An [Map] that allows you to add items to it. Once an item is added
- * to a [Registry], it is considered immutable. It cannot be overwritten or removed.
- * */
-public interface Registry<L, V> : Map<L, V> {
-    /**
-     * Adds the [value] to the underlying [Map] with the given [location].
-     *
-     * Unlike [MutableMap], registering two values to the same location will throw a [DuplicateRegistrationError].
-     * The value at each location is considered immutable once it has been set.
-     * */
-    public fun <PATH : L> register(location: PATH, value: V): Locationed<PATH, V>
-}
+    public val extensions: MutableExtensions = MutableExtensions()
 
-public class HttpBuilder {
-    public val interceptors: HttpInterceptors = HttpInterceptors()
+    public val imports: Registry<PathSpec0, ServerDefinition> = Registry()
+    public val modules: Registry<PathSpec0, ServerBuilder> = Registry()
 
-    private val _handlers = MutablePathSpecMap<HashMap<HttpMethod, HttpHandler<*>>>()
-    public val handlers: PathSpecMap<Map<HttpMethod, HttpHandler<*>>> get() = _handlers
 
-    public fun <PATH : PathSpec> register(
-        endpoint: HttpEndpoint<PATH>,
-        handler: HttpHandler<PATH>
-    ): Locationed<HttpEndpoint<PATH>, HttpHandler<PATH>> {
-        val methodsMap = _handlers.getOrPut(endpoint.path, ::HashMap)
+    public fun build(): ServerDefinition = object : ServerDefinition {
+        override val endpoints: PathSpecMap<ServerPathEndpoints> =
+            MutablePathSpecMap<ServerPathEndpoints>().apply {
+                val httpInterceptor = http.interceptors.build()
+                val websocketInterceptor = websockets.interceptors.build()
 
-        if (methodsMap.containsKey(endpoint.method)) throw DuplicateRegistrationError("Path ${endpoint.path} has already registered an endpoint for ${endpoint.method}.")
+                val paths = http.handlers.keys + websockets.handlers.keys
+                for (path in paths) {
+                    put(
+                        path,
+                        ServerPathEndpoints(
+                            http = http
+                                .handlers[path]
+                                ?.mapValues { (_, handler) ->
+                                    httpInterceptor.intercept(handler)
+                                }
+                                ?: emptyMap(),
 
-        methodsMap[endpoint.method] = handler
+                            websocket = websockets
+                                .handlers[path]
+                                ?.let(websocketInterceptor::invoke)
+                        )
+                    )
+                }
+            }
 
-        return Locationed(endpoint, handler)
-    }
-}
+        private val source = this@ServerBuilder
 
-public class WebSocketsBuilder {
-    public val interceptors: WebSocketHandlerInterceptors = WebSocketHandlerInterceptors()
+        override val settings: Map<PathSpec0, ServerSetting<*, *>> = source.settings
+        override val schedules: Map<PathSpec0, ScheduledTask> = source.schedules
+        override val tasks: Map<PathSpec0, Task<*>> = source.tasks
+        override val webSocketTopics: PathSpecMap<WebSocketTopic<*, *>> = source.websockets.topics.registered
+        override val extensions: Extensions = source.extensions
 
-    private val _handlers = MutablePathSpecMap<WebSocketHandler<*, *>>()
-    public val handlers: PathSpecMap<WebSocketHandler<*, *>> get() = _handlers
-
-    public fun <PATH : PathSpec, STORAGE> register(
-        path: PATH,
-        handler: WebSocketHandler<PATH, STORAGE>
-    ): Locationed<PATH, WebSocketHandler<PATH, STORAGE>> {
-        if (_handlers.containsKey(path)) throw DuplicateRegistrationError("Path $path already has a registered WebSocketHandler")
-
-        _handlers[path] = handler
-
-        return Locationed(path, handler)
+        override val modules: Map<PathSpec0, ServerDefinition> =
+            source.imports + source.modules.mapValues { (_, builder) -> builder.build() }
     }
 }

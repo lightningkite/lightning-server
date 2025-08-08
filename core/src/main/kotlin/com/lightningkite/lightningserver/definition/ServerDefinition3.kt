@@ -3,13 +3,13 @@ package com.lightningkite.lightningserver.definition
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpecMap
 import com.lightningkite.lightningserver.ScheduledTask
-import com.lightningkite.lightningserver.ServerPathHandlers
+import com.lightningkite.lightningserver.ServerPathEndpoints
 import com.lightningkite.lightningserver.ServerSetting
 import com.lightningkite.lightningserver.Task
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
 
 public interface ServerDefinition {
-    public val endpoints: PathSpecMap<ServerPathHandlers>
+    public val endpoints: PathSpecMap<ServerPathEndpoints>
     public val schedules: Map<PathSpec0, ScheduledTask>
     public val tasks: Map<PathSpec0, Task<*>>
     public val webSocketTopics: PathSpecMap<WebSocketTopic<*, *>>
