@@ -6,14 +6,7 @@ import com.lightningkite.services.data.StringArrayFormat
 public interface PathSpecMap<out V> : Map<PathSpec, V> {
     public fun match(format: StringArrayFormat, pathParts: List<String>, endingSlash: Boolean): Match<V>?
     public fun match(format: StringArrayFormat, string: String): Match<V>? = match(format, string.split('/').filter { it.isNotEmpty() }, string.endsWith('/'))
-    public fun asSequence(): Sequence<Entry<V>>
-
-    public data class Entry<out V>(
-        override val key: PathSpec,
-        override val value: V
-    ) : Map.Entry<PathSpec, V> {
-        public fun toLocationed(): Locationed<PathSpec, V> = Locationed(key, value)
-    }
+    public fun asSequence(): Sequence<Locationed<PathSpec, V>>
 
     public class Match<out V>(
         override val pathSpec: PathSpec,
@@ -25,7 +18,7 @@ public interface PathSpecMap<out V> : Map<PathSpec, V> {
     override fun containsKey(key: PathSpec): Boolean = get(key) != null
     override fun containsValue(value: @UnsafeVariance V): Boolean = asSequence().any { it.value == value }
 
-    override val entries: Set<Map.Entry<PathSpec, V>> get() = asSequence().toSet()
+    override val entries: Set<Locationed<PathSpec, V>> get() = asSequence().toSet()
     override val keys: Set<PathSpec> get() = asSequence().map { it.key }.toSet()
     override val values: Collection<V> get() = asSequence().map { it.value }.toList()
     override val size: Int get() = asSequence().count()
@@ -136,10 +129,10 @@ public class MutablePathSpecMap<V>(): PathSpecMap<V> {
         }
     }
 
-    override fun asSequence(): Sequence<PathSpecMap.Entry<V>> = sequence {
-        suspend fun SequenceScope<PathSpecMap.Entry<V>>.entry(path: PathSpec, value: V) = yield(PathSpecMap.Entry(path, value))
+    override fun asSequence(): Sequence<Locationed<PathSpec, V>> = sequence {
+        suspend fun SequenceScope<Locationed<PathSpec, V>>.entry(path: PathSpec, value: V) = yield(Locationed(path, value))
 
-        suspend fun SequenceScope<PathSpecMap.Entry<V>>.traverse(node: Node) {
+        suspend fun SequenceScope<Locationed<PathSpec, V>>.traverse(node: Node) {
             node.pathValue?.let { entry(node.path!!, it) }
             node.trailingSlashValue?.let { entry(node.trailingSlash!!, it) }
             node.chainedWildcardValue?.let { entry(node.chainedWildcard!!, it) }
