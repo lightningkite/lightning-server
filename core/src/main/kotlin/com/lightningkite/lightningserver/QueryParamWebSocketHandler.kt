@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.ServerPath
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketConnection
@@ -32,7 +33,7 @@ internal class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryP
         override val request: WebSocketConnectRequest<PathSpec>
             get() = wrapped.currentState.request as WebSocketConnectRequest<PathSpec>
         override var currentState: T = wrapped.currentState.underlyingData.value(
-            wrapped.server.internalSerialization.kotlinBytesFormat,
+            wrapped.internalSerialization.kotlinBytesFormat,
             handler.storageSerializer
         )
             private set
@@ -41,17 +42,17 @@ internal class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryP
         override suspend fun send(frame: WebSocketFrame) = wrapped.send(frame)
         override suspend fun repullState(): T =
             wrapped.repullState().underlyingData.value(
-                wrapped.server.internalSerialization.kotlinBytesFormat,
+                wrapped.internalSerialization.kotlinBytesFormat,
                 handler.storageSerializer
             )
 
         override suspend fun queueStateUpdate(modification: (T) -> T) {
             wrapped.queueStateUpdate { data ->
                 val underlying =
-                    data.underlyingData.value(wrapped.server.internalSerialization.kotlinBytesFormat, handler.storageSerializer)
+                    data.underlyingData.value(wrapped.internalSerialization.kotlinBytesFormat, handler.storageSerializer)
                 data.copy(
                     underlyingData = AnonType(
-                        wrapped.server.internalSerialization.kotlinBytesFormat,
+                        wrapped.internalSerialization.kotlinBytesFormat,
                         modification(underlying),
                         handler.storageSerializer
                     )
@@ -62,10 +63,10 @@ internal class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryP
         override suspend fun updateStateImmediately(modification: (T) -> T): T {
             wrapped.updateStateImmediately { data ->
                 val underlying =
-                    data.underlyingData.value(wrapped.server.internalSerialization.kotlinBytesFormat, handler.storageSerializer)
+                    data.underlyingData.value(wrapped.internalSerialization.kotlinBytesFormat, handler.storageSerializer)
                 data.copy(
                     underlyingData = AnonType(
-                        wrapped.server.internalSerialization.kotlinBytesFormat,
+                        wrapped.internalSerialization.kotlinBytesFormat,
                         modification(underlying).also { currentState = it },
                         handler.storageSerializer
                     )
@@ -104,7 +105,7 @@ internal class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryP
         request: WebSocketConnectRequest<PathSpec0>
     ): QueryParamWebSocketHandlerData {
         val rawPath = request.headers["x-path"]?.root ?: request.queryParameter("path")?.substringBefore('?') ?: "/"
-        val match = serverRuntime.server.handlers.match(serverRuntime.server.externalSerialization.stringArrayFormat, rawPath)
+        val match = serverRuntime.server.endpoints.match(serverRuntime.externalSerialization.stringArrayFormat, rawPath)
             ?: throw NotFoundException("No web socket handler found for '$rawPath' - ${request.queryParameter("path")}")
         val request = run {
             val fixedQueryParameters = request.queryParameters.mapNotNull {
@@ -126,7 +127,7 @@ internal class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryP
                 cache = request.cache,
             )
         }
-        val otherHandler = serverRuntime.server.handlers[match.pathSpec]?.websocket
+        val otherHandler = serverRuntime.server.endpoints[match.pathSpec]?.websocket
             ?: throw NotFoundException("No web socket handler found for '$rawPath'")
         @Suppress("UNCHECKED_CAST")
         otherHandler as WebSocketHandler<PathSpec, *>
@@ -145,7 +146,7 @@ internal class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryP
         @Suppress("UNCHECKED_CAST")
         return QueryParamWebSocketHandlerData(
             request,
-            AnonType(serverRuntime.server.internalSerialization.kotlinBytesFormat, startData, otherHandler.storageSerializer as KSerializer<Any?>)
+            AnonType(serverRuntime.internalSerialization.kotlinBytesFormat, startData, otherHandler.storageSerializer as KSerializer<Any?>)
         )
     }
 

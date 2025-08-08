@@ -6,7 +6,6 @@ import com.lightningkite.lightningserver.Locationed
 import com.lightningkite.lightningserver.pathing.MutablePathSpecMap
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpecMap
-import com.lightningkite.lightningserver.Serialization
 import com.lightningkite.lightningserver.http.HttpInterceptors
 import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.pathing.PathSpec0

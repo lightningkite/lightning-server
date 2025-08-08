@@ -124,6 +124,7 @@ public object DummyPathSpecSerializer : KSerializer<PathSpec> {
  * A [PathSpec] with no arguments - in other words, all segments are constant values.
  */
 public class PathSpec0(segments: List<Segment>, after: Afterwards) : PathSpec(segments, after) {
+    public constructor(vararg constants: String):this(constants.map { Segment.Constant(it) }, Afterwards.None)
     override val wildcards: List<Segment.Wildcard<*>> get() = listOf()
     public val slash: PathSpec0 get() = PathSpec0(segments, Afterwards.TrailingSlash)
     public val any: PathSpec0 get() = PathSpec0(segments, Afterwards.TrailingSegments)

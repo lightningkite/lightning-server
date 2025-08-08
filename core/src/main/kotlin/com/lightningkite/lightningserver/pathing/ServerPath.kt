@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.pathing
 
 import com.lightningkite.lightningserver.ServerPathHandlers
-import com.lightningkite.lightningserver.ServerRuntime
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -36,7 +36,7 @@ public class ServerPath<PATH: PathSpec>(
         public operator fun <A> invoke(spec: PathSpec1<A>, path1: A): ServerPath<PathSpec1<A>> = ServerPath(spec.segments.joinToString("/") {
             when(it) {
                 is PathSpec.Segment.Constant -> it.value
-                is PathSpec.Segment.Wildcard<*> -> serverRuntime.server.externalSerialization.stringArrayFormat.encodeToString(it.serializer as KSerializer<Any?>, path1)
+                is PathSpec.Segment.Wildcard<*> -> serverRuntime.externalSerialization.stringArrayFormat.encodeToString(it.serializer as KSerializer<Any?>, path1)
             }
         })
         context(serverRuntime: ServerRuntime)
@@ -45,7 +45,7 @@ public class ServerPath<PATH: PathSpec>(
             return ServerPath(spec.segments.joinToString("/") {
                 when (it) {
                     is PathSpec.Segment.Constant -> it.value
-                    is PathSpec.Segment.Wildcard<*> -> serverRuntime.server.externalSerialization.stringArrayFormat.encodeToString(
+                    is PathSpec.Segment.Wildcard<*> -> serverRuntime.externalSerialization.stringArrayFormat.encodeToString(
                         it.serializer as KSerializer<Any?>,
                         when(i++) {
                             0 -> path1
@@ -62,7 +62,7 @@ public class ServerPath<PATH: PathSpec>(
             return ServerPath(spec.segments.joinToString("/") {
                 when (it) {
                     is PathSpec.Segment.Constant -> it.value
-                    is PathSpec.Segment.Wildcard<*> -> serverRuntime.server.externalSerialization.stringArrayFormat.encodeToString(
+                    is PathSpec.Segment.Wildcard<*> -> serverRuntime.externalSerialization.stringArrayFormat.encodeToString(
                         it.serializer as KSerializer<Any?>,
                         when(i++) {
                             0 -> path1
@@ -86,7 +86,7 @@ public class ServerPath<PATH: PathSpec>(
     public val match: PathSpecMap.Match<ServerPathHandlers> get() {
         if(this.matchIfPresent == null) {
             this.matchIfPresent =
-                server.server.handlers.match(server.server.externalSerialization.stringArrayFormat, asString)
+                server.server.endpoints.match(server.externalSerialization.stringArrayFormat, asString)
         }
         return this.matchIfPresent!!
     }

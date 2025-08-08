@@ -2,34 +2,34 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.BadRequestException
-import com.lightningkite.lightningserver.ServerDefinition
-import com.lightningkite.lightningserver.ServerRuntime
+import com.lightningkite.lightningserver.OldServerDefinition
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.data.TypedData
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.SerializationStrategy
 import kotlin.collections.List
 
-public val ServerDefinition.mediaTypeDecoders: Map<MediaType, List<MediaTypeDecoder>>
+public val OldServerDefinition.mediaTypeDecoders: Map<MediaType, List<MediaTypeDecoder>>
     get() = get(MediaTypeDecoderList) ?: mapOf()
-public val ServerDefinition.mediaTypeEncoders: Map<MediaType, List<MediaTypeEncoder>>
+public val OldServerDefinition.mediaTypeEncoders: Map<MediaType, List<MediaTypeEncoder>>
     get() = get(MediaTypeEncoderList) ?: mapOf()
-public fun ServerDefinition.register(decoder: MediaTypeDecoder): Unit {
+public fun OldServerDefinition.register(decoder: MediaTypeDecoder): Unit {
     val resultingList = (get(MediaTypeDecoderList)?.get(decoder.mediaType) ?: listOf())
         .plus(decoder).sortedBy { it.priority }
     set(MediaTypeDecoderList, (get(MediaTypeDecoderList) ?: mapOf()) + (decoder.mediaType to resultingList))
 }
-public fun ServerDefinition.register(encoder: MediaTypeEncoder): Unit {
+public fun OldServerDefinition.register(encoder: MediaTypeEncoder): Unit {
     val resultingList = (get(MediaTypeEncoderList)?.get(encoder.mediaType) ?: listOf())
         .plus(encoder).sortedBy { it.priority }
     set(MediaTypeEncoderList, (get(MediaTypeEncoderList) ?: mapOf()) + (encoder.mediaType to resultingList))
 }
-public fun ServerDefinition.register(coder: MediaTypeCoder): Unit {
+public fun OldServerDefinition.register(coder: MediaTypeCoder): Unit {
     register(coder as MediaTypeEncoder)
     register(coder as MediaTypeDecoder)
 }
 
-public object MediaTypeDecoderList: ServerDefinition.ExtensionKey<Map<MediaType, List<MediaTypeDecoder>>>
-public object MediaTypeEncoderList: ServerDefinition.ExtensionKey<Map<MediaType, List<MediaTypeEncoder>>>
+public object MediaTypeDecoderList: OldServerDefinition.ExtensionKey<Map<MediaType, List<MediaTypeDecoder>>>
+public object MediaTypeEncoderList: OldServerDefinition.ExtensionKey<Map<MediaType, List<MediaTypeEncoder>>>
 
 
 

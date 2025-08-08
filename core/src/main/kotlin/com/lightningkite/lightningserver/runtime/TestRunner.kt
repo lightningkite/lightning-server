@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver
 
+import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpHeaders
@@ -11,6 +12,9 @@ import com.lightningkite.lightningserver.pathing.PathSpec1
 import com.lightningkite.lightningserver.pathing.PathSpec2
 import com.lightningkite.lightningserver.pathing.PathSpec3
 import com.lightningkite.lightningserver.pathing.ServerPath
+import com.lightningkite.lightningserver.runtime.Serialization
+import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.invoke
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketConnection
@@ -55,6 +59,8 @@ public class TestRunner<SD: ServerDefinition>(
         settings: context(TestSettings) SD.() -> Unit
     ): this(server, with(server) { TestSettings().apply { settings() } })
 
+    override val externalSerialization: Serialization = Serialization(server.externalSerializersModule)
+    override val internalSerialization: Serialization = Serialization(server.internalSerializersModule)
 
     private val settingsCache = HashMap<Locationed<PathSpec0, ServerSetting<*, *>>, Any?>()
 

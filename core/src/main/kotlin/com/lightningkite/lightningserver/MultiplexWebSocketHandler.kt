@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.ServerPath
 import com.lightningkite.lightningserver.pathing.path
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketConnection
@@ -54,7 +55,7 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
     ) : WebSocketConnection<PathSpec, T>, ServerRuntime by wrapped {
         @Suppress("UNCHECKED_CAST")
         override val request: WebSocketConnectRequest<PathSpec> get() = wrapped.currentState.map.getValue(channel).request as WebSocketConnectRequest<PathSpec>
-        override var currentState: T = wrapped.currentState.map.getValue(channel).storage.value(wrapped.server.internalSerialization.kotlinBytesFormat, handler.storageSerializer)
+        override var currentState: T = wrapped.currentState.map.getValue(channel).storage.value(wrapped.internalSerialization.kotlinBytesFormat, handler.storageSerializer)
             private set
 
         override suspend fun close(reason: WebSocketClose) = wrapped.close(reason)
@@ -68,19 +69,19 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
         )
 
         override suspend fun repullState(): T =
-            run { wrapped.repullState().map[channel]!!.storage.value(this.server.internalSerialization.kotlinBytesFormat, handler.storageSerializer) }
+            run { wrapped.repullState().map[channel]!!.storage.value(this.internalSerialization.kotlinBytesFormat, handler.storageSerializer) }
 
         override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-            if (topic.path(this.server.externalSerialization.stringArrayFormat) !in wrapped.currentState) wrapped.subscribe(topic)
+            if (topic.path(this.externalSerialization.stringArrayFormat) !in wrapped.currentState) wrapped.subscribe(topic)
             wrapped.updateStateImmediately { data ->
                 data.copy(map = data.map + (channel to data.map.getValue(channel).let {
-                    it.copy(topics = it.topics + topic.path(this.server.externalSerialization.stringArrayFormat))
+                    it.copy(topics = it.topics + topic.path(this.externalSerialization.stringArrayFormat))
                 }))
             }
         }
 
         override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-            val asString = topic.path(this.server.externalSerialization.stringArrayFormat)
+            val asString = topic.path(this.externalSerialization.stringArrayFormat)
             val newstate = wrapped.updateStateImmediately { data ->
                 data.copy(map = data.map + (channel to data.map.getValue(channel).let {
                     it.copy(topics = it.topics + asString)
@@ -91,20 +92,20 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
 
         override suspend fun queueStateUpdate(modification: (T) -> T) {
             wrapped.queueStateUpdate { data ->
-                val underlying = data.map.getValue(channel).storage.value(this.server.internalSerialization.kotlinBytesFormat, handler.storageSerializer)
+                val underlying = data.map.getValue(channel).storage.value(this.internalSerialization.kotlinBytesFormat, handler.storageSerializer)
                 data.copy(
                     map = data.map + (channel to data.map.getValue(channel)
-                        .copy(storage = AnonType(this.server.internalSerialization.kotlinBytesFormat, modification(underlying), handler.storageSerializer)))
+                        .copy(storage = AnonType(this.internalSerialization.kotlinBytesFormat, modification(underlying), handler.storageSerializer)))
                 )
             }
         }
 
         override suspend fun updateStateImmediately(modification: (T) -> T): T {
             wrapped.updateStateImmediately { data ->
-                val underlying = data.map.getValue(channel).storage.value(this.server.internalSerialization.kotlinBytesFormat, handler.storageSerializer)
+                val underlying = data.map.getValue(channel).storage.value(this.internalSerialization.kotlinBytesFormat, handler.storageSerializer)
                 data.copy(
                     map = data.map + (channel to data.map.getValue(channel)
-                        .copy(storage = AnonType(this.server.internalSerialization.kotlinBytesFormat, modification(underlying).also {
+                        .copy(storage = AnonType(this.internalSerialization.kotlinBytesFormat, modification(underlying).also {
                             currentState = it
                         }, handler.storageSerializer)))
                 )
@@ -156,7 +157,7 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
         try {
             when {
                 message.start -> {
-                    val match = connection.server.handlers.match(connection.server.externalSerialization.stringArrayFormat, message.path!!) ?: throw NotFoundException()
+                    val match = connection.server.endpoints.match(connection.externalSerialization.stringArrayFormat, message.path!!) ?: throw NotFoundException()
                     @Suppress("UNCHECKED_CAST")
                     val otherHandler = match.value?.websocket ?: throw NotFoundException()
                     @Suppress("UNCHECKED_CAST")
@@ -175,7 +176,7 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
                         it.copy(
                             map = it.map + (channel to MultiplexWebSocketHandlerConnectionInfo(
                                 request = r,
-                                storage = AnonType(connection.server.internalSerialization.kotlinBytesFormat, storage, otherHandler.storageSerializer),
+                                storage = AnonType(connection.internalSerialization.kotlinBytesFormat, storage, otherHandler.storageSerializer),
                             ))
                         )
                     }
@@ -251,7 +252,7 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
         topic: WebSocketSubscriptionMessage<*, *>
     ) = with(connection) {
         for ((channel, info) in currentState.map) {
-            if (info.topics.contains(topic.path(server.externalSerialization.stringArrayFormat))) {
+            if (info.topics.contains(topic.path(externalSerialization.stringArrayFormat))) {
                 val match = with(connection) { info.request.path.match }
                 val otherHandler = match.value ?: throw NotFoundException("No web socket handler found for '${match.pathSpec}'")
                 @Suppress("UNCHECKED_CAST")

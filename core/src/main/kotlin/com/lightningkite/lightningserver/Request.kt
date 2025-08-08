@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.pathing.ConcretePath
 import com.lightningkite.lightningserver.pathing.HasContextualPath
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.ServerPath
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 
 
 public abstract class Request<PATH: PathSpec>: HasContextualPath<PATH> {

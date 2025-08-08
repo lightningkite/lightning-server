@@ -1,12 +1,12 @@
 package com.lightningkite.lightningserver
 
+import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders
-import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.ServerPath
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
-import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.services.data.KotlinBytesFormat
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
@@ -31,19 +31,14 @@ class WebSocketConnectRequestTest {
             sourceIp = "127.0.0.1"
         )
         r.roundTripTest()
-        val s = object: ServerRuntime {
-            override val server: ServerDefinition = object: ServerDefinition() {
-                override val internalSerialization: Serialization = Serialization()
-                override val externalSerialization: Serialization = Serialization()
-            }
-            override fun <SERIALIZABLE, GOAL> Locationed<PathSpec0, ServerSetting<SERIALIZABLE, GOAL>>.invoke(): GOAL = TODO()
+        object: OldServerDefinition() {
 
-            override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>) {
-                TODO("Not yet implemented")
-            }
+        }.test(
+            settings = {}
+        ) {
+            r[CacheKey]
+            r.roundTripTest()
         }
-        with(s) { r[CacheKey] }
-        r.roundTripTest()
     }
 
     object CacheKey: KeyedSerializableCache.Key<String> {

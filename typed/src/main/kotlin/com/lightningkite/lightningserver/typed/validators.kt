@@ -1,17 +1,16 @@
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.BadRequestException
-import com.lightningkite.lightningserver.ServerDefinition
+import com.lightningkite.lightningserver.OldServerDefinition
 import com.lightningkite.services.data.ValidationIssue
 import com.lightningkite.services.data.Validators
 import com.lightningkite.services.data.validate
 import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.json.Json
 
-public val ServerDefinition.validators: Validators
+public val OldServerDefinition.validators: Validators
     get() = get(ValidatorsKey)!!
-public object ValidatorsKey: ServerDefinition.ExtensionKey<Validators>
+public object ValidatorsKey: OldServerDefinition.ExtensionKey<Validators>
 
 
 public suspend fun <T> Validators.validateOrThrow(serializer: SerializationStrategy<T>, value: T) {

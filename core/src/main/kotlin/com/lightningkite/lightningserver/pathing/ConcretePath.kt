@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.pathing
 
-import com.lightningkite.lightningserver.ServerRuntime
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.data.StringArrayFormat
 import kotlinx.serialization.KSerializer
 

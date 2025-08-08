@@ -1,5 +1,8 @@
-package com.lightningkite.lightningserver
+package com.lightningkite.lightningserver.runtime
 
+import com.lightningkite.lightningserver.Locationed
+import com.lightningkite.lightningserver.ServerSetting
+import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpec1
@@ -10,6 +13,8 @@ import com.lightningkite.lightningserver.websockets.WebSocketTopic
 
 public interface ServerRuntime {
     public val server: ServerDefinition
+    public val internalSerialization: Serialization
+    public val externalSerialization: Serialization
     public operator fun <SERIALIZABLE, GOAL> Locationed<PathSpec0, ServerSetting<SERIALIZABLE, GOAL>>.invoke(): GOAL
     public suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>)
 }

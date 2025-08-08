@@ -1,6 +1,9 @@
 package com.lightningkite.lightningserver
 
 import com.lightningkite.MediaType
+import com.lightningkite.lightningserver.definition.Extensions
+import com.lightningkite.lightningserver.definition.MutableExtensions
+import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpInterceptor
@@ -13,20 +16,28 @@ import com.lightningkite.lightningserver.pathing.MutablePathSpecMap
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpecMap
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketHandlerInterceptor
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
 import kotlinx.serialization.KSerializer
 import com.lightningkite.services.data.*
 import com.lightningkite.services.*
+import kotlinx.serialization.modules.EmptySerializersModule
+import kotlinx.serialization.modules.SerializersModule
 
 
-public abstract class ServerDefinition(allowIndexing: Boolean = false) : ServerDefinitionBuilder<PathSpec0> {
+public abstract class OldServerDefinition(allowIndexing: Boolean = false) : ServerDefinitionBuilder<PathSpec0>, ServerDefinition {
 
-    public abstract val internalSerialization: Serialization
-    public abstract val externalSerialization: Serialization
+    override val extensions: MutableExtensions = MutableExtensions()
+    override val modules: Map<PathSpec0, ServerDefinition> = mapOf()
 
-    public val handlers: PathSpecMap<ServerPathHandlers> get() = _requestables
+    override val externalSerializersModule: SerializersModule
+        get() = EmptySerializersModule()
+    override val internalSerializersModule: SerializersModule
+        get() = EmptySerializersModule()
+
+    override val endpoints: PathSpecMap<ServerPathHandlers> get() = _requestables
     private val _requestables: MutablePathSpecMap<ServerPathHandlersMutable> = MutablePathSpecMap()
     public lateinit var httpNotFound: (serverRuntime: ServerRuntime, HttpRequest<*>) -> HttpResponse
     public lateinit var httpException: (serverRuntime: ServerRuntime, Exception, HttpRequest<*>) -> HttpResponse
@@ -78,13 +89,13 @@ public abstract class ServerDefinition(allowIndexing: Boolean = false) : ServerD
         }
     private var _wsFullInterceptor: WebSocketHandlerInterceptor = WebSocketHandlerInterceptor.None
 
-    public val tasks: Map<PathSpec0, Task<*>> get() = _tasks
+    override val tasks: Map<PathSpec0, Task<*>> get() = _tasks
     private val _tasks: MutableMap<PathSpec0, Task<*>> = HashMap()
-    public val schedules: Map<PathSpec0, ScheduledTask> get() = _schedules
+    override val schedules: Map<PathSpec0, ScheduledTask> get() = _schedules
     private val _schedules: MutableMap<PathSpec0, ScheduledTask> = HashMap()
-    public val webSocketTopics: PathSpecMap<WebSocketTopic<*, *>> get() = _webSocketTopics
+    override val webSocketTopics: PathSpecMap<WebSocketTopic<*, *>> get() = _webSocketTopics
     private val _webSocketTopics: MutablePathSpecMap<WebSocketTopic<*, *>> = MutablePathSpecMap()
-    public val settings: Map<PathSpec0, ServerSetting<*, *>> get() = _settings
+    override val settings: Map<PathSpec0, ServerSetting<*, *>> get() = _settings
     private val _settings: MutableMap<PathSpec0, ServerSetting<*, *>> = HashMap()
 
     private val _extensions: MutableMap<ExtensionKey<*>, Any> = HashMap()
@@ -138,6 +149,9 @@ public abstract class ServerDefinition(allowIndexing: Boolean = false) : ServerD
 
     public val generalServerSettings: Locationed<PathSpec0, ServerSetting<GeneralServerSettings, GeneralServerSettings>>
         = setting("general", GeneralServerSettings())
+    public val metrics: Locationed<PathSpec0, ServerSetting<MetricSink.Settings, MetricSink>>
+        = setting("metrics", MetricSink.Settings())
+    public val secretBasis: Locationed<PathSpec0, ServerSetting<SecretBasis, SecretBasis>> = setting("secretBasis", SecretBasis())
     init {
         // global requirements
         if (allowIndexing) {

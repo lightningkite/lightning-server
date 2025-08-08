@@ -17,6 +17,10 @@ dependencies {
     api(libs.serviceAbstractionsBasis)
     api(libs.serviceAbstractionsSBSL)
     api(libs.kotlinHtmlJvm)
+    
+    // Multiplatform cryptography libraries
+    api(libs.kotlinxCryptoCore)
+    api(libs.kotlinxCryptoOptimal)
 }
 
 ksp {
