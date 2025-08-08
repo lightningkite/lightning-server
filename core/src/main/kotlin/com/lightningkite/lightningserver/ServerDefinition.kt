@@ -80,8 +80,8 @@ public abstract class ServerDefinition(allowIndexing: Boolean = false) : ServerD
 
     public val tasks: Map<PathSpec0, Task<*>> get() = _tasks
     private val _tasks: MutableMap<PathSpec0, Task<*>> = HashMap()
-    public val schedules: Map<PathSpec0, ScheduledTaskHandler> get() = _schedules
-    private val _schedules: MutableMap<PathSpec0, ScheduledTaskHandler> = HashMap()
+    public val schedules: Map<PathSpec0, ScheduledTask> get() = _schedules
+    private val _schedules: MutableMap<PathSpec0, ScheduledTask> = HashMap()
     public val webSocketTopics: PathSpecMap<WebSocketTopic<*, *>> get() = _webSocketTopics
     private val _webSocketTopics: MutablePathSpecMap<WebSocketTopic<*, *>> = MutablePathSpecMap()
     public val settings: Map<PathSpec0, ServerSetting<*, *>> get() = _settings
@@ -113,7 +113,7 @@ public abstract class ServerDefinition(allowIndexing: Boolean = false) : ServerD
     override fun PathSpec0.bind(other: Task<*>): Locationed<PathSpec0, Task<*>> =
         Locationed(this, other.also { _tasks.put(this, it) })
 
-    override fun PathSpec0.bind(other: ScheduledTaskHandler): Locationed<PathSpec0, ScheduledTaskHandler> =
+    override fun PathSpec0.bind(other: ScheduledTask): Locationed<PathSpec0, ScheduledTask> =
         Locationed(this, other.also { _schedules.put(this, it) })
 
     override fun <PATH : PathSpec, T> PATH.topic(type: KSerializer<T>): WebSocketTopic<PATH, T> =
@@ -180,7 +180,7 @@ public interface ServerDefinitionBuilder<Path : PathSpec> {
     public infix fun <PATH : PathSpec, STORAGE> PATH.bind(other: WebSocketHandler<PATH, STORAGE>): Locationed<PATH, WebSocketHandler<PATH, STORAGE>>
     public fun <PATH : PathSpec, T> PATH.topic(type: KSerializer<T>): WebSocketTopic<PATH, T>
     public infix fun PathSpec0.bind(other: Task<*>): Locationed<PathSpec0, Task<*>>
-    public infix fun PathSpec0.bind(other: ScheduledTaskHandler): Locationed<PathSpec0, ScheduledTaskHandler>
+    public infix fun PathSpec0.bind(other: ScheduledTask): Locationed<PathSpec0, ScheduledTask>
     public infix fun <PATH : PathSpec, T : ServerDefinitionPart<PATH>> PATH.bind(constructor: (PATH, passOnTo: ServerDefinitionBuilder<Path>) -> T): T =
         constructor(this, this@ServerDefinitionBuilder)
 
@@ -266,7 +266,13 @@ public inline fun <reified Setting> ServerDefinitionBuilder<PathSpec0>.setting(
     )
 )
 
-public data class Locationed<out Location, out Item>(public val location: Location, public val item: Item)
+public data class Locationed<out Location, out Item>(
+    public val location: Location,
+    public val item: Item
+) : Map.Entry<Location, Item> {
+    override val key: Location get() = location
+    override val value: Item get() = item
+}
 
 public open class ServerDefinitionPart<Path : PathSpec>(
     override val path: Path,

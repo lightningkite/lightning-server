@@ -4,20 +4,23 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
-public interface ScheduledTaskHandler {
+public interface ScheduledTask {
     public val schedule: Schedule
     public val timeout: Duration get() = 30.seconds
-    public suspend fun execute(serverRuntime: ServerRuntime)
+    context(server: ServerRuntime)
+    public suspend fun execute()
 }
-public fun ServerDefinitionBuilder<*>.scheduleHandler(
+
+public fun ServerDefinitionBuilder<*>.schedule(
     schedule: Schedule,
     timeout: Duration = 5.minutes,
     handler: suspend ServerRuntime.() -> Unit
-): ScheduledTaskHandler =
-    object : ScheduledTaskHandler {
+): ScheduledTask =
+    object : ScheduledTask {
         override val schedule: Schedule = schedule
         override val timeout: Duration = timeout
-        override suspend fun execute(serverRuntime: ServerRuntime) {
-            handler(serverRuntime)
+        context(server: ServerRuntime)
+        override suspend fun execute() {
+            handler(server)
         }
     }

@@ -9,19 +9,25 @@ import com.lightningkite.lightningserver.pathing.PathSpecMap
 import com.lightningkite.lightningserver.Serialization
 import com.lightningkite.lightningserver.http.HttpInterceptors
 import com.lightningkite.lightningserver.http.HttpMethod
+import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketHandlerInterceptors
+import kotlinx.serialization.modules.SerializersModule
 
-public abstract class ServerBuilder : ServerDefinition {
-    public abstract val internalSerialization: Serialization
-    public abstract val externalSerialization: Serialization
+public abstract class ServerBuilder {
+    public abstract val internalSerialization: SerializersModule
+    public abstract val externalSerialization: SerializersModule
 
     public val http: HttpBuilder = HttpBuilder()
-
-
+    public val websockets: WebSocketsBuilder = WebSocketsBuilder()
 }
+
 public class DuplicateRegistrationError(message: String) : Error(message)
 
+/**
+ * An [Map] that allows you to add items to it. Once an item is added
+ * to a [Registry], it is considered immutable. It cannot be overwritten or removed.
+ * */
 public interface Registry<L, V> : Map<L, V> {
     /**
      * Adds the [value] to the underlying [Map] with the given [location].
@@ -29,7 +35,7 @@ public interface Registry<L, V> : Map<L, V> {
      * Unlike [MutableMap], registering two values to the same location will throw a [DuplicateRegistrationError].
      * The value at each location is considered immutable once it has been set.
      * */
-    public fun register(location: L, value: V): Locationed<L, V>
+    public fun <PATH : L> register(location: PATH, value: V): Locationed<PATH, V>
 }
 
 public class HttpBuilder {

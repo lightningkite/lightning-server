@@ -11,8 +11,6 @@ public interface Task<Input> {
 
     context(server: ServerRuntime)
     public suspend fun execute(input: Input)
-
-
 }
 
 public fun <INPUT> ServerDefinitionBuilder<*>.task(
