@@ -19,11 +19,55 @@ import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.plus
 
+/**
+ * [ServerBuilder] provides a fluent, type-safe API for defining your server configuration.
+ *
+ * [ServerBuilder] is essentially a collection of [Registry]s for your endpoints, tasks, schedules, etc. You build a server by registering
+ * resources and their locations. Once the definition is complete the [build] method is used to construct an immutable
+ * [ServerDefinition] for runtime use.
+ *
+ * You don't typically use the registries inside of [ServerBuilder] directly, instead there is a provided builder dsl to do this
+ * registration for you and in a safe manner. This dsl is accessed by subclassing [ServerBuilder] into your server definition.
+ *
+ * Example:
+ * ```kotlin
+ * object Server : ServerBuilder() {
+ *     override val internalSerialization: SerializersModule = EmptySerializersModule()
+ *     override val externalSerialization: SerializersModule = EmptySerializersModule()
+ *
+ *     // GET handler (just returns OK)
+ *     val root = path.get bind HttpHandler { HttpResponse(status = HttpStatus.OK) }
+ *
+ *     // The "bind" infix fun you see above is provided by the dsl. It "binds" the
+ *     // path on the left to the handler on the right.
+ *
+ *     // Basic hello world endpoint, bound to the path "/hello/world" with method POST
+ *     val helloWorld = path.path("hello").path("world").post bind HttpHandler {
+ *         HttpResponse.plainText("Hello World!")
+ *     }
+ * }
+ * ```
+ *
+ * Additionally, [ServerBuilder] is designed to be modular. This means that you can use it to define both your root server definition, and
+ * also to define endpoints for specific models.
+ *
+ * ```kotlin
+ * object ModelEndpoints : ServerBuilder() {
+ *     // ...
+ * }
+ *
+ * object Server : ServerBuilder() {
+ *     // ...
+ *
+ *     val modelEndpoints = path.path("model") bind ModelEndpoints
+ * }
+ * ```
+ * */
 public abstract class ServerBuilder {
     public open val internalSerialization: SerializersModule get() = EmptySerializersModule()
     public open val externalSerialization: SerializersModule get() = EmptySerializersModule()
 
-    public val path: PathSpec0 = PathSpec.root
+    protected val path: PathSpec0 = PathSpec.root // just for convenience
 
     public val settings: ListRegistry<ServerSetting<*, *>> = ListRegistry()
 
