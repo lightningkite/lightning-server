@@ -23,7 +23,7 @@ public data class ImmutableLocation<out Location, out Item>(
 
 public fun <Location, Item> Locationed(location: Location, item: Item): Locationed<Location, Item> = ImmutableLocation(location, item)
 
-public data class MutableLocation<Location, Item>(
+public data class DynamicLocation<Location, Item>(
     private val updateLocation: () -> Location,
     override val item: Item
 ) : Locationed<Location, Item> {

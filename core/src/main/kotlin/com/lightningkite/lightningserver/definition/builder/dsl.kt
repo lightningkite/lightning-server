@@ -3,7 +3,7 @@ package com.lightningkite.lightningserver.definition.builder
 import com.lightningkite.lightningserver.ScheduledTask
 import com.lightningkite.lightningserver.Task
 import com.lightningkite.lightningserver.definition.Locationed
-import com.lightningkite.lightningserver.definition.MutableLocation
+import com.lightningkite.lightningserver.definition.DynamicLocation
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.http.HttpEndpoint
@@ -19,7 +19,7 @@ import kotlinx.serialization.KSerializer
 @DslMarker
 public annotation class LightningServerDsl
 
-private fun <Location, Item> locate(item: Item, location: () -> Location): Locationed<Location, Item> = MutableLocation(location, item)
+private fun <Location, Item> locate(item: Item, location: () -> Location): Locationed<Location, Item> = DynamicLocation(location, item)
 
 @LightningServerDsl
 context(builder: ServerBuilder)
