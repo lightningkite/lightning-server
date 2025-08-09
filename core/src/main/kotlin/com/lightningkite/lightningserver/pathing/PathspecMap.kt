@@ -73,7 +73,7 @@ public class MutablePathSpecMap<V>(): PathSpecMap<V> {
         }
     }
 
-    public fun putAll(prefix: PathSpec, map: PathSpecMap<V>) {
+    public fun putAll(prefix: PathSpec0, map: PathSpecMap<V>) {
         map.asSequence().forEach {
             this.put(prefix + it.key, it.value)
         }

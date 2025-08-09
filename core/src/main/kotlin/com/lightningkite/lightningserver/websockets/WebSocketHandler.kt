@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.websockets
 
 import com.lightningkite.lightningserver.InternalLightningServerApi
+import com.lightningkite.lightningserver.definition.builder.LightningServerDsl
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.pathing.PathSpec
 import kotlinx.serialization.KSerializer
@@ -23,7 +24,7 @@ public suspend fun <PATH: PathSpec, STORAGE> WebSocketConnection<PATH, STORAGE>.
 @InternalLightningServerApi
 public suspend fun <PATH: PathSpec, STORAGE> WebSocketConnection<PATH, STORAGE>.disconnectNoOp(reason: WebSocketClose): Unit = Unit
 
-public inline fun <PATH: PathSpec, STORAGE> webSocketHandler(
+public inline fun <PATH: PathSpec, STORAGE> WebSocketHandler(
     storageSerializer: KSerializer<STORAGE>,
     crossinline willConnect: suspend ServerRuntime.(request: WebSocketConnectRequest<PATH>) -> STORAGE,
     crossinline didConnect: suspend WebSocketConnection<PATH, STORAGE>.() -> Unit = WebSocketConnection<PATH, STORAGE>::didConnectNoOp,
@@ -49,17 +50,20 @@ public inline fun <PATH: PathSpec, STORAGE> webSocketHandler(
 
 public class TopicHandlersBuilder<PATH: PathSpec, STORAGE>() {
     public var handler: suspend WebSocketConnection<PATH, STORAGE>.(topic: WebSocketSubscriptionMessage<*, *>) -> Unit = {}
+
+    @LightningServerDsl
     @Suppress("UNCHECKED_CAST")
-    public inline infix fun <TOPICPATH: PathSpec, T> WebSocketTopic<TOPICPATH, T>.bind(crossinline handler: suspend WebSocketConnection<PATH, STORAGE>.(topic: WebSocketSubscriptionMessage<TOPICPATH, T>) -> Unit) {
+    public inline infix fun <TOPICPATH: PathSpec, T> WebSocketTopic<TOPICPATH, T>.bind(
+        crossinline handler: suspend WebSocketConnection<PATH, STORAGE>.(topic: WebSocketSubscriptionMessage<TOPICPATH, T>) -> Unit
+    ) {
         val topic = this
         this@TopicHandlersBuilder.handler = this@TopicHandlersBuilder.handler.let { current ->
             { it: WebSocketSubscriptionMessage<*, *> ->
-                if(topic == it.topic) handler(it as WebSocketSubscriptionMessage<TOPICPATH, T>)
-                else current(
-                    it
-                )
+                if (topic == it.topic) handler(it as WebSocketSubscriptionMessage<TOPICPATH, T>)
+                else current(it)
             }
         }
     }
+
     public fun build(): suspend WebSocketConnection<PATH, STORAGE>.(topic: WebSocketSubscriptionMessage<*, *>) -> Unit = handler
 }

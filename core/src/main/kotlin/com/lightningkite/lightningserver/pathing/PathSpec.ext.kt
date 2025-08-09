@@ -1,18 +1,26 @@
 package com.lightningkite.lightningserver.pathing
 
-
-public operator fun PathSpec.plus(other: PathSpec): PathSpec = PathSpecMany(this.segments + other.segments, other.after, this.wildcards + other.wildcards)
-
 public operator fun PathSpec0.plus(other: PathSpec0): PathSpec0 = PathSpec0(this.segments + other.segments, other.after)
-public operator fun <A> PathSpec0.plus(other: PathSpec1<A>): PathSpec1<A> = PathSpec1(this.segments + other.segments, other.after, other.first)
-public operator fun <A, B> PathSpec0.plus(other: PathSpec2<A, B>): PathSpec2<A, B> = PathSpec2(this.segments + other.segments, other.after, other.first, other.second)
-public operator fun <A, B, C> PathSpec0.plus(other: PathSpec3<A, B, C>): PathSpec3<A, B, C> = PathSpec3(this.segments + other.segments, other.after, other.first, other.second, other.third)
 
-public operator fun <A> PathSpec1<A>.plus(other: PathSpec0): PathSpec1<A> = PathSpec1(this.segments + other.segments, other.after, this.first)
+public operator fun <PATH : PathSpec> PathSpec0.plus(other: PATH): PATH =
+    when (other) {
+        is PathSpec0 -> PathSpec0(this.segments + other.segments, other.after)
+        is PathSpec1<*> -> PathSpec1(this.segments + other.segments, other.after, other.first)
+        is PathSpec2<*, *> -> PathSpec2(this.segments + other.segments, other.after, other.first, other.second)
+        is PathSpec3<*, *, *> -> PathSpec3(this.segments + other.segments, other.after, other.first, other.second, other.third)
+        is PathSpecMany -> PathSpecMany(this.segments + other.segments, other.after, this.wildcards + other.wildcards)
+    } as PATH
+
+public operator fun <PATH : PathSpec> PATH.plus(other: PathSpec0): PATH =
+    when (this) {
+        is PathSpec0 -> PathSpec0(this.segments + other.segments, other.after)
+        is PathSpec1<*> -> PathSpec1(this.segments + other.segments, other.after, this.first)
+        is PathSpec2<*, *> -> PathSpec2(this.segments + other.segments, other.after, this.first, this.second)
+        is PathSpec3<*, *, *> -> PathSpec3(this.segments + other.segments, other.after, this.first, this.second, this.third)
+        is PathSpecMany -> PathSpecMany(this.segments + other.segments, other.after, this.wildcards + other.wildcards)
+    } as PATH
+
 public operator fun <A, B> PathSpec1<A>.plus(other: PathSpec1<B>): PathSpec2<A, B> = PathSpec2(this.segments + other.segments, other.after, this.first, other.first)
 public operator fun <A, B, C> PathSpec1<A>.plus(other: PathSpec2<B, C>): PathSpec3<A, B, C> = PathSpec3(this.segments + other.segments, other.after, this.first, other.first, other.second)
 
-public operator fun <A, B> PathSpec2<A, B>.plus(other: PathSpec0): PathSpec2<A, B> = PathSpec2(this.segments + other.segments, other.after, this.first, this.second)
 public operator fun <A, B, C> PathSpec2<A, B>.plus(other: PathSpec1<C>): PathSpec3<A, B, C> = PathSpec3(this.segments + other.segments, other.after, this.first, this.second, other.first)
-
-public operator fun <A, B, C> PathSpec3<A, B, C>.plus(other: PathSpec0): PathSpec3<A, B, C> = PathSpec3(this.segments + other.segments, other.after, this.first, this.second, this.third)

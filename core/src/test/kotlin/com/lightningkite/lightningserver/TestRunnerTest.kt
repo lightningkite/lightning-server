@@ -18,7 +18,7 @@ import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.lightningserver.websockets.subscribe
 import com.lightningkite.lightningserver.websockets.text
-import com.lightningkite.lightningserver.websockets.webSocketHandler
+import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.builtins.serializer
 import kotlin.test.Test
@@ -26,16 +26,16 @@ import kotlin.test.assertEquals
 
 class TestRunnerTest {
 
-    object D1 : ServerBuilder() {
-
+    object TestServer : ServerBuilder() {
         val testEndpoint = path.path("test").get bind HttpHandler {
             HttpResponse.plainText("Hello world!")
         }
         val testEndpointWithArg = path.path("test").arg<String>("arg1").get bind HttpHandler {
             HttpResponse.plainText("Hello, ${it.first}!")
         }
-        val testWebsocketTopic = (path.path("broadcast")).topic(String.serializer())
-        val testWebsocket = path.path("mirror") bind webSocketHandler(
+        val testWebsocketTopic = path.path("broadcast").topic(String.serializer())
+
+        val testWebsocket = path.path("mirror") bind WebSocketHandler(
             storageSerializer = Unit.serializer(),
             willConnect = { Unit },
             didConnect = { subscribe(testWebsocketTopic) },
@@ -54,15 +54,44 @@ class TestRunnerTest {
             },
             disconnect = {}
         )
+
+        val modelEndpoints = path.path("model") bind TestModelEndpoints
     }
 
-    val test = TestRunner(D1, settings = {
+    object TestModelEndpoints : ServerBuilder() {
+        val describePerson = path.path("describe").arg<String>("id").get bind HttpHandler {
+            if (it.first == "hunter") HttpResponse.plainText("Really cool imo")
+            else HttpResponse(status = HttpStatus.NotFound)
+        }
+
+        val modelWebsocket = path.path("mirror") bind WebSocketHandler(
+            storageSerializer = Unit.serializer(),
+            willConnect = { Unit },
+            didConnect = { subscribe(TestServer.testWebsocketTopic) },
+            topicHandlers = {
+                TestServer.testWebsocketTopic bind {
+                    println("Topic hit!")
+                    send(WebSocketFrame(it.value))
+                }
+            },
+            messageFromClient = { frame ->
+                if (frame is WebSocketFrame.Text && frame.text == "close") {
+                    close(WebSocketClose.NORMAL)
+                } else {
+                    send(frame)  // Mirror
+                }
+            },
+            disconnect = {}
+        )
+    }
+
+    val test = TestRunner(TestServer, settings = {
         generalSettings set GeneralServerSettings()
     })
 
     @Test
     fun test() {
-        D1.test(
+        TestServer.test(
             settings = {
                 generalSettings set GeneralServerSettings()
             }
@@ -88,6 +117,43 @@ class TestRunnerTest {
                 testWebsocketTopic.send("Pong.")
                 assertEquals(WebSocketFrame("Pong."), lastMessage)
                 socket.close()
+            }
+        }
+    }
+
+    @Test
+    fun testModules() {
+        TestServer.test(
+            settings = { generalSettings set GeneralServerSettings() }
+        ) {
+            runBlocking {
+                val response = modelEndpoints.describePerson.test("1234")
+                assertEquals(HttpStatus.NotFound, response.status)
+            }
+            runBlocking {
+                val response = modelEndpoints.describePerson.test("hunter")
+                assertEquals(HttpStatus.OK, response.status)
+                assertEquals("Really cool imo", response.body!!.text())
+            }
+            runBlocking {
+                val rootSocket = testWebsocket.test()
+                val modelSocket = modelEndpoints.modelWebsocket.test()
+                var lastRootMessage: WebSocketFrame? = null
+                var lastModelMessage: WebSocketFrame? = null
+                rootSocket.onMessageSent = {
+                    lastRootMessage = it
+                }
+                modelSocket.onMessageSent = {
+                    lastModelMessage = it
+                }
+                rootSocket.send(WebSocketFrame("Ping!"))
+                assertEquals(WebSocketFrame("Ping!"), lastRootMessage)
+                modelSocket.send(WebSocketFrame("Ping!"))
+                assertEquals(WebSocketFrame("Ping!"), lastModelMessage)
+                testWebsocketTopic.send("Pong.")
+                assertEquals(WebSocketFrame("Pong."), lastRootMessage)
+                assertEquals(WebSocketFrame("Pong."), lastModelMessage)
+                rootSocket.close()
             }
         }
     }

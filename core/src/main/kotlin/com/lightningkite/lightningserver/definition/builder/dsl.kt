@@ -3,12 +3,14 @@ package com.lightningkite.lightningserver.definition.builder
 import com.lightningkite.lightningserver.ScheduledTask
 import com.lightningkite.lightningserver.Task
 import com.lightningkite.lightningserver.definition.Locationed
+import com.lightningkite.lightningserver.definition.MutableLocation
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.pathing.plus
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
@@ -17,38 +19,45 @@ import kotlinx.serialization.KSerializer
 @DslMarker
 public annotation class LightningServerDsl
 
+private fun <Location, Item> locate(item: Item, location: () -> Location): Locationed<Location, Item> = MutableLocation(location, item)
+
 @LightningServerDsl
 context(builder: ServerBuilder)
 public infix fun <PATH : PathSpec> HttpEndpoint<PATH>.bind(handler: HttpHandler<PATH>): Locationed<HttpEndpoint<PATH>, HttpHandler<PATH>> {
     builder.http.register(this, handler)
-    return Locationed(this, handler)
+    return locate(handler) {
+        HttpEndpoint(builder.modulePath + this.path, this.method)
+    }
 }
 
 @LightningServerDsl
 context(builder: ServerBuilder)
 public infix fun <PATH : PathSpec, STORAGE> PATH.bind(handler: WebSocketHandler<PATH, STORAGE>): Locationed<PATH, WebSocketHandler<PATH, STORAGE>> {
     builder.websockets.register(this, handler)
-    return Locationed(this, handler)
+    return locate(handler) { builder.modulePath + this }
 }
 
 @LightningServerDsl
 context(builder: ServerBuilder)
 public infix fun PathSpec0.bind(task: Task<*>): Locationed<PathSpec0, Task<*>> {
     builder.tasks.register(this, task)
-    return Locationed(this, task)
+    return locate(task) { builder.modulePath + this }
 }
 
 @LightningServerDsl
 context(builder: ServerBuilder)
 public infix fun PathSpec0.bind(schedule: ScheduledTask): Locationed<PathSpec0, ScheduledTask> {
     builder.schedules.register(this, schedule)
-    return Locationed(this, schedule)
+    return locate(schedule) { builder.modulePath + this }
 }
 
 @LightningServerDsl
 context(builder: ServerBuilder)
 public fun <PATH : PathSpec, T> PATH.topic(type: KSerializer<T>): WebSocketTopic<PATH, T> =
-    WebSocketTopic(this, type).also { builder.websockets.topics.register(this, it) }
+    WebSocketTopic(
+        path = { builder.modulePath + this },
+        type
+    ).also { builder.websockets.topics.register(this, it) }
 
 @LightningServerDsl
 context(builder: ServerBuilder)
@@ -95,9 +104,10 @@ public fun <Result> setting(
 
 @LightningServerDsl
 context(builder: ServerBuilder)
-public infix fun <T : ServerBuilder> PathSpec0.bind(module: T): Locationed<PathSpec0, T> {
+public infix fun <T : ServerBuilder> PathSpec0.bind(module: T): T {
+    module.modulePath = this
     builder.modules.register(this, module.build())
-    return Locationed(this, module)
+    return module
 }
 
 @LightningServerDsl

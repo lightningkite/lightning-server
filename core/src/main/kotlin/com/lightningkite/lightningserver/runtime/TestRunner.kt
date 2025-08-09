@@ -25,9 +25,9 @@ import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
 import com.lightningkite.services.data.TypedData
 import kotlinx.coroutines.flow.MutableSharedFlow
 
-public inline fun <SD: ServerBuilder> SD.test(
-    settings: context(TestSettings) SD.() -> Unit,
-    action: context(TestRunner<SD>) SD.()->Unit
+public inline fun <SERVER: ServerBuilder> SERVER.test(
+    settings: context(TestSettings) SERVER.() -> Unit,
+    action: context(TestRunner<SERVER>) SERVER.()->Unit
 ) {
     val runner = TestRunner(this, TestSettings().apply { settings() })
     action(runner, this)
@@ -53,14 +53,14 @@ public infix fun <RESULT> ServerSetting<*, RESULT>.setStatic(value: RESULT) {
     with(builder) { this@setStatic setStatic value }
 }
 
-public class TestRunner<S: ServerBuilder>(
-    public val serverBuilder: S,
+public class TestRunner<SERVER: ServerBuilder>(
+    public val serverBuilder: SERVER,
     public val settings: TestSettings,
-) : ServerRuntimeBase(serverBuilder.build()) {
+) : ServerRuntimeBase(serverBuilder.build().flatten()) {
 
     public constructor(
-        server: S,
-        settings: context(TestSettings) S.() -> Unit
+        server: SERVER,
+        settings: context(TestSettings) SERVER.() -> Unit
     ): this(server, with(server) { TestSettings().apply { settings() } })
 
     private val settingsCache = HashMap<ServerSetting<*, *>, Any?>()

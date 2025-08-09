@@ -23,7 +23,7 @@ public abstract class ServerBuilder {
     public open val internalSerialization: SerializersModule get() = EmptySerializersModule()
     public open val externalSerialization: SerializersModule get() = EmptySerializersModule()
 
-    public val path: PathSpec0 = PathSpec.Companion.root
+    public val path: PathSpec0 = PathSpec.root
 
     public val settings: ListRegistry<ServerSetting<*, *>> = ListRegistry()
 
@@ -79,4 +79,6 @@ public abstract class ServerBuilder {
         override val externalSerializersModule: SerializersModule =
             modules.values.fold(source.externalSerialization) { acc, module -> acc + module.externalSerializersModule }
     }
+
+    internal var modulePath: PathSpec0 = PathSpec.root
 }

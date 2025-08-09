@@ -12,9 +12,11 @@ import kotlinx.serialization.Serializable
 
 
 public class WebSocketTopic<PATH: PathSpec, T> internal constructor(
-    public val pathSpec: PATH,
+    private val path: () -> PATH,
     public val type: KSerializer<T>
 ) {
+    public val pathSpec: PATH get() = path()
+
     override fun equals(other: Any?): Boolean = other is WebSocketTopic<*, *> && other.pathSpec == pathSpec
     override fun hashCode(): Int = pathSpec.hashCode() + 1
     override fun toString(): String = pathSpec.toString()

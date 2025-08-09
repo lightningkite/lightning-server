@@ -88,7 +88,7 @@ public class ServerPath<PATH: PathSpec>(
             this.matchIfPresent =
                 server.server.endpoints.match(server.externalSerialization.stringArrayFormat, asString)
         }
-        return this.matchIfPresent!!
+        return this.matchIfPresent ?: throw NullPointerException("No match for path: $asString. Registered paths are ${server.server.endpoints.keys}")
     }
 
 
