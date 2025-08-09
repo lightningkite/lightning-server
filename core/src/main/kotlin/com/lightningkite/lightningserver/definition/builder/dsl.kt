@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.definition.builder
 
+import com.lightningkite.lightningserver.LightningServerDsl
 import com.lightningkite.lightningserver.ScheduledTask
 import com.lightningkite.lightningserver.Task
 import com.lightningkite.lightningserver.definition.Locationed
@@ -15,9 +16,6 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
 import kotlinx.serialization.KSerializer
-
-@DslMarker
-public annotation class LightningServerDsl
 
 private fun <Location, Item> locate(item: Item, location: () -> Location): Locationed<Location, Item> = DynamicLocation(location, item)
 

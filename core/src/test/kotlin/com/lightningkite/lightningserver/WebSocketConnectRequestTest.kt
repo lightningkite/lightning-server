@@ -6,7 +6,6 @@ import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.ServerPath
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.test
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.services.data.KotlinBytesFormat
 import kotlinx.coroutines.runBlocking
