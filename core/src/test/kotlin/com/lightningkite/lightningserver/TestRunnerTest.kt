@@ -13,6 +13,7 @@ import com.lightningkite.lightningserver.pathing.first
 import com.lightningkite.lightningserver.runtime.test.TestRunner
 import com.lightningkite.lightningserver.runtime.send
 import com.lightningkite.lightningserver.runtime.test.set
+import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.lightningserver.websockets.subscribe
