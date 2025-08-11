@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.websockets
 
 import com.lightningkite.lightningserver.InternalLightningServerApi
-import com.lightningkite.lightningserver.definition.builder.LightningServerDsl
+import com.lightningkite.lightningserver.LightningServerDsl
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.pathing.PathSpec
 import kotlinx.serialization.KSerializer

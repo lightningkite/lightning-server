@@ -1,9 +1,14 @@
 package com.lightningkite.lightningserver.pathing
 
-public operator fun PathSpec0.plus(other: PathSpec0): PathSpec0 = PathSpec0(this.segments + other.segments, other.after)
+public operator fun PathSpec0.plus(other: PathSpec0): PathSpec0 = when {
+    this == PathSpec.root -> other
+    other == PathSpec.root -> this
+    else -> PathSpec0(this.segments + other.segments, other.after)
+}
 
 public operator fun <PATH : PathSpec> PathSpec0.plus(other: PATH): PATH =
-    when (other) {
+    if (this == PathSpec.root) other
+    else when (other) {
         is PathSpec0 -> PathSpec0(this.segments + other.segments, other.after)
         is PathSpec1<*> -> PathSpec1(this.segments + other.segments, other.after, other.first)
         is PathSpec2<*, *> -> PathSpec2(this.segments + other.segments, other.after, other.first, other.second)
@@ -12,7 +17,8 @@ public operator fun <PATH : PathSpec> PathSpec0.plus(other: PATH): PATH =
     } as PATH
 
 public operator fun <PATH : PathSpec> PATH.plus(other: PathSpec0): PATH =
-    when (this) {
+    if (other == PathSpec.root) this
+    else when (this) {
         is PathSpec0 -> PathSpec0(this.segments + other.segments, other.after)
         is PathSpec1<*> -> PathSpec1(this.segments + other.segments, other.after, this.first)
         is PathSpec2<*, *> -> PathSpec2(this.segments + other.segments, other.after, this.first, this.second)
