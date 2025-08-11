@@ -2,26 +2,50 @@ package com.lightningkite.lightningserver.definition
 
 import com.lightningkite.lightningserver.definition.builder.ListRegistry
 import com.lightningkite.lightningserver.definition.builder.Registry
-import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import kotlin.properties.ReadOnlyProperty
+import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KProperty
 
 public operator fun <T : Any> Extensions.Key<T>.getValue(thisRef: Extended, property: KProperty<*>): T? =
     thisRef.extensions[this]
 
-public operator fun <T : Any> MutableExtensions.MutableKey<T>.setValue(thisRef: Extendable, property: KProperty<*>, value: T?) {
+public operator fun <T : Any> MutableExtensions.Key<T>.setValue(thisRef: Extendable, property: KProperty<*>, value: T?) {
     thisRef.extensions[this] = value
 }
 
-public operator fun <T : Any, M : T> MutableExtensions.DegradingKey<T, M>.getValue(thisRef: Extendable, property: KProperty<*>): M =
+// defaults
+public fun <T : Any> MutableExtensions.getOrPut(key: MutableExtensions.Key<T>, default: () -> T): T = get(key) ?: default().also { set(key, it) }
+
+public fun <T : Any, E : Extendable> MutableExtensions.Key<T>.cache(default: E.() -> T): ReadWriteProperty<E, T> =
+    object : ReadWriteProperty<E, T> {
+        override fun getValue(thisRef: E, property: KProperty<*>): T = thisRef.extensions.getOrPut(this@cache) { default(thisRef) }
+        override fun setValue(thisRef: E, property: KProperty<*>, value: T) { thisRef.extensions[this@cache] = value }
+    }
+
+public fun <T : Any, E : Extended> Extensions.Key<T>.default(default: E.() -> T): ReadOnlyProperty<E, T> =
+    ReadOnlyProperty { thisRef: E, _ -> thisRef.extensions[this] ?: default(thisRef) }
+
+// degrading
+public operator fun <M : T, T : Any> MutableExtensions.DegradingKey<M, T>.getValue(thisRef: Extendable, property: KProperty<*>): M =
     thisRef.extensions[this]
 
-public operator fun <T : Any, M : T> MutableExtensions.DegradingKey<T, M>.getValue(thisRef: Extended, property: KProperty<*>): T =
+public operator fun <M : T, T : Any> MutableExtensions.DegradingKey<M, T>.getValue(thisRef: Extended, property: KProperty<*>): T =
     thisRef.extensions[this] ?: default()
 
-public interface RegistryExtension<L, V : Any> : MutableExtensions.DegradingKey<Map<L, V>, Registry<L, V>> {
+
+/**
+ * A convenience wrapper of [MutableExtensions.DegradingKey] for a [Registry], providing an implementation of
+ * [default].
+ * */
+public interface RegistryExtension<L, V : Any> : MutableExtensions.DegradingKey<Registry<L, V>, Map<L, V>> {
     override fun default(): Registry<L, V> = Registry()
 }
-public interface ListRegistryExtension<V> : MutableExtensions.DegradingKey<List<V>, ListRegistry<V>> {
+
+/**
+ * A convenience wrapper of [MutableExtensions.DegradingKey] for a [ListRegistry], providing an implementation of
+ * [default].
+ * */
+public interface ListRegistryExtension<V> : MutableExtensions.DegradingKey<ListRegistry<V>, List<V>> {
     override fun default(): ListRegistry<V> = ListRegistry()
 }
 
@@ -34,11 +58,3 @@ context(extendable: Extendable)
 public fun <V> ListRegistryExtension<V>.register(value: V) {
     extendable.extensions[this].register(value)
 }
-
-
-
-public operator fun <T : Any> ServerBuilder.get(key : Extensions.Key<T>): T? =
-    extensions[key]
-
-public operator fun <T : Any> ServerDefinition.get(key : Extensions.Key<T>): T? =
-    extensions[key]

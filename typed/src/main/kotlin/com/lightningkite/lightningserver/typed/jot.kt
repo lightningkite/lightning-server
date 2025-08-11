@@ -52,7 +52,7 @@ public interface ApiHttpHandler<PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT>:
             HttpMethod.GET, HttpMethod.HEAD -> serverRuntime.externalSerialization.formDataFormat.decodeFromList(inputType, request.queryParameters)
             else -> if (inputType == Unit.serializer()) Unit as INPUT else request.body?.parse(inputType) ?: throw BadRequestException("No request body provided")
         }
-        serverRuntime.server.validators.validateOrThrow(inputType, input)
+        serverRuntime.validators.validateOrThrow(inputType, input)
         val runner = object: ServerRuntimeWithAuth<USER, PATH>, ServerRuntime by serverRuntime, ConcretePath<PATH> by request.pathInContext {
             override val request: Request<PATH>
                 get() = request

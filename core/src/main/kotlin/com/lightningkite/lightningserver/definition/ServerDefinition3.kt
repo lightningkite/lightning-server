@@ -29,8 +29,8 @@ public fun ServerDefinition.flatten(): ServerDefinition = if (modules.isEmpty())
     private val source get() = this@flatten
     private val flattenedModules = source.modules.mapValues { (_, mod) -> mod.flatten() }
 
-    override val internalSerializersModule: SerializersModule = source.modules.values.fold(source.internalSerializersModule) { acc, def -> acc + def.internalSerializersModule }
-    override val externalSerializersModule: SerializersModule = source.modules.values.fold(source.externalSerializersModule) { acc, def -> acc + def.externalSerializersModule }
+    override val internalSerializersModule: SerializersModule = flattenedModules.values.fold(source.internalSerializersModule) { acc, def -> acc + def.internalSerializersModule }
+    override val externalSerializersModule: SerializersModule = flattenedModules.values.fold(source.externalSerializersModule) { acc, def -> acc + def.externalSerializersModule }
 
     private fun <T> flatten(registry: (ServerDefinition) -> Map<PathSpec0, T>): Map<PathSpec0, T> = buildMap {
         putAll(registry(source))
@@ -56,21 +56,8 @@ public fun ServerDefinition.flatten(): ServerDefinition = if (modules.isEmpty())
         for (module in flattenedModules.values) include(module.extensions)
     }
 
-    override val settings: List<ServerSetting<*, *>> = buildList {
-        val alreadyDefined = HashSet<String>()
-
-        fun addSettings(settings: List<ServerSetting<*, *>>) {
-            val retained = settings
-                .distinctBy { it.settingName }
-                .filter { it.settingName !in alreadyDefined }
-
-            addAll(retained)
-            alreadyDefined.addAll(retained.map { it.settingName })
-        }
-
-        addSettings(source.settings)
-        for (module in flattenedModules.values) addSettings(module.settings)
-    }
+    override val settings: List<ServerSetting<*, *>> =
+        (source.settings + flattenedModules.values.flatMap { it.settings }).distinctBy { it.settingName }
 
     override val modules: Map<PathSpec0, ServerDefinition> = emptyMap()
 }

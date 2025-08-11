@@ -8,26 +8,20 @@ public interface Locationed<out Location, out Item> : Map.Entry<Location, Item> 
     public val location: Location
     public val item: Item
 
-    public fun fixInPlace(): ImmutableLocation<Location, Item>
-
     override val key: Location get() = location
     override val value: Item get() = item
 }
 
-public data class ImmutableLocation<out Location, out Item>(
+public data class FixedLocation<out Location, out Item>(
     override val location: Location,
     override val item: Item
-) : Locationed<Location, Item> {
-    override fun fixInPlace(): ImmutableLocation<Location, Item> = this
-}
+) : Locationed<Location, Item>
 
-public fun <Location, Item> Locationed(location: Location, item: Item): Locationed<Location, Item> = ImmutableLocation(location, item)
+public fun <Location, Item> Locationed(location: Location, item: Item): Locationed<Location, Item> = FixedLocation(location, item)
 
 public data class DynamicLocation<Location, Item>(
     private val updateLocation: () -> Location,
     override val item: Item
 ) : Locationed<Location, Item> {
     override val location: Location get() = updateLocation()
-
-    override fun fixInPlace(): ImmutableLocation<Location, Item> = ImmutableLocation(location, item)
 }

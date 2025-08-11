@@ -12,13 +12,30 @@ public class MutableExtensions: Extensions {
     /**
      * For values that can be overwritten in MutableExtensions
      * */
-    public interface MutableKey<T : Any> : Extensions.Key<T>
+    public interface Key<T : Any> : Extensions.Key<T>
 
     /**
-     * Meant to retrieve a mutable version of T when in the context of MutableExtensions,
-     * and an immutable version when reduced to Extensions.
+     * Retrieves a mutable value `M` when in the context of [MutableExtensions], but when
+     * degraded to [Extensions] retrieves `T`, which is an immutable version of `M`.
+     *
+     * Example:
+     * ```kotlin
+     * // Key that degrades from a MutableList to List
+     * object ListKey : MutableExtensions.DegradingKey<MutableList<Int>, List<Int>>
+     *
+     * fun main() {
+     *    val mutableExtensions = MutableExtensions()
+     *    val upgraded: MutableList<Int> = mutableExtensions[ListKey]
+     *
+     *    // degrading MutableExtensions to Extensions
+     *    val extensions: Extensions = mutableExtensions
+     *
+     *    // MutableList is degraded to List in Extensions
+     *    val degraded: List<Int> = extensions[ListKey]
+     * }
+     * ```
      * */
-    public interface DegradingKey<T : Any, M : T> : Extensions.Key<T> {
+    public interface DegradingKey<M : T, T : Any> : Extensions.Key<T> {
         public fun default(): M
     }
 
@@ -28,10 +45,10 @@ public class MutableExtensions: Extensions {
     override operator fun <T : Any> get(key: Extensions.Key<T>): T? = _extensions[key] as? T
 
     @Suppress("UNCHECKED_CAST")
-    public operator fun <T : Any, M : T> get(key: DegradingKey<T, M>): M =
+    public operator fun <M : T, T : Any> get(key: DegradingKey<M, T>): M =
         _extensions.getOrPut(key, key::default) as M
 
-    public operator fun <T : Any> set(key: MutableKey<T>, value: T?) {
+    public operator fun <T : Any> set(key: Key<T>, value: T?) {
         if (value == null) _extensions.remove(key)
         else _extensions[key] = value
     }
