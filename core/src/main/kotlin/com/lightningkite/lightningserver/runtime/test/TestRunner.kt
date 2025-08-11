@@ -4,20 +4,11 @@ import com.lightningkite.lightningserver.Task
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.http.HttpEndpoint
-import com.lightningkite.lightningserver.http.HttpHandler
-import com.lightningkite.lightningserver.http.HttpHeaders
-import com.lightningkite.lightningserver.http.HttpRequest
-import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.pathing.PathSpec1
-import com.lightningkite.lightningserver.pathing.PathSpec2
-import com.lightningkite.lightningserver.pathing.PathSpec3
-import com.lightningkite.lightningserver.pathing.ServerPath
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
-import com.lightningkite.lightningserver.runtime.invoke
+import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketConnection
@@ -25,32 +16,22 @@ import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
-import com.lightningkite.services.data.TypedData
 import kotlinx.coroutines.flow.MutableSharedFlow
+import java.util.concurrent.ConcurrentHashMap
 
 public class TestRunner<SERVER: ServerBuilder>(
     public val serverBuilder: SERVER,
-    public val settings: TestSettings,
 ) : ServerRuntimeBase(serverBuilder.build().flatten()) {
     public constructor(
         server: SERVER,
-        settings: context(TestSettings) SERVER.() -> Unit
-    ): this(server, with(server) { TestSettings().apply { settings() } })
+        settings: context(ServerSettings) SERVER.() -> Unit
+    ): this(server) {
+        context(this.settings) { settings(server) }
+    }
 
     private val settingsCache = HashMap<ServerSetting<*, *>, Any?>()
 
-    @Suppress("UNCHECKED_CAST")
-    override fun <SERIALIZABLE, GOAL> ServerSetting<SERIALIZABLE, GOAL>.invoke(): GOAL {
-        return settingsCache.getOrPut(this) {
-            (settings.goal[this] as? GOAL) ?: run {
-                val value = settings.serializable.getValue(this) as SERIALIZABLE
-                val result: GOAL = this.get(value)
-                result
-            }
-        } as GOAL
-    }
-
-    private val subscriptions = HashMap<WebSocketSubscriptionRequest<*, *>, ArrayList<suspend (WebSocketSubscriptionMessage<*, *>)->Unit>>()
+    private val subscriptions = ConcurrentHashMap<WebSocketSubscriptionRequest<*, *>, ArrayList<suspend (WebSocketSubscriptionMessage<*, *>)->Unit>>()
     override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>) {
         subscriptions[WebSocketSubscriptionRequest(topic = event.topic, rawPathArguments = event.rawPathArguments)]?.forEach {
             it(event)
@@ -141,9 +122,12 @@ public class TestRunner<SERVER: ServerBuilder>(
 }
 
 public inline fun <SERVER: ServerBuilder> SERVER.test(
-    settings: context(TestSettings) SERVER.() -> Unit,
+    settings: context(ServerSettings) SERVER.() -> Unit,
     action: context(TestRunner<SERVER>) SERVER.()->Unit
 ) {
-    val runner = TestRunner(this, TestSettings().apply { settings() })
+    val runner = TestRunner(this)
+    with(runner) {
+        context(this.settings) { settings(this@test) }
+    }
     action(runner, this)
 }

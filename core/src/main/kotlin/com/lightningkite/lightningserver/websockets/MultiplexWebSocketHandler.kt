@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.ServerPath
 import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -165,7 +166,7 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
                         sourceIp = connection.request.sourceIp,
                         cache = connection.request.cache,
                     )
-                    val storage = otherHandler.willConnect(connection, r)
+                    val storage = otherHandler.willConnectWithMetrics(match.pathSpec, connection, r)
                     connection.updateStateImmediately {
                         it.copy(
                             map = it.map + (channel to MultiplexWebSocketHandlerConnectionInfo(
@@ -174,7 +175,7 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
                             ))
                         )
                     }
-                    connection.withWrapped(otherHandler, channel) { otherHandler.didConnect(it) }
+                    connection.withWrapped(otherHandler, channel) { otherHandler.didConnectWithMetrics(match.pathSpec, it) }
                     connection.send(
                         WebSocketFrame(
                             json.encodeToString(
@@ -193,7 +194,7 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
                     val otherHandler = match.value ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${match.pathSpec}'")
                     @Suppress("UNCHECKED_CAST")
                     otherHandler as WebSocketHandler<PathSpec, Any?>
-                    connection.withWrapped(otherHandler, channel) { otherHandler.disconnect(it, WebSocketClose.NORMAL) }
+                    connection.withWrapped(otherHandler, channel) { otherHandler.disconnectWithMetrics(match.pathSpec, it, WebSocketClose.NORMAL) }
                     connection.updateStateImmediately { it.copy(map = it.map - channel) }
                     connection.send(
                         WebSocketFrame(
@@ -214,7 +215,7 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
                     @Suppress("UNCHECKED_CAST")
                     otherHandler as WebSocketHandler<PathSpec, Any?>
                     val textFrame = WebSocketFrame.Text(message.data!!)
-                    connection.withWrapped(otherHandler, channel) { otherHandler.messageFromClient(it, textFrame) }
+                    connection.withWrapped(otherHandler, channel) { otherHandler.messageFromClientWithMetrics(match.pathSpec, it, textFrame) }
                 }
             }
         } catch (e: Exception) {
@@ -228,13 +229,12 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
                 )
             )
             connection.currentState.map[channel]?.let { info ->
-                val info = connection.currentState.map[message.channel]!!
                 val match = with(connection) { info.request.path.match }
                 val otherHandler = match.value ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${match.pathSpec}'")
                 @Suppress("UNCHECKED_CAST")
                 otherHandler as WebSocketHandler<PathSpec, Any?>
                 connection.withWrapped(otherHandler, channel) {
-                    otherHandler.disconnect(it, WebSocketClose.CLOSED_ABNORMALLY)
+                    otherHandler.disconnectWithMetrics(match.pathSpec, it, WebSocketClose.CLOSED_ABNORMALLY)
                 }
             }
             connection.queueStateUpdate { it.copy(map = it.map - channel) }
@@ -252,7 +252,7 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
                 @Suppress("UNCHECKED_CAST")
                 otherHandler as WebSocketHandler<PathSpec, Any?>
                 connection.withWrapped(otherHandler, channel) {
-                    otherHandler.messageFromSubscription(it, topic)
+                    otherHandler.messageFromSubscriptionWithMetrics(match.pathSpec, it, topic)
                 }
             }
         }
@@ -266,7 +266,7 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
                 @Suppress("UNCHECKED_CAST")
                 otherHandler as WebSocketHandler<PathSpec, Any?>
                 connection.withWrapped(otherHandler, channel) {
-                    otherHandler.disconnect(it, reason)
+                    otherHandler.disconnectWithMetrics(match.pathSpec, it, reason)
                 }
             }
         }

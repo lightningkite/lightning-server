@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver
 import com.lightningkite.lightningserver.definition.GeneralServerSettings
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.builder.bind
+import com.lightningkite.lightningserver.definition.builder.setting
 import com.lightningkite.lightningserver.definition.builder.topic
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.HttpResponse
@@ -12,8 +13,9 @@ import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.pathing.first
 import com.lightningkite.lightningserver.runtime.test.TestRunner
 import com.lightningkite.lightningserver.runtime.send
-import com.lightningkite.lightningserver.runtime.test.set
+import com.lightningkite.lightningserver.runtime.invoke
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.lightningserver.websockets.subscribe
@@ -27,7 +29,9 @@ import kotlin.test.assertEquals
 class TestRunnerTest {
 
     object TestServer : ServerBuilder() {
+        val sampleSetting = setting("sample", "default")
         val testEndpoint = path.path("test").get bind HttpHandler {
+            val settingValue = sampleSetting()
             HttpResponse.plainText("Hello world!")
         }
         val testEndpointWithArg = path.path("test").arg<String>("arg1").get bind HttpHandler {

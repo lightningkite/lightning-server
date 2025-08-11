@@ -46,7 +46,7 @@ public fun <SETTING : Setting<RESULT>, RESULT> ServerSetting(
     default: SETTING,
     optional: Boolean = false
 ): ServerSetting<SETTING, RESULT> =
-    ServerSetting(name, serializer, default, optional) { it.invoke(this) }
+    ServerSetting(name, serializer, default, optional) { it.invoke(name, this) }
 
 private data class BasicDirectServerSetting<SETTING>(
     override val settingName: String,

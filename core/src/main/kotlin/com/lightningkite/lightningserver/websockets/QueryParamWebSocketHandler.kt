@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.ServerPath
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 
@@ -135,7 +136,7 @@ internal class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryP
 //                    null /*TODO*/
 //                )
 //            ) {
-            otherHandler.willConnect(serverRuntime, request)
+            otherHandler.willConnectWithMetrics(match.pathSpec, serverRuntime, request)
 //            }
 
         @Suppress("UNCHECKED_CAST")
@@ -149,11 +150,12 @@ internal class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryP
         connection: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>,
     ) {
         val innerRequest = connection.currentState.request
-        val otherHandler = with(connection) { innerRequest.path.match.value?.websocket }
+        val match = with(connection) { innerRequest.path.match }
+        val otherHandler = match.value?.websocket
             ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${innerRequest.path.asString}'")
         @Suppress("UNCHECKED_CAST")
         otherHandler as WebSocketHandler<PathSpec, Any?>
-        connection.withWrapped(otherHandler) { otherHandler.didConnect(it) }
+        connection.withWrapped(otherHandler) { otherHandler.didConnectWithMetrics(match.pathSpec, it) }
     }
 
     override suspend fun messageFromClient(
@@ -161,11 +163,12 @@ internal class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryP
         frame: WebSocketFrame,
     ) {
         val innerRequest = connection.currentState.request
-        val otherHandler = with(connection) { innerRequest.path.match.value?.websocket }
+        val match = with(connection) { innerRequest.path.match }
+        val otherHandler = match.value?.websocket
             ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${innerRequest.path.asString}'")
         @Suppress("UNCHECKED_CAST")
         otherHandler as WebSocketHandler<PathSpec, Any?>
-        connection.withWrapped(otherHandler) { otherHandler.messageFromClient(it, frame) }
+        connection.withWrapped(otherHandler) { otherHandler.messageFromClientWithMetrics(match.pathSpec, it, frame) }
     }
 
     override suspend fun messageFromSubscription(
@@ -173,11 +176,12 @@ internal class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryP
         topic: WebSocketSubscriptionMessage<*, *>
     ) {
         val innerRequest = connection.currentState.request
-        val otherHandler = with(connection) { innerRequest.path.match.value?.websocket }
+        val match = with(connection) { innerRequest.path.match }
+        val otherHandler = match.value?.websocket
             ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${innerRequest.path.asString}'")
         @Suppress("UNCHECKED_CAST")
         otherHandler as WebSocketHandler<PathSpec, Any?>
-        connection.withWrapped(otherHandler) { otherHandler.messageFromSubscription(it, topic) }
+        connection.withWrapped(otherHandler) { otherHandler.messageFromSubscriptionWithMetrics(match.pathSpec, it, topic) }
     }
 
     override suspend fun disconnect(
@@ -185,10 +189,11 @@ internal class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryP
         reason: WebSocketClose,
     ) {
         val innerRequest = connection.currentState.request
-        val otherHandler = with(connection) { innerRequest.path.match.value?.websocket }
+        val match = with(connection) { innerRequest.path.match }
+        val otherHandler = match.value?.websocket
             ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${innerRequest.path.asString}'")
         @Suppress("UNCHECKED_CAST")
         otherHandler as WebSocketHandler<PathSpec, Any?>
-        connection.withWrapped(otherHandler) { otherHandler.disconnect(it, reason) }
+        connection.withWrapped(otherHandler) { otherHandler.disconnectWithMetrics(match.pathSpec, it, reason) }
     }
 }

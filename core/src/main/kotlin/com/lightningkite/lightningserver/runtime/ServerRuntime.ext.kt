@@ -10,7 +10,9 @@ import com.lightningkite.lightningserver.websockets.WebSocketTopic
 
 
 context(server: ServerRuntime)
-public operator fun <SERIALIZABLE, GOAL> ServerSetting<SERIALIZABLE, GOAL>.invoke(): GOAL = with(server) { invoke() }
+public operator fun <SERIALIZABLE, GOAL> ServerSetting<SERIALIZABLE, GOAL>.invoke(): GOAL = with(server) {
+    settings.get(this@invoke, this)
+}
 
 context(serverRuntime: ServerRuntime)
 public suspend fun <T> WebSocketTopic<PathSpec0, T>.send(value: T): Unit =
