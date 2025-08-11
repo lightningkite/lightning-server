@@ -14,7 +14,11 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.ConcretePath
 import com.lightningkite.lightningserver.Request
-import com.lightningkite.lightningserver.OldServerDefinition
+import com.lightningkite.lightningserver.definition.ServerDefinition
+import com.lightningkite.lightningserver.definition.builder.ListRegistry
+import com.lightningkite.lightningserver.definition.ListRegistryExtension
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.definition.getValue
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.data.Description
 import com.lightningkite.services.database.HasId
@@ -82,12 +86,8 @@ public data class ApiExample<INPUT, OUTPUT>(
     val notes: String? = null,
 )
 
-public val OldServerDefinition.principalTypes: List<PrincipalType<*, *>>
-    get() = get(PrincipalTypesKey)!!
-public fun OldServerDefinition.register(type: PrincipalType<*, *>) {
-    set(PrincipalTypesKey, (get(PrincipalTypesKey) ?: listOf()) + type)
-}
-public object PrincipalTypesKey: OldServerDefinition.ExtensionKey<List<PrincipalType<*, *>>>
+public val ServerDefinition.principalTypes: List<PrincipalType<*, *>> by PrincipalType.RegistryKey
+public val ServerBuilder.principalTypes: ListRegistry<PrincipalType<*, *>> by PrincipalType.RegistryKey
 
 @Serializable
 public class PrincipalTypeAndId<USER: HasId<ID>, ID: Comparable<ID>>(
@@ -199,6 +199,8 @@ public interface ServerRuntimeWithAuth<USER: HasId<*>?, PATH: PathSpec>: ServerR
 }
 
 public interface PrincipalType<SUBJECT: HasId<ID>, ID: Comparable<ID>> {
+    public object RegistryKey : ListRegistryExtension<PrincipalType<*, *>>
+
     public val idSerializer: KSerializer<ID>
     public val name: String get() = subjectSerializer.descriptor.serialName
     public val cacheTypes: Collection<CacheKey<*, *, *>>

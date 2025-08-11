@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.http
 
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import kotlin.time.Duration
 
 public interface HttpInterceptor {
     public suspend fun handle(serverRuntime: ServerRuntime, request: HttpRequest<*>, cont: suspend ServerRuntime.(HttpRequest<*>) -> HttpResponse): HttpResponse
@@ -70,8 +71,10 @@ private data class InterceptedHandler<PATH : PathSpec>(
     val handler: HttpHandler<PATH>,
     val interceptor: HttpInterceptor
 ) : HttpHandler<PATH> {
+    override val timeout: Duration get() = handler.timeout
     override suspend fun handle(serverRuntime: ServerRuntime, request: HttpRequest<PATH>): HttpResponse =
         interceptor.handle(serverRuntime, request) { handler.handle(serverRuntime, request) }
 }
 
-public fun <PATH : PathSpec> HttpInterceptor.intercept(handler: HttpHandler<PATH>): HttpHandler<PATH> = InterceptedHandler(handler, this)
+public fun <PATH : PathSpec> HttpInterceptor.intercept(handler: HttpHandler<PATH>): HttpHandler<PATH> =
+    if (this === HttpInterceptor.None) handler else InterceptedHandler(handler, this)

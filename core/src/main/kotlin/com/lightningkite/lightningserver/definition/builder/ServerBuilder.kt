@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.definition.builder
 
 import com.lightningkite.lightningserver.ScheduledTask
 import com.lightningkite.lightningserver.Task
+import com.lightningkite.lightningserver.definition.Extendable
 import com.lightningkite.lightningserver.definition.Extensions
 import com.lightningkite.lightningserver.definition.MutableExtensions
 import com.lightningkite.lightningserver.definition.ServerDefinition
@@ -63,7 +64,7 @@ import kotlinx.serialization.modules.plus
  * }
  * ```
  * */
-public abstract class ServerBuilder {
+public abstract class ServerBuilder : Extendable {
     public open val internalSerialization: SerializersModule get() = EmptySerializersModule()
     public open val externalSerialization: SerializersModule get() = EmptySerializersModule()
 
@@ -77,7 +78,7 @@ public abstract class ServerBuilder {
     public val schedules: Registry<PathSpec0, ScheduledTask> = Registry()
     public val tasks: Registry<PathSpec0, Task<*>> = Registry()
 
-    public val extensions: MutableExtensions = MutableExtensions()
+    public override val extensions: MutableExtensions = MutableExtensions()
 
     public val modules: Registry<PathSpec0, ServerDefinition> = Registry()
 
