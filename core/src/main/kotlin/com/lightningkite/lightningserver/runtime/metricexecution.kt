@@ -18,55 +18,50 @@ import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.services.topLevelReportingContext
 
 context(serverRuntime: ServerRuntime)
-public suspend fun <PATH : PathSpec> Locationed<HttpEndpoint<PATH>, HttpHandler<PATH>>.handleWithMetrics(request: HttpRequest<PATH>): HttpResponse {
-    return topLevelReportingContext(this.location.toString(), serverRuntime) {
-        item.handle(serverRuntime, request)
+public suspend fun <PATH : PathSpec> HttpHandler<PATH>.handleWithMetrics(location: HttpEndpoint<PATH>, request: HttpRequest<PATH>): HttpResponse {
+    return topLevelReportingContext(location.toString(), serverRuntime.metrics) {
+        handle(serverRuntime, request)
     }
 }
-context(serverRuntime: ServerRuntime)
-public suspend fun <PATH : PathSpec, STORAGE> Locationed<PATH, WebSocketHandler<PATH, STORAGE>>.willConnectWithMetrics(request: WebSocketConnectRequest<PATH>): STORAGE {
-    return topLevelReportingContext(this.location.toString(), serverRuntime) {
-        item.willConnect(serverRuntime, request)
+public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.willConnectWithMetrics(location: PATH, serverRuntime: ServerRuntime, request: WebSocketConnectRequest<PATH>): STORAGE {
+    return topLevelReportingContext("WEBSOCKET.WILLCONNECT $location", serverRuntime.metrics) {
+        willConnect(serverRuntime, request)
     }
 }
-context(connection: WebSocketConnection<PATH, STORAGE>)
-public suspend fun <PATH : PathSpec, STORAGE> Locationed<PATH, WebSocketHandler<PATH, STORAGE>>.didConnectWithMetrics() {
-    return topLevelReportingContext(this.location.toString(), connection) {
-        item.didConnect(connection)
+public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.didConnectWithMetrics(location: PATH, connection: WebSocketConnection<PATH, STORAGE>, ) {
+    return topLevelReportingContext("WEBSOCKET.DIDCONNECT $location", connection.metrics) {
+        didConnect(connection)
     }
 }
-context(connection: WebSocketConnection<PATH, STORAGE>)
-public suspend fun <PATH : PathSpec, STORAGE> Locationed<PATH, WebSocketHandler<PATH, STORAGE>>.messageFromClientWithMetrics(frame: WebSocketFrame) {
-    return topLevelReportingContext(this.location.toString(), connection) {
-        item.messageFromClient(connection, frame)
+public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.messageFromClientWithMetrics(location: PATH, connection: WebSocketConnection<PATH, STORAGE>, frame: WebSocketFrame) {
+    return topLevelReportingContext("WEBSOCKET.MESSAGE $location", connection.metrics) {
+        messageFromClient(connection, frame)
     }
 }
-context(connection: WebSocketConnection<PATH, STORAGE>)
-public suspend fun <PATH : PathSpec, STORAGE> Locationed<PATH, WebSocketHandler<PATH, STORAGE>>.messageFromSubscriptionWithMetrics(topic: WebSocketSubscriptionMessage<*, *>) {
-    return topLevelReportingContext(this.location.toString(), connection) {
-        item.messageFromSubscription(connection, topic)
+public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.messageFromSubscriptionWithMetrics(location: PATH, connection: WebSocketConnection<PATH, STORAGE>, topic: WebSocketSubscriptionMessage<*, *>) {
+    return topLevelReportingContext("WEBSOCKET.SUBSCRIPTION $location", connection.metrics) {
+        messageFromSubscription(connection, topic)
     }
 }
-context(connection: WebSocketConnection<PATH, STORAGE>)
-public suspend fun <PATH : PathSpec, STORAGE> Locationed<PATH, WebSocketHandler<PATH, STORAGE>>.disconnectWithMetrics(reason: WebSocketClose) {
-    return topLevelReportingContext(this.location.toString(), connection) {
-        item.disconnect(connection, reason)
+public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.disconnectWithMetrics(location: PATH, connection: WebSocketConnection<PATH, STORAGE>, reason: WebSocketClose) {
+    return topLevelReportingContext("WEBSOCKET.DISCONNECT $location", connection.metrics) {
+        disconnect(connection, reason)
     }
 }
 
 context(serverRuntime: ServerRuntime)
-public suspend fun <T> Locationed<PathSpec0, Task<T>>.executeWithMetrics(input: T) {
-    return topLevelReportingContext(this.location.toString(), serverRuntime) {
+public suspend fun <T> Task<T>.executeWithMetrics(location: PathSpec0, input: T) {
+    return topLevelReportingContext("TASK $location", serverRuntime.metrics) {
         with(serverRuntime) {
-            item.execute(input)
+            execute(input)
         }
     }
 }
 context(serverRuntime: ServerRuntime)
-public suspend fun Locationed<PathSpec0, ScheduledTask>.executeWithMetrics() {
-    return topLevelReportingContext(this.location.toString(), serverRuntime) {
+public suspend fun ScheduledTask.executeWithMetrics(location: PathSpec0, ) {
+    return topLevelReportingContext("SCHEDULE $location", serverRuntime.metrics) {
         with(serverRuntime) {
-            item.execute()
+            execute()
         }
     }
 }

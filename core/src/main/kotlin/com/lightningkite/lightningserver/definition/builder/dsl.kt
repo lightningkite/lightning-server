@@ -13,6 +13,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.plus
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.serializerOrContextual
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
 import kotlinx.serialization.KSerializer
@@ -93,6 +94,40 @@ public fun <Result> setting(
     val setting = ServerSetting(
         name,
         serializer,
+        default,
+        optional,
+    )
+    builder.settings.register(setting)
+    return setting
+}
+
+@LightningServerDsl
+context(builder: ServerBuilder)
+public inline fun <reified Setting, Result> setting(
+    name: String,
+    default: Setting,
+    optional: Boolean = false,
+    crossinline getter: ServerRuntime.(Setting) -> Result,
+): ServerSetting<Setting, Result> =
+    setting(
+        ServerSetting(
+            name,
+            serializerOrContextual<Setting>(),
+            default,
+            optional,
+        ) { value -> getter(this, value) }
+    )
+
+@LightningServerDsl
+context(builder: ServerBuilder)
+public inline fun <reified Result> setting(
+    name: String,
+    default: Result,
+    optional: Boolean = false,
+): ServerSetting.Direct<Result> {
+    val setting = ServerSetting(
+        name,
+        serializerOrContextual<Result>(),
         default,
         optional,
     )
