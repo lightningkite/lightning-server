@@ -86,8 +86,6 @@ public data class ApiExample<INPUT, OUTPUT>(
     val notes: String? = null,
 )
 
-public val ServerDefinition.principalTypes: List<PrincipalType<*, *>> by PrincipalType.RegistryKey
-public val ServerBuilder.principalTypes: ListRegistry<PrincipalType<*, *>> by PrincipalType.RegistryKey
 
 @Serializable
 public class PrincipalTypeAndId<USER: HasId<ID>, ID: Comparable<ID>>(
@@ -198,6 +196,10 @@ public interface ServerRuntimeWithAuth<USER: HasId<*>?, PATH: PathSpec>: ServerR
     public val authOrNull: RequestAuth<USER & Any, *>?
 }
 
+
+public val ServerBuilder.principalTypes: ListRegistry<PrincipalType<*, *>> by PrincipalType.RegistryKey
+public val ServerDefinition.principalTypes: List<PrincipalType<*, *>> by PrincipalType.RegistryKey
+
 public interface PrincipalType<SUBJECT: HasId<ID>, ID: Comparable<ID>> {
     public object RegistryKey : ListRegistryExtension<PrincipalType<*, *>>
 
@@ -208,7 +210,7 @@ public interface PrincipalType<SUBJECT: HasId<ID>, ID: Comparable<ID>> {
     public suspend fun get(serverRuntime: ServerRuntime, request: Request<*>): RequestAuth<SUBJECT, ID>? = null
 
     public val subjectSerializer: KSerializer<SUBJECT>
-    public suspend fun fetch(serverRuntime: ServerRuntime, id: ID): RequestAuth<SUBJECT, ID>?
+    public suspend fun fetch(serverRuntime: ServerRuntime, id: ID): SUBJECT
 
     public suspend fun permitMasquerade(
         other: PrincipalType<*, *>,

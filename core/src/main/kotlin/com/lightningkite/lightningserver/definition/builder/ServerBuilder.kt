@@ -23,7 +23,7 @@ import kotlinx.serialization.modules.plus
 /**
  * [ServerBuilder] provides a fluent, type-safe API for defining your server configuration.
  *
- * [ServerBuilder] is essentially a collection of [Registry]s for your endpoints, tasks, schedules, etc. You build a server by registering
+ * [ServerBuilder] is essentially a collection of [MapRegistry]s for your endpoints, tasks, schedules, etc. You build a server by registering
  * resources and their locations. Once the definition is complete the [build] method is used to construct an immutable
  * [ServerDefinition] for runtime use.
  *
@@ -75,12 +75,12 @@ public abstract class ServerBuilder : Extendable {
     public val http: HttpBuilder = HttpBuilder()
     public val websockets: WebSocketsBuilder = WebSocketsBuilder()
 
-    public val schedules: Registry<PathSpec0, ScheduledTask> = Registry()
-    public val tasks: Registry<PathSpec0, Task<*>> = Registry()
+    public val schedules: MapRegistry<PathSpec0, ScheduledTask> = MapRegistry()
+    public val tasks: MapRegistry<PathSpec0, Task<*>> = MapRegistry()
 
     public override val extensions: MutableExtensions = MutableExtensions()
 
-    public val modules: Registry<PathSpec0, ServerDefinition> = Registry()
+    public val modules: MapRegistry<PathSpec0, ServerDefinition> = MapRegistry()
 
 
     public fun build(): ServerDefinition = object : ServerDefinition {

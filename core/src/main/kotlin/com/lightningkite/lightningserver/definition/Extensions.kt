@@ -39,23 +39,32 @@ public interface Extensions {
  * */
 public class MutableExtensions: Extensions {
     /**
-     * Provides direct read-write access to an extension value of type `T`.
+     * Provides mutable access to an extension value of type `T`.
      *
-     * [MutableExtensions.Key] can also perform read-write property delegation
-     * for [Extendable] receivers.
+     * [MutableExtensions.Key] instances defined for public use should also define an extension property so that
+     * the extension can be easily located. For convenience [MutableExtensions.Key] extension properties can be
+     * defined by delegation to the key itself, creating read-write properties for [Extendable] receivers and
+     * read-only properties for [Extended] receivers.
      *
      * Example:
-     *```kotlin
-     *   class Util {
-     *      object Key : MutableExtensions.Key<Util>
-     *   }
+     * ```kotlin
+     * interface Foo : Extended
+     * class FooBuilder : Foo, Extendable { //... }
      *
-     *   interface Foo : Extendable
+     * object NameKey : MutableExtensions.Key<String>
      *
-     *   var Foo.util: Util? by Util.Key
-     *   // Non-null delegation can be done by providing a default value
-     *   var Foo.utilNotNull: Util by Util.Key.cached { Util() }
-     *```
+     * // extension made publicly accessible through extension property.
+     * var FooBuilder.name: String? by NameKey // mutable
+     * val Foo.name: String? by NameKey // immutable
+     *
+     * fun foo(builder: FooBuilder.() -> Unit): Foo = FooBuilder().apply(builder)
+     *
+     * fun example() {
+     *    val foo: Foo = foo {
+     *       name = "Hello World"
+     *    }
+     *    assertEquals(foo.name, "Hello World")
+     * }
      * */
     public interface Key<T : Any> : Extensions.Key<T>
 
@@ -64,20 +73,30 @@ public class MutableExtensions: Extensions {
      * degraded to [Extensions] retrieves `READ`. The typical use for this
      * is to degrade a type `WRITE` with read-write access to a read-only type `READ`.
      *
+     * [DegradingKey] instances defined for public use should also define an extension property so that
+     * the extension can be easily located. For convenience [DegradingKey] extension properties can be
+     * defined by delegation to the key itself, retrieving `WRITE` for [Extendable] receivers and
+     * `READ` for [Extended] receivers.
+     *
      * Example:
      * ```kotlin
-     * // Key that degrades from a MutableList to List
-     * object Key : MutableExtensions.DegradingKey<MutableList<Int>, List<Int>>
+     * interface Foo : Extended
+     * class FooBuilder : Foo, Extendable { //... }
      *
-     * fun main() {
-     *    val mutableExtensions = MutableExtensions()
-     *    val upgraded: MutableList<Int> = mutableExtensions[Key]
+     * object ArgumentsKey : MutableExtensions.DegradingKey<MutableList<String>, List<String>>
      *
-     *    // degrading MutableExtensions to Extensions
-     *    val extensions: Extensions = mutableExtensions
+     * // extension made publicly accessible through extension property.
+     * val FooBuilder.arguments: MutableList<String> by ArgumentsKey // WRITE type
+     * val Foo.arguments: List<String> by ArgumentsKey // READ type
      *
-     *    // MutableList is degraded to List in Extensions
-     *    val degraded: List<Int> = extensions[Key]
+     * fun foo(builder: FooBuilder.() -> Unit): Foo = FooBuilder().apply(builder)
+     *
+     * fun example() {
+     *    val foo: Foo = foo {
+     *       arguments.add("Hello")
+     *       arguments.add("World")
+     *    }
+     *    assertEquals(foo.arguments, listOf("Hello", "World"))
      * }
      * ```
      * */
