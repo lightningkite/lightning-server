@@ -1,8 +1,5 @@
-//@file:UseContextualSerialization(Instant::class, UUID::class, ServerFile::class)
+package com.lightningkite.lightningserver.demo
 
-package com.lightningkite.lightningserverdemo
-
-import com.lightningkite.kotlinercli.cli
 import com.lightningkite.lightningserver.definition.flatten
 import com.lightningkite.lightningserver.engine.ktor.KtorEngine
 import com.lightningkite.lightningserver.settings.loadFromFile

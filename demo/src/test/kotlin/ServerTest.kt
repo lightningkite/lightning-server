@@ -1,5 +1,4 @@
-import com.lightningkite.lightningserver.db.DatabaseSettings
-import com.lightningkite.lightningserverdemo.Server
+import com.lightningkite.lightningserver.demo.Server
 import com.lightningkite.lightningserver.engine.UnitTestEngine
 import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.jsonschema.lightningServerSchema
@@ -11,7 +10,6 @@ import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.typed.Documentable
 import com.lightningkite.lightningserver.typed.typescriptSdk
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.Test
 
