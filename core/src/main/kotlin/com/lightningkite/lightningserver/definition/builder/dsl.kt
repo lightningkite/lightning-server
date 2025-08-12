@@ -77,8 +77,8 @@ public fun <Setting, Result> setting(
     setting(
         ServerSetting(
             name,
-            serializer,
             default,
+            serializer,
             optional,
         ) { value -> getter(this, value) }
     )
@@ -93,8 +93,8 @@ public fun <Result> setting(
 ): ServerSetting.Direct<Result> {
     val setting = ServerSetting(
         name,
-        serializer,
         default,
+        serializer,
         optional,
     )
     builder.settings.register(setting)
@@ -112,8 +112,8 @@ public inline fun <reified Setting, Result> setting(
     setting(
         ServerSetting(
             name,
-            serializerOrContextual<Setting>(),
             default,
+            serializerOrContextual<Setting>(),
             optional,
         ) { value -> getter(this, value) }
     )
@@ -127,8 +127,8 @@ public inline fun <reified Result> setting(
 ): ServerSetting.Direct<Result> {
     val setting = ServerSetting(
         name,
-        serializerOrContextual<Result>(),
         default,
+        serializerOrContextual<Result>(),
         optional,
     )
     builder.settings.register(setting)

@@ -22,8 +22,8 @@ public interface ServerSetting<SETTING, RESULT> {
 
 private data class BasicServerSetting<SETTING, RESULT>(
     override val settingName: String,
-    override val serializer: KSerializer<SETTING>,
     override val default: SETTING,
+    override val serializer: KSerializer<SETTING>,
     override val optional: Boolean,
     private val getter: ServerRuntime.(SETTING) -> RESULT
 ) : ServerSetting<SETTING, RESULT> {
@@ -33,34 +33,34 @@ private data class BasicServerSetting<SETTING, RESULT>(
 
 public fun <SETTING, RESULT> ServerSetting(
     name: String,
-    serializer: KSerializer<SETTING>,
     default: SETTING,
+    serializer: KSerializer<SETTING>,
     optional: Boolean = false,
     getter: ServerRuntime.(SETTING) -> RESULT
 ) : ServerSetting<SETTING, RESULT> =
-    BasicServerSetting(name, serializer, default, optional, getter)
+    BasicServerSetting(name, default, serializer, optional, getter)
 
 public fun <SETTING : Setting<RESULT>, RESULT> ServerSetting(
     name: String,
-    serializer: KSerializer<SETTING>,
     default: SETTING,
+    serializer: KSerializer<SETTING>,
     optional: Boolean = false
 ): ServerSetting<SETTING, RESULT> =
-    ServerSetting(name, serializer, default, optional) { it.invoke(name, this) }
+    ServerSetting(name, default, serializer, optional) { it.invoke(name, this) }
 
 private data class BasicDirectServerSetting<SETTING>(
     override val settingName: String,
-    override val serializer: KSerializer<SETTING>,
     override val default: SETTING,
+    override val serializer: KSerializer<SETTING>,
     override val optional: Boolean,
 ) : ServerSetting.Direct<SETTING>
 
 public fun <SETTING> ServerSetting(
     name: String,
-    serializer: KSerializer<SETTING>,
     default: SETTING,
+    serializer: KSerializer<SETTING>,
     optional: Boolean = false
 ) : ServerSetting.Direct<SETTING> =
-    BasicDirectServerSetting(name, serializer, default, optional)
+    BasicDirectServerSetting(name, default, serializer, optional)
 
 

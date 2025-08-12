@@ -36,11 +36,12 @@ import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
-public val enginePubSub: ServerSetting<PubSub.Settings, PubSub> = ServerSetting("pubSub", PubSub.Settings.serializer(), PubSub.Settings())
-public val engineCache: ServerSetting<Cache.Settings, Cache> = ServerSetting("cache", Cache.Settings.serializer(), Cache.Settings())
+public val enginePubSub: ServerSetting<PubSub.Settings, PubSub> = ServerSetting("pubSub", PubSub.Settings(), PubSub.Settings.serializer())
+public val engineCache: ServerSetting<Cache.Settings, Cache> = ServerSetting("cache", Cache.Settings(), Cache.Settings.serializer())
 
 public abstract class LocalEngine(server: ServerDefinition): ServerRuntimeBase(server) {
     protected open val scope: CoroutineScope = GlobalScope
+
     override val settings: ServerSettings = ServerSettings(server.settings.plus(listOf(
         generalSettings,
         metricsSettings,
@@ -48,6 +49,7 @@ public abstract class LocalEngine(server: ServerDefinition): ServerRuntimeBase(s
         enginePubSub,
         engineCache,
     )).toSet())
+
     public val pubSub: PubSub by lazy { settings.get(enginePubSub, this) }
     public val cache: Cache by lazy { settings.get(engineCache, this) }
 

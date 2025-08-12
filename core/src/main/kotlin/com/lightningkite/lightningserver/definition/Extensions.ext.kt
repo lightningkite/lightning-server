@@ -48,13 +48,3 @@ public interface RegistryExtension<L, V : Any> : MutableExtensions.DegradingKey<
 public interface ListRegistryExtension<V> : MutableExtensions.DegradingKey<ListRegistry<V>, List<V>> {
     override fun default(): ListRegistry<V> = ListRegistry()
 }
-
-context(extendable: Extendable)
-public fun <L, V : Any> RegistryExtension<L, V>.register(location: L, value: V) {
-    extendable.extensions[this].register(location, value)
-}
-
-context(extendable: Extendable)
-public fun <V> ListRegistryExtension<V>.register(value: V) {
-    extendable.extensions[this].register(value)
-}

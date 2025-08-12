@@ -61,11 +61,8 @@ public data class VertXSettings(
 /**
  * Server setting for Vert.X configuration.
  */
-public val vertxSettings: ServerSetting<VertXSettings, VertXSettings> = ServerSetting(
-    "vertx",
-    VertXSettings.serializer(),
-    VertXSettings()
-)
+public val vertxSettings: ServerSetting.Direct<VertXSettings> =
+    ServerSetting("vertx", VertXSettings(), VertXSettings.serializer())
 
 /**
  * A Vert.X implementation of the Lightning Server engine.

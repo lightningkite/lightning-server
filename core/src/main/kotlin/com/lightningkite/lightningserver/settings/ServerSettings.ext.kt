@@ -66,7 +66,7 @@ public fun ServerSettings.loadFromFile(
     val text = decryptedBytes.decodeToString()
     val loaded = format.decodeFromString(serializer, text).toMutableMap()
     val missingKeys = HashSet<ServerSetting<*, *>>()
-    for(key in keys) {
+    for (key in keys) {
         if(key !in loaded) {
             loaded[key] = key.default
             if(!key.optional) {
@@ -74,9 +74,9 @@ public fun ServerSettings.loadFromFile(
             }
         }
     }
-    val suggestedFile = file.resolveSibling(file.nameWithoutExtension.replace(".enc", "") + ".suggested." + file.extension)
-    suggestedFile.writeText(format.encodeToString(serializer, loaded))
-    if(missingKeys.isNotEmpty()) {
+    if (missingKeys.isNotEmpty()) {
+        val suggestedFile = file.resolveSibling(file.nameWithoutExtension.replace(".enc", "") + ".suggested." + file.extension)
+        suggestedFile.writeText(format.encodeToString(serializer, loaded))
         throw IncompleteSettingsException(missingKeys, suggestedFile)
     }
     return loaded

@@ -68,7 +68,7 @@ public abstract class ServerBuilder : Extendable {
     public open val internalSerialization: SerializersModule get() = EmptySerializersModule()
     public open val externalSerialization: SerializersModule get() = EmptySerializersModule()
 
-    protected val path: PathSpec0 = PathSpec.root // just for convenience
+    protected val path: PathSpec0 get() = PathSpec.root // just for convenience
 
     public val settings: ListRegistry<ServerSetting<*, *>> = ListRegistry()
 

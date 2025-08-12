@@ -2,35 +2,54 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.BadRequestException
-import com.lightningkite.lightningserver.OldServerDefinition
+import com.lightningkite.lightningserver.definition.MutableExtensions
+import com.lightningkite.lightningserver.definition.ServerDefinition
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.definition.getValue
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.data.TypedData
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.SerializationStrategy
 import kotlin.collections.List
 
-public val OldServerDefinition.mediaTypeDecoders: Map<MediaType, List<MediaTypeDecoder>>
-    get() = get(MediaTypeDecoderList) ?: mapOf()
-public val OldServerDefinition.mediaTypeEncoders: Map<MediaType, List<MediaTypeEncoder>>
-    get() = get(MediaTypeEncoderList) ?: mapOf()
-public fun OldServerDefinition.register(decoder: MediaTypeDecoder): Unit {
-    val resultingList = (get(MediaTypeDecoderList)?.get(decoder.mediaType) ?: listOf())
-        .plus(decoder).sortedBy { it.priority }
-    set(MediaTypeDecoderList, (get(MediaTypeDecoderList) ?: mapOf()) + (decoder.mediaType to resultingList))
-}
-public fun OldServerDefinition.register(encoder: MediaTypeEncoder): Unit {
-    val resultingList = (get(MediaTypeEncoderList)?.get(encoder.mediaType) ?: listOf())
-        .plus(encoder).sortedBy { it.priority }
-    set(MediaTypeEncoderList, (get(MediaTypeEncoderList) ?: mapOf()) + (encoder.mediaType to resultingList))
-}
-public fun OldServerDefinition.register(coder: MediaTypeCoder): Unit {
-    register(coder as MediaTypeEncoder)
-    register(coder as MediaTypeDecoder)
+public class MediaTypeEncoderRegistry(
+    private val registry: HashMap<MediaType, ArrayList<MediaTypeEncoder>> = HashMap()
+) : Map<MediaType, List<MediaTypeEncoder>> by registry {
+    public fun register(encoder: MediaTypeEncoder) {
+        registry.getOrPut(encoder.mediaType, ::ArrayList).apply {
+            add(encoder)
+            sortBy { it.priority }
+        }
+    }
+
+    // extension key for registration
+    public object Extension : MutableExtensions.DegradingKey<MediaTypeEncoderRegistry, Map<MediaType, List<MediaTypeEncoder>>> {
+        override fun default(): MediaTypeEncoderRegistry = MediaTypeEncoderRegistry()
+    }
 }
 
-public object MediaTypeDecoderList: OldServerDefinition.ExtensionKey<Map<MediaType, List<MediaTypeDecoder>>>
-public object MediaTypeEncoderList: OldServerDefinition.ExtensionKey<Map<MediaType, List<MediaTypeEncoder>>>
 
+public class MediaTypeDecoderRegistry(
+    private val registry: HashMap<MediaType, ArrayList<MediaTypeDecoder>> = HashMap()
+) : Map<MediaType, List<MediaTypeDecoder>> by registry {
+    public fun register(decoder: MediaTypeDecoder) {
+        registry.getOrPut(decoder.mediaType, ::ArrayList).apply {
+            add(decoder)
+            sortBy { it.priority }
+        }
+    }
+
+    // extension key for registration
+    public object Extension : MutableExtensions.DegradingKey<MediaTypeDecoderRegistry, Map<MediaType, List<MediaTypeDecoder>>> {
+        override fun default(): MediaTypeDecoderRegistry = MediaTypeDecoderRegistry()
+    }
+}
+
+public val ServerBuilder.mediaTypeDecoders: MediaTypeDecoderRegistry by MediaTypeDecoderRegistry.Extension
+public val ServerDefinition.mediaTypeDecoders: Map<MediaType, List<MediaTypeDecoder>> by MediaTypeDecoderRegistry.Extension
+
+public val ServerBuilder.mediaTypeEncoders: MediaTypeEncoderRegistry by MediaTypeEncoderRegistry.Extension
+public val ServerDefinition.mediaTypeEncoders: Map<MediaType, List<MediaTypeEncoder>> by MediaTypeEncoderRegistry.Extension
 
 
 context(serverRuntime: ServerRuntime)
@@ -39,12 +58,13 @@ public suspend fun <T> TypedData.parse(serializer: DeserializationStrategy<T>): 
         ?: throw BadRequestException("No media type decoder found supporting $mediaType")
     return format(this, serializer)
 }
+
 context(serverRuntime: ServerRuntime)
 public suspend fun <T> T.toHttpContent(accepts: List<MediaType>, serializer: SerializationStrategy<T>): TypedData {
-    val (type, format) = accepts.firstNotNullOfOrNull {
-        serverRuntime.server.mediaTypeEncoders[it]?.firstOrNull { it.accepts(it.mediaType.parameters) }?.let { f ->
-            it to f
-        }
+    val (type, format) = accepts.firstNotNullOfOrNull { type ->
+        serverRuntime.server.mediaTypeEncoders[type]
+            ?.firstOrNull { it.accepts(type.parameters) }
+            ?.let { type to it }
     } ?: throw BadRequestException("No media type decoder found supporting ${accepts.joinToString()}")
     return format(type, serializer, this)
 }

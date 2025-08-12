@@ -104,7 +104,11 @@ public fun TypedData.Companion.html(
 //    mediaType = MediaType.Application.Json
 //)
 
-public fun TypedData.Companion.path(path: Path, fileSystem: FileSystem, type: MediaType = MediaType.fromExtension(path.name.substringAfterLast('.'))): TypedData {
+public fun TypedData.Companion.path(
+    path: Path,
+    fileSystem: FileSystem,
+    type: MediaType = MediaType.fromExtension(path.name.substringAfterLast('.'))
+): TypedData {
     return TypedData.source(
         source = fileSystem.source(path).buffered(),
         mediaType = type,

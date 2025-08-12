@@ -47,11 +47,8 @@ public data class KtorSettings(
 /**
  * Server setting for Ktor-specific configuration.
  */
-public val ktorSettings: ServerSetting<KtorSettings, KtorSettings> = ServerSetting(
-    "ktor",
-    KtorSettings.serializer(),
-    KtorSettings()
-)
+public val ktorSettings: ServerSetting.Direct<KtorSettings> =
+    ServerSetting("ktor", KtorSettings(), KtorSettings.serializer())
 
 /**
  * A Ktor implementation of the Lightning Server engine.
