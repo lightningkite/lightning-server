@@ -21,7 +21,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 public class TestRunner<SERVER: ServerBuilder>(
     public val serverBuilder: SERVER,
-) : ServerRuntimeBase(serverBuilder.build().flatten()) {
+) : ServerRuntimeBase(serverBuilder.build()) {
     public constructor(
         server: SERVER,
         settings: context(ServerSettings) SERVER.() -> Unit

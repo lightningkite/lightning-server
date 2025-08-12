@@ -3,7 +3,6 @@
 package com.lightningkite.lightningserverdemo
 
 import com.lightningkite.kotlinercli.cli
-import com.lightningkite.lightningserver.definition.flatten
 import com.lightningkite.lightningserver.engine.ktor.KtorEngine
 import com.lightningkite.lightningserver.settings.loadFromFile
 import io.ktor.server.netty.Netty
@@ -30,7 +29,7 @@ import java.io.File
 //}
 
 private fun serve() {
-    KtorEngine(Server.build().flatten()).apply {
+    KtorEngine(Server.build()).apply {
         settings.loadFromFile(File("settings.json"), internalSerializersModule)
         start(Netty)
     }
@@ -45,7 +44,7 @@ private fun serve() {
 //}
 
 fun main(vararg args: String) {
-    KtorEngine(Server.build().flatten()).apply {
+    KtorEngine(Server.build()).apply {
         settings.loadFromFile(File("settings.json"), internalSerializersModule)
         start(Netty)
     }

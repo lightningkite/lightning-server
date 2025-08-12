@@ -3,18 +3,18 @@ package com.lightningkite.lightningserver.definition.builder
 import com.lightningkite.lightningserver.ScheduledTask
 import com.lightningkite.lightningserver.Task
 import com.lightningkite.lightningserver.definition.Extendable
-import com.lightningkite.lightningserver.definition.Extensions
 import com.lightningkite.lightningserver.definition.MutableExtensions
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerPathEndpoints
 import com.lightningkite.lightningserver.definition.ServerSetting
+import com.lightningkite.lightningserver.definition.toMutableExtensions
 import com.lightningkite.lightningserver.http.HttpBuilder
 import com.lightningkite.lightningserver.http.intercept
 import com.lightningkite.lightningserver.pathing.MutablePathSpecMap
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpecMap
-import com.lightningkite.lightningserver.websockets.WebSocketTopic
+import com.lightningkite.lightningserver.pathing.plus
 import com.lightningkite.lightningserver.websockets.WebSocketsBuilder
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
@@ -80,50 +80,70 @@ public abstract class ServerBuilder : Extendable {
 
     public override val extensions: MutableExtensions = MutableExtensions()
 
-    public val modules: MapRegistry<PathSpec0, ServerDefinition> = MapRegistry()
+    public val imports: MapRegistry<PathSpec0, ServerDefinition> = MapRegistry()
+    public val modules: MapRegistry<PathSpec0, ServerBuilder> = MapRegistry()
 
+    public fun build(): ServerDefinition {
+        val shallow = shallowBuild()
+        val modules = imports + modules.mapValues { (_, module) -> module.build() }
 
-    public fun build(): ServerDefinition = object : ServerDefinition {
-        override val endpoints: PathSpecMap<ServerPathEndpoints> =
-            MutablePathSpecMap<ServerPathEndpoints>().apply {
-                val httpInterceptor = http.interceptors.build()
-                val websocketInterceptor = websockets.interceptors.build()
+        if (modules.isEmpty()) return shallow
 
-                val paths = http.handlers.keys + websockets.handlers.keys
-                for (path in paths) {
-                    put(
-                        path,
-                        ServerPathEndpoints(
-                            http = http
-                                .handlers[path]
-                                ?.mapValues { (_, handler) ->
-                                    httpInterceptor.intercept(handler)
-                                }
-                                ?: emptyMap(),
-
-                            websocket = websockets
-                                .handlers[path]
-                                ?.let(websocketInterceptor::invoke)
-                        )
-                    )
-                }
+        fun <T> flatten(registry: (ServerDefinition) -> Map<PathSpec0, T>): Map<PathSpec0, T> = buildMap {
+            putAll(registry(shallow))
+            for ((modPath, module) in modules) {
+                putAll(registry(module).mapKeys { (path, _) -> modPath + path })
             }
+        }
+        fun <T> flattenPathSpec(registry: (ServerDefinition) -> PathSpecMap<T>): PathSpecMap<T> = MutablePathSpecMap<T>().apply {
+            putAll(PathSpec.root, registry(shallow))
+            for ((modPath, module) in modules) {
+                putAll(modPath, registry(module))
+            }
+        }
 
-        private val source get() = this@ServerBuilder
-
-        override val settings: List<ServerSetting<*, *>> = source.settings
-        override val schedules: Map<PathSpec0, ScheduledTask> = source.schedules
-        override val tasks: Map<PathSpec0, Task<*>> = source.tasks
-        override val webSocketTopics: PathSpecMap<WebSocketTopic<*, *>> = source.websockets.topics.registered
-        override val extensions: Extensions = source.extensions
-        override val modules: Map<PathSpec0, ServerDefinition> = source.modules
-
-        override val internalSerializersModule: SerializersModule =
-            modules.values.fold(source.internalSerialization) { acc, module -> acc + module.internalSerializersModule }
-
-        override val externalSerializersModule: SerializersModule =
-            modules.values.fold(source.externalSerialization) { acc, module -> acc + module.externalSerializersModule }
+        return ServerDefinition(
+            internalSerializersModule = modules.values.fold(shallow.internalSerializersModule) { acc, module -> acc + module.internalSerializersModule },
+            externalSerializersModule = modules.values.fold(shallow.externalSerializersModule) { acc, module -> acc + module.externalSerializersModule },
+            endpoints = flattenPathSpec { it.endpoints },
+            schedules = flatten { it.schedules },
+            tasks = flatten { it.tasks },
+            webSocketTopics = flattenPathSpec { it.webSocketTopics },
+            settings = (shallow.settings + modules.values.flatMap { it.settings }).distinctBy { it.settingName },
+            extensions = shallow.extensions.toMutableExtensions().apply {
+                modules.values.forEach { include(it.extensions) }
+            }
+        )
     }
+
+    public fun shallowBuild(): ServerDefinition = ServerDefinition(
+        internalSerializersModule = internalSerialization,
+        externalSerializersModule = externalSerialization,
+        endpoints = MutablePathSpecMap<ServerPathEndpoints>().apply {
+            val httpInterceptor = http.interceptors.build()
+            val websocketInterceptor = websockets.interceptors.build()
+
+            for (path in http.handlers.keys + websockets.handlers.keys) {
+                put(path, ServerPathEndpoints(
+                    http = http
+                        .handlers[path]
+                        ?.mapValues { (_, handler) ->
+                            httpInterceptor.intercept(handler)
+                        }
+                        ?: emptyMap(),
+
+                    websocket = websockets
+                        .handlers[path]
+                        ?.let(websocketInterceptor::invoke)
+                ))
+            }
+        },
+        schedules = schedules,
+        tasks = tasks,
+        webSocketTopics = websockets.topics.registered,
+        settings = settings,
+        extensions = extensions
+    )
 
     internal var modulePath: PathSpec0 = PathSpec.root
 }

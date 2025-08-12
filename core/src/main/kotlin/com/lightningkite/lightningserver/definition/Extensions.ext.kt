@@ -127,3 +127,5 @@ public interface RegistryExtension<L, V : Any> : MutableExtensions.DegradingKey<
 public interface ListRegistryExtension<V> : MutableExtensions.DegradingKey<ListRegistry<V>, List<V>> {
     override fun default(): ListRegistry<V> = ListRegistry()
 }
+
+public fun Extensions.toMutableExtensions(): MutableExtensions = this as? MutableExtensions ?: MutableExtensions(this)

@@ -37,7 +37,7 @@ public interface Extensions {
  * [MutableExtensions] provides read-write access to strongly-typed extension values.
  * Write access is provided in two ways: [MutableExtensions.Key] and [MutableExtensions.DegradingKey].
  * */
-public class MutableExtensions: Extensions {
+public class MutableExtensions(start: Extensions? = null): Extensions {
     /**
      * Provides mutable access to an extension value of type `T`.
      *
@@ -105,6 +105,14 @@ public class MutableExtensions: Extensions {
     }
 
     private val map: MutableMap<Extensions.Key<*>, Any> = HashMap()
+
+    init {
+        start?.entries?.let { entries ->
+            for ((key, value) in entries) {
+                map[key] = value
+            }
+        }
+    }
 
     @Suppress("UNCHECKED_CAST")
     override operator fun <T : Any> get(key: Extensions.Key<T>): T? = map[key] as? T

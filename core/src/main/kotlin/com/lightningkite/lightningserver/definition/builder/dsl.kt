@@ -139,14 +139,14 @@ public inline fun <reified Result> setting(
 context(builder: ServerBuilder)
 public infix fun <T : ServerBuilder> PathSpec0.bind(module: T): T {
     module.modulePath = this
-    builder.modules.register(this, module.build())
+    builder.imports.register(this, module.build())
     return module
 }
 
 @LightningServerDsl
 context(builder: ServerBuilder)
 public infix fun <T : ServerDefinition> PathSpec0.bind(import: T): Locationed<PathSpec0, T> {
-    builder.modules.register(this, import)
+    builder.imports.register(this, import)
     return Locationed(this, import)
 }
 
