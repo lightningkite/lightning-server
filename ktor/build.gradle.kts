@@ -23,7 +23,7 @@ dependencies {
     api(libs.ktorCioJvm)
     api(libs.ktorWebsockets)
     api(libs.ktorCallLogging)
-    api(libs.ktorCors)
+//    api(libs.ktorCors)
     api(libs.ktorJson)
 }
 

@@ -1,41 +1,52 @@
-@file:UseContextualSerialization(Instant::class, UUID::class, ServerFile::class)
+//@file:UseContextualSerialization(Instant::class, UUID::class, ServerFile::class)
 
 package com.lightningkite.lightningserverdemo
 
 import com.lightningkite.kotlinercli.cli
-import com.lightningkite.lightningserver.cache.*
-import com.lightningkite.lightningserver.files.ServerFile
-import com.lightningkite.lightningserver.ktor.runServer
-import com.lightningkite.lightningserver.pubsub.LocalPubSub
-import com.lightningkite.lightningserver.settings.loadSettings
-import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.*
+import com.lightningkite.lightningserver.definition.flatten
+import com.lightningkite.lightningserver.engine.ktor.KtorEngine
+import com.lightningkite.lightningserver.settings.loadFromFile
+import io.ktor.server.netty.Netty
 import java.io.File
-import kotlinx.datetime.Instant
-import java.util.*
-import com.lightningkite.UUID
-import com.lightningkite.lightningserver.aws.terraform.createTerraform
-import com.lightningkite.lightningserver.ktor.runServerNetty
-import com.lightningkite.lightningserver.pubsub.BadPubSub
 
-fun setup() {
-    Server
-}
+//import com.lightningkite.kotlinercli.cli
+//import com.lightningkite.lightningserver.cache.*
+//import com.lightningkite.lightningserver.files.ServerFile
+//import com.lightningkite.lightningserver.ktor.runServer
+//import com.lightningkite.lightningserver.pubsub.LocalPubSub
+//import com.lightningkite.lightningserver.settings.loadSettings
+//import kotlinx.coroutines.runBlocking
+//import kotlinx.serialization.*
+//import java.io.File
+//import kotlinx.datetime.Instant
+//import java.util.*
+//import com.lightningkite.UUID
+//import com.lightningkite.lightningserver.aws.terraform.createTerraform
+//import com.lightningkite.lightningserver.ktor.runServerNetty
+//import com.lightningkite.lightningserver.pubsub.BadPubSub
+
+//fun setup() {
+//    Server
+//}
 
 private fun serve() {
-    loadSettings(File("settings.json"))
-    runServerNetty(BadPubSub, LocalCache)
+    KtorEngine(Server.build().flatten()).apply {
+        settings.loadFromFile(File("settings.json"), internalSerializersModule)
+        start(Netty)
+    }
+
+//    loadSettings(File("settings.json"))
+//    runServerNetty(BadPubSub, LocalCache)
 }
 
-fun terraform() {
-    Server
-    createTerraform("com.lightningkite.lightningserverdemo.AwsHandler", "demo", File("demo/terraform"))
-}
+//fun terraform() {
+//    Server
+////    createTerraform("com.lightningkite.lightningserverdemo.AwsHandler", "demo", File("demo/terraform"))
+//}
 
 fun main(vararg args: String) {
-    cli(
-        arguments = args,
-        setup = ::setup,
-        available = listOf(::serve, ::terraform),
-    )
+    KtorEngine(Server.build().flatten()).apply {
+        settings.loadFromFile(File("settings.json"), internalSerializersModule)
+        start(Netty)
+    }
 }

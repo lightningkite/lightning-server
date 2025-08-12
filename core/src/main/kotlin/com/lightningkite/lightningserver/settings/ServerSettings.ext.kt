@@ -23,7 +23,7 @@ public infix fun <RESULT> ServerSetting<*, RESULT>.setStatic(value: RESULT) {
 public fun ServerSettings.loadFromFile(
     file: File,
     module: SerializersModule,
-): Map<ServerSetting<*, *>, Any?> {
+) {
     val serializer = SettingsSerializer(keys.sortedBy { it.settingName })
     val format = if (file.name.contains(".properties")) {
         object : StringFormat {
@@ -31,7 +31,7 @@ public fun ServerSettings.loadFromFile(
             override val serializersModule: SerializersModule = EmptySerializersModule()
             override fun <T> encodeToString(
                 serializer: SerializationStrategy<T>,
-                value: T
+                value: T,
             ): String {
                 return properties.encodeToStringMap(serializer, value).entries.joinToString("\n") {
                     "${it.key}=${it.value}"
@@ -40,7 +40,7 @@ public fun ServerSettings.loadFromFile(
 
             override fun <T> decodeFromString(
                 deserializer: DeserializationStrategy<T>,
-                string: String
+                string: String,
             ): T {
                 return properties.decodeFromStringMap(
                     deserializer,
@@ -56,28 +56,38 @@ public fun ServerSettings.loadFromFile(
         encodeDefaults = true
         serializersModule = module
     }
-    val bytes = file.readBytes()
-    val decryptedBytes = System.getenv("LIGHTNING_SERVER_SETTINGS_DECRYPTION")
-        ?.takeIf { it.isNotBlank() }
-        ?.let { sha256Password ->
-            OpenSsl.decryptAesCbcPkcs5Sha256(bytes, sha256Password.toByteArray())
-        }
-        ?: bytes
-    val text = decryptedBytes.decodeToString()
-    val loaded = format.decodeFromString(serializer, text).toMutableMap()
-    val missingKeys = HashSet<ServerSetting<*, *>>()
-    for (key in keys) {
-        if(key !in loaded) {
-            loaded[key] = key.default
-            if(!key.optional) {
-                missingKeys += key
+    if (file.exists()) {
+        val bytes = file.readBytes()
+        val decryptedBytes = System.getenv("LIGHTNING_SERVER_SETTINGS_DECRYPTION")
+            ?.takeIf { it.isNotBlank() }
+            ?.let { sha256Password ->
+                OpenSsl.decryptAesCbcPkcs5Sha256(bytes, sha256Password.toByteArray())
+            }
+            ?: bytes
+        val text = decryptedBytes.decodeToString()
+        val loaded: MutableMap<ServerSetting<*, *>, Any?> = format.decodeFromString(serializer, text).toMutableMap()
+        val missingKeys = HashSet<ServerSetting<*, *>>()
+        for (key in keys) {
+            if (key !in loaded) {
+                loaded[key] = key.default
+                if (!key.optional) {
+                    missingKeys += key
+                }
             }
         }
+        if (missingKeys.isNotEmpty()) {
+            val suggestedFile =
+                file.resolveSibling(file.nameWithoutExtension.replace(".enc", "") + ".suggested." + file.extension)
+            suggestedFile.writeText(format.encodeToString(serializer, loaded))
+            throw IncompleteSettingsException(missingKeys, suggestedFile)
+        }
+        this.serializable.putAll(loaded)
+    } else {
+        val defaults: MutableMap<ServerSetting<*, *>, Any?> = mutableMapOf()
+        for (key in keys) {
+            defaults[key] = key.default
+        }
+        file.writeText(format.encodeToString(serializer, defaults))
+        throw MissingSettingFile( file)
     }
-    if (missingKeys.isNotEmpty()) {
-        val suggestedFile = file.resolveSibling(file.nameWithoutExtension.replace(".enc", "") + ".suggested." + file.extension)
-        suggestedFile.writeText(format.encodeToString(serializer, loaded))
-        throw IncompleteSettingsException(missingKeys, suggestedFile)
-    }
-    return loaded
 }

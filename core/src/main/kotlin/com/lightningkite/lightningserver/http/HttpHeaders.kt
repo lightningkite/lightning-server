@@ -10,7 +10,7 @@ import kotlin.time.Instant
 import kotlin.time.toJavaInstant
 
 @Serializable
-public class HttpHeaders internal constructor (internal val normalizedEntries: Map<String, List<HttpHeaderValue>>) {
+public class HttpHeaders internal constructor (public val normalizedEntries: Map<String, List<HttpHeaderValue>>) {
     override fun equals(other: Any?): Boolean = other is HttpHeaders && other.normalizedEntries == this.normalizedEntries
     override fun hashCode(): Int = normalizedEntries.hashCode() + 1
     override fun toString(): String = normalizedEntries.toString()
