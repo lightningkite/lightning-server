@@ -1,5 +1,4 @@
-//@file:UseContextualSerialization(UUID::class, ServerFile::class)
-//package com.lightningkite.lightningserverdemo
+package com.lightningkite.lightningserver.demo
 //
 //import com.lightningkite.lightningserver.db.*
 //import com.lightningkite.serialization.*

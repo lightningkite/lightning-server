@@ -1,8 +1,7 @@
-package com.lightningkite.lightningserverdemo
+package com.lightningkite.lightningserver.demo
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.builder.bind
-import com.lightningkite.lightningserver.definition.builder.setting
 import com.lightningkite.lightningserver.definition.builder.topic
 import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpResponse
@@ -15,18 +14,7 @@ import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.subscribe
 import com.lightningkite.lightningserver.websockets.text
-import io.ktor.http.HttpHeaders
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
-import java.lang.IllegalStateException
-import kotlin.time.Duration
-import kotlin.random.Random
-import kotlin.time.Duration.Companion.minutes
-import kotlinx.html.*
-
 
 
 object Server : ServerBuilder() {
@@ -39,7 +27,7 @@ object Server : ServerBuilder() {
     val websocket = path bind WebSocketHandler(
         storageSerializer = Unit.serializer(),
         willConnect = { Unit },
-        didConnect = { com.lightningkite.lightningserver.websockets.subscribe(topic) },
+        didConnect = { subscribe(topic) },
         topicHandlers = {
             topic bind {
                 println("Topic hit!")

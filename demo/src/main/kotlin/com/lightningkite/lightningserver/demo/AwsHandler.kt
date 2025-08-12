@@ -1,4 +1,4 @@
-//package com.lightningkite.lightningserverdemo
+package com.lightningkite.lightningserver.demo
 //
 //import com.lightningkite.lightningserver.aws.AwsAdapter
 //import com.lightningkite.lightningserver.metrics.CloudwatchMetrics
