@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.ScheduledTask
 import com.lightningkite.lightningserver.Task
 import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.DynamicLocation
+import com.lightningkite.lightningserver.definition.ModularServerDefinition
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.http.HttpEndpoint
@@ -139,14 +140,22 @@ public inline fun <reified Result> setting(
 context(builder: ServerBuilder)
 public infix fun <T : ServerBuilder> PathSpec0.bind(module: T): T {
     module.modulePath = this
-    builder.imports.register(this, module.build())
+    builder.modules.register(this, module)
     return module
+}
+
+
+@LightningServerDsl
+context(builder: ServerBuilder)
+public infix fun PathSpec0.bind(import: ModularServerDefinition): Locationed<PathSpec0, ModularServerDefinition> {
+    builder.imports.register(this, import)
+    return Locationed(this, import)
 }
 
 @LightningServerDsl
 context(builder: ServerBuilder)
-public infix fun <T : ServerDefinition> PathSpec0.bind(import: T): Locationed<PathSpec0, T> {
-    builder.imports.register(this, import)
+public infix fun PathSpec0.bind(import: ServerDefinition): Locationed<PathSpec0, ServerDefinition> {
+    builder.imports.register(this, ModularServerDefinition(import))
     return Locationed(this, import)
 }
 

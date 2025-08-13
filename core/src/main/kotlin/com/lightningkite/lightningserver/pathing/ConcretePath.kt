@@ -32,7 +32,7 @@ public fun ConcretePath<*>.path(stringArrayFormat: StringArrayFormat): String = 
         }
         append('/')
     }
-    if(this.isNotBlank() && pathSpec.after != PathSpec.Afterwards.TrailingSlash)
+    if (this.isNotBlank() && pathSpec.after != PathSpec.Afterwards.TrailingSlash)
         deleteAt(lastIndex)
 }
 

@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.demo
 
-import com.lightningkite.lightningserver.definition.flatten
 import com.lightningkite.lightningserver.engine.ktor.KtorEngine
 import com.lightningkite.lightningserver.settings.loadFromFile
 import io.ktor.server.netty.Netty
@@ -43,6 +42,7 @@ private fun serve() {
 
 fun main(vararg args: String) {
     KtorEngine(Server.build()).apply {
+        println(server.endpoints.entries.joinToString("\n"))
         settings.loadFromFile(File("settings.json"), internalSerializersModule)
         start(Netty)
     }

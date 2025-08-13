@@ -125,8 +125,6 @@ public class KtorEngine(server: ServerDefinition) : LocalEngine(server) {
                                 is Data.Source -> call.respondBytesWriter(type) {
                                     b.source.transferTo(this.asSink())
                                 }
-
-//                                is HttpContent.Multipart -> TODO()
                             }
                         }
                     }

@@ -56,38 +56,35 @@ public fun ServerSettings.loadFromFile(
         encodeDefaults = true
         serializersModule = module
     }
-    if (file.exists()) {
-        val bytes = file.readBytes()
-        val decryptedBytes = System.getenv("LIGHTNING_SERVER_SETTINGS_DECRYPTION")
-            ?.takeIf { it.isNotBlank() }
-            ?.let { sha256Password ->
-                OpenSsl.decryptAesCbcPkcs5Sha256(bytes, sha256Password.toByteArray())
-            }
-            ?: bytes
-        val text = decryptedBytes.decodeToString()
-        val loaded: MutableMap<ServerSetting<*, *>, Any?> = format.decodeFromString(serializer, text).toMutableMap()
-        val missingKeys = HashSet<ServerSetting<*, *>>()
-        for (key in keys) {
-            if (key !in loaded) {
-                loaded[key] = key.default
-                if (!key.optional) {
-                    missingKeys += key
-                }
-            }
-        }
-        if (missingKeys.isNotEmpty()) {
-            val suggestedFile =
-                file.resolveSibling(file.nameWithoutExtension.replace(".enc", "") + ".suggested." + file.extension)
-            suggestedFile.writeText(format.encodeToString(serializer, loaded))
-            throw IncompleteSettingsException(missingKeys, suggestedFile)
-        }
-        this.serializable.putAll(loaded)
-    } else {
-        val defaults: MutableMap<ServerSetting<*, *>, Any?> = mutableMapOf()
-        for (key in keys) {
-            defaults[key] = key.default
-        }
-        file.writeText(format.encodeToString(serializer, defaults))
-        throw MissingSettingFile( file)
+
+    if (!file.exists()) {
+        file.writeText(format.encodeToString(serializer, keys.associateWith { it.default }))
+        throw MissingSettingFile(file)
     }
+
+    val bytes = file.readBytes()
+    val decryptedBytes = System.getenv("LIGHTNING_SERVER_SETTINGS_DECRYPTION")
+        ?.takeIf { it.isNotBlank() }
+        ?.let { sha256Password ->
+            OpenSsl.decryptAesCbcPkcs5Sha256(bytes, sha256Password.toByteArray())
+        }
+        ?: bytes
+    val text = decryptedBytes.decodeToString()
+    val loaded: MutableMap<ServerSetting<*, *>, Any?> = format.decodeFromString(serializer, text).toMutableMap()
+    val missingKeys = HashSet<ServerSetting<*, *>>()
+    for (key in keys) {
+        if (key !in loaded) {
+            loaded[key] = key.default
+            if (!key.optional) {
+                missingKeys += key
+            }
+        }
+    }
+    if (missingKeys.isNotEmpty()) {
+        val suggestedFile =
+            file.resolveSibling(file.nameWithoutExtension.replace(".enc", "") + ".suggested." + file.extension)
+        suggestedFile.writeText(format.encodeToString(serializer, loaded))
+        throw IncompleteSettingsException(missingKeys, suggestedFile)
+    }
+    this.serializable.putAll(loaded)
 }

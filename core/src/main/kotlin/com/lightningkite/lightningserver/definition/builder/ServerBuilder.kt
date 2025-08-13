@@ -3,22 +3,19 @@ package com.lightningkite.lightningserver.definition.builder
 import com.lightningkite.lightningserver.ScheduledTask
 import com.lightningkite.lightningserver.Task
 import com.lightningkite.lightningserver.definition.Extendable
+import com.lightningkite.lightningserver.definition.ModularServerDefinition
 import com.lightningkite.lightningserver.definition.MutableExtensions
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerPathEndpoints
 import com.lightningkite.lightningserver.definition.ServerSetting
-import com.lightningkite.lightningserver.definition.toMutableExtensions
 import com.lightningkite.lightningserver.http.HttpBuilder
 import com.lightningkite.lightningserver.http.intercept
 import com.lightningkite.lightningserver.pathing.MutablePathSpecMap
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.pathing.PathSpecMap
-import com.lightningkite.lightningserver.pathing.plus
 import com.lightningkite.lightningserver.websockets.WebSocketsBuilder
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
-import kotlinx.serialization.modules.plus
 
 /**
  * [ServerBuilder] provides a fluent, type-safe API for defining your server configuration.
@@ -80,42 +77,69 @@ public abstract class ServerBuilder : Extendable {
 
     public override val extensions: MutableExtensions = MutableExtensions()
 
-    public val imports: MapRegistry<PathSpec0, ServerDefinition> = MapRegistry()
+    public val imports: MapRegistry<PathSpec0, ModularServerDefinition> = MapRegistry()
     public val modules: MapRegistry<PathSpec0, ServerBuilder> = MapRegistry()
 
-    public fun build(): ServerDefinition {
-        val shallow = shallowBuild()
-        val modules = imports + modules.mapValues { (_, module) -> module.build() }
+    /**
+     * Builds a complete, flattened [ServerDefinition] ready for runtime use.
+     *
+     * This is the primary method for converting a [ServerBuilder] into a deployable server configuration.
+     * It performs a full build process that involves:
+     * 1. Creating a [shallowBuild] of this builder's direct configuration
+     * 2. Recursively builds all imported modules
+     * 3. Flattens the modular structure into a single [ServerDefinition]
+     *
+     * @return A complete [ServerDefinition] with all modules flattened and ready for deployment
+     * @see modularBuild
+     * @see shallowBuild
+     */
+    public fun build(): ServerDefinition = modularBuild().flatten()
 
-        if (modules.isEmpty()) return shallow
-
-        fun <T> flatten(registry: (ServerDefinition) -> Map<PathSpec0, T>): Map<PathSpec0, T> = buildMap {
-            putAll(registry(shallow))
-            for ((modPath, module) in modules) {
-                putAll(registry(module).mapKeys { (path, _) -> modPath + path })
-            }
-        }
-        fun <T> flattenPathSpec(registry: (ServerDefinition) -> PathSpecMap<T>): PathSpecMap<T> = MutablePathSpecMap<T>().apply {
-            putAll(PathSpec.root, registry(shallow))
-            for ((modPath, module) in modules) {
-                putAll(modPath, registry(module))
-            }
-        }
-
-        return ServerDefinition(
-            internalSerializersModule = modules.values.fold(shallow.internalSerializersModule) { acc, module -> acc + module.internalSerializersModule },
-            externalSerializersModule = modules.values.fold(shallow.externalSerializersModule) { acc, module -> acc + module.externalSerializersModule },
-            endpoints = flattenPathSpec { it.endpoints },
-            schedules = flatten { it.schedules },
-            tasks = flatten { it.tasks },
-            webSocketTopics = flattenPathSpec { it.webSocketTopics },
-            settings = (shallow.settings + modules.values.flatMap { it.settings }).distinctBy { it.settingName },
-            extensions = shallow.extensions.toMutableExtensions().apply {
-                modules.values.forEach { include(it.extensions) }
-            }
+    /**
+     * Builds a [ModularServerDefinition] that preserves the modular structure.
+     *
+     * This method creates a hierarchical server definition that maintains the separation
+     * between the current builder's configuration and its nested modules. The resulting
+     * structure can be inspected for debugging or flattened later using [ModularServerDefinition.flatten].
+     *
+     * The build process:
+     * 1. Creates a [shallowBuild] of this builder's direct configuration
+     * 2. Recursively builds all imported modules
+     * 3. Combines them into a hierarchical structure with proper path mounting
+     *
+     * @return A [ModularServerDefinition] containing this builder's configuration and all nested modules
+     * @see build
+     * @see shallowBuild
+     */
+    public fun modularBuild(): ModularServerDefinition =
+        ModularServerDefinition(
+            definition = shallowBuild(),
+            modules = imports + modules.mapValues { it.value.modularBuild() }
         )
-    }
 
+    /**
+     * Builds a [ServerDefinition] containing only this builder's direct configuration.
+     *
+     * This method creates a server definition that includes only the endpoints, settings,
+     * and other configurations defined directly in this builder. It does not include
+     * any nested modules or imported definitions.
+     *
+     * Use this when you need to:
+     * - Inspect only the current builder's configuration
+     * - Build a partial definition for testing
+     * - Create a base definition that will be extended elsewhere
+     *
+     * This method called in both the [build] and [modularBuild] methods.
+     *
+     * The build process includes:
+     * - Applying HTTP and WebSocket interceptors to all handlers
+     * - Combining HTTP and WebSocket endpoints into [ServerPathEndpoints]
+     * - Converting all registries into their corresponding read-only versions
+     *
+     * @return A [ServerDefinition] containing only this builder's direct configuration
+     * @see build
+     * @see modularBuild
+     */
     public fun shallowBuild(): ServerDefinition = ServerDefinition(
         internalSerializersModule = internalSerialization,
         externalSerializersModule = externalSerialization,
