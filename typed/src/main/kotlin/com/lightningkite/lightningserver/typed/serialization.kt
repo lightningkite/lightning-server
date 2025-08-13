@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.BadRequestException
+import com.lightningkite.lightningserver.definition.Extensions
 import com.lightningkite.lightningserver.definition.MutableExtensions
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -25,6 +26,9 @@ public class MediaTypeEncoderRegistry(
     // extension key for registration
     public object Extension : MutableExtensions.DegradingKey<MediaTypeEncoderRegistry, Map<MediaType, List<MediaTypeEncoder>>> {
         override fun default(): MediaTypeEncoderRegistry = MediaTypeEncoderRegistry()
+        override fun MediaTypeEncoderRegistry.include(other: Map<MediaType, List<MediaTypeEncoder>>) {
+            for ((type, list) in other) registry.getOrPut(type, ::ArrayList).addAll(list)
+        }
     }
 }
 
@@ -42,6 +46,9 @@ public class MediaTypeDecoderRegistry(
     // extension key for registration
     public object Extension : MutableExtensions.DegradingKey<MediaTypeDecoderRegistry, Map<MediaType, List<MediaTypeDecoder>>> {
         override fun default(): MediaTypeDecoderRegistry = MediaTypeDecoderRegistry()
+        override fun MediaTypeDecoderRegistry.include(other: Map<MediaType, List<MediaTypeDecoder>>) {
+            for ((type, list) in other) registry.getOrPut(type, ::ArrayList).addAll(list)
+        }
     }
 }
 

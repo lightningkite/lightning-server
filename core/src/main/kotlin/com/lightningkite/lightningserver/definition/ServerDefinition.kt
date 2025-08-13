@@ -114,19 +114,19 @@ public data class ServerDefinition(
  * Modules are organized as a tree structure where each module can contain its own nested modules:
  * ```kotlin
  * object UserEndpoints : ServerBuilder() {
- *     val getUser = path.arg<UserId>("userId").get bind HttpHandler<UserId, User> { userId ->
+ *     val getUser = path.arg<UserId>("userId").get bind HttpHandler { userId ->
  *         // Get user logic
  *     }
  * }
  *
  * object AdminEndpoints : ServerBuilder() {
- *     val deleteUser = path.path("users").arg<UserId>("userId").delete bind HttpHandler<UserId, Unit> { userId ->
+ *     val deleteUser = path.path("users").arg<UserId>("userId").delete bind HttpHandler { userId ->
  *         // Delete user logic
  *     }
  * }
  *
- * object PublicEndpoints : ServerBuilder() {
- *     val getPublicInfo = path.path("public").path("info").get bind HttpHandler {
+ * object MetaEndpoints : ServerBuilder() {
+ *     val getPublicInfo = path.path("info").get bind HttpHandler {
  *         HttpResponse.plainText("Public information")
  *     }
  * }
@@ -134,13 +134,13 @@ public data class ServerDefinition(
  * object ApiV1 : ServerBuilder() {
  *     val userEndpoints = path.path("users") bind UserEndpoints
  *     val adminModule = path.path("admin") bind AdminEndpoints
- *     val publicModule = path.path("public") bind PublicEndpoints
+ *     val publicModule = path.path("meta") bind MetaEndpoints
  * }
  *
  * object RootServer : ServerBuilder() {
  *     val apiV1 = path.path("api").path("v1") bind ApiV1
- *     val health = path.path("health").get bind HttpHandler {
- *         HttpResponse.plainText("OK")
+ *     val index = path.get bind HttpHandler {
+ *         HttpResponse()
  *     }
  * }
  * ```
@@ -158,13 +158,13 @@ public data class ServerDefinition(
  *
  * ```kotlin
  * object UserEndpoints : ServerBuilder() {
- *     val getUser = path.path("users").path(userId).get bind HttpHandler<UserId, User> { userId ->
+ *     val getUser = path.path("users").path(userId).get bind HttpHandler { userId ->
  *         // Get user logic
  *     }
  * }
  *
  * object AdminEndpoints : ServerBuilder() {
- *     val deleteUser = path.path("users").arg<UserId>("userId").delete bind HttpHandler<UserId, Unit> { userId ->
+ *     val deleteUser = path.path("users").arg<UserId>("userId").delete bind HttpHandler { userId ->
  *         // Delete user logic
  *     }
  * }
@@ -232,8 +232,8 @@ public data class ModularServerDefinition(
      * Flattens this modular server definition into a single [ServerDefinition] ready for runtime use.
      *
      * This method recursively processes all nested modules and combines them into a unified server definition.
-     * It's the counterpart to [ServerBuilder.build] - where the builder creates a modular structure and then
-     * flattens it, this method handles the flattening step for pre-built modular definitions.
+     * It's the final step in [ServerBuilder.build] - where the builder creates a modular structure and then
+     * flattens it, this method handles the flattening step.
      *
      * The flattening process:
      * 1. **Recursively flattens nested modules**: Each module in the hierarchy is flattened first to ensure
@@ -244,11 +244,15 @@ public data class ModularServerDefinition(
      *    - **Serialization modules**: Combined using kotlinx.serialization's `+` operator
      *    - **Endpoints & WebSocket topics**: Merged using [PathSpecMap] with proper path mounting
      *    - **Schedules & tasks**: Combined with path prefixing to avoid conflicts
-     *    - **Settings**: Merged and deduplicated by setting name to prevent duplicates
-     *    - **Extensions**: Combined using the extension system's merge capabilities
+     *    - **Settings**: Merged, and kept distinct by `settingName`. Settings declared higher up
+     *      in the higherarchy take precedence.
+     *    - **Extensions**: Combined using `MutableExtensions.include`. Any extensions in modules with
+     *      existing keys will be discarded, unless it is a `DegradingKey`, in which case
+     *      `DegradingKey.include` is used to merge the extensions.
+     *
      *
      * **Performance Note**: This is an expensive operation that should typically be done once during
-     * server startup, not per-request. The resulting [ServerDefinition] should be cached and reused.
+     * server startup, not per-request. The resulting [ServerDefinition] should be stored and reused.
      *
      * @return A flattened [ServerDefinition] containing all configurations from this definition and
      *         all nested modules, with proper path resolution and resource merging

@@ -16,6 +16,7 @@ group = "com.lightningkite.lightningserver"
 dependencies {
     api(project(":core"))
     api(project(":ktor"))
+    api(project(":typed"))
 //    api(project(":server-aws"))
 //    api(project(":server-azure"))
 //    api(project(":server-core"))

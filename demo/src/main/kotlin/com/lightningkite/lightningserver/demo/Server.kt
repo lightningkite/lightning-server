@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.demo
 
+import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.definition.builder.topic
@@ -9,11 +10,16 @@ import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.runtime.send
+import com.lightningkite.lightningserver.typed.MediaTypeEncoder
+import com.lightningkite.lightningserver.typed.mediaTypeEncoders
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.subscribe
 import com.lightningkite.lightningserver.websockets.text
+import com.lightningkite.services.data.Data
+import com.lightningkite.services.data.TypedData
+import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.builtins.serializer
 
 object Server : ServerBuilder() {
@@ -59,6 +65,20 @@ object Module : ServerBuilder() {
     }
 
     val topic = path.topic(String.serializer())
+
+    init {
+        mediaTypeEncoders.register(
+            object : MediaTypeEncoder {
+                override val mediaType: MediaType = MediaType.Text.Plain
+
+                override suspend fun <T> invoke(
+                    mediaType: MediaType,
+                    serializer: SerializationStrategy<T>,
+                    value: T
+                ): TypedData = TODO()
+            }
+        )
+    }
 
     val websocket = path bind WebSocketHandler(
         storageSerializer = Unit.serializer(),

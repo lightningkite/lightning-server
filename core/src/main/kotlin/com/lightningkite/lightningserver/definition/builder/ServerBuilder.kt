@@ -20,7 +20,7 @@ import kotlinx.serialization.modules.SerializersModule
 /**
  * [ServerBuilder] provides a fluent, type-safe API for defining your server configuration.
  *
- * [ServerBuilder] is essentially a collection of [MapRegistry]s for your endpoints, tasks, schedules, etc. You build a server by registering
+ * [ServerBuilder] is essentially a collection of registries for your endpoints, tasks, schedules, etc. You build a server by registering
  * resources and their locations. Once the definition is complete the [build] method is used to construct an immutable
  * [ServerDefinition] for runtime use.
  *

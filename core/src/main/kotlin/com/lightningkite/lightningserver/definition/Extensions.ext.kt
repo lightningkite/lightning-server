@@ -2,6 +2,9 @@ package com.lightningkite.lightningserver.definition
 
 import com.lightningkite.lightningserver.definition.builder.ListRegistry
 import com.lightningkite.lightningserver.definition.builder.MapRegistry
+import kotlin.collections.component1
+import kotlin.collections.component2
+import kotlin.collections.iterator
 import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KProperty
 
@@ -104,8 +107,11 @@ public operator fun <WRITE : READ, READ : Any> MutableExtensions.DegradingKey<WR
  * val MyClass.handlers: Map<String, RequestHandler> by HandlersKey
  * ```
  */
-public interface RegistryExtension<L, V : Any> : MutableExtensions.DegradingKey<MapRegistry<L, V>, Map<L, V>> {
+public interface MapRegistryExtension<L, V : Any> : MutableExtensions.DegradingKey<MapRegistry<L, V>, Map<L, V>> {
     override fun default(): MapRegistry<L, V> = MapRegistry()
+    override fun MapRegistry<L, V>.include(other: Map<L, V>) {
+        for ((key, value) in other) register(key, value)
+    }
 }
 
 /**
@@ -126,6 +132,9 @@ public interface RegistryExtension<L, V : Any> : MutableExtensions.DegradingKey<
  */
 public interface ListRegistryExtension<V> : MutableExtensions.DegradingKey<ListRegistry<V>, List<V>> {
     override fun default(): ListRegistry<V> = ListRegistry()
+    override fun ListRegistry<V>.include(other: List<V>) {
+        for (value in other) register(value)
+    }
 }
 
 public fun Extensions.toMutableExtensions(): MutableExtensions = this as? MutableExtensions ?: MutableExtensions(this)

@@ -102,6 +102,7 @@ public class MutableExtensions(start: Extensions? = null): Extensions {
      * */
     public interface DegradingKey<WRITE : READ, READ : Any> : Extensions.Key<READ> {
         public fun default(): WRITE
+        public fun WRITE.include(other: READ)
     }
 
     private val map: MutableMap<Extensions.Key<*>, Any> = HashMap()
@@ -136,7 +137,14 @@ public class MutableExtensions(start: Extensions? = null): Extensions {
 
     public fun include(extensions: Extensions) {
         for ((key, value) in extensions.entries) {
-            map.putIfAbsent(key, value)
+            if (key is DegradingKey<*, *>) {
+                @Suppress("UNCHECKED_CAST")
+                key as DegradingKey<Any, Any>
+                val including = extensions[key] ?: continue
+                val existing = get(key)
+                key.run { existing.include(including) }
+            }
+            else map.putIfAbsent(key, value)
         }
     }
 }
