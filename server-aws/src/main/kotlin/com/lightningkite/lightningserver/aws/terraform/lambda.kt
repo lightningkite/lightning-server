@@ -413,7 +413,7 @@ internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(proje
                             """
                     resource "aws_cloudwatch_event_rule" "scheduled_task_${safeName}" {
                       name                = "${namePrefix}_${safeName}"
-                      schedule_expression = "cron(${s.cron})"
+                      schedule_expression = "cron(${s.cron} *)"
                     }
                     resource "aws_cloudwatch_event_target" "scheduled_task_${safeName}" {
                       rule      = aws_cloudwatch_event_rule.scheduled_task_${safeName}.name
