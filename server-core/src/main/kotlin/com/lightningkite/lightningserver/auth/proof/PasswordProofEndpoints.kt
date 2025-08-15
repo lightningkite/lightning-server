@@ -58,7 +58,7 @@ class PasswordProofEndpoints(
     val loggedInInterfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo(path, "AuthenticatedPasswordProofClientEndpoints", listOf())
     val interfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo(path, "PasswordProofClientEndpoints", listOf())
 
-    private val active get() = condition<PasswordSecret> { it.disabledAt.eq(null) and (it.expiresAt.eq(null) or it.expiresAt.notNull.gte(now())) }
+    private val active get() = condition<PasswordSecret> { it.disabledAt.eq(null) and (it.expiresAt.eq(null) or it.expiresAt.notNull.gt(now())) }
 
     val modelInfo = database.modelInfo<HasId<*>?, PasswordSecret, UUID>(
         authOptions = anyAuthRoot + Authentication.isAdmin,

@@ -9,6 +9,8 @@ import com.lightningkite.lightningdb.and
 import com.lightningkite.lightningdb.condition
 import com.lightningkite.lightningdb.eq
 import com.lightningkite.lightningdb.findOne
+import com.lightningkite.lightningdb.gt
+import com.lightningkite.lightningdb.gte
 import com.lightningkite.lightningdb.insertOne
 import com.lightningkite.lightningdb.mask
 import com.lightningkite.lightningdb.modification
@@ -42,6 +44,7 @@ import com.lightningkite.lightningserver.exceptions.ForbiddenException
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.now
+import com.lightningkite.serialization.notNull
 import com.webauthn4j.WebAuthnManager
 import com.webauthn4j.authenticator.AuthenticatorImpl
 import com.webauthn4j.converter.AttestationObjectConverter
@@ -99,7 +102,7 @@ class WebAuthNProofEndpoints(
     val registerInterface = Documentable.InterfaceInfo(path, "WebAuthNRegistrationEndpoints", listOf())
     val proveInterface = Documentable.InterfaceInfo(path, "WebAuthNProofEndpoints", listOf())
 
-    val active get() = condition<WebAuthNCredential> { it.disabledAt.eq(null) }
+    val active get() = condition<WebAuthNCredential> { it.disabledAt.eq(null) and (it.expiresAt.eq(null) or it.expiresAt.notNull.gt(now())) }
 
     val modelInfo = database.modelInfo<HasId<*>?, WebAuthNCredential, String>(
         collectionName = "WebAuthNCredential",

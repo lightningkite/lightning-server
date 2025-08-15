@@ -25,7 +25,7 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 
 @Serializable
 @GenerateDataClassPaths
-@IndexSet(["subjectType", "subjectId"])
+@IndexSet(["subjectId", "subjectType", "expiresAt", "disabledAt"])
 data class WebAuthNCredential(
     override val _id: String,
     @Index val subjectId: String,

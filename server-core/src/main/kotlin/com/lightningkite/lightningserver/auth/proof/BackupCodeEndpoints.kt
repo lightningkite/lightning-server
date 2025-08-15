@@ -27,6 +27,7 @@ import kotlin.time.Duration.Companion.seconds
 
 @Serializable
 @GenerateDataClassPaths
+@IndexSet(["subjectId", "subjectType"])
 data class BackupCodeSecret(
     override val _id: UUID = UUID.random(),
     val code: String,

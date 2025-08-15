@@ -5,6 +5,7 @@ import com.lightningkite.UUID
 import com.lightningkite.lightningdb.ExperimentalLightningServer
 import com.lightningkite.lightningdb.GenerateDataClassPaths
 import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningdb.IndexSet
 import com.lightningkite.now
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
@@ -14,6 +15,7 @@ import kotlin.time.Duration
 @OptIn(ExperimentalLightningServer::class)
 @Serializable
 @GenerateDataClassPaths
+@IndexSet(["subjectId", "subjectType", "expiresAt", "disabledAt"])
 data class OtpSecret( //Version 5 rename to TOTPSecret
     override val _id: UUID = UUID.random(),
     val subjectType: String,
@@ -34,6 +36,7 @@ data class OtpSecret( //Version 5 rename to TOTPSecret
 
 @Serializable
 @GenerateDataClassPaths
+@IndexSet(["subjectId", "subjectType", "expiresAt", "disabledAt"])
 data class PasswordSecret(
     override val _id: UUID = UUID.random(),
     val subjectType: String,
@@ -50,6 +53,7 @@ data class PasswordSecret(
 
 @Serializable
 @GenerateDataClassPaths
+@IndexSet(["subjectId", "subjectType", "expiresAt", "disabledAt"])
 data class KnownDeviceSecret(
     override val _id: UUID = UUID.random(),
     val subjectType: String,
