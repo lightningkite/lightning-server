@@ -226,8 +226,9 @@ public data class ServerDefinition(
  */
 public data class ModularServerDefinition(
     val definition: ServerDefinition,
-    val modules: Map<PathSpec0, ModularServerDefinition> = emptyMap()
-) {
+    val modules: Map<PathSpec0, ModularServerDefinition> = emptyMap(),
+    val parent: ModularServerDefinition? = null
+) : Extended by definition {
     /**
      * Flattens this modular server definition into a single [ServerDefinition] ready for runtime use.
      *

@@ -14,3 +14,4 @@ private data class BasicListRegistry<V>(
 }
 
 public fun <V> ListRegistry(): ListRegistry<V> = BasicListRegistry()
+public fun <V> ListRegistry(items: List<V>): ListRegistry<V> = BasicListRegistry(ArrayList(items))

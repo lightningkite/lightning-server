@@ -8,8 +8,11 @@ import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
+import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.runtime.send
+import com.lightningkite.lightningserver.sdk.ClientInterfaceBuilder
+import com.lightningkite.lightningserver.sdk.module
 import com.lightningkite.lightningserver.typed.MediaTypeEncoder
 import com.lightningkite.lightningserver.typed.mediaTypeEncoders
 import com.lightningkite.lightningserver.websockets.WebSocketClose
@@ -17,7 +20,6 @@ import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.subscribe
 import com.lightningkite.lightningserver.websockets.text
-import com.lightningkite.services.data.Data
 import com.lightningkite.services.data.TypedData
 import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.builtins.serializer
@@ -55,11 +57,11 @@ object Server : ServerBuilder() {
         HttpResponse()
     }
 
-    val module = path.path("module") bind Module
-    val module2 = path.path("module2") bind Module
+    val module = path.path("module") bind module(ModelEndpoints)
+    val module2 = path.path("module2") bind module(ModelEndpoints, interfaceName = "Module2")
 }
 
-object Module : ServerBuilder() {
+object ModelEndpoints : ServerBuilder() {
     val index = path.get bind HttpHandler {
         HttpResponse.plainText("Module hit")
     }
@@ -103,4 +105,15 @@ object Module : ServerBuilder() {
         },
         disconnect = {}
     )
+
+    val rest = path.path("rest") bind Rest(0)
+
+    init {
+        println("SdkSettings:")
+        println("Imports: ${rest.sdk.imports}")
+        println("Name: ${rest.sdk.name}")
+        println("Params: ${rest.sdk.typeParameters}")
+    }
 }
+
+class Rest<T>(val item: T) : ClientInterfaceBuilder()

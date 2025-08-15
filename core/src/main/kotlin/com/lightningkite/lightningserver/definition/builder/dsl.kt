@@ -140,6 +140,7 @@ public inline fun <reified Result> setting(
 context(builder: ServerBuilder)
 public infix fun <T : ServerBuilder> PathSpec0.bind(module: T): T {
     module.modulePath = this
+    module.extensions.include(builder.extensions)
     builder.modules.register(this, module)
     return module
 }
