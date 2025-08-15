@@ -1,9 +1,11 @@
 package com.lightningkite.lightningserver.ktor
 
-import com.lightningkite.lightningserver.cache.*
+import com.lightningkite.lightningserver.cache.Cache
+import com.lightningkite.lightningserver.cache.get
+import com.lightningkite.lightningserver.cache.set
+import com.lightningkite.lightningserver.cache.setIfNotExists
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.engine.LocalEngine
-import com.lightningkite.lightningserver.engine.engine as lsEngine
 import com.lightningkite.lightningserver.exceptions.exceptionSettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
@@ -16,20 +18,10 @@ import com.lightningkite.lightningserver.schedule.plus
 import com.lightningkite.lightningserver.serverLogger
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.Tasks
-import com.lightningkite.lightningserver.websocket.LocalWebSocketConnection
-import com.lightningkite.lightningserver.websocket.WebSocketConnection
-import com.lightningkite.lightningserver.websocket.QueryParamWebSocketHandler
-import com.lightningkite.lightningserver.websocket.WebSocketClose
-import com.lightningkite.lightningserver.websocket.WebSocketConnectRequest
-import com.lightningkite.lightningserver.websocket.WebSocketFrame
-import com.lightningkite.lightningserver.websocket.WebSocketFrame.*
-import com.lightningkite.lightningserver.websocket.WebSocketHandler
+import com.lightningkite.lightningserver.websocket.*
+import com.lightningkite.lightningserver.websocket.WebSocketFrame.Binary
+import com.lightningkite.lightningserver.websocket.WebSocketFrame.Text
 import com.lightningkite.lightningserver.websocket.WebSockets
-import com.lightningkite.lightningserver.websocket.didConnectTracked
-import com.lightningkite.lightningserver.websocket.disconnectTracked
-import com.lightningkite.lightningserver.websocket.messageFromClientTracked
-import com.lightningkite.lightningserver.websocket.text
-import com.lightningkite.lightningserver.websocket.willConnectTracked
 import com.lightningkite.now
 import com.sun.management.HotSpotDiagnosticMXBean
 import io.ktor.http.*
@@ -40,8 +32,6 @@ import io.ktor.server.cio.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.*
-import io.ktor.server.plugins.cors.CORSConfig.Companion.CorsSimpleResponseHeaders
-import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -60,8 +50,8 @@ import kotlinx.datetime.*
 import java.lang.management.ManagementFactory
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.seconds
 import com.lightningkite.lightningserver.core.ContentType as HttpContentType
+import com.lightningkite.lightningserver.engine.engine as lsEngine
 
 fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
     val myEngine = LocalEngine(pubSub)
@@ -97,10 +87,12 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                         headers = call.request.headers.adapt(),
                         domain = call.request.origin.serverHost,
                         protocol = call.request.origin.scheme,
-                        sourceIp = generalSettings().realIpHeader?.let {
-                            call.request.header(it)
-                                ?: throw Exception("Real IP address header for proxy '$it' was missing from the request.")
-                        } ?: call.request.origin.remoteAddress,
+                        sourceIp = generalSettings().realIpHeader
+                            ?.let {
+                                call.request.header(it)
+                                    ?: run { serverLogger.warn("Real IP address header for proxy '$it' was missing from the request."); null }
+                            }
+                            ?: call.request.origin.remoteAddress,
                     )
                     val startingState = handler.willConnectTracked(path, request)
                     var closingMid: WebSocketConnection<Any?>? = null
@@ -332,35 +324,35 @@ fun forceAppResetOnLowMemory() {
                     true
                 )
                 serverLogger.error("Attempting to dump memory, MXBean method complete!")
-            } catch(t: Throwable) {
+            } catch (t: Throwable) {
                 try {
                     serverLogger.error("Attempting to dump memory, MXBean method failed. $t")
                     serverLogger.error("Attempting to dump memory, jcmd method")
                     val myPid = ProcessHandle.current().pid()
                     Runtime.getRuntime().exec("jcmd $myPid GC.heap_dump filename=dump${now()}.hprof")
                     serverLogger.error("Attempting to dump memory, jcmd method complete!")
-                } catch(t: Throwable) {
+                } catch (t: Throwable) {
                     serverLogger.error("Attempting to dump memory, jcmd method failed")
                 }
             }
             exitProcess(1)
         }
-        while(true) {
+        while (true) {
             Thread.sleep(1_000)
             try {
-                if(Runtime.getRuntime().freeMemory() < memRequired) {
+                if (Runtime.getRuntime().freeMemory() < memRequired) {
                     Runtime.getRuntime().gc()
-                    if(Runtime.getRuntime().freeMemory() < memRequired) {
+                    if (Runtime.getRuntime().freeMemory() < memRequired) {
                         kill()
                     }
                 }
                 memCheckA = ByteArray(memRequired)
                 Thread.sleep(1_000)
                 memCheckA = null
-            } catch(e: OutOfMemoryError) {
+            } catch (e: OutOfMemoryError) {
                 println(e.toString())
                 kill()
-            } catch(e: Exception) {
+            } catch (e: Exception) {
                 println(e.toString())
                 e.printStackTrace()
             }
@@ -371,8 +363,10 @@ fun forceAppResetOnLowMemory() {
 /**
  * A helper function to start a Ktor server using GeneralServerSettings and the provided Module.
  */
-@Deprecated("use runServerNetty instead, as CIO has a memory leak.  If you REALLY want to run CIO, use runServerCio.",
-    ReplaceWith("runServerNetty(pubSub, cache)"))
+@Deprecated(
+    "use runServerNetty instead, as CIO has a memory leak.  If you REALLY want to run CIO, use runServerCio.",
+    ReplaceWith("runServerNetty(pubSub, cache)")
+)
 fun runServer(pubSub: PubSub, cache: Cache) = runServerCio(pubSub, cache)
 
 @Deprecated("use runServerNetty instead, as CIO has a memory leak.", ReplaceWith("runServerNetty(pubSub, cache)"))
@@ -429,10 +423,12 @@ internal suspend fun ApplicationCall.adapt(route: HttpEndpoint): HttpRequest {
         },
         domain = request.origin.serverHost,
         protocol = request.origin.scheme,
-        sourceIp = generalSettings().realIpHeader?.let {
-            request.header(it)
-                ?: throw Exception("Real IP address header for proxy '$it' was missing from the request.")
-        } ?: request.origin.remoteAddress
+        sourceIp = generalSettings().realIpHeader
+            ?.let {
+                request.header(it)
+                    ?: run { serverLogger.warn("Real IP address header for proxy '$it' was missing from the request."); null }
+            }
+            ?: request.origin.remoteAddress
     )
 }
 
