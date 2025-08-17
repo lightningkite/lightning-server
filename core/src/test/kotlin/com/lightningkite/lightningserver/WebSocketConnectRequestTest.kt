@@ -40,17 +40,14 @@ class WebSocketConnectRequestTest {
         }
     }
 
-    object CacheKey: KeyedSerializableCache.Key<String> {
+    private object CacheKey: KeyedSerializableCache.Key<Request<*>, String> {
         override val id: String
             get() = "cache"
         override val serializer: KSerializer<String>
             get() = String.serializer()
 
-        override suspend fun calculate(
-            serverRuntime: ServerRuntime,
-            request: Request<*>
-        ): String = "asdf"
-
+        context(server: ServerRuntime)
+        override suspend fun calculate(request: Request<*>): String = "asdf"
     }
 }
 

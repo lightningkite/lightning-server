@@ -33,7 +33,7 @@ public class TestRunner<SERVER: ServerBuilder>(
 
     private val subscriptions = ConcurrentHashMap<WebSocketSubscriptionRequest<*, *>, ArrayList<suspend (WebSocketSubscriptionMessage<*, *>)->Unit>>()
     override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>) {
-        subscriptions[WebSocketSubscriptionRequest(topic = event.topic, rawPathArguments = event.rawPathArguments)]?.forEach {
+        subscriptions[WebSocketSubscriptionRequest(topic = event.topic, rawPathArguments = event.path.rawPathArguments)]?.forEach {
             it(event)
         }
     }

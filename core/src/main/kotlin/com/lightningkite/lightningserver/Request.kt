@@ -15,7 +15,7 @@ public abstract class Request<PATH: PathSpec>: HasContextualPath<PATH> {
     public abstract val domain: String
     public abstract val protocol: String
     public abstract val sourceIp: String
-    public abstract val cache: KeyedSerializableCache
+    public abstract val cache: KeyedSerializableCache<Request<*>>
 
     context(serverRuntime: ServerRuntime)
     override val pathInContext: ConcretePath<PATH>
@@ -25,6 +25,6 @@ public abstract class Request<PATH: PathSpec>: HasContextualPath<PATH> {
 }
 
 context(server: ServerRuntime)
-public suspend operator fun <T> Request<*>.get(key: KeyedSerializableCache.Key<T>): T {
-    return cache.get(server, this, key)
+public suspend operator fun <T> Request<*>.get(key: KeyedSerializableCache.Key<Request<*>, T>): T {
+    return cache.get(key, this)
 }

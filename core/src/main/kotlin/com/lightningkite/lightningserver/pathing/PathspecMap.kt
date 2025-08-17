@@ -9,11 +9,20 @@ public interface PathSpecMap<out V> : Map<PathSpec, V> {
     public fun asSequence(): Sequence<Locationed<PathSpec, V>>
 
     public class Match<out V>(
-        override val pathSpec: PathSpec,
-        override val rawPathArguments: List<Any?>,
-        override val wildcard: List<String>?,
+        override val path: ConcretePath<PathSpec>,
         public val value: V?
-    ): ConcretePath<PathSpec>
+    ): HasConcretePath<PathSpec> {
+        public constructor(
+            pathSpec: PathSpec,
+            rawPathArguments: List<Any?>,
+            wildcard: List<String>?,
+            value: V?
+        ) : this(ConcretePath(pathSpec, rawPathArguments, wildcard), value)
+
+        public val pathSpec: PathSpec get() = path.pathSpec
+
+        override fun toString(): String = "Match(path = $path, value = $value)"
+    }
 
     override fun containsKey(key: PathSpec): Boolean = get(key) != null
     override fun containsValue(value: @UnsafeVariance V): Boolean = asSequence().any { it.value == value }

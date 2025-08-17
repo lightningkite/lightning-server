@@ -21,8 +21,10 @@ import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.lightningserver.websockets.subscribe
 import com.lightningkite.lightningserver.websockets.text
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
+import com.lightningkite.services.data.StringArrayFormat
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.modules.EmptySerializersModule
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -160,5 +162,12 @@ class TestRunnerTest {
                 rootSocket.close()
             }
         }
+    }
+
+    @Test
+    fun testPathString() {
+        println(TestModelEndpoints.describePerson.location.path)
+        println(TestModelEndpoints.describePerson.location.path.concrete("hunter"))
+        println(TestModelEndpoints.describePerson.location.path.concrete("hunter").toString(StringArrayFormat(EmptySerializersModule())))
     }
 }

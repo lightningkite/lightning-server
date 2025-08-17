@@ -24,7 +24,15 @@ package com.lightningkite.lightningserver.pathing
  * - `/foo` does not satisfy `/foo/bar` (missing segment `/bar`)
  * - `/foo/bar` does not satisfy `/foo/bar/` (missing trailing slash)
  * - `/foo/bar/baz` does not satisfy `/foo/bar` (extra segment)
- * - `/foo/bar/baz` ***does*** satisfy `/foo/bar/{...}` (trailing wildcard allows extra segments)
+ *
+ * Wildcards
+ * - `/foo/{bar}/baz` satisfies `/foo/{bar}/baz`
+ * - `/foo/{bar}/baz` does not satisfy `/foo/bar/baz`
+ * - `/foo/bar/baz` satisfies `/foo/bar/{...}` (trailing wildcard allows extra segments)
+ *
+ * Concrete Paths
+ * - `/foo/1234/baz` satisfies `/foo/{bar}/baz`
+ * - `/foo/{bar}/baz` does not satisfy `/foo/1234/baz`
  * */
 public sealed interface PathPredicate {
     public fun satisfiedBy(path: ConcretePath<*>): Boolean

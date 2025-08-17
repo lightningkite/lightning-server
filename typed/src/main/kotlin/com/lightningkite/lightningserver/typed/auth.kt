@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.typed
 
+import com.lightningkite.lightningserver.KeyedSerializableCache
 import com.lightningkite.lightningserver.Request
-import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.http.HttpRequest
@@ -19,10 +19,12 @@ public data class Authentication<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 ) {
     init {
         if (limitTo != null && forbid != null) limitTo.intersect(forbid).let { intersection ->
-            if (intersection.isNotEmpty()) throw IllegalArgumentException(
-                "limitTo and forbid cannot have any common predicates, as this leads to a contradiction. Intersection: $intersection"
-            )
+            if (intersection.isNotEmpty()) throw IllegalArgumentException("limitTo and forbid cannot have any common predicates, as this leads to a contradiction. Intersection: $intersection")
         }
+    }
+
+    object CacheKey : KeyedSerializableCache.Key<Authentication<*, *>?> {
+        override val id: String = "authentication"
     }
 }
 
@@ -89,6 +91,20 @@ public data class RequestPredicates(
                 }
             }.takeUnless { it.isEmpty() },
         queryParameters = queryParameters.intersect2(other.queryParameters)
+    )
+
+    private inline fun <T : Any> op(first: T?, second: T?, operation: (T, T) -> T): T? =
+        when {
+            first == null -> second
+            second == null -> first
+            else -> operation(first, second)
+        }
+
+    public operator fun plus(other: RequestPredicates): RequestPredicates = RequestPredicates(
+        methods = op(methods, other.methods) { a, b -> a + b },
+        paths = op(paths, other.paths) { a, b -> a + b },
+        headers = op(headers, other.headers) { a, b -> a + b },
+        queryParameters = op(queryParameters, other.queryParameters) { a, b -> a + b }
     )
 
     public fun isEmpty(): Boolean =

@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.pathing.RawPath
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.Request
 import com.lightningkite.services.data.TypedData
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 
@@ -17,6 +18,6 @@ public data class HttpRequest<PATH: PathSpec>(
     override val protocol: String,
     override val sourceIp: String,
     public val method: HttpMethod,
-    override val cache: KeyedSerializableCache = KeyedSerializableCache(),
+    override val cache: KeyedSerializableCache<@Contextual Request<*>> = KeyedSerializableCache(),
     @Transient public val body: TypedData? = null,
 ) : Request<PATH>()

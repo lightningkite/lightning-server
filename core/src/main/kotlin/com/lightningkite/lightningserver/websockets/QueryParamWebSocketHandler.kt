@@ -77,7 +77,7 @@ internal class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryP
         override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) = wrapped.unsubscribe(topic)
 
         suspend fun finalize() {
-            if(request.cache.cacheUpdated) {
+            if(request.cache.updated) {
                 wrapped.updateStateImmediately { data ->
                     data.copy(request = request)
                 }

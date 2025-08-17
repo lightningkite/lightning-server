@@ -109,7 +109,7 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
         }
 
         suspend fun finalize() {
-            if(request.cache.cacheUpdated) {
+            if(request.cache.updated) {
                 wrapped.updateStateImmediately { data ->
                     data.copy(
                         map = data.map + (channel to data.map.getValue(channel).copy(request = request))
@@ -166,7 +166,7 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
                         sourceIp = connection.request.sourceIp,
                         cache = connection.request.cache,
                     )
-                    val storage = otherHandler.willConnectWithMetrics(match.pathSpec, connection, r)
+                    val storage = otherHandler.willConnectWithMetrics(match.path.pathSpec, connection, r)
                     connection.updateStateImmediately {
                         it.copy(
                             map = it.map + (channel to MultiplexWebSocketHandlerConnectionInfo(
