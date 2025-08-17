@@ -4,19 +4,17 @@ import com.lightningkite.lightningserver.definition.CorsSettings
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.engine.local.LocalEngine
-import com.lightningkite.lightningserver.engine.local.enginePubSub
 import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.ServerPath
+import com.lightningkite.lightningserver.pathing.RawPath
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.Data
 import com.lightningkite.services.data.TypedData
-import com.lightningkite.services.pubsub.PubSub
 import com.lightningkite.services.pubsub.PubSubChannel
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -70,7 +68,7 @@ public class KtorEngine(server: ServerDefinition) : LocalEngine(server) {
                     route(path.toString(), io.ktor.http.HttpMethod.parse(method.toString())) {
                         handle {
                             val request = HttpRequest(
-                                path = ServerPath(call.request.path()),
+                                path = RawPath(call.request.path()),
                                 queryParameters = call.request.queryParameters.flattenEntries(),
                                 headers = call.request.headers.adapt(),
                                 domain = call.request.origin.serverHost,
@@ -144,7 +142,7 @@ public class KtorEngine(server: ServerDefinition) : LocalEngine(server) {
                                 else listOf(it)
                             }
                             val request = WebSocketConnectRequest(
-                                path = ServerPath(call.request.path()),
+                                path = RawPath(call.request.path()),
                                 queryParameters = queryParams,
                                 headers = call.request.headers.adapt(),
                                 domain = call.request.origin.serverHost,

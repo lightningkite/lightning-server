@@ -4,7 +4,7 @@ import com.lightningkite.lightningserver.AnonType
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.pathing.ServerPath
+import com.lightningkite.lightningserver.pathing.RawPath
 import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.*
@@ -158,7 +158,7 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
                     @Suppress("UNCHECKED_CAST")
                     otherHandler as WebSocketHandler<PathSpec, Any?>
                     val r = WebSocketConnectRequest<PathSpec>(
-                        path = ServerPath<PathSpec>(message.path, match),
+                        path = RawPath<PathSpec>(message.path, match),
                         queryParameters = connection.request.queryParameters + (message.queryParams?.entries?.flatMap { it.value.map { v -> it.key to v } } ?: listOf()),
                         headers = connection.request.headers,
                         domain = connection.request.domain,

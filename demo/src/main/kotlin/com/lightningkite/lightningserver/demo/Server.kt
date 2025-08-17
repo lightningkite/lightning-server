@@ -107,13 +107,6 @@ object ModelEndpoints : ServerBuilder() {
     )
 
     val rest = path.path("rest") bind Rest(0)
-
-    init {
-        println("SdkSettings:")
-        println("Imports: ${rest.sdk.imports}")
-        println("Name: ${rest.sdk.name}")
-        println("Params: ${rest.sdk.typeParameters}")
-    }
 }
 
 class Rest<T>(val item: T) : ClientInterfaceBuilder()

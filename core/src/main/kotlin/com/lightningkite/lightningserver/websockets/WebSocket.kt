@@ -6,7 +6,7 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.pathing.ConcretePath
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.ServerPath
+import com.lightningkite.lightningserver.pathing.RawPath
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 
@@ -40,7 +40,7 @@ public data class WebSocketSubscriptionMessage<PATH: PathSpec, T>(
 
 @Serializable
 public data class WebSocketConnectRequest<PATH: PathSpec>(
-    override val path: ServerPath<PATH>,
+    override val path: RawPath<PATH>,
     override val queryParameters: List<Pair<String, String>> = listOf(),
     override val headers: HttpHeaders = HttpHeaders.EMPTY,
     override val domain: String = "",

@@ -17,7 +17,10 @@ public class KeyedSerializableCache {
     public interface Key<T> {
         public val id: String
         public val serializer: KSerializer<T>
-        public suspend fun calculate(serverRuntime: ServerRuntime, request: Request<*>): T
+
+        context(server: ServerRuntime)
+        public suspend fun calculate(request: Request<*>): T
+
         public val expireAfter: Duration? get() = null
     }
 
@@ -35,7 +38,7 @@ public class KeyedSerializableCache {
                 key.serializer,
                 cacheQuickAccess!![key.id]!!
             )
-        } else key.calculate(serverRuntime, request)
+        } else context(serverRuntime) { key.calculate(request) }
         cache[key] = calculated
         cacheUpdated = true
         return calculated

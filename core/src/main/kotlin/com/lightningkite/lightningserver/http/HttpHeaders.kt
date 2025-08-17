@@ -18,6 +18,8 @@ public class HttpHeaders internal constructor (public val normalizedEntries: Map
         public val EMPTY: HttpHeaders = HttpHeaders(mapOf<String, List<HttpHeaderValue>>())
     }
 
+    public fun isEmpty(): Boolean = normalizedEntries.isEmpty()
+
     public operator fun get(key: String): HttpHeaderValue? = normalizedEntries[key.lowercase()]?.firstOrNull()
     public fun getMany(key: String): List<HttpHeaderValue> = normalizedEntries[key.lowercase()] ?: listOf()
 
@@ -56,16 +58,20 @@ public class HttpHeaders internal constructor (public val normalizedEntries: Map
     public class Builder() {
         private val entries = HashMap<String, ArrayList<HttpHeaderValue>>()
         public fun set(key: String, value: String) {
-            entries.getOrPut(key.lowercase()) { ArrayList() }.add(HttpHeaderValue.Companion.parse(value))
+            entries.getOrPut(key.lowercase(), ::ArrayList).add(HttpHeaderValue.parse(value))
         }
 
         public fun set(key: String, value: HttpHeaderValue) {
-            entries.getOrPut(key.lowercase()) { ArrayList() }.add(value)
+            entries.getOrPut(key.lowercase(), ::ArrayList).add(value)
+        }
+
+        public fun set(key: String, values: List<HttpHeaderValue>) {
+            entries.getOrPut(key.lowercase(), ::ArrayList).addAll(values)
         }
 
         public fun set(headers: HttpHeaders) {
             headers.normalizedEntries.forEach { (key, values) ->
-                entries.getOrPut(key) { ArrayList() }.addAll(values)
+                entries.getOrPut(key, ::ArrayList).addAll(values)
             }
         }
 

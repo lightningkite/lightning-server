@@ -12,7 +12,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpec1
 import com.lightningkite.lightningserver.pathing.PathSpec2
 import com.lightningkite.lightningserver.pathing.PathSpec3
-import com.lightningkite.lightningserver.pathing.ServerPath
+import com.lightningkite.lightningserver.pathing.RawPath
 import com.lightningkite.lightningserver.runtime.invoke
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
@@ -34,7 +34,7 @@ public suspend fun <STORAGE> Locationed<PathSpec0, WebSocketHandler<PathSpec0, S
     sourceIp: String = "local",
 ): TestRunner<*>.TestWebSocket<PathSpec0, STORAGE> {
     val request = WebSocketConnectRequest(
-        ServerPath(this.location),
+        RawPath(this.location),
         queryParameters = queryParameters,
         headers = headers,
         domain = domain,
@@ -57,7 +57,7 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A> Locationed<PathSpec
     sourceIp: String = "local",
 ): TestRunner<*>.TestWebSocket<PathSpec1<A>, STORAGE> {
     val request = WebSocketConnectRequest(
-        ServerPath(this.location, path1),
+        RawPath(this.location, path1),
         queryParameters = queryParameters,
         headers = headers,
         domain = domain,
@@ -79,7 +79,7 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A, B> Locationed<PathS
     sourceIp: String = "local",
 ): TestRunner<*>.TestWebSocket<PathSpec2<A, B>, STORAGE> {
     val request = WebSocketConnectRequest(
-        ServerPath(this.location, path1, path2),
+        RawPath(this.location, path1, path2),
         queryParameters = queryParameters,
         headers = headers,
         domain = domain,
@@ -102,7 +102,7 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A, B, C> Locationed<Pa
     sourceIp: String = "local",
 ): TestRunner<*>.TestWebSocket<PathSpec3<A, B, C>, STORAGE> {
     val request = WebSocketConnectRequest(
-        ServerPath(this.location, path1, path2, path3),
+        RawPath(this.location, path1, path2, path3),
         queryParameters = queryParameters,
         headers = headers,
         domain = domain,
@@ -124,7 +124,7 @@ context(test: TestRunner<*>) public suspend fun Locationed<HttpEndpoint<PathSpec
 ): HttpResponse {
     return this.item.handle(
         test, HttpRequest(
-            ServerPath(this.location.path),
+            RawPath(this.location.path),
             method = this.location.method,
             queryParameters = queryParameters,
             headers = headers,
@@ -147,7 +147,7 @@ context(test: TestRunner<*>) public suspend fun <A> Locationed<HttpEndpoint<Path
 ): HttpResponse {
     return this.item.handle(
         test, HttpRequest(
-            ServerPath(this.location.path, path1),
+            RawPath(this.location.path, path1),
             method = this.location.method,
             queryParameters = queryParameters,
             headers = headers,
@@ -170,7 +170,7 @@ context(test: TestRunner<*>) public suspend fun <A, B> Locationed<HttpEndpoint<P
 ): HttpResponse {
     return this.item.handle(
         test, HttpRequest(
-            ServerPath(this.location.path, path1, path2),
+            RawPath(this.location.path, path1, path2),
             method = this.location.method,
             queryParameters = queryParameters,
             headers = headers,
@@ -194,7 +194,7 @@ context(test: TestRunner<*>) public suspend fun <A, B, C> Locationed<HttpEndpoin
 ): HttpResponse {
     return this.item.handle(
         test, HttpRequest(
-            ServerPath(this.location.path, path1, path2, path3),
+            RawPath(this.location.path, path1, path2, path3),
             method = this.location.method,
             queryParameters = queryParameters,
             headers = headers,

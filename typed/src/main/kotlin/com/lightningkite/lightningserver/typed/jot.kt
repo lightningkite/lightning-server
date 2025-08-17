@@ -29,6 +29,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.NothingSerializer
 import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.encoding.CompositeDecoder
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
@@ -95,7 +96,7 @@ public class PrincipalTypeAndId<USER: HasId<ID>, ID: Comparable<ID>>(
 
 @Serializable
 public class RequestAuth<USER: HasId<ID>, ID: Comparable<ID>>(
-    public val principalTypeAndId: PrincipalTypeAndId<USER, ID>,
+    public val principalTypeAndId: PrincipalType.WithId<USER, ID>,
     public val sessionId: Uuid? = null,
     @Contextual public val issuedAt: Instant,
     @Description("The scopes permitted.  * indicates root access.")
@@ -105,7 +106,7 @@ public class RequestAuth<USER: HasId<ID>, ID: Comparable<ID>>(
     public val cache: KeyedSerializableCache = KeyedSerializableCache(),
 //    public val requirements: RequestRequirements? = null,  // TODO: Revive this
 ) {
-    public val principalType: PrincipalType<USER, ID> get() = principalTypeAndId.principalType
+    public val principalType: PrincipalType<USER, ID> get() = principalTypeAndId.type
     public val id: ID get() = principalTypeAndId.id
     override fun toString(): String = buildString {
         fromMasquerade?.let {
@@ -135,16 +136,18 @@ public class RequestAuth<USER: HasId<ID>, ID: Comparable<ID>>(
         @OptIn(ExperimentalSerializationApi::class)
         @Suppress("UNCHECKED_CAST")
         override val serializer: KSerializer<RequestAuth<*, *>?> = serializer(NothingSerializer(), NothingSerializer()).nullable as KSerializer<RequestAuth<*, *>?>
-        override suspend fun calculate(serverRuntime: ServerRuntime, request: Request<*>): RequestAuth<*, *>? {
-            for (reader in serverRuntime.server.principalTypes) {
+
+        context(server: ServerRuntime)
+        override suspend fun calculate(request: Request<*>): RequestAuth<*, *>? {
+            for (reader in server.server.principalTypes) {
                 @Suppress("UNCHECKED_CAST")
                 reader as PrincipalType<HasId<Comparable<Any?>>, Comparable<Any?>>
-                return reader.get(serverRuntime, request)?.let { it ->
+                return reader.get(server, request)?.let { it ->
                     request.headers[HttpHeader.XMasquerade]?.root?.let { m ->
                         val otherType = m.substringBefore('/')
-                        val otherHandler = serverRuntime.server.principalTypes.find { it.name == otherType }
+                        val otherHandler = server.server.principalTypes.find { it.name == otherType }
                             ?: throw BadRequestException("No subject type ${otherType} known")
-                        @Suppress("UNCHECKED_CAST") val otherId = serverRuntime.externalSerialization.stringArrayFormat.decodeFromString(otherHandler.idSerializer, m.substringAfter('/')) as Comparable<Any?>
+                        @Suppress("UNCHECKED_CAST") val otherId = server.externalSerialization.stringArrayFormat.decodeFromString(otherHandler.idSerializer, m.substringAfter('/')) as Comparable<Any?>
                         @Suppress("UNCHECKED_CAST")
                         if (reader.permitMasquerade(
                                 otherHandler as PrincipalType<HasId<Comparable<Any?>>, Comparable<Any?>>,
@@ -153,7 +156,7 @@ public class RequestAuth<USER: HasId<ID>, ID: Comparable<ID>>(
                             )
                         ) {
                             RequestAuth(
-                                principalTypeAndId = PrincipalTypeAndId(otherHandler, otherId),
+                                principalTypeAndId = PrincipalType.WithId(otherHandler, otherId),
                                 sessionId = it.sessionId,
                                 issuedAt = it.issuedAt,
                                 scopes = it.scopes,
@@ -207,10 +210,20 @@ public interface PrincipalType<SUBJECT: HasId<ID>, ID: Comparable<ID>> {
     public val name: String get() = subjectSerializer.descriptor.serialName
     public val cacheTypes: Collection<CacheKey<*, *, *>>
     public val subjectCacheExpiration: Duration get() = 5.minutes
-    public suspend fun get(serverRuntime: ServerRuntime, request: Request<*>): RequestAuth<SUBJECT, ID>? = null
+
+    context(server: ServerRuntime)
+    public suspend operator fun get(request: Request<*>): RequestAuth<SUBJECT, ID>? = null
 
     public val subjectSerializer: KSerializer<SUBJECT>
     public suspend fun fetch(serverRuntime: ServerRuntime, id: ID): SUBJECT
+
+    public fun hasProperty(property: String): Boolean = subjectSerializer.descriptor.getElementIndex(property) != CompositeDecoder.UNKNOWN_NAME
+//
+//    context(server: ServerRuntime)
+//    public fun getProperty(principal: SUBJECT, property: String): String {
+//        if (property == "$name/_id") return server.internalSerialization.json.encodeToString(idSerializer, principal._id)
+//        else
+//    }
 
     public suspend fun permitMasquerade(
         other: PrincipalType<*, *>,
@@ -224,6 +237,12 @@ public interface PrincipalType<SUBJECT: HasId<ID>, ID: Comparable<ID>> {
         public suspend fun calculate(serverRuntime: ServerRuntime, auth: RequestAuth<SUBJECT, ID>): T
         public val expireAfter: Duration? get() = null
     }
+
+    @Serializable
+    public data class WithId<SUBJECT: HasId<ID>, ID: Comparable<ID>>(
+        public val type: PrincipalType<SUBJECT, ID>,
+        public val id: ID
+    )
 }
 
 public class AuthOption<SUBJECT: HasId<ID>, ID: Comparable<ID>>(
