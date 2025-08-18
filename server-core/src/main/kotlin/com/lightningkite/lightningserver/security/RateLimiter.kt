@@ -20,7 +20,6 @@ import com.lightningkite.now
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.contracts.ExperimentalContracts
@@ -112,19 +111,23 @@ class RateLimiter(
         if (stoppedUntilTime == null) {
             log?.invoke("stoppedUntilTime virtual before borrow: ${now.minus(leeway).let { "$it (rel ${it - now()})" }}")
             cache().set(cacheKey, now.minus(leeway).plus(borrowedValue).toEpochMilliseconds(), timeToLive = 15.minutes)
-        } else if (now < stoppedUntilTime)
+        } else if (now < stoppedUntilTime) {
+            val currentWait = stoppedUntilTime - now
+            val newWait = (currentWait.inWholeSeconds + 1).seconds
+            val newUntilTime = now + newWait
+            cache().set(cacheKey, newUntilTime.toEpochMilliseconds())
             throw HttpStatusException(
                 LSError(
                     http = HttpStatus.TooManyRequests.code,
                     detail = "rate-limit-$rateLimiterId",
                     message = "You're asking too much from the server; please wait before trying again.",
                     data = Serialization.json.encodeToString(buildJsonObject {
-                        put("at", stoppedUntilTime.toString())
-                        put("wait", (stoppedUntilTime - now).toString())
+                        put("at", newUntilTime.toString())
+                        put("wait", (newWait).toString())
                     })
                 )
             )
-        else if (now - stoppedUntilTime > leeway) {
+        }else if (now - stoppedUntilTime > leeway) {
             log?.invoke("stoppedUntilTime virtual before borrow: ${now.minus(leeway).let { "$it (rel ${it - now()})" }}")
             cache().set(cacheKey, now.minus(leeway).plus(borrowedValue).toEpochMilliseconds(), timeToLive = 15.minutes)
         } else
