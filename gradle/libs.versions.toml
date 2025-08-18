@@ -55,6 +55,7 @@ sentry = "8.17.0"
 serializationLibs = "1.9.0"
 serviceAbstractions = "0.0.1-11"
 shadow = "8.1.1"
+vertx = "4.5.7"
 vanniktechMavenPublish = "0.34.0"
 versionCatalogUpdate = "1.0.0"
 webauthn4jCore = "0.29.4.RELEASE"
@@ -149,6 +150,11 @@ serviceAbstractionsDatabase = { module = "com.lightningkite.services:database", 
 serviceAbstractionsSBSL = { module = "com.lightningkite.services:should-be-standard-library", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsCache = { module = "com.lightningkite.services:cache", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsPubsub = { module = "com.lightningkite.services:pubsub", version = { ref = "serviceAbstractions" } }
+vertxCore = { module = "io.vertx:vertx-core", version = { ref = "vertx" } }
+vertxWeb = { module = "io.vertx:vertx-web", version = { ref = "vertx" } }
+vertxWebClient = { module = "io.vertx:vertx-web-client", version = { ref = "vertx" } }
+vertxLangKotlin = { module = "io.vertx:vertx-lang-kotlin", version = { ref = "vertx" } }
+vertxLangKotlinCoroutines = { module = "io.vertx:vertx-lang-kotlin-coroutines", version = { ref = "vertx" } }
 webauthn4jCore = { module = "com.webauthn4j:webauthn4j-core", version = { ref = "webauthn4jCore" } }
 xmlUtilJvm = { module = "io.github.pdvrieze.xmlutil:serialization-jvm", version = { ref = "xmlUtilJvm" } }
 

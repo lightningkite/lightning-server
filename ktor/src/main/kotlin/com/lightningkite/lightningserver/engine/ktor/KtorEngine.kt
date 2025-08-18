@@ -58,7 +58,9 @@ public class KtorEngine(server: ServerDefinition) : LocalEngine(server) {
 
     private fun Application.adapt() {
         install(WebSockets)
-        install(getLSCorsPlugin())
+
+        settings.get(ktorRunConfig, this@KtorEngine).cors
+            ?.also{ corsSettings -> install(getLSCorsPlugin(corsSettings)) }
 
         routing {
             server.endpoints.forEach { (path, endpoints) ->
@@ -93,8 +95,8 @@ public class KtorEngine(server: ServerDefinition) : LocalEngine(server) {
                             val result: HttpResponse = handler.handle(this@KtorEngine, request)
 
                             for (header in result.headers.normalizedEntries) {
-                                header.value.forEach {
-                                    call.response.header(header.key, it.toHttpString())
+                                for(value in header.value){
+                                    call.response.header(header.key, value.toHttpString())
                                 }
                             }
                             call.response.status(HttpStatusCode.fromValue(result.status.code))
@@ -206,6 +208,7 @@ public class KtorEngine(server: ServerDefinition) : LocalEngine(server) {
     }
 
     public fun <TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.Configuration> start(factory: ApplicationEngineFactory<TEngine, TConfiguration>): Unit {
+        startSchedules()
         embeddedServer(
             factory = factory,
             port = settings.get(ktorRunConfig, this).port,
@@ -223,7 +226,7 @@ private abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
     val handler: WebSocketHandler<PATH, STORAGE>,
     val scope: CoroutineScope,
     server: ServerRuntime,
-    val pubSub: (request: WebSocketSubscriptionRequest<*, Any?>) -> PubSubChannel<Any?>
+    val pubSub: (request: WebSocketSubscriptionRequest<*, Any?>) -> PubSubChannel<Any?>,
 ) : WebSocketConnection<PATH, STORAGE>, ServerRuntime by server {
     override var currentState: STORAGE = startingState
     override suspend fun repullState(): STORAGE = currentState
