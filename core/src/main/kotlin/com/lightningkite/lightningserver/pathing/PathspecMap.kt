@@ -15,9 +15,13 @@ public interface PathSpecMap<out V> : Map<PathSpec, V> {
         public constructor(
             pathSpec: PathSpec,
             rawPathArguments: List<Any?>,
+            trailingSlash: Boolean,
             wildcard: List<String>?,
             value: V?
-        ) : this(ConcretePath(pathSpec, rawPathArguments, wildcard), value)
+        ) : this(
+            ConcretePath(pathSpec, rawPathArguments, wildcard?.let { ConcretePath.TrailingSegments(it, trailingSlash) }),
+            value
+        )
 
         public val pathSpec: PathSpec get() = path.pathSpec
 
@@ -159,6 +163,7 @@ public class MutablePathSpecMap<V>(): PathSpecMap<V> {
                 PathSpecMap.Match<V>(
                     pathSpec = PathSpec.root,
                     rawPathArguments = emptyList(),
+                    trailingSlash = endingSlash,
                     wildcard = if (it.after == PathSpec.Afterwards.TrailingSegments) emptyList() else null,
                     value = root[it.after]
                 )
@@ -193,6 +198,7 @@ public class MutablePathSpecMap<V>(): PathSpecMap<V> {
                     PathSpecMap.Match<V>(
                         pathSpec = spec,
                         rawPathArguments = wildcards.zip(spec.wildcards) { v, s -> format.decodeFromString(s.serializer, v) },
+                        trailingSlash = endingSlash,
                         wildcard = pathParts.drop(spec.segments.size),
                         value = it.chainedWildcardValue,
                     )
@@ -205,6 +211,7 @@ public class MutablePathSpecMap<V>(): PathSpecMap<V> {
                     PathSpecMap.Match<V>(
                         pathSpec = spec,
                         rawPathArguments = wildcards.zip(spec.wildcards) { v, s -> format.decodeFromString(s.serializer, v) },
+                        trailingSlash = true,
                         wildcard = null,
                         value = current.trailingSlashValue,
                     )
@@ -215,6 +222,7 @@ public class MutablePathSpecMap<V>(): PathSpecMap<V> {
                     PathSpecMap.Match<V>(
                         pathSpec = it,
                         rawPathArguments = wildcards.zip(it.wildcards) { v, s -> format.decodeFromString(s.serializer, v) },
+                        trailingSlash = false,
                         wildcard = null,
                         value = current.pathValue
                     )
@@ -226,6 +234,7 @@ public class MutablePathSpecMap<V>(): PathSpecMap<V> {
                         PathSpecMap.Match<V>(
                             pathSpec = spec,
                             rawPathArguments = wildcards.zip(spec.wildcards) { v, s -> format.decodeFromString(s.serializer, v) },
+                            trailingSlash = endingSlash,
                             wildcard = pathParts.drop(spec.segments.size),
                             value = it.chainedWildcardValue
                         )

@@ -13,8 +13,8 @@ import kotlinx.serialization.StringFormat
 public class ConcretePath<PATH: PathSpec> internal constructor(
     public val pathSpec: PATH,
     public val rawPathArguments: List<Any?>,
-    public val wildcard: List<String>? = null,
-) : PathPredicate {
+    public val wildcard: TrailingSegments? = null,
+) {
     public val segments: List<Segment> by lazy {
         var index = 0
         pathSpec.segments.map {
@@ -22,50 +22,39 @@ public class ConcretePath<PATH: PathSpec> internal constructor(
                 is PathSpec.Segment.Constant -> Segment.Constant(it)
                 is PathSpec.Segment.Wildcard<*> -> Segment.WildcardWithValue(it as PathSpec.Segment.Wildcard<Any?>, rawPathArguments[index++])
             }
-        }
+        } + (wildcard?.segments?.map(Segment::Constant) ?: emptyList())
     }
+
+    public val hasTrailingSlash: Boolean get() =
+        wildcard?.trailingSlash ?: (pathSpec.after == PathSpec.Afterwards.TrailingSlash)
+
+    public data class TrailingSegments(val segments: List<String>, val trailingSlash: Boolean)
 
     public sealed interface Segment {
-        public val segment: PathSpec.Segment
+        public fun toString(format: StringFormat): String
 
-        public data class Constant(override val segment: PathSpec.Segment.Constant) : Segment {
-            public val value: String get() = segment.value
+        public data class Constant(val value: String) : Segment {
+            public constructor(segment: PathSpec.Segment.Constant) : this(segment.value)
+
             override fun toString(): String = value
+            override fun toString(format: StringFormat): String = value
         }
-        public data class WildcardWithValue<T>(override val segment: PathSpec.Segment.Wildcard<T>, val value: T) : Segment {
-            public val name: String get() = segment.name
-            public val serializer: KSerializer<T> get() = segment.serializer
+        public data class WildcardWithValue<T>(val name: String, val serializer: KSerializer<T>, val value: T) : Segment {
+            public constructor(segment: PathSpec.Segment.Wildcard<T>, value: T) : this(segment.name, segment.serializer, value)
+
             override fun toString(): String = "{$name=$value}"
-            public fun toString(format: StringFormat): String = format.encodeToString(serializer, value)
+            override fun toString(format: StringFormat): String = format.encodeToString(serializer, value)
         }
     }
 
-    // PathPredicate overloads
-    override fun satisfiedBy(path: PathSpec): Boolean = false // only matches concrete paths with the same arguments
-    override fun satisfiedBy(path: ConcretePath<*>): Boolean {
-        val predicateSegments = segments
-        val otherSegments = path.segments
-        if (otherSegments.size != predicateSegments.size) return false
-        for ((idx, segment) in predicateSegments.withIndex()) {
-            if (segment != otherSegments.getOrNull(idx)) return false
-        }
-        return true
-    }
-
-    private fun <T> List<T>.joinToPath() = joinToString("/", prefix = "/", postfix = if (pathSpec.after == PathSpec.Afterwards.TrailingSlash) "/" else "")
-
-    override fun toString(): String = segments.joinToPath()
+    override fun toString(): String =
+        segments.joinToString(prefix = "/", separator = "/", postfix = if (hasTrailingSlash) "/" else "")
 
     public fun pathSegments(stringArrayFormat: StringArrayFormat): List<String> =
-        segments.map {
-            when (it) {
-                is Segment.Constant -> it.toString()
-                is Segment.WildcardWithValue<*> -> it.toString(stringArrayFormat)
-            }
-        }
+        segments.map { it.toString(stringArrayFormat) } + (wildcard?.segments ?: emptyList())
 
     public fun path(stringArrayFormat: StringArrayFormat): String =
-        pathSegments(stringArrayFormat).plus(wildcard ?: emptyList()).joinToPath()
+        segments.joinToString(prefix = "/", separator = "/", postfix = if (hasTrailingSlash) "/" else "") { it.toString(stringArrayFormat) }
 
     public fun toString(stringArrayFormat: StringArrayFormat): String = path(stringArrayFormat)
 }
@@ -78,13 +67,13 @@ public interface HasContextualPath<PATH : PathSpec> {
     context(server: ServerRuntime) public val pathInContext: ConcretePath<PATH>
 }
 
-public fun ConcretePath(path: PathSpec0, trailingWildcard: List<String>? = null): ConcretePath<PathSpec0> =
+public fun ConcretePath(path: PathSpec0, trailingWildcard: ConcretePath.TrailingSegments? = null): ConcretePath<PathSpec0> =
     ConcretePath(path, emptyList(), trailingWildcard?.takeIf { path.after == PathSpec.Afterwards.TrailingSegments })
-public fun <A> ConcretePath(path: PathSpec1<A>, first: A, trailingWildcard: List<String>? = null): ConcretePath<PathSpec1<A>> =
+public fun <A> ConcretePath(path: PathSpec1<A>, first: A, trailingWildcard: ConcretePath.TrailingSegments? = null): ConcretePath<PathSpec1<A>> =
     ConcretePath(path, listOf(first), trailingWildcard?.takeIf { path.after == PathSpec.Afterwards.TrailingSegments })
-public fun <A, B> ConcretePath(path: PathSpec2<A, B>, first: A, second: B, trailingWildcard: List<String>? = null): ConcretePath<PathSpec2<A, B>> =
+public fun <A, B> ConcretePath(path: PathSpec2<A, B>, first: A, second: B, trailingWildcard: ConcretePath.TrailingSegments? = null): ConcretePath<PathSpec2<A, B>> =
     ConcretePath(path, listOf(first, second), trailingWildcard?.takeIf { path.after == PathSpec.Afterwards.TrailingSegments })
-public fun <A, B, C> ConcretePath(path: PathSpec3<A, B, C>, first: A, second: B, third: C, trailingWildcard: List<String>? = null): ConcretePath<PathSpec3<A, B, C>> =
+public fun <A, B, C> ConcretePath(path: PathSpec3<A, B, C>, first: A, second: B, third: C, trailingWildcard: ConcretePath.TrailingSegments? = null): ConcretePath<PathSpec3<A, B, C>> =
     ConcretePath(path, listOf(first, second, third), trailingWildcard?.takeIf { path.after == PathSpec.Afterwards.TrailingSegments })
 
 public fun HasConcretePath<*>.pathSegments(stringArrayFormat: StringArrayFormat): List<String> = path.pathSegments(stringArrayFormat)

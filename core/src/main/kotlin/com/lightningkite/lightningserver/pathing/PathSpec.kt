@@ -17,7 +17,7 @@ import kotlinx.serialization.encoding.Encoder
  * A `PathSpec` also defines what comes after the segments, as nothing, a trailing slash, or arbitrary trailing path segments.
  */
 @Serializable(DummyPathSpecSerializer::class)
-public sealed class PathSpec(public val segments: List<Segment>, public val after: Afterwards) : PathPredicate {
+public sealed class PathSpec(public val segments: List<Segment>, public val after: Afterwards) {
     override fun hashCode(): Int = segments.hashCode() * 31 + after.hashCode()
     override fun equals(other: Any?): Boolean =
         other is PathSpec && this.segments == other.segments && this.after == other.after
@@ -108,17 +108,6 @@ public sealed class PathSpec(public val segments: List<Segment>, public val afte
     public companion object {
         public val root: PathSpec0 = PathSpec0(emptyList(), Afterwards.None)
     }
-
-    override fun satisfiedBy(path: PathSpec): Boolean {
-        // Check that each segment is matched
-        for ((idx, segment) in segments.withIndex()) {
-            if (path.segments.getOrNull(idx) != segment) return false
-        }
-        // Check afterwards behavior
-        return if (after == Afterwards.TrailingSegments) true
-        else segments.size == path.segments.size && after == path.after
-    }
-    override fun satisfiedBy(path: ConcretePath<*>): Boolean = satisfiedBy(path.pathSpec)
 }
 
 public object DummyPathSpecSerializer : KSerializer<PathSpec> {
@@ -143,7 +132,7 @@ public class PathSpec0(segments: List<Segment>, after: Afterwards) : PathSpec(se
     public override fun path(constant: String): PathSpec0 = PathSpec0(segments + Segment.Constant(constant), Afterwards.None)
     public override fun <T> arg(wildcard: Segment.Wildcard<T>): PathSpec1<T> = PathSpec1(segments + wildcard, after, wildcard)
 
-    public fun concrete(trailingWildcard: List<String>? = null): ConcretePath<PathSpec0> = ConcretePath(this, trailingWildcard)
+    public fun concrete(trailingWildcard: ConcretePath.TrailingSegments? = null): ConcretePath<PathSpec0> = ConcretePath(this, trailingWildcard)
 
     public inline fun <reified T> arg(name: String): PathSpec1<T> = arg(Segment.Wildcard(name, serializerOrContextual<T>()))
 }
@@ -163,7 +152,7 @@ public class PathSpec1<A>(
     public override fun path(constant: String): PathSpec1<A> = PathSpec1<A>(segments + Segment.Constant(constant), Afterwards.None, first)
     public override fun <T> arg(wildcard: Segment.Wildcard<T>): PathSpec2<A, T> = PathSpec2<A, T>(segments + wildcard, after, first, wildcard)
 
-    public fun concrete(first: A, trailingWildcard: List<String>? = null): ConcretePath<PathSpec1<A>> = ConcretePath(this, first, trailingWildcard)
+    public fun concrete(first: A, trailingWildcard: ConcretePath.TrailingSegments? = null): ConcretePath<PathSpec1<A>> = ConcretePath(this, first, trailingWildcard)
 
     public inline fun <reified T> arg(name: String): PathSpec2<A, T> = arg(Segment.Wildcard(name, serializerOrContextual<T>()))
 }
@@ -184,7 +173,7 @@ public class PathSpec2<A, B>(
     public override fun path(constant: String): PathSpec2<A, B> = PathSpec2<A, B>(segments + Segment.Constant(constant), Afterwards.None, first, second)
     public override fun <T> arg(wildcard: Segment.Wildcard<T>): PathSpec3<A, B, T> = PathSpec3<A, B, T>(segments + wildcard, after, first, second, wildcard)
 
-    public fun concrete(first: A, second: B, trailingWildcard: List<String>? = null): ConcretePath<PathSpec2<A, B>> = ConcretePath(this, first, second, trailingWildcard)
+    public fun concrete(first: A, second: B, trailingWildcard: ConcretePath.TrailingSegments? = null): ConcretePath<PathSpec2<A, B>> = ConcretePath(this, first, second, trailingWildcard)
 
     public inline fun <reified T> arg(name: String): PathSpec3<A, B, T> = arg(Segment.Wildcard(name, serializerOrContextual<T>()))
 }
@@ -206,7 +195,7 @@ public class PathSpec3<A, B, C>(
     public override fun path(constant: String): PathSpec3<A, B, C> = PathSpec3<A, B, C>(segments + Segment.Constant(constant), Afterwards.None, first, second, third)
     public override fun <T> arg(wildcard: Segment.Wildcard<T>): PathSpecMany = PathSpecMany(segments + wildcard, after, wildcards + wildcard)
 
-    public fun concrete(first: A, second: B, third: C, trailingWildcard: List<String>? = null): ConcretePath<PathSpec3<A, B, C>> = ConcretePath(this, first, second, third, trailingWildcard)
+    public fun concrete(first: A, second: B, third: C, trailingWildcard: ConcretePath.TrailingSegments? = null): ConcretePath<PathSpec3<A, B, C>> = ConcretePath(this, first, second, third, trailingWildcard)
 
     public inline fun <reified T> arg(name: String): PathSpecMany = arg(Segment.Wildcard(name, serializerOrContextual<T>()))
 }
