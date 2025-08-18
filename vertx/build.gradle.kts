@@ -18,11 +18,11 @@ dependencies {
     api(libs.kotlinReflect)
     
     // VertX dependencies
-    api("io.vertx:vertx-core:4.5.7")
-    api("io.vertx:vertx-web:4.5.7")
-    api("io.vertx:vertx-web-client:4.5.7")
-    api("io.vertx:vertx-lang-kotlin:4.5.7")
-    api("io.vertx:vertx-lang-kotlin-coroutines:4.5.7")
+    api(libs.vertxCore)
+    api(libs.vertxWeb)
+//    api(libs.vertxWebClient)
+    api(libs.vertxLangKotlin)
+    api(libs.vertxLangKotlinCoroutines)
 }
 
 ksp {

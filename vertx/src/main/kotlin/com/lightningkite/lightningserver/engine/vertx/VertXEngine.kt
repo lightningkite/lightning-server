@@ -1,35 +1,54 @@
 //package com.lightningkite.lightningserver.engine.vertx
 //
 //import com.lightningkite.MediaType
-//import com.lightningkite.lightningserver.KeyedSerializableCache
+//import com.lightningkite.lightningserver.definition.CorsSettings
 //import com.lightningkite.lightningserver.definition.ServerDefinition
 //import com.lightningkite.lightningserver.definition.ServerSetting
-//import com.lightningkite.lightningserver.definition.generalSettings
 //import com.lightningkite.lightningserver.engine.local.LocalEngine
 //import com.lightningkite.lightningserver.http.HttpHandler
-//import com.lightningkite.lightningserver.http.HttpHeaders
-//import com.lightningkite.lightningserver.http.HttpMethod
-//import com.lightningkite.lightningserver.http.HttpRequest
+//import com.lightningkite.lightningserver.http.HttpHeader
 //import com.lightningkite.lightningserver.http.HttpResponse
 //import com.lightningkite.lightningserver.http.HttpStatus
 //import com.lightningkite.lightningserver.pathing.PathSpec
 //import com.lightningkite.lightningserver.pathing.ServerPath
+//import com.lightningkite.lightningserver.settings.ServerSettings
+//import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
+//import com.lightningkite.lightningserver.websockets.WebSocketHandler
 //import com.lightningkite.services.data.Data
-//import com.lightningkite.services.data.TypedData
 //import io.vertx.core.Vertx
 //import io.vertx.core.buffer.Buffer
+//import io.vertx.core.buffer.impl.BufferImpl
 //import io.vertx.core.http.HttpServerOptions
+//import io.vertx.core.http.ServerWebSocket
+//import io.vertx.core.streams.ReadStream
 //import io.vertx.ext.web.Route
 //import io.vertx.ext.web.Router
 //import io.vertx.ext.web.RoutingContext
-//import io.vertx.ext.web.handler.BodyHandler
-//import io.vertx.ext.web.handler.CorsHandler
 //import io.vertx.kotlin.coroutines.dispatcher
 //import kotlinx.coroutines.CoroutineScope
 //import kotlinx.coroutines.SupervisorJob
 //import kotlinx.coroutines.launch
 //import kotlinx.coroutines.runBlocking
+//import kotlinx.io.asSink
+//import kotlinx.io.buffered
 //import kotlinx.serialization.Serializable
+//import kotlin.text.toLong
+//
+//
+//@Serializable
+//public data class VertxRuntimeSettings(
+//    val host: String = "0.0.0.0",
+//    val port: Int = 8080,
+//    val realIpHeader: String? = null,
+//    val cors: CorsSettings? = null,
+//)
+//
+//internal val vertxRunConfig: ServerSetting.Direct<VertxRuntimeSettings> = ServerSetting(
+//    "vertxRunConfig",
+//    VertxRuntimeSettings(),
+//    VertxRuntimeSettings.serializer()
+//)
+//
 //
 ///**
 // * Extension function to handle requests with coroutines.
@@ -46,23 +65,6 @@
 //        }
 //    }
 //}
-//
-///**
-// * Vert.X engine settings for configuring the Vert.X server.
-// * Note: Most basic settings like host and port are taken from generalSettings.
-// * This class provides additional Vert.X-specific configuration options.
-// */
-//@Serializable
-//public data class VertXSettings(
-//    val developmentMode: Boolean = false,
-//    val connectionIdleTimeoutSeconds: Int = 45
-//)
-//
-///**
-// * Server setting for Vert.X configuration.
-// */
-//public val vertxSettings: ServerSetting.Direct<VertXSettings> =
-//    ServerSetting("vertx", VertXSettings(), VertXSettings.serializer())
 //
 ///**
 // * A Vert.X implementation of the Lightning Server engine.
@@ -88,15 +90,13 @@
 // */
 //public class VertXEngine(server: ServerDefinition) : LocalEngine(server) {
 //
-//    private val engineScope = CoroutineScope(SupervisorJob() + Vertx.vertx().dispatcher())
-//    override val scope: CoroutineScope = engineScope
-//
-//    private val vertxConfig: VertXSettings by lazy { settings.get(vertxSettings, this) }
-//    private val generalConfig by lazy { settings.get(generalSettings, this) }
-//
 //    private val vertx: Vertx = Vertx.vertx()
-//    private val router: Router = Router.router(vertx)
+//
+//    override val settings: ServerSettings = ServerSettings(super.settings.keys.plus(vertxRunConfig).toSet())
+//    private val vertXScope = CoroutineScope(SupervisorJob() + Vertx.vertx().dispatcher())
+//
 //    private var httpServer: io.vertx.core.http.HttpServer? = null
+//
 //
 //    /**
 //     * Starts the Vert.X server using configuration from generalSettings.
@@ -105,64 +105,21 @@
 //    public fun start() {
 //        startSchedules()
 //
-//        // Get configuration from generalSettings
-//        val host = generalConfig.host
-//        val port = generalConfig.port
-//
-//        // Configure CORS if needed
-//        if (generalConfig.cors != null) {
-//            val corsHandler = CorsHandler.create(".*")
-//                .allowedHeader("Content-Type")
-//                .allowedHeader("Authorization")
-//                .allowedHeader("*")
-//                .allowedMethod(io.vertx.core.http.HttpMethod.OPTIONS)
-//                .allowedMethod(io.vertx.core.http.HttpMethod.GET)
-//                .allowedMethod(io.vertx.core.http.HttpMethod.POST)
-//                .allowedMethod(io.vertx.core.http.HttpMethod.PUT)
-//                .allowedMethod(io.vertx.core.http.HttpMethod.DELETE)
-//                .allowedMethod(io.vertx.core.http.HttpMethod.PATCH)
-//                .allowedMethod(io.vertx.core.http.HttpMethod.HEAD)
-//                .allowCredentials(true)
-//
-//            router.route().handler(corsHandler)
-//        }
-//
-//        // Configure request handling
-//        router.route().handler(BodyHandler.create())
+//        val router: Router = Router.router(vertx)
 //
 //        // Set up routing for HTTP endpoints
 //        server.endpoints.forEach { (pathSpec, endpoints) ->
 //            val path = pathSpec.toString()
 //
-//            // Handle HTTP endpoints
 //            endpoints.http.forEach { (method, handler) ->
-//                when (method) {
-//                    HttpMethod.GET -> router.get(path).coroutineHandler(scope) { ctx ->
+//                router.route(io.vertx.core.http.HttpMethod.valueOf(method.toString()), path)
+//                    .coroutineHandler(vertXScope) { ctx ->
 //                        handleRequest(handler, ctx)
 //                    }
-//                    HttpMethod.POST -> router.post(path).coroutineHandler(scope) { ctx ->
-//                        handleRequest(handler, ctx)
-//                    }
-//                    HttpMethod.PUT -> router.put(path).coroutineHandler(scope) { ctx ->
-//                        handleRequest(handler, ctx)
-//                    }
-//                    HttpMethod.DELETE -> router.delete(path).coroutineHandler(scope) { ctx ->
-//                        handleRequest(handler, ctx)
-//                    }
-//                    HttpMethod.PATCH -> router.patch(path).coroutineHandler(scope) { ctx ->
-//                        handleRequest(handler, ctx)
-//                    }
-//                    HttpMethod.HEAD -> router.head(path).coroutineHandler(scope) { ctx ->
-//                        handleRequest(handler, ctx)
-//                    }
-//                    HttpMethod.OPTIONS -> router.options(path).coroutineHandler(scope) { ctx ->
-//                        handleRequest(handler, ctx)
-//                    }
-//                }
 //            }
 //
 //            // Handle WebSocket endpoints
-//            endpoints.websocket?.let {
+//            endpoints.websocket?.also { socketHandler: WebSocketHandler<*, *> ->
 //                httpServer?.webSocketHandler { socket ->
 //                    if (socket.path() == path) {
 //                        // Basic WebSocket handling
@@ -189,21 +146,60 @@
 //            }
 //        }
 //
+//
 //        // Start the server
 //        val options = HttpServerOptions()
-//            .setIdleTimeout(vertxConfig.connectionIdleTimeoutSeconds)
 //
 //        httpServer = vertx.createHttpServer(options)
 //            .requestHandler(router)
+//            .let {
+//                if (server.endpoints.any { it.value.websocket != null }) {
+//                    it.webSocketHandler { incoming: ServerWebSocket ->
+//
+//                        val handler: WebSocketHandler<PathSpec, Any?> =
+//                            (server.endpoints.match(this.externalSerialization.stringArrayFormat, incoming.path())
+//                                ?.value?.websocket as? WebSocketHandler<PathSpec, Any?>)
+//                                ?: run {
+//                                    incoming.reject()
+//                                    return@webSocketHandler
+//                                }
+//
+//
+//                        var queryParams = incoming.query().split('&').map {
+//                            val split = it.split('=')
+//                            if (split.size != 2) incoming.reject()
+//                            split.first() to split.last()
+//                        }
+//                        // TODO: Remove this fugly hack and deal with websocket auth better
+//                        queryParams = queryParams.flatMap {
+//                            if (it.first == "path") listOf(it) + it.second.substringAfter('?').split('&')
+//                                .map { it.substringBefore('=') to it.substringAfter('=') }
+//                            else listOf(it)
+//                        }
+//
+//                        incoming.accept()
+//
+//                        val request = WebSocketConnectRequest(
+//                            path = ServerPath(incoming.path()),
+//                            queryParameters = queryParams,
+//                            headers = incoming.headers(),
+//                            domain = call.request.origin.serverHost,
+//                            protocol = call.request.origin.scheme,
+//                            sourceIp = settings.get(ktorRunConfig, this@KtorEngine).realIpHeader?.let {
+//                                call.request.header(it)
+//                                    ?: throw Exception("Real IP address header for proxy '$it' was missing from the request.")
+//                            } ?: call.request.origin.remoteAddress,
+//                        )
+//                    }
+//                } else it
+//            }
 //
 //        runBlocking {
-//            httpServer!!.listen(port, host)
+//            val config = settings.get(vertxRunConfig, this@VertXEngine)
+//            httpServer!!.listen(config.port, config.host)
 //        }
 //
 //        println("VertXEngine started with configuration:")
-//        println("- Host: $host")
-//        println("- Port: $port")
-//        println("- Development Mode: ${vertxConfig.developmentMode}")
 //    }
 //
 //    /**
@@ -212,22 +208,39 @@
 //     */
 //    private suspend fun handleRequest(handler: HttpHandler<*>, ctx: RoutingContext) {
 //        try {
-//            // Log that we're handling the request with the actual handler
-//            println("VertXEngine is handling ${ctx.request().method()} request to ${ctx.request().path()} using the provided handler")
 //
-//            // In a complete implementation, we would:
-//            // 1. Convert the Vert.x request to a Lightning Server HttpRequest
-//            // 2. Call the handler with the request
-//            // 3. Convert the response back to a Vert.x response
-//
-//            // For now, we'll just acknowledge that we're using the handler
-//            val message = "VertXEngine is handling your ${ctx.request().method()} request to ${ctx.request().path()} using the provided handler"
+//            val result: HttpResponse = handler.handle(this, request)
 //
 //            // Set a successful response
 //            ctx.response()
-//                .setStatusCode(200)
-//                .putHeader("Content-Type", "text/plain")
-//                .end(message)
+//                .apply {
+//                    setStatusCode(result.status.code)
+//                    for (header in result.headers.normalizedEntries) {
+//                        for(value in header.value){
+//                            putHeader(header.key, value.toHttpString())
+//                        }
+//                    }
+//                    result.body?.also { body ->
+//                        putHeader(HttpHeader.ContentType, body.mediaType.toString())
+//                        when (val b = body.data) {
+//
+//                            is Data.Bytes -> {
+//                                end(Buffer.buffer(b.data))
+//                            }
+//
+//                            is Data.Text -> end(b.data)
+//                            is Data.Sink -> end(Buffer.buffer().in) call.respondOutputStream(type) {
+//                                b.emit(this.asSink().buffered())
+//                            }
+//
+//                            is Data.Source -> {
+//                                send(ReadStream)
+//                            }
+//
+////                                is HttpContent.Multipart -> TODO()
+//                        }
+//                    }
+//                }
 //
 //        } catch (e: Exception) {
 //            // Handle errors
