@@ -55,8 +55,9 @@ data class MetricSettings(
             register("lightningservermonitor") {
                 val after = it.url.substringAfter("://")
                 val domain = after.substringBefore('/')
-                val token = after.substringAfter('/')
-                LightningServerMonitorMetrics(it, "https://$domain", token = token)
+                val token = after.substringAfter('/').substringBefore('?')
+                val params = parseParameterString(it.url.substringAfter('?'))
+                LightningServerMonitorMetrics(it, "https://$domain", applicationOverride = params["applicationOverride"]?.firstOrNull(), token = token)
             }
         }
     }
