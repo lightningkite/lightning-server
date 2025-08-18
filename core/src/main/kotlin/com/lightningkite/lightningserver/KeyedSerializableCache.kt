@@ -16,11 +16,12 @@ import kotlin.time.Instant
 
 
 @Serializable(KeyedSerializableCacheSerializer::class)
-public class KeyedSerializableCache<INPUT> internal constructor(
+public class KeyedSerializableCache private constructor(
     private val serialized: HashMap<String, ByteArray>
 ) {
-    public constructor() : this(HashMap())
     internal constructor(serialized: Map<String, ByteArray>) : this(HashMap(serialized))
+
+    public constructor() : this(HashMap())
 
     public interface Key<INPUT, T> {
         public val id: String
@@ -43,13 +44,13 @@ public class KeyedSerializableCache<INPUT> internal constructor(
 
     private data class KeyAndResult<INPUT, T>(val key: Key<INPUT, T>, val result: Expiring<T>)
 
-    private val cache = HashMap<String, KeyAndResult<INPUT, *>>()
+    private val cache = HashMap<String, KeyAndResult<*, *>>()
 
     public var updated: Boolean = false
         private set
 
     context(server: ServerRuntime)
-    public suspend fun <T> get(key: Key<INPUT, T>, input: INPUT): T {
+    public suspend fun <INPUT, T> get(key: Key<INPUT, T>, input: INPUT): T {
         cache[key.id]?.let {
             if (it.key !== key) throw IllegalStateException("KeyedSerializableCache encountered keys with duplicate ids. ID: ${key.id}, Key1: ${it.key}, Key2: $key")
         }
@@ -82,7 +83,7 @@ public class KeyedSerializableCache<INPUT> internal constructor(
 
     internal val bytes: Map<String, ByteArray> get() = serialized.toMap()
 
-    override fun equals(other: Any?): Boolean = other is KeyedSerializableCache<*> && run {
+    override fun equals(other: Any?): Boolean = other is KeyedSerializableCache && run {
         val a = this.bytes
         val b = other.bytes
         if(a.size != b.size) return false
@@ -101,7 +102,7 @@ public class KeyedSerializableCache<INPUT> internal constructor(
     }
 }
 
-public object KeyedSerializableCacheSerializer : KSerializer<KeyedSerializableCache<*>> {
+public object KeyedSerializableCacheSerializer : KSerializer<KeyedSerializableCache> {
     private val defer = MapSerializer(String.serializer(), ByteArraySerializer())
 
     override val descriptor: SerialDescriptor
@@ -109,10 +110,10 @@ public object KeyedSerializableCacheSerializer : KSerializer<KeyedSerializableCa
 
     override fun serialize(
         encoder: Encoder,
-        value: KeyedSerializableCache<*>
+        value: KeyedSerializableCache
     ) {
        defer.serialize(encoder, value.bytes)
     }
 
-    override fun deserialize(decoder: Decoder): KeyedSerializableCache<*> = KeyedSerializableCache<Any?>(decoder.decodeSerializableValue(defer))
+    override fun deserialize(decoder: Decoder): KeyedSerializableCache = KeyedSerializableCache(decoder.decodeSerializableValue(defer))
 }

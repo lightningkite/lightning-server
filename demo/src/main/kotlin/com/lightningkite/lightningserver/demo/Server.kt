@@ -21,8 +21,11 @@ import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.subscribe
 import com.lightningkite.lightningserver.websockets.text
 import com.lightningkite.services.data.TypedData
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.builtins.serializer
+import kotlin.coroutines.EmptyCoroutineContext
 
 object Server : ServerBuilder() {
     val index = path.get bind HttpHandler {
@@ -49,6 +52,13 @@ object Server : ServerBuilder() {
         },
         disconnect = {}
     )
+
+    init {
+        http.interceptors.register { req, cont ->
+            println("Intercepted request: $req")
+            cont(req)
+        }
+    }
 
     val ping = path.path("ping").post bind HttpHandler {
         val body = it.body?.text()

@@ -15,7 +15,7 @@ public abstract class Request<PATH: PathSpec>: HasContextualPath<PATH> {
     public abstract val domain: String
     public abstract val protocol: String
     public abstract val sourceIp: String
-    public abstract val cache: KeyedSerializableCache<Request<*>>
+    public abstract val cache: KeyedSerializableCache
 
     context(serverRuntime: ServerRuntime)
     override val pathInContext: ConcretePath<PATH>

@@ -4,11 +4,11 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import kotlin.time.Duration
 
-public interface HttpInterceptor {
-    public suspend fun handle(serverRuntime: ServerRuntime, request: HttpRequest<*>, cont: suspend ServerRuntime.(HttpRequest<*>) -> HttpResponse): HttpResponse
+public fun interface HttpInterceptor {
+    public suspend fun ServerRuntime.handle(request: HttpRequest<*>, cont: suspend ServerRuntime.(HttpRequest<*>) -> HttpResponse): HttpResponse
 
     public object None : HttpInterceptor {
-        override suspend fun handle(serverRuntime: ServerRuntime, request: HttpRequest<*>, cont: suspend ServerRuntime.(HttpRequest<*>) -> HttpResponse): HttpResponse = serverRuntime.cont(request)
+        override suspend fun ServerRuntime.handle(request: HttpRequest<*>, cont: suspend ServerRuntime.(HttpRequest<*>) -> HttpResponse): HttpResponse = this.cont(request)
     }
 
     public class Builder(
@@ -24,12 +24,11 @@ public interface HttpInterceptor {
             val first: HttpInterceptor,
             val second: HttpInterceptor
         ) : HttpInterceptor {
-            override suspend fun handle(
-                serverRuntime: ServerRuntime,
+            override suspend fun ServerRuntime.handle(
                 request: HttpRequest<*>,
                 cont: suspend ServerRuntime.(HttpRequest<*>) -> HttpResponse
             ): HttpResponse =
-                first.handle(serverRuntime, request) { second.handle(serverRuntime, it, cont) }
+                first.handle(request) { second.handle(it, cont) }
         }
 
         private fun HttpInterceptor.then(other: HttpInterceptor) = when {
@@ -65,15 +64,16 @@ public interface HttpInterceptor {
 
 context(server: ServerRuntime)
 public suspend fun HttpInterceptor.handle(request: HttpRequest<*>, action: suspend ServerRuntime.(HttpRequest<*>) -> HttpResponse): HttpResponse =
-    handle(server, request, action)
+    server.handle(request, action)
 
 private data class InterceptedHandler<PATH : PathSpec>(
     val handler: HttpHandler<PATH>,
     val interceptor: HttpInterceptor
 ) : HttpHandler<PATH> {
     override val timeout: Duration get() = handler.timeout
+
     override suspend fun handle(serverRuntime: ServerRuntime, request: HttpRequest<PATH>): HttpResponse =
-        interceptor.handle(serverRuntime, request) { handler.handle(serverRuntime, request) }
+        with(serverRuntime) { interceptor.handle(request) { handler.handle(serverRuntime, request) } }
 }
 
 public fun <PATH : PathSpec> HttpInterceptor.intercept(handler: HttpHandler<PATH>): HttpHandler<PATH> =

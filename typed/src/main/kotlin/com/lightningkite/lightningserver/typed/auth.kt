@@ -22,10 +22,6 @@ public data class Authentication<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             if (intersection.isNotEmpty()) throw IllegalArgumentException("limitTo and forbid cannot have any common predicates, as this leads to a contradiction. Intersection: $intersection")
         }
     }
-
-    object CacheKey : KeyedSerializableCache.Key<Authentication<*, *>?> {
-        override val id: String = "authentication"
-    }
 }
 
 

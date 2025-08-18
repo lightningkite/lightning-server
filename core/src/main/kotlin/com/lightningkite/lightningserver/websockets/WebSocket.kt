@@ -48,7 +48,7 @@ public data class WebSocketConnectRequest<PATH: PathSpec>(
     override val domain: String = "",
     override val protocol: String = "",
     override val sourceIp: String = "",
-    override val cache: KeyedSerializableCache<@Contextual Request<*>> = KeyedSerializableCache(),
+    override val cache: KeyedSerializableCache = KeyedSerializableCache(),
 ) : Request<PATH>()
 
 public interface WebSocketConnection<PATH: PathSpec, STORAGE>: ServerRuntime {

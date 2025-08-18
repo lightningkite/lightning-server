@@ -18,6 +18,6 @@ public data class HttpRequest<PATH: PathSpec>(
     override val protocol: String,
     override val sourceIp: String,
     public val method: HttpMethod,
-    override val cache: KeyedSerializableCache<@Contextual Request<*>> = KeyedSerializableCache(),
+    override val cache: KeyedSerializableCache = KeyedSerializableCache(),
     @Transient public val body: TypedData? = null,
 ) : Request<PATH>()
