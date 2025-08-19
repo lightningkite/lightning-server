@@ -8,17 +8,13 @@ import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpStatus
-import com.lightningkite.lightningserver.KeyedSerializableCache
+import com.lightningkite.lightningserver.SerializableCache
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.ConcretePath
 import com.lightningkite.lightningserver.Request
-import com.lightningkite.lightningserver.definition.ServerDefinition
-import com.lightningkite.lightningserver.definition.builder.ListRegistry
-import com.lightningkite.lightningserver.definition.ListRegistryExtension
-import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.getValue
+import com.lightningkite.lightningserver.pathing.HasConcretePath
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.data.Description
 import com.lightningkite.services.database.HasId
@@ -29,9 +25,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.NothingSerializer
 import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.encoding.CompositeDecoder
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -54,11 +48,13 @@ public interface ApiHttpHandler<PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT>:
             else -> if (inputType == Unit.serializer()) Unit as INPUT else request.body?.parse(inputType) ?: throw BadRequestException("No request body provided")
         }
         serverRuntime.validators.validateOrThrow(inputType, input)
-        val runner = object: ServerRuntimeWithAuth<USER, PATH>, ServerRuntime by serverRuntime, ConcretePath<PATH> by request.pathInContext {
+        val runner = object: ServerRuntimeWithAuth<USER, PATH>, ServerRuntime by serverRuntime {
             override val request: Request<PATH>
                 get() = request
             override val authOrNull: RequestAuth<USER & Any, *>?
                 get() = auth
+            override val path: ConcretePath<PATH>
+                get() = request.pathInContext
         }
         val result: OUTPUT = runner.handle(input)
         return HttpResponse(
@@ -103,7 +99,7 @@ public class RequestAuth<USER: HasId<ID>, ID: Comparable<ID>>(
     public val scopes: Set<String> = setOf("*"),
     public val thirdParty: String? = null,
     public val fromMasquerade: RequestAuth<*, *>? = null,
-    public val cache: KeyedSerializableCache = KeyedSerializableCache(),
+    public val cache: SerializableCache = SerializableCache(),
 //    public val requirements: RequestRequirements? = null,  // TODO: Revive this
 ) {
     public val principalType: PrincipalType<USER, ID> get() = principalTypeAndId.type
@@ -130,7 +126,7 @@ public class RequestAuth<USER: HasId<ID>, ID: Comparable<ID>>(
 //        }
     }
 
-    internal object Key : KeyedSerializableCache.Key<RequestAuth<*, *>?> {
+    internal object Key : SerializableCache.CalculatingKey<RequestAuth<*, *>?> {
         override val id: String
             get() = "auth"
         @OptIn(ExperimentalSerializationApi::class)
@@ -194,56 +190,12 @@ internal data class RequestAuthSerializable(
     }
 }
 
-public interface ServerRuntimeWithAuth<USER: HasId<*>?, PATH: PathSpec>: ServerRuntime, ConcretePath<PATH> {
+public interface ServerRuntimeWithAuth<USER: HasId<*>?, PATH: PathSpec>: ServerRuntime, HasConcretePath<PATH> {
     public val request: Request<PATH>
     public val authOrNull: RequestAuth<USER & Any, *>?
 }
 
 
-public val ServerBuilder.principalTypes: ListRegistry<PrincipalType<*, *>> by PrincipalType.RegistryKey
-public val ServerDefinition.principalTypes: List<PrincipalType<*, *>> by PrincipalType.RegistryKey
-
-public interface PrincipalType<SUBJECT: HasId<ID>, ID: Comparable<ID>> {
-    public object RegistryKey : ListRegistryExtension<PrincipalType<*, *>>
-
-    public val idSerializer: KSerializer<ID>
-    public val name: String get() = subjectSerializer.descriptor.serialName
-    public val cacheTypes: Collection<CacheKey<*, *, *>>
-    public val subjectCacheExpiration: Duration get() = 5.minutes
-
-    context(server: ServerRuntime)
-    public suspend operator fun get(request: Request<*>): RequestAuth<SUBJECT, ID>? = null
-
-    public val subjectSerializer: KSerializer<SUBJECT>
-    public suspend fun fetch(serverRuntime: ServerRuntime, id: ID): SUBJECT
-
-    public fun hasProperty(property: String): Boolean = subjectSerializer.descriptor.getElementIndex(property) != CompositeDecoder.UNKNOWN_NAME
-//
-//    context(server: ServerRuntime)
-//    public fun getProperty(principal: SUBJECT, property: String): String {
-//        if (property == "$name/_id") return server.internalSerialization.json.encodeToString(idSerializer, principal._id)
-//        else
-//    }
-
-    public suspend fun permitMasquerade(
-        other: PrincipalType<*, *>,
-        request: RequestAuth<SUBJECT, ID>,
-        otherId: Comparable<*>,
-    ): Boolean = false
-
-    public interface CacheKey<SUBJECT: HasId<ID>, ID: Comparable<ID>, T> {
-        public val id: String
-        public val serializer: KSerializer<T>
-        public suspend fun calculate(serverRuntime: ServerRuntime, auth: RequestAuth<SUBJECT, ID>): T
-        public val expireAfter: Duration? get() = null
-    }
-
-    @Serializable
-    public data class WithId<SUBJECT: HasId<ID>, ID: Comparable<ID>>(
-        public val type: PrincipalType<SUBJECT, ID>,
-        public val id: ID
-    )
-}
 
 public class AuthOption<SUBJECT: HasId<ID>, ID: Comparable<ID>>(
     public val type: PrincipalType<SUBJECT, ID>,

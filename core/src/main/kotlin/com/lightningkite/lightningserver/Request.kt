@@ -8,14 +8,13 @@ import com.lightningkite.lightningserver.pathing.RawPath
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 
 
-public abstract class Request<PATH: PathSpec>: HasContextualPath<PATH> {
+public abstract class Request<PATH: PathSpec>: HasContextualPath<PATH>, Caching {
     public abstract val path: RawPath<PATH>
     public abstract val queryParameters: List<Pair<String, String>>
     public abstract val headers: HttpHeaders
     public abstract val domain: String
     public abstract val protocol: String
     public abstract val sourceIp: String
-    public abstract val cache: KeyedSerializableCache
 
     context(serverRuntime: ServerRuntime)
     override val pathInContext: ConcretePath<PATH>
@@ -25,6 +24,6 @@ public abstract class Request<PATH: PathSpec>: HasContextualPath<PATH> {
 }
 
 context(server: ServerRuntime)
-public suspend operator fun <T> Request<*>.get(key: KeyedSerializableCache.Key<Request<*>, T>): T {
+public suspend operator fun <T> Request<*>.get(key: SerializableCache.CalculatingKey<Request<*>, T>): T {
     return cache.get(key, this)
 }

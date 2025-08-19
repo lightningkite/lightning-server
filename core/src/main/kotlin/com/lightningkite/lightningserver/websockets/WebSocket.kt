@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.websockets
 
-import com.lightningkite.lightningserver.KeyedSerializableCache
+import com.lightningkite.lightningserver.SerializableCache
 import com.lightningkite.lightningserver.Request
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.http.HttpHeaders
@@ -8,7 +8,6 @@ import com.lightningkite.lightningserver.pathing.ConcretePath
 import com.lightningkite.lightningserver.pathing.HasConcretePath
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawPath
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 
@@ -48,7 +47,7 @@ public data class WebSocketConnectRequest<PATH: PathSpec>(
     override val domain: String = "",
     override val protocol: String = "",
     override val sourceIp: String = "",
-    override val cache: KeyedSerializableCache = KeyedSerializableCache(),
+    override val cache: SerializableCache = SerializableCache(),
 ) : Request<PATH>()
 
 public interface WebSocketConnection<PATH: PathSpec, STORAGE>: ServerRuntime {

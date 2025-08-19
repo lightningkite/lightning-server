@@ -40,7 +40,7 @@ class WebSocketConnectRequestTest {
         }
     }
 
-    private object CacheKey: KeyedSerializableCache.Key<Request<*>, String> {
+    private object CacheKey: SerializableCache.CalculatingKey<Request<*>, String> {
         override val id: String
             get() = "cache"
         override val serializer: KSerializer<String>

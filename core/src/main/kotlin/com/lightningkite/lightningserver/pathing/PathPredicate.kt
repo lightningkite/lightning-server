@@ -145,7 +145,7 @@ public fun PathSpec.toPredicate(): PathPredicate = PathPredicate(this)
 public fun ConcretePath<*>.toPredicate(): PathPredicate = PathPredicate(this)
 
 public object PathPredicateSerializer : KSerializer<PathPredicate> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("PathPredicate", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.lightningserver.PathPredicate", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: PathPredicate) { encoder.encodeString(value.toString()) }
     override fun deserialize(decoder: Decoder): PathPredicate = PathPredicate.fromString(decoder.decodeString())
 }

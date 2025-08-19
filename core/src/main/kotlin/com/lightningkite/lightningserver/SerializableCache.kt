@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver
 
+import com.lightningkite.lightningserver.SerializableCache.CalculatingKey
+import com.lightningkite.lightningserver.SerializableCache.Key
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
@@ -8,30 +10,32 @@ import kotlinx.serialization.builtins.ByteArraySerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlin.time.Duration
 import kotlin.time.Instant
 
 
-@Serializable(KeyedSerializableCacheSerializer::class)
-public class KeyedSerializableCache private constructor(
+@Serializable(SerializableCacheSerializer::class)
+public class SerializableCache private constructor(
     private val serialized: HashMap<String, ByteArray>
 ) {
     internal constructor(serialized: Map<String, ByteArray>) : this(HashMap(serialized))
 
     public constructor() : this(HashMap())
 
-    public interface Key<INPUT, T> {
+    public interface Key<T> {
         public val id: String
         public val serializer: KSerializer<T>
-
-        context(server: ServerRuntime)
-        public suspend fun calculate(input: INPUT): T
-
         public val expireAfter: Duration? get() = null
     }
+
+    public interface CalculatingKey<INPUT, T> : Key<T> {
+        context(server: ServerRuntime)
+        public suspend fun calculate(input: INPUT): T
+    }
+
+
 
     @Serializable
     private data class Expiring<T>(
@@ -42,20 +46,20 @@ public class KeyedSerializableCache private constructor(
         val expired get() = expires != null && expires <= server.clock.now()
     }
 
-    private data class KeyAndResult<INPUT, T>(val key: Key<INPUT, T>, val result: Expiring<T>)
+    private data class KeyAndResult<T>(val key: Key<T>, val result: Expiring<T>)
 
-    private val cache = HashMap<String, KeyAndResult<*, *>>()
+    private val cache = HashMap<String, KeyAndResult<*>>()
 
     public var updated: Boolean = false
         private set
 
+
     context(server: ServerRuntime)
-    public suspend fun <INPUT, T> get(key: Key<INPUT, T>, input: INPUT): T {
+    private fun <T> retrieve(key: Key<T>): T? {
         cache[key.id]?.let {
-            if (it.key !== key) throw IllegalStateException("KeyedSerializableCache encountered keys with duplicate ids. ID: ${key.id}, Key1: ${it.key}, Key2: $key")
+            if (it.key !== key) throw IllegalStateException("KeyedSerializableCache encountered keys with duplicate ids. ID: ${key.id}")
         }
 
-        @Suppress("UNCHECKED_CAST")
         cache[key.id]
             ?.takeUnless { it.result.expired }
             ?.let { return it.result.value as T }
@@ -68,32 +72,51 @@ public class KeyedSerializableCache private constructor(
                 return it.value
             }
 
-        val calculated = key.calculate(input)
+        return null
+    }
+
+    context(server: ServerRuntime)
+    private fun <T> cache(key: Key<T>, value: T) {
         val expiring = Expiring(
-            calculated,
+            value,
             expires = key.expireAfter?.let { server.clock.now() + it }
         )
 
         serialized[key.id] = server.internalSerialization.kotlinBytesFormat.encodeToByteArray(Expiring.serializer(key.serializer), expiring)
         cache[key.id] = KeyAndResult(key, expiring)
         updated = true
-
-        return calculated
     }
+
+    context(server: ServerRuntime)
+    public operator fun <T> set(key: Key<T>, value: T): Unit = cache(key, value)
+
+    context(server: ServerRuntime)
+    public operator fun <T> get(key: Key<T>): T? = retrieve(key)
+
+    context(server: ServerRuntime)
+    public suspend fun <INPUT, T> get(key: CalculatingKey<INPUT, T>, input: INPUT): T =
+        retrieve(key) ?: key.calculate(input).also { cache(key, it) }
+
 
     internal val bytes: Map<String, ByteArray> get() = serialized.toMap()
 
-    override fun equals(other: Any?): Boolean = other is KeyedSerializableCache && run {
+    override fun equals(other: Any?): Boolean = other is SerializableCache && run {
         val a = this.bytes
         val b = other.bytes
-        if(a.size != b.size) return false
-        for((key, value) in a) {
-            if(!b.containsKey(key) || !value.contentEquals(b[key]!!)) return false
+        if (a.size != b.size) return false
+        for ((key, value) in a) {
+            if (!b.containsKey(key) || !value.contentEquals(b[key]!!)) return false
         }
         return true
     }
+
     override fun hashCode(): Int = bytes.hashCode()
-    override fun toString(): String = cache.toString()
+    override fun toString(): String = cache
+        .map { entry ->
+            entry.key to entry.value.result.let { if (it.expires == null) it.value else it }
+        }
+        .plus((serialized.keys - cache.keys).map { it to "ENCODED" })
+        .joinToString(prefix = "{", separator = ", ", postfix = "}") { "${it.first}=${it.second}" }
 
     public fun clear() {
         cache.clear()
@@ -102,18 +125,26 @@ public class KeyedSerializableCache private constructor(
     }
 }
 
-public object KeyedSerializableCacheSerializer : KSerializer<KeyedSerializableCache> {
+public interface Caching {
+    public val cache: SerializableCache
+}
+
+context(server: ServerRuntime)
+public operator fun <T : Any> Caching.set(key: Key<T>, value: T): Unit = cache.set(key, value)
+
+context(server: ServerRuntime)
+public operator fun <T : Any> Caching.get(key: Key<T>): T? = cache[key]
+
+context(server: ServerRuntime)
+public suspend fun <INPUT, T : Any> Caching.get(key: CalculatingKey<INPUT, T>, input: INPUT): T = cache.get(key, input)
+
+
+public object SerializableCacheSerializer : KSerializer<SerializableCache> {
     private val defer = MapSerializer(String.serializer(), ByteArraySerializer())
 
     override val descriptor: SerialDescriptor
         get() = SerialDescriptor("com.lightningkite.lightningserver.KeyedSerializableCache", defer.descriptor)
 
-    override fun serialize(
-        encoder: Encoder,
-        value: KeyedSerializableCache
-    ) {
-       defer.serialize(encoder, value.bytes)
-    }
-
-    override fun deserialize(decoder: Decoder): KeyedSerializableCache = KeyedSerializableCache(decoder.decodeSerializableValue(defer))
+    override fun serialize(encoder: Encoder, value: SerializableCache) { defer.serialize(encoder, value.bytes) }
+    override fun deserialize(decoder: Decoder): SerializableCache = SerializableCache(decoder.decodeSerializableValue(defer))
 }

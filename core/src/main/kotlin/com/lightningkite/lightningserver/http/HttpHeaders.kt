@@ -19,6 +19,7 @@ public class HttpHeaders internal constructor (public val normalizedEntries: Map
     }
 
     public fun isEmpty(): Boolean = normalizedEntries.isEmpty()
+    public fun isNotEmpty(): Boolean = normalizedEntries.isNotEmpty()
 
     public operator fun get(key: String): HttpHeaderValue? = normalizedEntries[key.lowercase()]?.firstOrNull()
     public fun getMany(key: String): List<HttpHeaderValue> = normalizedEntries[key.lowercase()] ?: listOf()
