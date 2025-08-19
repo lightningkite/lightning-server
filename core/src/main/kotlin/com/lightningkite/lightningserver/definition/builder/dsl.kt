@@ -1,8 +1,8 @@
 package com.lightningkite.lightningserver.definition.builder
 
 import com.lightningkite.lightningserver.LightningServerDsl
-import com.lightningkite.lightningserver.ScheduledTask
-import com.lightningkite.lightningserver.Task
+import com.lightningkite.lightningserver.definition.ScheduledTask
+import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.DynamicLocation
 import com.lightningkite.lightningserver.definition.ModularServerDefinition
@@ -14,7 +14,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.plus
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.serializerOrContextual
+import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
 import kotlinx.serialization.KSerializer

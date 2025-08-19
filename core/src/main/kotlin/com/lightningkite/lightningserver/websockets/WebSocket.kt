@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.websockets
 
-import com.lightningkite.lightningserver.SerializableCache
-import com.lightningkite.lightningserver.Request
+import com.lightningkite.lightningserver.data.SerializableCache
+import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.pathing.ConcretePath

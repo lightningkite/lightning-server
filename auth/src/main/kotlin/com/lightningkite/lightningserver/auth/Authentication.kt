@@ -1,19 +1,13 @@
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.BadRequestException
-import com.lightningkite.lightningserver.Caching
+import com.lightningkite.lightningserver.data.Caching
 import com.lightningkite.lightningserver.ForbiddenException
-import com.lightningkite.lightningserver.Request
-import com.lightningkite.lightningserver.SerializableCache
+import com.lightningkite.lightningserver.data.Request
+import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.UnauthorizedException
 import com.lightningkite.lightningserver.definition.ListRegistryExtension
-import com.lightningkite.lightningserver.definition.Locationed
-import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpHeader
-import com.lightningkite.lightningserver.http.HttpHeaders
-import com.lightningkite.lightningserver.http.HttpMethod
-import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.toPredicate
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -24,7 +18,6 @@ import kotlinx.serialization.Transient
 import kotlinx.serialization.builtins.NothingSerializer
 import kotlinx.serialization.builtins.nullable
 import kotlin.String
-import kotlin.collections.getOrPut
 import kotlin.time.Instant
 
 @Serializable
@@ -84,6 +77,12 @@ public class Authentication<SUBJECT : HasId<ID>, ID : Comparable<ID>> private co
     public val id: ID get() = cachedId
         ?: server.internalSerialization.json.decodeFromString(principalType.idSerializer, rawId).also { cachedId = it }
 
+
+    @Transient
+    private var self: SUBJECT? = null
+
+    context(server: ServerRuntime)
+    suspend fun
 
 
     override fun toString(): String = listOfNotNull(

@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.definition.builder
 
-import com.lightningkite.lightningserver.ScheduledTask
-import com.lightningkite.lightningserver.Task
+import com.lightningkite.lightningserver.definition.ScheduledTask
+import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.definition.Extendable
 import com.lightningkite.lightningserver.definition.ModularServerDefinition
 import com.lightningkite.lightningserver.definition.MutableExtensions

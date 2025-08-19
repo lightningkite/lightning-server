@@ -1,4 +1,4 @@
-package com.lightningkite.lightningserver
+package com.lightningkite.lightningserver.data
 
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.pathing.ConcretePath

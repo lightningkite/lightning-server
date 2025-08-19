@@ -1,9 +1,9 @@
 package com.lightningkite.lightningserver.http
 
-import com.lightningkite.lightningserver.SerializableCache
+import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.pathing.RawPath
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.Request
+import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.services.data.TypedData
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient

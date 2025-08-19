@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.definition.metricsSettings
 import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.runtime.invoke
+import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.services.MetricSink
 

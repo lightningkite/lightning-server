@@ -7,7 +7,9 @@ import kotlin.time.Duration.Companion.seconds
 
 public interface HttpHandler<PATH : PathSpec> {
     public val timeout: Duration get() = 30.seconds
-    public suspend fun handle(serverRuntime: ServerRuntime, request: HttpRequest<PATH>): HttpResponse
+
+    context(server: ServerRuntime)
+    public suspend fun handle(request: HttpRequest<PATH>): HttpResponse
 }
 
 public fun <PATH : PathSpec> HttpHandler(
@@ -15,7 +17,9 @@ public fun <PATH : PathSpec> HttpHandler(
     handler: suspend ServerRuntime.(HttpRequest<PATH>) -> HttpResponse
 ): HttpHandler<PATH> = object : HttpHandler<PATH> {
     override val timeout: Duration = timeout
-    override suspend fun handle(serverRuntime: ServerRuntime, request: HttpRequest<PATH>): HttpResponse {
-        return handler(serverRuntime, request)
+
+    context(server: ServerRuntime)
+    override suspend fun handle(request: HttpRequest<PATH>): HttpResponse {
+        return handler(server, request)
     }
 }

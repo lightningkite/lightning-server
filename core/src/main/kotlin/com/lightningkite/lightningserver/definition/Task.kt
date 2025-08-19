@@ -1,4 +1,4 @@
-package com.lightningkite.lightningserver
+package com.lightningkite.lightningserver.definition
 
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import kotlinx.serialization.KSerializer

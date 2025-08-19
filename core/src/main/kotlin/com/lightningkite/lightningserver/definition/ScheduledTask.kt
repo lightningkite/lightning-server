@@ -1,5 +1,6 @@
-package com.lightningkite.lightningserver
+package com.lightningkite.lightningserver.definition
 
+import com.lightningkite.lightningserver.data.Schedule
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes

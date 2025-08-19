@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.pathing
 
-import com.lightningkite.lightningserver.serializerOrContextual
+import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer

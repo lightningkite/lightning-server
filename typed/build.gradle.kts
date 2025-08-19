@@ -11,6 +11,7 @@ plugins {
 
 dependencies {
     api(project(":core"))
+    api(project(":auth"))
     api(project(":sdk"))
     api(libs.serviceAbstractionsDatabase)
     api(libs.kotlinReflect)

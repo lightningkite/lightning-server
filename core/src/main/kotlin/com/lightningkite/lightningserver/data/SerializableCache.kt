@@ -1,7 +1,7 @@
-package com.lightningkite.lightningserver
+package com.lightningkite.lightningserver.data
 
-import com.lightningkite.lightningserver.SerializableCache.CalculatingKey
-import com.lightningkite.lightningserver.SerializableCache.Key
+import com.lightningkite.lightningserver.data.SerializableCache.CalculatingKey
+import com.lightningkite.lightningserver.data.SerializableCache.Key
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
@@ -12,6 +12,7 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlin.collections.iterator
 import kotlin.time.Duration
 import kotlin.time.Instant
 
@@ -35,24 +36,12 @@ public class SerializableCache private constructor(
         public suspend fun calculate(input: INPUT): T
     }
 
-
-
-    @Serializable
-    private data class Expiring<T>(
-        val value: T,
-        @Contextual val expires: Instant?
-    ) {
-        context(server: ServerRuntime)
-        val expired get() = expires != null && expires <= server.clock.now()
-    }
-
     private data class KeyAndResult<T>(val key: Key<T>, val result: Expiring<T>)
 
     private val cache = HashMap<String, KeyAndResult<*>>()
 
     public var updated: Boolean = false
         private set
-
 
     context(server: ServerRuntime)
     private fun <T> retrieve(key: Key<T>): T? {

@@ -1,6 +1,6 @@
-package com.lightningkite.lightningserver.runtime
+package com.lightningkite.lightningserver.serialization
 
-import com.lightningkite.lightningserver.FormDataFormat
+import com.lightningkite.lightningserver.serialization.FormDataFormat
 import com.lightningkite.services.data.KotlinBytesFormat
 import com.lightningkite.services.data.StringArrayFormat
 import kotlinx.serialization.json.Json

@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.auth
 
-import com.lightningkite.lightningserver.Request
+import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.http.HttpRequest
@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
 import kotlin.collections.iterator
 
 /**
- * A set of conditions that can be checked against a [com.lightningkite.lightningserver.Request]. This is typically
+ * A set of conditions that can be checked against a [Request]. This is typically
  * used to apply limitations to [com.lightningkite.lightningserver.auth.Authentication], like what methods it is limited to or forbidden
  * from requesting.
  *

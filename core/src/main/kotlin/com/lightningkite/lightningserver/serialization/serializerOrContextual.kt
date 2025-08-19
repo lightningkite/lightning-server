@@ -1,6 +1,7 @@
-package com.lightningkite.lightningserver
+package com.lightningkite.lightningserver.serialization
 
 import kotlinx.serialization.ContextualSerializer
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.nullable
@@ -13,6 +14,8 @@ import kotlin.reflect.typeOf
 
 @Suppress("UNCHECKED_CAST")
 public inline fun <reified T> serializerOrContextual(): KSerializer<T> = serializerOrContextual(typeOf<T>()) as KSerializer<T>
+
+@OptIn(ExperimentalSerializationApi::class)
 public fun serializerOrContextual(type: KType): KSerializer<*> {
     val args = type.arguments.map { serializerOrContextual(it.type!!) }
     val kclass = type.classifier as KClass<*>

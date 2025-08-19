@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.runtime.test
 
-import com.lightningkite.lightningserver.Task
+import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder

@@ -1,4 +1,4 @@
-package com.lightningkite.lightningserver
+package com.lightningkite.lightningserver.data
 
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
@@ -7,7 +7,6 @@ import kotlinx.datetime.Month
 import kotlinx.datetime.YearMonth
 import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.number
-import java.time.Year
 
 
 @JvmInline
