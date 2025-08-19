@@ -9,8 +9,8 @@ import kotlinx.serialization.builtins.serializer
 import kotlin.time.Duration
 import kotlin.uuid.Uuid
 
-public data class AuthOptions<SUBJECT : HasId<ID>?, ID : Comparable<ID>>(
-    val options: Set<AuthenticationRequirement<SUBJECT, ID>>
+public class AuthOptions<SUBJECT : HasId<ID>?, ID : Comparable<ID>> internal constructor(
+    public val options: Set<AuthenticationRequirement<SUBJECT, ID>>
 ) {
     public constructor(vararg requirements: AuthenticationRequirement<SUBJECT, ID>) : this(requirements.toSet())
 
@@ -50,22 +50,8 @@ public infix fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> AuthOptions<SUBJECT,
 
 @Suppress("UNCHECKED_CAST")
 public infix fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> AnyAuth.or(other: AuthOptions<SUBJECT, ID>): AnyAuth =
-    AuthOptions(other.options as Set<AuthenticationRequirement<HasId<AnyId>, AnyId>> + options)
+    AuthOptions(options + other.options as Set<AuthenticationRequirement<HasId<AnyId>, AnyId>>)
 
 @Suppress("UNCHECKED_CAST")
 public infix fun AnyAuth.or(other: NoAuth): AuthOptions<HasId<AnyId>?, AnyId> =
     AuthOptions(AuthenticationRequirement.NoAuthentication, AuthenticationRequirement.AnyAuthentication as AuthenticationRequirement<HasId<AnyId>?, AnyId>)
-
-
-@Serializable
-private data class User(
-    override val _id: Uuid
-) : HasId<Uuid> {
-    companion object : PrincipalType<User, Uuid> {
-        override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
-        override val subjectSerializer: KSerializer<User> = serializer()
-
-        context(server: ServerRuntime)
-        override suspend fun fetch(id: Uuid): User = User(id)
-    }
-}

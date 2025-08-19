@@ -10,8 +10,7 @@ public data class LSError(
     val detail: String = "",
     val message: String = "",
     val data: String = "",
-) {
-}
+)
 
 
 /**

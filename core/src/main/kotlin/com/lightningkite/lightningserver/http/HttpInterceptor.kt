@@ -72,8 +72,9 @@ private data class InterceptedHandler<PATH : PathSpec>(
 ) : HttpHandler<PATH> {
     override val timeout: Duration get() = handler.timeout
 
-    override suspend fun handle(serverRuntime: ServerRuntime, request: HttpRequest<PATH>): HttpResponse =
-        with(serverRuntime) { interceptor.handle(request) { handler.handle(serverRuntime, request) } }
+    context(server: ServerRuntime)
+    override suspend fun handle(request: HttpRequest<PATH>): HttpResponse =
+        interceptor.handle(request) { handler.handle(request) }
 }
 
 public fun <PATH : PathSpec> HttpInterceptor.intercept(handler: HttpHandler<PATH>): HttpHandler<PATH> =

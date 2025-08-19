@@ -7,10 +7,14 @@ import com.lightningkite.lightningserver.definition.MutableExtensions
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.getValue
+import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.data.TypedData
 import kotlinx.serialization.DeserializationStrategy
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.SerializationStrategy
+import kotlinx.serialization.builtins.serializer
 import kotlin.collections.List
 
 public class MediaTypeEncoderRegistry(
@@ -74,4 +78,22 @@ public suspend fun <T> T.toHttpContent(accepts: List<MediaType>, serializer: Ser
             ?.let { type to it }
     } ?: throw BadRequestException("No media type decoder found supporting ${accepts.joinToString()}")
     return format(type, serializer, this)
+}
+
+context(server: ServerRuntime)
+public fun <T> HttpRequest<*>.queryParameters(serializer: KSerializer<T>): T {
+    try {
+        @Suppress("UNCHECKED_CAST")
+        if (serializer == Unit.serializer()) return Unit as T
+        return server.internalSerialization.formDataFormat.decodeFromMap(
+            serializer,
+            queryParameters.groupBy { it.first }.mapValues { it.value.joinToString(",") { it.second } }
+        )
+    } catch (e: SerializationException) {
+        throw BadRequestException(
+            detail = "serialization",
+            message = e.message ?: "Unknown serialization error",
+            cause = e.cause
+        )
+    }
 }

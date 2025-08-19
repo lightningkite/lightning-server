@@ -19,7 +19,7 @@ import com.lightningkite.services.topLevelReportingContext
 context(serverRuntime: ServerRuntime)
 public suspend fun <PATH : PathSpec> HttpHandler<PATH>.handleWithMetrics(location: HttpEndpoint<PATH>, request: HttpRequest<PATH>): HttpResponse {
     return topLevelReportingContext(location.toString(), serverRuntime.metrics) {
-        handle(serverRuntime, request)
+        handle(request)
     }
 }
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.willConnectWithMetrics(location: PATH, serverRuntime: ServerRuntime, request: WebSocketConnectRequest<PATH>): STORAGE {

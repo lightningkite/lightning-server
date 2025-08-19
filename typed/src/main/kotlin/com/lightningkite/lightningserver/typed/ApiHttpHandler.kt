@@ -9,14 +9,11 @@ import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.data.get
 import com.lightningkite.lightningserver.http.HttpMethod
-import com.lightningkite.lightningserver.pathing.HasContextualPath
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.serializer
 
 public interface ApiHttpHandler<PATH: PathSpec, USER: HasId<ID>?, ID : Comparable<ID>, INPUT, OUTPUT> : HttpHandler<PATH> {
@@ -27,7 +24,7 @@ public interface ApiHttpHandler<PATH: PathSpec, USER: HasId<ID>?, ID : Comparabl
     public val description: String
     public val successCode: HttpStatus
     public val errorCases: List<LSError>
-    public val examples: List<ApiExample<INPUT, OUTPUT>>
+    public val examples: List<Example<INPUT, OUTPUT>>
 
     context(server: ServerRuntime)
     public suspend fun HttpRequestAndAuth<PATH, USER, ID>.handle(input: INPUT): OUTPUT
@@ -53,30 +50,11 @@ public interface ApiHttpHandler<PATH: PathSpec, USER: HasId<ID>?, ID : Comparabl
             status = successCode
         )
     }
+
+    public data class Example<INPUT, OUTPUT>(
+        val input: INPUT,
+        val output: OUTPUT,
+        val name: String = "Example",
+        val notes: String? = null,
+    )
 }
-
-context(server: ServerRuntime)
-public fun <T> HttpRequest<*>.queryParameters(serializer: KSerializer<T>): T {
-    try {
-        @Suppress("UNCHECKED_CAST")
-        if (serializer == Unit.serializer()) return Unit as T
-        return server.internalSerialization.formDataFormat.decodeFromMap(
-            serializer,
-            queryParameters.groupBy { it.first }.mapValues { it.value.joinToString(",") { it.second } }
-        )
-    } catch (e: SerializationException) {
-        throw BadRequestException(
-            detail = "serialization",
-            message = e.message ?: "Unknown serialization error",
-            cause = e.cause
-        )
-    }
-}
-
-
-public data class ApiExample<INPUT, OUTPUT>(
-    val input: INPUT,
-    val output: OUTPUT,
-    val name: String = "Example",
-    val notes: String? = null,
-)

@@ -23,7 +23,7 @@ private fun <Location, Item> locate(item: Item, location: () -> Location): Locat
 
 @LightningServerDsl
 context(builder: ServerBuilder)
-public infix fun <PATH : PathSpec> HttpEndpoint<PATH>.bind(handler: HttpHandler<PATH>): Locationed<HttpEndpoint<PATH>, HttpHandler<PATH>> {
+public infix fun <PATH : PathSpec, HANDLER : HttpHandler<PATH>> HttpEndpoint<PATH>.bind(handler: HANDLER): Locationed<HttpEndpoint<PATH>, HANDLER> {
     builder.http.register(this, handler)
     return locate(handler) {
         HttpEndpoint(builder.modulePath + this.path, this.method)

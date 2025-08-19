@@ -123,7 +123,7 @@ context(test: TestRunner<*>) public suspend fun Locationed<HttpEndpoint<PathSpec
     body: TypedData? = null,
 ): HttpResponse {
     return this.item.handle(
-        test, HttpRequest(
+        HttpRequest(
             RawPath(this.location.path),
             method = this.location.method,
             queryParameters = queryParameters,
@@ -146,7 +146,7 @@ context(test: TestRunner<*>) public suspend fun <A> Locationed<HttpEndpoint<Path
     body: TypedData? = null,
 ): HttpResponse {
     return this.item.handle(
-        test, HttpRequest(
+        HttpRequest(
             RawPath(this.location.path, path1),
             method = this.location.method,
             queryParameters = queryParameters,
@@ -169,7 +169,7 @@ context(test: TestRunner<*>) public suspend fun <A, B> Locationed<HttpEndpoint<P
     body: TypedData? = null,
 ): HttpResponse {
     return this.item.handle(
-        test, HttpRequest(
+        HttpRequest(
             RawPath(this.location.path, path1, path2),
             method = this.location.method,
             queryParameters = queryParameters,
@@ -193,7 +193,7 @@ context(test: TestRunner<*>) public suspend fun <A, B, C> Locationed<HttpEndpoin
     body: TypedData? = null,
 ): HttpResponse {
     return this.item.handle(
-        test, HttpRequest(
+        HttpRequest(
             RawPath(this.location.path, path1, path2, path3),
             method = this.location.method,
             queryParameters = queryParameters,

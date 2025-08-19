@@ -27,51 +27,6 @@ public class PathSerializer<T: PathSpec>(ignored: KSerializer<T>) : KSerializer<
 
 @Serializable(with = PathSerializer::class)
 public class RawPath<PATH: PathSpec>(public val string: String): HasContextualPath<PATH> {
-    public companion object {
-        public operator fun invoke(spec: PathSpec0): RawPath<PathSpec0> = RawPath(spec.segments.joinToString("/"))
-        context(serverRuntime: ServerRuntime)
-        public operator fun <A> invoke(spec: PathSpec1<A>, path1: A): RawPath<PathSpec1<A>> = RawPath(spec.segments.joinToString("/") {
-            when(it) {
-                is PathSpec.Segment.Constant -> it.value
-                is PathSpec.Segment.Wildcard<*> -> serverRuntime.externalSerialization.stringArrayFormat.encodeToString(it.serializer as KSerializer<Any?>, path1)
-            }
-        })
-        context(serverRuntime: ServerRuntime)
-        public operator fun <A, B> invoke(spec: PathSpec2<A, B>, path1: A, path2: B): RawPath<PathSpec2<A, B>> {
-            var i = 0
-            return RawPath(spec.segments.joinToString("/") {
-                when (it) {
-                    is PathSpec.Segment.Constant -> it.value
-                    is PathSpec.Segment.Wildcard<*> -> serverRuntime.externalSerialization.stringArrayFormat.encodeToString(
-                        it.serializer as KSerializer<Any?>,
-                        when(i++) {
-                            0 -> path1
-                            1 -> path2
-                            else -> throw Error("This should never be reachable")
-                        }
-                    )
-                }
-            })
-        }
-        context(serverRuntime: ServerRuntime)
-        public operator fun <A, B, C> invoke(spec: PathSpec3<A, B, C>, path1: A, path2: B, path3: C): RawPath<PathSpec3<A, B, C>> {
-            var i = 0
-            return RawPath(spec.segments.joinToString("/") {
-                when (it) {
-                    is PathSpec.Segment.Constant -> it.value
-                    is PathSpec.Segment.Wildcard<*> -> serverRuntime.externalSerialization.stringArrayFormat.encodeToString(
-                        it.serializer as KSerializer<Any?>,
-                        when(i++) {
-                            0 -> path1
-                            1 -> path2
-                            2 -> path3
-                            else -> throw Error("This should never be reachable")
-                        }
-                    )
-                }
-            })
-        }
-    }
 
     @Suppress("UNCHECKED_CAST")
     context(server: ServerRuntime)
@@ -81,7 +36,7 @@ public class RawPath<PATH: PathSpec>(public val string: String): HasContextualPa
 
     context(server: ServerRuntime)
     public val match: PathSpecMap.Match<ServerPathEndpoints> get() {
-        if(this.matchIfPresent == null) {
+        if (this.matchIfPresent == null) {
             this.matchIfPresent = server.server.endpoints.match(server.externalSerialization.stringArrayFormat, string)
         }
         return this.matchIfPresent ?: throw NullPointerException("No match for path: $string. Registered paths are ${server.server.endpoints.keys}")
@@ -98,3 +53,20 @@ public class RawPath<PATH: PathSpec>(public val string: String): HasContextualPa
     override fun hashCode(): Int = string.hashCode() + 1
     override fun toString(): String = string
 }
+
+context(server: ServerRuntime)
+public fun <PATH : PathSpec> RawPath(path: ConcretePath<PATH>): RawPath<PATH> = RawPath(path.path(server.internalSerialization.stringArrayFormat))
+
+public fun RawPath(spec: PathSpec0): RawPath<PathSpec0> = RawPath(spec.segments.joinToString("/"))
+
+context(serverRuntime: ServerRuntime)
+public fun <A> RawPath(spec: PathSpec1<A>, path1: A): RawPath<PathSpec1<A>> =
+    RawPath(ConcretePath(spec, path1))
+
+context(serverRuntime: ServerRuntime)
+public fun <A, B> RawPath(spec: PathSpec2<A, B>, path1: A, path2: B): RawPath<PathSpec2<A, B>> =
+    RawPath(ConcretePath(spec, path1, path2))
+
+context(serverRuntime: ServerRuntime)
+public fun <A, B, C> RawPath(spec: PathSpec3<A, B, C>, path1: A, path2: B, path3: C): RawPath<PathSpec3<A, B, C>> =
+    RawPath(ConcretePath(spec, path1, path2, path3))
