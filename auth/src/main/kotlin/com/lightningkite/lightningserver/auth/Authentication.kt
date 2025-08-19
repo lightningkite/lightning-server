@@ -6,6 +6,8 @@ import com.lightningkite.lightningserver.ForbiddenException
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.UnauthorizedException
+import com.lightningkite.lightningserver.data.Expiring
+import com.lightningkite.lightningserver.data.getOrPut
 import com.lightningkite.lightningserver.definition.ListRegistryExtension
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -18,6 +20,7 @@ import kotlinx.serialization.Transient
 import kotlinx.serialization.builtins.NothingSerializer
 import kotlinx.serialization.builtins.nullable
 import kotlin.String
+import kotlin.time.Duration
 import kotlin.time.Instant
 
 @Serializable
@@ -79,10 +82,18 @@ public class Authentication<SUBJECT : HasId<ID>, ID : Comparable<ID>> private co
 
 
     @Transient
-    private var self: SUBJECT? = null
+    private var _subjectCacheKey: SerializableCache.Key<SUBJECT>? = null
 
     context(server: ServerRuntime)
-    suspend fun
+    private val subjectCacheKey get() = _subjectCacheKey
+        ?: object : SerializableCache.Key<SUBJECT> {
+            override val id: String = "${principalType.name}-subject-cache"
+            override val serializer: KSerializer<SUBJECT> = principalType.subjectSerializer
+            override val expireAfter: Duration? = principalType.subjectCacheExpiration
+        }.also { _subjectCacheKey = it }
+
+    context(server: ServerRuntime)
+    public suspend fun fetch(): SUBJECT = cache.getOrPut(subjectCacheKey) { principalType.fetch(id) }
 
 
     override fun toString(): String = listOfNotNull(

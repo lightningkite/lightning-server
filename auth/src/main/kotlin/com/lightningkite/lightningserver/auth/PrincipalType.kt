@@ -19,7 +19,8 @@ public interface PrincipalType<SUBJECT: HasId<ID>, ID: Comparable<ID>> {
 
     public val subjectCacheExpiration: Duration? get() = 5.minutes
 
-    public suspend fun fetch(serverRuntime: ServerRuntime, id: ID): SUBJECT
+    context(server: ServerRuntime)
+    public suspend fun fetch(id: ID): SUBJECT
 
     public fun hasProperty(property: String): Boolean = subjectSerializer.descriptor.getElementIndex(property) != CompositeDecoder.UNKNOWN_NAME
 

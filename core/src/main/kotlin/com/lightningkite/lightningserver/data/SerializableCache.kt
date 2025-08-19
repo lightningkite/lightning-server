@@ -3,7 +3,6 @@ package com.lightningkite.lightningserver.data
 import com.lightningkite.lightningserver.data.SerializableCache.CalculatingKey
 import com.lightningkite.lightningserver.data.SerializableCache.Key
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ByteArraySerializer
@@ -14,7 +13,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlin.collections.iterator
 import kotlin.time.Duration
-import kotlin.time.Instant
 
 
 @Serializable(SerializableCacheSerializer::class)
@@ -68,7 +66,7 @@ public class SerializableCache private constructor(
     private fun <T> cache(key: Key<T>, value: T) {
         val expiring = Expiring(
             value,
-            expires = key.expireAfter?.let { server.clock.now() + it }
+            expiresAt = key.expireAfter?.let { server.clock.now() + it }
         )
 
         serialized[key.id] = server.internalSerialization.kotlinBytesFormat.encodeToByteArray(Expiring.serializer(key.serializer), expiring)
@@ -102,7 +100,7 @@ public class SerializableCache private constructor(
     override fun hashCode(): Int = bytes.hashCode()
     override fun toString(): String = cache
         .map { entry ->
-            entry.key to entry.value.result.let { if (it.expires == null) it.value else it }
+            entry.key to entry.value.result.let { if (it.expiresAt == null) it.value else it }
         }
         .plus((serialized.keys - cache.keys).map { it to "ENCODED" })
         .joinToString(prefix = "{", separator = ", ", postfix = "}") { "${it.first}=${it.second}" }
@@ -114,18 +112,21 @@ public class SerializableCache private constructor(
     }
 }
 
+context(server: ServerRuntime)
+public inline fun <T> SerializableCache.getOrPut(key: Key<T>, default: () -> T): T = get(key) ?: default().also { set(key, it) }
+
 public interface Caching {
     public val cache: SerializableCache
 }
 
 context(server: ServerRuntime)
-public operator fun <T : Any> Caching.set(key: Key<T>, value: T): Unit = cache.set(key, value)
+public operator fun <T> Caching.set(key: Key<T>, value: T): Unit = cache.set(key, value)
 
 context(server: ServerRuntime)
-public operator fun <T : Any> Caching.get(key: Key<T>): T? = cache[key]
+public operator fun <T> Caching.get(key: Key<T>): T? = cache[key]
 
 context(server: ServerRuntime)
-public suspend fun <INPUT, T : Any> Caching.get(key: CalculatingKey<INPUT, T>, input: INPUT): T = cache.get(key, input)
+public suspend fun <INPUT, T> Caching.get(key: CalculatingKey<INPUT, T>, input: INPUT): T = cache.get(key, input)
 
 
 public object SerializableCacheSerializer : KSerializer<SerializableCache> {

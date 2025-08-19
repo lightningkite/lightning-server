@@ -1,15 +1,20 @@
 package com.lightningkite.lightningserver.data
 
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.now
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
+import kotlin.time.Duration
 import kotlin.time.Instant
 
 @Serializable
 public data class Expiring<T>(
     val value: T,
-    @Contextual val expires: Instant?
+    @Contextual val expiresAt: Instant?
 ) {
     context(server: ServerRuntime)
-    public val expired: Boolean get() = expires != null && expires <= server.clock.now()
+    public val expired: Boolean get() = expiresAt != null && expiresAt <= server.clock.now()
 }
+
+context(server: ServerRuntime)
+public fun <T> Expiring(value: T, expireAfter: Duration?): Expiring<T> = Expiring(value, expireAfter?.let { now() + it })
