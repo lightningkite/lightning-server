@@ -59,12 +59,12 @@ public class ConcretePath<PATH: PathSpec> internal constructor(
     public fun toString(stringArrayFormat: StringArrayFormat): String = path(stringArrayFormat)
 }
 
-public interface HasConcretePath<PATH : PathSpec> {
-    public val path: ConcretePath<PATH>
-}
-
 public interface HasContextualPath<PATH : PathSpec> {
     context(server: ServerRuntime) public val pathInContext: ConcretePath<PATH>
+}
+
+public interface HasConcretePath<PATH : PathSpec> {
+    public val path: ConcretePath<PATH>
 }
 
 public fun ConcretePath(path: PathSpec0, trailingWildcard: ConcretePath.TrailingSegments? = null): ConcretePath<PathSpec0> =

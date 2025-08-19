@@ -54,9 +54,9 @@ public class HttpHeaders internal constructor (public val normalizedEntries: Map
         Strict, Lax, None
     }
 
-    public fun copy(builder: Builder.()->Unit): HttpHeaders = Builder().also { it.set(this) }.apply(builder).build()
+    public fun copy(builder: Builder.()->Unit): HttpHeaders = Builder(this).apply(builder).build()
 
-    public class Builder() {
+    public class Builder(start: HttpHeaders? = null) {
         private val entries = HashMap<String, ArrayList<HttpHeaderValue>>()
         public fun set(key: String, value: String) {
             entries.getOrPut(key.lowercase(), ::ArrayList).add(HttpHeaderValue.parse(value))
@@ -75,6 +75,8 @@ public class HttpHeaders internal constructor (public val normalizedEntries: Map
                 entries.getOrPut(key, ::ArrayList).addAll(values)
             }
         }
+
+        init { start?.let(::set) }
 
         public fun setCookie(
             key: String,

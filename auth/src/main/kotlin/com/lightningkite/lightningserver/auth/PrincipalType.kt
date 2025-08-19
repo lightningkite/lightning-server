@@ -31,6 +31,8 @@ public interface PrincipalType<SUBJECT: HasId<ID>, ID: Comparable<ID>> {
         from: Authentication<*, *>,
         into: Authentication<SUBJECT, ID>
     ): Boolean = false
+
+    public companion object;
 }
 
 private object PrincipalTypeRegistry : MapRegistryExtension<String, PrincipalType<*, *>>

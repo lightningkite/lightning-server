@@ -101,12 +101,14 @@ public data class RequestPredicates(
     public fun isNotEmpty(): Boolean =
         methods.isNotEmpty() || headers.isNotEmpty() || queryParameters.isNotEmpty() || scopes.isNotEmpty()
 
-    public class Builder {
-        public val methods: MutableMap<HttpMethod?, MutableList<PathPredicate>> = HashMap()
-        public val headers: HttpHeaders.Builder = HttpHeaders.Builder()
-        public val queryParameters: MutableSet<Pair<String, String>> = HashSet()
-        public val scopes: MutableSet<String> = HashSet()
+    public fun copy(builder: Builder.() -> Unit): RequestPredicates = Builder(this).apply(builder).build()
 
-        public fun build(): RequestPredicates = RequestPredicates(methods.toMap(), headers.build(), queryParameters.toSet(), scopes.toSet())
+    public class Builder(start: RequestPredicates? = null) {
+        public val methods: MutableMap<HttpMethod?, MutableList<PathPredicate>> = start?.methods?.mapValues { it.value.toMutableList() }?.toMutableMap() ?: HashMap()
+        public val headers: HttpHeaders.Builder = HttpHeaders.Builder(start?.headers)
+        public val queryParameters: MutableSet<Pair<String, String>> = start?.queryParameters?.toMutableSet() ?: HashSet()
+        public val scopes: MutableSet<String> = start?.scopes?.toMutableSet() ?: HashSet()
+
+        public fun build(): RequestPredicates = RequestPredicates(methods, headers.build(), queryParameters, scopes)
     }
 }

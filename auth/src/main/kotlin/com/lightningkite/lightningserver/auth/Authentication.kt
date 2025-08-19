@@ -23,6 +23,7 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.Transient
 import kotlinx.serialization.builtins.NothingSerializer
 import kotlinx.serialization.builtins.nullable
+import kotlin.String
 import kotlin.collections.getOrPut
 import kotlin.time.Instant
 
@@ -108,6 +109,13 @@ public class Authentication<SUBJECT : HasId<ID>, ID : Comparable<ID>> private co
             for (reader in server.server.extensions[Reader] ?: emptyList()) {
                 val auth = reader.read(input) ?: continue
 
+                auth.limitTo?.let {
+                    if (!it.matchesAll(input)) throw ForbiddenException(detail = "limitTo-violated", message = "Request outside limitations", data = it.toString())
+                }
+                auth.forbid?.let {
+                    if (it.matchesAny(input)) throw ForbiddenException(detail = "forbid-violated", message = "Request touches forbidden resources", data = it.toString())
+                }
+
                 input.headers[HttpHeader.XMasquerade]?.root?.let { masquerade ->
                     val principal = masquerade.substringBefore('/')
 
@@ -152,21 +160,25 @@ public class Authentication<SUBJECT : HasId<ID>, ID : Comparable<ID>> private co
         public companion object : ListRegistryExtension<Reader<*, *>>
     }
 
-    public class Builder {
-        public val limitTo: RequestPredicates.Builder = RequestPredicates.Builder()
-        public val forbid: RequestPredicates.Builder = RequestPredicates.Builder()
+    public fun limitTo(builder: RequestPredicates.Builder.() -> Unit): Authentication<SUBJECT, ID> =
+        Authentication(
+            principalName,
+            rawId,
+            issuedAt,
+            fromMasquerade,
+            limitTo = limitTo?.copy(builder = builder) ?: RequestPredicates.Builder().apply(builder).build().takeUnless { it.isEmpty() },
+            forbid,
+            cache
+        )
 
-        public fun limitToEndpoints(vararg endpoints: HttpEndpoint<PathSpec>) { for (endpoint in endpoints) limitTo.methods.getOrPut(endpoint.method, ::ArrayList).add(endpoint.path.toPredicate()) }
-        public fun limitToEndpoints(vararg endpoints: Locationed<HttpEndpoint<PathSpec>, *>) { for (endpoint in endpoints) limitTo.methods.getOrPut(endpoint.location.method, ::ArrayList).add(endpoint.location.path.toPredicate()) }
-        @Suppress("FINAL_UPPER_BOUND") public fun <T : HttpMethod> limitToMethods(vararg methods: T) { for (method in methods) limitTo.methods.getOrPut(method, ::ArrayList).clear() }
-        public fun limitToHeaders(headers: HttpHeaders) { limitTo.headers.set(headers) }
-        public fun limitToQueryParameters(vararg queryParameters: Pair<String, String>) { limitTo.queryParameters.addAll(queryParameters) }
-        public fun limitToScopes(vararg scopes: String) { limitTo.scopes.addAll(scopes) }
-        public fun forbidEndpoints(vararg endpoints: HttpEndpoint<PathSpec>) { for (endpoint in endpoints) forbid.methods.getOrPut(endpoint.method, ::ArrayList).add(endpoint.path.toPredicate()) }
-        public fun forbidEndpoints(vararg endpoints: Locationed<HttpEndpoint<PathSpec>, *>) { for (endpoint in endpoints) forbid.methods.getOrPut(endpoint.location.method, ::ArrayList).add(endpoint.location.path.toPredicate()) }
-        @Suppress("FINAL_UPPER_BOUND") public fun <T : HttpMethod> forbidMethods(vararg methods: T) { for (method in methods) forbid.methods.getOrPut(method, ::ArrayList).clear() }
-        public fun forbidHeaders(headers: HttpHeaders) { forbid.headers.set(headers) }
-        public fun forbidQueryParameters(vararg queryParameters: Pair<String, String>) { forbid.queryParameters.addAll(queryParameters) }
-        public fun forbidScopes(vararg scopes: String) { forbid.scopes.addAll(scopes) }
-    }
+    public fun forbid(builder: RequestPredicates.Builder.() -> Unit): Authentication<SUBJECT, ID> =
+        Authentication(
+            principalName,
+            rawId,
+            issuedAt,
+            fromMasquerade,
+            limitTo,
+            forbid = forbid?.copy(builder = builder) ?: RequestPredicates.Builder().apply(builder).build().takeUnless { it.isEmpty() },
+            cache
+        )
 }

@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec2
 import com.lightningkite.lightningserver.pathing.PathSpec3
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
+import kotlin.time.Instant
 
 
 context(server: ServerRuntime)
@@ -45,3 +46,6 @@ public suspend fun <A, B, C, T> WebSocketTopic<PathSpec3<A, B, C>, T>.send(
 ): Unit = serverRuntime.sendWebSocketSubscriptionMessage(
     WebSocketSubscriptionMessage(this, listOf(path1, path2, path3), value)
 )
+
+context(server: ServerRuntime)
+public fun now(): Instant = server.clock.now()
