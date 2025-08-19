@@ -5,16 +5,16 @@ import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.services.database.HasId
 import kotlin.time.Duration
 
-public sealed interface AuthenticationRequirement {
+public sealed interface AuthenticationRequirement<SUBJECT : HasId<ID>?, ID : Comparable<ID>> {
     context(server: ServerRuntime)
     public suspend fun accepts(auth: Authentication<*, *>?): Boolean
 
-    public data object NoAuthentication : AuthenticationRequirement {
+    public data object NoAuthentication : AuthenticationRequirement<HasId<AnyId>?, AnyId> {
         context(server: ServerRuntime)
         override suspend fun accepts(auth: Authentication<*, *>?): Boolean = auth == null
     }
 
-    public data object AnyAuthentication : AuthenticationRequirement {
+    public data object AnyAuthentication : AuthenticationRequirement<HasId<AnyId>, AnyId> {
         context(server: ServerRuntime)
         override suspend fun accepts(auth: Authentication<*, *>?): Boolean = auth != null
     }
@@ -25,7 +25,7 @@ public sealed interface AuthenticationRequirement {
         val scopes: Set<String> = setOf("*"),
         val maxAge: Duration? = null,
         val requirement: (suspend context(ServerRuntime) (Authentication<SUBJECT, ID>) -> Boolean)? = null
-    ) : AuthenticationRequirement {
+    ) : AuthenticationRequirement<SUBJECT, ID> {
         context(server: ServerRuntime)
         override suspend fun accepts(auth: Authentication<*, *>?): Boolean {
             if (auth == null) return false

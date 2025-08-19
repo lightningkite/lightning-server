@@ -47,9 +47,11 @@ public class SerializableCache private constructor(
             if (it.key !== key) throw IllegalStateException("KeyedSerializableCache encountered keys with duplicate ids. ID: ${key.id}")
         }
 
-        cache[key.id]
-            ?.takeUnless { it.result.expired }
-            ?.let { return it.result.value as T }
+        @Suppress("UNCHECKED_CAST")
+        cache[key.id]?.let {
+            return if (it.result.expired) null
+            else it.result.value as T
+        }
 
         serialized[key.id]
             ?.let { server.internalSerialization.kotlinBytesFormat.decodeFromByteArray(Expiring.serializer(key.serializer), it) }

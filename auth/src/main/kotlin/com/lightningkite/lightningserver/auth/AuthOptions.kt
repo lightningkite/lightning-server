@@ -1,25 +1,71 @@
 package com.lightningkite.lightningserver.auth
 
+import com.lightningkite.lightningserver.ForbiddenException
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.HasId
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.serializer
 import kotlin.time.Duration
+import kotlin.uuid.Uuid
 
-public typealias AuthOptions = Set<AuthenticationRequirement>
+public data class AuthOptions<SUBJECT : HasId<ID>?, ID : Comparable<ID>>(
+    val options: Set<AuthenticationRequirement<SUBJECT, ID>>
+) {
+    public constructor(vararg requirements: AuthenticationRequirement<SUBJECT, ID>) : this(requirements.toSet())
 
-context(server: ServerRuntime)
-public suspend fun AuthOptions.accepts(auth: Authentication<*, *>?): Boolean = any { it.accepts(auth) }
+    context(server: ServerRuntime)
+    public suspend fun accepts(auth: Authentication<*, *>?): Boolean = options.any { it.accepts(auth) }
 
-public infix fun AuthOptions.or(other: AuthOptions): AuthOptions = this + other
-public infix fun AuthOptions.or(requirement: AuthenticationRequirement): AuthOptions = this + requirement
+    @Suppress("UNCHECKED_CAST")
+    context(server: ServerRuntime)
+    public suspend fun assert(auth: Authentication<*, *>?): Authentication<SUBJECT & Any, ID>? =
+        if (accepts(auth)) auth?.let { it as Authentication<SUBJECT & Any, ID> }
+        else throw ForbiddenException("You do not meet the authorization criteria.")
 
-public val noAuth: AuthOptions = setOf(AuthenticationRequirement.NoAuthentication)
-public val anyAuth: AuthOptions = setOf(AuthenticationRequirement.AnyAuthentication)
+    public infix fun or(other: AuthOptions<SUBJECT, ID>): AuthOptions<SUBJECT, ID> = AuthOptions(options + other.options)
+    public infix fun or(requirement: AuthenticationRequirement<SUBJECT, ID>): AuthOptions<SUBJECT, ID> = AuthOptions(options + requirement)
+}
+
+public typealias AnyId = Comparable<Any?>
+
+public typealias NoAuth = AuthOptions<HasId<AnyId>?, AnyId>
+public typealias AnyAuth = AuthOptions<HasId<AnyId>, AnyId>
+
+public val noAuth: NoAuth = AuthOptions(AuthenticationRequirement.NoAuthentication)
+public val anyAuth: AnyAuth = AuthOptions(AuthenticationRequirement.AnyAuthentication)
 
 public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.auth(
     /**The required scopes. Empty set indicates no requirements and * indicates root access.*/
     scopes: Set<String> = setOf("*"),
     maxAge: Duration? = null,
     requirement: (suspend context(ServerRuntime) (Authentication<SUBJECT, ID>) -> Boolean)? = null
-): AuthOptions = setOf(
+): AuthOptions<SUBJECT, ID> = AuthOptions(
     AuthenticationRequirement.AuthenticatedAs(this, scopes, maxAge, requirement)
 )
+
+@Suppress("UNCHECKED_CAST")
+public infix fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> AuthOptions<SUBJECT, ID>.or(other: NoAuth): AuthOptions<SUBJECT?, ID> =
+    AuthOptions(options as Set<AuthenticationRequirement<SUBJECT?, ID>> + AuthenticationRequirement.NoAuthentication as AuthenticationRequirement<SUBJECT?, ID>)
+
+@Suppress("UNCHECKED_CAST")
+public infix fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> AnyAuth.or(other: AuthOptions<SUBJECT, ID>): AnyAuth =
+    AuthOptions(other.options as Set<AuthenticationRequirement<HasId<AnyId>, AnyId>> + options)
+
+@Suppress("UNCHECKED_CAST")
+public infix fun AnyAuth.or(other: NoAuth): AuthOptions<HasId<AnyId>?, AnyId> =
+    AuthOptions(AuthenticationRequirement.NoAuthentication, AuthenticationRequirement.AnyAuthentication as AuthenticationRequirement<HasId<AnyId>?, AnyId>)
+
+
+@Serializable
+private data class User(
+    override val _id: Uuid
+) : HasId<Uuid> {
+    companion object : PrincipalType<User, Uuid> {
+        override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
+        override val subjectSerializer: KSerializer<User> = serializer()
+
+        context(server: ServerRuntime)
+        override suspend fun fetch(id: Uuid): User = User(id)
+    }
+}

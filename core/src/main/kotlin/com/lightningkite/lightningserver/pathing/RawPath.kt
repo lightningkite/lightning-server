@@ -75,15 +75,14 @@ public class RawPath<PATH: PathSpec>(public val string: String): HasContextualPa
 
     @Suppress("UNCHECKED_CAST")
     context(server: ServerRuntime)
-    override val pathInContext: ConcretePath<PATH> get() = match as ConcretePath<PATH>
+    override val pathInContext: ConcretePath<PATH> get() = match.path as ConcretePath<PATH>
 
     private var matchIfPresent: PathSpecMap.Match<ServerPathEndpoints>? = null
 
     context(server: ServerRuntime)
     public val match: PathSpecMap.Match<ServerPathEndpoints> get() {
         if(this.matchIfPresent == null) {
-            this.matchIfPresent =
-                server.server.endpoints.match(server.externalSerialization.stringArrayFormat, string)
+            this.matchIfPresent = server.server.endpoints.match(server.externalSerialization.stringArrayFormat, string)
         }
         return this.matchIfPresent ?: throw NullPointerException("No match for path: $string. Registered paths are ${server.server.endpoints.keys}")
     }
