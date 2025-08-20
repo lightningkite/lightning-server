@@ -43,13 +43,15 @@ public class Authentication<SUBJECT : HasId<ID>, ID : Comparable<ID>> private co
         fromMasquerade: Authentication<*, *>? = null,
         limitTo: RequestPredicates? = null,
         forbid: RequestPredicates? = null,
+        precache: SerializableCache? = null
     ) : this(
         principalName = principalType.name,
         rawId = server.internalSerialization.json.encodeToString(principalType.idSerializer, id),
         issuedAt,
         fromMasquerade,
         limitTo,
-        forbid
+        forbid,
+        precache ?: SerializableCache()
     ) {
         cachedType = principalType
         cachedId = id

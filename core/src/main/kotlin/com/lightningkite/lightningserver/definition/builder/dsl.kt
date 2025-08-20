@@ -17,6 +17,7 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
+import com.lightningkite.services.SettingContext
 import kotlinx.serialization.KSerializer
 
 private fun <Location, Item> locate(item: Item, location: () -> Location): Locationed<Location, Item> = DynamicLocation(location, item)
@@ -73,7 +74,7 @@ public fun <Setting, Result> setting(
     default: Setting,
     serializer: KSerializer<Setting>,
     optional: Boolean = false,
-    getter: ServerRuntime.(Setting) -> Result,
+    getter: SettingContext.(Setting) -> Result,
 ): ServerSetting<Setting, Result> =
     setting(
         ServerSetting(
@@ -108,7 +109,7 @@ public inline fun <reified Setting, Result> setting(
     name: String,
     default: Setting,
     optional: Boolean = false,
-    crossinline getter: ServerRuntime.(Setting) -> Result,
+    crossinline getter: SettingContext.(Setting) -> Result,
 ): ServerSetting<Setting, Result> =
     setting(
         ServerSetting(

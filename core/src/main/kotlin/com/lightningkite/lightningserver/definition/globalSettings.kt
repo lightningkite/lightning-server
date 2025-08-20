@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.definition
 
+import com.lightningkite.lightningserver.encryption.SecretBasis
 import com.lightningkite.services.MetricSink
 
 public val secretBasis: ServerSetting.Direct<SecretBasis> =

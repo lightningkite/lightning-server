@@ -1,14 +1,26 @@
 package com.lightningkite.lightningserver.definition
 
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.services.MetricSink
 import com.lightningkite.services.Setting
+import com.lightningkite.services.SettingContext
 import kotlinx.serialization.KSerializer
 
-public fun interface Runtime<GOAL> {
+public fun interface RuntimeDeferred<T> {
     context(server: ServerRuntime)
-    public operator fun invoke(): GOAL
+    public suspend fun await(): T
 }
+
+public fun interface Runtime<T> : RuntimeDeferred<T> {
+    context(server: ServerRuntime)
+    public operator fun invoke(): T
+
+    context(server: ServerRuntime)
+    override suspend fun await(): T = invoke()
+}
+
+public fun <T, R> Runtime<T>.map(transform: context(ServerRuntime) (T) -> R): Runtime<R> = Runtime { transform(this()) }
+public fun <T, R> RuntimeDeferred<T>.mapSuspending(transform: suspend context(ServerRuntime) (T) -> R): RuntimeDeferred<R> =
+    RuntimeDeferred { transform(this.await()) }
 
 public interface ServerSetting<SETTING, RESULT> : Runtime<RESULT> {
     public val settingName: String
@@ -16,11 +28,11 @@ public interface ServerSetting<SETTING, RESULT> : Runtime<RESULT> {
     public val default: SETTING
     public val optional: Boolean get() = false
 
-    context(server: ServerRuntime)
+    context(settings: SettingContext)
     public fun get(setting: SETTING): RESULT
 
     public interface Direct<Setting> : ServerSetting<Setting, Setting> {
-        context(server: ServerRuntime)
+        context(settings: SettingContext)
         override fun get(setting: Setting): Setting = setting
     }
 
@@ -33,10 +45,10 @@ private data class BasicServerSetting<SETTING, RESULT>(
     override val default: SETTING,
     override val serializer: KSerializer<SETTING>,
     override val optional: Boolean,
-    private val getter: ServerRuntime.(SETTING) -> RESULT
+    private val getter: SettingContext.(SETTING) -> RESULT
 ) : ServerSetting<SETTING, RESULT> {
-    context(server: ServerRuntime)
-    override fun get(setting: SETTING): RESULT = getter(server, setting)
+    context(settings: SettingContext)
+    override fun get(setting: SETTING): RESULT = getter(settings, setting)
 }
 
 public fun <SETTING, RESULT> ServerSetting(
@@ -44,7 +56,7 @@ public fun <SETTING, RESULT> ServerSetting(
     default: SETTING,
     serializer: KSerializer<SETTING>,
     optional: Boolean = false,
-    getter: ServerRuntime.(SETTING) -> RESULT
+    getter: SettingContext.(SETTING) -> RESULT
 ) : ServerSetting<SETTING, RESULT> =
     BasicServerSetting(name, default, serializer, optional, getter)
 

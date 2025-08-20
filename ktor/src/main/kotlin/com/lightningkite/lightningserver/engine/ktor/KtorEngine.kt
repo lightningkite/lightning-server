@@ -92,7 +92,7 @@ public class KtorEngine(server: ServerDefinition) : LocalEngine(server) {
                                     }
                                 },
                             )
-                            val result: HttpResponse = handler.handle(this@KtorEngine, request)
+                            val result: HttpResponse = handler.handle(request)
 
                             for (header in result.headers.normalizedEntries) {
                                 for(value in header.value){
@@ -251,7 +251,7 @@ private abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
                 println("Got subscription message: $value")
                 handler.messageFromSubscription(
                     this@LocalWebSocketConnection,
-                    WebSocketSubscriptionMessage(socketRequest.topic, socketRequest.rawPathArguments, value),
+                    WebSocketSubscriptionMessage(socketRequest.topic, socketRequest.path.rawPathArguments, value),
                 )
             }
             yield()
