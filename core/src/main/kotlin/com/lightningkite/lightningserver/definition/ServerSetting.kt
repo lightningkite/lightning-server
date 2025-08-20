@@ -5,7 +5,12 @@ import com.lightningkite.services.MetricSink
 import com.lightningkite.services.Setting
 import kotlinx.serialization.KSerializer
 
-public interface ServerSetting<SETTING, RESULT> {
+public fun interface Runtime<GOAL> {
+    context(server: ServerRuntime)
+    public operator fun invoke(): GOAL
+}
+
+public interface ServerSetting<SETTING, RESULT> : Runtime<RESULT> {
     public val settingName: String
     public val serializer: KSerializer<SETTING>
     public val default: SETTING
@@ -18,6 +23,9 @@ public interface ServerSetting<SETTING, RESULT> {
         context(server: ServerRuntime)
         override fun get(setting: Setting): Setting = setting
     }
+
+    context(server: ServerRuntime)
+    override fun invoke(): RESULT = server.settings.get(this, server)
 }
 
 private data class BasicServerSetting<SETTING, RESULT>(

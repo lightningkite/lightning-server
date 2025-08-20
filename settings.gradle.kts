@@ -31,8 +31,9 @@ pluginManagement {
 
 include(":core")
 include(":engine-local")
-include(":typed")
 include(":auth")
+include(":typed")
+include(":sessions")
 include(":sdk")
 include(":upload-files")
 include(":ktor")

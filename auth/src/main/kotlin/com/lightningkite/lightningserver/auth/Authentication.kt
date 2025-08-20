@@ -162,9 +162,9 @@ public class Authentication<SUBJECT : HasId<ID>, ID : Comparable<ID>> private co
 
     // related types
 
-    public interface Reader<SUBJECT : HasId<ID>, ID : Comparable<ID>> {
+    public fun interface Reader<SUBJECT : HasId<ID>, ID : Comparable<ID>> {
         context(server: ServerRuntime)
-        public suspend fun read(request: Request<*>): Authentication<SUBJECT, ID>?
+        public fun read(request: Request<*>): Authentication<SUBJECT, ID>?
 
         public companion object : ListRegistryExtension<Reader<*, *>>
     }

@@ -9,7 +9,8 @@ import kotlinx.serialization.builtins.serializer
 import kotlin.time.Duration
 import kotlin.uuid.Uuid
 
-public class AuthOptions<SUBJECT : HasId<ID>?, ID : Comparable<ID>> internal constructor(
+@JvmInline
+public value class AuthOptions<SUBJECT : HasId<ID>?, ID : Comparable<ID>> internal constructor(
     public val options: Set<AuthenticationRequirement<SUBJECT, ID>>
 ) {
     public constructor(vararg requirements: AuthenticationRequirement<SUBJECT, ID>) : this(requirements.toSet())
@@ -25,6 +26,8 @@ public class AuthOptions<SUBJECT : HasId<ID>?, ID : Comparable<ID>> internal con
 
     public infix fun or(other: AuthOptions<SUBJECT, ID>): AuthOptions<SUBJECT, ID> = AuthOptions(options + other.options)
     public infix fun or(requirement: AuthenticationRequirement<SUBJECT, ID>): AuthOptions<SUBJECT, ID> = AuthOptions(options + requirement)
+
+    override fun toString(): String = "AuthOptions(${options.joinToString()})"
 }
 
 public typealias AnyId = Comparable<Any?>

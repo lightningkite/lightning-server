@@ -15,12 +15,16 @@ public data class SdkModuleInfo(
     val valueName: String
 ) {
     public companion object : MutableExtensions.Key<SdkModuleInfo>
+
+    public object Default : MutableExtensions.Key<String>
 }
+
+public var ServerBuilder.defaultInterfaceName: String? by SdkModuleInfo.Default
 
 @LightningServerDsl
 public fun <S : ServerBuilder> module(
     module: S,
-    interfaceName: String = module::class.simpleName?.pascalCase() ?: throw IllegalArgumentException("Cannot infer name for anonymous object"),
+    interfaceName: String = module.defaultInterfaceName ?: module::class.simpleName?.pascalCase() ?: throw IllegalArgumentException("Cannot infer name for anonymous object"),
     valueName: String = interfaceName.camelCase()
 ) : S {
     module.extensions[SdkModuleInfo] = SdkModuleInfo(interfaceName, valueName)
