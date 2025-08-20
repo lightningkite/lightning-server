@@ -60,7 +60,16 @@ public data class SecretBasis(public val string: String) {
         .also { hmac = it }
 
     /**
-     * Derives a key from this SecretBasis using the provided key.
+     * The HMAC-SHA512 key for this [SecretBasis]
+     * */
+    public fun keyBlocking(): HMAC.Key = hmac ?: CryptographyProvider.Default.get(HMAC)
+        .keyDecoder(SHA512)
+        .decodeFromByteArrayBlocking(HMAC.Key.Format.RAW, bytes)
+        .also { hmac = it }
+
+
+    /**
+     * Derives a key from this [SecretBasis] using the provided key.
      * This implementation uses HMAC-SHA512.
      */
     public suspend fun derive(key: String): ByteArray = key()
@@ -68,7 +77,16 @@ public data class SecretBasis(public val string: String) {
         .generateSignature(key.encodeToByteArray())
 
     /**
-     * Derives a key from this SecretBasis using the provided key.
+     * Derives a key from this [SecretBasis] using the provided key.
+     * This implementation uses HMAC-SHA512.
+     */
+    public fun deriveBlocking(key: String): ByteArray = keyBlocking()
+        .signatureGenerator()
+        .generateSignatureBlocking(key.encodeToByteArray())
+
+
+    /**
+     * Derives a `whyoleg.cryptography.Key` from this [SecretBasis] using the provided variant.
      * This implementation uses HMAC-SHA512.
      */
     public suspend fun <KD : KeyDecoder<KF, K>, KF : KeyFormat, K : Key> deriveKey(
@@ -76,4 +94,14 @@ public data class SecretBasis(public val string: String) {
         format: KF,
         variant: String
     ): K = decoder.decodeFromByteArray(format, derive(variant))
+
+    /**
+     * Derives a `whyoleg.cryptography.Key` from this [SecretBasis] using the provided variant.
+     * This implementation uses HMAC-SHA512.
+     */
+    public fun <KD : KeyDecoder<KF, K>, KF : KeyFormat, K : Key> deriveKeyBlocking(
+        decoder: KD,
+        format: KF,
+        variant: String
+    ): K = decoder.decodeFromByteArrayBlocking(format, deriveBlocking(variant))
 }
