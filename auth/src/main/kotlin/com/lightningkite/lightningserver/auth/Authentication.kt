@@ -80,7 +80,6 @@ public class Authentication<SUBJECT : HasId<ID>, ID : Comparable<ID>> private co
     public val id: ID get() = cachedId
         ?: server.internalSerialization.json.decodeFromString(principalType.idSerializer, rawId).also { cachedId = it }
 
-
     @Transient
     private var _subjectCacheKey: SerializableCache.Key<SUBJECT>? = null
 

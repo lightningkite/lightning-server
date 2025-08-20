@@ -100,8 +100,6 @@ object Server : ServerBuilder() {
         authOptions = User.auth(scopes = setOf("api-endpoints"))
     ) { input: Int ->
 
-        auth
-
         Unit
     }
 

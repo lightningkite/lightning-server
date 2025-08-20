@@ -2,24 +2,12 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.AuthOptions
-import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.auth.PrincipalType
-import com.lightningkite.lightningserver.auth.auth
-import com.lightningkite.lightningserver.auth.noAuth
-import com.lightningkite.lightningserver.auth.or
-import com.lightningkite.lightningserver.data.Request
-import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.typed.RequestAndAuth
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.serializerOrContextual
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.serializer
-import kotlin.uuid.Uuid
 
 public fun <PATH: PathSpec, USER: HasId<ID>?, ID : Comparable<ID>, INPUT, OUTPUT> ApiHttpHandler(
     summary: String,
@@ -30,7 +18,7 @@ public fun <PATH: PathSpec, USER: HasId<ID>?, ID : Comparable<ID>, INPUT, OUTPUT
     successCode: HttpStatus = HttpStatus.OK,
     errorCases: List<LSError> = emptyList(),
     examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = emptyList(),
-    handler: suspend context(ServerRuntime) HttpRequestAndAuth<PATH, USER, ID>.(INPUT) -> OUTPUT
+    handler: suspend context(ServerRuntime) HttpAccess<PATH, USER, ID>.(INPUT) -> OUTPUT
 ): ApiHttpHandler<PATH, USER, ID, INPUT, OUTPUT> =
     object : ApiHttpHandler<PATH, USER, ID, INPUT, OUTPUT> {
         override val summary: String = summary
@@ -43,7 +31,7 @@ public fun <PATH: PathSpec, USER: HasId<ID>?, ID : Comparable<ID>, INPUT, OUTPUT
         override val examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = examples
 
         context(server: ServerRuntime)
-        override suspend fun HttpRequestAndAuth<PATH, USER, ID>.handle(input: INPUT): OUTPUT = handler(input)
+        override suspend fun HttpAccess<PATH, USER, ID>.handle(input: INPUT): OUTPUT = handler(input)
     }
 
 public inline fun <PATH: PathSpec, USER: HasId<ID>?, ID : Comparable<ID>, reified INPUT, reified OUTPUT> ApiHttpHandler(
@@ -53,6 +41,6 @@ public inline fun <PATH: PathSpec, USER: HasId<ID>?, ID : Comparable<ID>, reifie
     successCode: HttpStatus = HttpStatus.OK,
     errorCases: List<LSError> = emptyList(),
     examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = emptyList(),
-    noinline handler: suspend context(ServerRuntime) HttpRequestAndAuth<PATH, USER, ID>.(INPUT) -> OUTPUT
+    noinline handler: suspend context(ServerRuntime) HttpAccess<PATH, USER, ID>.(INPUT) -> OUTPUT
 ): ApiHttpHandler<PATH, USER, ID, INPUT, OUTPUT> =
     ApiHttpHandler(summary, description, serializerOrContextual<INPUT>(), serializerOrContextual<OUTPUT>(), authOptions, successCode, errorCases, examples, handler)

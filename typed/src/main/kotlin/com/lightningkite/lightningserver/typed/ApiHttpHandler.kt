@@ -27,12 +27,10 @@ public interface ApiHttpHandler<PATH: PathSpec, USER: HasId<ID>?, ID : Comparabl
     public val examples: List<Example<INPUT, OUTPUT>>
 
     context(server: ServerRuntime)
-    public suspend fun HttpRequestAndAuth<PATH, USER, ID>.handle(input: INPUT): OUTPUT
+    public suspend fun HttpAccess<PATH, USER, ID>.handle(input: INPUT): OUTPUT
 
     context(server: ServerRuntime)
     override suspend fun handle(request: HttpRequest<PATH>): HttpResponse {
-        val auth = authOptions.assert(request[Authentication.CacheKey])
-
         @Suppress("UNCHECKED_CAST")
         val input: INPUT = when (request.method) {
             HttpMethod.GET, HttpMethod.HEAD -> request.queryParameters(inputType)
@@ -43,7 +41,7 @@ public interface ApiHttpHandler<PATH: PathSpec, USER: HasId<ID>?, ID : Comparabl
 
         server.validators.validateOrThrow(inputType, input)
 
-        val result = HttpRequestAndAuth<PATH, USER, ID>(request, auth).handle(input)
+        val result = request.access(authOptions).handle(input)
 
         return HttpResponse(
             body = result.toHttpContent(request.headers.accept, outputType),
