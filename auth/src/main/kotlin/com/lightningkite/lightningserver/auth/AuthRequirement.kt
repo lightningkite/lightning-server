@@ -1,23 +1,34 @@
 package com.lightningkite.lightningserver.auth
 
+import com.lightningkite.lightningserver.definition.MutableExtensions
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.services.database.HasId
 import kotlin.time.Duration
 
-public sealed interface AuthenticationRequirement<SUBJECT : HasId<ID>?, ID : Comparable<ID>> {
+public sealed interface AuthRequirement<SUBJECT : HasId<ID>?, ID : Comparable<ID>> {
     context(server: ServerRuntime)
     public suspend fun accepts(auth: Authentication<*, *>?): Boolean
 
-    public data object NoAuthentication : AuthenticationRequirement<HasId<AnyId>?, AnyId> {
+    public data object NoAuth : AuthRequirement<HasId<AnyId>?, AnyId> {
         context(server: ServerRuntime)
         override suspend fun accepts(auth: Authentication<*, *>?): Boolean = auth == null
     }
 
-    public data object AnyAuthentication : AuthenticationRequirement<HasId<AnyId>, AnyId> {
+    public data object AnyAuth : AuthRequirement<HasId<AnyId>, AnyId> {
         context(server: ServerRuntime)
         override suspend fun accepts(auth: Authentication<*, *>?): Boolean = auth != null
     }
+
+    public abstract class AuthSetting : AuthRequirement<HasId<AnyId>, AnyId>, MutableExtensions.Key<AuthOptions<HasId<*>, *>> {
+        context(server: ServerRuntime)
+        override suspend fun accepts(auth: Authentication<*, *>?): Boolean =
+            server.server.extensions[this]?.accepts(auth) ?: false
+    }
+
+    public data object IsAdmin : AuthSetting()
+    public data object IsSuperUser : AuthSetting()
+    public data object IsDeveloper : AuthSetting()
 
     public data class AuthenticatedAs<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         val principalType: PrincipalType<SUBJECT, ID>,
@@ -25,7 +36,7 @@ public sealed interface AuthenticationRequirement<SUBJECT : HasId<ID>?, ID : Com
         val scopes: Set<String> = setOf("*"),
         val maxAge: Duration? = null,
         val requirement: (suspend context(ServerRuntime) (Authentication<SUBJECT, ID>) -> Boolean)? = null
-    ) : AuthenticationRequirement<SUBJECT, ID> {
+    ) : AuthRequirement<SUBJECT, ID> {
         context(server: ServerRuntime)
         override suspend fun accepts(auth: Authentication<*, *>?): Boolean {
             if (auth == null) return false

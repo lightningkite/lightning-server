@@ -147,6 +147,7 @@ serializationProtobuf = { module = "org.jetbrains.kotlinx:kotlinx-serialization-
 serviceAbstractionsBasis = { module = "com.lightningkite.services:basis", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsData = { module = "com.lightningkite.services:data", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsDatabase = { module = "com.lightningkite.services:database", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsDatabaseProcessor = { module = "com.lightningkite.services:database-processor", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsSBSL = { module = "com.lightningkite.services:should-be-standard-library", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsCache = { module = "com.lightningkite.services:cache", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsPubsub = { module = "com.lightningkite.services:pubsub", version = { ref = "serviceAbstractions" } }

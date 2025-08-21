@@ -14,6 +14,7 @@ dependencies {
     api(project(":auth"))
     api(project(":sdk"))
     api(project(":typed"))
+    ksp(libs.serviceAbstractionsDatabaseProcessor)
     api(libs.serviceAbstractionsDatabase)
     api(libs.kotlinReflect)
 }
