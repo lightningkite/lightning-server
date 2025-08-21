@@ -16,14 +16,14 @@ import kotlin.collections.iterator
 import kotlin.collections.plus
 
 @Serializable
-internal data class MultiplexWebSocketHandlerState(
+public data class MultiplexWebSocketHandlerState(
     val map: Map<String, MultiplexWebSocketHandlerConnectionInfo>,
 ) {
-    operator fun contains(topic: String): Boolean = map.values.any { info -> info.topics.contains(topic) }
+    internal operator fun contains(topic: String): Boolean = map.values.any { info -> info.topics.contains(topic) }
 }
 
 @Serializable
-internal data class MultiplexWebSocketHandlerConnectionInfo(
+public data class MultiplexWebSocketHandlerConnectionInfo(
     val storage: AnonType,
     val topics: Set<String> = setOf(),
     val request: WebSocketConnectRequest<*>,
@@ -40,10 +40,10 @@ public data class MultiplexMessage(
     val error: String? = null
 )
 
-internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<PathSpec0, MultiplexWebSocketHandlerState> {
+public class MultiplexWebSocketHandler(internal val json: Json) : WebSocketHandler<PathSpec0, MultiplexWebSocketHandlerState> {
     override val storageSerializer: KSerializer<MultiplexWebSocketHandlerState> get() = serializer()
 
-    inner class WrappedConnection<T>(
+    private inner class WrappedConnection<T>(
         val wrapped: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>,
         val channel: String,
         val handler: WebSocketHandler<PathSpec, T>
@@ -119,7 +119,7 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
         }
     }
 
-    suspend inline fun <T> WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>.withWrapped(
+    private suspend inline fun <T> WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>.withWrapped(
         handler: WebSocketHandler<PathSpec, T>,
         channel: String,
         action: suspend (WrappedConnection<T>) -> Unit
@@ -137,7 +137,7 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
 
     override suspend fun didConnect(
         connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>
-    ) = Unit
+    ): Unit = Unit
 
     override suspend fun messageFromClient(
         connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>,
@@ -244,7 +244,7 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
     override suspend fun messageFromSubscription(
         connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>,
         topic: WebSocketSubscriptionMessage<*, *>
-    ) = with(connection) {
+    ): Unit = with(connection) {
         for ((channel, info) in currentState.map) {
             if (info.topics.contains(topic.path(externalSerialization.stringArrayFormat))) {
                 val match = with(connection) { info.request.path.match }
@@ -258,7 +258,7 @@ internal class MultiplexWebSocketHandler(val json: Json) : WebSocketHandler<Path
         }
     }
 
-    override suspend fun disconnect(connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>, reason: WebSocketClose) =
+    override suspend fun disconnect(connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>, reason: WebSocketClose): Unit =
         with(connection) {
             currentState.map.entries.forEach { (channel, info) ->
                 val match = with(connection) { info.request.path.match }

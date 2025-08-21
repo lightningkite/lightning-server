@@ -8,7 +8,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
-import com.lightningkite.services.MetricSink
+import com.lightningkite.services.MetricReporter
 import com.lightningkite.services.SettingContext
 import kotlinx.serialization.modules.SerializersModule
 import kotlin.time.Clock
@@ -18,7 +18,7 @@ public interface ServerRuntime: SettingContext {
 
     public val externalSerialization: Serialization
     public val internalSerialization: Serialization
-    public val metrics: MetricSink
+    public val metrics: MetricReporter
 
     override val clock: Clock get() = Clock.System
     public val settings: ServerSettings

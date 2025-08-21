@@ -8,11 +8,17 @@ import com.lightningkite.lightningserver.definition.MutableExtensions
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerPathEndpoints
 import com.lightningkite.lightningserver.definition.ServerSetting
+import com.lightningkite.lightningserver.definition.StartupTask
+import com.lightningkite.lightningserver.http.DefaultExceptionHttpHandler
+import com.lightningkite.lightningserver.http.ExceptionHttpHandler
 import com.lightningkite.lightningserver.http.HttpBuilder
+import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.intercept
 import com.lightningkite.lightningserver.pathing.MutablePathSpecMap
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.serialization.MediaTypeDecoderRegistry
+import com.lightningkite.lightningserver.serialization.MediaTypeEncoderRegistry
 import com.lightningkite.lightningserver.websockets.WebSocketsBuilder
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
@@ -71,9 +77,14 @@ public abstract class ServerBuilder : Extendable {
 
     public val http: HttpBuilder = HttpBuilder()
     public val websockets: WebSocketsBuilder = WebSocketsBuilder()
+    public var exceptionHandler: ExceptionHttpHandler = DefaultExceptionHttpHandler
 
+    public val startupTasks: MapRegistry<PathSpec0, StartupTask> = MapRegistry()
     public val schedules: MapRegistry<PathSpec0, ScheduledTask> = MapRegistry()
     public val tasks: MapRegistry<PathSpec0, Task<*>> = MapRegistry()
+
+    public val mediaTypeDecoders: MediaTypeDecoderRegistry = MediaTypeDecoderRegistry()
+    public val mediaTypeEncoders: MediaTypeEncoderRegistry = MediaTypeEncoderRegistry()
 
     public override val extensions: MutableExtensions = MutableExtensions()
 
@@ -166,7 +177,11 @@ public abstract class ServerBuilder : Extendable {
         tasks = tasks,
         webSocketTopics = websockets.topics.registered,
         settings = settings,
-        extensions = extensions
+        extensions = extensions,
+        exceptionHandler = exceptionHandler,
+        startupTasks = startupTasks,
+        mediaTypeDecoders = mediaTypeDecoders,
+        mediaTypeEncoders = mediaTypeEncoders,
     )
 
     internal var modulePath: PathSpec0 = PathSpec.root

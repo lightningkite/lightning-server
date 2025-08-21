@@ -131,5 +131,6 @@ public class HttpHeaders internal constructor (public val normalizedEntries: Map
     }
 }
 
+public fun HttpHeaders(entry: Iterable<Pair<String, String>>): HttpHeaders = HttpHeaders(entry.groupBy { it.first.lowercase() }.mapValues { it.value.map { HttpHeaderValue.Companion.parse(it.second) }})
 public fun HttpHeaders(vararg entry: Pair<String, String>): HttpHeaders = HttpHeaders(entry.groupBy { it.first.lowercase() }.mapValues { it.value.map { HttpHeaderValue.Companion.parse(it.second) }})
 public inline fun HttpHeaders(setup: HttpHeaders.Builder.() -> Unit): HttpHeaders = HttpHeaders.Builder().apply(setup).build()

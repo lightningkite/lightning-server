@@ -48,10 +48,12 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>
 )
 
 @Suppress("UNCHECKED_CAST")
+@JvmName("orNoAuth")
 public infix fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> AuthOptions<SUBJECT, ID>.or(other: NoAuth): AuthOptions<SUBJECT?, ID> =
     AuthOptions(options as Set<AuthenticationRequirement<SUBJECT?, ID>> + AuthenticationRequirement.NoAuthentication as AuthenticationRequirement<SUBJECT?, ID>)
 
 @Suppress("UNCHECKED_CAST")
+@JvmName("orAnyAuth")
 public infix fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> AnyAuth.or(other: AuthOptions<SUBJECT, ID>): AnyAuth =
     AuthOptions(options + other.options as Set<AuthenticationRequirement<HasId<AnyId>, AnyId>>)
 
