@@ -22,7 +22,7 @@ public data class JwtClaims(
     val cache: String? = null,
 )
 
-public open class TokenException(message: String) : Exception(message)
+public open class TokenException(message: String, override val cause: Throwable? = null) : Exception(message)
 public open class JwtException(message: String) : TokenException(message)
 public open class JwtFormatException(message: String) : JwtException(message)
 public open class JwtSignatureException(message: String) : JwtException(message)

@@ -19,17 +19,17 @@ import dev.whyoleg.cryptography.algorithms.SHA384
 import dev.whyoleg.cryptography.algorithms.SHA512
 
 /**Uses ECDSA with P-521 curve and SHA-512 hashing*/
-public suspend fun SecretBasis.hasher(variant: String): SecureHasher = ES512(variant)
+public suspend fun SecretBasis.hasher(variant: String): SecureHasher.WithId = ES512(variant)
 
 /**Uses ECDSA with P-521 curve and SHA-512 hashing*/
-public fun Runtime<SecretBasis>.hasher(variant: String): RuntimeDeferred<SecureHasher> = mapSuspending { it.hasher(variant) }
+public fun Runtime<SecretBasis>.hasher(variant: String): RuntimeDeferred<SecureHasher.WithId> = mapSuspending { it.hasher(variant) }
 
 
 /**Uses ECDSA with P-521 curve and SHA-512 hashing*/
-public fun SecretBasis.hasherBlocking(variant: String): SecureHasher = ECDSA_Blocking(variant, EC.Curve.P521).hasher(SHA512).withId("ES512")
+public fun SecretBasis.hasherBlocking(variant: String): SecureHasher.WithId = ECDSA_Blocking(variant, EC.Curve.P521).hasher(SHA512).withId("ES512")
 
 /**Uses ECDSA with P-521 curve and SHA-512 hashing*/
-public fun Runtime<SecretBasis>.hasherBlocking(variant: String): Runtime<SecureHasher> = map { it.hasherBlocking(variant) }
+public fun Runtime<SecretBasis>.hasherBlocking(variant: String): Runtime<SecureHasher.WithId> = map { it.hasherBlocking(variant) }
 
 
 private fun SecureHasher.withId(id: String) = SecureHasher.WithId(this, id)

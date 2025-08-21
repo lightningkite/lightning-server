@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.data.get
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.pathing.HasContextualPath
 import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.HasId
 
@@ -21,6 +22,8 @@ public suspend fun <REQUEST : Request<PATH>, PATH : PathSpec, SUBJECT : HasId<ID
 ): Access<REQUEST, PATH, SUBJECT, ID> = Access(this, auth.assert(get(Authentication.CacheKey)))
 
 public typealias HttpAccess<PATH, SUBJECT, ID> = Access<HttpRequest<PATH>, PATH, SUBJECT, ID>
+
+public typealias AuthAccess<SUBJECT, ID> = HttpAccess<PathSpec0, SUBJECT, ID>
 
 public val <SUBJECT : HasId<ID>, ID : Comparable<ID>> Access<*, *, SUBJECT, ID>.auth: Authentication<SUBJECT, ID>
     get() = authOrNull!! // safe because the type is non-null

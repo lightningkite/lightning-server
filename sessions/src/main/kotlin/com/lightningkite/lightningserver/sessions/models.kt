@@ -1,0 +1,62 @@
+package com.lightningkite.lightningserver.sessions
+
+import com.lightningkite.services.data.AdminTableColumns
+import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.database.HasId
+import kotlinx.serialization.Serializable
+import kotlin.time.Instant
+import kotlin.uuid.Uuid
+
+@Serializable
+public data class SubSessionRequest(
+    val label: String,
+    val scopes: Set<String> = setOf("*"),
+    val oauthClient: String? = null,
+    val expires: Instant? = null,
+)
+
+@GenerateDataClassPaths
+@Serializable
+@AdminTableColumns(["label", "subjectId", "scopes"])
+public data class Session<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
+    override val _id: Uuid = Uuid.random(),
+    val secretHash: String,
+    val derivedFrom: Uuid? = null,
+    val label: String? = null,
+    val subjectId: ID,
+    val createdAt: Instant,
+    val lastUsed: Instant,
+    val expires: Instant? = null,
+    val stale: Instant? = null,
+    val terminated: Instant? = null,
+    val ips: Set<String> = setOf(),
+    val userAgents: Set<String> = setOf(),
+    val scopes: Set<String>,
+//    @References(OauthClient::class) val oauthClient: String? = null,
+) : HasId<Uuid>
+
+
+@Serializable
+public data class LogInRequest(
+    val proofs: List<Proof>,
+    val label: String = "Root Session",
+    val scopes: Set<String> = setOf("*"),
+    val expires: Instant? = null,
+)
+
+@Serializable
+public data class IdAndAuthMethods<ID>(
+    val id: ID,
+    val options: List<ProofOption> = listOf(),
+    val strengthRequired: Int = 1,
+    val session: String? = null,
+)
+
+@Serializable
+public data class ProofsCheckResult<ID>(
+    val id: ID,
+    val options: List<ProofOption> = listOf(),
+    val strengthRequired: Int = 1,
+    val readyToLogIn: Boolean,
+    val maxExpiration: Instant?,
+)

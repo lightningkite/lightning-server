@@ -28,9 +28,9 @@ public class Authentication<SUBJECT : HasId<ID>, ID : Comparable<ID>> private co
     public val principalName: String,
     public val rawId: String,
     public val issuedAt: Instant,
-    public val fromMasquerade: Authentication<*, *>? = null,
     public val limitTo: RequestPredicates? = null,
     public val forbid: RequestPredicates? = null,
+    public val fromMasquerade: Authentication<*, *>? = null,
     override val cache: SerializableCache = SerializableCache()
 ) : Caching {
 
@@ -40,17 +40,17 @@ public class Authentication<SUBJECT : HasId<ID>, ID : Comparable<ID>> private co
         principalType: PrincipalType<SUBJECT, ID>,
         id: ID,
         issuedAt: Instant = server.clock.now(),
-        fromMasquerade: Authentication<*, *>? = null,
         limitTo: RequestPredicates? = null,
         forbid: RequestPredicates? = null,
+        fromMasquerade: Authentication<*, *>? = null,
         precache: SerializableCache? = null
     ) : this(
         principalName = principalType.name,
         rawId = server.internalSerialization.json.encodeToString(principalType.idSerializer, id),
         issuedAt,
-        fromMasquerade,
         limitTo,
         forbid,
+        fromMasquerade,
         precache ?: SerializableCache()
     ) {
         cachedType = principalType
@@ -137,9 +137,9 @@ public class Authentication<SUBJECT : HasId<ID>, ID : Comparable<ID>> private co
                         principal,
                         rawId = masquerade.substringAfter('/'),
                         issuedAt = server.clock.now(),
-                        fromMasquerade = auth,
                         limitTo = auth.limitTo,
-                        forbid = auth.forbid
+                        forbid = auth.forbid,
+                        fromMasquerade = auth,
                     )
 
                     try {
@@ -176,9 +176,9 @@ public class Authentication<SUBJECT : HasId<ID>, ID : Comparable<ID>> private co
             principalName,
             rawId,
             issuedAt,
-            fromMasquerade,
             limitTo = limitTo?.copy(builder = builder) ?: RequestPredicates.Builder().apply(builder).build().takeUnless { it.isEmpty() },
             forbid,
+            fromMasquerade,
             cache
         )
 
@@ -187,9 +187,9 @@ public class Authentication<SUBJECT : HasId<ID>, ID : Comparable<ID>> private co
             principalName,
             rawId,
             issuedAt,
-            fromMasquerade,
             limitTo,
             forbid = forbid?.copy(builder = builder) ?: RequestPredicates.Builder().apply(builder).build().takeUnless { it.isEmpty() },
+            fromMasquerade,
             cache
         )
 }

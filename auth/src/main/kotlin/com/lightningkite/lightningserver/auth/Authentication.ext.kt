@@ -9,9 +9,22 @@ import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.toPredicate
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.HasId
+import com.lightningkite.services.database.serializerOrContextual
+import java.lang.IllegalArgumentException
+import kotlin.time.Instant
 
 public val ServerBuilder.authReaders: ListRegistry<Authentication.Reader<*, *>> by Authentication.Reader
+
+@Suppress("UNCHECKED_CAST")
+context(server: ServerRuntime)
+public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.testAuth(
+    subject: SUBJECT,
+    issuedAt: Instant = server.clock.now(),
+    limitTo: RequestPredicates? = null,
+    forbid: RequestPredicates? = null,
+): Authentication<SUBJECT, ID> = Authentication(server, this, subject._id, issuedAt, limitTo, forbid)
 
 
 public fun <S : HasId<ID>, ID : Comparable<ID>> Authentication<S, ID>.limitToEndpoints(

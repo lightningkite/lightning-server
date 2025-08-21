@@ -13,6 +13,7 @@ dependencies {
     api(project(":core"))
     api(project(":auth"))
     api(project(":sdk"))
+    api(project(":typed"))
     api(libs.serviceAbstractionsDatabase)
     api(libs.kotlinReflect)
 }

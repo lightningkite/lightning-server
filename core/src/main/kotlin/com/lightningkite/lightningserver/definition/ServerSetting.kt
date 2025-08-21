@@ -5,12 +5,12 @@ import com.lightningkite.services.Setting
 import com.lightningkite.services.SettingContext
 import kotlinx.serialization.KSerializer
 
-public fun interface RuntimeDeferred<T> {
+public fun interface RuntimeDeferred<out T> {
     context(server: ServerRuntime)
     public suspend fun await(): T
 }
 
-public fun interface Runtime<T> : RuntimeDeferred<T> {
+public fun interface Runtime<out T> : RuntimeDeferred<T> {
     context(server: ServerRuntime)
     public operator fun invoke(): T
 

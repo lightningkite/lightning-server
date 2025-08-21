@@ -17,6 +17,7 @@ import dev.whyoleg.cryptography.operations.Cipher
 import dev.whyoleg.cryptography.operations.Decryptor
 import dev.whyoleg.cryptography.operations.Encryptor
 
+
 /**Uses AES-GCM with 128-bit tag size*/
 public suspend fun SecretBasis.cipher(variant: String): Cipher = AES_GCM(variant).cipher()
 

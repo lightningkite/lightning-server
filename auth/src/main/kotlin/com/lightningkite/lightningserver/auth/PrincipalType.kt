@@ -6,8 +6,11 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.getValue
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.HasId
+import com.lightningkite.services.database.serializerOrContextual
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.encoding.CompositeDecoder
+import java.lang.IllegalArgumentException
+import kotlin.reflect.typeOf
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
@@ -44,4 +47,14 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> ServerBuilder.register(typ
     extensions[PrincipalTypeRegistry].register(type.name, type)
 }
 public val ServerDefinition.principalTypes: Map<String, PrincipalType<*, *>> by PrincipalTypeRegistry
+
+@Suppress("UNCHECKED_CAST")
+context(server: ServerRuntime)
+public inline fun <reified SUBJECT : HasId<ID>, ID : Comparable<ID>> principalTypeFor(): PrincipalType<SUBJECT, ID> {
+    val name = serializerOrContextual<SUBJECT>().descriptor.serialName
+    return server.server.principalTypes.values
+        .firstOrNull { it.subjectSerializer.descriptor.serialName == name }
+        as? PrincipalType<SUBJECT, ID>
+        ?: throw IllegalArgumentException("Principal type for $name not found")
+}
 
