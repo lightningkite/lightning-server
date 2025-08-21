@@ -5,7 +5,6 @@ import com.lightningkite.lightningserver.definition.CorsSettings
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.engine.local.LocalEngine
-import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
@@ -29,16 +28,13 @@ import io.ktor.server.websocket.*
 import io.ktor.util.*
 import io.ktor.utils.io.*
 import io.ktor.websocket.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.yield
+import kotlinx.coroutines.*
 import kotlinx.io.asSink
 import kotlinx.io.asSource
 import kotlinx.io.buffered
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlin.time.Clock
 
 @Serializable
 public data class KtorRuntimeSettings(
@@ -55,7 +51,7 @@ internal val ktorRunConfig: ServerSetting.Direct<KtorRuntimeSettings> = ServerSe
 )
 
 
-public class KtorEngine(server: ServerDefinition) : LocalEngine(server) {
+public class KtorEngine(server: ServerDefinition, override val clock: Clock = Clock.System) : LocalEngine(server) {
 
     override val settings: ServerSettings = ServerSettings(super.settings.keys.plus(ktorRunConfig).toSet())
 
@@ -83,15 +79,15 @@ public class KtorEngine(server: ServerDefinition) : LocalEngine(server) {
                             // Multipart Support?
                             val stream = call.receiveStream()
 
-                                    TypedData.sink(
-                                        call.request.contentType().adapt(),
-                                        call.request.contentLength() ?: -1
-                                    ) {
-                                        it.transferFrom(stream.asSource())
-                                    }
-                                },
-                            )
-                            val result: HttpResponse = handler.handle(request)
+                            TypedData.sink(
+                                call.request.contentType().adapt(),
+                                call.request.contentLength() ?: -1
+                            ) {
+                                it.transferFrom(stream.asSource())
+                            }
+                        },
+                    )
+                    val result: HttpResponse = this@KtorEngine.handle(request)
 
                     for (header in result.headers.normalizedEntries) {
                         for (value in header.value) {
@@ -149,7 +145,12 @@ public class KtorEngine(server: ServerDefinition) : LocalEngine(server) {
 
                 val match = server.endpoints.match(externalSerialization.stringArrayFormat, request.path.string)
                 val socketHandler = match?.value?.websocket ?: run {
-                    this@webSocket.close(CloseReason(CloseReason.Codes.CANNOT_ACCEPT, "No matching path found for ${request.path.string}"))
+                    this@webSocket.close(
+                        CloseReason(
+                            CloseReason.Codes.CANNOT_ACCEPT,
+                            "No matching path found for ${request.path.string}"
+                        )
+                    )
                     return@webSocket
                 }
 
@@ -199,15 +200,18 @@ public class KtorEngine(server: ServerDefinition) : LocalEngine(server) {
                     closingMid.let { mid ->
                         socketHandler.disconnect(mid, WebSocketClose.NORMAL)
                     }
-                } catch(e: HttpStatusException) {
+                } catch (e: HttpStatusException) {
                     closingMid?.let { mid ->
-                        socketHandler.disconnect(mid, when(e.status.code / 100) {
-                            1, 2, 3 -> WebSocketClose.NORMAL
-                            4 -> WebSocketClose.CLOSED_ABNORMALLY
-                            else -> WebSocketClose.INTERNAL_ERROR
-                        })
+                        socketHandler.disconnect(
+                            mid,
+                            when (e.status.code / 100) {
+                                1, 2, 3 -> WebSocketClose.NORMAL
+                                4 -> WebSocketClose.CLOSED_ABNORMALLY
+                                else -> WebSocketClose.INTERNAL_ERROR
+                            }
+                        )
                     }
-                } catch(e: Throwable) {
+                } catch (e: Throwable) {
                     closingMid?.let { mid ->
                         socketHandler.disconnect(mid, WebSocketClose.INTERNAL_ERROR)
                     }

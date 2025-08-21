@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.auth
 
+import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.definition.MapRegistryExtension
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -9,12 +10,10 @@ import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.serializerOrContextual
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.encoding.CompositeDecoder
-import java.lang.IllegalArgumentException
-import kotlin.reflect.typeOf
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
-public interface PrincipalType<SUBJECT: HasId<ID>, ID: Comparable<ID>> {
+public interface PrincipalType<SUBJECT : HasId<ID>, ID : Comparable<ID>> {
     public val idSerializer: KSerializer<ID>
     public val subjectSerializer: KSerializer<SUBJECT>
 
@@ -25,18 +24,30 @@ public interface PrincipalType<SUBJECT: HasId<ID>, ID: Comparable<ID>> {
     context(server: ServerRuntime)
     public suspend fun fetch(id: ID): SUBJECT
 
-    public fun hasProperty(property: String): Boolean = subjectSerializer.descriptor.getElementIndex(property) != CompositeDecoder.UNKNOWN_NAME
+    public fun hasProperty(property: String): Boolean =
+        subjectSerializer.descriptor.getElementIndex(property) != CompositeDecoder.UNKNOWN_NAME
 
     context(server: ServerRuntime)
     public fun getProperty(principal: SUBJECT, property: String): String =
         if (property == "$name/_id") server.internalSerialization.json.encodeToString(idSerializer, principal._id)
         else server.internalSerialization.formDataFormat.encodeToMap(subjectSerializer, principal)[property]!!
 
+
+    context(server: ServerRuntime)
+    public suspend fun fetchByProperty(property: String, value: String): SUBJECT? {
+        return when (property) {
+            "$name/_id" -> fetch(server.internalSerialization.json.decodeFromString(idSerializer, value))
+            else -> null
+        }
+    }
+
     context(server: ServerRuntime)
     public suspend fun permitMasquerade(
         from: Authentication<*, *>,
-        into: Authentication<SUBJECT, ID>
+        into: Authentication<SUBJECT, ID>,
     ): Boolean = false
+
+    public val knownCacheTypes: List<SerializableCache.CalculatingKey<Authentication<SUBJECT, ID>, *>>
 
     public companion object;
 }
@@ -46,6 +57,7 @@ private object PrincipalTypeRegistry : MapRegistryExtension<String, PrincipalTyp
 public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> ServerBuilder.register(type: PrincipalType<SUBJECT, ID>) {
     extensions[PrincipalTypeRegistry].register(type.name, type)
 }
+
 public val ServerDefinition.principalTypes: Map<String, PrincipalType<*, *>> by PrincipalTypeRegistry
 
 @Suppress("UNCHECKED_CAST")
@@ -54,7 +66,7 @@ public inline fun <reified SUBJECT : HasId<ID>, ID : Comparable<ID>> principalTy
     val name = serializerOrContextual<SUBJECT>().descriptor.serialName
     return server.server.principalTypes.values
         .firstOrNull { it.subjectSerializer.descriptor.serialName == name }
-        as? PrincipalType<SUBJECT, ID>
+            as? PrincipalType<SUBJECT, ID>
         ?: throw IllegalArgumentException("Principal type for $name not found")
 }
 
