@@ -13,11 +13,11 @@ import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.plus
-import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.serialization.MediaTypeCoder
 import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
+import com.lightningkite.services.Setting
 import com.lightningkite.services.SettingContext
 import kotlinx.serialization.KSerializer
 
@@ -84,6 +84,40 @@ public fun <Setting, Result> setting(
             serializer,
             optional,
         ) { value -> getter(this, value) }
+    )
+
+@LightningServerDsl
+context(builder: ServerBuilder)
+public fun <SETTING : Setting<RESULT>, RESULT> setting(
+    name: String,
+    default: SETTING,
+    serializer: KSerializer<SETTING>,
+    optional: Boolean = false,
+): ServerSetting<SETTING, RESULT> =
+    setting(
+        ServerSetting(
+            name,
+            default,
+            serializer,
+            optional,
+        )
+    )
+
+
+@LightningServerDsl
+context(builder: ServerBuilder)
+public inline fun <reified SETTING : Setting<RESULT>, RESULT> setting(
+    name: String,
+    default: SETTING,
+    optional: Boolean = false,
+): ServerSetting<SETTING, RESULT> =
+    setting(
+        ServerSetting(
+            name,
+            default,
+            serializerOrContextual<SETTING>(),
+            optional,
+        )
     )
 
 @LightningServerDsl
