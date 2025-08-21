@@ -18,14 +18,21 @@ import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
 import kotlinx.coroutines.flow.MutableSharedFlow
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Clock
 
 public class TestRunner<SERVER: ServerBuilder>(
     public val serverBuilder: SERVER,
+    private val clockGet: () -> Clock = { Clock.System }
 ) : ServerRuntimeBase(serverBuilder.build()) {
+
+    override val clock: Clock
+        get() = clockGet()
+
     public constructor(
         server: SERVER,
-        settings: context(ServerSettings) SERVER.() -> Unit
-    ): this(server) {
+        clockGet: () -> Clock = { Clock.System },
+        settings: context(ServerSettings) SERVER.() -> Unit,
+    ): this(server, clockGet) {
         context(this.settings) { settings(server) }
     }
 
