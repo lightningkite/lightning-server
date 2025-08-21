@@ -12,8 +12,10 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.data.plus
+import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
 import com.lightningkite.lightningserver.runtime.executeWithMetrics
+import com.lightningkite.lightningserver.runtime.handleWithMetrics
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
@@ -23,9 +25,14 @@ import com.lightningkite.services.cache.set
 import com.lightningkite.services.cache.setIfNotExists
 import com.lightningkite.services.pubsub.PubSub
 import com.lightningkite.services.pubsub.PubSubChannel
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.job
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDateTime
@@ -63,7 +70,11 @@ public abstract class LocalEngine(server: ServerDefinition): ServerRuntimeBase(s
 
     override suspend fun <T> Locationed<PathSpec0, Task<T>>.invoke(input: T) {
         scope.launch {
-            item.executeWithMetrics(location, input)
+            try {
+                item.executeWithMetrics(location, input)
+            } catch(e: Exception) {
+                /*squish; already reported*/
+            }
         }
     }
 
@@ -110,7 +121,11 @@ public abstract class LocalEngine(server: ServerDefinition): ServerRuntimeBase(s
                     val nextRun = it.schedule.calculateNextRun(clock.now())
                     if (cache.setIfNotExists("$name-lock", true)) {
                         cache.set("$name-lock", true, 1.hours)
-                        it.executeWithMetrics(location)
+                        try {
+                            it.executeWithMetrics(location)
+                        } catch(e: Exception) {
+                            /*squish; already reported*/
+                        }
                         cache.set<Long>("$name-nextRun", nextRun)
                         cache.remove("$name-lock")
                     } else {

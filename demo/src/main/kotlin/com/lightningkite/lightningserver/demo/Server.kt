@@ -19,6 +19,7 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.send
 import com.lightningkite.lightningserver.sdk.ClientInterfaceBuilder
 import com.lightningkite.lightningserver.sdk.module
+import com.lightningkite.lightningserver.serialization.basicMediaTypeCoders
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.MediaTypeEncoder
 import com.lightningkite.lightningserver.typed.auth
@@ -53,10 +54,15 @@ data class User(
 }
 
 object Server : ServerBuilder() {
-    init { register(User) }
+    init {
+        basicMediaTypeCoders()
+    }
 
     val index = path.get bind HttpHandler {
         HttpResponse.plainText("Ktor Test Success")
+    }
+    val subpath = path.path("subpath").get bind HttpHandler {
+        HttpResponse.plainText("Ktor Test Success 2")
     }
     val topic = path.topic(String.serializer())
 
@@ -93,66 +99,4 @@ object Server : ServerBuilder() {
         topic.send(body ?: "No Body")
         HttpResponse()
     }
-
-    val api = path.path("api").arg<Uuid>("id").post bind ApiHttpHandler(
-        summary = "Api Endpoint",
-        description = "Api Endpoint",
-        authOptions = User.auth(scopes = setOf("api-endpoints"))
-    ) { input: Int ->
-
-        Unit
-    }
-
-    val module = path.path("module") bind module(ModelEndpoints)
-    val module2 = path.path("module2") bind module(ModelEndpoints, interfaceName = "Module2")
 }
-
-object ModelEndpoints : ServerBuilder() {
-    val index = path.get bind HttpHandler {
-        HttpResponse.plainText("Module hit")
-    }
-
-    val topic = path.topic(String.serializer())
-
-    init {
-        mediaTypeEncoders.register(
-            object : MediaTypeEncoder {
-                override val mediaType: MediaType = MediaType.Text.Plain
-
-                override suspend fun <T> invoke(
-                    mediaType: MediaType,
-                    serializer: SerializationStrategy<T>,
-                    value: T
-                ): TypedData = TODO()
-            }
-        )
-    }
-
-    val websocket = path bind WebSocketHandler(
-        storageSerializer = Unit.serializer(),
-        willConnect = { Unit },
-        didConnect = { subscribe(topic); subscribe(Server.topic) },
-        topicHandlers = {
-            topic bind {
-                println("Module Topic hit!")
-                send(WebSocketFrame("Module" + it.value))
-            }
-            Server.topic bind {
-                println("Server Topic hit!")
-                send(WebSocketFrame("Server" + it.value))
-            }
-        },
-        messageFromClient = { frame ->
-            if (frame is WebSocketFrame.Text && frame.text == "close") {
-                close(WebSocketClose.NORMAL)
-            } else {
-                send(frame)  // Mirror
-            }
-        },
-        disconnect = {}
-    )
-
-    val rest = path.path("rest") bind Rest(0)
-}
-
-class Rest<T>(val item: T) : ClientInterfaceBuilder()

@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.definition
 
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import kotlinx.serialization.KSerializer
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -13,6 +14,11 @@ public interface Task<Input> {
     context(server: ServerRuntime)
     public suspend fun execute(input: Input)
 }
+
+public inline fun <reified INPUT> Task(
+    timeout: Duration = 5.minutes,
+    noinline handler: suspend ServerRuntime.(INPUT) -> Unit
+): Task<INPUT> = Task(serializerOrContextual<INPUT>(), timeout, handler)
 
 public fun <INPUT> Task(
     input: KSerializer<INPUT>,

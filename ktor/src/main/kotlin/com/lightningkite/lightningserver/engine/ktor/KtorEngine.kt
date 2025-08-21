@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.engine.ktor
 
+import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.definition.CorsSettings
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
@@ -11,6 +12,7 @@ import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawPath
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.handle
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.Data
@@ -30,6 +32,7 @@ import io.ktor.websocket.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
 import kotlinx.io.asSink
 import kotlinx.io.asSource
@@ -60,29 +63,25 @@ public class KtorEngine(server: ServerDefinition) : LocalEngine(server) {
         install(WebSockets)
 
         settings.get(ktorRunConfig, this@KtorEngine).cors
-            ?.also{ corsSettings -> install(getLSCorsPlugin(corsSettings)) }
+            ?.also { corsSettings -> install(getLSCorsPlugin(corsSettings)) }
 
         routing {
-            server.endpoints.forEach { (path, endpoints) ->
-
-                endpoints.http.forEach { (method, handler) ->
-                    handler as HttpHandler<PathSpec>
-                    route(path.toString(), io.ktor.http.HttpMethod.parse(method.toString())) {
-                        handle {
-                            val request = HttpRequest(
-                                path = RawPath(call.request.path()),
-                                queryParameters = call.request.queryParameters.flattenEntries(),
-                                headers = call.request.headers.adapt(),
-                                domain = call.request.origin.serverHost,
-                                protocol = call.request.origin.scheme,
-                                sourceIp = settings.get(ktorRunConfig, this@KtorEngine).realIpHeader?.let {
-                                    call.request.header(it)
-                                        ?: throw Exception("Real IP address header for proxy '$it' was missing from the request.")
-                                } ?: call.request.origin.remoteAddress,
-                                method = HttpMethod(call.request.httpMethod.value),
-                                body = run {
-                                    // MutliPart Support?
-                                    val stream = call.receiveStream()
+            route("{...}") {
+                handle {
+                    val request = HttpRequest(
+                        path = RawPath(call.request.path()),
+                        queryParameters = call.request.queryParameters.flattenEntries(),
+                        headers = call.request.headers.adapt(),
+                        domain = call.request.origin.serverHost,
+                        protocol = call.request.origin.scheme,
+                        sourceIp = settings.get(ktorRunConfig, this@KtorEngine).realIpHeader?.let {
+                            call.request.header(it)
+                                ?: throw Exception("Real IP address header for proxy '$it' was missing from the request.")
+                        } ?: call.request.origin.remoteAddress,
+                        method = HttpMethod(call.request.httpMethod.value),
+                        body = run {
+                            // Multipart Support?
+                            val stream = call.receiveStream()
 
                                     TypedData.sink(
                                         call.request.contentType().adapt(),
@@ -94,120 +93,131 @@ public class KtorEngine(server: ServerDefinition) : LocalEngine(server) {
                             )
                             val result: HttpResponse = handler.handle(request)
 
-                            for (header in result.headers.normalizedEntries) {
-                                for(value in header.value){
-                                    call.response.header(header.key, value.toHttpString())
-                                }
-                            }
-                            call.response.status(HttpStatusCode.fromValue(result.status.code))
-                            val type = result.body?.mediaType?.toString()?.let { ContentType.parse(it) }
-                            when (val b = result.body?.data) {
-                                null -> {
-                                    val contentType = call.response.headers[HttpHeaders.ContentType]
-                                    val contentLength = call.response.headers[HttpHeaders.ContentLength]
-                                    if (contentType != null && contentLength != null) {
-                                        call.response.call.respondOutputStream(
-                                            ContentType.parse(contentType),
-                                            HttpStatusCode.NoContent,
-                                            contentLength.toLong(),
-                                            {})
-                                    } else
-                                        call.respondText("", contentType = null, status = null, configure = { })
-                                }
+                    for (header in result.headers.normalizedEntries) {
+                        for (value in header.value) {
+                            call.response.header(header.key, value.toHttpString())
+                        }
+                    }
+                    call.response.status(HttpStatusCode.fromValue(result.status.code))
+                    val type = result.body?.mediaType?.toString()?.let { ContentType.parse(it) }
+                    when (val b = result.body?.data) {
+                        null -> {
+                            val contentType = call.response.headers[HttpHeaders.ContentType]
+                            val contentLength = call.response.headers[HttpHeaders.ContentLength]
+                            if (contentType != null && contentLength != null) {
+                                call.response.call.respondOutputStream(
+                                    ContentType.parse(contentType),
+                                    HttpStatusCode.NoContent,
+                                    contentLength.toLong()
+                                ) {}
+                            } else
+                                call.respondText("", contentType = null, status = null, configure = { })
+                        }
 
-                                is Data.Bytes -> call.respondBytes(b.data, type)
+                        is Data.Bytes -> call.respondBytes(b.data, type)
 
-                                is Data.Text -> call.respondText(b.data, type)
-                                is Data.Sink -> call.respondOutputStream(type) {
-                                    b.emit(this.asSink().buffered())
-                                }
+                        is Data.Text -> call.respondText(b.data, type)
+                        is Data.Sink -> call.respondOutputStream(type) {
+                            b.emit(this.asSink().buffered())
+                        }
 
-                                is Data.Source -> call.respondBytesWriter(type) {
-                                    b.source.transferTo(this.asSink())
-                                }
-                            }
+                        is Data.Source -> call.respondBytesWriter(type) {
+                            b.source.transferTo(this.asSink())
                         }
                     }
                 }
+            }
+            webSocket("{...}") {
+                var queryParams = call.request.queryParameters.flattenEntries()
+                // TODO: Remove this fugly hack and deal with websocket auth better
+                queryParams = queryParams.flatMap {
+                    if (it.first == "path") listOf(it) + it.second.substringAfter('?').split('&')
+                        .map { part -> part.substringBefore('=') to part.substringAfter('=') }
+                    else listOf(it)
+                }
+                val request = WebSocketConnectRequest(
+                    path = RawPath(call.request.path()),
+                    queryParameters = queryParams,
+                    headers = call.request.headers.adapt(),
+                    domain = call.request.origin.serverHost,
+                    protocol = call.request.origin.scheme,
+                    sourceIp = settings.get(ktorRunConfig, this@KtorEngine).realIpHeader?.let {
+                        call.request.header(it)
+                            ?: throw Exception("Real IP address header for proxy '$it' was missing from the request.")
+                    } ?: call.request.origin.remoteAddress,
+                )
 
-                endpoints.websocket?.also { socketHandler: WebSocketHandler<*, *> ->
-                    socketHandler as WebSocketHandler<PathSpec, Any?>
-                    route(path.toString()) {
-                        webSocket {
-//                            val handler = WebSockets.fullInterceptor(rawHandler)
+                val match = server.endpoints.match(externalSerialization.stringArrayFormat, request.path.string)
+                val socketHandler = match?.value?.websocket ?: run {
+                    this@webSocket.close(CloseReason(CloseReason.Codes.CANNOT_ACCEPT, "No matching path found for ${request.path.string}"))
+                    return@webSocket
+                }
 
-                            var queryParams = call.request.queryParameters.flattenEntries()
-                            // TODO: Remove this fugly hack and deal with websocket auth better
-                            queryParams = queryParams.flatMap {
-                                if (it.first == "path") listOf(it) + it.second.substringAfter('?').split('&')
-                                    .map { it.substringBefore('=') to it.substringAfter('=') }
-                                else listOf(it)
-                            }
-                            val request = WebSocketConnectRequest(
-                                path = RawPath(call.request.path()),
-                                queryParameters = queryParams,
-                                headers = call.request.headers.adapt(),
-                                domain = call.request.origin.serverHost,
-                                protocol = call.request.origin.scheme,
-                                sourceIp = settings.get(ktorRunConfig, this@KtorEngine).realIpHeader?.let {
-                                    call.request.header(it)
-                                        ?: throw Exception("Real IP address header for proxy '$it' was missing from the request.")
-                                } ?: call.request.origin.remoteAddress,
+                @Suppress("UNCHECKED_CAST")
+                socketHandler as WebSocketHandler<PathSpec, Any?>
+
+                val startingState = socketHandler.willConnect(this@KtorEngine, request)
+                var closingMid: WebSocketConnection<PathSpec, Any?>? = null
+                try {
+
+                    val mid = object : LocalWebSocketConnection<PathSpec, Any?>(
+                        startingState = startingState,
+                        request = request,
+                        handler = socketHandler,
+                        scope = this@webSocket,
+                        server = this@KtorEngine,
+                        pubSub = { pubSubChannel(it) }
+                    ) {
+                        override suspend fun send(frame: WebSocketFrame) {
+                            this@webSocket.send(
+                                when (frame) {
+                                    is WebSocketFrame.Binary -> Frame.Binary(true, frame.content)
+                                    is WebSocketFrame.Text -> Frame.Text(frame.content)
+                                }
                             )
-
-
-                            val startingState = socketHandler.willConnect(this@KtorEngine, request)
-                            var closingMid: WebSocketConnection<PathSpec, Any?>? = null
-                            try {
-
-                                val mid = object : LocalWebSocketConnection<PathSpec, Any?>(
-                                    startingState = startingState,
-                                    request = request,
-                                    handler = socketHandler,
-                                    scope = this@webSocket,
-                                    server = this@KtorEngine,
-                                    pubSub = { pubSubChannel(it) }
-                                ) {
-                                    override suspend fun send(frame: WebSocketFrame) {
-                                        this@webSocket.send(
-                                            when (frame) {
-                                                is WebSocketFrame.Binary -> Frame.Binary(true, frame.content)
-                                                is WebSocketFrame.Text -> Frame.Text(frame.content)
-                                            }
-                                        )
-                                    }
-
-                                    override suspend fun close(reason: WebSocketClose) {
-                                        this@webSocket.close(CloseReason(reason.code, reason.name))
-                                    }
-                                }
-                                closingMid = mid
-
-                                socketHandler.didConnect(mid)
-
-                                for (incoming in this.incoming) {
-                                    val m = when (incoming) {
-                                        is Frame.Binary -> WebSocketFrame(incoming.data)
-                                        is Frame.Text -> WebSocketFrame(incoming.readText())
-                                        is Frame.Close -> continue
-                                        is Frame.Ping -> continue
-                                        is Frame.Pong -> continue
-                                    }
-                                    socketHandler.messageFromClient(mid, m)
-                                }
-                            } finally {
-                                closingMid?.let { mid ->
-                                    socketHandler.disconnect(mid, WebSocketClose.NORMAL)
-                                }
-                            }
                         }
+
+                        override suspend fun close(reason: WebSocketClose) {
+                            this@webSocket.close(CloseReason(reason.code, reason.name))
+                        }
+                    }
+                    closingMid = mid
+
+                    socketHandler.didConnect(mid)
+
+                    for (incoming in this.incoming) {
+                        val m = when (incoming) {
+                            is Frame.Binary -> WebSocketFrame(incoming.data)
+                            is Frame.Text -> WebSocketFrame(incoming.readText())
+                            is Frame.Close -> continue
+                            is Frame.Ping -> continue
+                            is Frame.Pong -> continue
+                        }
+                        socketHandler.messageFromClient(mid, m)
+                    }
+
+                    closingMid.let { mid ->
+                        socketHandler.disconnect(mid, WebSocketClose.NORMAL)
+                    }
+                } catch(e: HttpStatusException) {
+                    closingMid?.let { mid ->
+                        socketHandler.disconnect(mid, when(e.status.code / 100) {
+                            1, 2, 3 -> WebSocketClose.NORMAL
+                            4 -> WebSocketClose.CLOSED_ABNORMALLY
+                            else -> WebSocketClose.INTERNAL_ERROR
+                        })
+                    }
+                } catch(e: Throwable) {
+                    closingMid?.let { mid ->
+                        socketHandler.disconnect(mid, WebSocketClose.INTERNAL_ERROR)
                     }
                 }
             }
         }
     }
 
-    public fun <TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.Configuration> start(factory: ApplicationEngineFactory<TEngine, TConfiguration>): Unit {
+    public fun <TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.Configuration> start(factory: ApplicationEngineFactory<TEngine, TConfiguration>) {
+        runBlocking { runStartupTasks() }
         startSchedules()
         embeddedServer(
             factory = factory,
@@ -241,17 +251,15 @@ private abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
 
     val subscriptions = HashMap<WebSocketTopic<*, *>, Job>()
 
-    override suspend fun subscribe(socketRequest: WebSocketSubscriptionRequest<*, *>) {
-        println("Subscribing $socketRequest")
-        socketRequest as WebSocketSubscriptionRequest<*, Any?>
-        subscriptions[socketRequest.topic]?.cancel()
-        subscriptions[socketRequest.topic] = scope.launch {
-            println("In subscribe launch")
-            pubSub(socketRequest).collect { value ->
-                println("Got subscription message: $value")
+    override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) {
+        @Suppress("UNCHECKED_CAST")
+        topic as WebSocketSubscriptionRequest<*, Any?>
+        subscriptions[topic.topic]?.cancel()
+        subscriptions[topic.topic] = scope.launch {
+            pubSub(topic).collect { value ->
                 handler.messageFromSubscription(
                     this@LocalWebSocketConnection,
-                    WebSocketSubscriptionMessage(socketRequest.topic, socketRequest.path.rawPathArguments, value),
+                    WebSocketSubscriptionMessage(topic.topic, topic.path.rawPathArguments, value),
                 )
             }
             yield()

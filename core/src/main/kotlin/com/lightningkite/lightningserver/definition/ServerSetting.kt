@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.definition
 
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.services.MetricReporter
 import com.lightningkite.services.Setting
 import com.lightningkite.services.SettingContext
 import kotlinx.serialization.KSerializer

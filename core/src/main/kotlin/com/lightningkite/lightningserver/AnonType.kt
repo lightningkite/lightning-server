@@ -10,26 +10,26 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.modules.SerializersModule
 
 @Serializable(with = AnonTypeSerializer::class)
-internal class AnonType {
+public class AnonType {
     private var kotlinBytesFormat: KotlinBytesFormat? = null
     private var serializedBytes: ByteArray? = null
     private var serializer: KSerializer<*>? = null
     private var direct: Any? = null
     private var hasDirect: Boolean = false
 
-    internal constructor(kotlinBytesFormat: KotlinBytesFormat, direct: Any?, serializer: KSerializer<*>) {
+    public constructor(kotlinBytesFormat: KotlinBytesFormat, direct: Any?, serializer: KSerializer<*>) {
         this.kotlinBytesFormat = kotlinBytesFormat
         this.direct = direct
         hasDirect = true
         this.serializer = serializer
     }
 
-    internal constructor(serialized: ByteArray) {
+    public constructor(serialized: ByteArray) {
         this.serializedBytes = serialized
     }
 
     @Suppress("UNCHECKED_CAST")
-    internal fun serializedBytes(): ByteArray {
+    public fun serializedBytes(): ByteArray {
         return serializedBytes ?: run {
             val newSer = kotlinBytesFormat!!.encodeToByteArray(serializer as KSerializer<Any?>, direct)
             serializedBytes = newSer
@@ -38,7 +38,7 @@ internal class AnonType {
     }
 
     @Suppress("UNCHECKED_CAST")
-    internal fun <T> value(kotlinBytesFormat: KotlinBytesFormat, serializer: KSerializer<T>): T {
+    public fun <T> value(kotlinBytesFormat: KotlinBytesFormat, serializer: KSerializer<T>): T {
         if (hasDirect) return direct as T
         this.kotlinBytesFormat = kotlinBytesFormat
         val d = serializedBytes!!.let { kotlinBytesFormat.decodeFromByteArray(serializer, it) }

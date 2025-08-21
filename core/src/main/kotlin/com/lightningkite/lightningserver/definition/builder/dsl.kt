@@ -14,6 +14,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.plus
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.serialization.MediaTypeCoder
 import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
@@ -161,4 +162,7 @@ public infix fun PathSpec0.bind(import: ServerDefinition): Locationed<PathSpec0,
     return Locationed(this, import)
 }
 
-
+public fun ServerBuilder.register(coder: MediaTypeCoder) {
+    mediaTypeDecoders.register(coder)
+    mediaTypeEncoders.register(coder)
+}

@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.builder.setting
+import com.lightningkite.lightningserver.definition.exceptionSettings
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.definition.metricsSettings
 import com.lightningkite.lightningserver.runtime.*
@@ -25,7 +26,11 @@ class SettingsLoaderFileTest {
         val processed = setting("processed", "x", getter = { it.repeat(2) })
         val complex = setting("complex", Complex("asdf", 42))
     }
-    val allSettings = (Server.settings + listOf<ServerSetting<*, *>>(generalSettings, metricsSettings, com.lightningkite.lightningserver.definition.secretBasis)).toSet()
+    val allSettings = (Server.settings + listOf<ServerSetting<*, *>>(
+        generalSettings,
+        metricsSettings,
+        com.lightningkite.lightningserver.definition.secretBasis,
+    )).toSet()
 
     @Test
     fun testPropertiesComplete() {

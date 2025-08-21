@@ -12,16 +12,16 @@ import kotlinx.serialization.Serializable
 
 
 @Serializable
-internal data class QueryParamWebSocketHandlerData(
+public data class QueryParamWebSocketHandlerData(
     val request: WebSocketConnectRequest<*>,
     val underlyingData: AnonType
 )
 
-internal class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryParamWebSocketHandlerData> {
+public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryParamWebSocketHandlerData> {
     override val storageSerializer: KSerializer<QueryParamWebSocketHandlerData> =
         QueryParamWebSocketHandlerData.serializer()
 
-    class ConnectionWrapped<T>(
+    private class ConnectionWrapped<T>(
         val wrapped: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>,
         val handler: WebSocketHandler<PathSpec, T>
     ) : WebSocketConnection<PathSpec, T>, ServerRuntime by wrapped {
@@ -85,7 +85,7 @@ internal class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryP
         }
     }
 
-    suspend inline fun <T> WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>.withWrapped(
+    private suspend inline fun <T> WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>.withWrapped(
         handler: WebSocketHandler<PathSpec, T>,
         action: suspend (ConnectionWrapped<T>) -> Unit
     ): WebSocketConnection<PathSpec, T> {

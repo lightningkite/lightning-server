@@ -43,6 +43,7 @@ private fun serve() {
 
 fun main(vararg args: String) {
     val server = Server.build()
+    println("Coders: ${server.mediaTypeEncoders.entries.joinToString { "${it.key}: ${it.value}" }}")
     assert(server.mediaTypeEncoders.isNotEmpty())
     KtorEngine(server).apply {
         println(server.endpoints.entries.joinToString("\n"))

@@ -2,6 +2,8 @@ package com.lightningkite.lightningserver
 
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpStatus
+import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.pathing.RawPath
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -10,7 +12,9 @@ public data class LSError(
     val detail: String = "",
     val message: String = "",
     val data: String = "",
-)
+    val stackTrace: String? = null,
+) {
+}
 
 
 /**
@@ -24,7 +28,6 @@ public open class HttpStatusException(
     public val detail: String = "",
     message: String = "",
     public val data: String = "",
-    public val headers: HttpHeaders = HttpHeaders.EMPTY,
     cause: Throwable? = null
 ) : Exception(message, cause) {
     public constructor(lsError: LSError): this(
@@ -46,13 +49,12 @@ public open class HttpStatusException(
 /**
  * An HttpStatusException that results in a status code of 400 to be returned to the client
  */
-public class BadRequestException(
+public open class BadRequestException(
     detail: String = "",
     message: String = "",
     data: String = "",
     cause: Throwable? = null,
-    headers: HttpHeaders = HttpHeaders.EMPTY
-) : HttpStatusException(HttpStatus.BadRequest, detail, message, data, headers, cause)
+) : HttpStatusException(HttpStatus.BadRequest, detail, message, data, cause)
 
 /**
  * A Helper function for creating an instance of BadRequestException.
@@ -63,13 +65,12 @@ public fun BadRequestException(message: String): BadRequestException = BadReques
 /**
  * An HttpStatusException that results in a status code of 401 to be returned to the client
  */
-public class UnauthorizedException(
+public open class UnauthorizedException(
     detail: String = "",
     message: String = "",
     data: String = "",
     cause: Throwable? = null,
-    headers: HttpHeaders = HttpHeaders.EMPTY
-) : HttpStatusException(HttpStatus.Unauthorized, detail, message, data, headers, cause)
+) : HttpStatusException(HttpStatus.Unauthorized, detail, message, data, cause)
 
 /**
  * A Helper function for creating an instance of UnauthorizedException.
@@ -80,13 +81,12 @@ public fun UnauthorizedException(message: String): UnauthorizedException =
 /**
  * An HttpStatusException that results in a status code of 403 to be returned to the client
  */
-public class ForbiddenException(
+public open class ForbiddenException(
     detail: String = "",
     message: String = "",
     data: String = "",
     cause: Throwable? = null,
-    headers: HttpHeaders = HttpHeaders.EMPTY
-) : HttpStatusException(HttpStatus.Forbidden, detail, message, data, headers, cause)
+) : HttpStatusException(HttpStatus.Forbidden, detail, message, data, cause)
 
 /**
  * A Helper function for creating an instance of ForbiddenException.
@@ -96,15 +96,22 @@ public fun ForbiddenException(message: String): ForbiddenException = ForbiddenEx
 /**
  * An HttpStatusException that results in a status code of 404 to be returned to the client
  */
-public class NotFoundException(
+public open class NotFoundException(
     detail: String = "",
     message: String = "",
     data: String = "",
     cause: Throwable? = null,
-    headers: HttpHeaders = HttpHeaders.EMPTY
-) : HttpStatusException(HttpStatus.NotFound, detail, message, data, headers, cause)
+) : HttpStatusException(HttpStatus.NotFound, detail, message, data, cause)
 
 /**
  * A Helper function for creating an instance of NotFoundException.
  */
 public fun NotFoundException(message: String): NotFoundException = NotFoundException(message = message, detail = "")
+
+public class RouteNotFoundException(
+    public val requestedRoute: RawPath<*>
+): NotFoundException(
+    detail = "not-found",
+    message = "No route matching ${requestedRoute} was found.",
+    data = requestedRoute.toString(),
+)

@@ -1,10 +1,16 @@
 package com.lightningkite.lightningserver.definition
 
+import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpecMap
 import com.lightningkite.lightningserver.pathing.MutablePathSpecMap
 import com.lightningkite.lightningserver.pathing.plus
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.http.DefaultExceptionHttpHandler
+import com.lightningkite.lightningserver.http.ExceptionHttpHandler
+import com.lightningkite.lightningserver.http.HttpHandler
+import com.lightningkite.lightningserver.serialization.MediaTypeDecoder
+import com.lightningkite.lightningserver.serialization.MediaTypeEncoder
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.plus
@@ -81,9 +87,17 @@ import kotlinx.serialization.modules.plus
 public data class ServerDefinition(
     public val internalSerializersModule: SerializersModule,
     public val externalSerializersModule: SerializersModule,
+
     public val endpoints: PathSpecMap<ServerPathEndpoints>,
-    public val schedules: Map<PathSpec0, ScheduledTask>,
+    public val exceptionHandler: ExceptionHttpHandler = DefaultExceptionHttpHandler,
+
+    public val startupTasks: Map<PathSpec0, StartupTask>,
     public val tasks: Map<PathSpec0, Task<*>>,
+    public val schedules: Map<PathSpec0, ScheduledTask>,
+
+    public val mediaTypeDecoders: Map<MediaType, List<MediaTypeDecoder>>,
+    public val mediaTypeEncoders: Map<MediaType, List<MediaTypeEncoder>>,
+
     public val webSocketTopics: PathSpecMap<WebSocketTopic<*, *>>,
     public val settings: List<ServerSetting<*, *>>,
     public override val extensions: Extensions,
@@ -287,7 +301,11 @@ public data class ModularServerDefinition(
             settings = (definition.settings + flattenedModules.values.flatMap { it.settings }).distinctBy { it.settingName },
             extensions = definition.extensions.toMutableExtensions().apply {
                 flattenedModules.values.forEach { include(it.extensions) }
-            }
+            },
+            mediaTypeDecoders = definition.mediaTypeDecoders,
+            mediaTypeEncoders = definition.mediaTypeEncoders,
+            exceptionHandler = definition.exceptionHandler,
+            startupTasks = flatten { it.startupTasks },
         )
     }
 }
