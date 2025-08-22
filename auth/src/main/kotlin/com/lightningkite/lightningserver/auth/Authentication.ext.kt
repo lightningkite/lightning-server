@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.auth
 
+import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.builder.ListRegistry
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -14,6 +15,24 @@ import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.serializerOrContextual
 import java.lang.IllegalArgumentException
 import kotlin.time.Instant
+
+context(server: ServerRuntime)
+public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
+    principalType: PrincipalType<SUBJECT, ID>,
+    id: ID,
+    issuedAt: Instant = server.clock.now(),
+    limitTo: RequestPredicates? = null,
+    forbid: RequestPredicates? = null,
+    fromMasquerade: Authentication<*, *>? = null,
+    cache: SerializableCache? = null
+): Authentication<SUBJECT, ID> = Authentication(server, principalType, id, issuedAt, limitTo, forbid, fromMasquerade, cache)
+
+public typealias AuthCacheKey<SUBJECT, ID, T> = SerializableCache.CalculatingKey<Authentication<SUBJECT, ID>, T>
+
+context(_: ServerRuntime)
+public suspend operator fun <SUBJECT : HasId<ID>, ID : Comparable<ID>, T> Authentication<SUBJECT, ID>.get(
+    key: AuthCacheKey<SUBJECT, ID, T>
+): T = cache.get(key, this)
 
 public val ServerBuilder.authReaders: ListRegistry<Authentication.Reader<*, *>> by Authentication.Reader
 

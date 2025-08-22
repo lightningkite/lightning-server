@@ -6,7 +6,6 @@ import com.lightningkite.lightningserver.ForbiddenException
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.UnauthorizedException
-import com.lightningkite.lightningserver.data.Expiring
 import com.lightningkite.lightningserver.data.getOrPut
 import com.lightningkite.lightningserver.definition.ListRegistryExtension
 import com.lightningkite.lightningserver.http.HttpHeader
@@ -43,7 +42,7 @@ public class Authentication<SUBJECT : HasId<ID>, ID : Comparable<ID>> private co
         limitTo: RequestPredicates? = null,
         forbid: RequestPredicates? = null,
         fromMasquerade: Authentication<*, *>? = null,
-        precache: SerializableCache? = null
+        cache: SerializableCache? = null
     ) : this(
         principalName = principalType.name,
         rawId = server.internalSerialization.json.encodeToString(principalType.idSerializer, id),
@@ -51,7 +50,7 @@ public class Authentication<SUBJECT : HasId<ID>, ID : Comparable<ID>> private co
         limitTo,
         forbid,
         fromMasquerade,
-        precache ?: SerializableCache()
+        cache ?: SerializableCache()
     ) {
         cachedType = principalType
         cachedId = id
@@ -96,6 +95,10 @@ public class Authentication<SUBJECT : HasId<ID>, ID : Comparable<ID>> private co
     context(server: ServerRuntime)
     public suspend fun fetch(): SUBJECT = cache.getOrPut(subjectCacheKey) { principalType.fetch(id) }
 
+    context(server: ServerRuntime)
+    public suspend fun precache(keys: Iterable<AuthCacheKey<SUBJECT, ID, *>>) {
+        for (key in keys) cache.get(key, this)
+    }
 
     override fun toString(): String = listOfNotNull(
         fromMasquerade?.let { "$it masquerading as" },

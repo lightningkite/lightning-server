@@ -6,24 +6,21 @@ import dev.whyoleg.cryptography.algorithms.SHA512
 import dev.whyoleg.cryptography.materials.key.Key
 import dev.whyoleg.cryptography.materials.key.KeyDecoder
 import dev.whyoleg.cryptography.materials.key.KeyFormat
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlin.io.encoding.Base64
 
 /**
  * A secure basis for cryptographic operations.
  * This class provides a foundation for cryptographic operations like hashing and encryption.
- *
- * Note: This implementation currently uses JVM-specific cryptography libraries.
- * For multiplatform support, this should be refactored to use the dev.whyoleg.cryptography
- * libraries that are already included in the project dependencies.
- *
- * TODO: Implement multiplatform support using dev.whyoleg.cryptography:
- * 1. Create expect/actual declarations for platform-specific implementations
- * 2. Implement JVM version using either JVM crypto or dev.whyoleg.cryptography
- * 3. Implement JS/Native versions using dev.whyoleg.cryptography
  */
-@Serializable
+@Serializable(SecretBasisSerializer::class)
 public data class SecretBasis(public val string: String) {
     public companion object {
         public const val BITS: Int = 512
@@ -104,4 +101,11 @@ public data class SecretBasis(public val string: String) {
         format: KF,
         variant: String
     ): K = decoder.decodeFromByteArrayBlocking(format, deriveBlocking(variant))
+}
+
+public object SecretBasisSerializer : KSerializer<SecretBasis> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("com.lightningkite.lightningserver.encryption.SecretBasis", PrimitiveKind.STRING)
+    override fun deserialize(decoder: Decoder): SecretBasis = SecretBasis(decoder.decodeString())
+    override fun serialize(encoder: Encoder, value: SecretBasis) { encoder.encodeString(value.string) }
 }

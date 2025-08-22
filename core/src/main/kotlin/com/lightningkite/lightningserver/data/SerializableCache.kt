@@ -42,7 +42,7 @@ public class SerializableCache private constructor(
         private set
 
     context(server: ServerRuntime)
-    private fun <T> retrieve(key: Key<T>): T? {
+    private fun <T> retrieve(key: Key<T>): Expiring<T>? {
         cache[key.id]?.let {
             if (it.key !== key) throw IllegalStateException("KeyedSerializableCache encountered keys with duplicate ids. ID: ${key.id}")
         }
@@ -50,7 +50,7 @@ public class SerializableCache private constructor(
         @Suppress("UNCHECKED_CAST")
         cache[key.id]?.let {
             return if (it.result.expired) null
-            else it.result.value as T
+            else it.result as Expiring<T>
         }
 
         serialized[key.id]
@@ -58,7 +58,7 @@ public class SerializableCache private constructor(
             ?.takeUnless { it.expired }
             ?.let {
                 cache[key.id] = KeyAndResult(key, it)
-                return it.value
+                return it
             }
 
         return null
@@ -80,12 +80,14 @@ public class SerializableCache private constructor(
     public operator fun <T> set(key: Key<T>, value: T): Unit = cache(key, value)
 
     context(server: ServerRuntime)
-    public operator fun <T> get(key: Key<T>): T? = retrieve(key)
+    public operator fun <T> get(key: Key<T>): T? = retrieve(key)?.value
 
     context(server: ServerRuntime)
     public suspend fun <INPUT, T> get(key: CalculatingKey<INPUT, T>, input: INPUT): T =
-        retrieve(key) ?: key.calculate(input).also { cache(key, it) }
+        retrieve(key)?.value ?: key.calculate(input).also { cache(key, it) }
 
+    context(server: ServerRuntime)
+    public fun containsKey(key: Key<*>): Boolean = retrieve(key) != null
 
     internal val bytes: Map<String, ByteArray> get() = serialized.toMap()
 

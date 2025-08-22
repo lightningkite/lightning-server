@@ -41,6 +41,9 @@ public interface ServerSetting<SETTING, RESULT> : Runtime<RESULT> {
     override fun invoke(): RESULT = server.settings.get(this, server)
 }
 
+@JvmInline
+private value class NullWrapper<T>(val value: T)
+
 private data class BasicServerSetting<SETTING, RESULT>(
     override val settingName: String,
     override val default: SETTING,
@@ -48,8 +51,15 @@ private data class BasicServerSetting<SETTING, RESULT>(
     override val optional: Boolean,
     private val getter: SettingContext.(SETTING) -> RESULT
 ) : ServerSetting<SETTING, RESULT> {
+    private var cached: NullWrapper<RESULT>? = null
+
     context(settings: SettingContext)
-    override fun get(setting: SETTING): RESULT = getter(settings, setting)
+    override fun get(setting: SETTING): RESULT =
+        cached?.value ?: getter(settings, setting).also { cached = NullWrapper(it) }
+
+    context(server: ServerRuntime)
+    override fun invoke(): RESULT =
+        cached?.value ?: server.settings.get(this, server)
 }
 
 public fun <SETTING, RESULT> ServerSetting(
@@ -74,7 +84,13 @@ private data class BasicDirectServerSetting<SETTING>(
     override val default: SETTING,
     override val serializer: KSerializer<SETTING>,
     override val optional: Boolean,
-) : ServerSetting.Direct<SETTING>
+) : ServerSetting.Direct<SETTING> {
+    private var cached: NullWrapper<SETTING>? = null
+
+    context(server: ServerRuntime)
+    override fun invoke(): SETTING =
+        cached?.value ?: server.settings.get(this, server).also { cached = NullWrapper(it) }
+}
 
 public fun <SETTING> ServerSetting(
     name: String,

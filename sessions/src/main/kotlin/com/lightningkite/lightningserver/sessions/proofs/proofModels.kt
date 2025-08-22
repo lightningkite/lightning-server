@@ -1,4 +1,4 @@
-package com.lightningkite.lightningserver.sessions
+package com.lightningkite.lightningserver.sessions.proofs
 
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration

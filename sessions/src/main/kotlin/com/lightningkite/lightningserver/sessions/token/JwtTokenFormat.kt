@@ -4,16 +4,21 @@ import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.RequestPredicates
 import com.lightningkite.lightningserver.data.SerializableCache
+import com.lightningkite.lightningserver.data.set
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.generalSettings
+import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.encryption.SecureHasher
+import com.lightningkite.lightningserver.encryption.hasher
+import com.lightningkite.lightningserver.encryption.sign
+import com.lightningkite.lightningserver.encryption.verify
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
-import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.sessions.Authentication
+import com.lightningkite.lightningserver.sessions.Session
+import com.lightningkite.lightningserver.sessions.sessionId
 import com.lightningkite.services.database.HasId
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.io.encoding.Base64
 import kotlin.time.Duration
@@ -21,7 +26,7 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 public class JwtTokenFormat(
-    public val hasher: RuntimeDeferred<SecureHasher.WithId>,
+    public val hasher: RuntimeDeferred<SecureHasher.WithId> = secretBasis.hasher("jwt"),
     public val expiration: Duration = 5.minutes,
     public val issuerOverride: String? = null,
     public val audienceOverride: String? = null,
@@ -33,11 +38,11 @@ public class JwtTokenFormat(
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> create(
         handler: PrincipalType<SUBJECT, ID>,
         auth: Authentication<SUBJECT, ID>
-    ): String {
-        return hasher.await().signJwt(
+    ): String =
+        hasher.await().signJwt(
             JwtClaims(
                 iss = issuer(),
-//                sid = auth.sessionId,
+                sid = auth.sessionId,
                 sub = "${handler.name}|${server.internalSerialization.json.encodeToString(handler.idSerializer, auth.id)}",
                 aud = audience(),
                 exp = now().plus(expiration).epochSeconds,
@@ -48,7 +53,6 @@ public class JwtTokenFormat(
                 cache = server.internalSerialization.json.encodeToString(auth.cache)
             )
         )
-    }
 
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> read(
@@ -61,17 +65,16 @@ public class JwtTokenFormat(
         val rawSub = claims.sub!!
         val sub = if(rawSub.startsWith(prefix)) rawSub.removePrefix(prefix) else return null
 
-        if(now() > Instant.fromEpochSeconds(claims.exp)) throw TokenException("Token has expired")
-        if(claims.nbf?.let { now() < Instant.fromEpochSeconds(it) } == true) throw TokenException("Token not valid yet")
+        if (now() > Instant.fromEpochSeconds(claims.exp)) throw TokenException("Token has expired")
+        if (claims.nbf?.let { now() < Instant.fromEpochSeconds(it) } == true) throw TokenException("Token not valid yet")
 
-        return Authentication<SUBJECT, ID>(
-            server,
+        return Authentication(
             principalType = handler,
             id = server.internalSerialization.json.decodeFromString(handler.idSerializer, sub),
+            sessionId = claims.sid,
             issuedAt = Instant.fromEpochSeconds(claims.iat),
             limitTo = claims.scope?.let { RequestPredicates(scopes = it.split(' ').toSet()) },
-            // TODO: SessionId, Third Party
-            precache = claims.cache?.let { server.internalSerialization.json.decodeFromString<SerializableCache>(it) }
+            cache = claims.cache?.let { server.internalSerialization.json.decodeFromString<SerializableCache>(it) }
         )
     }
 

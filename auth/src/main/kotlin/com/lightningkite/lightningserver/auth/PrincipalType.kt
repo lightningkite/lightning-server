@@ -1,8 +1,8 @@
 package com.lightningkite.lightningserver.auth
 
-import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.definition.MapRegistryExtension
 import com.lightningkite.lightningserver.definition.ServerDefinition
+import com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationError
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.getValue
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -47,7 +47,7 @@ public interface PrincipalType<SUBJECT : HasId<ID>, ID : Comparable<ID>> {
         into: Authentication<SUBJECT, ID>,
     ): Boolean = false
 
-    public val knownCacheTypes: List<SerializableCache.CalculatingKey<Authentication<SUBJECT, ID>, *>>
+    public val precache: List<AuthCacheKey<SUBJECT, ID, *>>
 
     public companion object;
 }
@@ -55,7 +55,12 @@ public interface PrincipalType<SUBJECT : HasId<ID>, ID : Comparable<ID>> {
 private object PrincipalTypeRegistry : MapRegistryExtension<String, PrincipalType<*, *>>
 
 public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> ServerBuilder.register(type: PrincipalType<SUBJECT, ID>) {
-    extensions[PrincipalTypeRegistry].register(type.name, type)
+    val registry = extensions[PrincipalTypeRegistry]
+    registry[type.name]?.let {
+        if (it.subjectSerializer != type.subjectSerializer) throw DuplicateRegistrationError("Encountered two PrincipalTypes with the same name: ${type.name}", it, type)
+        return
+    }
+    registry.register(type.name, type)
 }
 
 public val ServerDefinition.principalTypes: Map<String, PrincipalType<*, *>> by PrincipalTypeRegistry

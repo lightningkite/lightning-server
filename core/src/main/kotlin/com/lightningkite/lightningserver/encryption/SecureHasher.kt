@@ -14,6 +14,7 @@ import dev.whyoleg.cryptography.algorithms.SHA384
 import dev.whyoleg.cryptography.algorithms.SHA512
 import dev.whyoleg.cryptography.operations.SignatureGenerator
 import dev.whyoleg.cryptography.operations.SignatureVerifier
+import kotlin.io.encoding.Base64
 
 public interface SecureHasher {
     public val generator: SignatureGenerator
@@ -68,3 +69,6 @@ public fun ECDSA.KeyPair.hasher(
 
 public fun RSA.PSS.KeyPair.hasher(): SecureHasher = SecureHasher.RSA_PSS(this)
 public fun RSA.PKCS1.KeyPair.hasher(): SecureHasher = SecureHasher.RSA_PKCS1(this)
+
+public suspend fun SecureHasher.sign(string: String): String = Base64.encode(sign(string.encodeToByteArray()))
+public suspend fun SecureHasher.verify(string: String, signature: String): Boolean = verify(string.encodeToByteArray(), signature.encodeToByteArray())

@@ -11,7 +11,7 @@ import kotlinx.serialization.KSerializer
 
 public fun <PATH: PathSpec, USER: HasId<ID>?, ID : Comparable<ID>, INPUT, OUTPUT> ApiHttpHandler(
     summary: String,
-    description: String,
+    description: String = "",
     inputType: KSerializer<INPUT>,
     outputType: KSerializer<OUTPUT>,
     authOptions: AuthOptions<USER, ID>,
@@ -36,7 +36,7 @@ public fun <PATH: PathSpec, USER: HasId<ID>?, ID : Comparable<ID>, INPUT, OUTPUT
 
 public inline fun <PATH: PathSpec, USER: HasId<ID>?, ID : Comparable<ID>, reified INPUT, reified OUTPUT> ApiHttpHandler(
     summary: String,
-    description: String,
+    description: String = "",
     authOptions: AuthOptions<USER, ID>,
     successCode: HttpStatus = HttpStatus.OK,
     errorCases: List<LSError> = emptyList(),
