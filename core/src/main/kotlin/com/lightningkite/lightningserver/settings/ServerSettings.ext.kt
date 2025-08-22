@@ -1,6 +1,8 @@
 package com.lightningkite.lightningserver.settings
 
 import com.lightningkite.lightningserver.definition.ServerSetting
+import com.lightningkite.lightningserver.logger
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.StringFormat
@@ -87,4 +89,24 @@ public fun ServerSettings.loadFromFile(
         throw IncompleteSettingsException(missingKeys, suggestedFile)
     }
     this.serializable.putAll(loaded)
+}
+
+context(server: ServerRuntime)
+public fun ServerSettings.preload() {
+    val errors = mutableMapOf<ServerSetting<*, *>, Exception>()
+    serializable.keys.forEach { setting ->
+        try {
+            get(setting, server)
+        } catch (e: Exception) {
+            errors[setting] = e
+        }
+    }
+    if (errors.isNotEmpty()) {
+        errors.forEach { (setting, error) ->
+            server.logger.error { "Invalid value for ${setting.settingName}" }
+            server.logger.error { error.stackTraceToString() }
+        }
+        throw Error("Failed to preload all settings")
+    }
+
 }

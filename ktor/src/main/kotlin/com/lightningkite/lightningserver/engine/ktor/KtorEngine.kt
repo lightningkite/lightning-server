@@ -58,7 +58,9 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
     private fun Application.adapt() {
         install(WebSockets)
 
-        settings.get(ktorRunConfig, this@KtorEngine).cors
+        val runConfig = ktorRunConfig()
+
+        runConfig.cors
             ?.also { corsSettings -> install(getLSCorsPlugin(corsSettings)) }
 
         routing {
@@ -70,7 +72,7 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
                         headers = call.request.headers.adapt(),
                         domain = call.request.origin.serverHost,
                         protocol = call.request.origin.scheme,
-                        sourceIp = settings.get(ktorRunConfig, this@KtorEngine).realIpHeader?.let {
+                        sourceIp = runConfig.realIpHeader?.let {
                             call.request.header(it)
                                 ?: throw Exception("Real IP address header for proxy '$it' was missing from the request.")
                         } ?: call.request.origin.remoteAddress,
@@ -137,7 +139,7 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
                     headers = call.request.headers.adapt(),
                     domain = call.request.origin.serverHost,
                     protocol = call.request.origin.scheme,
-                    sourceIp = settings.get(ktorRunConfig, this@KtorEngine).realIpHeader?.let {
+                    sourceIp = runConfig.realIpHeader?.let {
                         call.request.header(it)
                             ?: throw Exception("Real IP address header for proxy '$it' was missing from the request.")
                     } ?: call.request.origin.remoteAddress,
@@ -225,8 +227,8 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
         startSchedules()
         embeddedServer(
             factory = factory,
-            port = settings.get(ktorRunConfig, this).port,
-            host = settings.get(ktorRunConfig, this).host,
+            port = ktorRunConfig().port,
+            host = ktorRunConfig().host,
             module = { adapt() },
             watchPaths = listOf()
         ).start(wait = true)

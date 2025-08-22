@@ -1,21 +1,13 @@
 package com.lightningkite.lightningserver.engine.local
 
 import com.lightningkite.lightningserver.data.Schedule
-import com.lightningkite.lightningserver.definition.Task
-import com.lightningkite.lightningserver.definition.Locationed
-import com.lightningkite.lightningserver.definition.ServerDefinition
-import com.lightningkite.lightningserver.definition.ServerSetting
-import com.lightningkite.lightningserver.definition.generalSettings
-import com.lightningkite.lightningserver.definition.metricsSettings
-import com.lightningkite.lightningserver.definition.secretBasis
+import com.lightningkite.lightningserver.data.plus
+import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.path
-import com.lightningkite.lightningserver.data.plus
-import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
 import com.lightningkite.lightningserver.runtime.executeWithMetrics
-import com.lightningkite.lightningserver.runtime.handleWithMetrics
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
@@ -25,46 +17,51 @@ import com.lightningkite.services.cache.set
 import com.lightningkite.services.cache.setIfNotExists
 import com.lightningkite.services.pubsub.PubSub
 import com.lightningkite.services.pubsub.PubSubChannel
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.job
-import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
-import kotlinx.datetime.DatePeriod
-import kotlinx.datetime.LocalDateTime
-import kotlinx.datetime.plus
-import kotlinx.datetime.toInstant
-import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.*
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
-public val enginePubSub: ServerSetting<PubSub.Settings, PubSub> = ServerSetting("pubSub", PubSub.Settings(), PubSub.Settings.serializer())
-public val engineCache: ServerSetting<Cache.Settings, Cache> = ServerSetting("cache", Cache.Settings(), Cache.Settings.serializer())
+public val enginePubSub: ServerSetting<PubSub.Settings, PubSub> =
+    ServerSetting("pubSub", PubSub.Settings(), PubSub.Settings.serializer())
+public val engineCache: ServerSetting<Cache.Settings, Cache> =
+    ServerSetting("cache", Cache.Settings(), Cache.Settings.serializer())
 
-public abstract class LocalEngine(server: ServerDefinition): ServerRuntimeBase(server) {
+public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(server) {
     protected open val scope: CoroutineScope = GlobalScope
 
-    override val settings: ServerSettings = ServerSettings(server.settings.plus(listOf(
-        generalSettings,
-        metricsSettings,
-        secretBasis,
-        enginePubSub,
-        engineCache,
-    )).toSet())
+    override val settings: ServerSettings = ServerSettings(
+        server.settings.plus(
+            listOf(
+                generalSettings,
+                metricsSettings,
+                secretBasis,
+                enginePubSub,
+                engineCache,
+            )
+        ).toSet()
+    )
 
-    public val pubSub: PubSub by lazy { settings.get(enginePubSub, this) }
-    public val cache: Cache by lazy { settings.get(engineCache, this) }
+    public val pubSub: PubSub by lazy { enginePubSub() }
+    public val cache: Cache by lazy { engineCache() }
 
-    protected fun <PATH: PathSpec, T> pubSubChannel(event: WebSocketSubscriptionMessage<PATH, T>): PubSubChannel<T> = pubSub.get(event.path(internalSerialization.stringArrayFormat), event.topic.type)
-    protected fun <PATH: PathSpec, T> pubSubChannel(event: WebSocketSubscriptionRequest<PATH, T>): PubSubChannel<T> = pubSub.get(event.path(internalSerialization.stringArrayFormat), event.topic.type)
+    protected fun <PATH : PathSpec, T> pubSubChannel(event: WebSocketSubscriptionMessage<PATH, T>): PubSubChannel<T> =
+        pubSub.get(event.path(internalSerialization.stringArrayFormat), event.topic.type)
+
+    protected fun <PATH : PathSpec, T> pubSubChannel(event: WebSocketSubscriptionRequest<PATH, T>): PubSubChannel<T> =
+        pubSub.get(event.path(internalSerialization.stringArrayFormat), event.topic.type)
+
     override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>) {
         pubSubChannel(event).emit(event.value)
     }
-    protected suspend fun <PATH: PathSpec, T> webSocketEventCollect(event: WebSocketSubscriptionRequest<PATH, T>, collector: suspend (T) -> Unit) {
+
+    protected suspend fun <PATH : PathSpec, T> webSocketEventCollect(
+        event: WebSocketSubscriptionRequest<PATH, T>,
+        collector: suspend (T) -> Unit,
+    ) {
         pubSubChannel(event).collect(collector)
     }
 
@@ -72,7 +69,7 @@ public abstract class LocalEngine(server: ServerDefinition): ServerRuntimeBase(s
         scope.launch {
             try {
                 item.executeWithMetrics(location, input)
-            } catch(e: Exception) {
+            } catch (e: Exception) {
                 /*squish; already reported*/
             }
         }
@@ -123,7 +120,7 @@ public abstract class LocalEngine(server: ServerDefinition): ServerRuntimeBase(s
                         cache.set("$name-lock", true, 1.hours)
                         try {
                             it.executeWithMetrics(location)
-                        } catch(e: Exception) {
+                        } catch (e: Exception) {
                             /*squish; already reported*/
                         }
                         cache.set<Long>("$name-nextRun", nextRun)

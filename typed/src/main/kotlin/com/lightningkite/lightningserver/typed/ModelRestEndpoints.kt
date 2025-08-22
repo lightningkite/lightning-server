@@ -1,0 +1,542 @@
+package com.lightningkite.lightningserver.typed
+
+import com.lightningkite.lightningserver.BadRequestException
+import com.lightningkite.lightningserver.ForbiddenException
+import com.lightningkite.lightningserver.LSError
+import com.lightningkite.lightningserver.NotFoundException
+import com.lightningkite.lightningserver.definition.Locationed
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.definition.builder.bind
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.pathing.PathSpec.Segment
+import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.pathing.PathSpec1
+import com.lightningkite.lightningserver.pathing.first
+import com.lightningkite.lightningserver.runtime.test.serverRuntime
+import com.lightningkite.lightningserver.sdk.titleCase
+import com.lightningkite.services.database.*
+import kotlinx.coroutines.flow.toList
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.nullable
+import kotlinx.serialization.builtins.serializer
+
+public class ModelRestEndpoints<USER : HasId<UID>?, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>>(
+    public val info: ModelInfo<USER, UID, T, ID>,
+) : ServerBuilder() {
+
+
+    private val detailPath = path.arg(Segment.Wildcard("id", info.idSerializer))
+    private val bulkPath = path.path("bulk")
+
+
+    public val permissions: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, Unit, ModelPermissions<T>>> =
+        path.path("_permissions_").get bind ApiHttpHandler(
+            summary = "Permissions",
+            description = "Returns the user's permissions for this collection.",
+            inputType = Unit.serializer(),
+            outputType = ModelPermissions.serializer(info.serializer),
+            authOptions = info.authOptions,
+            errorCases = emptyList(),
+            examples = emptyList(),
+            handler = { _: Unit ->
+                info.permissions(this)
+            }
+        )
+
+
+    public val list: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, Query<T>, List<T>>> =
+        path.get bind ApiHttpHandler(
+            summary = "List",
+            description = "Gets a list of ${info.collectionName}s.",
+            inputType = Query.serializer(info.serializer),
+            outputType = ListSerializer(info.serializer),
+            authOptions = info.authOptions,
+            errorCases = emptyList(),
+            examples = emptyList(),
+            handler = { input: Query<T> ->
+                info.collection(this)
+                    .query(input)
+                    .toList()
+            }
+        )
+
+
+    public val query: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, Query<T>, List<T>>> =
+        path.path("query").post bind ApiHttpHandler(
+            summary = "Query",
+            description = "Gets a list of ${info.collectionName}s that match the given query.",
+            inputType = Query.serializer(info.serializer),
+            outputType = ListSerializer(info.serializer),
+            authOptions = info.authOptions,
+            errorCases = emptyList(),
+            examples = emptyList(),
+            handler = { input: Query<T> ->
+                info.collection(this)
+                    .query(input)
+                    .toList()
+            }
+        )
+
+
+    public val queryPartial: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, QueryPartial<T>, List<Partial<T>>>> =
+        path.path("query-partial").post bind ApiHttpHandler(
+            summary = "QueryPartial",
+            description = "Gets parts of ${info.collectionName}s that match the given query.",
+            inputType = QueryPartial.serializer(info.serializer),
+            outputType = ListSerializer(PartialSerializer(info.serializer)),
+            authOptions = info.authOptions,
+            errorCases = emptyList(),
+            examples = emptyList(),
+            handler = { input: QueryPartial<T> ->
+                info.collection(this)
+                    .queryPartial(input)
+                    .toList()
+            }
+        )
+
+
+    public val detail: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, UID, Unit, T>> =
+        detailPath.get bind ApiHttpHandler(
+            summary = "Query",
+            description = "Gets a list of ${info.collectionName}s that match the given query.",
+            inputType = Unit.serializer(),
+            outputType = info.serializer,
+            authOptions = info.authOptions,
+            errorCases = listOf(
+                LSError(
+                    http = HttpStatus.NotFound.code,
+                    detail = "",
+                    message = "There was no known object by that ID.",
+                    data = ""
+                )
+            ),
+            examples = emptyList(),
+            handler = { _: Unit ->
+                info.collection(this)
+                    .get(this.first)
+                    ?: throw NotFoundException()
+            }
+        )
+
+
+    public val insertBulk: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, List<T>, List<T>>> =
+        bulkPath.post bind ApiHttpHandler(
+            summary = "Insert Bulk",
+            description = "Creates multiple ${info.collectionName}s at the same time.",
+            inputType = ListSerializer(info.serializer),
+            outputType = ListSerializer(info.serializer),
+            authOptions = info.authOptions,
+            errorCases = emptyList(),
+            examples = emptyList(),
+            handler = { values: List<T> ->
+                try {
+                    info.collection(this)
+                        .insert(values)
+                } catch (e: UniqueViolationException) {
+                    throw BadRequestException(
+                        detail = "unique",
+                        message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists",
+                        cause = e)
+                }
+            }
+        )
+
+
+    public val insert: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, T, T>> =
+        path.post bind ApiHttpHandler(
+            summary = "Insert",
+            description = "Creates a new ${info.collectionName}",
+            inputType = info.serializer,
+            outputType = info.serializer,
+            authOptions = info.authOptions,
+            errorCases = emptyList(),
+            examples = emptyList(),
+            handler = { value: T ->
+                try {
+                    info.collection(this)
+                        .insertOne(value)
+                        ?: throw ForbiddenException("Value was not posted as requested.")
+                } catch (e: UniqueViolationException) {
+                    throw BadRequestException(
+                        detail = "unique",
+                        message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists",
+                        cause = e)
+                }
+            }
+        )
+
+
+    public val upsert: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, UID, T, T>> =
+        detailPath.post bind ApiHttpHandler(
+            summary = "Upsert",
+            description = "Creates or updates a ${info.collectionName}",
+            inputType = info.serializer,
+            outputType = info.serializer,
+            authOptions = info.authOptions,
+            errorCases = emptyList(),
+            examples = emptyList(),
+            handler = { value: T ->
+                try {
+                    info.collection(this)
+                        .upsertOneById(first, value)
+                        .new
+                        ?: throw NotFoundException()
+                } catch (e: UniqueViolationException) {
+                    throw BadRequestException(
+                        detail = "unique",
+                        message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists",
+                        cause = e)
+                }
+            }
+        )
+
+
+    public val bulkReplace: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, List<T>, List<T>>> =
+        bulkPath.put bind ApiHttpHandler(
+            summary = "Bulk Replace",
+            description = "Modifies many ${info.collectionName}s at the same time by ID.",
+            inputType = ListSerializer(info.serializer),
+            outputType = ListSerializer(info.serializer),
+            authOptions = info.authOptions,
+            errorCases = emptyList(),
+            examples = emptyList(),
+            handler = { values: List<T> ->
+                try {
+                    val db = info.collection(this)
+                    values.map { db.replaceOneById(it._id, it) }.mapNotNull { it.new }
+                } catch (e: UniqueViolationException) {
+                    throw BadRequestException(
+                        detail = "unique",
+                        message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists",
+                        cause = e)
+                }
+            }
+        )
+
+
+    public val replace: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, UID, T, T>> =
+        detailPath.put bind ApiHttpHandler(
+            summary = "Replace",
+            description = "Replaces a single ${info.collectionName} by ID.",
+            inputType = info.serializer,
+            outputType = info.serializer,
+            authOptions = info.authOptions,
+            errorCases = emptyList(),
+            examples = emptyList(),
+            handler = { value: T ->
+                try {
+                    info.collection(this)
+                        .replaceOneById(first, value)
+                        .new
+                        ?: throw NotFoundException()
+                } catch (e: UniqueViolationException) {
+                    throw BadRequestException(
+                        detail = "unique",
+                        message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists",
+                        cause = e)
+                }
+            }
+        )
+
+
+    public val bulkModify: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, MassModification<T>, Int>> =
+        bulkPath.patch bind ApiHttpHandler(
+            summary = "Bulk Modify",
+            description = "Modifies many ${info.collectionName}s at the same time.  Returns the number of changed items.",
+            inputType = MassModification.serializer(info.serializer),
+            outputType = Int.serializer(),
+            authOptions = info.authOptions,
+            errorCases = emptyList(),
+            examples = emptyList(),
+            handler = { input: MassModification<T> ->
+                try {
+                    info.collection(this)
+                        .updateManyIgnoringResult(input)
+                } catch (e: UniqueViolationException) {
+                    throw BadRequestException(
+                        detail = "unique",
+                        message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists",
+                        cause = e)
+                }
+            }
+        )
+
+
+    public val modifyWithDiff: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, UID, Modification<T>, EntryChange<T>>> =
+        detailPath.patch bind ApiHttpHandler(
+            summary = "Modify with Diff",
+            description = "Modifies a ${info.collectionName} by ID, returning both the previous value and new value.",
+            inputType = Modification.serializer(info.serializer),
+            outputType = EntryChange.serializer(info.serializer),
+            authOptions = info.authOptions,
+            errorCases = listOf(
+                LSError(
+                    http = HttpStatus.NotFound.code,
+                    detail = "",
+                    message = "There was no known object by that ID.",
+                    data = ""
+                )
+            ),
+            examples = emptyList(),
+            handler = { input: Modification<T> ->
+                try {
+                    info.collection(this)
+                        .updateOneById(first, input)
+                        .also { if (it.old == null && it.new == null) throw NotFoundException() }
+                } catch (e: UniqueViolationException) {
+                    throw BadRequestException(
+                        detail = "unique",
+                        message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists",
+                        cause = e)
+                }
+            }
+        )
+
+
+    public val modify: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, UID, Modification<T>, T>> =
+        detailPath.path("delta").patch bind ApiHttpHandler(
+            summary = "Modify with Diff",
+            description = "Modifies a ${info.collectionName} by ID, returning both the previous value and new value.",
+            inputType = Modification.serializer(info.serializer),
+            outputType = info.serializer,
+            authOptions = info.authOptions,
+            errorCases = listOf(
+                LSError(
+                    http = HttpStatus.NotFound.code,
+                    detail = "",
+                    message = "There was no known object by that ID.",
+                    data = ""
+                )
+            ),
+            examples = emptyList(),
+            handler = { input: Modification<T> ->
+                try {
+                    info.collection(this)
+                        .updateOneById(first, input)
+                        .also { if (it.old == null && it.new == null) throw NotFoundException() }
+                        .new!!
+                } catch (e: UniqueViolationException) {
+                    throw BadRequestException(
+                        detail = "unique",
+                        message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists",
+                        cause = e)
+                }
+            }
+        )
+
+
+    public val modifySimple: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, UID, Partial<T>, T>> =
+        detailPath.path("simplified").patch bind ApiHttpHandler(
+            summary = "Modify with Diff",
+            description = "Modifies a ${info.collectionName} by ID, returning both the previous value and new value.",
+            inputType = Partial.serializer(info.serializer),
+            outputType = info.serializer,
+            authOptions = info.authOptions,
+            errorCases = listOf(
+                LSError(
+                    http = HttpStatus.NotFound.code,
+                    detail = "",
+                    message = "There was no known object by that ID.",
+                    data = ""
+                )
+            ),
+            examples = emptyList(),
+            handler = { input: Partial<T> ->
+                try {
+                    info.collection(this)
+                        .updateOneById(first, input.toModification(info.serializer))
+                        .also { if (it.old == null && it.new == null) throw NotFoundException() }
+                        .new!!
+                } catch (e: UniqueViolationException) {
+                    throw BadRequestException(
+                        detail = "unique",
+                        message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists",
+                        cause = e)
+                }
+            }
+        )
+
+
+    public val bulkDelete: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, Condition<T>, Int>> =
+        path.path("bulk-delete").post bind ApiHttpHandler(
+            summary = "Bulk Delete",
+            description = "Deletes all matching ${info.collectionName}s, returning the number of deleted items.",
+            inputType = Condition.serializer(info.serializer),
+            outputType = Int.serializer(),
+            authOptions = info.authOptions,
+            errorCases = emptyList(),
+            examples = emptyList(),
+            handler = { filter: Condition<T> ->
+                info.collection(this)
+                    .deleteManyIgnoringOld(filter)
+            }
+        )
+
+
+    public val deleteItem: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, UID, Unit, Unit>> =
+        detailPath.delete bind ApiHttpHandler(
+            summary = "Delete",
+            description = "Deletes a ${info.collectionName} by id.",
+            inputType = Unit.serializer(),
+            outputType = Unit.serializer(),
+            authOptions = info.authOptions,
+            errorCases = listOf(
+                LSError(
+                    http = HttpStatus.NotFound.code,
+                    detail = "",
+                    message = "There was no known object by that ID.",
+                    data = ""
+                )
+            ),
+            examples = emptyList(),
+            handler = { _: Unit ->
+                if (!info.collection(this)
+                        .deleteOneById(first)
+                ) {
+                    throw NotFoundException()
+                }
+                Unit
+            }
+        )
+
+
+    public val countGet: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, Condition<T>, Int>> =
+        path.path("count").get bind ApiHttpHandler(
+            summary = "Count",
+            description = "Gets the total number of ${info.collectionName}s matching the given condition.",
+            inputType = Condition.serializer(info.serializer),
+            outputType = Int.serializer(),
+            authOptions = info.authOptions,
+            errorCases = emptyList(),
+            examples = emptyList(),
+            handler = { condition: Condition<T> ->
+                info.collection(this)
+                    .count(condition)
+            }
+        )
+
+
+    public val count: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, Condition<T>, Int>> =
+        path.path("count").post bind ApiHttpHandler(
+            summary = "Count",
+            description = "Gets the total number of ${info.collectionName}s matching the given condition.",
+            inputType = Condition.serializer(info.serializer),
+            outputType = Int.serializer(),
+            authOptions = info.authOptions,
+            errorCases = emptyList(),
+            examples = emptyList(),
+            handler = { condition: Condition<T> ->
+                info.collection(this)
+                    .count(condition)
+            }
+        )
+
+
+    public val groupCount: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, GroupCountQuery<T>, Map<String, Int>>> =
+        path.path("group-count").post bind ApiHttpHandler(
+            summary = "Group Count",
+            description = "Gets the total number of ${info.collectionName}s matching the given condition divided by group.",
+            inputType = GroupCountQuery.serializer(info.serializer),
+            outputType = MapSerializer(String.serializer(), Int.serializer()),
+            authOptions = info.authOptions,
+            errorCases = emptyList(),
+            examples = emptyList(),
+            handler = { condition: GroupCountQuery<T> ->
+                @Suppress("UNCHECKED_CAST")
+                info.collection(this)
+                    .groupCount(condition.condition, condition.groupBy as DataClassPath<T, Any?>)
+                    .mapKeys { it.key.toString() }
+            }
+        )
+
+
+    public val aggregate: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, AggregateQuery<T>, Double?>> =
+        path.path("aggregate").post bind ApiHttpHandler(
+            summary = "Aggregate",
+            description = "Aggregates a property of ${info.collectionName}s matching the given condition.",
+            inputType = AggregateQuery.serializer(info.serializer),
+            outputType = Double.serializer().nullable,
+            authOptions = info.authOptions,
+            errorCases = emptyList(),
+            examples = emptyList(),
+            handler = { condition: AggregateQuery<T> ->
+                @Suppress("UNCHECKED_CAST")
+                info.collection(this)
+                    .aggregate(
+                        condition.aggregate,
+                        condition.condition,
+                        condition.property as DataClassPath<T, Number>
+                    )
+            }
+        )
+
+
+    public val groupAggregate: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, GroupAggregateQuery<T>, Map<String, Double?>>> =
+        path.path("group-aggregate").post bind ApiHttpHandler(
+            summary = "Group Aggregate",
+            description = "Aggregates a property of ${info.collectionName}s matching the given condition divided by group.",
+            inputType = GroupAggregateQuery.serializer(info.serializer),
+            outputType = MapSerializer(String.serializer(), Double.serializer().nullable),
+            authOptions = info.authOptions,
+            errorCases = emptyList(),
+            examples = emptyList(),
+            handler = { condition: GroupAggregateQuery<T> ->
+                @Suppress("UNCHECKED_CAST")
+                info.collection(this)
+                    .groupAggregate(
+                        condition.aggregate,
+                        condition.condition,
+                        condition.groupBy as DataClassPath<T, Any?>,
+                        condition.property as DataClassPath<T, Number>
+                    )
+                    .mapKeys { it.key.toString() }
+            }
+        )
+
+
+    public val groupCount2: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, GroupCountQuery<T>, Map<String, Int>>> =
+        path.path("group-count-2").post bind ApiHttpHandler(
+            summary = "Group Count 2",
+            description = "Gets the total number of ${info.collectionName}s matching the given condition divided by group.",
+            inputType = GroupCountQuery.serializer(info.serializer),
+            outputType = MapSerializer(String.serializer(), Int.serializer()),
+            authOptions = info.authOptions,
+            errorCases = emptyList(),
+            examples = emptyList(),
+            handler = { condition: GroupCountQuery<T> ->
+                @Suppress("UNCHECKED_CAST")
+                val keySerializer = condition.groupBy.serializerAny as KSerializer<Any?>
+                @Suppress("UNCHECKED_CAST")
+                info.collection(this)
+                    .groupCount(condition.condition, condition.groupBy as DataClassPath<T, Any?>)
+                    .mapKeys { serverRuntime.externalSerialization.json.encodeToString(keySerializer, it.key) }
+            }
+        )
+
+
+    public val groupAggregate2: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, GroupAggregateQuery<T>, Map<String, Double?>>> =
+        path.path("group-aggregate-2").post bind ApiHttpHandler(
+            summary = "Group Aggregate 2",
+            description = "Aggregates a property of ${info.collectionName}s matching the given condition divided by group.",
+            inputType = GroupAggregateQuery.serializer(info.serializer),
+            outputType = MapSerializer(String.serializer(), Double.serializer().nullable),
+            authOptions = info.authOptions,
+            errorCases = emptyList(),
+            examples = emptyList(),
+            handler = { condition: GroupAggregateQuery<T> ->
+                @Suppress("UNCHECKED_CAST")
+                val keySerializer = condition.groupBy.serializerAny as KSerializer<Any?>
+                @Suppress("UNCHECKED_CAST")
+                info.collection(this)
+                    .groupAggregate(
+                        condition.aggregate,
+                        condition.condition,
+                        condition.groupBy as DataClassPath<T, Any?>,
+                        condition.property as DataClassPath<T, Number>
+                    )
+                    .mapKeys { serverRuntime.externalSerialization.json.encodeToString(keySerializer, it.key) }
+            }
+        )
+}

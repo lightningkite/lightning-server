@@ -2,28 +2,15 @@ package com.lightningkite.lightningserver.engine.awsserverless
 
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.RequestStreamHandler
-import com.lightningkite.lightningserver.definition.Locationed
-import com.lightningkite.lightningserver.definition.ServerDefinition
-import com.lightningkite.lightningserver.definition.Task
-import com.lightningkite.lightningserver.definition.exceptionSettings
-import com.lightningkite.lightningserver.definition.generalSettings
-import com.lightningkite.lightningserver.definition.metricsSettings
+import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
-import com.lightningkite.lightningserver.runtime.invoke
-import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.SettingsSerializer
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.services.Service
 import com.lightningkite.services.aws.AwsConnections
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.KSerializer
+import kotlinx.coroutines.*
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.encodeToStream
@@ -81,10 +68,12 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
                 OpenSsl.decryptAesCbcPkcs5Sha256(bytes, sha256Password.toByteArray())
             }
             ?: bytes
-        this.settings.serializable.putAll(internalSerialization.json.decodeFromString(
-            SettingsSerializer(server.settings),
-            decryptedBytes.toString(Charsets.UTF_8)
-        ))
+        this.settings.serializable.putAll(
+            internalSerialization.json.decodeFromString(
+                SettingsSerializer(server.settings),
+                decryptedBytes.toString(Charsets.UTF_8)
+            )
+        )
         runBlocking { runStartupTasks() }
         Core.getGlobalContext().register(this)
     }

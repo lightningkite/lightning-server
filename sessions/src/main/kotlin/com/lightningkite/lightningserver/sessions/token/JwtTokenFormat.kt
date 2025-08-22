@@ -82,22 +82,22 @@ public class JwtTokenFormat(
     context(server: ServerRuntime)
     private suspend fun SecureHasher.WithId.signJwt(claims: JwtClaims): String = buildString {
         val withDefaults = Json(server.internalSerialization.json) { encodeDefaults = true; explicitNulls = false }
-        val encoder = Base64.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
+        val encoder = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
 
         append(
             encoder.encode(
-                withDefaults.encodeToString(JwtHeader(alg = id)).toByteArray()
+                withDefaults.encodeToString(JwtHeader(alg = id)).encodeToByteArray()
             )
         )
         append('.')
         append(
             encoder.encode(
-                withDefaults.encodeToString(claims).toByteArray()
+                withDefaults.encodeToString(claims).encodeToByteArray()
             )
         )
         val soFar = this.toString()
+        val signature = encoder.encode(sign(soFar.encodeToByteArray()))
         append('.')
-        val signature = encoder.encode(sign(soFar.toByteArray()))
         append(signature)
     }
 

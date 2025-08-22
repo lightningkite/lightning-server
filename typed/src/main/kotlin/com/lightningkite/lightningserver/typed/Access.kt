@@ -23,7 +23,7 @@ public suspend fun <REQUEST : Request<PATH>, PATH : PathSpec, SUBJECT : HasId<ID
 
 public typealias HttpAccess<PATH, SUBJECT, ID> = Access<HttpRequest<PATH>, PATH, SUBJECT, ID>
 
-public typealias AuthAccess<SUBJECT, ID> = HttpAccess<PathSpec0, SUBJECT, ID>
+public typealias AuthAccess<SUBJECT, ID> = Access<*, *, SUBJECT, ID>
 
 public val <SUBJECT : HasId<ID>, ID : Comparable<ID>> Access<*, *, SUBJECT, ID>.auth: Authentication<SUBJECT, ID>
     get() = authOrNull!! // safe because the type is non-null

@@ -19,7 +19,7 @@ import dev.whyoleg.cryptography.algorithms.SHA384
 import dev.whyoleg.cryptography.algorithms.SHA512
 
 /**Uses ECDSA with P-521 curve and SHA-512 hashing*/
-public suspend fun SecretBasis.hasher(variant: String): SecureHasher.WithId = ES512(variant)
+public suspend fun SecretBasis.hasher(variant: String): SecureHasher.WithId = HS512(variant)
 
 /**Uses ECDSA with P-521 curve and SHA-512 hashing*/
 public fun Runtime<SecretBasis>.hasher(variant: String): RuntimeDeferred<SecureHasher.WithId> = mapSuspending { it.hasher(variant) }
