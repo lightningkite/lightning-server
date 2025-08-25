@@ -7,9 +7,7 @@ import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.RequestPredicates
-import com.lightningkite.lightningserver.auth.anyAuth
 import com.lightningkite.lightningserver.auth.auth
-import com.lightningkite.lightningserver.auth.get
 import com.lightningkite.lightningserver.auth.isSuperUser
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.auth.register
@@ -21,15 +19,14 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.definition.secretBasis
-import com.lightningkite.lightningserver.encryption.SecureHasher
-import com.lightningkite.lightningserver.encryption.hasher
+import com.lightningkite.lightningserver.encryption.Signer
+import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.encryption.sign
 import com.lightningkite.lightningserver.encryption.verify
 import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
-import com.lightningkite.lightningserver.path
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
@@ -59,7 +56,7 @@ import kotlin.uuid.Uuid
 public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     public val principal: PrincipalType<SUBJECT, ID>,
     database: Runtime<Database>,
-    public val refreshHasher: RuntimeDeferred<SecureHasher> = secretBasis.hasher("refresh"),
+    public val refreshHasher: RuntimeDeferred<Signer> = secretBasis.signer("refresh"),
     public val tokenFormat: Runtime<TokenFormat> = Runtime { PrivateTinyTokenFormat() }
 ) : ServerBuilder() {
     init { register(principal) }

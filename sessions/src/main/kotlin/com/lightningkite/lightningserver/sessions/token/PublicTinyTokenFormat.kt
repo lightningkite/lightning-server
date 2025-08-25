@@ -4,8 +4,8 @@ import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.mapSuspending
 import com.lightningkite.lightningserver.definition.secretBasis
-import com.lightningkite.lightningserver.encryption.SecureHasher
-import com.lightningkite.lightningserver.encryption.hasher
+import com.lightningkite.lightningserver.encryption.Signer
+import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.encryption.sign
 import com.lightningkite.lightningserver.encryption.verify
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -15,7 +15,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 public class PublicTinyTokenFormat(
-    public val hasher: RuntimeDeferred<SecureHasher> = secretBasis.hasher("public-tiny-token"),
+    public val hasher: RuntimeDeferred<Signer> = secretBasis.signer("public-tiny-token"),
     public val expiration: Duration = 5.minutes,
 ): TokenFormat {
     public val resultSize: RuntimeDeferred<Int> = hasher.mapSuspending { it.sign(byteArrayOf(1, 2, 3)).size }
