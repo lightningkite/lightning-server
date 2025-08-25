@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.services.database.HasId
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 public sealed interface AuthRequirement<SUBJECT : HasId<ID>?, ID : Comparable<ID>> {
     context(server: ServerRuntime)
@@ -12,12 +13,18 @@ public sealed interface AuthRequirement<SUBJECT : HasId<ID>?, ID : Comparable<ID
 
     public data object NoAuth : AuthRequirement<HasId<AnyId>?, AnyId> {
         context(server: ServerRuntime)
-        override suspend fun accepts(auth: Authentication<*, *>?): Boolean = auth == null
+        override suspend fun accepts(auth: Authentication<*, *>?): Boolean = true
     }
 
     public data object AnyAuth : AuthRequirement<HasId<AnyId>, AnyId> {
         context(server: ServerRuntime)
         override suspend fun accepts(auth: Authentication<*, *>?): Boolean = auth != null
+    }
+
+    public data object RecentRootAuth : AuthRequirement<HasId<AnyId>, AnyId> {
+        context(server: ServerRuntime)
+        override suspend fun accepts(auth: Authentication<*, *>?): Boolean =
+            auth != null && auth.limitTo == null && auth.forbid == null && auth.issuedAt > now() - 10.minutes
     }
 
     public abstract class AuthSetting : AuthRequirement<HasId<AnyId>, AnyId>, MutableExtensions.Key<AuthOptions<HasId<*>, *>> {
@@ -44,13 +51,13 @@ public sealed interface AuthRequirement<SUBJECT : HasId<ID>?, ID : Comparable<ID
             if (principalType != auth.principalType) return false
 
             if (scopes.isNotEmpty()) {
-                auth.limitTo?.scopes?.let { limits ->
-                    if (limits.isEmpty() || limits.contains("*")) return@let
+                auth.limitTo?.scopes?.also { limits ->
+                    if (limits.isEmpty() || limits.contains("*")) return@also
                     if (scopes.contains("*")) return false // we know limits doesn't have root access
                     if (!limits.containsAll(scopes)) return false
                 }
-                auth.forbid?.scopes?.let { forbidden ->
-                    if (forbidden.isEmpty()) return@let
+                auth.forbid?.scopes?.also { forbidden ->
+                    if (forbidden.isEmpty()) return@also
                     if (forbidden.contains("*")) return false
                     if (scopes.any { it in forbidden }) return false
                 }

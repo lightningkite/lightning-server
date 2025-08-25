@@ -71,7 +71,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     public val sessionInfo: ModelInfo<SUBJECT, ID, Session<SUBJECT, ID>, Uuid> =
         database.modelInfo2(
-            authOptions = principal.auth(scopes = setOf("sessions")),
+            authOptions = principal.auth(scopes = setOf("com/lightningkite/lightningserver/sessions")),
             serializer = Session.serializer(principal.subjectSerializer, principal.idSerializer),
             idSerializer = Uuid.serializer(),
             collectionName = principal.name + "Session",

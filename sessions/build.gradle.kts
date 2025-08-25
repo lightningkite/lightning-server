@@ -14,13 +14,18 @@ dependencies {
     api(project(":auth"))
     api(project(":sdk"))
     api(project(":typed"))
-    ksp(libs.serviceAbstractionsDatabaseProcessor)
+    api(project(":sessions-shared"))
     api(libs.serviceAbstractionsDatabase)
+    api(libs.serviceAbstractionsCache)
     api(libs.kotlinReflect)
-}
 
-ksp {
-    arg("generateFields", "true")
+    implementation(libs.oneTimePass)
+    implementation(libs.bouncyCastleBcprov)
+    implementation(libs.bouncyCastleBcpkix)
+
+    implementation(libs.webauthn4jCore)
+
+    ksp(libs.serviceAbstractionsDatabaseProcessor)
 }
 
 kotlin {

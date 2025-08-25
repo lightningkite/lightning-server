@@ -31,7 +31,7 @@ public fun <PATH: PathSpec, USER: HasId<ID>?, ID : Comparable<ID>, INPUT, OUTPUT
         override val examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = examples
 
         context(server: ServerRuntime)
-        override suspend fun HttpAccess<PATH, USER, ID>.handle(input: INPUT): OUTPUT = handler(input)
+        override suspend fun handle(access: HttpAccess<PATH, USER, ID>, input: INPUT): OUTPUT = access.handler(input)
     }
 
 public inline fun <PATH: PathSpec, USER: HasId<ID>?, ID : Comparable<ID>, reified INPUT, reified OUTPUT> ApiHttpHandler(

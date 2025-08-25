@@ -37,6 +37,7 @@ public typealias AuthAny = AuthOptions<HasId<AnyId>, AnyId>
 
 public val noAuth: NoAuth = AuthOptions(AuthRequirement.NoAuth)
 public val anyAuth: AuthAny = AuthOptions(AuthRequirement.AnyAuth)
+public val recentRootAuth: AuthAny = AuthOptions(AuthRequirement.RecentRootAuth)
 
 
 public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.auth(
