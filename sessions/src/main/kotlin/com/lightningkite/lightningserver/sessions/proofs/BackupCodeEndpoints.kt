@@ -1,3 +1,4 @@
+@file:UseContextualSerialization(Uuid::class)
 package com.lightningkite.lightningserver.sessions.proofs
 
 import com.lightningkite.lightningserver.BadRequestException
@@ -33,6 +34,7 @@ import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseContextualSerialization
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import java.security.SecureRandom

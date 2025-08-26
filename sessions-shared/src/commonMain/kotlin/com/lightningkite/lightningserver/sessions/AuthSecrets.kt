@@ -1,4 +1,4 @@
-@file:UseContextualSerialization(Duration::class)
+@file:UseContextualSerialization(Duration::class, Instant::class, Uuid::class)
 
 package com.lightningkite.lightningserver.sessions
 

@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.sessions.token
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.RequestPredicates
+import com.lightningkite.lightningserver.auth.id
 import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
@@ -35,13 +36,13 @@ public class JwtTokenFormat(
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> create(
         handler: PrincipalType<SUBJECT, ID>,
-        auth: Authentication<SUBJECT, ID>
+        auth: Authentication<SUBJECT>
     ): String =
         hasher.await().signJwt(
             JwtClaims(
                 iss = issuer(),
                 sid = auth.sessionId,
-                sub = "${handler.name}|${server.internalSerialization.json.encodeToString(handler.idSerializer, auth._id)}",
+                sub = "${handler.name}|${server.internalSerialization.json.encodeToString(handler.idSerializer, auth.id)}",
                 aud = audience(),
                 exp = now().plus(expiration).epochSeconds,
                 iat = auth.issuedAt.epochSeconds,
@@ -56,7 +57,7 @@ public class JwtTokenFormat(
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> read(
         handler: PrincipalType<SUBJECT, ID>,
         value: String
-    ): Authentication<SUBJECT, ID>? {
+    ): Authentication<SUBJECT>? {
         val prefix = "${handler.name}|"
         val claims = hasher.await().verifyJwt(value, audience()) ?: return null
 

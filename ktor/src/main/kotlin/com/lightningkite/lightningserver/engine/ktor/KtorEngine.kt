@@ -26,12 +26,9 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.util.*
-import io.ktor.utils.io.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.*
-import kotlinx.io.asSink
 import kotlinx.io.asSource
-import kotlinx.io.buffered
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlin.time.Clock
@@ -96,7 +93,7 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
                             call.response.header(header.key, value.toHttpString())
                         }
                     }
-                    call.response.status(HttpStatusCode.fromValue(result.status.code))
+                    val code = HttpStatusCode.fromValue(result.status.code)
                     val type = result.body?.mediaType?.toString()?.let { ContentType.parse(it) }
                     when (val b = result.body?.data) {
                         null -> {
@@ -107,20 +104,20 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
                                     ContentType.parse(contentType),
                                     HttpStatusCode.NoContent,
                                     contentLength.toLong()
-                                ) {}
+                                ) { close() }
                             } else
-                                call.respondText("", contentType = null, status = null, configure = { })
+                                call.respondText(text = "", contentType = type, status = code, configure = { })
                         }
 
-                        is Data.Bytes -> call.respondBytes(b.data, type)
+                        is Data.Bytes -> call.respondBytes(bytes = b.data, contentType = type, status = code)
 
-                        is Data.Text -> call.respondText(b.data, type)
-                        is Data.Sink -> call.respondOutputStream(type) {
-                            b.emit(this.asSink().buffered())
+                        is Data.Text -> call.respondText(text = b.data, contentType = type, status = code)
+                        is Data.Sink -> b.source().use {
+                            call.respondSource(source = it, contentType = type, status = code)
                         }
 
-                        is Data.Source -> call.respondBytesWriter(type) {
-                            b.source.transferTo(this.asSink())
+                        is Data.Source -> b.source.use {
+                            call.respondSource(source = it, contentType = type, status = code)
                         }
                     }
                 }

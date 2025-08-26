@@ -23,11 +23,11 @@ public class PublicTinyTokenFormat(
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> create(
         handler: PrincipalType<SUBJECT, ID>,
-        auth: Authentication<SUBJECT, ID>
+        auth: Authentication<SUBJECT>
     ): String =
         "tt/${handler.name}/" + server.internalSerialization.kotlinBytesFormat
             .encodeToByteArray(
-                Authentication.serializer(handler.subjectSerializer, handler.idSerializer),
+                Authentication.serializer(handler.subjectSerializer),
                 auth
             )
             .let { hasher.await().sign(it) + it }
@@ -37,7 +37,7 @@ public class PublicTinyTokenFormat(
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> read(
         handler: PrincipalType<SUBJECT, ID>,
         value: String
-    ): Authentication<SUBJECT, ID>? {
+    ): Authentication<SUBJECT>? {
         val prefix = "tt/${handler.name}/"
         if (!value.startsWith(prefix)) return null
 
@@ -49,7 +49,7 @@ public class PublicTinyTokenFormat(
         if (!hasher.await().verify(data, signature)) throw TokenException("Incorrect signature")
 
         return server.internalSerialization.kotlinBytesFormat.decodeFromByteArray(
-            Authentication.serializer(handler.subjectSerializer, handler.idSerializer),
+            Authentication.serializer(handler.subjectSerializer),
             data
         )
     }

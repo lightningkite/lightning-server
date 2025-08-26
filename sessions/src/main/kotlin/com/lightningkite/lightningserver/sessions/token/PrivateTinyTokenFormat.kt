@@ -19,11 +19,11 @@ public class PrivateTinyTokenFormat(
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> create(
         handler: PrincipalType<SUBJECT, ID>,
-        auth: Authentication<SUBJECT, ID>
+        auth: Authentication<SUBJECT>
     ): String =
         handler.name + '/' + cipher.await().encrypt(
             server.internalSerialization.kotlinBytesFormat.encodeToByteArray(
-                Authentication.serializer(handler.subjectSerializer, handler.idSerializer),
+                Authentication.serializer(handler.subjectSerializer),
                 auth
             )
         ).let(Base64.UrlSafe::encode)
@@ -32,14 +32,14 @@ public class PrivateTinyTokenFormat(
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> read(
         handler: PrincipalType<SUBJECT, ID>,
         value: String
-    ): Authentication<SUBJECT, ID>? {
+    ): Authentication<SUBJECT>? {
         if (!value.startsWith(handler.name + '/')) return null
         try {
             val decoded = Base64.UrlSafe.decode(value.substringAfter('/'))
             val decrypted = cipher.await().decrypt(decoded)
 
             return server.internalSerialization.kotlinBytesFormat.decodeFromByteArray(
-                Authentication.serializer(handler.subjectSerializer, handler.idSerializer),
+                Authentication.serializer(handler.subjectSerializer),
                 decrypted
             )
         } catch (e: Exception) {

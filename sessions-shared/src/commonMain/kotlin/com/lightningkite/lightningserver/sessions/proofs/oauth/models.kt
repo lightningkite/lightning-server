@@ -1,8 +1,10 @@
+@file:UseContextualSerialization(Instant::class)
 package com.lightningkite.lightningserver.sessions.proofs.oauth
 
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseContextualSerialization
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 

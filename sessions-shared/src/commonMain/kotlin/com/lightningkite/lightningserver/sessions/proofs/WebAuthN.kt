@@ -1,3 +1,4 @@
+@file:UseContextualSerialization(Instant::class)
 @file:OptIn(ExperimentalSerializationApi::class)
 
 package com.lightningkite.lightningserver.sessions.proofs
@@ -9,6 +10,7 @@ import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.EncodeDefault.Mode
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.UseContextualSerialization
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor

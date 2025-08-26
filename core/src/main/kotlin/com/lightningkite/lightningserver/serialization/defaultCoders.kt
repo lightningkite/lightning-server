@@ -7,17 +7,10 @@ import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.services.data.Data
 import com.lightningkite.services.data.KotlinBytesFormat
 import com.lightningkite.services.data.TypedData
-import kotlinx.io.asInputStream
-import kotlinx.io.asOutputStream
-import kotlinx.serialization.BinaryFormat
-import kotlinx.serialization.DeserializationStrategy
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.SerializationStrategy
-import kotlinx.serialization.StringFormat
-import kotlinx.serialization.encoding.AbstractEncoder
+import kotlinx.serialization.*
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.decodeFromStream
-import kotlinx.serialization.json.encodeToStream
+import kotlinx.serialization.json.io.decodeFromSource
+import kotlinx.serialization.json.io.encodeToSink
 import kotlinx.serialization.modules.SerializersModule
 import kotlin.io.encoding.Base64
 
@@ -80,13 +73,14 @@ public open class StringFormatMediaTypeCoder(
 }
 
 public class JsonMediaTypeCoder(
-    private val json: () -> Json
+    private val json: () -> Json,
 ) : StringFormatMediaTypeCoder(json, MediaType.Application.Json) {
     override val priority: Float get() = 1f
+
     @OptIn(ExperimentalSerializationApi::class)
     override suspend fun <T> invoke(content: TypedData, serializer: DeserializationStrategy<T>): T {
         return when (val body = content.data) {
-            is Data.Source -> json().decodeFromStream(serializer, body.source.asInputStream())
+            is Data.Source -> body.source.use { json().decodeFromSource(serializer, it) }
             else -> super.invoke(content, serializer)
         }
     }
@@ -96,36 +90,39 @@ public class JsonMediaTypeCoder(
         return TypedData.sink(
             mediaType,
             emit = {
-                json().encodeToStream(serializer, value, it.asOutputStream())
+                it.use { json().encodeToSink(serializer, value, it) }
             }
         )
     }
 }
 
 public fun ServerBuilder.basicMediaTypeCoders(serializersModule: SerializersModule = externalSerialization) {
-    register(JsonMediaTypeCoder {
-        Json {
-            this.serializersModule = serializersModule
-            encodeDefaults = true
-            ignoreUnknownKeys = true
-            isLenient = true
-            allowStructuredMapKeys = true
-            prettyPrint = false
-            explicitNulls = false
-            coerceInputValues = true
-            allowSpecialFloatingPointValues = true
-            useAlternativeNames = true
-            decodeEnumsCaseInsensitive = true
-            allowTrailingComma = true
-            allowComments = true
-        }
-    })
-    register(StringFormatMediaTypeCoder(
-        stringFormat = { FormDataFormat(serializersModule) },
-        mediaType = MediaType.Application.FormUrlEncoded
-    ))
-    register(BinaryFormatMediaTypeCoder(
-        stringFormat = { KotlinBytesFormat(serializersModule) },
-        mediaType = MediaType("application", "x-lightningserver-kotlin-bytes")
-    ))
+    val json = Json {
+        this.serializersModule = serializersModule
+        encodeDefaults = true
+        ignoreUnknownKeys = true
+        isLenient = true
+        allowStructuredMapKeys = true
+        prettyPrint = false
+        explicitNulls = false
+        coerceInputValues = true
+        allowSpecialFloatingPointValues = true
+        useAlternativeNames = true
+        decodeEnumsCaseInsensitive = true
+        allowTrailingComma = true
+        allowComments = true
+    }
+    register(JsonMediaTypeCoder { json })
+    register(
+        StringFormatMediaTypeCoder(
+            stringFormat = { FormDataFormat(serializersModule) },
+            mediaType = MediaType.Application.FormUrlEncoded
+        )
+    )
+    register(
+        BinaryFormatMediaTypeCoder(
+            stringFormat = { KotlinBytesFormat(serializersModule) },
+            mediaType = MediaType("application", "x-lightningserver-kotlin-bytes")
+        )
+    )
 }

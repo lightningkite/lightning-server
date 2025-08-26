@@ -12,6 +12,7 @@ plugins {
 dependencies {
     api(libs.kotlinXIO)
     api(libs.kotlinXJson)
+    api(libs.kotlinXJsonIO)
     api(libs.serializationProperties)
     api(libs.serviceAbstractionsData)
     api(libs.serviceAbstractionsBasis)

@@ -6,11 +6,14 @@ import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.serialization.parse
+import com.lightningkite.lightningserver.serialization.queryParameters
+import com.lightningkite.lightningserver.serialization.toTypedData
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
 
-public interface ApiHttpHandler<PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT> : HttpHandler<PATH> {
+public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> : HttpHandler<PATH> {
     public val auth: AuthRequirement<USER>
     public val inputType: KSerializer<INPUT>
     public val outputType: KSerializer<OUTPUT>
@@ -38,7 +41,7 @@ public interface ApiHttpHandler<PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT> 
         val result = handle(request.access(auth), input)
 
         return HttpResponse(
-            body = result.toHttpContent(request.headers.accept, outputType),
+            body = if (result == Unit) null else result.toTypedData(request.headers.accept, outputType),
             status = successCode
         )
     }
