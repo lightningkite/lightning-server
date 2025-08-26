@@ -1,13 +1,3 @@
-plugins {
-     alias(libs.plugins.dokka) apply false
-    alias(libs.plugins.kotlinJvm) apply false
-    alias(libs.plugins.kotlinMultiplatform) apply false
-    alias(libs.plugins.androidApp) apply false
-    alias(libs.plugins.androidLibrary) apply false
-    alias(libs.plugins.graalVmNative) apply false
-    alias(libs.plugins.shadow) apply false
-    alias(libs.plugins.vanniktechMavenPublish) apply false
-}
 
 buildscript {
     repositories {
@@ -29,4 +19,16 @@ allprojects {
         mavenCentral()
 
     }
+}
+
+plugins {
+    alias(libs.plugins.kotlinMultiplatform) apply false
+    alias(libs.plugins.serialization) apply false
+    alias(libs.plugins.dokka) apply false
+    alias(libs.plugins.kotlinJvm) apply false
+    alias(libs.plugins.androidApp) apply false
+    alias(libs.plugins.androidLibrary) apply false
+    alias(libs.plugins.graalVmNative) apply false
+    alias(libs.plugins.shadow) apply false
+    alias(libs.plugins.vanniktechMavenPublish) apply false
 }

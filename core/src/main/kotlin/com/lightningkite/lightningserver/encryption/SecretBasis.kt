@@ -18,7 +18,7 @@ import kotlin.io.encoding.Base64
 
 /**
  * A secure basis for cryptographic operations.
- * This class provides a foundation for cryptographic operations like hashing and encryption.
+ * This class provides a foundation for cryptographic operations like signing and encryption.
  */
 @Serializable(SecretBasisSerializer::class)
 public data class SecretBasis(public val string: String) {

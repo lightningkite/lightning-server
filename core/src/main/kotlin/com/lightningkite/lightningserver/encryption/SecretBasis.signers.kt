@@ -19,32 +19,32 @@ import dev.whyoleg.cryptography.algorithms.SHA384
 import dev.whyoleg.cryptography.algorithms.SHA512
 
 /**Uses ECDSA with P-521 curve and SHA-512 hashing*/
-public suspend fun SecretBasis.hasher(variant: String): SecureHasher.WithId = HS512(variant)
+public suspend fun SecretBasis.signer(variant: String): Signer.WithId = HS512(variant)
 
 /**Uses ECDSA with P-521 curve and SHA-512 hashing*/
-public fun Runtime<SecretBasis>.hasher(variant: String): RuntimeDeferred<SecureHasher.WithId> = mapSuspending { it.hasher(variant) }
+public fun Runtime<SecretBasis>.signer(variant: String): RuntimeDeferred<Signer.WithId> = mapSuspending { it.signer(variant) }
 
 
 /**Uses ECDSA with P-521 curve and SHA-512 hashing*/
-public fun SecretBasis.hasherBlocking(variant: String): SecureHasher.WithId = ECDSA_Blocking(variant, EC.Curve.P521).hasher(SHA512).withId("ES512")
+public fun SecretBasis.signerBlocking(variant: String): Signer.WithId = ECDSA_Blocking(variant, EC.Curve.P521).signer(SHA512).withId("ES512")
 
 /**Uses ECDSA with P-521 curve and SHA-512 hashing*/
-public fun Runtime<SecretBasis>.hasherBlocking(variant: String): Runtime<SecureHasher.WithId> = map { it.hasherBlocking(variant) }
+public fun Runtime<SecretBasis>.signerBlocking(variant: String): Runtime<Signer.WithId> = map { it.signerBlocking(variant) }
 
 
-private fun SecureHasher.withId(id: String) = SecureHasher.WithId(this, id)
+private fun Signer.withId(id: String) = Signer.WithId(this, id)
 
-public suspend fun SecretBasis.HS256(variant: String): SecureHasher.WithId = HMAC(variant, SHA256).hasher().withId("HS256")
-public suspend fun SecretBasis.HS384(variant: String): SecureHasher.WithId = HMAC(variant, SHA384).hasher().withId("HS384")
-public suspend fun SecretBasis.HS512(variant: String): SecureHasher.WithId = HMAC(variant, SHA512).hasher().withId("HS512")
+public suspend fun SecretBasis.HS256(variant: String): Signer.WithId = HMAC(variant, SHA256).signer().withId("HS256")
+public suspend fun SecretBasis.HS384(variant: String): Signer.WithId = HMAC(variant, SHA384).signer().withId("HS384")
+public suspend fun SecretBasis.HS512(variant: String): Signer.WithId = HMAC(variant, SHA512).signer().withId("HS512")
 
-public suspend fun SecretBasis.RS256(variant: String): SecureHasher.WithId = RSA_PKCS1(variant, SHA256).hasher().withId("RS256")
-public suspend fun SecretBasis.RS384(variant: String): SecureHasher.WithId = RSA_PKCS1(variant, SHA384).hasher().withId("RS384")
-public suspend fun SecretBasis.RS512(variant: String): SecureHasher.WithId = RSA_PKCS1(variant, SHA512).hasher().withId("RS512")
+public suspend fun SecretBasis.RS256(variant: String): Signer.WithId = RSA_PKCS1(variant, SHA256).signer().withId("RS256")
+public suspend fun SecretBasis.RS384(variant: String): Signer.WithId = RSA_PKCS1(variant, SHA384).signer().withId("RS384")
+public suspend fun SecretBasis.RS512(variant: String): Signer.WithId = RSA_PKCS1(variant, SHA512).signer().withId("RS512")
 
-public suspend fun SecretBasis.ES256(variant: String): SecureHasher.WithId = ECDSA(variant, EC.Curve.P256).hasher(SHA256).withId("ES256")
-public suspend fun SecretBasis.ES384(variant: String): SecureHasher.WithId = ECDSA(variant, EC.Curve.P384).hasher(SHA384).withId("ES384")
-public suspend fun SecretBasis.ES512(variant: String): SecureHasher.WithId = ECDSA(variant, EC.Curve.P521).hasher(SHA512).withId("ES512")
+public suspend fun SecretBasis.ES256(variant: String): Signer.WithId = ECDSA(variant, EC.Curve.P256).signer(SHA256).withId("ES256")
+public suspend fun SecretBasis.ES384(variant: String): Signer.WithId = ECDSA(variant, EC.Curve.P384).signer(SHA384).withId("ES384")
+public suspend fun SecretBasis.ES512(variant: String): Signer.WithId = ECDSA(variant, EC.Curve.P521).signer(SHA512).withId("ES512")
 
 
 public suspend fun SecretBasis.HMAC(

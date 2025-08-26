@@ -28,9 +28,9 @@ public interface PrincipalType<SUBJECT : HasId<ID>, ID : Comparable<ID>> {
         subjectSerializer.descriptor.getElementIndex(property) != CompositeDecoder.UNKNOWN_NAME
 
     context(server: ServerRuntime)
-    public fun getProperty(principal: SUBJECT, property: String): String =
+    public fun getProperty(principal: SUBJECT, property: String): String? =
         if (property == "$name/_id") server.internalSerialization.json.encodeToString(idSerializer, principal._id)
-        else server.internalSerialization.formDataFormat.encodeToMap(subjectSerializer, principal)[property]!!
+        else server.internalSerialization.formDataFormat.encodeToMap(subjectSerializer, principal)[property]
 
 
     context(server: ServerRuntime)

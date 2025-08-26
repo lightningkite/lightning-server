@@ -11,22 +11,6 @@ pluginManagement {
         maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
         maven(url = "https://s01.oss.sonatype.org/content/repositories/releases/")
     }
-
-    plugins {
-        kotlin("plugin.serialization") version "2.0.0"
-        id("com.google.devtools.ksp") version "2.0.20-1.0.25"
-    }
-
-    dependencyResolutionManagement {
-        repositories {
-            mavenLocal()
-            google()
-            gradlePluginPortal()
-            mavenCentral()
-            maven("https://jitpack.io")
-        }
-
-    }
 }
 
 include(":core")
@@ -34,6 +18,11 @@ include(":engine-local")
 include(":auth")
 include(":typed")
 include(":sessions")
+include(":sessions-email")
+include(":sessions-sms")
+//include(":sessions-oauth")
+//include(":sessions-oauth-shared")
+include(":sessions-shared")
 include(":sdk")
 include(":upload-files")
 include(":ktor")

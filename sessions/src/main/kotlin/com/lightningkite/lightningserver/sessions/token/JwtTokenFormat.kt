@@ -8,8 +8,8 @@ import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.definition.secretBasis
-import com.lightningkite.lightningserver.encryption.SecureHasher
-import com.lightningkite.lightningserver.encryption.hasher
+import com.lightningkite.lightningserver.encryption.Signer
+import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.encryption.sign
 import com.lightningkite.lightningserver.encryption.verify
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -24,7 +24,7 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 public class JwtTokenFormat(
-    public val hasher: RuntimeDeferred<SecureHasher.WithId> = secretBasis.hasher("jwt"),
+    public val hasher: RuntimeDeferred<Signer.WithId> = secretBasis.signer("jwt"),
     public val expiration: Duration = 5.minutes,
     public val issuerOverride: String? = null,
     public val audienceOverride: String? = null,
@@ -78,7 +78,7 @@ public class JwtTokenFormat(
 
 
     context(server: ServerRuntime)
-    private suspend fun SecureHasher.WithId.signJwt(claims: JwtClaims): String = buildString {
+    private suspend fun Signer.WithId.signJwt(claims: JwtClaims): String = buildString {
         val withDefaults = Json(server.internalSerialization.json) { encodeDefaults = true; explicitNulls = false }
         val encoder = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
 
@@ -100,7 +100,7 @@ public class JwtTokenFormat(
     }
 
     context(server: ServerRuntime)
-    private suspend fun SecureHasher.WithId.verifyJwt(token: String, requiredAudience: String? = null): JwtClaims? {
+    private suspend fun Signer.WithId.verifyJwt(token: String, requiredAudience: String? = null): JwtClaims? {
         val decoder = Base64.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
 
         val parts = token.split('.')

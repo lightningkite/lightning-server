@@ -21,7 +21,7 @@ public interface ApiHttpHandler<PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT> 
     public val examples: List<Example<INPUT, OUTPUT>>
 
     context(server: ServerRuntime)
-    public suspend fun HttpAccess<PATH, USER>.handle(input: INPUT): OUTPUT
+    public suspend fun handle(access: HttpAccess<PATH, USER>, input: INPUT): OUTPUT
 
     context(server: ServerRuntime)
     override suspend fun handle(request: HttpRequest<PATH>): HttpResponse {
@@ -35,7 +35,7 @@ public interface ApiHttpHandler<PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT> 
 
         server.validators.validateOrThrow(inputType, input)
 
-        val result = request.access(auth).handle(input)
+        val result = handle(request.access(auth), input)
 
         return HttpResponse(
             body = result.toHttpContent(request.headers.accept, outputType),

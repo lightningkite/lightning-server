@@ -19,8 +19,8 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.definition.secretBasis
-import com.lightningkite.lightningserver.encryption.SecureHasher
-import com.lightningkite.lightningserver.encryption.hasher
+import com.lightningkite.lightningserver.encryption.Signer
+import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.encryption.sign
 import com.lightningkite.lightningserver.encryption.verify
 import com.lightningkite.lightningserver.http.HttpEndpoint
@@ -56,7 +56,7 @@ import kotlin.uuid.Uuid
 public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     public val principal: PrincipalType<SUBJECT, ID>,
     database: Runtime<Database>,
-    public val refreshHasher: RuntimeDeferred<SecureHasher> = secretBasis.hasher("refresh"),
+    public val refreshHasher: RuntimeDeferred<Signer> = secretBasis.signer("refresh"),
     public val tokenFormat: Runtime<TokenFormat> = Runtime { PrivateTinyTokenFormat() }
 ) : ServerBuilder() {
     init { register(principal) }
@@ -71,7 +71,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     public val sessionInfo: ModelInfo<SUBJECT, ID, Session<SUBJECT, ID>, Uuid> =
         database.modelInfo2(
-            authOptions = principal.auth(scopes = setOf("sessions")),
+            authOptions = principal.auth(scopes = setOf("com/lightningkite/lightningserver/sessions")),
             serializer = Session.serializer(principal.subjectSerializer, principal.idSerializer),
             idSerializer = Uuid.serializer(),
             collectionName = principal.name + "Session",
