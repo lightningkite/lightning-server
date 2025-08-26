@@ -1,23 +1,17 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.BadRequestException
-import com.lightningkite.lightningserver.http.HttpHandler
-import com.lightningkite.lightningserver.http.HttpRequest
-import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.LSError
+import com.lightningkite.lightningserver.auth.AuthRequirement
+import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.auth.AuthOptions
-import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.data.get
-import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
 
-public interface ApiHttpHandler<PATH: PathSpec, USER: HasId<ID>?, ID : Comparable<ID>, INPUT, OUTPUT> : HttpHandler<PATH> {
-    public val authOptions: AuthOptions<USER, ID>
+public interface ApiHttpHandler<PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT> : HttpHandler<PATH> {
+    public val auth: AuthRequirement<USER>
     public val inputType: KSerializer<INPUT>
     public val outputType: KSerializer<OUTPUT>
     public val summary: String
@@ -27,7 +21,7 @@ public interface ApiHttpHandler<PATH: PathSpec, USER: HasId<ID>?, ID : Comparabl
     public val examples: List<Example<INPUT, OUTPUT>>
 
     context(server: ServerRuntime)
-    public suspend fun HttpAccess<PATH, USER, ID>.handle(input: INPUT): OUTPUT
+    public suspend fun HttpAccess<PATH, USER>.handle(input: INPUT): OUTPUT
 
     context(server: ServerRuntime)
     override suspend fun handle(request: HttpRequest<PATH>): HttpResponse {
@@ -41,7 +35,7 @@ public interface ApiHttpHandler<PATH: PathSpec, USER: HasId<ID>?, ID : Comparabl
 
         server.validators.validateOrThrow(inputType, input)
 
-        val result = request.access(authOptions).handle(input)
+        val result = request.access(auth).handle(input)
 
         return HttpResponse(
             body = result.toHttpContent(request.headers.accept, outputType),

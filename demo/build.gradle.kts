@@ -32,6 +32,7 @@ dependencies {
 //    ksp(project(":processor"))
     implementation(libs.kotlinerCli)
     implementation(libs.ktorCallLogging)
+    implementation(project(":sessions"))
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
 }
 

@@ -18,85 +18,103 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.Transient
 import kotlinx.serialization.builtins.NothingSerializer
 import kotlinx.serialization.builtins.nullable
+import kotlinx.serialization.encodeToString
 import kotlin.String
 import kotlin.time.Duration
 import kotlin.time.Instant
 
+context(server: ServerRuntime)
+public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
+    principalType: PrincipalType<SUBJECT, ID>,
+    id: ID,
+    issuedAt: Instant = server.clock.now(),
+    limitTo: RequestPredicates? = null,
+    forbid: RequestPredicates? = null,
+    fromMasquerade: Authentication<*>? = null,
+    cache: SerializableCache? = null
+): Authentication<SUBJECT> = Authentication(
+    principalType = principalType,
+    id = id,
+    rawId = server.internalSerialization.stringArrayFormat.encodeToString(principalType.idSerializer, id),
+    issuedAt = issuedAt,
+    limitTo = limitTo,
+    forbid = forbid,
+    fromMasquerade = fromMasquerade,
+    cache = cache
+)
+
 @Serializable
-public class Authentication<SUBJECT : HasId<ID>, ID : Comparable<ID>> private constructor(
+public class Authentication<SUBJECT : HasId<*>> private constructor(
     public val principalName: String,
     public val rawId: String,
     public val issuedAt: Instant,
     public val limitTo: RequestPredicates? = null,
     public val forbid: RequestPredicates? = null,
-    public val fromMasquerade: Authentication<*, *>? = null,
+    public val fromMasquerade: Authentication<*>? = null,
     override val cache: SerializableCache = SerializableCache()
 ) : Caching {
-
-    // type-safe constructor
-    public constructor(
-        server: ServerRuntime,
-        principalType: PrincipalType<SUBJECT, ID>,
-        id: ID,
-        issuedAt: Instant = server.clock.now(),
-        limitTo: RequestPredicates? = null,
-        forbid: RequestPredicates? = null,
-        fromMasquerade: Authentication<*, *>? = null,
-        cache: SerializableCache? = null
+    internal constructor( // I wish kotlin had file-private visibility
+        principalType: PrincipalType<SUBJECT, *>,
+        id: Comparable<*>,
+        rawId: String,
+        issuedAt: Instant,
+        limitTo: RequestPredicates?,
+        forbid: RequestPredicates?,
+        fromMasquerade: Authentication<*>?,
+        cache: SerializableCache?
     ) : this(
         principalName = principalType.name,
-        rawId = server.internalSerialization.json.encodeToString(principalType.idSerializer, id),
+        rawId = rawId,
         issuedAt,
         limitTo,
         forbid,
         fromMasquerade,
         cache ?: SerializableCache()
     ) {
-        cachedType = principalType
         cachedId = id
+        cachedType = principalType
     }
 
     // check for contradictions
     init {
         if (limitTo != null && forbid != null) limitTo.intersect(forbid).let { intersection ->
-            if (intersection.isNotEmpty()) throw IllegalArgumentException("Authentication limitTo and forbid cannot have any common predicates, as this leads to a contradiction. Intersection: $intersection")
+            if (intersection.isNotEmpty()) throw IllegalArgumentException(
+                "Authentication limitTo and forbid cannot have any common predicates, as this leads to a contradiction. Intersection: $intersection"
+            )
         }
     }
 
     // typed parameters
 
     @Transient
-    private var cachedType: PrincipalType<SUBJECT, ID>? = null
+    private var cachedType: PrincipalType<SUBJECT, *>? = null
 
     @Suppress("UNCHECKED_CAST")
     context(server: ServerRuntime)
-    public val principalType: PrincipalType<SUBJECT, ID> get() = cachedType
-        ?: (server.server.principalTypes[principalName] as? PrincipalType<SUBJECT, ID>)?.also { cachedType = it }
+    public val untypedPrincipal: PrincipalType<SUBJECT, *> get() = cachedType
+        ?: (server.server.principalTypes[principalName] as? PrincipalType<SUBJECT, *>)?.also { cachedType = it }
         ?: throw UnauthorizedException("Principal type $principalName is unrecognized")
 
     @Transient
-    private var cachedId: ID? = null
+    public var cachedId: Comparable<*>? = null
 
     context(server: ServerRuntime)
-    public val id: ID get() = cachedId
-        ?: server.internalSerialization.json.decodeFromString(principalType.idSerializer, rawId).also { cachedId = it }
+    public val untypedId: Comparable<*> get() = cachedId
+        ?: server.internalSerialization.json.decodeFromString(untypedPrincipal.idSerializer, rawId).also { cachedId = it }
 
     @Transient
     private var _subjectCacheKey: SerializableCache.Key<SUBJECT>? = null
 
     context(server: ServerRuntime)
-    private val subjectCacheKey get() = _subjectCacheKey
+    internal val subjectCacheKey get() = _subjectCacheKey
         ?: object : SerializableCache.Key<SUBJECT> {
-            override val id: String = "${principalType.name}-subject-cache"
-            override val serializer: KSerializer<SUBJECT> = principalType.subjectSerializer
-            override val expireAfter: Duration? = principalType.subjectCacheExpiration
+            override val id: String = "${principalName}-subject-cache"
+            override val serializer: KSerializer<SUBJECT> = untypedPrincipal.subjectSerializer
+            override val expireAfter: Duration? = untypedPrincipal.subjectCacheExpiration
         }.also { _subjectCacheKey = it }
 
     context(server: ServerRuntime)
-    public suspend fun fetch(): SUBJECT = cache.getOrPut(subjectCacheKey) { principalType.fetch(id) }
-
-    context(server: ServerRuntime)
-    public suspend fun precache(keys: Iterable<AuthCacheKey<SUBJECT, ID, *>>) {
+    public suspend fun precache(keys: Iterable<AuthCacheKey<SUBJECT, *>>) {
         for (key in keys) cache.get(key, this)
     }
 
@@ -111,15 +129,15 @@ public class Authentication<SUBJECT : HasId<ID>, ID : Comparable<ID>> private co
     // caching
 
     @Suppress("UNCHECKED_CAST")
-    public object CacheKey : SerializableCache.CalculatingKey<Request<*>, Authentication<*, *>?> {
+    public object CacheKey : SerializableCache.CalculatingKey<Request<*>, Authentication<*>?> {
         override val id: String = "authentication"
 
         @OptIn(ExperimentalSerializationApi::class)
-        override val serializer: KSerializer<Authentication<*, *>?>
-            get() = serializer(NothingSerializer(), NothingSerializer()).nullable as KSerializer<Authentication<*, *>?>
+        override val serializer: KSerializer<Authentication<*>?>
+            get() = serializer(NothingSerializer()).nullable as KSerializer<Authentication<*>?>
 
         context(server: ServerRuntime)
-        override suspend fun calculate(input: Request<*>): Authentication<*, *>? {
+        override suspend fun calculate(input: Request<*>): Authentication<*>? {
             for (reader in server.server.extensions[Reader] ?: emptyList()) {
                 val auth = reader.read(input) ?: continue
 
@@ -133,10 +151,10 @@ public class Authentication<SUBJECT : HasId<ID>, ID : Comparable<ID>> private co
                 input.headers[HttpHeader.XMasquerade]?.root?.let { masquerade ->
                     val principal = masquerade.substringBefore('/')
 
-                    val handler = server.server.principalTypes[principal] as? PrincipalType<HasId<Comparable<Any?>>, Comparable<Any?>>
+                    val handler = server.server.principalTypes[principal] as? PrincipalType<HasId<AnyId>, AnyId>
                         ?: throw BadRequestException("Principal type $principal is unrecognized for masquerade")
 
-                    val mask = Authentication<HasId<Comparable<Any?>>, Comparable<Any?>>(
+                    val mask = Authentication<HasId<AnyId>>(
                         principal,
                         rawId = masquerade.substringAfter('/'),
                         issuedAt = server.clock.now(),
@@ -146,7 +164,7 @@ public class Authentication<SUBJECT : HasId<ID>, ID : Comparable<ID>> private co
                     )
 
                     try {
-                        mask.id
+                        mask.untypedId
                     } catch (_: SerializationException) {
                         throw BadRequestException(message = "Invalid masquerade id", data = mask.rawId)
                     }
@@ -161,20 +179,20 @@ public class Authentication<SUBJECT : HasId<ID>, ID : Comparable<ID>> private co
         }
     }
 
-    @Deprecated("Dont cache auth within itself.", level = DeprecationLevel.ERROR) public operator fun get(key: CacheKey): Authentication<*, *> = throw NotImplementedError()
-    @Deprecated("Dont cache auth within itself.", level = DeprecationLevel.ERROR) public fun get(key: CacheKey, input: Request<*>): Authentication<*, *> = throw NotImplementedError()
+    @Deprecated("Dont cache auth within itself.", level = DeprecationLevel.ERROR) public operator fun get(key: CacheKey): Authentication<*> = throw NotImplementedError()
+    @Deprecated("Dont cache auth within itself.", level = DeprecationLevel.ERROR) public fun get(key: CacheKey, input: Request<*>): Authentication<*> = throw NotImplementedError()
 
 
     // related types
 
     public fun interface Reader<SUBJECT : HasId<ID>, ID : Comparable<ID>> {
         context(server: ServerRuntime)
-        public fun read(request: Request<*>): Authentication<SUBJECT, ID>?
+        public fun read(request: Request<*>): Authentication<SUBJECT>?
 
         public companion object : ListRegistryExtension<Reader<*, *>>
     }
 
-    public fun limitTo(builder: RequestPredicates.Builder.() -> Unit): Authentication<SUBJECT, ID> =
+    public fun limitTo(builder: RequestPredicates.Builder.() -> Unit): Authentication<SUBJECT> =
         Authentication(
             principalName,
             rawId,
@@ -185,7 +203,7 @@ public class Authentication<SUBJECT : HasId<ID>, ID : Comparable<ID>> private co
             cache
         )
 
-    public fun forbid(builder: RequestPredicates.Builder.() -> Unit): Authentication<SUBJECT, ID> =
+    public fun forbid(builder: RequestPredicates.Builder.() -> Unit): Authentication<SUBJECT> =
         Authentication(
             principalName,
             rawId,
@@ -196,3 +214,17 @@ public class Authentication<SUBJECT : HasId<ID>, ID : Comparable<ID>> private co
             cache
         )
 }
+
+@Suppress("UNCHECKED_CAST")
+context(server: ServerRuntime)
+public val <SUBJECT: HasId<ID>, ID : Comparable<ID>> Authentication<SUBJECT>.principalType: PrincipalType<SUBJECT, ID>
+    get() = untypedPrincipal as PrincipalType<SUBJECT, ID>
+
+@Suppress("UNCHECKED_CAST")
+context(server: ServerRuntime)
+public val <SUBJECT: HasId<ID>, ID : Comparable<ID>> Authentication<SUBJECT>.id: ID
+    get() = untypedId as ID
+
+context(server: ServerRuntime)
+public suspend fun <SUBJECT: HasId<ID>, ID : Comparable<ID>> Authentication<SUBJECT>.fetch(): SUBJECT =
+    cache.getOrPut(subjectCacheKey) { principalType.fetch(id) }

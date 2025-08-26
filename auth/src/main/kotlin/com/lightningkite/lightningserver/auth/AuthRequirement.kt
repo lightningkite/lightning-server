@@ -1,28 +1,32 @@
 package com.lightningkite.lightningserver.auth
 
+import com.lightningkite.lightningserver.ForbiddenException
 import com.lightningkite.lightningserver.definition.MutableExtensions
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.services.database.HasId
 import kotlin.time.Duration
 
-public sealed interface AuthRequirement<SUBJECT : HasId<ID>?, ID : Comparable<ID>> {
+public sealed interface AuthRequirement<out SUBJECT : HasId<*>?> {
     context(server: ServerRuntime)
-    public suspend fun accepts(auth: Authentication<*, *>?): Boolean
+    public suspend fun accepts(auth: Authentication<*>?): Boolean
 
-    public data object NoAuth : AuthRequirement<HasId<AnyId>?, AnyId> {
+    public data object NoAuth : AuthRequirement<HasId<AnyId>?> {
         context(server: ServerRuntime)
-        override suspend fun accepts(auth: Authentication<*, *>?): Boolean = auth == null
+        override suspend fun accepts(auth: Authentication<*>?): Boolean = auth == null
+
+        @Suppress("UNCHECKED_CAST")
+        public fun <SUBJECT : HasId<*>> typed(): AuthRequirement<SUBJECT?> = this as AuthRequirement<SUBJECT?>
     }
 
-    public data object AnyAuth : AuthRequirement<HasId<AnyId>, AnyId> {
+    public data object AnyAuth : AuthRequirement<HasId<AnyId>> {
         context(server: ServerRuntime)
-        override suspend fun accepts(auth: Authentication<*, *>?): Boolean = auth != null
+        override suspend fun accepts(auth: Authentication<*>?): Boolean = auth != null
     }
 
-    public abstract class AuthSetting : AuthRequirement<HasId<AnyId>, AnyId>, MutableExtensions.Key<AuthOptions<HasId<*>, *>> {
+    public abstract class AuthSetting : AuthRequirement<HasId<AnyId>>, MutableExtensions.Key<AuthRequirement<HasId<*>>> {
         context(server: ServerRuntime)
-        override suspend fun accepts(auth: Authentication<*, *>?): Boolean =
+        override suspend fun accepts(auth: Authentication<*>?): Boolean =
             server.server.extensions[this]?.accepts(auth) ?: false
     }
 
@@ -35,13 +39,13 @@ public sealed interface AuthRequirement<SUBJECT : HasId<ID>?, ID : Comparable<ID
         /**The required scopes. Empty set indicates no requirements and * indicates root access.*/
         val scopes: Set<String> = setOf("*"),
         val maxAge: Duration? = null,
-        val requirement: (suspend context(ServerRuntime) (Authentication<SUBJECT, ID>) -> Boolean)? = null
-    ) : AuthRequirement<SUBJECT, ID> {
+        val requirement: (suspend context(ServerRuntime) (Authentication<SUBJECT>) -> Boolean)? = null
+    ) : AuthRequirement<SUBJECT> {
         context(server: ServerRuntime)
-        override suspend fun accepts(auth: Authentication<*, *>?): Boolean {
+        override suspend fun accepts(auth: Authentication<*>?): Boolean {
             if (auth == null) return false
 
-            if (principalType != auth.principalType) return false
+            if (principalType != auth.untypedPrincipal) return false
 
             if (scopes.isNotEmpty()) {
                 auth.limitTo?.scopes?.let { limits ->
@@ -59,7 +63,21 @@ public sealed interface AuthRequirement<SUBJECT : HasId<ID>?, ID : Comparable<ID
             if (maxAge != null && now() - auth.issuedAt > maxAge) return false
 
             @Suppress("UNCHECKED_CAST") // typecheck done when principal type was checked
-            return requirement?.invoke(server, auth as Authentication<SUBJECT, ID>) ?: true
+            return requirement?.invoke(server, auth as Authentication<SUBJECT>) ?: true
         }
+    }
+
+    @JvmInline
+    public value class Options<out SUBJECT : HasId<*>?>(
+        public val options: Set<AuthRequirement<SUBJECT>>
+    ) : AuthRequirement<SUBJECT> {
+        public constructor(vararg requirements: AuthRequirement<SUBJECT>) : this(requirements.toSet())
+
+        context(server: ServerRuntime)
+        override suspend fun accepts(auth: Authentication<*>?): Boolean = options.any { it.accepts(auth) }
+
+        override fun toString(): String = "AuthOptions(${options.joinToString()})"
+
+        public companion object;
     }
 }

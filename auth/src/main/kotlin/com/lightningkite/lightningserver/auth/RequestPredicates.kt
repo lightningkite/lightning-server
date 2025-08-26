@@ -11,7 +11,7 @@ import kotlin.collections.iterator
 
 /**
  * A set of conditions that can be checked against a [Request]. This is typically
- * used to apply limitations to [com.lightningkite.lightningserver.auth.Authentication], like what methods it is limited to or forbidden
+ * used to apply limitations to [Authentication], like what methods it is limited to or forbidden
  * from requesting.
  *
  * Any provided data must be matched or satisfied for the predicate to return true.
@@ -19,7 +19,7 @@ import kotlin.collections.iterator
  * `limitTo scopes = emptySet()`, both of these are no-ops. You cannot limit to an empty set,
  * because that would make the request useless.
  *
- * For `methods`, a [com.lightningkite.lightningserver.pathing.PathPredicate] with `null` method applies to all methods and/or no method.
+ * For `methods`, a [PathPredicate] with `null` method applies to all methods and/or no method.
  * This way you can specify "request may use `GET /a/b/c` or `POST d/e/f` or do anything with `/g/h/i`".
  * */
 @Serializable

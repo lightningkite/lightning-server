@@ -4,7 +4,6 @@ import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.RequestPredicates
 import com.lightningkite.lightningserver.data.SerializableCache
-import com.lightningkite.lightningserver.data.set
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.generalSettings
@@ -16,7 +15,6 @@ import com.lightningkite.lightningserver.encryption.verify
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.sessions.Authentication
-import com.lightningkite.lightningserver.sessions.Session
 import com.lightningkite.lightningserver.sessions.sessionId
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.json.Json
@@ -43,7 +41,7 @@ public class JwtTokenFormat(
             JwtClaims(
                 iss = issuer(),
                 sid = auth.sessionId,
-                sub = "${handler.name}|${server.internalSerialization.json.encodeToString(handler.idSerializer, auth.id)}",
+                sub = "${handler.name}|${server.internalSerialization.json.encodeToString(handler.idSerializer, auth._id)}",
                 aud = audience(),
                 exp = now().plus(expiration).epochSeconds,
                 iat = auth.issuedAt.epochSeconds,

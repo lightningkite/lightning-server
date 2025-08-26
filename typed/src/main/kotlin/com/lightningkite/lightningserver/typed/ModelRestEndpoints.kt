@@ -22,22 +22,20 @@ import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer
 
-public class ModelRestEndpoints<USER : HasId<UID>?, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>>(
-    public val info: ModelInfo<USER, UID, T, ID>,
+public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
+    public val info: ModelInfo<USER, T, ID>,
 ) : ServerBuilder() {
-
 
     private val detailPath = path.arg(Segment.Wildcard("id", info.idSerializer))
     private val bulkPath = path.path("bulk")
 
-
-    public val permissions: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, Unit, ModelPermissions<T>>> =
+    public val permissions: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, Unit, ModelPermissions<T>>> =
         path.path("_permissions_").get bind ApiHttpHandler(
             summary = "Permissions",
             description = "Returns the user's permissions for this collection.",
             inputType = Unit.serializer(),
             outputType = ModelPermissions.serializer(info.serializer),
-            authOptions = info.authOptions,
+            auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
             handler = { _: Unit ->
@@ -46,13 +44,13 @@ public class ModelRestEndpoints<USER : HasId<UID>?, UID : Comparable<UID>, T : H
         )
 
 
-    public val list: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, Query<T>, List<T>>> =
+    public val list: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, Query<T>, List<T>>> =
         path.get bind ApiHttpHandler(
             summary = "List",
             description = "Gets a list of ${info.collectionName}s.",
             inputType = Query.serializer(info.serializer),
             outputType = ListSerializer(info.serializer),
-            authOptions = info.authOptions,
+            auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
             handler = { input: Query<T> ->
@@ -63,13 +61,13 @@ public class ModelRestEndpoints<USER : HasId<UID>?, UID : Comparable<UID>, T : H
         )
 
 
-    public val query: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, Query<T>, List<T>>> =
+    public val query: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, Query<T>, List<T>>> =
         path.path("query").post bind ApiHttpHandler(
             summary = "Query",
             description = "Gets a list of ${info.collectionName}s that match the given query.",
             inputType = Query.serializer(info.serializer),
             outputType = ListSerializer(info.serializer),
-            authOptions = info.authOptions,
+            auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
             handler = { input: Query<T> ->
@@ -80,13 +78,13 @@ public class ModelRestEndpoints<USER : HasId<UID>?, UID : Comparable<UID>, T : H
         )
 
 
-    public val queryPartial: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, QueryPartial<T>, List<Partial<T>>>> =
+    public val queryPartial: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, QueryPartial<T>, List<Partial<T>>>> =
         path.path("query-partial").post bind ApiHttpHandler(
             summary = "QueryPartial",
             description = "Gets parts of ${info.collectionName}s that match the given query.",
             inputType = QueryPartial.serializer(info.serializer),
             outputType = ListSerializer(PartialSerializer(info.serializer)),
-            authOptions = info.authOptions,
+            auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
             handler = { input: QueryPartial<T> ->
@@ -97,13 +95,13 @@ public class ModelRestEndpoints<USER : HasId<UID>?, UID : Comparable<UID>, T : H
         )
 
 
-    public val detail: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, UID, Unit, T>> =
+    public val detail: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, Unit, T>> =
         detailPath.get bind ApiHttpHandler(
             summary = "Query",
             description = "Gets a list of ${info.collectionName}s that match the given query.",
             inputType = Unit.serializer(),
             outputType = info.serializer,
-            authOptions = info.authOptions,
+            auth = info.auth,
             errorCases = listOf(
                 LSError(
                     http = HttpStatus.NotFound.code,
@@ -121,13 +119,13 @@ public class ModelRestEndpoints<USER : HasId<UID>?, UID : Comparable<UID>, T : H
         )
 
 
-    public val insertBulk: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, List<T>, List<T>>> =
+    public val insertBulk: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, List<T>, List<T>>> =
         bulkPath.post bind ApiHttpHandler(
             summary = "Insert Bulk",
             description = "Creates multiple ${info.collectionName}s at the same time.",
             inputType = ListSerializer(info.serializer),
             outputType = ListSerializer(info.serializer),
-            authOptions = info.authOptions,
+            auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
             handler = { values: List<T> ->
@@ -144,13 +142,13 @@ public class ModelRestEndpoints<USER : HasId<UID>?, UID : Comparable<UID>, T : H
         )
 
 
-    public val insert: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, T, T>> =
+    public val insert: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, T, T>> =
         path.post bind ApiHttpHandler(
             summary = "Insert",
             description = "Creates a new ${info.collectionName}",
             inputType = info.serializer,
             outputType = info.serializer,
-            authOptions = info.authOptions,
+            auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
             handler = { value: T ->
@@ -168,13 +166,13 @@ public class ModelRestEndpoints<USER : HasId<UID>?, UID : Comparable<UID>, T : H
         )
 
 
-    public val upsert: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, UID, T, T>> =
+    public val upsert: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, T, T>> =
         detailPath.post bind ApiHttpHandler(
             summary = "Upsert",
             description = "Creates or updates a ${info.collectionName}",
             inputType = info.serializer,
             outputType = info.serializer,
-            authOptions = info.authOptions,
+            auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
             handler = { value: T ->
@@ -193,13 +191,13 @@ public class ModelRestEndpoints<USER : HasId<UID>?, UID : Comparable<UID>, T : H
         )
 
 
-    public val bulkReplace: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, List<T>, List<T>>> =
+    public val bulkReplace: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, List<T>, List<T>>> =
         bulkPath.put bind ApiHttpHandler(
             summary = "Bulk Replace",
             description = "Modifies many ${info.collectionName}s at the same time by ID.",
             inputType = ListSerializer(info.serializer),
             outputType = ListSerializer(info.serializer),
-            authOptions = info.authOptions,
+            auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
             handler = { values: List<T> ->
@@ -216,13 +214,13 @@ public class ModelRestEndpoints<USER : HasId<UID>?, UID : Comparable<UID>, T : H
         )
 
 
-    public val replace: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, UID, T, T>> =
+    public val replace: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, T, T>> =
         detailPath.put bind ApiHttpHandler(
             summary = "Replace",
             description = "Replaces a single ${info.collectionName} by ID.",
             inputType = info.serializer,
             outputType = info.serializer,
-            authOptions = info.authOptions,
+            auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
             handler = { value: T ->
@@ -241,13 +239,13 @@ public class ModelRestEndpoints<USER : HasId<UID>?, UID : Comparable<UID>, T : H
         )
 
 
-    public val bulkModify: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, MassModification<T>, Int>> =
+    public val bulkModify: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, MassModification<T>, Int>> =
         bulkPath.patch bind ApiHttpHandler(
             summary = "Bulk Modify",
             description = "Modifies many ${info.collectionName}s at the same time.  Returns the number of changed items.",
             inputType = MassModification.serializer(info.serializer),
             outputType = Int.serializer(),
-            authOptions = info.authOptions,
+            auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
             handler = { input: MassModification<T> ->
@@ -264,13 +262,13 @@ public class ModelRestEndpoints<USER : HasId<UID>?, UID : Comparable<UID>, T : H
         )
 
 
-    public val modifyWithDiff: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, UID, Modification<T>, EntryChange<T>>> =
+    public val modifyWithDiff: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, Modification<T>, EntryChange<T>>> =
         detailPath.patch bind ApiHttpHandler(
             summary = "Modify with Diff",
             description = "Modifies a ${info.collectionName} by ID, returning both the previous value and new value.",
             inputType = Modification.serializer(info.serializer),
             outputType = EntryChange.serializer(info.serializer),
-            authOptions = info.authOptions,
+            auth = info.auth,
             errorCases = listOf(
                 LSError(
                     http = HttpStatus.NotFound.code,
@@ -295,13 +293,13 @@ public class ModelRestEndpoints<USER : HasId<UID>?, UID : Comparable<UID>, T : H
         )
 
 
-    public val modify: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, UID, Modification<T>, T>> =
+    public val modify: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, Modification<T>, T>> =
         detailPath.path("delta").patch bind ApiHttpHandler(
             summary = "Modify with Diff",
             description = "Modifies a ${info.collectionName} by ID, returning both the previous value and new value.",
             inputType = Modification.serializer(info.serializer),
             outputType = info.serializer,
-            authOptions = info.authOptions,
+            auth = info.auth,
             errorCases = listOf(
                 LSError(
                     http = HttpStatus.NotFound.code,
@@ -327,13 +325,13 @@ public class ModelRestEndpoints<USER : HasId<UID>?, UID : Comparable<UID>, T : H
         )
 
 
-    public val modifySimple: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, UID, Partial<T>, T>> =
+    public val modifySimple: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, Partial<T>, T>> =
         detailPath.path("simplified").patch bind ApiHttpHandler(
             summary = "Modify with Diff",
             description = "Modifies a ${info.collectionName} by ID, returning both the previous value and new value.",
             inputType = Partial.serializer(info.serializer),
             outputType = info.serializer,
-            authOptions = info.authOptions,
+            auth = info.auth,
             errorCases = listOf(
                 LSError(
                     http = HttpStatus.NotFound.code,
@@ -359,13 +357,13 @@ public class ModelRestEndpoints<USER : HasId<UID>?, UID : Comparable<UID>, T : H
         )
 
 
-    public val bulkDelete: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, Condition<T>, Int>> =
+    public val bulkDelete: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, Condition<T>, Int>> =
         path.path("bulk-delete").post bind ApiHttpHandler(
             summary = "Bulk Delete",
             description = "Deletes all matching ${info.collectionName}s, returning the number of deleted items.",
             inputType = Condition.serializer(info.serializer),
             outputType = Int.serializer(),
-            authOptions = info.authOptions,
+            auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
             handler = { filter: Condition<T> ->
@@ -375,13 +373,13 @@ public class ModelRestEndpoints<USER : HasId<UID>?, UID : Comparable<UID>, T : H
         )
 
 
-    public val deleteItem: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, UID, Unit, Unit>> =
+    public val deleteItem: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, Unit, Unit>> =
         detailPath.delete bind ApiHttpHandler(
             summary = "Delete",
             description = "Deletes a ${info.collectionName} by id.",
             inputType = Unit.serializer(),
             outputType = Unit.serializer(),
-            authOptions = info.authOptions,
+            auth = info.auth,
             errorCases = listOf(
                 LSError(
                     http = HttpStatus.NotFound.code,
@@ -402,13 +400,13 @@ public class ModelRestEndpoints<USER : HasId<UID>?, UID : Comparable<UID>, T : H
         )
 
 
-    public val countGet: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, Condition<T>, Int>> =
+    public val countGet: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, Condition<T>, Int>> =
         path.path("count").get bind ApiHttpHandler(
             summary = "Count",
             description = "Gets the total number of ${info.collectionName}s matching the given condition.",
             inputType = Condition.serializer(info.serializer),
             outputType = Int.serializer(),
-            authOptions = info.authOptions,
+            auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
             handler = { condition: Condition<T> ->
@@ -418,13 +416,13 @@ public class ModelRestEndpoints<USER : HasId<UID>?, UID : Comparable<UID>, T : H
         )
 
 
-    public val count: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, Condition<T>, Int>> =
+    public val count: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, Condition<T>, Int>> =
         path.path("count").post bind ApiHttpHandler(
             summary = "Count",
             description = "Gets the total number of ${info.collectionName}s matching the given condition.",
             inputType = Condition.serializer(info.serializer),
             outputType = Int.serializer(),
-            authOptions = info.authOptions,
+            auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
             handler = { condition: Condition<T> ->
@@ -434,13 +432,13 @@ public class ModelRestEndpoints<USER : HasId<UID>?, UID : Comparable<UID>, T : H
         )
 
 
-    public val groupCount: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, GroupCountQuery<T>, Map<String, Int>>> =
+    public val groupCount: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, GroupCountQuery<T>, Map<String, Int>>> =
         path.path("group-count").post bind ApiHttpHandler(
             summary = "Group Count",
             description = "Gets the total number of ${info.collectionName}s matching the given condition divided by group.",
             inputType = GroupCountQuery.serializer(info.serializer),
             outputType = MapSerializer(String.serializer(), Int.serializer()),
-            authOptions = info.authOptions,
+            auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
             handler = { condition: GroupCountQuery<T> ->
@@ -452,13 +450,13 @@ public class ModelRestEndpoints<USER : HasId<UID>?, UID : Comparable<UID>, T : H
         )
 
 
-    public val aggregate: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, AggregateQuery<T>, Double?>> =
+    public val aggregate: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, AggregateQuery<T>, Double?>> =
         path.path("aggregate").post bind ApiHttpHandler(
             summary = "Aggregate",
             description = "Aggregates a property of ${info.collectionName}s matching the given condition.",
             inputType = AggregateQuery.serializer(info.serializer),
             outputType = Double.serializer().nullable,
-            authOptions = info.authOptions,
+            auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
             handler = { condition: AggregateQuery<T> ->
@@ -473,13 +471,13 @@ public class ModelRestEndpoints<USER : HasId<UID>?, UID : Comparable<UID>, T : H
         )
 
 
-    public val groupAggregate: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, GroupAggregateQuery<T>, Map<String, Double?>>> =
+    public val groupAggregate: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, GroupAggregateQuery<T>, Map<String, Double?>>> =
         path.path("group-aggregate").post bind ApiHttpHandler(
             summary = "Group Aggregate",
             description = "Aggregates a property of ${info.collectionName}s matching the given condition divided by group.",
             inputType = GroupAggregateQuery.serializer(info.serializer),
             outputType = MapSerializer(String.serializer(), Double.serializer().nullable),
-            authOptions = info.authOptions,
+            auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
             handler = { condition: GroupAggregateQuery<T> ->
@@ -496,13 +494,13 @@ public class ModelRestEndpoints<USER : HasId<UID>?, UID : Comparable<UID>, T : H
         )
 
 
-    public val groupCount2: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, GroupCountQuery<T>, Map<String, Int>>> =
+    public val groupCount2: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, GroupCountQuery<T>, Map<String, Int>>> =
         path.path("group-count-2").post bind ApiHttpHandler(
             summary = "Group Count 2",
             description = "Gets the total number of ${info.collectionName}s matching the given condition divided by group.",
             inputType = GroupCountQuery.serializer(info.serializer),
             outputType = MapSerializer(String.serializer(), Int.serializer()),
-            authOptions = info.authOptions,
+            auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
             handler = { condition: GroupCountQuery<T> ->
@@ -516,13 +514,13 @@ public class ModelRestEndpoints<USER : HasId<UID>?, UID : Comparable<UID>, T : H
         )
 
 
-    public val groupAggregate2: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, UID, GroupAggregateQuery<T>, Map<String, Double?>>> =
+    public val groupAggregate2: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, GroupAggregateQuery<T>, Map<String, Double?>>> =
         path.path("group-aggregate-2").post bind ApiHttpHandler(
             summary = "Group Aggregate 2",
             description = "Aggregates a property of ${info.collectionName}s matching the given condition divided by group.",
             inputType = GroupAggregateQuery.serializer(info.serializer),
             outputType = MapSerializer(String.serializer(), Double.serializer().nullable),
-            authOptions = info.authOptions,
+            auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
             handler = { condition: GroupAggregateQuery<T> ->

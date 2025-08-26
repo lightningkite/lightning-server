@@ -43,11 +43,11 @@ public interface PrincipalType<SUBJECT : HasId<ID>, ID : Comparable<ID>> {
 
     context(server: ServerRuntime)
     public suspend fun permitMasquerade(
-        from: Authentication<*, *>,
-        into: Authentication<SUBJECT, ID>,
+        from: Authentication<*>,
+        into: Authentication<SUBJECT>,
     ): Boolean = false
 
-    public val precache: List<AuthCacheKey<SUBJECT, ID, *>>
+    public val precache: List<AuthCacheKey<SUBJECT, *>> get() = emptyList()
 
     public companion object;
 }

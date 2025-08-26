@@ -1,43 +1,28 @@
 package com.lightningkite.lightningserver.demo
 
-import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.auth
-import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.auth.or
-import com.lightningkite.lightningserver.auth.register
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.builder.bind
+import com.lightningkite.lightningserver.definition.builder.setting
 import com.lightningkite.lightningserver.definition.builder.topic
 import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
-import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.send
-import com.lightningkite.lightningserver.sdk.ClientInterfaceBuilder
-import com.lightningkite.lightningserver.sdk.module
 import com.lightningkite.lightningserver.serialization.basicMediaTypeCoders
-import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.lightningserver.typed.MediaTypeEncoder
-import com.lightningkite.lightningserver.typed.auth
-import com.lightningkite.lightningserver.typed.mediaTypeEncoders
-import com.lightningkite.lightningserver.websockets.WebSocketClose
-import com.lightningkite.lightningserver.websockets.WebSocketFrame
-import com.lightningkite.lightningserver.websockets.WebSocketHandler
-import com.lightningkite.lightningserver.websockets.subscribe
-import com.lightningkite.lightningserver.websockets.text
-import com.lightningkite.services.data.TypedData
+import com.lightningkite.lightningserver.typed.modelInfo
+import com.lightningkite.lightningserver.websockets.*
+import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
+import com.lightningkite.services.database.ModelPermissions
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.builtins.serializer
-import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.uuid.Uuid
 
 @Serializable
@@ -53,6 +38,26 @@ data class User(
     }
 }
 
+@Serializable
+data class User2(
+    override val _id: Int
+) : HasId<Int> {
+    companion object : PrincipalType<User2, Int> {
+        override val idSerializer: KSerializer<Int> = Int.serializer()
+        override val subjectSerializer: KSerializer<User2> = serializer()
+
+        context(server: ServerRuntime)
+        override suspend fun fetch(id: Int): User2 = User2(id)
+    }
+}
+
+@Serializable
+data class Model(
+    override val _id: Uuid = Uuid.random(),
+    val name: String,
+    val data: Int,
+) : HasId<Uuid>
+
 object Server : ServerBuilder() {
     init {
         basicMediaTypeCoders()
@@ -65,6 +70,8 @@ object Server : ServerBuilder() {
         HttpResponse.plainText("Ktor Test Success 2")
     }
     val topic = path.topic(String.serializer())
+
+    val database = setting<Database.Settings, Database>("database", Database.Settings())
 
     val websocket = path bind WebSocketHandler(
         storageSerializer = Unit.serializer(),
@@ -99,4 +106,16 @@ object Server : ServerBuilder() {
         topic.send(body ?: "No Body")
         HttpResponse()
     }
+
+    val model = path.path("model") bind ModelEndpoints
+}
+
+object ModelEndpoints : ServerBuilder() {
+    val info = Server.database.modelInfo(
+        auth = User.auth() or User2.auth(),
+        permissions = { ModelPermissions.allowAll<Model>() },
+        postPermissionsForUser = {
+            it
+        }
+    )
 }

@@ -7,9 +7,7 @@ import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.RequestPredicates
-import com.lightningkite.lightningserver.auth.anyAuth
 import com.lightningkite.lightningserver.auth.auth
-import com.lightningkite.lightningserver.auth.get
 import com.lightningkite.lightningserver.auth.isSuperUser
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.auth.register
@@ -29,7 +27,6 @@ import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
-import com.lightningkite.lightningserver.path
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
@@ -82,7 +79,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 val auth = this.authOrNull
                 val canUse: Condition<Session<SUBJECT, ID>> = when {
                     auth == null -> Condition.Never
-                    else -> spath.subjectId eq auth.id
+                    else -> spath.subjectId eq auth._id
                 }
 
                 val isRoot: Condition<Session<SUBJECT, ID>> =
@@ -215,7 +212,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     public val tokenSimple: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, AnyId, String, String>> =
         path.path("token").path("simple").post bind ApiHttpHandler(
-            authOptions = noAuth,
+            auth = noAuth,
             summary = "Get Token Simple",
             handler = { refresh: String ->
                 val session = RefreshToken(refresh).session(request)
@@ -227,19 +224,19 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     public val createSubSession: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, SUBJECT, ID, SubSessionRequest, String>> =
         path.path("sub-session").post bind ApiHttpHandler(
-            authOptions = principal.auth(),
+            auth = principal.auth(),
             inputType = SubSessionRequest.serializer(),
             outputType = String.serializer(),
             summary = "Create Sub Session",
             description = "Creates a session with more limited authorization",
             handler = { request: SubSessionRequest ->
-                val session = sessionInfo.collection().get(auth.sessionId ?: throw UnauthorizedException())
+                val session = sessionInfo.collection().get(this.auth.sessionId ?: throw UnauthorizedException())
                     ?: throw UnauthorizedException()
 
                 newSession(
                     label = request.label,
-                    subjectId = auth.id,
-                    derivedFrom = auth.sessionId,
+                    subjectId = this.auth._id,
+                    derivedFrom = this.auth.sessionId,
                     limitTo = request.limitTo,
                     forbid = request.forbid,
                     expires = session.expires
@@ -254,9 +251,9 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     public val self: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, SUBJECT, ID, Unit, SUBJECT>> =
         path.path("self").get bind ApiHttpHandler(
             summary = "Get Self",
-            authOptions = principal.auth(scopes = setOf("scopes")),
+            auth = principal.auth(scopes = setOf("scopes")),
             inputType = Unit.serializer(),
             outputType = principal.subjectSerializer,
-            handler = { _ -> auth.fetch() }
+            handler = { _ -> this.auth.fetch() }
         )
 }
