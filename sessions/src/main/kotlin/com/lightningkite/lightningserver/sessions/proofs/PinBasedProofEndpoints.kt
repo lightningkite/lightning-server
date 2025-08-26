@@ -45,9 +45,9 @@ public abstract class PinBasedProofEndpoints(
         strength = strength
     )
 
-    public override val start: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, AnyId, String, String>> =
+    public override val start: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, String>> =
         path.path("start").post bind ApiHttpHandler(
-            authOptions = noAuth,
+            auth = noAuth,
             summary = "Begin $name Ownership Proof",
             description = "Sends a login code to the given ${name.lowercase()}.  The message will contain both a PIN that can be combined with the returned key to log in.",
             errorCases = emptyList(),
@@ -75,9 +75,9 @@ public abstract class PinBasedProofEndpoints(
         )
     }
 
-    override val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, AnyId, FinishProof, Proof>> =
+    override val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, FinishProof, Proof>> =
         path.path("prove").post bind ApiHttpHandler(
-            authOptions = noAuth,
+            auth = noAuth,
             summary = "Prove ${info.property} ownership",
             description = "Logs in to the given account with a PIN that was sent earlier and the key from that request.  Note that the PIN expires in ${pin.expiration.inWholeMinutes} minutes, and you are only permitted ${pin.maxAttempts} attempts.",
             errorCases = emptyList(),
@@ -94,7 +94,7 @@ public abstract class PinBasedProofEndpoints(
 
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<AnyId>> established(
-        handler: PrincipalType<SUBJECT, AnyId>,
+        principal: PrincipalType<SUBJECT, AnyId>,
         item: SUBJECT,
-    ): Boolean = handler.getProperty(item, info.property!!) != null
+    ): Boolean = principal.getProperty(item, info.property!!) != null
 }

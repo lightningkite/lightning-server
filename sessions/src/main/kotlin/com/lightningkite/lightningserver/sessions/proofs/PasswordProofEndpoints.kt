@@ -19,8 +19,8 @@ import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.runtime.test.serverRuntime
 import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.sessions.proofs.extensions.constrainAttemptRate
-import com.lightningkite.lightningserver.sessions.proofs.extensions.findUserIdString
-import com.lightningkite.lightningserver.sessions.proofs.extensions.idString
+import com.lightningkite.lightningserver.auth.findUserIdString
+import com.lightningkite.lightningserver.auth.idString
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.services.cache.Cache
@@ -52,12 +52,12 @@ public class PasswordProofEndpoints(
     context(_: ServerRuntime)
     private val active
         get() = condition<PasswordSecret> {
-            it.disabledAt.eq(null) and (it.expiresAt.eq(null) or it.expiresAt.notNull.gt(now()))
+            it.disabledAt.eq(null) and ((it.expiresAt.eq(null) or it.expiresAt.notNull.gt(now())))
         }
 
-    public val modelInfo: ModelInfo<HasId<AnyId>, AnyId, PasswordSecret, Uuid> =
+    public val modelInfo: ModelInfo<HasId<AnyId>, PasswordSecret, Uuid> =
         database.modelInfo(
-            authOptions = recentRootAuth or AuthRequirement.IsAdmin,
+            auth = recentRootAuth or AuthRequirement.IsAdmin,
             signals = {
                 it.interceptCreate {
                     evaluatePassword(it.hash)
@@ -90,7 +90,7 @@ public class PasswordProofEndpoints(
             }
         )
 
-    public val rest: ModelRestEndpoints<HasId<AnyId>, AnyId, PasswordSecret, Uuid> = ModelRestEndpoints(modelInfo)
+    public val rest: ModelRestEndpoints<HasId<AnyId>, PasswordSecret, Uuid> = ModelRestEndpoints(modelInfo)
 
     context(_: ServerRuntime)
     public suspend fun <SUBJECT : HasId<ID>, ID: Comparable<ID>> establish(
@@ -117,28 +117,27 @@ public class PasswordProofEndpoints(
         )
     }
 
-    public val establish: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, AnyId, EstablishPassword, Unit>> =
+    public val establish: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, EstablishPassword, Unit>> =
         path.path("establish").post bind ApiHttpHandler(
             summary = "Establish Password",
             inputType = EstablishPassword.serializer(),
             outputType = Unit.serializer(),
             description = "Set your password",
-            authOptions = recentRootAuth,
+            auth = recentRootAuth,
             errorCases = emptyList(),
             handler = { value: EstablishPassword ->
-                @Suppress("UNCHECKED_CAST")
                 establish(
                     auth.principalType,
-                    auth.rawId as AnyId,
+                    auth.id,
                     value
                 )
                 Unit
             }
         )
 
-    public override val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, AnyId, IdentificationAndPassword, Proof>> =
+    public override val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, IdentificationAndPassword, Proof>> =
         path.path("prove").post bind ApiHttpHandler(
-            authOptions = noAuth,
+            auth = noAuth,
             summary = "Prove password ownership",
             description = "Logs in to the given account with a password.",
             errorCases = listOf(),
@@ -193,14 +192,16 @@ public class PasswordProofEndpoints(
 
     context(server: ServerRuntime)
     public override suspend fun <SUBJECT : HasId<AnyId>> established(
-        handler: PrincipalType<SUBJECT, AnyId>,
+        principal: PrincipalType<SUBJECT, AnyId>,
         item: SUBJECT,
     ): Boolean {
         @Suppress("UNCHECKED_CAST")
         return modelInfo.collection().count(condition {
-            it.subjectId.eq(handler.idString(item._id)) and
-                    it.subjectType.eq(handler.name) and
-                    active
+            Condition.And(
+                it.subjectId eq principal.idString(item._id),
+                it.subjectType eq principal.name,
+                active
+            )
         }) > 0
     }
 }

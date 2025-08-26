@@ -3,11 +3,13 @@ package com.lightningkite.lightningserver.sessions
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.UnauthorizedException
 import com.lightningkite.lightningserver.auth.AnyId
-import com.lightningkite.lightningserver.auth.AuthOptions
+import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.RequestPredicates
 import com.lightningkite.lightningserver.auth.auth
+import com.lightningkite.lightningserver.auth.fetch
+import com.lightningkite.lightningserver.auth.id
 import com.lightningkite.lightningserver.auth.isSuperUser
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.auth.register
@@ -69,9 +71,9 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     private val spath = Session.path(principal.subjectSerializer, principal.idSerializer)
 
-    public val sessionInfo: ModelInfo<SUBJECT, ID, Session<SUBJECT, ID>, Uuid> =
+    public val sessionInfo: ModelInfo<SUBJECT, Session<SUBJECT, ID>, Uuid> =
         database.modelInfo2(
-            authOptions = principal.auth(scopes = setOf("com/lightningkite/lightningserver/sessions")),
+            auth = principal.auth(scopes = setOf("com/lightningkite/lightningserver/sessions")),
             serializer = Session.serializer(principal.subjectSerializer, principal.idSerializer),
             idSerializer = Uuid.serializer(),
             collectionName = principal.name + "Session",
@@ -79,11 +81,11 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 val auth = this.authOrNull
                 val canUse: Condition<Session<SUBJECT, ID>> = when {
                     auth == null -> Condition.Never
-                    else -> spath.subjectId eq auth._id
+                    else -> spath.subjectId eq auth.id
                 }
 
                 val isRoot: Condition<Session<SUBJECT, ID>> =
-                    if (AuthOptions.isSuperUser.accepts(auth)) Condition.Always
+                    if (AuthRequirement.isSuperUser.accepts(auth)) Condition.Always
                     else Condition.Never
 
                 ModelPermissions(
@@ -159,7 +161,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     }
 
     context(server: ServerRuntime)
-    public fun Session<SUBJECT, ID>.toAuth(): Authentication<SUBJECT, ID> = Authentication(
+    public fun Session<SUBJECT, ID>.toAuth(): Authentication<SUBJECT> = Authentication(
         principalType = principal,
         id = subjectId,
         sessionId = _id,
@@ -210,7 +212,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         return session
     }
 
-    public val tokenSimple: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, AnyId, String, String>> =
+    public val tokenSimple: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, String>> =
         path.path("token").path("simple").post bind ApiHttpHandler(
             auth = noAuth,
             summary = "Get Token Simple",
@@ -222,7 +224,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             }
         )
 
-    public val createSubSession: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, SUBJECT, ID, SubSessionRequest, String>> =
+    public val createSubSession: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, SUBJECT, SubSessionRequest, String>> =
         path.path("sub-session").post bind ApiHttpHandler(
             auth = principal.auth(),
             inputType = SubSessionRequest.serializer(),
@@ -235,8 +237,8 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
                 newSession(
                     label = request.label,
-                    subjectId = this.auth._id,
-                    derivedFrom = this.auth.sessionId,
+                    subjectId = auth.id,
+                    derivedFrom = auth.sessionId,
                     limitTo = request.limitTo,
                     forbid = request.forbid,
                     expires = session.expires
@@ -248,12 +250,12 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             }
         )
 
-    public val self: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, SUBJECT, ID, Unit, SUBJECT>> =
+    public val self: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, SUBJECT, Unit, SUBJECT>> =
         path.path("self").get bind ApiHttpHandler(
             summary = "Get Self",
-            auth = principal.auth(scopes = setOf("scopes")),
+            auth = principal.auth(scopes = setOf("self")),
             inputType = Unit.serializer(),
             outputType = principal.subjectSerializer,
-            handler = { _ -> this.auth.fetch() }
+            handler = { _ -> auth.fetch() }
         )
 }

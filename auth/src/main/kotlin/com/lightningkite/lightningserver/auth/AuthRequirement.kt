@@ -8,7 +8,7 @@ import com.lightningkite.services.database.HasId
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
-public sealed interface AuthRequirement<out SUBJECT : HasId<*>?> {
+public interface AuthRequirement<out SUBJECT : HasId<*>?> {
     context(server: ServerRuntime)
     public suspend fun accepts(auth: Authentication<*>?): Boolean
 
@@ -55,13 +55,13 @@ public sealed interface AuthRequirement<out SUBJECT : HasId<*>?> {
             if (principalType != auth.untypedPrincipal) return false
 
             if (scopes.isNotEmpty()) {
-                auth.limitTo?.scopes?.also { limits ->
-                    if (limits.isEmpty() || limits.contains("*")) return@also
+                auth.limitTo?.scopes?.let { limits ->
+                    if (limits.isEmpty() || limits.contains("*")) return@let
                     if (scopes.contains("*")) return false // we know limits doesn't have root access
                     if (!limits.containsAll(scopes)) return false
                 }
-                auth.forbid?.scopes?.also { forbidden ->
-                    if (forbidden.isEmpty()) return@also
+                auth.forbid?.scopes?.let { forbidden ->
+                    if (forbidden.isEmpty()) return@let
                     if (forbidden.contains("*")) return false
                     if (scopes.any { it in forbidden }) return false
                 }
@@ -84,7 +84,7 @@ public sealed interface AuthRequirement<out SUBJECT : HasId<*>?> {
         override suspend fun accepts(auth: Authentication<*>?): Boolean = options.any { it.accepts(auth) }
 
         override fun toString(): String = "AuthOptions(${options.joinToString()})"
-
-        public companion object;
     }
+
+    public companion object;
 }

@@ -1,19 +1,10 @@
 package com.lightningkite.lightningserver.sessions.proofs.oauth
 
 import com.lightningkite.lightningserver.BadRequestException
-import com.lightningkite.lightningserver.client
-import com.lightningkite.lightningserver.debugJsonBody
 import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.routes.fullUrl
 import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.serialization.encodeToFormData
-import com.lightningkite.lightningserver.settings.setting
-import com.lightningkite.lightningserver.statusFailing
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.http.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.nullable
@@ -34,7 +25,6 @@ public class OauthProviderInfo(
     public val scopeForProfile: String,
     public val getProfile: suspend (OauthResponse) -> ExternalProfile,
 ) {
-
     public data class SettingInfo<T : Any>(
         val serializer: KSerializer<T>,
         val read: (T) -> OauthProviderCredentials,

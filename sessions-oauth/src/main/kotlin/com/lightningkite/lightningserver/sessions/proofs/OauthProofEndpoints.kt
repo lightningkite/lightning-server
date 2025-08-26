@@ -45,9 +45,11 @@ public class OauthProofEndpoints(
             at = now()
         )).encodeURLQueryComponent()}&backend=${generalSettings().publicUrl.encodeURLQueryComponent()}")
     }
+
     override val indirectLink: ServerPath = path("open").get.handler {
         HttpResponse.redirectToGet(callback.loginUrl(UUID.random()))
     }.path
+
     val loginApi = path("login").get.api(
         summary = "Log In via ${provider.niceName}",
         authOptions = noAuth,

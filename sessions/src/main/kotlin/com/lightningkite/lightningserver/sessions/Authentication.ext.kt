@@ -20,9 +20,8 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
     limitTo: RequestPredicates? = null,
     forbid: RequestPredicates? = null,
     cache: SerializableCache? = null
-): Authentication<SUBJECT, ID> =
+): Authentication<SUBJECT> =
     Authentication(
-        server,
         principalType,
         id,
         issuedAt,
@@ -34,4 +33,4 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
     }
 
 context(_: ServerRuntime)
-public val Authentication<*, *>.sessionId: Uuid? get() = get(Session)
+public val Authentication<*>.sessionId: Uuid? get() = get(Session)

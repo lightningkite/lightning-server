@@ -15,8 +15,8 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.runtime.test.serverRuntime
-import com.lightningkite.lightningserver.sessions.proofs.extensions.findUserIdString
-import com.lightningkite.lightningserver.sessions.proofs.extensions.idString
+import com.lightningkite.lightningserver.auth.findUserIdString
+import com.lightningkite.lightningserver.auth.idString
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.services.cache.Cache
@@ -72,8 +72,8 @@ public class WebAuthNProofEndpoints(
             it.disabledAt.eq(null) and (it.expiresAt.eq(null) or it.expiresAt.notNull.gt(now()))
         }
 
-    public val modelInfo: ModelInfo<HasId<AnyId>, AnyId, WebAuthNCredential, String> = database.modelInfo(
-        authOptions = recentRootAuth or AuthRequirement.IsAdmin,
+    public val modelInfo: ModelInfo<HasId<AnyId>, WebAuthNCredential, String> = database.modelInfo(
+        auth = recentRootAuth or AuthRequirement.IsAdmin,
         permissions = {
             val admin = condition<WebAuthNCredential>(AuthRequirement.IsAdmin.accepts(authOrNull))
             val mine = authOrNull?.let { a ->
@@ -105,7 +105,7 @@ public class WebAuthNProofEndpoints(
         }
     )
 
-    public val rest: ModelRestEndpoints<HasId<AnyId>, AnyId, WebAuthNCredential, String> = ModelRestEndpoints(modelInfo)
+    public val rest: ModelRestEndpoints<HasId<AnyId>, WebAuthNCredential, String> = ModelRestEndpoints(modelInfo)
 
 
     private fun challengeCacheKey(key: String): String =
@@ -135,13 +135,12 @@ public class WebAuthNProofEndpoints(
 
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<AnyId>> established(
-        handler: PrincipalType<SUBJECT, AnyId>,
+        principal: PrincipalType<SUBJECT, AnyId>,
         item: SUBJECT,
     ): Boolean {
-        @Suppress("UNCHECKED_CAST")
         return modelInfo.collection().findOne(condition {
-            it.subjectId.eq(handler.idString(item._id)) and
-                    it.subjectType.eq(handler.name) and
+            it.subjectId.eq(principal.idString(item._id)) and
+                    it.subjectType.eq(principal.name) and
                     active
         }) != null
     }
@@ -163,17 +162,15 @@ public class WebAuthNProofEndpoints(
             .toList()
 
     @OptIn(ExperimentalEncodingApi::class)
-    public val registerStart: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, AnyId, WebAuthN.GeneralPreference, WebAuthN.Registration.RegistrationResponse>> =
+    public val registerStart: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, WebAuthN.GeneralPreference, WebAuthN.Registration.RegistrationResponse>> =
         path.path("register-start").post bind ApiHttpHandler(
-            authOptions = recentRootAuth,
+            auth = recentRootAuth,
             summary = "Issue WebAuthN creation challenge",
             description = "Returns a challenge to be passed on to a client authenticator for the creation of a new Public Key Credential.",
             errorCases = listOf(),
             examples = listOf(),
             successCode = HttpStatus.OK,
             handler = { residentKeyPreference: WebAuthN.GeneralPreference ->
-
-                @Suppress("UNCHECKED_CAST")
                 val options = registrationForUser(auth.fetch(), residentKeyPreference)
 
                 val challenge = generate()
@@ -215,9 +212,9 @@ public class WebAuthNProofEndpoints(
         )
 
     @OptIn(ExperimentalEncodingApi::class)
-    public val registerFinish: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, AnyId, WebAuthN.Registration.RegisterRequest, Unit>> =
+    public val registerFinish: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, WebAuthN.Registration.RegisterRequest, Unit>> =
         path.path("register-finish").post bind ApiHttpHandler(
-            authOptions = recentRootAuth,
+            auth = recentRootAuth,
             summary = "Establish WebAuthN Credential",
             description = "Validates and Accepts a public key credential created from a previously issued creation challenge.",
             errorCases = listOf(),
@@ -271,7 +268,6 @@ public class WebAuthNProofEndpoints(
                     throw BadRequestException("Failed to verify Authenticator")
                 }
 
-                @Suppress("UNCHECKED_CAST")
                 modelInfo.collection().insertOne(
                     WebAuthNCredential(
                         _id = credentials.id,
@@ -302,9 +298,9 @@ public class WebAuthNProofEndpoints(
     // keys. If they do, then we must return the subjects existing credential IDs. If a user hits this endpoint WITH
     // authentication, then they are re-authenticating, and we will return the existing credential ids regardless of
     // identity provided.
-    public val start: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, AnyId, Identification, WebAuthN.Authentication.StartResponse>> =
+    public val start: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, Identification, WebAuthN.Authentication.StartResponse>> =
         path.path("start").post bind ApiHttpHandler(
-            authOptions = anyAuth or noAuth,
+            auth = anyAuth or noAuth,
             summary = "Begin WebAuthN challenge",
             description = "Returns a challenge to be passed on to a client authenticator for signing.",
             errorCases = listOf(),
@@ -375,9 +371,9 @@ public class WebAuthNProofEndpoints(
 
 
     @OptIn(ExperimentalEncodingApi::class)
-    public val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, AnyId, WebAuthN.Authentication.ProveRequest, Proof>> =
+    public val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, WebAuthN.Authentication.ProveRequest, Proof>> =
         path.path("prove").post bind ApiHttpHandler(
-            authOptions = noAuth,
+            auth = noAuth,
             summary = "Prove WebAuthN ownership",
             description = "Returns a challenge to be passed on to a client authenticator for signing.",
             errorCases = listOf(),

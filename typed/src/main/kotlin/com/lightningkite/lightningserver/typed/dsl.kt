@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.AuthRequirement
+import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -44,3 +45,13 @@ public inline fun <PATH: PathSpec, USER: HasId<*>?, reified INPUT, reified OUTPU
     noinline handler: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT
 ): ApiHttpHandler<PATH, USER, INPUT, OUTPUT> =
     ApiHttpHandler(summary, description, serializerOrContextual<INPUT>(), serializerOrContextual<OUTPUT>(), auth, successCode, errorCases, examples, handler)
+
+context(server: ServerRuntime, access: HttpAccess<PATH, out USER>)
+public suspend operator fun <PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.invoke(input: INPUT): OUTPUT {
+    val newAccess = access.request.access(this.auth)
+    return handle(newAccess, input)
+}
+
+context(server: ServerRuntime, access: HttpAccess<PATH, out USER>)
+public suspend operator fun <PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT> Locationed<*, ApiHttpHandler<PATH, USER, INPUT, OUTPUT>>.invoke(input: INPUT): OUTPUT =
+    item.invoke(input)

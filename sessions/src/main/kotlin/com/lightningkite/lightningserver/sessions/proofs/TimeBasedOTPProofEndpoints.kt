@@ -24,6 +24,8 @@ import dev.turingcomplete.kotlinonetimepassword.HmacAlgorithm
 import dev.turingcomplete.kotlinonetimepassword.TimeBasedOneTimePasswordConfig
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.InternalSerializationApi
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import java.security.SecureRandom
 import java.util.concurrent.TimeUnit
@@ -61,8 +63,8 @@ public class TimeBasedOTPProofEndpoints(
             it.disabledAt.eq(null) and (it.expiresAt.eq(null) or it.expiresAt.notNull.gte(now()))
         }
 
-    public val modelInfo: ModelInfo<HasId<AnyId>, AnyId, TotpSecret, Uuid> = database.modelInfo(
-        authOptions = recentRootAuth or AuthRequirement.IsAdmin,
+    public val modelInfo: ModelInfo<HasId<AnyId>, TotpSecret, Uuid> = database.modelInfo(
+        auth = recentRootAuth or AuthRequirement.IsAdmin,
         permissions = {
             val admin = condition<TotpSecret>(AuthRequirement.IsAdmin.accepts(authOrNull))
             val mine = authOrNull?.let { a ->
@@ -92,15 +94,15 @@ public class TimeBasedOTPProofEndpoints(
         }
     )
 
-    public val rest: ModelRestEndpoints<HasId<AnyId>, AnyId, TotpSecret, Uuid> = ModelRestEndpoints(modelInfo)
+    public val rest: ModelRestEndpoints<HasId<AnyId>, TotpSecret, Uuid> = ModelRestEndpoints(modelInfo)
 
-    public val establish: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, AnyId, EstablishOtp, String>> =
+    public val establish: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, EstablishOtp, String>> =
         path.path("establish").post bind ApiHttpHandler(
             summary = "Establish One Time Password", // Version 5: Rename to "Establish Time Based One Time Password"
             inputType = EstablishOtp.serializer(),
             outputType = String.serializer(),
             description = "Generates a new Time Based One Time Password configuration.",
-            authOptions = recentRootAuth,
+            auth = recentRootAuth,
             errorCases = listOf(),
             examples = listOf(),
             handler = { input: EstablishOtp ->
@@ -123,9 +125,9 @@ public class TimeBasedOTPProofEndpoints(
             }
         )
 
-    override val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, AnyId, IdentificationAndPassword, Proof>> =
+    override val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, IdentificationAndPassword, Proof>> =
         path.path("prove").post bind ApiHttpHandler(
-            authOptions = noAuth,
+            auth = noAuth,
             summary = "Prove OTP", // Version 5: Rename to "Prove TOTP"
             description = "Logs in to the given account with an TOTP code.  Limits to 10 attempts per hour.",
             errorCases = listOf(),
@@ -180,13 +182,13 @@ public class TimeBasedOTPProofEndpoints(
             }
         )
 
-    public val confirm: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, AnyId, String, Unit>> =
+    public val confirm: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, String, Unit>> =
         path.path("existing").post bind ApiHttpHandler(
             summary = "Confirm One Time Password", // Version 5: Rename to "Confirm Time Based One Time Password"
             inputType = String.serializer(),
             outputType = Unit.serializer(),
             description = "Confirms your TOTP, making it fully active",
-            authOptions = recentRootAuth,
+            auth = recentRootAuth,
             errorCases = listOf(),
             examples = listOf(),
             handler = { code: String ->
@@ -196,9 +198,7 @@ public class TimeBasedOTPProofEndpoints(
 
                 if (active.isEmpty()) throw NotFoundException()
 
-                val proveAccess = this.request.access(prove.item.authOptions)
-                prove.item.handle(
-                    proveAccess,
+                prove(
                     IdentificationAndPassword(
                         type = auth.principalName,
                         property = "${auth.principalName}/_id",
@@ -213,13 +213,13 @@ public class TimeBasedOTPProofEndpoints(
 
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<AnyId>> established(
-        handler: PrincipalType<SUBJECT, AnyId>,
+        principal: PrincipalType<SUBJECT, AnyId>,
         item: SUBJECT,
     ): Boolean {
         @Suppress("UNCHECKED_CAST")
         return modelInfo.collection().count(condition {
-            it.subjectId.eq(handler.idString(item._id)) and
-                    it.subjectType.eq(handler.name) and
+            it.subjectId.eq(principal.idString(item._id)) and
+                    it.subjectType.eq(principal.name) and
                     active and
                     it.lastUsedAt.neq(null)
         }) > 0

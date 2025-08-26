@@ -16,7 +16,7 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.sessions.proofs.extensions.constrainAttemptRate
-import com.lightningkite.lightningserver.sessions.proofs.extensions.idString
+import com.lightningkite.lightningserver.auth.idString
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.services.cache.Cache
@@ -39,6 +39,7 @@ public class KnownDeviceProofEndpoints(
     init {
         proofMethods.register(this)
     }
+
     override val info: ProofMethodInfo = ProofMethodInfo(
         via = "known-device",
         property = null,
@@ -48,11 +49,11 @@ public class KnownDeviceProofEndpoints(
     context(_: ServerRuntime)
     private val active
         get() = condition<KnownDeviceSecret> {
-            it.disabledAt.eq(null) and (it.expiresAt.eq(null) or it.expiresAt.notNull.gte(now()))
+            it.disabledAt.eq(null) and ((it.expiresAt.eq(null) or it.expiresAt.notNull.gte(now())))
         }
 
-    public val modelInfo: ModelInfo<HasId<AnyId>, AnyId, KnownDeviceSecret, Uuid> = database.modelInfo(
-        authOptions = recentRootAuth or AuthRequirement.IsAdmin,
+    public val modelInfo: ModelInfo<HasId<AnyId>, KnownDeviceSecret, Uuid> = database.modelInfo(
+        auth = recentRootAuth or AuthRequirement.isAdmin,
         signals = {
             it.interceptCreate {
                 it.copy(hash = it.hash.secureHash(), expiresAt = now() + expires())
@@ -84,11 +85,11 @@ public class KnownDeviceProofEndpoints(
         }
     )
 
-    public val rest: ModelRestEndpoints<HasId<AnyId>, AnyId, KnownDeviceSecret, Uuid> = ModelRestEndpoints(modelInfo)
+    public val rest: ModelRestEndpoints<HasId<AnyId>, KnownDeviceSecret, Uuid> = ModelRestEndpoints(modelInfo)
 
     context(_: ServerRuntime)
     public suspend fun <SUBJECT : HasId<ID>, ID: Comparable<ID>> establish(
-        subject: PrincipalType<SUBJECT, ID>,
+        principal: PrincipalType<SUBJECT, ID>,
         id: ID,
         deviceInfo: String,
     ): KnownDeviceSecretAndExpiration {
@@ -96,12 +97,11 @@ public class KnownDeviceProofEndpoints(
         val secretId = Uuid.random()
         val exp = now() + expires()
 
-        @Suppress("UNCHECKED_CAST")
         val secret = KnownDeviceSecret(
             _id = secretId,
             hash = secretValue.secureHash(),
-            subjectId = subject.idString(id),
-            subjectType = subject.name,
+            subjectId = principal.idString(id),
+            subjectType = principal.name,
             deviceInfo = deviceInfo,
             establishedAt = now()
         )
@@ -109,20 +109,19 @@ public class KnownDeviceProofEndpoints(
         return KnownDeviceSecretAndExpiration("$secretId/$secretValue", exp)
     }
 
-    public val establish: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, AnyId, Unit, String>> =
+    public val establish: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, Unit, String>> =
         path.path("establish").post bind ApiHttpHandler(
             summary = "Establish Known Device",
             inputType = Unit.serializer(),
             outputType = String.serializer(),
             description = "Establishes a new known device.  You can use the returned string to gain partial authentication later.",
-            authOptions = recentRootAuth,
+            auth = recentRootAuth,
             errorCases = listOf(),
             examples = listOf(),
             handler = { _: Unit ->
-                @Suppress("UNCHECKED_CAST")
                 establish(
                     auth.principalType,
-                    auth.rawId as AnyId,
+                    auth.id,
                     run {
                         val agent = request.headers[HttpHeader.UserAgent]
                         val ip = request.sourceIp
@@ -132,20 +131,19 @@ public class KnownDeviceProofEndpoints(
             }
         )
 
-    public val establish2: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, AnyId, Unit, KnownDeviceSecretAndExpiration>> =
+    public val establish2: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, Unit, KnownDeviceSecretAndExpiration>> =
         path.path("establish2").post bind ApiHttpHandler(
             summary = "Establish Known Device V2",
             inputType = Unit.serializer(),
             outputType = KnownDeviceSecretAndExpiration.serializer(),
             description = "Establishes a new known device.  You can use the returned string to gain partial authentication later.",
-            authOptions = recentRootAuth,
+            auth = recentRootAuth,
             errorCases = listOf(),
             examples = listOf(),
             handler = { _: Unit ->
-                @Suppress("UNCHECKED_CAST")
                 establish(
                     auth.principalType,
-                    auth.rawId as AnyId,
+                    auth.id,
                     run {
                         val agent = request.headers[HttpHeader.UserAgent]
                         val ip = request.sourceIp
@@ -155,13 +153,13 @@ public class KnownDeviceProofEndpoints(
             }
         )
 
-    public val options: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, AnyId, Unit, KnownDeviceOptions>> =
+    public val options: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, Unit, KnownDeviceOptions>> =
         path.path("options").get bind ApiHttpHandler(
             summary = "Known Device Options",
             inputType = Unit.serializer(),
             outputType = KnownDeviceOptions.serializer(),
             description = "Gives information about how valuable working from a known device is and for how long it works.",
-            authOptions = noAuth,
+            auth = noAuth,
             errorCases = listOf(),
             examples = listOf(),
             handler = { _: Unit ->
@@ -172,9 +170,9 @@ public class KnownDeviceProofEndpoints(
             }
         )
 
-    public override val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, AnyId, String, Proof>> =
+    public override val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, Proof>> =
         path.path("prove").post bind ApiHttpHandler(
-            authOptions = noAuth,
+            auth = noAuth,
             summary = "Prove Known Device",
             description = "Get proof that your device is known.",
             errorCases = listOf(),
@@ -221,7 +219,7 @@ public class KnownDeviceProofEndpoints(
 
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<AnyId>> established(
-        handler: PrincipalType<SUBJECT, AnyId>,
+        principal: PrincipalType<SUBJECT, AnyId>,
         item: SUBJECT,
     ): Boolean = false
 }

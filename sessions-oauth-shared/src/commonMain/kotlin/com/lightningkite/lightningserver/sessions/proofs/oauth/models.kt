@@ -69,7 +69,8 @@ public data class OauthCodeRequest(
     val sessionExpiration: Instant? = null,
 )
 
-@Serializable public enum class OauthPromptType {
+@Serializable
+public enum class OauthPromptType {
     consent, select_account, none
 }
 
@@ -83,6 +84,6 @@ public enum class OauthAccessType {
 }
 
 public object OauthGrantTypes {
-    public const val authorizationCode:String = "authorization_code"
-    public const val refreshToken:String = "refresh_token"
+    public const val authorizationCode : String = "authorization_code"
+    public const val refreshToken : String = "refresh_token"
 }

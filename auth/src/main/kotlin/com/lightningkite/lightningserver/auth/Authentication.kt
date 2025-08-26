@@ -35,7 +35,7 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
 ): Authentication<SUBJECT> = Authentication(
     principalType = principalType,
     id = id,
-    rawId = server.internalSerialization.stringArrayFormat.encodeToString(principalType.idSerializer, id),
+    rawId = principalType.idString(id),
     issuedAt = issuedAt,
     limitTo = limitTo,
     forbid = forbid,
@@ -100,7 +100,7 @@ public class Authentication<SUBJECT : HasId<*>> private constructor(
 
     context(server: ServerRuntime)
     public val untypedId: Comparable<*> get() = cachedId
-        ?: server.internalSerialization.json.decodeFromString(untypedPrincipal.idSerializer, rawId).also { cachedId = it }
+        ?: server.internalSerialization.stringArrayFormat.decodeFromString(untypedPrincipal.idSerializer, rawId).also { cachedId = it }
 
     @Transient
     private var _subjectCacheKey: SerializableCache.Key<SUBJECT>? = null

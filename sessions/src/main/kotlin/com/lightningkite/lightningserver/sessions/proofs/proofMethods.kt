@@ -27,25 +27,25 @@ public interface ProofMethod {
 
     context(server: ServerRuntime)
     public suspend fun <SUBJECT : HasId<AnyId>> established(
-        handler: PrincipalType<SUBJECT, AnyId>,
+        principal: PrincipalType<SUBJECT, AnyId>,
         item: SUBJECT,
-    ): Boolean = info.property?.let{ handler.getProperty(item, it) != null } ?: false
+    ): Boolean = info.property?.let { principal.getProperty(item, it) != null } ?: false
 }
 
 public interface DirectProofMethod : ProofMethod {
-    public val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, AnyId, IdentificationAndPassword, Proof>>
+    public val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, IdentificationAndPassword, Proof>>
 }
 
 public interface StringProofMethod : ProofMethod {
-    public val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, AnyId, String, Proof>>
+    public val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, Proof>>
 }
 
 public interface StartedProofMethod : ProofMethod {
-    public val start: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, AnyId, String, String>>
-    public val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, AnyId, FinishProof, Proof>>
+    public val start: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, String>>
+    public val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, FinishProof, Proof>>
 }
 
 public interface ExternalProofMethod : ProofMethod {
-    public val start: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, AnyId, String, String>>
+    public val start: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, String>>
     public val indirectLink: PathSpec
 }

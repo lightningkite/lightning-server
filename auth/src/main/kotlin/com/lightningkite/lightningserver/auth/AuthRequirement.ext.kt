@@ -24,6 +24,7 @@ public typealias AuthAny = AuthRequirement<HasId<AnyId>>
 
 public val noAuth: AuthRequirement.NoAuth = AuthRequirement.NoAuth
 public val anyAuth: AuthRequirement.AnyAuth = AuthRequirement.AnyAuth
+public val recentRootAuth: AuthRequirement.RecentRootAuth = AuthRequirement.RecentRootAuth
 
 public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.auth(
     /**The required scopes. Empty set indicates no requirements and * indicates root access.*/
@@ -46,28 +47,28 @@ public infix fun <SUBJECT : HasId<*>> AuthRequirement<SUBJECT>.or(
 ): AuthRequirement<SUBJECT?> = Options(options + other.typed())
 
 public infix fun <SUBJECT : HasId<*>> AuthRequirement.NoAuth.or(
-    other: Options<SUBJECT>
+    other: AuthRequirement<SUBJECT>
 ): AuthRequirement<SUBJECT?> = Options(other.options + this.typed())
 
 
-public val Options.Companion.isSuperUser: AuthAny
+public val AuthRequirement.Companion.isSuperUser: AuthAny
     get() = AuthRequirement.IsSuperUser
-public val Options.Companion.isAdmin: AuthAny
+public val AuthRequirement.Companion.isAdmin: AuthAny
     get() = AuthRequirement.IsAdmin
-public val Options.Companion.isDeveloper: AuthAny
+public val AuthRequirement.Companion.isDeveloper: AuthAny
     get() = AuthRequirement.IsDeveloper
 
 context(builder: ServerBuilder)
-public var Options.Companion.isSuperUser: AuthAny
+public var AuthRequirement.Companion.isSuperUser: AuthAny
     get() = AuthRequirement.IsSuperUser
     set(value) { builder.extensions[AuthRequirement.IsSuperUser] = value }
 
 context(builder: ServerBuilder)
-public var Options.Companion.isAdmin: AuthAny
+public var AuthRequirement.Companion.isAdmin: AuthAny
     get() = AuthRequirement.IsAdmin
     set(value) { builder.extensions[AuthRequirement.IsAdmin] = value }
 
 context(builder: ServerBuilder)
-public var Options.Companion.isDeveloper: AuthAny
+public var AuthRequirement.Companion.isDeveloper: AuthAny
     get() = AuthRequirement.IsDeveloper
     set(value) { builder.extensions[AuthRequirement.IsDeveloper] = value }

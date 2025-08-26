@@ -19,8 +19,8 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.runtime.test.serverRuntime
 import com.lightningkite.lightningserver.sessions.proofs.extensions.constrainAttemptRate
-import com.lightningkite.lightningserver.sessions.proofs.extensions.findUserIdString
-import com.lightningkite.lightningserver.sessions.proofs.extensions.idString
+import com.lightningkite.lightningserver.auth.findUserIdString
+import com.lightningkite.lightningserver.auth.idString
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.ModelInfo
@@ -70,23 +70,22 @@ public class BackupCodeEndpoints(
 
     private val availableCharacters = ('A'..'Z').toList() - setOf('I', 'O')
 
-    public val modelInfo: ModelInfo<HasId<AnyId>?, AnyId, BackupCodeSecret, Uuid> =
+    public val modelInfo: ModelInfo<HasId<*>?, BackupCodeSecret, Uuid> =
         database.modelInfo(
-            authOptions = noAuth,
+            auth = noAuth,
             permissions = { ModelPermissions() }
         )
 
-    public val resetCodes: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, AnyId, Unit, List<String>>> =
+    public val resetCodes: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, Unit, List<String>>> =
         path.path("reset-codes").post bind ApiHttpHandler(
             summary = "Reset Codes",
             inputType = Unit.serializer(),
             outputType = ListSerializer(String.serializer()),
             description = "Reset your existing backup codes with new ones. Input how many codes you wish to generate",
-            authOptions = recentRootAuth,
+            auth = recentRootAuth,
             errorCases = listOf(),
             examples = listOf(),
             handler = { _: Unit ->
-
                 modelInfo.collection().deleteManyIgnoringOld(
                     condition { it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) }
                 )
@@ -114,13 +113,13 @@ public class BackupCodeEndpoints(
             }
         )
 
-    public val clearCodes: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, AnyId, Unit, Unit>> =
+    public val clearCodes: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, Unit, Unit>> =
         path.path("clear-codes").post bind ApiHttpHandler(
             summary = "Clear Codes",
             inputType = Unit.serializer(),
             outputType = Unit.serializer(),
             description = "Removes all backup codes for the user",
-            authOptions = recentRootAuth,
+            auth = recentRootAuth,
             errorCases = listOf(),
             examples = listOf(),
             handler = { _: Unit ->
@@ -133,26 +132,25 @@ public class BackupCodeEndpoints(
             }
         )
 
-    public val established: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, AnyId, Unit, Boolean>> =
+    public val established: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, Unit, Boolean>> =
         path.path("established").get bind ApiHttpHandler(
             summary = "Established",
             inputType = Unit.serializer(),
             outputType = Boolean.serializer(),
             description = "Returns whether or a user has valid backup codes established",
-            authOptions = recentRootAuth,
+            auth = recentRootAuth,
             errorCases = listOf(),
             examples = listOf(),
             handler = { _: Unit ->
-
                 modelInfo.collection().findOne(
                     condition { it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) }
                 ) != null
             }
         )
 
-    public override val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, AnyId, IdentificationAndPassword, Proof>> =
+    public override val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, IdentificationAndPassword, Proof>> =
         path.path("prove").post bind ApiHttpHandler(
-            authOptions = noAuth,
+            auth = noAuth,
             summary = "Prove With Backup Code",
             description = "Use an established backup code as an authentication method.",
             errorCases = listOf(),
@@ -176,7 +174,6 @@ public class BackupCodeEndpoints(
             ),
             successCode = HttpStatus.OK,
             handler = { input: IdentificationAndPassword ->
-
                 cache().constrainAttemptRate(
                     cacheKey = "backup-code-count-${input.property}-${input.value}"
                 ) {
@@ -212,11 +209,11 @@ public class BackupCodeEndpoints(
 
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<AnyId>> established(
-        handler: PrincipalType<SUBJECT, AnyId>,
+        principal: PrincipalType<SUBJECT, AnyId>,
         item: SUBJECT,
     ): Boolean = modelInfo.collection()
         .findOne(condition {
-            it.subjectId.eq(handler.idString(item._id)) and
-                    it.subjectType.eq(handler.name)
+            it.subjectId.eq(principal.idString(item._id)) and
+                    it.subjectType.eq(principal.name)
         }) != null
 }
