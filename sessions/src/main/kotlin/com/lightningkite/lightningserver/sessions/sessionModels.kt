@@ -77,7 +77,7 @@ public data class IdAndAuthMethods<ID>(
     val id: ID,
     val options: List<ProofOption> = listOf(),
     val strengthRequired: Int = 1,
-    val session: String? = null,
+    val refreshToken: String? = null,
 )
 
 @Serializable

@@ -22,7 +22,7 @@ public suspend operator fun <SUBJECT : HasId<ID>, ID : Comparable<ID>, T> Authen
     key: AuthCacheKey<SUBJECT, T>
 ): T = cache.get(key, this)
 
-public val ServerBuilder.authReaders: ListRegistry<Authentication.Reader<*, *>> by Authentication.Reader
+public val ServerBuilder.authReaders: ListRegistry<Authentication.Reader<*>> by Authentication.Reader
 
 
 context(server: ServerRuntime)

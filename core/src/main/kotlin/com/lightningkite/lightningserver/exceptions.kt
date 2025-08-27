@@ -13,8 +13,17 @@ public data class LSError(
     val message: String = "",
     val data: String = "",
     val stackTrace: String? = null,
-) {
-}
+)
+
+public fun LSError.toException(
+    message: String = this.message,
+    data: String = this.data
+): HttpStatusException = HttpStatusException(
+    status = HttpStatus(http),
+    detail = detail,
+    message = message,
+    data = data,
+)
 
 
 /**

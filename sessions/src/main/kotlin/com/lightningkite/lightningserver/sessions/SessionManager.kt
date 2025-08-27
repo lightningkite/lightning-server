@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.RequestPredicates
 import com.lightningkite.lightningserver.auth.auth
+import com.lightningkite.lightningserver.auth.authReaders
 import com.lightningkite.lightningserver.auth.fetch
 import com.lightningkite.lightningserver.auth.id
 import com.lightningkite.lightningserver.auth.isSuperUser
@@ -32,7 +33,10 @@ import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
+import com.lightningkite.lightningserver.sessions.proofs.checkAgainstHash
+import com.lightningkite.lightningserver.sessions.proofs.secureHash
 import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
+import com.lightningkite.lightningserver.sessions.token.TokenException
 import com.lightningkite.lightningserver.sessions.token.TokenFormat
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.ModelInfo
@@ -58,10 +62,10 @@ import kotlin.uuid.Uuid
 public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     public val principal: PrincipalType<SUBJECT, ID>,
     database: Runtime<Database>,
-    public val refreshHasher: RuntimeDeferred<Signer> = secretBasis.signer("refresh"),
     public val tokenFormat: Runtime<TokenFormat> = Runtime { PrivateTinyTokenFormat() }
-) : ServerBuilder() {
+) : ServerBuilder(), Authentication.Reader<SUBJECT> {
     init { register(principal) }
+    init { authReaders.register(this) }
 
     context(server: ServerRuntime)
     public open suspend fun sessionExpiration(subject: SUBJECT): Instant? = null
@@ -102,6 +106,24 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             }
         )
 
+    context(server: ServerRuntime)
+    override suspend fun read(request: Request<*>): Authentication<SUBJECT>? {
+        val token =
+            request.headers[HttpHeader.Authorization]?.root?.removePrefix("bearer ")?.removePrefix("Bearer ")
+                ?: request.queryParameters.find {
+                    it.first.equals(HttpHeader.Authorization, ignoreCase = true)
+                }?.second?.replace(' ', '+')
+                ?: request.queryParameters.find { it.first == "jwt" }?.second?.replace(' ', '+')
+                ?: request.headers.cookies[HttpHeader.Authorization]
+                ?: return null
+
+        try {
+            return tokenFormat().read(principal, token) ?: RefreshToken(token).session(request)?.toAuth()
+        } catch (e: TokenException) {
+            throw UnauthorizedException(e.message ?: "JWT issue")
+        }
+    }
+
     context(_: ServerRuntime)
     protected suspend fun newSession(
         subjectId: ID,
@@ -115,7 +137,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         val secret = Base64.encode(CryptographyRandom.nextBytes(24))
 
         return Session<SUBJECT, ID>(
-            secretHash = refreshHasher.await().sign(secret),
+            secretHash = secret.secureHash(),
             subjectId = subjectId,
             label = label,
             expires = expires,
@@ -144,7 +166,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         val secret = Base64.encode(CryptographyRandom.nextBytes(24))
 
         return Session<SUBJECT, ID>(
-            secretHash = refreshHasher.await().sign(secret),
+            secretHash = secret.secureHash(),
             subjectId = subjectId,
             label = label,
             expires = expires,
@@ -184,7 +206,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             if (generalSettings().debug) println("No such session")
             throw UnauthorizedException("No such session")
         }
-        if (!refreshHasher.await().verify(plainTextSecret, session.secretHash)) {
+        if (!plainTextSecret.checkAgainstHash(session.secretHash)) {
             if (generalSettings().debug) println("Auth failed because hash verification failed ($plainTextSecret vs ${session.secretHash})")
             throw UnauthorizedException("Incorrect hash for session")
         }

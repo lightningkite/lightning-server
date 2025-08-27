@@ -39,6 +39,7 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import java.security.SecureRandom
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.Uuid
 
 @Serializable
@@ -84,7 +85,7 @@ public class BackupCodeEndpoints(
             inputType = Unit.serializer(),
             outputType = ListSerializer(String.serializer()),
             description = "Reset your existing backup codes with new ones. Input how many codes you wish to generate",
-            auth = recentRootAuth,
+            auth = proofMethodAuth,
             errorCases = listOf(),
             examples = listOf(),
             handler = { _: Unit ->
@@ -121,7 +122,7 @@ public class BackupCodeEndpoints(
             inputType = Unit.serializer(),
             outputType = Unit.serializer(),
             description = "Removes all backup codes for the user",
-            auth = recentRootAuth,
+            auth = proofMethodAuth,
             errorCases = listOf(),
             examples = listOf(),
             handler = { _: Unit ->
@@ -140,7 +141,7 @@ public class BackupCodeEndpoints(
             inputType = Unit.serializer(),
             outputType = Boolean.serializer(),
             description = "Returns whether or a user has valid backup codes established",
-            auth = recentRootAuth,
+            auth = proofMethodAuth,
             errorCases = listOf(),
             examples = listOf(),
             handler = { _: Unit ->
@@ -210,8 +211,8 @@ public class BackupCodeEndpoints(
         )
 
     context(server: ServerRuntime)
-    override suspend fun <SUBJECT : HasId<AnyId>> established(
-        principal: PrincipalType<SUBJECT, AnyId>,
+    override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> established(
+        principal: PrincipalType<SUBJECT, ID>,
         item: SUBJECT,
     ): Boolean = modelInfo.collection()
         .findOne(condition {

@@ -57,7 +57,7 @@ public class PasswordProofEndpoints(
 
     public val modelInfo: ModelInfo<HasId<AnyId>, PasswordSecret, Uuid> =
         database.modelInfo(
-            auth = recentRootAuth or AuthRequirement.IsAdmin,
+            auth = proofMethodAuth or AuthRequirement.IsAdmin,
             signals = {
                 it.interceptCreate {
                     evaluatePassword(it.hash)
@@ -123,7 +123,7 @@ public class PasswordProofEndpoints(
             inputType = EstablishPassword.serializer(),
             outputType = Unit.serializer(),
             description = "Set your password",
-            auth = recentRootAuth,
+            auth = proofMethodAuth,
             errorCases = emptyList(),
             handler = { value: EstablishPassword ->
                 establish(
@@ -191,8 +191,8 @@ public class PasswordProofEndpoints(
         )
 
     context(server: ServerRuntime)
-    public override suspend fun <SUBJECT : HasId<AnyId>> established(
-        principal: PrincipalType<SUBJECT, AnyId>,
+    public override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> established(
+        principal: PrincipalType<SUBJECT, ID>,
         item: SUBJECT,
     ): Boolean {
         @Suppress("UNCHECKED_CAST")

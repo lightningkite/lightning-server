@@ -73,7 +73,7 @@ public class WebAuthNProofEndpoints(
         }
 
     public val modelInfo: ModelInfo<HasId<AnyId>, WebAuthNCredential, String> = database.modelInfo(
-        auth = recentRootAuth or AuthRequirement.IsAdmin,
+        auth = proofMethodAuth or AuthRequirement.IsAdmin,
         permissions = {
             val admin = condition<WebAuthNCredential>(AuthRequirement.IsAdmin.accepts(authOrNull))
             val mine = authOrNull?.let { a ->
@@ -134,14 +134,16 @@ public class WebAuthNProofEndpoints(
     }
 
     context(server: ServerRuntime)
-    override suspend fun <SUBJECT : HasId<AnyId>> established(
-        principal: PrincipalType<SUBJECT, AnyId>,
+    override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> established(
+        principal: PrincipalType<SUBJECT, ID>,
         item: SUBJECT,
     ): Boolean {
         return modelInfo.collection().findOne(condition {
-            it.subjectId.eq(principal.idString(item._id)) and
-                    it.subjectType.eq(principal.name) and
-                    active
+            Condition.And(
+                it.subjectId eq principal.idString(item._id),
+                it.subjectType eq principal.name,
+                active
+            )
         }) != null
     }
 
@@ -164,7 +166,7 @@ public class WebAuthNProofEndpoints(
     @OptIn(ExperimentalEncodingApi::class)
     public val registerStart: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, WebAuthN.GeneralPreference, WebAuthN.Registration.RegistrationResponse>> =
         path.path("register-start").post bind ApiHttpHandler(
-            auth = recentRootAuth,
+            auth = proofMethodAuth,
             summary = "Issue WebAuthN creation challenge",
             description = "Returns a challenge to be passed on to a client authenticator for the creation of a new Public Key Credential.",
             errorCases = listOf(),
@@ -214,7 +216,7 @@ public class WebAuthNProofEndpoints(
     @OptIn(ExperimentalEncodingApi::class)
     public val registerFinish: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, WebAuthN.Registration.RegisterRequest, Unit>> =
         path.path("register-finish").post bind ApiHttpHandler(
-            auth = recentRootAuth,
+            auth = proofMethodAuth,
             summary = "Establish WebAuthN Credential",
             description = "Validates and Accepts a public key credential created from a previously issued creation challenge.",
             errorCases = listOf(),

@@ -185,11 +185,11 @@ public class Authentication<SUBJECT : HasId<*>> private constructor(
 
     // related types
 
-    public fun interface Reader<SUBJECT : HasId<ID>, ID : Comparable<ID>> {
+    public fun interface Reader<SUBJECT : HasId<*>> {
         context(server: ServerRuntime)
-        public fun read(request: Request<*>): Authentication<SUBJECT>?
+        public suspend fun read(request: Request<*>): Authentication<SUBJECT>?
 
-        public companion object : ListRegistryExtension<Reader<*, *>>
+        public companion object : ListRegistryExtension<Reader<*>>
     }
 
     public fun limitTo(builder: RequestPredicates.Builder.() -> Unit): Authentication<SUBJECT> =

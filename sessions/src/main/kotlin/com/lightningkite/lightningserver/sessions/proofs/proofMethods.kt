@@ -1,6 +1,8 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
 import com.lightningkite.lightningserver.auth.AnyId
+import com.lightningkite.lightningserver.auth.AuthAny
+import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.definition.ListRegistryExtension
 import com.lightningkite.lightningserver.definition.Locationed
@@ -14,6 +16,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.services.database.HasId
+import kotlin.time.Duration.Companion.minutes
 
 
 private object ProofMethods : ListRegistryExtension<ProofMethod>
@@ -26,8 +29,8 @@ public interface ProofMethod {
     public val info: ProofMethodInfo
 
     context(server: ServerRuntime)
-    public suspend fun <SUBJECT : HasId<AnyId>> established(
-        principal: PrincipalType<SUBJECT, AnyId>,
+    public suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> established(
+        principal: PrincipalType<SUBJECT, ID>,
         item: SUBJECT,
     ): Boolean = info.property?.let { principal.getProperty(item, it) != null } ?: false
 }
@@ -49,3 +52,9 @@ public interface ExternalProofMethod : ProofMethod {
     public val start: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, String>>
     public val indirectLink: PathSpec
 }
+
+public val ProofMethod.proofMethodAuth: AuthRequirement.Authenticated get() =
+    AuthRequirement.Authenticated(
+        scopes = setOf("auth:proofs:${info.via}"),
+        maxAge = 10.minutes
+    )

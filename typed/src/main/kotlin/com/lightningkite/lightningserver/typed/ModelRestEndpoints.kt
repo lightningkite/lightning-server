@@ -97,8 +97,8 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
     public val detail: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, Unit, T>> =
         detailPath.get bind ApiHttpHandler(
-            summary = "Query",
-            description = "Gets a list of ${info.collectionName}s that match the given query.",
+            summary = "Detail",
+            description = "Gets the ${info.collectionName} for the provided id.",
             inputType = Unit.serializer(),
             outputType = info.serializer,
             auth = info.auth,
@@ -112,9 +112,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             ),
             examples = emptyList(),
             handler = { _: Unit ->
-                info.collection(this)
-                    .get(this.first)
-                    ?: throw NotFoundException()
+                info.collection(this).get(first) ?: throw NotFoundException()
             }
         )
 
@@ -185,7 +183,8 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
                     throw BadRequestException(
                         detail = "unique",
                         message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists",
-                        cause = e)
+                        cause = e
+                    )
                 }
             }
         )
@@ -208,7 +207,8 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
                     throw BadRequestException(
                         detail = "unique",
                         message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists",
-                        cause = e)
+                        cause = e
+                    )
                 }
             }
         )
@@ -233,7 +233,8 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
                     throw BadRequestException(
                         detail = "unique",
                         message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists",
-                        cause = e)
+                        cause = e
+                    )
                 }
             }
         )
@@ -256,7 +257,8 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
                     throw BadRequestException(
                         detail = "unique",
                         message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists",
-                        cause = e)
+                        cause = e
+                    )
                 }
             }
         )
@@ -287,7 +289,8 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
                     throw BadRequestException(
                         detail = "unique",
                         message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists",
-                        cause = e)
+                        cause = e
+                    )
                 }
             }
         )
@@ -319,7 +322,8 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
                     throw BadRequestException(
                         detail = "unique",
                         message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists",
-                        cause = e)
+                        cause = e
+                    )
                 }
             }
         )
@@ -351,7 +355,8 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
                     throw BadRequestException(
                         detail = "unique",
                         message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists",
-                        cause = e)
+                        cause = e
+                    )
                 }
             }
         )
@@ -367,8 +372,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             errorCases = emptyList(),
             examples = emptyList(),
             handler = { filter: Condition<T> ->
-                info.collection(this)
-                    .deleteManyIgnoringOld(filter)
+                info.collection(this).deleteManyIgnoringOld(filter)
             }
         )
 
@@ -390,9 +394,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             ),
             examples = emptyList(),
             handler = { _: Unit ->
-                if (!info.collection(this)
-                        .deleteOneById(first)
-                ) {
+                if (!info.collection(this).deleteOneById(first)) {
                     throw NotFoundException()
                 }
                 Unit
@@ -410,8 +412,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             errorCases = emptyList(),
             examples = emptyList(),
             handler = { condition: Condition<T> ->
-                info.collection(this)
-                    .count(condition)
+                info.collection(this).count(condition)
             }
         )
 
@@ -426,8 +427,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             errorCases = emptyList(),
             examples = emptyList(),
             handler = { condition: Condition<T> ->
-                info.collection(this)
-                    .count(condition)
+                info.collection(this).count(condition)
             }
         )
 

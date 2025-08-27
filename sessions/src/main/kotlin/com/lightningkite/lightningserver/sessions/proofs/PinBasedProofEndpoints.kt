@@ -93,8 +93,8 @@ public abstract class PinBasedProofEndpoints(
         )
 
     context(server: ServerRuntime)
-    override suspend fun <SUBJECT : HasId<AnyId>> established(
-        principal: PrincipalType<SUBJECT, AnyId>,
+    override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> established(
+        principal: PrincipalType<SUBJECT, ID>,
         item: SUBJECT,
-    ): Boolean = principal.getProperty(item, info.property!!) != null
+    ): Boolean = principal.getProperty(item, property) != null
 }

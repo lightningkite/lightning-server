@@ -26,6 +26,7 @@ import kotlinx.serialization.builtins.serializer
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.Uuid
 
 @OptIn(InternalSerializationApi::class)
@@ -35,7 +36,6 @@ public class KnownDeviceProofEndpoints(
     private val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
     private val expires: () -> Duration = { 30.days },
 ) : ServerBuilder(), StringProofMethod {
-
     init {
         proofMethods.register(this)
     }
@@ -53,7 +53,7 @@ public class KnownDeviceProofEndpoints(
         }
 
     public val modelInfo: ModelInfo<HasId<AnyId>, KnownDeviceSecret, Uuid> = database.modelInfo(
-        auth = recentRootAuth or AuthRequirement.isAdmin,
+        auth = proofMethodAuth or AuthRequirement.IsAdmin,
         signals = {
             it.interceptCreate {
                 it.copy(hash = it.hash.secureHash(), expiresAt = now() + expires())
@@ -115,7 +115,7 @@ public class KnownDeviceProofEndpoints(
             inputType = Unit.serializer(),
             outputType = String.serializer(),
             description = "Establishes a new known device.  You can use the returned string to gain partial authentication later.",
-            auth = recentRootAuth,
+            auth = proofMethodAuth,
             errorCases = listOf(),
             examples = listOf(),
             handler = { _: Unit ->
@@ -137,7 +137,7 @@ public class KnownDeviceProofEndpoints(
             inputType = Unit.serializer(),
             outputType = KnownDeviceSecretAndExpiration.serializer(),
             description = "Establishes a new known device.  You can use the returned string to gain partial authentication later.",
-            auth = recentRootAuth,
+            auth = proofMethodAuth,
             errorCases = listOf(),
             examples = listOf(),
             handler = { _: Unit ->
@@ -218,8 +218,8 @@ public class KnownDeviceProofEndpoints(
         )
 
     context(server: ServerRuntime)
-    override suspend fun <SUBJECT : HasId<AnyId>> established(
-        principal: PrincipalType<SUBJECT, AnyId>,
+    override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> established(
+        principal: PrincipalType<SUBJECT, ID>,
         item: SUBJECT,
     ): Boolean = false
 }

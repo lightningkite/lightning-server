@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.HasId
 import kotlin.collections.plus
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 
 @Suppress("UNCHECKED_CAST")
@@ -22,9 +23,14 @@ public typealias AnyId = Comparable<Any?>
 public typealias NoAuth = AuthRequirement<HasId<AnyId>?>
 public typealias AuthAny = AuthRequirement<HasId<AnyId>>
 
-public val noAuth: AuthRequirement.NoAuth = AuthRequirement.NoAuth
+public val noAuth: AuthRequirement.None = AuthRequirement.None
 public val anyAuth: AuthRequirement.AnyAuth = AuthRequirement.AnyAuth
-public val recentRootAuth: AuthRequirement.RecentRootAuth = AuthRequirement.RecentRootAuth
+
+public val recentRootAuth: AuthAny =
+    AuthRequirement.Authenticated(
+        scopes = setOf("*"), // root access
+        maxAge = 10.minutes
+    )
 
 public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.auth(
     /**The required scopes. Empty set indicates no requirements and * indicates root access.*/
@@ -43,10 +49,10 @@ public infix fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.or(
 ): AuthRequirement<SUBJECT> = Options(options + other.options)
 
 public infix fun <SUBJECT : HasId<*>> AuthRequirement<SUBJECT>.or(
-    other: AuthRequirement.NoAuth
+    other: AuthRequirement.None
 ): AuthRequirement<SUBJECT?> = Options(options + other.typed())
 
-public infix fun <SUBJECT : HasId<*>> AuthRequirement.NoAuth.or(
+public infix fun <SUBJECT : HasId<*>> AuthRequirement.None.or(
     other: AuthRequirement<SUBJECT>
 ): AuthRequirement<SUBJECT?> = Options(other.options + this.typed())
 

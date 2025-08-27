@@ -1,7 +1,6 @@
 package com.lightningkite.lightningserver.definition
 
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.services.MetricReporter
 import com.lightningkite.services.Setting
 import com.lightningkite.services.SettingContext
 import kotlinx.serialization.KSerializer
@@ -9,6 +8,14 @@ import kotlinx.serialization.KSerializer
 public fun interface RuntimeDeferred<out T> {
     context(server: ServerRuntime)
     public suspend fun await(): T
+
+    public data class Cached<out T>(private val wraps: RuntimeDeferred<T>) : RuntimeDeferred<T> {
+        private var cache: NullWrapper<T>? = null
+
+        context(server: ServerRuntime)
+        override suspend fun await(): T =
+            cache?.value ?: wraps.await().also { cache = NullWrapper(it) }
+    }
 }
 
 public fun interface Runtime<out T> : RuntimeDeferred<T> {
@@ -17,6 +24,14 @@ public fun interface Runtime<out T> : RuntimeDeferred<T> {
 
     context(server: ServerRuntime)
     override suspend fun await(): T = invoke()
+
+    public data class Cached<out T>(private val wraps: Runtime<T>) : Runtime<T> {
+        private var cache: NullWrapper<T>? = null
+
+        context(server: ServerRuntime)
+        override operator fun invoke(): T =
+            cache?.value ?: wraps.invoke().also { cache = NullWrapper(it) }
+    }
 }
 
 public fun <T, R> Runtime<T>.map(transform: context(ServerRuntime) (T) -> R): Runtime<R> = Runtime { transform(this()) }

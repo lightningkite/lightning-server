@@ -27,7 +27,7 @@ public data class RequestPredicates(
     public val methods: Map<HttpMethod?, List<PathPredicate>> = emptyMap(),
     public val headers: HttpHeaders = HttpHeaders(),
     public val queryParameters: Set<Pair<String, String>> = emptySet(),
-    public val scopes: Set<String> = emptySet()
+    public val scopes: Set<Scope> = emptySet()
 ) {
     context(server: ServerRuntime)
     public fun matchesAll(request: Request<*>): Boolean {

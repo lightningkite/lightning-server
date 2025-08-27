@@ -22,7 +22,7 @@ import dev.whyoleg.cryptography.algorithms.SHA512
 public suspend fun SecretBasis.signer(variant: String): Signer.WithId = HS512(variant)
 
 /**Uses ECDSA with P-521 curve and SHA-512 hashing*/
-public fun Runtime<SecretBasis>.signer(variant: String): RuntimeDeferred<Signer.WithId> = mapSuspending { it.signer(variant) }
+public fun Runtime<SecretBasis>.signer(variant: String): RuntimeDeferred<Signer.WithId> = RuntimeDeferred.Cached { this().signer(variant) }
 
 
 /**Uses ECDSA with P-521 curve and SHA-512 hashing*/

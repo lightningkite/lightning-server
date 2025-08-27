@@ -22,13 +22,13 @@ import dev.whyoleg.cryptography.operations.Encryptor
 public suspend fun SecretBasis.cipher(variant: String): Cipher = AES_GCM(variant).cipher()
 
 /**Uses AES-GCM with 128-bit tag size*/
-public fun Runtime<SecretBasis>.cipher(variant: String): RuntimeDeferred<Cipher> = mapSuspending { it.cipher(variant) }
+public fun Runtime<SecretBasis>.cipher(variant: String): RuntimeDeferred<Cipher> = RuntimeDeferred.Cached { this().cipher(variant) }
 
 /**Uses AES-GCM with 128-bit tag size*/
 public fun SecretBasis.cipherBlocking(variant: String): Cipher = AES_GCM_Blocking(variant).cipher()
 
 /**Uses AES-GCM with 128-bit tag size*/
-public fun Runtime<SecretBasis>.cipherBlocking(variant: String): Runtime<Cipher> = map { it.cipherBlocking(variant) }
+public fun Runtime<SecretBasis>.cipherBlocking(variant: String): Runtime<Cipher> = Runtime.Cached { this().cipherBlocking(variant) }
 
 
 
