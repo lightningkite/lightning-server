@@ -17,19 +17,51 @@ dependencies {
     api(project(":core"))
     api(project(":ktor"))
     api(project(":typed"))
-//    api(project(":server-aws"))
-//    api(project(":server-azure"))
-//    api(project(":server-core"))
-//    api(project(":server-testing"))
-//    api(project(":server-dynamodb"))
-//    api(project(":server-firebase"))
-//    api(project(":server-ktor"))
-//    api(project(":server-memcached"))
-//    api(project(":server-mongo"))
-//    api(project(":server-redis"))
-//    api(project(":server-sentry"))
-//    api(project(":server-sftp"))
-//    ksp(project(":processor"))
+    api(project(":aws-serverless"))
+    api(project(":sessions"))
+    api(project(":sessions-email"))
+//    api(project(":sessions-oauth"))
+//    api(project(":sessions-oauth-shared"))
+    api(project(":sessions-shared"))
+    api(project(":sessions-sms"))
+    api(libs.serviceAbstractionsPubsub)
+    api(libs.serviceAbstractionsPubsubRedis)
+    api(libs.serviceAbstractionsPubsubTest)
+    api(libs.serviceAbstractionsShouldBeStandardLibrary)
+    api(libs.serviceAbstractionsSms)
+    api(libs.serviceAbstractionsSmsTest)
+    api(libs.serviceAbstractionsSmsTwilio)
+    api(libs.serviceAbstractionsTest)
+    api(libs.serviceAbstractionsNotificationsTest)
+    api(libs.serviceAbstractionsNotificationsFcm)
+    api(libs.serviceAbstractionsNotifications)
+    api(libs.serviceAbstractionsMetricsCloudwatch)
+    api(libs.serviceAbstractionsHttpClient)
+    api(libs.serviceAbstractionsFilesTest)
+    api(libs.serviceAbstractionsFilesS3)
+    api(libs.serviceAbstractionsFilesClient)
+    api(libs.serviceAbstractionsFilesClamav)
+    api(libs.serviceAbstractionsFiles)
+    api(libs.serviceAbstractionsExceptionsSentry)
+    api(libs.serviceAbstractionsEmailTest)
+    api(libs.serviceAbstractionsEmailJavasmtp)
+    api(libs.serviceAbstractionsEmail)
+    api(libs.serviceAbstractionsDemo)
+    api(libs.serviceAbstractionsDatabaseTest)
+    api(libs.serviceAbstractionsDatabaseProcessor)
+    api(libs.serviceAbstractionsDatabaseMongodb)
+    api(libs.serviceAbstractionsDatabasePostgres)
+    api(libs.serviceAbstractionsDatabaseJsonfile)
+    api(libs.serviceAbstractionsDatabase)
+    api(libs.serviceAbstractionsData)
+    api(libs.serviceAbstractionsCacheTest)
+    api(libs.serviceAbstractionsCacheRedis)
+    api(libs.serviceAbstractionsCacheMemcached)
+    api(libs.serviceAbstractionsCacheDynamodb)
+    api(libs.serviceAbstractionsCache)
+    api(libs.serviceAbstractionsBasis)
+    api(libs.serviceAbstractionsAwsClient)
+
     implementation(libs.kotlinerCli)
     implementation(libs.ktorCallLogging)
     implementation(project(":sessions"))
@@ -39,7 +71,8 @@ dependencies {
 kotlin {
     compilerOptions {
         freeCompilerArgs.add("-Xcontext-parameters")
-        freeCompilerArgs.add("-opt-in=kotlin.uuid.ExperimentalUuidApi")
+        optIn.add("kotlin.time.ExperimentalTime")
+        optIn.add("kotlin.uuid.ExperimentalUuidApi")
     }
     sourceSets.main {
         kotlin.srcDir("build/generated/ksp/main/kotlin")
@@ -47,14 +80,14 @@ kotlin {
 }
 
 application {
-    mainClass.set("com.lightningkite.lightningserverdemo.MainKt")
+    mainClass.set("com.lightningkite.lightningserver.demo.MainKt")
     this.applicationName = "server"
 }
 
 tasks.create("serve", JavaExec::class.java) {
     group = "application"
     classpath(sourceSets.main.get().runtimeClasspath)
-    mainClass.set("com.lightningkite.lightningserverdemo.MainKt")
+    mainClass.set("com.lightningkite.lightningserver.demo.MainKt")
     args("serve")
     workingDir(project.rootDir)
 }
@@ -73,7 +106,7 @@ tasks.create("lambda", Copy::class.java) {
 tasks.create("rebuildTerraform", JavaExec::class.java) {
     group = "deploy"
     classpath(sourceSets.main.get().runtimeClasspath)
-    mainClass.set("com.lightningkite.lightningserverdemo.MainKt")
+    mainClass.set("com.lightningkite.lightningserver.demo.MainKt")
     args("terraform")
     workingDir(project.rootDir)
     inputs.files(*file("terraform").walkTopDown().filter { it.name == "project.json" }.toList().toTypedArray())

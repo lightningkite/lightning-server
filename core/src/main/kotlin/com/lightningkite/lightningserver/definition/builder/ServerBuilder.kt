@@ -12,8 +12,16 @@ import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.http.DefaultExceptionHttpHandler
 import com.lightningkite.lightningserver.http.ExceptionHttpHandler
 import com.lightningkite.lightningserver.http.HttpBuilder
+import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpHandler
+import com.lightningkite.lightningserver.http.delete
+import com.lightningkite.lightningserver.http.get
+import com.lightningkite.lightningserver.http.head
 import com.lightningkite.lightningserver.http.intercept
+import com.lightningkite.lightningserver.http.options
+import com.lightningkite.lightningserver.http.patch
+import com.lightningkite.lightningserver.http.post
+import com.lightningkite.lightningserver.http.put
 import com.lightningkite.lightningserver.pathing.MutablePathSpecMap
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0

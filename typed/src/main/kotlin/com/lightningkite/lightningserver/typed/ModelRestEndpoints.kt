@@ -38,7 +38,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
-            handler = { _: Unit ->
+            implementation = { _: Unit ->
                 info.permissions(this)
             }
         )
@@ -53,7 +53,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
-            handler = { input: Query<T> ->
+            implementation = { input: Query<T> ->
                 info.collection(this)
                     .query(input)
                     .toList()
@@ -70,7 +70,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
-            handler = { input: Query<T> ->
+            implementation = { input: Query<T> ->
                 info.collection(this)
                     .query(input)
                     .toList()
@@ -87,7 +87,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
-            handler = { input: QueryPartial<T> ->
+            implementation = { input: QueryPartial<T> ->
                 info.collection(this)
                     .queryPartial(input)
                     .toList()
@@ -111,7 +111,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
                 )
             ),
             examples = emptyList(),
-            handler = { _: Unit ->
+            implementation = { _: Unit ->
                 info.collection(this).get(first) ?: throw NotFoundException()
             }
         )
@@ -126,7 +126,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
-            handler = { values: List<T> ->
+            implementation = { values: List<T> ->
                 try {
                     info.collection(this)
                         .insert(values)
@@ -149,7 +149,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
-            handler = { value: T ->
+            implementation = { value: T ->
                 try {
                     info.collection(this)
                         .insertOne(value)
@@ -173,7 +173,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
-            handler = { value: T ->
+            implementation = { value: T ->
                 try {
                     info.collection(this)
                         .upsertOneById(first, value)
@@ -199,7 +199,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
-            handler = { values: List<T> ->
+            implementation = { values: List<T> ->
                 try {
                     val db = info.collection(this)
                     values.map { db.replaceOneById(it._id, it) }.mapNotNull { it.new }
@@ -223,7 +223,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
-            handler = { value: T ->
+            implementation = { value: T ->
                 try {
                     info.collection(this)
                         .replaceOneById(first, value)
@@ -249,7 +249,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
-            handler = { input: MassModification<T> ->
+            implementation = { input: MassModification<T> ->
                 try {
                     info.collection(this)
                         .updateManyIgnoringResult(input)
@@ -280,7 +280,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
                 )
             ),
             examples = emptyList(),
-            handler = { input: Modification<T> ->
+            implementation = { input: Modification<T> ->
                 try {
                     info.collection(this)
                         .updateOneById(first, input)
@@ -312,7 +312,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
                 )
             ),
             examples = emptyList(),
-            handler = { input: Modification<T> ->
+            implementation = { input: Modification<T> ->
                 try {
                     info.collection(this)
                         .updateOneById(first, input)
@@ -345,7 +345,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
                 )
             ),
             examples = emptyList(),
-            handler = { input: Partial<T> ->
+            implementation = { input: Partial<T> ->
                 try {
                     info.collection(this)
                         .updateOneById(first, input.toModification(info.serializer))
@@ -371,7 +371,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
-            handler = { filter: Condition<T> ->
+            implementation = { filter: Condition<T> ->
                 info.collection(this).deleteManyIgnoringOld(filter)
             }
         )
@@ -393,7 +393,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
                 )
             ),
             examples = emptyList(),
-            handler = { _: Unit ->
+            implementation = { _: Unit ->
                 if (!info.collection(this).deleteOneById(first)) {
                     throw NotFoundException()
                 }
@@ -411,7 +411,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
-            handler = { condition: Condition<T> ->
+            implementation = { condition: Condition<T> ->
                 info.collection(this).count(condition)
             }
         )
@@ -426,7 +426,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
-            handler = { condition: Condition<T> ->
+            implementation = { condition: Condition<T> ->
                 info.collection(this).count(condition)
             }
         )
@@ -441,7 +441,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
-            handler = { condition: GroupCountQuery<T> ->
+            implementation = { condition: GroupCountQuery<T> ->
                 @Suppress("UNCHECKED_CAST")
                 info.collection(this)
                     .groupCount(condition.condition, condition.groupBy as DataClassPath<T, Any?>)
@@ -459,7 +459,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
-            handler = { condition: AggregateQuery<T> ->
+            implementation = { condition: AggregateQuery<T> ->
                 @Suppress("UNCHECKED_CAST")
                 info.collection(this)
                     .aggregate(
@@ -480,7 +480,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
-            handler = { condition: GroupAggregateQuery<T> ->
+            implementation = { condition: GroupAggregateQuery<T> ->
                 @Suppress("UNCHECKED_CAST")
                 info.collection(this)
                     .groupAggregate(
@@ -503,7 +503,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
-            handler = { condition: GroupCountQuery<T> ->
+            implementation = { condition: GroupCountQuery<T> ->
                 @Suppress("UNCHECKED_CAST")
                 val keySerializer = condition.groupBy.serializerAny as KSerializer<Any?>
                 @Suppress("UNCHECKED_CAST")
@@ -523,7 +523,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             auth = info.auth,
             errorCases = emptyList(),
             examples = emptyList(),
-            handler = { condition: GroupAggregateQuery<T> ->
+            implementation = { condition: GroupAggregateQuery<T> ->
                 @Suppress("UNCHECKED_CAST")
                 val keySerializer = condition.groupBy.serializerAny as KSerializer<Any?>
                 @Suppress("UNCHECKED_CAST")

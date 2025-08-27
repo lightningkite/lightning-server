@@ -23,6 +23,7 @@ import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.apigatewaymanagementapi.ApiGatewayManagementApiAsyncClient
 import software.amazon.awssdk.services.lambda.LambdaAsyncClient
 import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
@@ -46,6 +47,11 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
 
     internal fun loadSettings() {
         logger.debug("Loading settings...")
+        System.getenv("LIGHTNING_SERVER_SETTINGS_SECRET_ID")?.let { secretId ->
+            SecretsManagerClient.create().getSecretValue {
+                it.secretId(secretId)
+            }.secretString().let { loadSettings(it.toByteArray()) }
+        }
         val root = File(System.getenv("LAMBDA_TASK_ROOT"))
         root.resolve("settings.json").takeIf { it.exists() }?.let {
             it.readBytes().let { loadSettings(it) }

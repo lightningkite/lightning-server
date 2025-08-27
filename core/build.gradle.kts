@@ -16,7 +16,7 @@ dependencies {
     api(libs.serializationProperties)
     api(libs.serviceAbstractionsData)
     api(libs.serviceAbstractionsBasis)
-    api(libs.serviceAbstractionsSBSL)
+    api(libs.serviceAbstractionsShouldBeStandardLibrary)
     api(libs.kotlinHtmlJvm)
     
     // Multiplatform cryptography libraries

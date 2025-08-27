@@ -3,15 +3,18 @@ package com.lightningkite.lightningserver.websockets
 
 public sealed interface WebSocketFrame {
     public val content: Any
+    public fun isEmpty(): Boolean
 
     @JvmInline
     public value class Text(override val content: String) : WebSocketFrame {
         override fun toString(): String = content
+        override fun isEmpty(): Boolean = content.isEmpty()
     }
 
     @JvmInline
     public value class Binary(override val content: ByteArray) : WebSocketFrame {
         override fun toString(): String = "<bytes ${content.toHexString()}>"
+        override fun isEmpty(): Boolean = content.isEmpty()
     }
 }
 

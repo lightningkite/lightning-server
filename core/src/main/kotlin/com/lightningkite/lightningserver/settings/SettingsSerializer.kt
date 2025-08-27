@@ -17,7 +17,7 @@ public class SettingsSerializer(private val keys: List<ServerSetting<*, *>>) :
     override val descriptor: SerialDescriptor =
         buildClassSerialDescriptor("com.lightningkite.lightningserver.settings.Settings${keys.hashCode()}") {
             for (key in keys) element(
-                key.settingName,
+                key.name,
                 key.serializer.descriptor,
                 isOptional = key.optional,
             )
@@ -34,7 +34,7 @@ public class SettingsSerializer(private val keys: List<ServerSetting<*, *>>) :
                     @Suppress("UNCHECKED_CAST")
                     encodeSerializableElement(
                         descriptor,
-                        descriptor.getElementIndex(key.settingName),
+                        descriptor.getElementIndex(key.name),
                         key.serializer as KSerializer<Any?>,
                         value[key]!!
                     )
@@ -58,7 +58,7 @@ public class SettingsSerializer(private val keys: List<ServerSetting<*, *>>) :
                         "json" -> Json.parseToJsonElement(f.readText())
                             .let { it as JsonObject }
                             .entries.forEach { entry ->
-                                val setting = keys.find { it.settingName == entry.key } ?: return@forEach
+                                val setting = keys.find { it.name == entry.key } ?: return@forEach
                                 lowPriorityMap[setting] =
                                     Json.decodeFromJsonElement(setting.serializer, entry.value)
                             }

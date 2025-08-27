@@ -102,7 +102,7 @@ public class TimeBasedOTPProofEndpoints(
             auth = proofMethodAuth,
             errorCases = listOf(),
             examples = listOf(),
-            handler = { input: EstablishOtp ->
+            implementation = { input: EstablishOtp ->
                 modelInfo.collection().updateMany(condition {
                     it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName)
                 }, modification {
@@ -147,7 +147,7 @@ public class TimeBasedOTPProofEndpoints(
                 )
             ),
             successCode = HttpStatus.OK,
-            handler = { input: IdentificationAndPassword ->
+            implementation = { input: IdentificationAndPassword ->
                 val now = now()
                 cache().constrainAttemptRate(
                     cacheKey = "totp-count-${input.property}-${input.value}"
@@ -188,7 +188,7 @@ public class TimeBasedOTPProofEndpoints(
             auth = proofMethodAuth,
             errorCases = listOf(),
             examples = listOf(),
-            handler = { code: String ->
+            implementation = { code: String ->
                 val active = modelInfo.collection().find(condition {
                     it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) and it.disabledAt.eq(null)
                 }).toList()

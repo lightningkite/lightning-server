@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.definition
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.Setting
 import com.lightningkite.services.SettingContext
+import com.lightningkite.services.terraform.TerraformNeed
 import kotlinx.serialization.KSerializer
 
 public fun interface RuntimeDeferred<out T> {
@@ -38,8 +39,8 @@ public fun <T, R> Runtime<T>.map(transform: context(ServerRuntime) (T) -> R): Ru
 public fun <T, R> RuntimeDeferred<T>.mapSuspending(transform: suspend context(ServerRuntime) (T) -> R): RuntimeDeferred<R> =
     RuntimeDeferred { transform(this.await()) }
 
-public interface ServerSetting<SETTING, RESULT> : Runtime<RESULT> {
-    public val settingName: String
+public interface ServerSetting<SETTING, RESULT> : Runtime<RESULT>, TerraformNeed<SETTING> {
+    override val name: String
     public val serializer: KSerializer<SETTING>
     public val default: SETTING
     public val optional: Boolean get() = false
@@ -60,7 +61,7 @@ public interface ServerSetting<SETTING, RESULT> : Runtime<RESULT> {
 private value class NullWrapper<T>(val value: T)
 
 private data class BasicServerSetting<SETTING, RESULT>(
-    override val settingName: String,
+    override val name: String,
     override val default: SETTING,
     override val serializer: KSerializer<SETTING>,
     override val optional: Boolean,
@@ -95,7 +96,7 @@ public fun <SETTING : Setting<RESULT>, RESULT> ServerSetting(
     ServerSetting(name, default, serializer, optional) { it.invoke(name, this) }
 
 private data class BasicDirectServerSetting<SETTING>(
-    override val settingName: String,
+    override val name: String,
     override val default: SETTING,
     override val serializer: KSerializer<SETTING>,
     override val optional: Boolean,

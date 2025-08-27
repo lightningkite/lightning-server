@@ -119,7 +119,7 @@ public class KnownDeviceProofEndpoints(
             auth = proofMethodAuth,
             errorCases = listOf(),
             examples = listOf(),
-            handler = { _: Unit ->
+            implementation = { _: Unit ->
                 establish(
                     auth.principalType,
                     auth.id,
@@ -141,7 +141,7 @@ public class KnownDeviceProofEndpoints(
             auth = proofMethodAuth,
             errorCases = listOf(),
             examples = listOf(),
-            handler = { _: Unit ->
+            implementation = { _: Unit ->
                 establish(
                     auth.principalType,
                     auth.id,
@@ -163,7 +163,7 @@ public class KnownDeviceProofEndpoints(
             auth = noAuth,
             errorCases = listOf(),
             examples = listOf(),
-            handler = { _: Unit ->
+            implementation = { _: Unit ->
                 KnownDeviceOptions(
                     duration = expires(),
                     strength = info.strength
@@ -191,7 +191,7 @@ public class KnownDeviceProofEndpoints(
                 )
             ),
             successCode = HttpStatus.OK,
-            handler = { input: String ->
+            implementation = { input: String ->
                 val now = now()
                 val id = input.substringBefore('/').let { Uuid.parse(it) }
                 val secret = input.substringAfter('/')

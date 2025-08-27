@@ -1,53 +1,64 @@
 package com.lightningkite.lightningserver.demo
 
+import com.lightningkite.kotlinercli.cli
+import com.lightningkite.lightningserver.definition.exceptionSettings
+import com.lightningkite.lightningserver.definition.metricsSettings
+import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.engine.ktor.KtorEngine
 import com.lightningkite.lightningserver.settings.loadFromFile
-import com.lightningkite.lightningserver.typed.mediaTypeEncoders
+import com.lightningkite.lightningserver.terraform.awsserverless.TerraformAwsServerlessDomainBuilder
+import com.lightningkite.lightningserver.terraform.generated
+import com.lightningkite.services.ExceptionReporter
+import com.lightningkite.services.MetricReporter
+import com.lightningkite.services.database.mongodb.mongodbAtlas
+import com.lightningkite.services.database.mongodb.mongodbAtlasFree
+import com.lightningkite.services.terraform.byVariable
+import com.lightningkite.services.terraform.direct
+import com.lightningkite.toEmailAddress
 import io.ktor.server.netty.Netty
+import software.amazon.awssdk.regions.Region
 import java.io.File
 
-//import com.lightningkite.kotlinercli.cli
-//import com.lightningkite.lightningserver.cache.*
-//import com.lightningkite.lightningserver.files.ServerFile
-//import com.lightningkite.lightningserver.ktor.runServer
-//import com.lightningkite.lightningserver.pubsub.LocalPubSub
-//import com.lightningkite.lightningserver.settings.loadSettings
-//import kotlinx.coroutines.runBlocking
-//import kotlinx.serialization.*
-//import java.io.File
-//import kotlinx.datetime.Instant
-//import java.util.*
-//import com.lightningkite.UUID
-//import com.lightningkite.lightningserver.aws.terraform.createTerraform
-//import com.lightningkite.lightningserver.ktor.runServerNetty
-//import com.lightningkite.lightningserver.pubsub.BadPubSub
-
-//fun setup() {
-//    Server
-//}
 
 private fun serve() {
     KtorEngine(Server.build()).apply {
         settings.loadFromFile(File("settings.json"), internalSerializersModule)
         start(Netty)
     }
-
-//    loadSettings(File("settings.json"))
-//    runServerNetty(BadPubSub, LocalCache)
 }
 
-//fun terraform() {
-//    Server
-////    createTerraform("com.lightningkite.lightningserverdemo.AwsHandler", "demo", File("demo/terraform"))
-//}
+fun terraform() {
+    Server
+    TerraformAwsServerlessDomainBuilder(
+        handlerFullyQualifiedName = "com.lightningkite.lightningserver.demo.AwsHandler",
+
+        storageBucket = "ivieleague-deployment-states",
+        storageBucketPathOverride = "demo/example",
+        projectPrefix = "demo-example",
+        deploymentTag = "demo-example",
+
+        displayName = "Demo Example",
+        debug = true,
+        emergencyContact = "josephivie@gmail.com".toEmailAddress(),
+
+        region = Region.US_WEST_2,
+        domain = "example.demo.ivieleague.com",
+        domainZone = "ivieleague.com",
+//        purchaseDomain = true,
+    ).apply {
+//        settings(Server) {
+        with(Server) {
+            database.mongodbAtlasFree(orgId = "6323a65c43d66b56a2ea5aea")
+            secretBasis.generated()
+            metricsSettings.direct(MetricReporter.Settings("none"))
+            exceptionSettings.direct(ExceptionReporter.Settings("none"))
+        }
+    }.write(File("demo/terraform/example-new").also { it.mkdirs() })
+}
 
 fun main(vararg args: String) {
-    val server = Server.build()
-    println("Coders: ${server.mediaTypeEncoders.entries.joinToString { "${it.key}: ${it.value}" }}")
-    assert(server.mediaTypeEncoders.isNotEmpty())
-    KtorEngine(server).apply {
-        println(server.endpoints.entries.joinToString("\n"))
-        settings.loadFromFile(File("settings.json"), internalSerializersModule)
-        start(Netty)
-    }
+    cli(
+        arguments = args,
+        available = listOf(::serve, ::terraform),
+    )
 }

@@ -40,7 +40,7 @@ public data class MultiplexMessage(
     val error: String? = null
 )
 
-public class MultiplexWebSocketHandler(internal val json: Json) : WebSocketHandler<PathSpec0, MultiplexWebSocketHandlerState> {
+public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, MultiplexWebSocketHandlerState> {
     override val storageSerializer: KSerializer<MultiplexWebSocketHandlerState> get() = serializer()
 
     private inner class WrappedConnection<T>(
@@ -55,7 +55,7 @@ public class MultiplexWebSocketHandler(internal val json: Json) : WebSocketHandl
 
         override suspend fun close(reason: WebSocketClose) = wrapped.close(reason)
         override suspend fun send(frame: WebSocketFrame) = wrapped.send(
-            json.encodeToString(
+            externalSerialization.json.encodeToString(
                 MultiplexMessage(
                     channel = channel,
                     data = frame.text
@@ -147,7 +147,7 @@ public class MultiplexWebSocketHandler(internal val json: Json) : WebSocketHandl
             connection.send(" ")
             return
         }
-        val message = json.decodeFromString<MultiplexMessage>((frame as WebSocketFrame.Text).content)
+        val message = connection.externalSerialization.json.decodeFromString<MultiplexMessage>((frame as WebSocketFrame.Text).content)
         val channel = message.channel
         try {
             when {
@@ -178,7 +178,7 @@ public class MultiplexWebSocketHandler(internal val json: Json) : WebSocketHandl
                     connection.withWrapped(otherHandler, channel) { otherHandler.didConnectWithMetrics(match.pathSpec, it) }
                     connection.send(
                         WebSocketFrame(
-                            json.encodeToString(
+                            connection.externalSerialization.json.encodeToString(
                                 MultiplexMessage(
                                     channel = channel,
                                     start = true
@@ -198,7 +198,7 @@ public class MultiplexWebSocketHandler(internal val json: Json) : WebSocketHandl
                     connection.updateStateImmediately { it.copy(map = it.map - channel) }
                     connection.send(
                         WebSocketFrame(
-                            json.encodeToString(
+                            connection.externalSerialization.json.encodeToString(
                                 MultiplexMessage(
                                     channel = channel,
                                     end = true
@@ -220,7 +220,7 @@ public class MultiplexWebSocketHandler(internal val json: Json) : WebSocketHandl
             }
         } catch (e: Exception) {
             connection.send(
-                json.encodeToString(
+                connection.externalSerialization.json.encodeToString(
                     MultiplexMessage(
                         channel,
                         end = true,

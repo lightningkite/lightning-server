@@ -1,16 +1,11 @@
 package com.lightningkite.lightningserver.settings
 
-import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.builder.setting
-import com.lightningkite.lightningserver.definition.exceptionSettings
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.definition.metricsSettings
-import com.lightningkite.lightningserver.runtime.*
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.serializer
-import org.junit.Assert.*
 import java.io.File
 import kotlin.test.Test
 
@@ -52,7 +47,7 @@ class SettingsLoaderFileTest {
         ServerSettings(allSettings)
             .apply { loadFromFile(file, Server.internalSerialization) }
             .allSerializable()
-            .forEach { println("${it.key.settingName}: ${it.value}") }
+            .forEach { println("${it.key.name}: ${it.value}") }
     }
     @Test
     fun testJsonComplete() {
@@ -78,7 +73,7 @@ class SettingsLoaderFileTest {
         ServerSettings(allSettings)
             .apply { loadFromFile(file, Server.internalSerialization) }
             .allSerializable()
-            .forEach { println("${it.key.settingName}: ${it.value}") }
+            .forEach { println("${it.key.name}: ${it.value}") }
     }
     @Test
     fun testPropertiesClean() {
@@ -91,7 +86,7 @@ class SettingsLoaderFileTest {
             ServerSettings(allSettings)
                 .apply { loadFromFile(file, Server.internalSerialization) }
                 .allSerializable()
-                .forEach { println("${it.key.settingName}: ${it.value}") }
+                .forEach { println("${it.key.name}: ${it.value}") }
         } catch(e: IncompleteSettingsException) {
             println("---SUGGESTED---\n${e.suggestedFile.readText()}\n")
             e.suggestedFile.copyRecursively(file, overwrite = true)
@@ -99,7 +94,7 @@ class SettingsLoaderFileTest {
         ServerSettings(allSettings)
             .apply { loadFromFile(file, Server.internalSerialization) }
             .allSerializable()
-            .forEach { println("${it.key.settingName}: ${it.value}") }
+            .forEach { println("${it.key.name}: ${it.value}") }
     }
     @Test
     fun testJsonClean() {
@@ -112,7 +107,7 @@ class SettingsLoaderFileTest {
             ServerSettings(allSettings)
                 .apply { loadFromFile(file, Server.internalSerialization) }
                 .allSerializable()
-                .forEach { println("${it.key.settingName}: ${it.value}") }
+                .forEach { println("${it.key.name}: ${it.value}") }
         } catch(e: IncompleteSettingsException) {
             println("---SUGGESTED---\n${e.suggestedFile.readText()}\n")
             e.suggestedFile.copyRecursively(file, overwrite = true)
@@ -120,6 +115,6 @@ class SettingsLoaderFileTest {
         ServerSettings(allSettings)
             .apply { loadFromFile(file, Server.internalSerialization) }
             .allSerializable()
-            .forEach { println("${it.key.settingName}: ${it.value}") }
+            .forEach { println("${it.key.name}: ${it.value}") }
     }
 }

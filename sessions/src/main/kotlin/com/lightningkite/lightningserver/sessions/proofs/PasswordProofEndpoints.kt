@@ -130,7 +130,7 @@ public class PasswordProofEndpoints(
             description = "Set your password",
             auth = proofMethodAuth,
             errorCases = emptyList(),
-            handler = { value: EstablishPassword ->
+            implementation = { value: EstablishPassword ->
                 establish(
                     auth.principalType,
                     auth.id,
@@ -165,7 +165,7 @@ public class PasswordProofEndpoints(
                 )
             ),
             successCode = HttpStatus.OK,
-            handler = { input: IdentificationAndPassword ->
+            implementation = { input: IdentificationAndPassword ->
                 val now = now()
                 cache().constrainAttemptRate("password-${input.property}-${input.value}") {
                     val subject = input.type

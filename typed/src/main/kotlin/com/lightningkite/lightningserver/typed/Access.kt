@@ -11,13 +11,13 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.HasId
 
-public data class Access<REQ : Request<PATH>, PATH : PathSpec, SUBJECT : HasId<*>?>(
-    val request: REQ,
-    val authOrNull: Authentication<SUBJECT & Any>?,
+public class Access<REQ : Request<PATH>, PATH : PathSpec, SUBJECT : HasId<*>?> internal constructor(
+    public val request: REQ,
+    public val authOrNull: Authentication<SUBJECT & Any>?,
 ) : HasContextualPath<PATH> by request
 
 context(server: ServerRuntime)
-public suspend fun <REQUEST : Request<PATH>, PATH : PathSpec, SUBJECT : HasId<*>?> REQUEST.access(
+internal suspend fun <REQUEST : Request<PATH>, PATH : PathSpec, SUBJECT : HasId<*>?> REQUEST.access(
     auth: AuthRequirement<SUBJECT>
 ): Access<REQUEST, PATH, SUBJECT> = Access(this, auth.assert(get(Authentication.CacheKey)))
 
@@ -28,3 +28,11 @@ public typealias AuthAccess<SUBJECT> = Access<*, *, SUBJECT>
 public val <SUBJECT : HasId<*>> Access<*, *, SUBJECT>.auth: Authentication<SUBJECT>
     get() = authOrNull!! // safe because the type is non-null
 
+context(server: ServerRuntime)
+public suspend fun <SUBJECT: HasId<*>> Request<*>.auth(auth: AuthRequirement<SUBJECT?>): Authentication<SUBJECT>? {
+    return auth.assert(this[Authentication.CacheKey])
+}
+context(server: ServerRuntime)
+public suspend fun <SUBJECT: HasId<*>> Request<*>.auth(auth: AuthRequirement<SUBJECT>): Authentication<SUBJECT> {
+    return auth.assert(this[Authentication.CacheKey])!!
+}

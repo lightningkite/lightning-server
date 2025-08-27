@@ -44,14 +44,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 ) : SessionManager<SUBJECT, ID>(principal, database, tokenFormat) {
 
     context(server: ServerRuntime)
-    public open suspend fun requiredProofStrengthFor(subject: SUBJECT): Int = 5
-
-    context(server: ServerRuntime)
-    public open suspend fun authLimitsFor(subject: SUBJECT): RequestPredicates? = null
-
-    context(server: ServerRuntime)
-    public open suspend fun authForbidFor(subject: SUBJECT): RequestPredicates? = null
-
+    public abstract suspend fun requiredProofStrengthFor(subject: SUBJECT): Int
 
     private val errorNoSingleUser = LSError(
         404,
@@ -94,25 +87,6 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     ): Pair<Session<SUBJECT, ID>, RefreshToken>? {
         val subject = principal.fetch(result.id)
 
-        val limits = authLimitsFor(subject)
-        val forbidden = authForbidFor(subject)
-
-        if (limits != null && forbidden != null) {
-            val intersection = limits.intersect(forbidden)
-            if (intersection.isNotEmpty()) throw IllegalStateException(
-                """
-                    Intersections between authLimitsFor and authForbidFor are not allowed, as it is a contradiction. 
-                    
-                    Subject: $subject
-                    
-                    Intersection: $intersection
-                """.trimIndent()
-            )
-        }
-
-        if (limits?.scopes?.acceptsAllScopes(request.scopes) == false) throw ForbiddenException("You are limited to scopes ${limits.scopes}")
-        if (forbidden?.scopes?.acceptsAnyScopes(request.scopes) == true) throw ForbiddenException("You are forbidden from scopes ${forbidden.scopes}")
-
         return if (result.readyToLogIn) newSession(
             subjectId = result.id,
             label = request.label,
@@ -121,8 +95,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 val b = request.expires
                 if (a != null && b != null) minOf(a, b) else a ?: b
             },
-            limitTo = limits,
-            forbid = forbidden,
+            scopes = request.scopes,
             stale = sessionStaleAfter(subject)?.let { now() + it }
         )
         else null
@@ -136,7 +109,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             summary = "Log In",
             description = "Attempt to log in as a ${principal.name} using various proofs.",
             errorCases = errors,
-            handler = { proofs: List<Proof> ->
+            implementation = { proofs: List<Proof> ->
                 login2(LogInRequest(proofs, scopes = emptySet())) // Uses empty set so that enforced limitations don't conflict. May still be granted root access
             }
         )
@@ -149,7 +122,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             summary = "Log In With Limitations",
             description = "Attempt to log in as a ${principal.name} using various proofs.",
             errorCases = errors,
-            handler = { input: LogInRequest ->
+            implementation = { input: LogInRequest ->
                 proofsCheck(input.proofs).let {
                     IdAndAuthMethods(
                         id = it.id,
@@ -169,7 +142,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             summary = "Check Proofs",
             description = "Check if you can log in as a ${principal.name} using various proofs.",
             errorCases = errors,
-            handler = { proofs: List<Proof> ->
+            implementation = { proofs: List<Proof> ->
                 proofs.forEach {
                     if (!proofSigner.await().verify(it)) throw errorInvalidProof.toException(data = it.via)
                     if (now() > it.at + 1.hours) throw errorExpiredProof.toException(data = it.via)

@@ -19,7 +19,7 @@ public fun <PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT> ApiHttpHandler(
     successCode: HttpStatus = HttpStatus.OK,
     errorCases: List<LSError> = emptyList(),
     examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = emptyList(),
-    handler: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT
+    implementation: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT
 ): ApiHttpHandler<PATH, USER, INPUT, OUTPUT> =
     object : ApiHttpHandler<PATH, USER, INPUT, OUTPUT> {
         override val summary: String = summary
@@ -32,7 +32,7 @@ public fun <PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT> ApiHttpHandler(
         override val examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = examples
 
         context(server: ServerRuntime)
-        override suspend fun handle(access: HttpAccess<PATH, USER>, input: INPUT): OUTPUT = access.handler(input)
+        override suspend fun handle(access: HttpAccess<PATH, USER>, input: INPUT): OUTPUT = access.implementation(input)
     }
 
 public inline fun <PATH: PathSpec, USER: HasId<*>?, reified INPUT, reified OUTPUT> ApiHttpHandler(
@@ -42,9 +42,9 @@ public inline fun <PATH: PathSpec, USER: HasId<*>?, reified INPUT, reified OUTPU
     successCode: HttpStatus = HttpStatus.OK,
     errorCases: List<LSError> = emptyList(),
     examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = emptyList(),
-    noinline handler: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT
+    noinline implementation: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT
 ): ApiHttpHandler<PATH, USER, INPUT, OUTPUT> =
-    ApiHttpHandler(summary, description, serializerOrContextual<INPUT>(), serializerOrContextual<OUTPUT>(), auth, successCode, errorCases, examples, handler)
+    ApiHttpHandler(summary, description, serializerOrContextual<INPUT>(), serializerOrContextual<OUTPUT>(), auth, successCode, errorCases, examples, implementation)
 
 context(server: ServerRuntime, access: HttpAccess<PATH, out USER>)
 public suspend operator fun <PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.invoke(input: INPUT): OUTPUT {

@@ -19,6 +19,7 @@ dependencies {
     api(libs.awsS3) { excludeNetty() }
     api(libs.awsLambda) { excludeNetty() }
     api(libs.awsApiGateway) { excludeNetty() }
+    api(libs.awsSecretsManager) { excludeNetty() }
     api(libs.lambdaJavaCore) { excludeNetty() }
     api(libs.lambdaJavaEvents) { excludeNetty() }
     api(libs.lambdaJavaLog4j2) { excludeNetty() }

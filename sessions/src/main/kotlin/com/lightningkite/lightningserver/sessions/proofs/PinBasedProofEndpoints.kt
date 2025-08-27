@@ -52,7 +52,7 @@ public abstract class PinBasedProofEndpoints(
             description = "Sends a login code to the given ${name.lowercase()}.  The message will contain both a PIN that can be combined with the returned key to log in.",
             errorCases = emptyList(),
             successCode = HttpStatus.OK,
-            handler = { valueUnsafe: String ->
+            implementation = { valueUnsafe: String ->
                 val value = normalize(valueUnsafe)
 
                 pin.cache().constrainAttemptRate(
@@ -82,7 +82,7 @@ public abstract class PinBasedProofEndpoints(
             description = "Logs in to the given account with a PIN that was sent earlier and the key from that request.  Note that the PIN expires in ${pin.expiration.inWholeMinutes} minutes, and you are only permitted ${pin.maxAttempts} attempts.",
             errorCases = emptyList(),
             successCode = HttpStatus.OK,
-            handler = { input: FinishProof ->
+            implementation = { input: FinishProof ->
                 proofSigner.await().makeProof(
                     info = info,
                     property = info.property!!,

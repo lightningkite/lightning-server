@@ -1,30 +1,20 @@
 package com.lightningkite.lightningserver.demo
-//
-//import com.lightningkite.lightningserver.db.*
-//import com.lightningkite.serialization.*
-//import com.lightningkite.lightningserver.auth.AuthOptions
-//import com.lightningkite.lightningserver.auth.Authentication
-//import com.lightningkite.lightningserver.auth.RequestAuth
-//import com.lightningkite.lightningserver.auth.noAuth
-//import com.lightningkite.lightningserver.core.ServerPath
-//import com.lightningkite.lightningserver.core.ServerPathGroup
-//import com.lightningkite.lightningserver.db.*
-//import com.lightningkite.lightningserver.typed.AuthAccessor
-//import java.util.*
-//import com.lightningkite.UUID
-//import com.lightningkite.lightningserver.typed.typed
-//import kotlin.random.Random
-//
-//class TestModelEndpoints(path: ServerPath): ServerPathGroup(path) {
-//    val info = modelInfoWithDefault(
-//        serialization = ModelSerializationInfo(),
-//        authOptions = noAuth,
-//        getBaseCollection = {Server.database().collection<TestModel>()},
-//        defaultItem = { TestModel() },
-//    )
-//
-//    val rest = ModelRestEndpoints(path("rest"), info)
-//    val restWebsocket = path("rest").restApiWebsocket(info)
-//    val rest2Websocket = ModelRestUpdatesWebsocket(path("rest2").typed, info, TestModel__id)
-//    val dump = ModelDumpEndpoints(path("rest"), info, Authentication.isSuperUser, Server.files, Server.email)
-//}
+
+import com.lightningkite.lightningserver.auth.noAuth
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.definition.builder.bind
+import com.lightningkite.lightningserver.typed.ModelRestEndpoints
+import com.lightningkite.lightningserver.typed.modelInfo
+import com.lightningkite.services.database.ModelPermissions
+import com.lightningkite.services.database.collection
+import java.util.*
+import kotlin.random.Random
+
+class TestModelEndpoints: ServerBuilder() {
+    val info = Server.database.modelInfo(
+        auth = noAuth,
+        permissions = { ModelPermissions.allowAll<TestModel>() },
+    )
+
+    val rest = path("rest") bind ModelRestEndpoints(info)
+}

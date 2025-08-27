@@ -8,7 +8,6 @@ import com.lightningkite.lightningserver.pathing.plus
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.DefaultExceptionHttpHandler
 import com.lightningkite.lightningserver.http.ExceptionHttpHandler
-import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.serialization.MediaTypeDecoder
 import com.lightningkite.lightningserver.serialization.MediaTypeEncoder
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
@@ -298,7 +297,7 @@ public data class ModularServerDefinition(
             schedules = flatten { it.schedules },
             tasks = flatten { it.tasks },
             webSocketTopics = flattenPathSpec { it.webSocketTopics },
-            settings = (definition.settings + flattenedModules.values.flatMap { it.settings }).distinctBy { it.settingName },
+            settings = (definition.settings + flattenedModules.values.flatMap { it.settings }).distinctBy { it.name },
             extensions = definition.extensions.toMutableExtensions().apply {
                 flattenedModules.values.forEach { include(it.extensions) }
             },

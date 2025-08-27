@@ -1,10 +1,11 @@
 package com.lightningkite.lightningserver.engine.awsserverless
 
 import com.lightningkite.lightningserver.*
+import com.lightningkite.lightningserver.definition.exceptionSettings
 import com.lightningkite.lightningserver.definition.generalSettings
+import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.invoke
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.aws.AwsConnections
@@ -13,14 +14,13 @@ import kotlinx.coroutines.future.await
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import software.amazon.awssdk.core.SdkBytes
 import software.amazon.awssdk.http.SdkHttpFullResponse
 import software.amazon.awssdk.services.apigatewaymanagementapi.model.GoneException
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.lambda.model.InvocationType
+import java.net.URLDecoder
 import java.util.Base64
-import kotlin.time.measureTime
 
 internal class AwsAdapterWs(val root: AwsAdapter) {
     val wsUrl: String get() = with(root) { generalSettings.invoke().wsUrl }
@@ -66,7 +66,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
             path = path,
             handler = handler,
             socketId = socketId,
-            stateString = stateString
+            stateAnonType = stateString
         )
         val r = action(mid)
         mid.commit()
@@ -78,9 +78,9 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
         val path: P,
         val handler: WebSocketHandler<P, T>,
         val socketId: String,
-        val stateString: AnonType
+        val stateAnonType: AnonType
     ) : WebSocketConnection<P, T>, ServerRuntime by root {
-        override var currentState: T = stateString.value(encoding, handler.storageSerializer)
+        override var currentState: T = stateAnonType.value(encoding, handler.storageSerializer)
 
         override suspend fun repullState(): T = webSocketDynamo.statesAlone(listOf(socketId))[socketId]!!
             .let { encoding.decodeFromByteArray(handler.storageSerializer, it) }
@@ -175,225 +175,221 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
 
 
     suspend fun publishHandler(event: WebSocketPublish): APIGatewayV2HTTPResponse {
-//        val fullTopicMatch = root.server.webSocketTopics.match(root.internalSerialization.stringArrayFormat, event.topic) ?: run {
-//            root.logger.warn("No topic found for ${event.topic}")
-//            return APIGatewayV2HTTPResponse(500, body = "No topic found for ${event.topic}")
-//        }
-//        val tr = event.data
-//        webSocketDynamo.forSubscribers(event.topic) { path, ids ->
-//            try {
-//                val match = root.server.endpoints.match(root.externalSerialization.stringArrayFormat, path) ?: run {
-//                    root.logger.warn("No handler found for $path")
-//                    return@forSubscribers
-//                }
-//                val p = match.path
-//                val h = match.value?.websocket ?: run {
-//                    root.logger.warn("No handler found for $p")
-//                    return@forSubscribers
-//                }
-//                h as WebSocketHandler<PathSpec, Any?>
-//                // TODO: could retrieve more states at once?
-//                val states = webSocketDynamo.states(ids)
-//                for (socketId in ids) {
-//                    val s = states[socketId] ?: continue
-//                    try {
-//                        withMid<PathSpec, Any?, Unit>(p.pathSpec, s.connectRequest as WebSocketConnectRequest<PathSpec>, h, socketId, AnonType(s.state)) { mid ->
-//                            h.messageFromSubscriptionWithMetrics(p.pathSpec, mid, WebSocketSubscriptionMessage(fullTopicMatch.value, fullTopicMatch.path.rawPathArguments, event.data))
-//                        }
-//                    } catch (e: Exception) {
-//                        // Suppress, already reported inside *Tracked
-//                        webSocketClose(socketId, WebSocketClose.INTERNAL_ERROR)
-//                    }
-//                }
-//            } catch (e: Exception) {
-//                root.logger.warn("WebSocket subs fail $path: ${e.message}")
-//            }
-//        }
+        @Suppress("UNCHECKED_CAST")
+        val fullTopicMatch = root.server.webSocketTopics.match(root.internalSerialization.stringArrayFormat, event.topic) as? PathSpecMap.Match<WebSocketTopic<PathSpec, Any?>> ?: run {
+            root.logger.warn("No topic found for ${event.topic}")
+            return APIGatewayV2HTTPResponse(500, body = "No topic found for ${event.topic}")
+        }
+        val fullValue = event.data.value(root.internalSerialization.kotlinBytesFormat, fullTopicMatch.value!!.type)
+        webSocketDynamo.forSubscribers(event.topic) { path, ids ->
+            try {
+                val match = root.server.endpoints.match(root.externalSerialization.stringArrayFormat, path) ?: run {
+                    root.logger.warn("No handler found for $path")
+                    return@forSubscribers
+                }
+                val p = match.path
+                val h = match.value?.websocket ?: run {
+                    root.logger.warn("No handler found for $p")
+                    return@forSubscribers
+                }
+                h as WebSocketHandler<PathSpec, Any?>
+                // TODO: could retrieve more states at once?
+                val states = webSocketDynamo.states(ids)
+                for (socketId in ids) {
+                    val s = states[socketId] ?: continue
+                    try {
+                        withMid<PathSpec, Any?, Unit>(p.pathSpec, s.connectRequest as WebSocketConnectRequest<PathSpec>, h, socketId, AnonType(s.state)) { mid ->
+                            h.messageFromSubscriptionWithMetrics(p.pathSpec, mid, WebSocketSubscriptionMessage(fullTopicMatch.value!!, fullTopicMatch.path.rawPathArguments, fullValue))
+                        }
+                    } catch (e: Exception) {
+                        // Suppress, already reported inside *Tracked
+                        webSocketClose(socketId, WebSocketClose.INTERNAL_ERROR)
+                    }
+                }
+            } catch (e: Exception) {
+                root.logger.warn("WebSocket subs fail $path: ${e.message}")
+            }
+        }
 
         return APIGatewayV2HTTPResponse(200)
     }
 
     val rootWs = QueryParamWebSocketHandler()
+    val rootPath = PathSpec0(listOf(), PathSpec.Afterwards.None)
     suspend fun <T> publish(topic: String, serializer: KSerializer<T>, output: T) {
-//        try {
-//            root.lambdaClient.invoke {
-//                it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
-//                it.qualifier(System.getenv("AWS_LAMBDA_FUNCTION_VERSION"))
-//                it.invocationType(InvocationType.EVENT)
-//
-//                it.payload(
-//                    SdkBytes.fromUtf8String(
-//                        root.internalSerialization.json.encodeToString(
-//                            WebSocketPublish.serializer(),
-//                            WebSocketPublish(
-//                                topic,
-//                                AnonType(output, serializer)
-//                            )
-//                        )
-//                    )
-//                )
-//            }.await()
-//        } catch (e: Exception) {
-//            e.report()
-//        }
-    }
+        try {
+            root.lambdaClient.invoke {
+                it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
+                it.qualifier(System.getenv("AWS_LAMBDA_FUNCTION_VERSION"))
+                it.invocationType(InvocationType.EVENT)
 
+                it.payload(
+                    SdkBytes.fromUtf8String(
+                        root.internalSerialization.json.encodeToString(
+                            WebSocketPublish.serializer(),
+                            WebSocketPublish(
+                                topic,
+                                AnonType(root.internalSerialization.kotlinBytesFormat, output, serializer)
+                            )
+                        )
+                    )
+                )
+            }.await()
+        } catch (e: Exception) {
+            with(root) {
+                exceptionSettings().report(e, "METRICS")
+            }
+        }
+    }
     suspend fun handleWebsocketDidConnect(event: WebSocketDidConnect): APIGatewayV2HTTPResponse {
-        TODO()
-//        val path = ServerPath.root
-//        try {
-//            withMid(path, event.connection, rootWs, event.socketId, event.storage) { mid ->
-//                rootWs.didConnectWithMetrics(
-//                    path,
-//                    mid
-//                )
-//                return APIGatewayV2HTTPResponse(200)
-//            }
-//        } catch (e: Exception) {
-//            webSocketClose(event.socketId, WebSocketClose.INTERNAL_ERROR)
-//            return APIGatewayV2HTTPResponse(500, body = e.message ?: "")
-//        }
+        try {
+            @Suppress("UNCHECKED_CAST")
+            withMid(rootPath, event.connection as WebSocketConnectRequest<PathSpec0>, rootWs, event.socketId, event.storage) { mid ->
+                rootWs.didConnectWithMetrics(
+                    rootPath,
+                    mid
+                )
+                return APIGatewayV2HTTPResponse(200)
+            }
+        } catch (e: Exception) {
+            webSocketClose(event.socketId, WebSocketClose.INTERNAL_ERROR)
+            return APIGatewayV2HTTPResponse(500, body = e.message ?: "")
+        }
     }
 
     suspend fun handleWebsocket(event: APIGatewayV2WebsocketRequest): APIGatewayV2HTTPResponse {
-        TODO()
-//        val headers =
-//            HttpHeaders(event.multiValueHeaders?.entries?.flatMap { it.value.map { v -> it.key to v } } ?: listOf())
-//        val body = event.body?.let { raw ->
-//            if (event.isBase64Encoded)
-//                HttpContent.Binary(
-//                    Base64.getDecoder().decode(raw),
-//                    headers.contentType ?: ContentType.Application.OctetStream
-//                )
-//            else
-//                HttpContent.Text(raw, headers.contentType ?: ContentType.Text.Plain)
-//        }
-//        var queryParams =
-//            (event.multiValueQueryStringParameters
-//                ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to v.decodeURLPart() } }
-//
-//        return when (event.requestContext.routeKey) {
-//            "\$connect" -> {
-//                // TODO: Remove this fugly hack and deal with websocket auth better
-//                queryParams = queryParams.flatMap {
-//                    if (it.first == "path") listOf(it) + it.second.substringAfter('?').split('&')
-//                        .map { it.substringBefore('=') to it.substringAfter('=') }
-//                    else listOf(it)
-//                }
-//                val lkEvent = WebSocketConnectRequest(
-//                    path = ServerPath.root,
-//                    parts = mapOf(),
-//                    wildcard = null,
-//                    queryParameters = queryParams,
-//                    headers = headers,
-//                    domain = event.requestContext.domainName,
-//                    protocol = "https",
-//                    sourceIp = event.requestContext.identity.sourceIp ?: "0.0.0.0"
-//                )
-//                try {
-//                    lkEvent.authAny()  // force cache
-//                    val storage = rootWs.willConnectWithMetrics(ServerPath.root, lkEvent)
-//                    val storageBytes = encoding.encodeByteArray(rootWs.storageSerializer, storage)
-//                    val storageString = encoding.encodeString(rootWs.storageSerializer, storage)
-//                    webSocketDynamo.setState(event.requestContext.connectionId, lkEvent, storageBytes)
-//                    try {
-//                        root.lambdaClient.invoke {
-//                            it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
-//                            it.qualifier(System.getenv("AWS_LAMBDA_FUNCTION_VERSION"))
-//                            it.invocationType(InvocationType.EVENT)
-//
-//                            it.payload(
-//                                SdkBytes.fromUtf8String(
-//                                    Serialization.Internal.json.encodeToString(
-//                                        WebSocketDidConnect.serializer(),
-//                                        WebSocketDidConnect(
-//                                            event.requestContext.connectionId,
-//                                            lkEvent,
-//                                            AnonType(storageString)
-//                                        )
-//                                    )
-//                                )
-//                            )
-//                        }.await()
-//                    } catch (e: Exception) {
-//                        e.report()
-//                    }
-//                    root.logger.info("WebSocket ${event.requestContext.connectionId} connected successfully.")
-//                    APIGatewayV2HTTPResponse(200)
-//                } catch (http: HttpStatusException) {
-//                    http.toResponse(lkEvent).toAws()
-//                } catch (e: Exception) {
-//                    APIGatewayV2HTTPResponse(500, body = e.message ?: "")
-//                }
-//            }
-//
-//            "\$disconnect" -> {
-//                try {
-//                    val state =
-//                        webSocketDynamo.state(event.requestContext.connectionId) ?: return APIGatewayV2HTTPResponse(204)
-//                    withMid(
-//                        ServerPath.root,
-//                        state.connectRequest,
-//                        rootWs,
-//                        event.requestContext.connectionId,
-//                        AnonType(state.state)
-//                    ) { mid ->
-//                        rootWs.disconnectWithMetrics(
-//                            ServerPath.root,
-//                            mid,
-//                            WebSocketClose.NORMAL
-//                        )
-//                    }
-//                    APIGatewayV2HTTPResponse(200)
-//                } catch (e: Exception) {
-//                    APIGatewayV2HTTPResponse(500, body = e.message ?: "")
-//                }.also {
-//                    webSocketDynamo.clean(event.requestContext.connectionId)
-//                }
-//            }
-//
-//            else -> if (body == null || body.length == 0L)
-//                APIGatewayV2HTTPResponse(200)
-//            else {
-//                val state =
-//                    webSocketDynamo.state(event.requestContext.connectionId) ?: return APIGatewayV2HTTPResponse(204)
-//                try {
-//                    withMid(
-//                        ServerPath.root,
-//                        state.connectRequest,
-//                        rootWs,
-//                        event.requestContext.connectionId,
-//                        AnonType(state.state),
-//                    ) { mid ->
-//                        try {
-//                            if (generalSettings().debug && state.connectRequest.queryParameterCaseInsensitive("debug")
-//                                    ?.toBoolean() == true
-//                            ) {
-//                                mid.send(
-//                                    WebSocketFrame(
-//                                        "!!! DEBUG AWS INFO !!! - ${
-//                                            if (engine.internalCommunicationEncoding.byteOriented) state.state.encodeBase64() else state.state.toString(
-//                                                Charsets.UTF_8
-//                                            )
-//                                        }"
-//                                    )
-//                                )
-//                            }
-//                        } catch (e: Exception) {
-//                            Exception("Failed to send debug info", e).report()
-//                        }
-//                        rootWs.messageFromClientWithMetrics(
-//                            ServerPath.root,
-//                            mid,
-//                            WebSocketFrame(event.body)
-//                        )
-//                        APIGatewayV2HTTPResponse(200)
-//                    }
-//                } catch (e: Exception) {
-//                    webSocketClose(event.requestContext.connectionId, WebSocketClose.INTERNAL_ERROR)
-//                    APIGatewayV2HTTPResponse(500, body = e.message ?: "")
-//                }
-//            }
-//        }
+        val headers =
+            HttpHeaders(event.multiValueHeaders?.entries?.flatMap { it.value.map { v -> it.key to v } } ?: listOf())
+        val body: WebSocketFrame? = event.body?.let { raw ->
+            if (event.isBase64Encoded)
+                WebSocketFrame.Binary(
+                    Base64.getDecoder().decode(raw)
+                )
+            else
+                WebSocketFrame.Text(raw)
+        }
+        var queryParams =
+            (event.multiValueQueryStringParameters
+                ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to URLDecoder.decode(v, Charsets.UTF_8) } }
+
+        return when (event.requestContext.routeKey) {
+            "\$connect" -> {
+                queryParams = queryParams.flatMap {
+                    if (it.first == "path") listOf(it) + it.second.substringAfter('?').split('&')
+                        .map { it.substringBefore('=') to it.substringAfter('=') }
+                    else listOf(it)
+                }
+                val lkEvent = WebSocketConnectRequest(
+                    path = RawPath<PathSpec0>(""),
+                    queryParameters = queryParams,
+                    headers = headers,
+                    domain = event.requestContext.domainName,
+                    protocol = "https",
+                    sourceIp = event.requestContext.identity.sourceIp ?: "0.0.0.0"
+                )
+                try {
+                    val storage = rootWs.willConnectWithMetrics(rootPath, root, lkEvent)
+                    val storageBytes = encoding.encodeToByteArray(rootWs.storageSerializer, storage)
+                    webSocketDynamo.setState(event.requestContext.connectionId, lkEvent, storageBytes)
+                    try {
+                        root.lambdaClient.invoke {
+                            it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
+                            it.qualifier(System.getenv("AWS_LAMBDA_FUNCTION_VERSION"))
+                            it.invocationType(InvocationType.EVENT)
+
+                            @Suppress("UNCHECKED_CAST")
+                            it.payload(
+                                SdkBytes.fromUtf8String(
+                                    root.internalSerialization.json.encodeToString(
+                                        WebSocketDidConnect.serializer(),
+                                        WebSocketDidConnect(
+                                            event.requestContext.connectionId,
+                                            lkEvent as WebSocketConnectRequest<Nothing>,
+                                            AnonType(storageBytes)
+                                        )
+                                    )
+                                )
+                            )
+                        }.await()
+                    } catch (e: Exception) {
+                        with(root) { exceptionSettings().report(e, "AWS WEBSOCKET DIDCONNECT") }
+                    }
+                    root.logger.info("WebSocket ${event.requestContext.connectionId} connected successfully.")
+                    APIGatewayV2HTTPResponse(200)
+                } catch (http: HttpStatusException) {
+                    APIGatewayV2HTTPResponse(http.status.code, body = http.message)
+                } catch (e: Exception) {
+                    APIGatewayV2HTTPResponse(500, body = e.message ?: "")
+                }
+            }
+
+            "\$disconnect" -> {
+                try {
+                    val state =
+                        webSocketDynamo.state(event.requestContext.connectionId) ?: return APIGatewayV2HTTPResponse(204)
+                    @Suppress("UNCHECKED_CAST")
+                    withMid(
+                        rootPath,
+                        state.connectRequest as WebSocketConnectRequest<PathSpec0>,
+                        rootWs,
+                        event.requestContext.connectionId,
+                        AnonType(state.state)
+                    ) { mid ->
+                        rootWs.disconnectWithMetrics(
+                            rootPath,
+                            mid,
+                            WebSocketClose.NORMAL
+                        )
+                    }
+                    APIGatewayV2HTTPResponse(200)
+                } catch (e: Exception) {
+                    APIGatewayV2HTTPResponse(500, body = e.message ?: "")
+                }.also {
+                    webSocketDynamo.clean(event.requestContext.connectionId)
+                }
+            }
+
+            else -> if (body == null || body.isEmpty())
+                APIGatewayV2HTTPResponse(200)
+            else {
+                val state =
+                    webSocketDynamo.state(event.requestContext.connectionId) ?: return APIGatewayV2HTTPResponse(204)
+                try {
+                    @Suppress("UNCHECKED_CAST")
+                    withMid(
+                        rootPath,
+                        state.connectRequest as WebSocketConnectRequest<PathSpec0>,
+                        rootWs,
+                        event.requestContext.connectionId,
+                        AnonType(state.state),
+                    ) { mid ->
+                        try {
+                            if (with(root) { generalSettings() }.debug && state.connectRequest.queryParameter("debug")
+                                    ?.toBoolean() == true
+                            ) {
+                                mid.send(
+                                    WebSocketFrame(
+                                        "!!! DEBUG AWS INFO !!! - ${
+                                            mid.currentState
+                                        }"
+                                    )
+                                )
+                            }
+                        } catch (e: Exception) {
+                            with(root) { exceptionSettings().report(Exception("Failed to send debug info", e), "AWS WEBSOCKET MESSAGE DEBUG") }
+                        }
+                        rootWs.messageFromClientWithMetrics(
+                            rootPath,
+                            mid,
+                            WebSocketFrame(event.body)
+                        )
+                        APIGatewayV2HTTPResponse(200)
+                    }
+                } catch (e: Exception) {
+                    webSocketClose(event.requestContext.connectionId, WebSocketClose.INTERNAL_ERROR)
+                    APIGatewayV2HTTPResponse(500, body = e.message ?: "")
+                }
+            }
+        }
     }
 }

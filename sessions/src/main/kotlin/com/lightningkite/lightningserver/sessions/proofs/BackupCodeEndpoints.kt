@@ -88,7 +88,7 @@ public class BackupCodeEndpoints(
             auth = proofMethodAuth,
             errorCases = listOf(),
             examples = listOf(),
-            handler = { _: Unit ->
+            implementation = { _: Unit ->
                 modelInfo.collection().deleteManyIgnoringOld(
                     condition { it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) }
                 )
@@ -125,7 +125,7 @@ public class BackupCodeEndpoints(
             auth = proofMethodAuth,
             errorCases = listOf(),
             examples = listOf(),
-            handler = { _: Unit ->
+            implementation = { _: Unit ->
 
                 modelInfo.collection().deleteManyIgnoringOld(
                     condition { it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) }
@@ -144,7 +144,7 @@ public class BackupCodeEndpoints(
             auth = proofMethodAuth,
             errorCases = listOf(),
             examples = listOf(),
-            handler = { _: Unit ->
+            implementation = { _: Unit ->
                 modelInfo.collection().findOne(
                     condition { it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) }
                 ) != null
@@ -176,7 +176,7 @@ public class BackupCodeEndpoints(
                 )
             ),
             successCode = HttpStatus.OK,
-            handler = { input: IdentificationAndPassword ->
+            implementation = { input: IdentificationAndPassword ->
                 cache().constrainAttemptRate(
                     cacheKey = "backup-code-count-${input.property}-${input.value}"
                 ) {

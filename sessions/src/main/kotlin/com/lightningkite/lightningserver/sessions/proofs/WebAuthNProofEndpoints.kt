@@ -172,7 +172,7 @@ public class WebAuthNProofEndpoints(
             errorCases = listOf(),
             examples = listOf(),
             successCode = HttpStatus.OK,
-            handler = { residentKeyPreference: WebAuthN.GeneralPreference ->
+            implementation = { residentKeyPreference: WebAuthN.GeneralPreference ->
                 val options = registrationForUser(auth.fetch(), residentKeyPreference)
 
                 val challenge = generate()
@@ -222,7 +222,7 @@ public class WebAuthNProofEndpoints(
             errorCases = listOf(),
             examples = listOf(),
             successCode = HttpStatus.OK,
-            handler = { (challengeId, displayName, credentials): WebAuthN.Registration.RegisterRequest ->
+            implementation = { (challengeId, displayName, credentials): WebAuthN.Registration.RegisterRequest ->
 
                 val clientData = serverRuntime.externalSerialization.json.decodeFromString<WebAuthN.ClientData>(
                     Base64.decode(credentials.response.clientDataJSON).decodeToString()
@@ -308,7 +308,7 @@ public class WebAuthNProofEndpoints(
             errorCases = listOf(),
             examples = listOf(),
             successCode = HttpStatus.OK,
-            handler = { (subjectType, subjectProperty, value): Identification ->
+            implementation = { (subjectType, subjectProperty, value): Identification ->
 
                 val handler = serverRuntime.server.principalTypes.values.find { it.name == subjectType }
                 if (handler == null)
@@ -381,7 +381,7 @@ public class WebAuthNProofEndpoints(
             errorCases = listOf(),
             examples = listOf(),
             successCode = HttpStatus.OK,
-            handler = { (challengeId, credentials): WebAuthN.Authentication.ProveRequest ->
+            implementation = { (challengeId, credentials): WebAuthN.Authentication.ProveRequest ->
 
                 val clientData = serverRuntime.externalSerialization.json.decodeFromString<WebAuthN.ClientData>(
                     Base64.decode(credentials.response.clientDataJSON).decodeToString()

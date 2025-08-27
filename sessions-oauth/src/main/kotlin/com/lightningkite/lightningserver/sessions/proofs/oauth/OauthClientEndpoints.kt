@@ -48,7 +48,7 @@ public class OauthClientEndpoints(
         path.arg<String>("_id").path("create-secret").post bind ApiHttpHandler(
         authOptions = maintainPermissions,
         summary = "Create Secret",
-        handler = { _: Unit ->
+        implementation = { _: Unit ->
             val newSecret = Base64.getEncoder().encodeToString(Random.nextBytes(24))
             modelInfo.collection().updateOneById(first, modification {
                 it.secrets += OauthClientSecret(masked = newSecret.take(3) + "*".repeat(newSecret.length-3), secretHash = newSecret.secureHash(), createdAt = now())

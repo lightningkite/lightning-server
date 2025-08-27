@@ -35,7 +35,7 @@ import com.lightningkite.lightningserver.sessions.token.TokenFormat
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.ModelInfo
 import com.lightningkite.lightningserver.typed.auth
-import com.lightningkite.lightningserver.typed.modelInfo2
+import com.lightningkite.lightningserver.typed.modelInfo
 import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
@@ -62,15 +62,15 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     init { authReaders.register(this) }
 
     context(server: ServerRuntime)
-    public open suspend fun sessionExpiration(subject: SUBJECT): Instant? = null
+    public abstract suspend fun sessionExpiration(subject: SUBJECT): Instant?
 
     context(server: ServerRuntime)
-    public open suspend fun sessionStaleAfter(subject: SUBJECT): Duration? = null
+    public abstract suspend fun sessionStaleAfter(subject: SUBJECT): Duration?
 
     private val spath = Session.path(principal.subjectSerializer, principal.idSerializer)
 
     public val sessionInfo: ModelInfo<SUBJECT, Session<SUBJECT, ID>, Uuid> =
-        database.modelInfo2(
+        database.modelInfo(
             auth = principal.auth(scopes = setOf("com/lightningkite/lightningserver/sessions")),
             serializer = Session.serializer(principal.subjectSerializer, principal.idSerializer),
             idSerializer = Uuid.serializer(),
@@ -224,7 +224,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         path.path("token").path("simple").post bind ApiHttpHandler(
             auth = noAuth,
             summary = "Get Token Simple",
-            handler = { refresh: String ->
+            implementation = { refresh: String ->
                 val session = RefreshToken(refresh).session(request)
                     ?: throw BadRequestException("Refresh token not recognized")
 
@@ -239,7 +239,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             outputType = String.serializer(),
             summary = "Create Sub Session",
             description = "Creates a session with more limited authorization",
-            handler = { request: SubSessionRequest ->
+            implementation = { request: SubSessionRequest ->
                 val session = sessionInfo.collection().get(this.auth.sessionId ?: throw UnauthorizedException())
                     ?: throw UnauthorizedException()
 
@@ -264,7 +264,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             auth = principal.auth(scopes = setOf("self")),
             inputType = Unit.serializer(),
             outputType = principal.subjectSerializer,
-            handler = { _ -> auth.fetch() }
+            implementation = { _ -> auth.fetch() }
         )
 
     context(_: ServerRuntime)

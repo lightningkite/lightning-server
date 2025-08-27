@@ -51,7 +51,7 @@ proguard = "7.7.0"
 scrimage = "4.3.3"
 sentry = "8.19.1"
 serializationLibs = "1.9.0"
-serviceAbstractions = "0.0.1-27"
+serviceAbstractions = "0.0.1-30"
 shadow = "8.1.1"
 vertx = "4.5.7"
 vanniktechMavenPublish = "0.34.0"
@@ -63,6 +63,7 @@ androidDesugaring = { module = "com.android.tools:desugar_jdk_libs", version = {
 angusMail = { module = "org.eclipse.angus:angus-mail", version = { ref = "angusMail" } }
 apacheTika = { module = "org.apache.tika:tika-parsers", version = { ref = "apacheTika" } }
 awsApiGateway = { module = "software.amazon.awssdk:apigatewaymanagementapi", version = { ref = "awsVersion" } }
+awsSecretsManager = { module = "software.amazon.awssdk:secretsmanager", version = { ref = "awsVersion" } }
 awsCloudWatch = { module = "software.amazon.awssdk:cloudwatch", version = { ref = "awsVersion" } }
 awsCrtClient = { module = "software.amazon.awssdk:aws-crt-client", version = { ref = "awsVersion" } }
 awsLambda = { module = "software.amazon.awssdk:lambda", version = { ref = "awsVersion" } }
@@ -141,16 +142,45 @@ serialization = { module = "org.jetbrains.kotlin:kotlin-serialization", version 
 serializationCbor = { module = "org.jetbrains.kotlinx:kotlinx-serialization-cbor", version = { ref = "serializationLibs" } }
 serializationProperties = { module = "org.jetbrains.kotlinx:kotlinx-serialization-properties", version = { ref = "serializationLibs" } }
 serializationProtobuf = { module = "org.jetbrains.kotlinx:kotlinx-serialization-protobuf", version = { ref = "serializationLibs" } }
-serviceAbstractionsBasis = { module = "com.lightningkite.services:basis", version = { ref = "serviceAbstractions" } }
-serviceAbstractionsEmail = { module = "com.lightningkite.services:email", version = { ref = "serviceAbstractions" } }
-serviceAbstractionsSms = { module = "com.lightningkite.services:sms", version = { ref = "serviceAbstractions" } }
-serviceAbstractionsData = { module = "com.lightningkite.services:data", version = { ref = "serviceAbstractions" } }
-serviceAbstractionsDatabase = { module = "com.lightningkite.services:database", version = { ref = "serviceAbstractions" } }
-serviceAbstractionsDatabaseProcessor = { module = "com.lightningkite.services:database-processor", version = { ref = "serviceAbstractions" } }
-serviceAbstractionsSBSL = { module = "com.lightningkite.services:should-be-standard-library", version = { ref = "serviceAbstractions" } }
-serviceAbstractionsCache = { module = "com.lightningkite.services:cache", version = { ref = "serviceAbstractions" } }
+
 serviceAbstractionsPubsub = { module = "com.lightningkite.services:pubsub", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsPubsubRedis = { module = "com.lightningkite.services:pubsub-redis", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsPubsubTest = { module = "com.lightningkite.services:pubsub-test", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsShouldBeStandardLibrary = { module = "com.lightningkite.services:should-be-standard-library", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsSms = { module = "com.lightningkite.services:sms", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsSmsTest = { module = "com.lightningkite.services:sms-test", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsSmsTwilio = { module = "com.lightningkite.services:sms-twilio", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsTest = { module = "com.lightningkite.services:test", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsNotificationsTest = { module = "com.lightningkite.services:notifications-test", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsNotificationsFcm = { module = "com.lightningkite.services:notifications-fcm", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsNotifications = { module = "com.lightningkite.services:notifications", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsMetricsCloudwatch = { module = "com.lightningkite.services:metrics-cloudwatch", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsHttpClient = { module = "com.lightningkite.services:http-client", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsFilesTest = { module = "com.lightningkite.services:files-test", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsFilesS3 = { module = "com.lightningkite.services:files-s3", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsFilesClient = { module = "com.lightningkite.services:files-client", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsFilesClamav = { module = "com.lightningkite.services:files-clamav", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsFiles = { module = "com.lightningkite.services:files", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsExceptionsSentry = { module = "com.lightningkite.services:exceptions-sentry", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsEmailTest = { module = "com.lightningkite.services:email-test", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsEmailJavasmtp = { module = "com.lightningkite.services:email-javasmtp", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsEmail = { module = "com.lightningkite.services:email", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsDemo = { module = "com.lightningkite.services:demo", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsDatabaseTest = { module = "com.lightningkite.services:database-test", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsDatabaseProcessor = { module = "com.lightningkite.services:database-processor", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsDatabaseMongodb = { module = "com.lightningkite.services:database-mongodb", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsDatabasePostgres = { module = "com.lightningkite.services:database-postgres", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsDatabaseJsonfile = { module = "com.lightningkite.services:database-jsonfile", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsDatabase = { module = "com.lightningkite.services:database", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsData = { module = "com.lightningkite.services:data", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsCacheTest = { module = "com.lightningkite.services:cache-test", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsCacheRedis = { module = "com.lightningkite.services:cache-redis", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsCacheMemcached = { module = "com.lightningkite.services:cache-memcached", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsCacheDynamodb = { module = "com.lightningkite.services:cache-dynamodb", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsCache = { module = "com.lightningkite.services:cache", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsBasis = { module = "com.lightningkite.services:basis", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsAwsClient = { module = "com.lightningkite.services:aws-client", version = { ref = "serviceAbstractions" } }
+
 vertxCore = { module = "io.vertx:vertx-core", version = { ref = "vertx" } }
 vertxWeb = { module = "io.vertx:vertx-web", version = { ref = "vertx" } }
 vertxWebClient = { module = "io.vertx:vertx-web-client", version = { ref = "vertx" } }

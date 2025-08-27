@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.definition.DynamicLocation
 import com.lightningkite.lightningserver.definition.ModularServerDefinition
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
+import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.pathing.PathSpec
@@ -41,9 +42,16 @@ public infix fun <PATH : PathSpec, STORAGE> PATH.bind(handler: WebSocketHandler<
 
 @LightningServerDsl
 context(builder: ServerBuilder)
-public infix fun PathSpec0.bind(task: Task<*>): Locationed<PathSpec0, Task<*>> {
+public infix fun <T> PathSpec0.bind(task: Task<T>): Locationed<PathSpec0, Task<T>> {
     builder.tasks.register(this, task)
     return locate(task) { builder.modulePath + this }
+}
+
+@LightningServerDsl
+context(builder: ServerBuilder)
+public infix fun PathSpec0.bind(startupTask: StartupTask): Locationed<PathSpec0, StartupTask> {
+    builder.startupTasks.register(this, startupTask)
+    return locate(startupTask) { builder.modulePath + this }
 }
 
 @LightningServerDsl

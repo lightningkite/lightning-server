@@ -26,7 +26,7 @@ public fun ServerSettings.loadFromFile(
     file: File,
     module: SerializersModule,
 ) {
-    val serializer = SettingsSerializer(keys.sortedBy { it.settingName })
+    val serializer = SettingsSerializer(keys.sortedBy { it.name })
     val format = if (file.name.contains(".properties")) {
         object : StringFormat {
             val properties = Properties(module)
@@ -103,7 +103,7 @@ public fun ServerSettings.preload() {
     }
     if (errors.isNotEmpty()) {
         errors.forEach { (setting, error) ->
-            server.logger.error { "Invalid value for ${setting.settingName}" }
+            server.logger.error { "Invalid value for ${setting.name}" }
             server.logger.error { error.stackTraceToString() }
         }
         throw Error("Failed to preload all settings")
