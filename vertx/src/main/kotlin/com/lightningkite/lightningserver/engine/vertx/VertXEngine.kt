@@ -152,6 +152,7 @@ public class VertXEngine(server: ServerDefinition) : LocalEngine(server) {
                 if (server.endpoints.any { it.value.websocket != null }) {
                     it.webSocketHandler { incoming: ServerWebSocket ->
 
+                        @Suppress("UNCHECKED_CAST")
                         val handler: WebSocketHandler<PathSpec, Any?> =
                             (server.endpoints.match(this.externalSerialization.stringArrayFormat, incoming.path())
                                 ?.value?.websocket as? WebSocketHandler<PathSpec, Any?>)

@@ -18,10 +18,12 @@ import com.lightningkite.services.cache.setIfNotExists
 import com.lightningkite.services.pubsub.PubSub
 import com.lightningkite.services.pubsub.PubSubChannel
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.datetime.*
+import java.net.NetworkInterface
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
@@ -31,7 +33,16 @@ public val engineCache: ServerSetting<Cache.Settings, Cache> =
     ServerSetting("cache", Cache.Settings(), Cache.Settings.serializer())
 
 public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(server) {
+    @OptIn(DelicateCoroutinesApi::class)
     protected open val scope: CoroutineScope = GlobalScope
+
+    public override val serverId:String = NetworkInterface.getNetworkInterfaces().toList()
+        .minByOrNull { it.name }
+        ?.hardwareAddress
+        ?.sumOf { it.hashCode() }
+        ?.toString(16)
+        ?: "?"
+    public override val serverVersion:String =  "Unknown"
 
     override val settings: ServerSettings = ServerSettings(
         server.settings.plus(

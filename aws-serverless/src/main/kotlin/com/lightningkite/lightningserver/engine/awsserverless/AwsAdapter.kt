@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package com.lightningkite.lightningserver.engine.awsserverless
 
 import com.amazonaws.services.lambda.runtime.Context
@@ -11,6 +13,7 @@ import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.services.Service
 import com.lightningkite.services.aws.AwsConnections
 import kotlinx.coroutines.*
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.encodeToStream
@@ -104,6 +107,11 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
     override suspend fun <T> Locationed<PathSpec0, Task<T>>.invoke(input: T) {
         tasks.launchTask(this, input)
     }
+
+    override val serverId: String
+        get() =  System.getenv("AWS_LAMBDA_LOG_STREAM_NAME")
+    override val serverVersion: String
+        get() = System.getenv("AWS_LAMBDA_FUNCTION_VERSION")
 
     override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>) {
         ws.publish(event.path.toString(internalSerialization.stringArrayFormat), event.topic.type, event.value)

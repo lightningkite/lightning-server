@@ -16,6 +16,7 @@ public class Access<REQ : Request<PATH>, PATH : PathSpec, SUBJECT : HasId<*>?> i
     public val authOrNull: Authentication<SUBJECT & Any>?,
 ) : HasContextualPath<PATH> by request
 
+@JvmName("RequestAuthNullable")
 context(server: ServerRuntime)
 internal suspend fun <REQUEST : Request<PATH>, PATH : PathSpec, SUBJECT : HasId<*>?> REQUEST.access(
     auth: AuthRequirement<SUBJECT>

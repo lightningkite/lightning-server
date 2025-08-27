@@ -1,3 +1,5 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package com.lightningkite.lightningserver.pathing
 
 public operator fun PathSpec0.plus(other: PathSpec0): PathSpec0 = when {

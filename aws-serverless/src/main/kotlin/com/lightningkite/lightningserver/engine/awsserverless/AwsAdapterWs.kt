@@ -192,12 +192,14 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     root.logger.warn("No handler found for $p")
                     return@forSubscribers
                 }
+                @Suppress("UNCHECKED_CAST")
                 h as WebSocketHandler<PathSpec, Any?>
                 // TODO: could retrieve more states at once?
                 val states = webSocketDynamo.states(ids)
                 for (socketId in ids) {
                     val s = states[socketId] ?: continue
                     try {
+                        @Suppress("UNCHECKED_CAST")
                         withMid<PathSpec, Any?, Unit>(p.pathSpec, s.connectRequest as WebSocketConnectRequest<PathSpec>, h, socketId, AnonType(s.state)) { mid ->
                             h.messageFromSubscriptionWithMetrics(p.pathSpec, mid, WebSocketSubscriptionMessage(fullTopicMatch.value!!, fullTopicMatch.path.rawPathArguments, fullValue))
                         }

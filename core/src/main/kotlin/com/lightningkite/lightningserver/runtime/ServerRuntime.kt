@@ -26,5 +26,8 @@ public interface ServerRuntime: SettingContext {
     public suspend fun <T> Locationed<PathSpec0, Task<T>>.invoke(input: T)
 
     override val internalSerializersModule: SerializersModule get() = internalSerialization.serializersModule
+
+    public val serverId: String
+    public val serverVersion: String
 }
 

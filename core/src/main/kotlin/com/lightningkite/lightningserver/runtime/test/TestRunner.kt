@@ -17,6 +17,7 @@ import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
 import kotlinx.coroutines.flow.MutableSharedFlow
+import java.net.NetworkInterface
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Clock
 
@@ -24,6 +25,9 @@ public class TestRunner<SERVER: ServerBuilder>(
     public val serverBuilder: SERVER,
     private val clockGet: () -> Clock = { Clock.System }
 ) : ServerRuntimeBase(serverBuilder.build()) {
+
+    public override val serverId:String = "Test Server"
+    public override val serverVersion:String =  "N/A"
 
     override val clock: Clock
         get() = clockGet()

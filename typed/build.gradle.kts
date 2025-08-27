@@ -14,6 +14,7 @@ dependencies {
     api(project(":auth"))
     api(project(":sdk"))
     api(libs.serviceAbstractionsDatabase)
+    api(libs.serviceAbstractionsCache)
     api(libs.kotlinReflect)
 }
 

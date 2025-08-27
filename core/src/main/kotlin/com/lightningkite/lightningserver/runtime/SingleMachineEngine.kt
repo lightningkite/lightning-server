@@ -1,3 +1,5 @@
+@file:OptIn(DelicateCoroutinesApi::class)
+
 package com.lightningkite.lightningserver.runtime
 
 import com.lightningkite.lightningserver.data.Schedule
@@ -9,6 +11,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.data.plus
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -17,6 +20,7 @@ import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.plus
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
+import java.net.NetworkInterface
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Instant
 
@@ -30,6 +34,14 @@ public abstract class SingleMachineEngine(server: ServerDefinition): ServerRunti
             }
         }
     }
+
+    public override val serverId:String = NetworkInterface.getNetworkInterfaces().toList()
+        .minByOrNull { it.name }
+        ?.hardwareAddress
+        ?.sumOf { it.hashCode() }
+        ?.toString(16)
+        ?: "?"
+    public override val serverVersion:String =  "Unknown"
 
     override suspend fun <T> Locationed<PathSpec0, Task<T>>.invoke(input: T) {
         GlobalScope.launch {
@@ -70,7 +82,6 @@ public abstract class SingleMachineEngine(server: ServerDefinition): ServerRunti
             }
 
 
-            @Suppress("OPT_IN_USAGE")
             GlobalScope.launch {
                 while (true) {
                     val upcomingRun = task_nextRun["$name-nextRun"] ?: run {

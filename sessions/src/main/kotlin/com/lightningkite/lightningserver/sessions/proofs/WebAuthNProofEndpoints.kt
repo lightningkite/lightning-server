@@ -411,6 +411,7 @@ public class WebAuthNProofEndpoints(
                     AttestationObjectConverter(ObjectConverter()).convert(publicKeyCredential.attestationObject)!!
 
 
+                @Suppress("DEPRECATION")
                 val authParams = AuthenticationParameters(
                     ServerProperty(
                         /* origin = */ Origin(clientData.origin),
