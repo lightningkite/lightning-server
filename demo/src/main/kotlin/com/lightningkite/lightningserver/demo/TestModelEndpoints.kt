@@ -16,5 +16,5 @@ class TestModelEndpoints: ServerBuilder() {
         permissions = { ModelPermissions.allowAll<TestModel>() },
     )
 
-    val rest = path("rest") bind ModelRestEndpoints(info)
+    val rest = path.path("rest") bind ModelRestEndpoints(info)
 }

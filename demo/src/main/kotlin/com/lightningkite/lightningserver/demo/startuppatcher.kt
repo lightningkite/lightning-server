@@ -1,17 +1,26 @@
 package com.lightningkite.lightningserver.demo
 
 import com.lightningkite.lightningserver.definition.Runtime
+import com.lightningkite.lightningserver.definition.StartupTask
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.definition.exceptionSettings
+import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
+import com.lightningkite.services.database.and
 import com.lightningkite.services.database.collection
 import com.lightningkite.services.database.condition
+import com.lightningkite.services.database.eq
 import com.lightningkite.services.database.get
 import com.lightningkite.services.database.insertOne
+import com.lightningkite.services.database.lt
 import com.lightningkite.services.database.modification
+import com.lightningkite.services.database.notNull
+import com.lightningkite.services.database.or
 import com.lightningkite.services.database.updateOneById
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
@@ -55,7 +64,7 @@ suspend fun doOnce(
         if (lock.new == null) return
     }
     try {
-        action()
+        action(runtime)
         a.updateOneById(
             name,
             modification {
@@ -72,5 +81,12 @@ suspend fun doOnce(
                 (it.started assign null)
             }
         )
+    }
+}
+
+context(builder: ServerBuilder)
+inline fun startupOnce(key: String, database: Runtime<Database>, noinline action: suspend ServerRuntime.() -> Unit) {
+    PathSpec.root.path(key) bind StartupTask {
+        doOnce(key, database, action = action)
     }
 }

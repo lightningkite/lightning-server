@@ -48,7 +48,7 @@ dependencies {
     api(libs.serviceAbstractionsEmail)
     api(libs.serviceAbstractionsDemo)
     api(libs.serviceAbstractionsDatabaseTest)
-    api(libs.serviceAbstractionsDatabaseProcessor)
+    ksp(libs.serviceAbstractionsDatabaseProcessor)
     api(libs.serviceAbstractionsDatabaseMongodb)
     api(libs.serviceAbstractionsDatabasePostgres)
     api(libs.serviceAbstractionsDatabaseJsonfile)

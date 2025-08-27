@@ -42,7 +42,7 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
                 enginePubSub,
                 engineCache,
             )
-        ).distinctBy { it.settingName }.toSet()
+        ).distinctBy { it.name }.toSet()
     )
 
     public val pubSub: PubSub by lazy { enginePubSub() }

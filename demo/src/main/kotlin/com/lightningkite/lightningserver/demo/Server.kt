@@ -1,70 +1,38 @@
+@file:Suppress("unused")
+
 package com.lightningkite.lightningserver.demo
 
+import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
-import com.lightningkite.lightningserver.definition.Locationed
-import com.lightningkite.lightningserver.definition.Runtime
-import com.lightningkite.lightningserver.definition.StartupTask
-import com.lightningkite.lightningserver.definition.Task
-import kotlinx.coroutines.delay
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.builtins.serializer
-import java.lang.IllegalStateException
-import kotlin.time.Duration
-import kotlin.random.Random
-import kotlin.time.Duration.Companion.minutes
-import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
-import com.lightningkite.lightningserver.definition.builder.setting
-import com.lightningkite.lightningserver.html
-import com.lightningkite.lightningserver.http.HttpHandler
-import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.path
-import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.plainText
-import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.sessions.AuthEndpoints
-import com.lightningkite.lightningserver.sessions.proofs.EmailProofEndpoints
-import com.lightningkite.lightningserver.sessions.proofs.KnownDeviceProofEndpoints
-import com.lightningkite.lightningserver.sessions.proofs.PasswordProofEndpoints
-import com.lightningkite.lightningserver.sessions.proofs.PinHandler
-import com.lightningkite.lightningserver.sessions.proofs.SmsProofEndpoints
-import com.lightningkite.lightningserver.sessions.proofs.TimeBasedOTPProofEndpoints
-import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.lightningserver.typed.ModelRestEndpoints
-import com.lightningkite.lightningserver.typed.auth
-import com.lightningkite.lightningserver.typed.modelInfo
-import com.lightningkite.lightningserver.websockets.MultiplexWebSocketHandler
-import com.lightningkite.lightningserver.websockets.WebSocketHandler
-import com.lightningkite.lightningserver.websockets.send
-import com.lightningkite.lightningserver.websockets.text
-import com.lightningkite.services.cache.Cache
-import com.lightningkite.services.cache.dynamodb.DynamoDbCache
-import com.lightningkite.services.cache.get
-import com.lightningkite.services.cache.memcached.MemcachedCache
-import com.lightningkite.services.database.Condition
-import com.lightningkite.services.database.Database
-import com.lightningkite.services.database.ModelPermissions
-import com.lightningkite.services.database.collection
-import com.lightningkite.services.database.condition
-import com.lightningkite.services.database.get
-import com.lightningkite.services.database.insertOne
-import com.lightningkite.services.database.mongodb.MongoDatabase
-import com.lightningkite.services.database.or
-import com.lightningkite.services.email.Email
-import com.lightningkite.services.email.EmailAddressWithName
-import com.lightningkite.services.email.EmailService
-import com.lightningkite.services.files.PublicFileSystem
-import com.lightningkite.services.files.s3.S3PublicFileSystem
-import com.lightningkite.services.http.client
-import com.lightningkite.services.metrics.cloudwatch.CloudwatchMetricReporter
-import com.lightningkite.services.sms.SMS
-import io.ktor.client.request.get
+import com.lightningkite.lightningserver.definition.*
+import com.lightningkite.lightningserver.definition.builder.*
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.runtime.*
+import com.lightningkite.lightningserver.sessions.*
+import com.lightningkite.lightningserver.sessions.proofs.*
+import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.lightningserver.websockets.*
+import com.lightningkite.services.cache.*
+import com.lightningkite.services.cache.dynamodb.*
+import com.lightningkite.services.cache.memcached.*
+import com.lightningkite.services.database.*
+import com.lightningkite.services.database.mongodb.*
+import com.lightningkite.services.email.*
+import com.lightningkite.services.files.*
+import com.lightningkite.services.files.s3.*
+import com.lightningkite.services.http.*
+import com.lightningkite.services.metrics.cloudwatch.*
+import com.lightningkite.services.sms.*
+import io.ktor.client.request.*
 import io.ktor.server.plugins.NotFoundException
-import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.*
 import kotlinx.html.*
-import kotlin.time.Instant
-import kotlin.uuid.Uuid
+import kotlinx.serialization.*
+import kotlinx.serialization.builtins.*
+import kotlin.random.*
+import kotlin.time.*
+import kotlin.time.Duration.Companion.minutes
+import kotlin.uuid.*
 
 object Server : ServerBuilder() {
 
@@ -73,12 +41,6 @@ object Server : ServerBuilder() {
     val sms = setting("sms", SMS.Settings())
     val files = setting("files", PublicFileSystem.Settings())
     val cache = setting("cache", Cache.Settings())
-
-    private inline fun startupOnce(key: String, database: Runtime<Database>, noinline action: suspend ServerRuntime.() -> Unit) {
-        path.path(key) bind StartupTask {
-            doOnce(key, database, action = action)
-        }
-    }
 
     init {
         CloudwatchMetricReporter
@@ -120,19 +82,22 @@ object Server : ServerBuilder() {
             )
         }
     )
-    val user = path("user") bind object: ServerBuilder() {
-        val rest = path("rest") bind ModelRestEndpoints(userInfo)
+    val user = path.path("user") bind object : ServerBuilder() {
+        val rest = path.path("rest") bind ModelRestEndpoints(userInfo)
     }
 
-    val uploadEarly = path("upload") bind object: ServerBuilder() { init { TODO() } }
+    val uploadEarly = path.path("upload") bind object : ServerBuilder() { init {
+        TODO()
+    }
+    }
 //    val uploadEarly = UploadEarlyEndpoint(path("upload"), files, database)
-    val testModel = path("test-model") bind TestModelEndpoints()
+    val testModel = path.path("test-model") bind TestModelEndpoints()
 
     val root = path.get bind HttpHandler {
         HttpResponse.plainText("Hello ${it.auth(UserAuth.auth() or noAuth)}")
     }
 
-    val socket = path("socket") bind WebSocketHandler(
+    val socket = path.path("socket") bind WebSocketHandler(
         willConnect = { Uuid.random().toString() },
         didConnect = { /*send("Connected $currentState")*/ },
         messageFromClient = {
@@ -144,7 +109,7 @@ object Server : ServerBuilder() {
         disconnect = { println("Disconnect $currentState") }
     )
 
-    val task = path("Sample Task") bind Task { it: Int ->
+    val task = path.path("Sample Task") bind Task { it: Int ->
         val id = Uuid.random()
         println("Got input $it in the sample task $id")
         var value = cache().get<Int>("key")
@@ -155,19 +120,19 @@ object Server : ServerBuilder() {
         println("Finishing sample task $id")
     }
 
-    val runTask = path("run-task").get bind HttpHandler {
+    val runTask = path.path("run-task").get bind HttpHandler {
         val number = Random.nextInt(0, 100)
         task.invoke(number)
         HttpResponse.plainText("OK")
     }
 
-    val testPrimitive = path("test-primitive").get bind ApiHttpHandler(
+    val testPrimitive = path.path("test-primitive").get bind ApiHttpHandler(
         auth = UserAuth.auth(),
         summary = "Get Test Primitive",
         errorCases = listOf(),
         implementation = { input: Unit -> "42 is great" }
     )
-    val testObject = path("test-object").get bind ApiHttpHandler(
+    val testObject = path.path("test-object").get bind ApiHttpHandler(
         auth = UserAuth.auth(),
         summary = "Get Test Object",
         errorCases = listOf(),
@@ -176,9 +141,9 @@ object Server : ServerBuilder() {
             TestModel()
         }
     )
-    val die = path("die").get bind HttpHandler {  throw Exception("OUCH") }
+    val die = path.path("die").get bind HttpHandler {  throw Exception("OUCH") }
 
-    val fileSignPerfCheck = path("file-sign-perf-check").get bind HttpHandler {
+    val fileSignPerfCheck = path.path("file-sign-perf-check").get bind HttpHandler {
         val system = files()
         var endAt = System.currentTimeMillis() + 1000
         while(System.currentTimeMillis() < endAt)
@@ -193,41 +158,41 @@ object Server : ServerBuilder() {
         HttpResponse.plainText("$count - $last")
     }
 
-    val databaseCheck = path("database-check").get bind HttpHandler {
+    val databaseCheck = path.path("database-check").get bind HttpHandler {
         HttpResponse.plainText(database().collection<User>()::class.qualifiedName ?: "???")
     }
 
-    val testSchedule = schedule("test-schedule", 5.minutes) {
+    val testSchedule = path.path("test-schedule") bind ScheduledTask(frequency = 5.minutes) {
         println("Hello schedule!")
     }
 
-    val hasInternet = path("has-internet").get bind HttpHandler {
+    val hasInternet = path.path("has-internet").get bind HttpHandler {
         println("Checking for internet...")
         val response = client.get("https://lightningkite.com")
         HttpResponse.plainText("Got status ${response.status}")
     }
 
-    val dieSlowly = path("die-slowly").get bind HttpHandler {
+    val dieSlowly = path.path("die-slowly").get bind HttpHandler {
         Thread.sleep(60_000L)
         HttpResponse.plainText("Impossible.")
     }
 
-    val multiplex = path("multiplex").websocket(MultiplexWebSocketHandler())
+    val multiplex = path.path("multiplex").websocket(MultiplexWebSocketHandler())
 
-    val meta = path("meta").metaEndpoints()
+//    val meta = path.path("meta").metaEndpoints()
 
     val pins = PinHandler(cache, "pins")
-    val proofPhone = path("proof/phone") bind SmsProofEndpoints(pins, sms)
-    val proofEmail = path("proof/email") bind EmailProofEndpoints(pins, email, { to, pin ->
+    val proofPhone = path.path("proof/phone") bind SmsProofEndpoints(pins, sms)
+    val proofEmail = path.path("proof/email") bind EmailProofEndpoints(pins, email, { to, pin ->
         Email(
             subject = "Log In Code",
             to = listOf(EmailAddressWithName(to)),
             plainText = "Your PIN is $pin."
         )
     })
-    val proofOtp = path("proof/otp") bind TimeBasedOTPProofEndpoints(database, cache)
-    val proofPassword = path("proof/password") bind PasswordProofEndpoints(database, cache)
-    val proofDevices = path("proof/devices") bind KnownDeviceProofEndpoints(database, cache)
+    val proofOtp = path.path("proof/otp") bind TimeBasedOTPProofEndpoints(database, cache)
+    val proofPassword = path.path("proof/password") bind PasswordProofEndpoints(database, cache)
+    val proofDevices = path.path("proof/devices") bind KnownDeviceProofEndpoints(database, cache)
     val subjects = object: AuthEndpoints<User, Uuid>(
         principal = UserAuth,
         database = database,
@@ -243,7 +208,7 @@ object Server : ServerBuilder() {
     }
 
     val permanentMemory = ArrayList<ByteArray>()
-    val causeOutOfMemory = get("cause-out-of-memory") bind HttpHandler {
+    val causeOutOfMemory = path.path("cause-out-of-memory").get bind HttpHandler {
         while (true) {
             permanentMemory += ByteArray(1024 * 1024)
             println("Allocated ${permanentMemory.size} times")
@@ -251,7 +216,7 @@ object Server : ServerBuilder() {
         HttpResponse.plainText("This should not be reachable.")
     }
 
-    val sample = get("page") bind HttpHandler {
+    val sample = path.path("page").get bind HttpHandler {
         HttpResponse.html {
 
             head {
@@ -260,7 +225,7 @@ object Server : ServerBuilder() {
 
             body {
                 div {
-                    p { +"My text here"  }
+                    p { +"My text here" }
                 }
                 input(InputType.email) {
                     id = "asdf"
@@ -270,7 +235,7 @@ object Server : ServerBuilder() {
         }
     }
 
-    val memLeakCheck = post("memLeakCheck") bind HttpHandler {
+    val memLeakCheck = path.path("memLeakCheck").post bind HttpHandler {
         // Not reading the body.  Is that it?
 //        HttpResponse.plainText("OK")
 //        HttpResponse.json(testModel.info.collection().all().toList())

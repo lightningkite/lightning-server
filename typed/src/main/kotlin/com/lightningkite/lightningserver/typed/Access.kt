@@ -28,10 +28,12 @@ public typealias AuthAccess<SUBJECT> = Access<*, *, SUBJECT>
 public val <SUBJECT : HasId<*>> Access<*, *, SUBJECT>.auth: Authentication<SUBJECT>
     get() = authOrNull!! // safe because the type is non-null
 
+@JvmName("authNullable")
 context(server: ServerRuntime)
 public suspend fun <SUBJECT: HasId<*>> Request<*>.auth(auth: AuthRequirement<SUBJECT?>): Authentication<SUBJECT>? {
     return auth.assert(this[Authentication.CacheKey])
 }
+@JvmName("auth")
 context(server: ServerRuntime)
 public suspend fun <SUBJECT: HasId<*>> Request<*>.auth(auth: AuthRequirement<SUBJECT>): Authentication<SUBJECT> {
     return auth.assert(this[Authentication.CacheKey])!!
