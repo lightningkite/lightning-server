@@ -21,6 +21,8 @@ import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.sessions.proofs.extensions.constrainAttemptRate
 import com.lightningkite.lightningserver.auth.findUserIdString
 import com.lightningkite.lightningserver.auth.idString
+import com.lightningkite.lightningserver.encryption.checkAgainstHash
+import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.services.cache.Cache
@@ -58,8 +60,8 @@ public class PasswordProofEndpoints(
     public val modelInfo: ModelInfo<HasId<AnyId>, PasswordSecret, Uuid> =
         database.modelInfo(
             auth = proofMethodAuth or AuthRequirement.IsAdmin,
-            signals = {
-                it.interceptCreate {
+            signals = { col ->
+                col.interceptCreate {
                     evaluatePassword(it.hash)
                     if (it.hint?.contains(it.hash, true) == true)
                         throw BadRequestException("Hint cannot contain the password itself!")
@@ -90,7 +92,8 @@ public class PasswordProofEndpoints(
             }
         )
 
-    public val rest: ModelRestEndpoints<HasId<AnyId>, PasswordSecret, Uuid> = ModelRestEndpoints(modelInfo)
+    public val rest: ModelRestEndpoints<HasId<AnyId>, PasswordSecret, Uuid> =
+        path.path("rest") bind ModelRestEndpoints(modelInfo)
 
     context(_: ServerRuntime)
     public suspend fun <SUBJECT : HasId<ID>, ID: Comparable<ID>> establish(
@@ -102,19 +105,21 @@ public class PasswordProofEndpoints(
         val secret = PasswordSecret(
             subjectId = subject.idString(id),
             subjectType = subject.name,
-            hash = password.password.secureHash(),
+            hash = password.password,
             hint = password.hint,
             establishedAt = now
         )
-        modelInfo.collection().insertOne(secret)
         modelInfo.collection().updateMany(
             condition {
-                it.subjectId.eq(secret.subjectId) and
-                        it.subjectType.eq(secret.subjectType) and
-                        it.establishedAt.lt(now)
+                Condition.And(
+                    it.subjectId eq secret.subjectId,
+                    it.subjectType eq secret.subjectType,
+                    it.establishedAt lt now
+                )
             },
             modification { it.disabledAt assign now }
         )
+        modelInfo.collection().insertOne(secret)
     }
 
     public val establish: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, EstablishPassword, Unit>> =

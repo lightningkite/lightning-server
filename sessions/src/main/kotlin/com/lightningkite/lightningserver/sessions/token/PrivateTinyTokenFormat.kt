@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.HasId
 import dev.whyoleg.cryptography.operations.Cipher
 import java.lang.Exception
+import javax.crypto.AEADBadTagException
 import kotlin.io.encoding.Base64
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -42,7 +43,7 @@ public class PrivateTinyTokenFormat(
                 Authentication.serializer(handler.subjectSerializer),
                 decrypted
             )
-        } catch (e: Exception) {
+        } catch (e: AEADBadTagException) {
             throw TokenException("Invalid Token", e)
         }
     }

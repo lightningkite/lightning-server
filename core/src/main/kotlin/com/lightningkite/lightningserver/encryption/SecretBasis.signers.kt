@@ -18,17 +18,17 @@ import dev.whyoleg.cryptography.algorithms.SHA256
 import dev.whyoleg.cryptography.algorithms.SHA384
 import dev.whyoleg.cryptography.algorithms.SHA512
 
-/**Uses ECDSA with P-521 curve and SHA-512 hashing*/
+/**Uses HMAC with SHA-512 hashing*/
 public suspend fun SecretBasis.signer(variant: String): Signer.WithId = HS512(variant)
 
-/**Uses ECDSA with P-521 curve and SHA-512 hashing*/
+/**Uses HMAC with SHA-512 hashing*/
 public fun Runtime<SecretBasis>.signer(variant: String): RuntimeDeferred<Signer.WithId> = RuntimeDeferred.Cached { this().signer(variant) }
 
 
-/**Uses ECDSA with P-521 curve and SHA-512 hashing*/
-public fun SecretBasis.signerBlocking(variant: String): Signer.WithId = ECDSA_Blocking(variant, EC.Curve.P521).signer(SHA512).withId("ES512")
+/**Uses HMAC with SHA-512 hashing*/
+public fun SecretBasis.signerBlocking(variant: String): Signer.WithId = HMAC_Blocking(variant, SHA512).signer().withId("ES512")
 
-/**Uses ECDSA with P-521 curve and SHA-512 hashing*/
+/**Uses HMAC with SHA-512 hashing*/
 public fun Runtime<SecretBasis>.signerBlocking(variant: String): Runtime<Signer.WithId> = map { it.signerBlocking(variant) }
 
 
@@ -37,14 +37,6 @@ private fun Signer.withId(id: String) = Signer.WithId(this, id)
 public suspend fun SecretBasis.HS256(variant: String): Signer.WithId = HMAC(variant, SHA256).signer().withId("HS256")
 public suspend fun SecretBasis.HS384(variant: String): Signer.WithId = HMAC(variant, SHA384).signer().withId("HS384")
 public suspend fun SecretBasis.HS512(variant: String): Signer.WithId = HMAC(variant, SHA512).signer().withId("HS512")
-
-public suspend fun SecretBasis.RS256(variant: String): Signer.WithId = RSA_PKCS1(variant, SHA256).signer().withId("RS256")
-public suspend fun SecretBasis.RS384(variant: String): Signer.WithId = RSA_PKCS1(variant, SHA384).signer().withId("RS384")
-public suspend fun SecretBasis.RS512(variant: String): Signer.WithId = RSA_PKCS1(variant, SHA512).signer().withId("RS512")
-
-public suspend fun SecretBasis.ES256(variant: String): Signer.WithId = ECDSA(variant, EC.Curve.P256).signer(SHA256).withId("ES256")
-public suspend fun SecretBasis.ES384(variant: String): Signer.WithId = ECDSA(variant, EC.Curve.P384).signer(SHA384).withId("ES384")
-public suspend fun SecretBasis.ES512(variant: String): Signer.WithId = ECDSA(variant, EC.Curve.P521).signer(SHA512).withId("ES512")
 
 
 public suspend fun SecretBasis.HMAC(
@@ -64,105 +56,3 @@ public fun SecretBasis.HMAC_Blocking(
     HMAC.Key.Format.RAW,
     variant
 )
-
-@OptIn(CryptographyProviderApi::class)
-public suspend fun SecretBasis.ECDSA(
-    variant: String,
-    curve: EC.Curve = EC.Curve.P521,
-    publicFormat: EC.PublicKey.Format = EC.PublicKey.Format.RAW,
-    privateFormat: EC.PrivateKey.Format = EC.PrivateKey.Format.RAW
-): ECDSA.KeyPair {
-    val algorithm = CryptographyProvider.Default.get(ECDSA)
-    val public = deriveKey(algorithm.publicKeyDecoder(curve), publicFormat, variant)
-    val private = deriveKey(algorithm.privateKeyDecoder(curve), privateFormat, variant)
-
-    return object : ECDSA.KeyPair {
-        override val publicKey: ECDSA.PublicKey = public
-        override val privateKey: ECDSA.PrivateKey = private
-    }
-}
-
-@OptIn(CryptographyProviderApi::class)
-public fun SecretBasis.ECDSA_Blocking(
-    variant: String,
-    curve: EC.Curve = EC.Curve.P521,
-    publicFormat: EC.PublicKey.Format = EC.PublicKey.Format.RAW,
-    privateFormat: EC.PrivateKey.Format = EC.PrivateKey.Format.RAW
-): ECDSA.KeyPair {
-    val algorithm = CryptographyProvider.Default.get(ECDSA)
-    val public = deriveKeyBlocking(algorithm.publicKeyDecoder(curve), publicFormat, variant)
-    val private = deriveKeyBlocking(algorithm.privateKeyDecoder(curve), privateFormat, variant)
-
-    return object : ECDSA.KeyPair {
-        override val publicKey: ECDSA.PublicKey = public
-        override val privateKey: ECDSA.PrivateKey = private
-    }
-}
-
-@OptIn(CryptographyProviderApi::class)
-public suspend fun SecretBasis.RSA_PSS(
-    variant: String,
-    digest: CryptographyAlgorithmId<Digest> = SHA512,
-    publicFormat: RSA.PublicKey.Format = RSA.PublicKey.Format.DER,
-    privateFormat: RSA.PrivateKey.Format = RSA.PrivateKey.Format.DER
-): RSA.PSS.KeyPair {
-    val algorithm = CryptographyProvider.Default.get(RSA.PSS)
-    val public = deriveKey(algorithm.publicKeyDecoder(digest), publicFormat, variant)
-    val private = deriveKey(algorithm.privateKeyDecoder(digest), privateFormat, variant)
-
-    return object : RSA.PSS.KeyPair {
-        override val publicKey: RSA.PSS.PublicKey = public
-        override val privateKey: RSA.PSS.PrivateKey = private
-    }
-}
-
-@OptIn(CryptographyProviderApi::class)
-public fun SecretBasis.RSA_PSS_Blocking(
-    variant: String,
-    digest: CryptographyAlgorithmId<Digest> = SHA512,
-    publicFormat: RSA.PublicKey.Format = RSA.PublicKey.Format.DER,
-    privateFormat: RSA.PrivateKey.Format = RSA.PrivateKey.Format.DER
-): RSA.PSS.KeyPair {
-    val algorithm = CryptographyProvider.Default.get(RSA.PSS)
-    val public = deriveKeyBlocking(algorithm.publicKeyDecoder(digest), publicFormat, variant)
-    val private = deriveKeyBlocking(algorithm.privateKeyDecoder(digest), privateFormat, variant)
-
-    return object : RSA.PSS.KeyPair {
-        override val publicKey: RSA.PSS.PublicKey = public
-        override val privateKey: RSA.PSS.PrivateKey = private
-    }
-}
-
-@OptIn(CryptographyProviderApi::class)
-public suspend fun SecretBasis.RSA_PKCS1(
-    variant: String,
-    digest: CryptographyAlgorithmId<Digest> = SHA512,
-    publicFormat: RSA.PublicKey.Format = RSA.PublicKey.Format.DER,
-    privateFormat: RSA.PrivateKey.Format = RSA.PrivateKey.Format.DER
-): RSA.PKCS1.KeyPair {
-    val algorithm = CryptographyProvider.Default.get(RSA.PKCS1)
-    val public = deriveKey(algorithm.publicKeyDecoder(digest), publicFormat, variant)
-    val private = deriveKey(algorithm.privateKeyDecoder(digest), privateFormat, variant)
-
-    return object : RSA.PKCS1.KeyPair {
-        override val publicKey: RSA.PKCS1.PublicKey = public
-        override val privateKey: RSA.PKCS1.PrivateKey = private
-    }
-}
-
-@OptIn(CryptographyProviderApi::class)
-public fun SecretBasis.RSA_PKCS1_Blocking(
-    variant: String,
-    digest: CryptographyAlgorithmId<Digest> = SHA512,
-    publicFormat: RSA.PublicKey.Format = RSA.PublicKey.Format.DER,
-    privateFormat: RSA.PrivateKey.Format = RSA.PrivateKey.Format.DER
-): RSA.PKCS1.KeyPair {
-    val algorithm = CryptographyProvider.Default.get(RSA.PKCS1)
-    val public = deriveKeyBlocking(algorithm.publicKeyDecoder(digest), publicFormat, variant)
-    val private = deriveKeyBlocking(algorithm.privateKeyDecoder(digest), privateFormat, variant)
-
-    return object : RSA.PKCS1.KeyPair {
-        override val publicKey: RSA.PKCS1.PublicKey = public
-        override val privateKey: RSA.PKCS1.PrivateKey = private
-    }
-}

@@ -17,15 +17,9 @@ import com.lightningkite.lightningserver.auth.register
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.Runtime
-import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.definition.generalSettings
-import com.lightningkite.lightningserver.definition.secretBasis
-import com.lightningkite.lightningserver.encryption.Signer
-import com.lightningkite.lightningserver.encryption.signer
-import com.lightningkite.lightningserver.encryption.sign
-import com.lightningkite.lightningserver.encryption.verify
 import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.get
@@ -33,8 +27,8 @@ import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
-import com.lightningkite.lightningserver.sessions.proofs.checkAgainstHash
-import com.lightningkite.lightningserver.sessions.proofs.secureHash
+import com.lightningkite.lightningserver.encryption.checkAgainstHash
+import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.sessions.token.TokenException
 import com.lightningkite.lightningserver.sessions.token.TokenFormat

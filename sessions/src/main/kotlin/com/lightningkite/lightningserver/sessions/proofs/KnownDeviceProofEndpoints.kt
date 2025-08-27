@@ -17,6 +17,8 @@ import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.sessions.proofs.extensions.constrainAttemptRate
 import com.lightningkite.lightningserver.auth.idString
+import com.lightningkite.lightningserver.encryption.checkAgainstHash
+import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.services.cache.Cache
@@ -26,7 +28,6 @@ import kotlinx.serialization.builtins.serializer
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
-import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.Uuid
 
 @OptIn(InternalSerializationApi::class)

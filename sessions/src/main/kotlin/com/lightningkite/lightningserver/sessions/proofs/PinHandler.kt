@@ -3,6 +3,8 @@ package com.lightningkite.lightningserver.sessions.proofs
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.definition.Runtime
+import com.lightningkite.lightningserver.encryption.checkAgainstHash
+import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.cache.get

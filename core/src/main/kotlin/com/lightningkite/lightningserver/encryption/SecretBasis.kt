@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.encryption
 
+import dev.whyoleg.cryptography.BinarySize
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.HMAC
 import dev.whyoleg.cryptography.algorithms.SHA512
@@ -64,22 +65,54 @@ public data class SecretBasis(public val string: String) {
         .decodeFromByteArrayBlocking(HMAC.Key.Format.RAW, bytes)
         .also { hmac = it }
 
+    private fun ByteArray.padToSize(size: BinarySize): ByteArray {
+        if (this.size <= size.inBytes) return sliceArray(0 until size.inBytes)
+
+        var remaining = this.size - size.inBytes
+        val padded = ByteArray(remaining)
+
+        var offset = 0
+        while (remaining > 0) {
+            val copy =
+                if (remaining < this.size) sliceArray(0 until remaining)
+                else this
+
+            copy.copyInto(padded, offset)
+
+            remaining -= copy.size
+            offset += copy.size
+        }
+
+        return padded
+    }
+
+    public suspend fun derive(
+        key: ByteArray,
+        size: BinarySize? = null
+    ): ByteArray = key()
+        .signatureGenerator()
+        .generateSignature(key)
+        .let { if (size == null) it else it.padToSize(size) }
+
+    public fun deriveBlocking(
+        key: ByteArray,
+        size: BinarySize? = null
+    ): ByteArray = keyBlocking()
+        .signatureGenerator()
+        .generateSignatureBlocking(key)
+        .let { if (size == null) it else it.padToSize(size) }
 
     /**
      * Derives a key from this [SecretBasis] using the provided key.
      * This implementation uses HMAC-SHA512.
      */
-    public suspend fun derive(key: String): ByteArray = key()
-        .signatureGenerator()
-        .generateSignature(key.encodeToByteArray())
+    public suspend fun derive(key: String, size: BinarySize? = null): ByteArray = derive(key.encodeToByteArray(), size)
 
     /**
      * Derives a key from this [SecretBasis] using the provided key.
      * This implementation uses HMAC-SHA512.
      */
-    public fun deriveBlocking(key: String): ByteArray = keyBlocking()
-        .signatureGenerator()
-        .generateSignatureBlocking(key.encodeToByteArray())
+    public fun deriveBlocking(key: String, size: BinarySize? = null): ByteArray = deriveBlocking(key.encodeToByteArray(), size)
 
 
     /**
@@ -89,8 +122,12 @@ public data class SecretBasis(public val string: String) {
     public suspend fun <KD : KeyDecoder<KF, K>, KF : KeyFormat, K : Key> deriveKey(
         decoder: KD,
         format: KF,
-        variant: String
-    ): K = decoder.decodeFromByteArray(format, derive(variant))
+        variant: String,
+        size: BinarySize? = null
+    ): K = decoder.decodeFromByteArray(
+        format,
+        derive(variant, size)
+    )
 
     /**
      * Derives a `whyoleg.cryptography.Key` from this [SecretBasis] using the provided variant.
@@ -99,8 +136,9 @@ public data class SecretBasis(public val string: String) {
     public fun <KD : KeyDecoder<KF, K>, KF : KeyFormat, K : Key> deriveKeyBlocking(
         decoder: KD,
         format: KF,
-        variant: String
-    ): K = decoder.decodeFromByteArrayBlocking(format, deriveBlocking(variant))
+        variant: String,
+        size: BinarySize? = null
+    ): K = decoder.decodeFromByteArrayBlocking(format, deriveBlocking(variant, size))
 }
 
 public object SecretBasisSerializer : KSerializer<SecretBasis> {
