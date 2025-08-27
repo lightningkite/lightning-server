@@ -33,7 +33,6 @@ public val recentRootAuth: AuthAny =
     )
 
 public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.auth(
-    /**The required scopes. Empty set indicates no requirements and * indicates root access.*/
     scopes: Set<String> = setOf("*"),
     maxAge: Duration? = null,
     requirement: (suspend context(ServerRuntime) (Authentication<SUBJECT>) -> Boolean)? = null

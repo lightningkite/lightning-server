@@ -86,5 +86,5 @@ public data class ProofsCheckResult<ID>(
     val options: List<ProofOption> = listOf(),
     val strengthRequired: Int = 1,
     val readyToLogIn: Boolean,
-    val maxExpiration: Instant?,
+    val expires: Instant?,
 )

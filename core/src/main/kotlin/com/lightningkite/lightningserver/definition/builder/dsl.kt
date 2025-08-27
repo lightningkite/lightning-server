@@ -103,7 +103,6 @@ public fun <SETTING : Setting<RESULT>, RESULT> setting(
         )
     )
 
-
 @LightningServerDsl
 context(builder: ServerBuilder)
 public inline fun <reified SETTING : Setting<RESULT>, RESULT> setting(

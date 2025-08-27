@@ -15,6 +15,7 @@ import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.send
 import com.lightningkite.lightningserver.serialization.basicMediaTypeCoders
+import com.lightningkite.lightningserver.sessions.AuthEndpoints
 import com.lightningkite.lightningserver.typed.modelInfo
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.database.Database
@@ -23,6 +24,7 @@ import com.lightningkite.services.database.ModelPermissions
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
+import kotlin.time.Duration
 import kotlin.uuid.Uuid
 
 @Serializable
@@ -35,19 +37,6 @@ data class User(
 
         context(server: ServerRuntime)
         override suspend fun fetch(id: Uuid): User = User(id)
-    }
-}
-
-@Serializable
-data class User2(
-    override val _id: Int
-) : HasId<Int> {
-    companion object : PrincipalType<User2, Int> {
-        override val idSerializer: KSerializer<Int> = Int.serializer()
-        override val subjectSerializer: KSerializer<User2> = serializer()
-
-        context(server: ServerRuntime)
-        override suspend fun fetch(id: Int): User2 = User2(id)
     }
 }
 
@@ -71,7 +60,7 @@ object Server : ServerBuilder() {
     }
     val topic = path.topic(String.serializer())
 
-    val database = setting<Database.Settings, Database>("database", Database.Settings())
+    val database = setting("database", Database.Settings())
 
     val websocket = path bind WebSocketHandler(
         storageSerializer = Unit.serializer(),
@@ -110,11 +99,23 @@ object Server : ServerBuilder() {
     val model = path.path("model") bind ModelEndpoints
 }
 
+object UserAuthEndpoints : AuthEndpoints<User, Uuid>(
+    principal = User,
+    database = Server.database,
+) {
+    context(server: ServerRuntime)
+    override suspend fun sessionStaleAfter(subject: User): Duration? {
+        return super.sessionStaleAfter(subject)
+    }
+}
+
 object ModelEndpoints : ServerBuilder() {
     val info = Server.database.modelInfo(
-        auth = User.auth() or User2.auth(),
+        auth = User.auth(),
         permissions = { ModelPermissions.allowAll<Model>() },
         postPermissionsForUser = {
+
+
             it
         }
     )

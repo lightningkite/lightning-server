@@ -29,14 +29,14 @@ public interface PrincipalType<SUBJECT : HasId<ID>, ID : Comparable<ID>> {
 
     context(server: ServerRuntime)
     public fun getProperty(principal: SUBJECT, property: String): String? =
-        if (property == "$name/_id") server.internalSerialization.json.encodeToString(idSerializer, principal._id)
+        if (property == "$name/_id") idString(principal._id)
         else server.internalSerialization.formDataFormat.encodeToMap(subjectSerializer, principal)[property]
 
 
     context(server: ServerRuntime)
     public suspend fun fetchByProperty(property: String, value: String): SUBJECT? {
         return when (property) {
-            "$name/_id" -> fetch(server.internalSerialization.json.decodeFromString(idSerializer, value))
+            "$name/_id" -> fetch(server.internalSerialization.stringArrayFormat.decodeFromString(idSerializer, value))
             else -> null
         }
     }

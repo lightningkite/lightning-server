@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.pathing
 
 import com.lightningkite.services.data.StringArrayFormat
 import com.lightningkite.lightningserver.pathing.PathSpec.Afterwards
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -59,11 +60,12 @@ import kotlinx.serialization.modules.EmptySerializersModule
 @Serializable(PathPredicateSerializer::class)
 public class PathPredicate private constructor(
     private val segments: Array<Segment>,
-    private val after: Afterwards
+    public val after: Afterwards
 ) {
     public constructor(path: PathSpec) : this(path.segments.map(::Segment).toTypedArray(), path.after)
-    public constructor(path: ConcretePath<*>) : this(
-        path.segments.map(::Segment).toTypedArray() + (path.wildcard?.segments?.map(::Segment) ?: emptyList()),
+
+    public constructor(path: ConcretePath<*>, format: StringArrayFormat) : this(
+        path.segments.map { Segment(it, format) }.toTypedArray() + (path.wildcard?.segments?.map(::Segment) ?: emptyList()),
         after = if (path.wildcard?.trailingSlash == true) Afterwards.TrailingSlash else Afterwards.None
     )
 
@@ -74,8 +76,6 @@ public class PathPredicate private constructor(
         segments.contentHashCode() * 31 + after.hashCode()
 
     public companion object {
-        private val format = StringArrayFormat(EmptySerializersModule())
-
         public fun fromString(string: String): PathPredicate = PathPredicate(
             string.splitToSequence('/')
                 .filter { it.isNotBlank() }
@@ -89,7 +89,7 @@ public class PathPredicate private constructor(
 
     private data class Segment(val raw: String) {
         constructor(segment: PathSpec.Segment) : this(segment.toString())
-        constructor(segment: ConcretePath.Segment) : this(segment.toString(format))
+        constructor(segment: ConcretePath.Segment, format: StringArrayFormat) : this(segment.toString(format))
 
         val wildcard: Boolean = raw.startsWith('{')
         val value: String = if (wildcard) raw.substringAfter('{').substringBefore('}') else raw
@@ -99,7 +99,7 @@ public class PathPredicate private constructor(
             is PathSpec.Segment.Constant -> !wildcard && segment.value == value
             is PathSpec.Segment.Wildcard<*> -> wildcard && segment.name == value
         }
-        fun matches(segment: ConcretePath.Segment?): Boolean = when (segment) {
+        fun matches(segment: ConcretePath.Segment?, format: StringArrayFormat): Boolean = when (segment) {
             null -> false
             is ConcretePath.Segment.Constant -> wildcard || segment.value == value
             is ConcretePath.Segment.WildcardWithValue<*> -> wildcard || segment.toString(format) == value
@@ -126,9 +126,10 @@ public class PathPredicate private constructor(
         else segments.size == path.segments.size && after == path.after
     }
 
+    context(server: ServerRuntime)
     public fun matches(path: ConcretePath<*>): Boolean {
         for ((idx, segment) in segments.withIndex()) {
-            if (!segment.matches(path.segments.getOrNull(idx))) return false
+            if (!segment.matches(path.segments.getOrNull(idx), server.internalSerialization.stringArrayFormat)) return false
         }
         return when (after) {
             Afterwards.None -> segments.size == path.segments.size && !path.hasTrailingSlash
@@ -138,11 +139,13 @@ public class PathPredicate private constructor(
     }
 
     public operator fun invoke(on: PathSpec): Boolean = matches(on)
-    public operator fun invoke(on: ConcretePath<*>): Boolean = matches(on)
+    context(_: ServerRuntime) public operator fun invoke(on: ConcretePath<*>): Boolean = matches(on)
 }
 
 public fun PathSpec.toPredicate(): PathPredicate = PathPredicate(this)
-public fun ConcretePath<*>.toPredicate(): PathPredicate = PathPredicate(this)
+
+context(server: ServerRuntime)
+public fun ConcretePath<*>.toPredicate(): PathPredicate = PathPredicate(this, server.internalSerialization.stringArrayFormat)
 
 public object PathPredicateSerializer : KSerializer<PathPredicate> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.lightningserver.PathPredicate", PrimitiveKind.STRING)

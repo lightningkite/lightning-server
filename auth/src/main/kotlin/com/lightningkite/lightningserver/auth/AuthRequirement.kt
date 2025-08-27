@@ -75,8 +75,7 @@ public fun interface AuthRequirement<out SUBJECT : HasId<*>?> {
         }
     }
 
-    @JvmInline
-    public value class Options<out SUBJECT : HasId<*>?>(
+    public data class Options<out SUBJECT : HasId<*>?>(
         public val options: Set<AuthRequirement<SUBJECT>>
     ) : AuthRequirement<SUBJECT> {
         public constructor(vararg requirements: AuthRequirement<SUBJECT>) : this(requirements.toSet())

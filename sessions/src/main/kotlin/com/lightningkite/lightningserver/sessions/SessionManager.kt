@@ -124,34 +124,6 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         label: String? = null,
         expires: Instant? = null,
         stale: Instant? = null,
-        scopes: Set<String>,
-        oauthClient: String? = null,
-        derivedFrom: Uuid? = null,
-    ): Pair<Session<SUBJECT, ID>, RefreshToken> {
-        val secret = Base64.encode(CryptographyRandom.nextBytes(24))
-
-        return Session<SUBJECT, ID>(
-            secretHash = secret.secureHash(),
-            subjectId = subjectId,
-            label = label,
-            expires = expires,
-            stale = stale,
-            limitTo = RequestPredicates(scopes = scopes),
-            createdAt = now(),
-            lastUsed = now(),
-//            oauthClient = oauthClient,  TODO: OAuth
-            derivedFrom = derivedFrom,
-        ).also { sessionInfo.collection().insertOne(it) }.let {
-            it to RefreshToken(principal.name, it._id, secret)
-        }
-    }
-
-    context(_: ServerRuntime)
-    protected suspend fun newSession(
-        subjectId: ID,
-        label: String? = null,
-        expires: Instant? = null,
-        stale: Instant? = null,
         limitTo: RequestPredicates? = null,
         forbid: RequestPredicates? = null,
         oauthClient: String? = null,
@@ -175,6 +147,26 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             it to RefreshToken(principal.name, it._id, secret)
         }
     }
+
+    context(_: ServerRuntime)
+    protected suspend fun newSession(
+        subjectId: ID,
+        label: String? = null,
+        expires: Instant? = null,
+        stale: Instant? = null,
+        scopes: Set<String>,
+        oauthClient: String? = null,
+        derivedFrom: Uuid? = null,
+    ): Pair<Session<SUBJECT, ID>, RefreshToken> = newSession(
+        subjectId,
+        label,
+        expires,
+        stale,
+        limitTo = RequestPredicates(scopes = scopes),
+        forbid = null,
+        oauthClient,
+        derivedFrom
+    )
 
     context(server: ServerRuntime)
     public fun Session<SUBJECT, ID>.toAuth(): Authentication<SUBJECT> = Authentication(
@@ -242,7 +234,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     public val createSubSession: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, SUBJECT, SubSessionRequest, String>> =
         path.path("sub-session").post bind ApiHttpHandler(
-            auth = principal.auth(),
+            auth = principal.auth(scopes = setOf("self")),
             inputType = SubSessionRequest.serializer(),
             outputType = String.serializer(),
             summary = "Create Sub Session",
@@ -274,4 +266,43 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             outputType = principal.subjectSerializer,
             handler = { _ -> auth.fetch() }
         )
+
+    context(_: ServerRuntime)
+    public suspend fun presignToken(
+        session: Session<SUBJECT, ID>,
+        limitTo: RequestPredicates?,
+        forbid: RequestPredicates? = null
+    ): String {
+        require(limitTo != null || forbid != null) { "presignToken must provide limitations or forbids" }
+
+        return tokenFormat().create(
+            principal, Authentication(
+                principalType = principal,
+                id = session.subjectId,
+                sessionId = session._id,
+                issuedAt = now(),
+                limitTo = limitTo,
+                forbid = forbid
+            )
+        )
+    }
+
+    context(_: ServerRuntime)
+    public suspend fun presignToken(
+        id: ID,
+        limitTo: RequestPredicates?,
+        forbid: RequestPredicates? = null
+    ): String {
+        require(limitTo != null || forbid != null) { "presignToken must provide limitations or forbids" }
+
+        return tokenFormat().create(
+            principal, Authentication(
+                principalType = principal,
+                id = id,
+                issuedAt = now(),
+                limitTo = limitTo,
+                forbid = forbid
+            )
+        )
+    }
 }

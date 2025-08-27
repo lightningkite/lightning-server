@@ -1,10 +1,15 @@
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.data.Request
+import com.lightningkite.lightningserver.definition.Locationed
+import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.http.HttpRequest
+import com.lightningkite.lightningserver.pathing.ConcretePath
 import com.lightningkite.lightningserver.pathing.PathPredicate
+import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.pathing.toPredicate
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import kotlinx.serialization.Serializable
 import kotlin.collections.iterator
@@ -29,6 +34,9 @@ public data class RequestPredicates(
     public val queryParameters: Set<Pair<String, String>> = emptySet(),
     public val scopes: Set<Scope> = emptySet()
 ) {
+    private constructor(built: RequestPredicates) : this(built.methods, built.headers, built.queryParameters, built.scopes)
+    public constructor(builder: Builder.() -> Unit) : this(Builder().apply(builder).build())
+
     context(server: ServerRuntime)
     public fun matchesAll(request: Request<*>): Boolean {
         if (methods.isNotEmpty()) {
@@ -104,11 +112,53 @@ public data class RequestPredicates(
     public fun copy(builder: Builder.() -> Unit): RequestPredicates = Builder(this).apply(builder).build()
 
     public class Builder(start: RequestPredicates? = null) {
-        public val methods: MutableMap<HttpMethod?, MutableList<PathPredicate>> = start?.methods?.mapValues { it.value.toMutableList() }?.toMutableMap() ?: HashMap()
-        public val headers: HttpHeaders.Builder = HttpHeaders.Builder(start?.headers)
-        public val queryParameters: MutableSet<Pair<String, String>> = start?.queryParameters?.toMutableSet() ?: HashSet()
-        public val scopes: MutableSet<String> = start?.scopes?.toMutableSet() ?: HashSet()
+        public val methodsPredicates: MutableMap<HttpMethod?, MutableList<PathPredicate>> = start?.methods?.mapValues { it.value.toMutableList() }?.toMutableMap() ?: HashMap()
+        public val headersPredicates: HttpHeaders.Builder = HttpHeaders.Builder(start?.headers)
+        public val queryParametersPredicates: MutableSet<Pair<String, String>> = start?.queryParameters?.toMutableSet() ?: HashSet()
+        public val scopesPredicates: MutableSet<Scope> = start?.scopes?.toMutableSet() ?: HashSet()
 
-        public fun build(): RequestPredicates = RequestPredicates(methods, headers.build(), queryParameters, scopes)
+        public fun endpoints(vararg endpoints: HttpEndpoint<PathSpec>) {
+            for (endpoint in endpoints) methodsPredicates.getOrPut(endpoint.method, ::ArrayList).add(endpoint.path.toPredicate())
+        }
+
+        public fun endpoints(vararg endpoints: Locationed<HttpEndpoint<PathSpec>, *>) {
+            for ((endpoint, _) in endpoints) methodsPredicates.getOrPut(endpoint.method, ::ArrayList).add(endpoint.path.toPredicate())
+        }
+
+        public fun methods(methods: Iterable<HttpMethod>) {
+            for (method in methods) methodsPredicates.getOrPut(method, ::ArrayList).clear()
+        }
+
+        public fun paths(vararg paths: PathPredicate) {
+            methodsPredicates.getOrPut(null, ::ArrayList).addAll(paths)
+        }
+
+        context(_: ServerRuntime)
+        public fun paths(vararg paths: ConcretePath<*>) {
+            methodsPredicates.getOrPut(null, ::ArrayList).addAll(paths.map { it.toPredicate() })
+        }
+
+        public fun paths(vararg paths: PathSpec) {
+            methodsPredicates.getOrPut(null, ::ArrayList).addAll(paths.map { it.toPredicate() })
+        }
+
+        public fun headers(headers: HttpHeaders) {
+            headersPredicates.set(headers)
+        }
+
+        public fun queryParameters(vararg queryParameters: Pair<String, String>) {
+            queryParametersPredicates.addAll(queryParameters)
+        }
+
+        public fun scopes(vararg scopes: Scope) {
+            scopesPredicates.addAll(scopes)
+        }
+
+        public fun build(): RequestPredicates = RequestPredicates(
+            methodsPredicates.toMap(),
+            headersPredicates.build(),
+            queryParametersPredicates.toSet(),
+            scopesPredicates.toSet()
+        )
     }
 }
