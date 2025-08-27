@@ -25,7 +25,7 @@ public fun interface AuthRequirement<out SUBJECT : HasId<*>?> {
 
     public abstract class AuthSetting(
         public val default: AuthRequirement<*>? = null
-    ) : AuthRequirement<HasId<AnyId>>, MutableExtensions.Key<AuthRequirement<HasId<*>>> {
+    ) : AuthRequirement<HasId<AnyId>>, MutableExtensions.Key<AuthRequirement<*>> {
         context(server: ServerRuntime)
         override suspend fun accepts(auth: Authentication<*>?): Boolean =
             server.server.extensions[this]?.accepts(auth) ?: default?.accepts(auth) ?: false

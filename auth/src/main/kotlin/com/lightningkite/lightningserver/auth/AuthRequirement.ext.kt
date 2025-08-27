@@ -64,16 +64,16 @@ public val AuthRequirement.Companion.isDeveloper: AuthAny
     get() = AuthRequirement.IsDeveloper
 
 context(builder: ServerBuilder)
-public var AuthRequirement.Companion.isSuperUser: AuthAny
+public var AuthRequirement.Companion.isSuperUser: AuthRequirement<*>
     get() = AuthRequirement.IsSuperUser
     set(value) { builder.extensions[AuthRequirement.IsSuperUser] = value }
 
 context(builder: ServerBuilder)
-public var AuthRequirement.Companion.isAdmin: AuthAny
+public var AuthRequirement.Companion.isAdmin: AuthRequirement<*>
     get() = AuthRequirement.IsAdmin
     set(value) { builder.extensions[AuthRequirement.IsAdmin] = value }
 
 context(builder: ServerBuilder)
-public var AuthRequirement.Companion.isDeveloper: AuthAny
+public var AuthRequirement.Companion.isDeveloper: AuthRequirement<*>
     get() = AuthRequirement.IsDeveloper
     set(value) { builder.extensions[AuthRequirement.IsDeveloper] = value }

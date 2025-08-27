@@ -83,7 +83,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 }
 
                 val isRoot: Condition<Session<SUBJECT, ID>> =
-                    if (AuthRequirement.isSuperUser.accepts(auth)) Condition.Always
+                    if (AuthRequirement.IsSuperUser.accepts(auth)) Condition.Always
                     else Condition.Never
 
                 ModelPermissions(
