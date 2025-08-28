@@ -31,8 +31,8 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
         forbid,
         cache = cache
     ).also {
-        if (sessionId != null) it[Session] = sessionId
+        if (sessionId != null) it[Session.Id] = sessionId
     }
 
 context(_: ServerRuntime)
-public val Authentication<*>.sessionId: Uuid? get() = get(Session)
+public val Authentication<*>.sessionId: Uuid? get() = get(Session.Id)

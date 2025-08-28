@@ -41,6 +41,7 @@ import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.Mask
 import com.lightningkite.services.database.ModelPermissions
+import com.lightningkite.services.database.condition
 import com.lightningkite.services.database.eq
 import com.lightningkite.services.database.get
 import com.lightningkite.services.database.insertOne
@@ -71,7 +72,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     public val sessionInfo: ModelInfo<SUBJECT, Session<SUBJECT, ID>, Uuid> =
         database.modelInfo(
-            auth = principal.auth(scopes = setOf("com/lightningkite/lightningserver/sessions")),
+            auth = principal.auth(scopes = setOf("auth:sessions")),
             serializer = Session.serializer(principal.subjectSerializer, principal.idSerializer),
             idSerializer = Uuid.serializer(),
             collectionName = principal.name + "Session",
@@ -82,9 +83,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                     else -> spath.subjectId eq auth.id
                 }
 
-                val isRoot: Condition<Session<SUBJECT, ID>> =
-                    if (AuthRequirement.IsSuperUser.accepts(auth)) Condition.Always
-                    else Condition.Never
+                val isRoot = condition<Session<SUBJECT, ID>>(AuthRequirement.IsSuperUser.accepts(auth))
 
                 ModelPermissions(
                     create = isRoot,

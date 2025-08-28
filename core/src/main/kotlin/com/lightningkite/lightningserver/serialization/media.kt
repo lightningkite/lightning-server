@@ -22,6 +22,11 @@ public class MediaTypeEncoderRegistry(
             sortBy { it.priority }
         }
     }
+    public fun include(encoders: Map<MediaType, List<MediaTypeEncoder>>) {
+        for ((type, encoders) in encoders) {
+            registry.getOrPut(type, ::ArrayList).addAll(encoders)
+        }
+    }
 }
 
 
@@ -32,6 +37,11 @@ public class MediaTypeDecoderRegistry(
         registry.getOrPut(decoder.mediaType, ::ArrayList).apply {
             add(decoder)
             sortBy { it.priority }
+        }
+    }
+    public fun include(decoders: Map<MediaType, List<MediaTypeDecoder>>) {
+        for ((type, decoders) in decoders) {
+            registry.getOrPut(type, ::ArrayList).addAll(decoders)
         }
     }
 }

@@ -9,7 +9,9 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.DefaultExceptionHttpHandler
 import com.lightningkite.lightningserver.http.ExceptionHttpHandler
 import com.lightningkite.lightningserver.serialization.MediaTypeDecoder
+import com.lightningkite.lightningserver.serialization.MediaTypeDecoderRegistry
 import com.lightningkite.lightningserver.serialization.MediaTypeEncoder
+import com.lightningkite.lightningserver.serialization.MediaTypeEncoderRegistry
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.plus
@@ -301,8 +303,14 @@ public data class ModularServerDefinition(
             extensions = definition.extensions.toMutableExtensions().apply {
                 flattenedModules.values.forEach { include(it.extensions) }
             },
-            mediaTypeDecoders = definition.mediaTypeDecoders,
-            mediaTypeEncoders = definition.mediaTypeEncoders,
+            mediaTypeDecoders = MediaTypeDecoderRegistry().apply {
+                include(definition.mediaTypeDecoders)
+                for ((_, mod) in flattenedModules) include(mod.mediaTypeDecoders)
+            },
+            mediaTypeEncoders = MediaTypeEncoderRegistry().apply {
+                include(definition.mediaTypeEncoders)
+                for ((_, mod) in flattenedModules) include(mod.mediaTypeEncoders)
+            },
             exceptionHandler = definition.exceptionHandler,
             startupTasks = flatten { it.startupTasks },
         )

@@ -94,7 +94,7 @@ object Server : ServerBuilder() {
     val testModel = path.path("test-model") bind TestModelEndpoints()
 
     val root = path.get bind HttpHandler {
-        HttpResponse.plainText("Hello ${it.auth(UserAuth.auth() or noAuth)}")
+        HttpResponse.plainText("Hello ${it.auth(UserAuth.auth() or noAuth)?.fetch()}")
     }
 
     val socket = path.path("socket") bind WebSocketHandler(
