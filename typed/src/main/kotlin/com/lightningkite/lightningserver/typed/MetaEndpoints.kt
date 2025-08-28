@@ -10,82 +10,22 @@ import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.html
 import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.pathMoved
 import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.services.HealthStatus
 import com.lightningkite.services.Service
 import com.lightningkite.services.cache.Cache
-import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.html.*
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import java.lang.management.ManagementFactory
-import kotlin.math.roundToInt
 
-
-@Serializable
-@GenerateDataClassPaths
-public data class ServerHealth(
-    val serverId: String,
-    val version: String,
-    val memory: Memory,
-    val features: Map<String, HealthStatus>,
-    val loadAverageCpu: Double,
-) {
-    val overall: HealthStatus.Level get() = features.maxOf { it.value.level }
-    public val loadAverageCpuHealth: HealthStatus
-        get() = when (val amount = loadAverageCpu) {
-            in 0.0..<0.7 -> HealthStatus(HealthStatus.Level.OK)
-            in 0.7..<0.95 -> HealthStatus(
-                HealthStatus.Level.WARNING,
-                additionalMessage = "CPU utilization: ${amount.times(100).roundToInt()}%"
-            )
-
-            in 0.95..<1.0 -> HealthStatus(
-                HealthStatus.Level.URGENT,
-                additionalMessage = "CPU utilization: ${amount.times(100).roundToInt()}%"
-            )
-
-            else -> HealthStatus(
-                HealthStatus.Level.ERROR,
-                additionalMessage = "CPU utilization: ${amount.times(100).roundToInt()}%"
-            )
-        }
-
-    @Serializable
-    @GenerateDataClassPaths
-    public data class Memory(
-        val max: Long,
-        val total: Long,
-        val free: Long,
-        val systemAllocated: Long,
-        val usage: Float,
-    ) {
-        public val status: HealthStatus
-            get() = when (val amount = usage) {
-                in 0f..<0.7f -> HealthStatus(HealthStatus.Level.OK)
-                in 0.7f..<0.95f -> HealthStatus(
-                    HealthStatus.Level.WARNING,
-                    additionalMessage = "Memory utilization: ${amount.times(100).roundToInt()}%"
-                )
-
-                in 0.95f..<1f -> HealthStatus(
-                    HealthStatus.Level.URGENT,
-                    additionalMessage = "Memory utilization: ${amount.times(100).roundToInt()}%"
-                )
-
-                else -> HealthStatus(
-                    HealthStatus.Level.ERROR,
-                    additionalMessage = "Memory utilization: ${amount.times(100).roundToInt()}%"
-                )
-            }
-    }
-}
 
 public class MetaEndpoints(
     private val packageName: String,
@@ -110,6 +50,8 @@ public class MetaEndpoints(
         })
     }
 
+    public val isOnline: Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>> =
+        path.path("online").get bind HttpHandler { HttpResponse.plainText("Server is running.") }
 
     context(server: ServerRuntime)
     private fun serverHealth(
@@ -178,18 +120,259 @@ public class MetaEndpoints(
         )
 
 
+    context(server: ServerRuntime)
+    private suspend fun openAdmin(): HttpResponse {
+//        val inject = buildJsonObject {
+//            put("url", generalSettings().publicUrl)
+//        }
+//        val page = client.get("https://lsadmin.cs.lightningkite.com").bodyAsText()
+//            .let { original ->
+//                (original.substringBeforeLast("</body>") + """
+//                    <script type="application/json" id="injectedBackendInformation">${inject}</script>
+//                    </body>
+//                """.trimIndent() + original.substringAfterLast("</body>"))
+//            }
+//            .let { original ->
+//                (original.substringBeforeLast("<head>") + """
+//                    <head>
+//                    <base href="${path("admin2/").fullUrl()}">
+//                """.trimIndent() + original.substringAfterLast("<head>"))
+//            }
+//        return HttpResponse.html(content = page, headers = {
+//            set(
+//                "Content-Security-Policy",
+//                "script-src 'unsafe-eval' ${generalSettings().publicUrl}/ https://lsadmin.cs.lightningkite.com/"
+//            )
+//        })
+        return HttpResponse()
+    }
+
+    public val admin: Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>> =
+        path.path("admin").get bind HttpHandler {
+            openAdmin()
+        }
+
+    public val adminResources: Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>> =
+        path.path("admin").any.get bind HttpHandler {
+            val wildcard = it.path.pathInContext.wildcard?.toString()
+            if (wildcard?.contains('.') == true)
+                HttpResponse.pathMoved("https://lsadmin.cs.lightningkite.com/${wildcard}")
+            else
+                openAdmin()
+        }
+
+    public val schema: Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>> =
+        path.path("schema").get bind HttpHandler {
+            HttpResponse(
+                body = TypedData.text(
+                    "{}"/*externalSerialization.json.encodeToString(lightningServerSchema)*/,
+                    MediaType.Application.Json
+                ),
+                status = HttpStatus.OK
+            )
+        }
+
+    public val kschema: Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>> =
+        path.path("kschema").get bind HttpHandler {
+            HttpResponse(
+                body = TypedData.text(
+                    "{}"/*externalSerialization.json.encodeToString(lightningServerKSchema)*/,
+                    MediaType.Application.Json
+                )
+            )
+        }
+
+    public val openApi: Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>> =
+        path.path("openapi").get bind HttpHandler {
+            when (it.headers.accept.firstOrNull()) {
+                MediaType.Text.Html -> HttpResponse.html(
+                    content = """
+                    <!DOCTYPE html>
+                    <html>
+                      <head>
+                        <meta charset="utf-8" />
+                        <meta name="viewport" content="width=device-width, initial-scale=1" />
+                        <meta
+                          name="description"
+                          content="SwaggerUI"
+                        />
+                        <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@4.5.0/swagger-ui.css" />
+                        <style>
+                          .topbar {
+                            display: none;
+                          }
+                        </style>
+                      </head>
+    
+                      <body>
+                        <div id="swagger-ui"></div>
+                        <script src="https://unpkg.com/swagger-ui-dist@4.5.0/swagger-ui-bundle.js" crossorigin></script>
+                        <script src="https://unpkg.com/swagger-ui-dist@4.5.0/swagger-ui-standalone-preset.js" crossorigin></script>
+                        <script>
+                          window.onload = function() {
+                            const ui = SwaggerUIBundle({
+                              spec: ${"{}"/*externalSerialization.json.encodeToString(openApiDescription)*/},
+                              dom_id: '#swagger-ui',
+                              deepLinking: true,
+                              presets: [
+                                SwaggerUIBundle.presets.apis,
+                                SwaggerUIStandalonePreset
+                              ],
+                              plugins: [
+                                SwaggerUIBundle.plugins.DownloadUrl
+                              ],
+                              layout: "StandaloneLayout"
+                            })
+                         
+                            window.ui = ui
+                          }
+                      </script>
+                      </body>
+                    </html>
+                """.trimIndent()
+                )
+
+                else -> HttpResponse(
+                    body = TypedData.text(
+                        "{}"/*externalSerialization.json.encodeToString(openApiDescription)*/,
+                        MediaType.Application.Json
+                    ),
+                    status = HttpStatus.OK
+                )
+            }
+        }
+    public val openApiJson: Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>> =
+        path.path("openapi.json").get bind HttpHandler {
+            HttpResponse(
+                body = TypedData.text(
+                    "{}"/*externalSerialization.json.encodeToString(openApiDescription)*/,
+                    MediaType.Application.Json
+                ),
+                status = HttpStatus.OK
+            )
+        }
+    public val paths: Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>> =
+        path.path("paths").get bind HttpHandler {
+            HttpResponse(body = TypedData.html {
+                head { title("${generalSettings().projectName} - Path List") }
+                body {
+//                ul {
+//                    for (endpoint in Http.endpoints.keys.sortedBy { it.path.toString() }) {
+//                        li { a(href = endpoint.path.fullUrl()) { +endpoint.toString() } }
+//                    }
+//                    for (wsPath in WebSockets.handlers.keys) {
+//                        li { a(href = wsTester.path.toString() + "?path=${wsPath}") { +"WS $wsPath" } }
+//                    }
+//                    for (schedule in Scheduler.schedules) {
+//                        li { +"SCHEDULE ${schedule.key}: ${schedule.value.schedule}" }
+//                    }
+//                    for (task in Tasks.tasks) {
+//                        li { +"TASK ${task.key}: ${task.value.serializer.descriptor.serialName}" }
+//                    }
+//                }
+                }
+            })
+        }
+
+    public val wsTester: Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>> =
+        path.path("ws-tester").get bind HttpHandler {
+            //language=HTML
+            HttpResponse.html(
+                content =
+                    """
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <meta name="robots" content="noindex">
+                <meta charset="utf-8">
+                <title>${generalSettings().projectName}</title>
+              </head>
+              <body>
+            <script>
+            /** @type {WebSocket | null} **/
+            let ws = null
+            function getCookie(name) {
+              var match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+              if (match) return match[2];
+            }
+            function connectClick() {
+                /** @type {HTMLInputElement} **/
+                const pathElement = document.getElementById("path") 
+                const messagesElement = document.getElementById("messages")
+                const token = getCookie("Authorization")
+                const url = "${generalSettings().wsUrl}" + pathElement.value + (token ? "?jwt=" + token : "")
+                console.log(url)
+                ws = new WebSocket(url, url.substring(0, url.indexOf("://")))
+                ws.addEventListener('open', ev => {
+                    const newElement = document.createElement('p')
+                    newElement.innerText = 'WS Opened.'
+                    messagesElement.appendChild(newElement)
+                })
+                ws.addEventListener('error', ev => {
+                    const newElement = document.createElement('p')
+                    newElement.innerText = 'WS Error!'
+                    messagesElement.appendChild(newElement)
+                })
+                ws.addEventListener('message', ev => {
+                    const newElement = document.createElement('p')
+                    newElement.innerText = 'IN: ' + ev.data
+                    messagesElement.appendChild(newElement)
+                })
+                ws.addEventListener('close', ev => {
+                    const newElement = document.createElement('p')
+                    newElement.innerText = 'WS Closed.'
+                    messagesElement.appendChild(newElement)
+                })
+            }
+            function sendClick() {
+                if(ws === null) return
+                /** @type {HTMLTextAreaElement} **/
+                const msgElement = document.getElementById("msg") 
+                ws.send(msgElement.value)
+                const messagesElement = document.getElementById("messages") 
+                const newElement = document.createElement('p')
+                newElement.innerText = 'OUT: ' + msgElement.value
+                messagesElement.appendChild(newElement)
+                msgElement.value = ""
+            }
+            function closeClick() {
+                if(ws === null) return
+                ws.close()
+            }
+            function clearClick() {
+                const messagesElement = document.getElementById("messages") 
+                messages.innerHTML = ''
+            }
+            </script>
+            <div>
+                <label>Path <input id='path' value='${it.queryParameter("path") ?: "/"}'/></label>
+                <button type='button' onclick='connectClick()'>Connect</button>
+                <button type='button' onclick='closeClick()'>Close</button>
+            </div>
+            <div>
+                <label>Message <textarea id='msg'></textarea></label>
+                <button type='button' onclick='sendClick()'>Send</button>
+            </div>
+            <button type='button' onclick='clearClick()'>clear</button>
+            <div id='messages'></div>
+              </body>
+            </html>
+        """.trimIndent()
+
+            )
+        }
+
     private val endpoints: List<Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>>> = listOf(
         docs.index,
+        isOnline,
         health,
-//        isOnline,
-//        admin,
-//        admin2,
-//        openApi,
-//        openApiJson,
-//        schema,
-//        kschema,
-//        paths,
-//        wsTester
+        admin,
+        schema,
+        kschema,
+        openApi,
+        openApiJson,
+        paths,
+        wsTester
     )
 
 }

@@ -28,7 +28,9 @@ public class ConcretePath<PATH: PathSpec> internal constructor(
     public val hasTrailingSlash: Boolean get() =
         wildcard?.trailingSlash ?: (pathSpec.after == PathSpec.Afterwards.TrailingSlash)
 
-    public data class TrailingSegments(val segments: List<String>, val trailingSlash: Boolean)
+    public data class TrailingSegments(val segments: List<String>, val trailingSlash: Boolean){
+        override fun toString(): String = segments.joinToString("/", postfix = if(trailingSlash) "/" else "")
+    }
 
     public sealed interface Segment {
         public fun toString(format: StringFormat): String
