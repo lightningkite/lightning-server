@@ -25,7 +25,7 @@ import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.services.topLevelReportingContext
 
 public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpResponse {
-    val match = this.server.endpoints.match(externalSerialization.stringArrayFormat, request.path.string)
+    val match = this.server.endpoints.match(externalSerialization.stringArrayFormat, request.path.string) { it.http[request.method] }
         ?: run {
             println("NO match found")
             try {
@@ -50,7 +50,7 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
             }
         }
     val properRequest = HttpRequest(
-        path = RawPath(request.path.string, match),
+        path = RawPath(asString = request.path.string, match = match),
         queryParameters = request.queryParameters,
         headers = request.headers,
         domain = request.domain,
@@ -60,27 +60,7 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
         cache = request.cache,
         body = request.body,
     )
-    val handler = match.value!!.http[request.method] ?: run {
-        try {
-            return@handle topLevelReportingContext("exceptionHandler") {
-                this.server.exceptionHandler.handle(
-                    request.castPathSpec0(),
-                    RouteNotFoundException(request.path)
-                )
-            }
-        } catch (e: Exception) {
-            try {
-                return@handle topLevelReportingContext("exceptionHandler") {
-                    this.server.exceptionHandler.handle(
-                        request.castPathSpec0(),
-                        e
-                    )
-                }
-            } catch (e: Exception) {
-                return@handle HttpResponse(status = HttpStatus.InternalServerError)
-            }
-        }
-    }
+    val handler = match.value
     @Suppress("UNCHECKED_CAST")
     handler as HttpHandler<PathSpec>
     return try {
@@ -151,35 +131,35 @@ public suspend fun <PATH : PathSpec> HttpHandler<PATH>.handleWithMetrics(locatio
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.willConnectWithMetrics(location: PATH, serverRuntime: ServerRuntime, request: WebSocketConnectRequest<PATH>): STORAGE {
     return with(serverRuntime) {
         topLevelReportingContext("WEBSOCKET.WILLCONNECT $location") {
-            willConnect(serverRuntime, request)
+            willConnect(request)
         }
     }
 }
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.didConnectWithMetrics(location: PATH, connection: WebSocketConnection<PATH, STORAGE>, ) {
     return with(connection) {
         topLevelReportingContext("WEBSOCKET.DIDCONNECT $location") {
-            didConnect(connection)
+            didConnect()
         }
     }
 }
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.messageFromClientWithMetrics(location: PATH, connection: WebSocketConnection<PATH, STORAGE>, frame: WebSocketFrame) {
     return with(connection) {
         topLevelReportingContext("WEBSOCKET.MESSAGE $location") {
-            messageFromClient(connection, frame)
+            messageFromClient(frame)
         }
     }
 }
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.messageFromSubscriptionWithMetrics(location: PATH, connection: WebSocketConnection<PATH, STORAGE>, topic: WebSocketSubscriptionMessage<*, *>) {
     return with(connection) {
         topLevelReportingContext("WEBSOCKET.SUBSCRIPTION $location") {
-            messageFromSubscription(connection, topic)
+            messageFromSubscription(topic)
         }
     }
 }
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.disconnectWithMetrics(location: PATH, connection: WebSocketConnection<PATH, STORAGE>, reason: WebSocketClose) {
     return with(connection) {
         topLevelReportingContext("WEBSOCKET.DISCONNECT $location") {
-            disconnect(connection, reason)
+            disconnect(reason)
         }
     }
 }

@@ -183,15 +183,12 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
         val fullValue = event.data.value(root.internalSerialization.kotlinBytesFormat, fullTopicMatch.value!!.type)
         webSocketDynamo.forSubscribers(event.topic) { path, ids ->
             try {
-                val match = root.server.endpoints.match(root.externalSerialization.stringArrayFormat, path) ?: run {
+                val match = root.server.endpoints.match(root.externalSerialization.stringArrayFormat, path) { it.websocket } ?: run {
                     root.logger.warn("No handler found for $path")
                     return@forSubscribers
                 }
                 val p = match.path
-                val h = match.value?.websocket ?: run {
-                    root.logger.warn("No handler found for $p")
-                    return@forSubscribers
-                }
+                val h = match.value
                 @Suppress("UNCHECKED_CAST")
                 h as WebSocketHandler<PathSpec, Any?>
                 // TODO: could retrieve more states at once?

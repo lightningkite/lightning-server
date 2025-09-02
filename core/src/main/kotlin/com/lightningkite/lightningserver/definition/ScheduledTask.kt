@@ -19,7 +19,7 @@ public interface ScheduledTask {
 public fun ScheduledTask(
     schedule: Schedule,
     timeout: Duration = 5.minutes,
-    handler: suspend ServerRuntime.() -> Unit
+    handler: suspend context(ServerRuntime) () -> Unit
 ): ScheduledTask =
     object : ScheduledTask {
         override val schedule: Schedule = schedule
@@ -33,7 +33,7 @@ public fun ScheduledTask(
 public fun ScheduledTask(
     frequency: Duration,
     timeout: Duration = 5.minutes,
-    handler: suspend ServerRuntime.() -> Unit
+    handler: suspend context(ServerRuntime) () -> Unit
 ): ScheduledTask =
     object : ScheduledTask {
         override val schedule: Schedule = Schedule.Frequency(frequency)
@@ -48,7 +48,7 @@ public fun ScheduledTask(
     timeOfDay: LocalTime,
     timeZone: TimeZone,
     timeout: Duration = 5.minutes,
-    handler: suspend ServerRuntime.() -> Unit
+    handler: suspend context(ServerRuntime) () -> Unit
 ): ScheduledTask =
     object : ScheduledTask {
         override val schedule: Schedule = Schedule.Daily(timeOfDay, timeZone)
@@ -64,7 +64,7 @@ public fun ScheduledTask(
     cron: CronPattern,
     timeZone: TimeZone,
     timeout: Duration = 5.minutes,
-    handler: suspend ServerRuntime.() -> Unit
+    handler: suspend context(ServerRuntime) () -> Unit
 ): ScheduledTask =
     object : ScheduledTask {
         override val schedule: Schedule = Schedule.Cron(cron, timeZone)

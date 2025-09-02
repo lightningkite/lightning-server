@@ -22,6 +22,8 @@ dependencies {
     // Multiplatform cryptography libraries
     api(libs.kotlinxCryptoCore)
     api(libs.kotlinxCryptoOptimal)
+
+    testImplementation(libs.kotlinTestJunit)
 }
 
 ksp {

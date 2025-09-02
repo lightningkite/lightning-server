@@ -130,17 +130,18 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
         return wrapped
     }
 
-    override suspend fun willConnect(serverRuntime: ServerRuntime, request: WebSocketConnectRequest<PathSpec0>): MultiplexWebSocketHandlerState =
+    context(serverRuntime: ServerRuntime)
+    override suspend fun willConnect(request: WebSocketConnectRequest<PathSpec0>): MultiplexWebSocketHandlerState =
         MultiplexWebSocketHandlerState(
             map = mapOf(),
         )
 
+    context(connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>)
     override suspend fun didConnect(
-        connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>
     ): Unit = Unit
 
+    context(connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>,)
     override suspend fun messageFromClient(
-        connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>,
         frame: WebSocketFrame
     ) {
         if ((frame as? WebSocketFrame.Text)?.content?.isBlank() == true) {
@@ -152,9 +153,8 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
         try {
             when {
                 message.start -> {
-                    val match = connection.server.endpoints.match(connection.externalSerialization.stringArrayFormat, message.path!!) ?: throw NotFoundException()
-                    @Suppress("UNCHECKED_CAST")
-                    val otherHandler = match.value?.websocket ?: throw NotFoundException()
+                    val match = connection.server.endpoints.match(connection.externalSerialization.stringArrayFormat, message.path!!) { it.websocket } ?: throw NotFoundException()
+                    val otherHandler = match.value
                     @Suppress("UNCHECKED_CAST")
                     otherHandler as WebSocketHandler<PathSpec, Any?>
                     val r = WebSocketConnectRequest<PathSpec>(
@@ -191,7 +191,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                 message.end -> {
                     val info = connection.currentState.map[message.channel]!!
                     val match = with(connection) { info.request.path.match }
-                    val otherHandler = match.value ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${match.pathSpec}'")
+                    val otherHandler = match.value
                     @Suppress("UNCHECKED_CAST")
                     otherHandler as WebSocketHandler<PathSpec, Any?>
                     connection.withWrapped(otherHandler, channel) { otherHandler.disconnectWithMetrics(match.pathSpec, it, WebSocketClose.NORMAL) }
@@ -211,7 +211,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                 message.data != null -> {
                     val info = connection.currentState.map[message.channel]!!
                     val match = with(connection) { info.request.path.match }
-                    val otherHandler = match.value ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${match.pathSpec}'")
+                    val otherHandler = match.value
                     @Suppress("UNCHECKED_CAST")
                     otherHandler as WebSocketHandler<PathSpec, Any?>
                     val textFrame = WebSocketFrame.Text(message.data!!)
@@ -230,7 +230,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
             )
             connection.currentState.map[channel]?.let { info ->
                 val match = with(connection) { info.request.path.match }
-                val otherHandler = match.value ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${match.pathSpec}'")
+                val otherHandler = match.value
                 @Suppress("UNCHECKED_CAST")
                 otherHandler as WebSocketHandler<PathSpec, Any?>
                 connection.withWrapped(otherHandler, channel) {
@@ -241,14 +241,14 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
         }
     }
 
+    context(connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>,)
     override suspend fun messageFromSubscription(
-        connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>,
         topic: WebSocketSubscriptionMessage<*, *>
     ): Unit = with(connection) {
         for ((channel, info) in currentState.map) {
             if (info.topics.contains(topic.path(externalSerialization.stringArrayFormat))) {
                 val match = with(connection) { info.request.path.match }
-                val otherHandler = match.value ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${match.pathSpec}'")
+                val otherHandler = match.value
                 @Suppress("UNCHECKED_CAST")
                 otherHandler as WebSocketHandler<PathSpec, Any?>
                 connection.withWrapped(otherHandler, channel) {
@@ -258,11 +258,12 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
         }
     }
 
-    override suspend fun disconnect(connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>, reason: WebSocketClose): Unit =
+    context(connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>)
+    override suspend fun disconnect(reason: WebSocketClose): Unit =
         with(connection) {
             currentState.map.entries.forEach { (channel, info) ->
                 val match = with(connection) { info.request.path.match }
-                val otherHandler = match.value ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${match.pathSpec}'")
+                val otherHandler = match.value
                 @Suppress("UNCHECKED_CAST")
                 otherHandler as WebSocketHandler<PathSpec, Any?>
                 connection.withWrapped(otherHandler, channel) {

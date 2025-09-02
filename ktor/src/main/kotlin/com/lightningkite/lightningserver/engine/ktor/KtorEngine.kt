@@ -156,7 +156,7 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
                 @Suppress("UNCHECKED_CAST")
                 socketHandler as WebSocketHandler<PathSpec, Any?>
 
-                val startingState = socketHandler.willConnect(this@KtorEngine, request)
+                val startingState = socketHandler.willConnect(request)
                 var closingMid: WebSocketConnection<PathSpec, Any?>? = null
                 try {
 
@@ -183,7 +183,7 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
                     }
                     closingMid = mid
 
-                    socketHandler.didConnect(mid)
+                    context(mid) { socketHandler.didConnect() }
 
                     for (incoming in this.incoming) {
                         val m = when (incoming) {
@@ -193,26 +193,27 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
                             is Frame.Ping -> continue
                             is Frame.Pong -> continue
                         }
-                        socketHandler.messageFromClient(mid, m)
+                        context(mid) { socketHandler.messageFromClient(m) }
                     }
 
                     closingMid.let { mid ->
-                        socketHandler.disconnect(mid, WebSocketClose.NORMAL)
+                        context(mid) { socketHandler.disconnect(WebSocketClose.NORMAL) }
                     }
                 } catch (e: HttpStatusException) {
                     closingMid?.let { mid ->
-                        socketHandler.disconnect(
-                            mid,
-                            when (e.status.code / 100) {
-                                1, 2, 3 -> WebSocketClose.NORMAL
-                                4 -> WebSocketClose.CLOSED_ABNORMALLY
-                                else -> WebSocketClose.INTERNAL_ERROR
-                            }
-                        )
+                        with(mid) {
+                            socketHandler.disconnect(
+                                when (e.status.code / 100) {
+                                    1, 2, 3 -> WebSocketClose.NORMAL
+                                    4 -> WebSocketClose.CLOSED_ABNORMALLY
+                                    else -> WebSocketClose.INTERNAL_ERROR
+                                }
+                            )
+                        }
                     }
                 } catch (e: Throwable) {
                     closingMid?.let { mid ->
-                        socketHandler.disconnect(mid, WebSocketClose.INTERNAL_ERROR)
+                        context(mid) { socketHandler.disconnect(WebSocketClose.INTERNAL_ERROR) }
                     }
                 }
             }
@@ -261,7 +262,6 @@ private abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
         subscriptions[topic.topic] = scope.launch {
             pubSub(topic).collect { value ->
                 handler.messageFromSubscription(
-                    this@LocalWebSocketConnection,
                     WebSocketSubscriptionMessage(topic.topic, topic.path.rawPathArguments, value),
                 )
             }

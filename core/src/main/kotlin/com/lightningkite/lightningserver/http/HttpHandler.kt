@@ -14,7 +14,7 @@ public interface HttpHandler<PATH : PathSpec> {
 
 public fun <PATH : PathSpec> HttpHandler(
     timeout: Duration = 30.seconds,
-    handler: suspend ServerRuntime.(HttpRequest<PATH>) -> HttpResponse
+    handler: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse
 ): HttpHandler<PATH> = object : HttpHandler<PATH> {
     override val timeout: Duration = timeout
 

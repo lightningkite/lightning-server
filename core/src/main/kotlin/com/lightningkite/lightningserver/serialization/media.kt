@@ -46,10 +46,29 @@ public class MediaTypeDecoderRegistry(
     }
 }
 
+context(serverRuntime: ServerRuntime)
+public val MediaType.encoder: MediaTypeEncoder?
+    get() = serverRuntime.server.mediaTypeEncoders[this]?.firstOrNull { it.accepts(this.parameters) }
+
+context(serverRuntime: ServerRuntime)
+public val List<MediaType>.encoder: Pair<MediaType, MediaTypeEncoder>?
+    get() = firstNotNullOfOrNull { type ->
+        serverRuntime.server.mediaTypeEncoders[type]
+            ?.firstOrNull { it.accepts(type.parameters) }
+            ?.let { type to it }
+    }
+
+context(serverRuntime: ServerRuntime)
+public val defaultEncoder: Pair<MediaType, MediaTypeEncoder>
+    get() = (serverRuntime.server.mediaTypeEncoders.values.asSequence().flatten().maxBy { it.priority }.let { it.mediaType to it })
+
+context(serverRuntime: ServerRuntime)
+public val MediaType.decoder: MediaTypeDecoder?
+    get() = serverRuntime.server.mediaTypeDecoders[this]?.firstOrNull { it.accepts(this.parameters) }
 
 context(serverRuntime: ServerRuntime)
 public suspend fun <T> TypedData.parse(serializer: DeserializationStrategy<T>): T {
-    val format = serverRuntime.server.mediaTypeDecoders[mediaType]?.firstOrNull { it.accepts(mediaType.parameters) }
+    val format = mediaType.decoder
         ?: throw BadRequestException("No media type decoder found supporting $mediaType")
     return format(this, serializer)
 }
@@ -59,11 +78,7 @@ context(serverRuntime: ServerRuntime) public suspend inline fun <reified T> T.to
 
 context(serverRuntime: ServerRuntime)
 public suspend fun <T> T.toTypedData(accepts: List<MediaType>, serializer: SerializationStrategy<T>): TypedData {
-    val (type, format) = accepts.firstNotNullOfOrNull { type ->
-        serverRuntime.server.mediaTypeEncoders[type]
-            ?.firstOrNull { it.accepts(type.parameters) }
-            ?.let { type to it }
-    } ?: (serverRuntime.server.mediaTypeEncoders.values.asSequence().flatten().maxBy { it.priority }.let { it.mediaType to it })
+    val (type, format) = accepts.encoder ?: defaultEncoder
     return format(type, serializer, this)
 }
 

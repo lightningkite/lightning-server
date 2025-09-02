@@ -10,14 +10,11 @@ plugins {
 }
 
 dependencies {
-    api(project(":core"))
-    api(project(":auth"))
-    api(project(":sdk"))
-    api(project(":typed-shared"))
+    api(project(":typed"))
     api(libs.serviceAbstractionsDatabase)
-    api(libs.serviceAbstractionsCache)
+    api(libs.serviceAbstractionsFiles)
     api(libs.kotlinReflect)
-    testImplementation(libs.kotlinTestJunit)
+
 }
 
 ksp {
@@ -40,5 +37,5 @@ kotlin {
 }
 
 lkLibrary("lightningkite", "lightning-server") {
-    description.set("A set of tools to fill in/replace what Ktor is lacking in.")
+    description.set("A Vert.x engine implementation for Lightning Server.")
 }

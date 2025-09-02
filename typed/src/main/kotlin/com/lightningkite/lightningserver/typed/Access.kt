@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.pathing.HasContextualPath
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.services.database.HasId
 
 public class Access<REQ : Request<PATH>, PATH : PathSpec, SUBJECT : HasId<*>?> internal constructor(
@@ -23,6 +24,7 @@ internal suspend fun <REQUEST : Request<PATH>, PATH : PathSpec, SUBJECT : HasId<
 ): Access<REQUEST, PATH, SUBJECT> = Access(this, auth.assert(get(Authentication.CacheKey)))
 
 public typealias HttpAccess<PATH, SUBJECT> = Access<HttpRequest<PATH>, PATH, SUBJECT>
+public typealias WebSocketConnectRequestAccess<PATH, SUBJECT> = Access<WebSocketConnectRequest<PATH>, PATH, SUBJECT>
 
 public typealias AuthAccess<SUBJECT> = Access<*, *, SUBJECT>
 

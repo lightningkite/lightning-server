@@ -17,13 +17,13 @@ public interface Task<Input> {
 
 public inline fun <reified INPUT> Task(
     timeout: Duration = 5.minutes,
-    noinline handler: suspend ServerRuntime.(INPUT) -> Unit
+    noinline handler: suspend context(ServerRuntime) (INPUT) -> Unit
 ): Task<INPUT> = Task(serializerOrContextual<INPUT>(), timeout, handler)
 
 public fun <INPUT> Task(
     input: KSerializer<INPUT>,
     timeout: Duration = 5.minutes,
-    handler: suspend ServerRuntime.(INPUT) -> Unit
+    handler: suspend context(ServerRuntime) (INPUT) -> Unit
 ): Task<INPUT> =
     object : Task<INPUT> {
         override val timeout: Duration = timeout

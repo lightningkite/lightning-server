@@ -32,10 +32,10 @@ public class RawPath<PATH: PathSpec>(public val string: String): HasContextualPa
     context(server: ServerRuntime)
     override val pathInContext: ConcretePath<PATH> get() = match.path as ConcretePath<PATH>
 
-    private var matchIfPresent: PathSpecMap.Match<ServerPathEndpoints>? = null
+    private var matchIfPresent: PathSpecMap.Match<*>? = null
 
     context(server: ServerRuntime)
-    public val match: PathSpecMap.Match<ServerPathEndpoints> get() {
+    public val match: PathSpecMap.Match<*> get() {
         if (this.matchIfPresent == null) {
             this.matchIfPresent = server.server.endpoints.match(server.externalSerialization.stringArrayFormat, string)
         }
@@ -44,7 +44,7 @@ public class RawPath<PATH: PathSpec>(public val string: String): HasContextualPa
 
     public constructor(
         asString: String,
-        match: PathSpecMap.Match<ServerPathEndpoints>
+        match: PathSpecMap.Match<*>
     ) : this(asString) {
         this.matchIfPresent = match
     }

@@ -1,6 +1,8 @@
 package com.lightningkite.lightningserver.runtime
 
+import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.ServerSetting
+import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpec1
 import com.lightningkite.lightningserver.pathing.PathSpec2
@@ -46,6 +48,11 @@ public suspend fun <A, B, C, T> WebSocketTopic<PathSpec3<A, B, C>, T>.send(
 ): Unit = serverRuntime.sendWebSocketSubscriptionMessage(
     WebSocketSubscriptionMessage(this, listOf(path1, path2, path3), value)
 )
+
+context(serverRuntime: ServerRuntime) public suspend operator fun <T> Locationed<PathSpec0, Task<T>>.invoke(input: T): Unit =
+    with(serverRuntime) {
+        this@invoke.invoke(input)
+    }
 
 context(server: ServerRuntime)
 public fun now(): Instant = server.clock.now()

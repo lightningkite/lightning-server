@@ -41,11 +41,9 @@ public suspend fun <STORAGE> Locationed<PathSpec0, WebSocketHandler<PathSpec0, S
         protocol = protocol,
         sourceIp = sourceIp,
     )
-    val storage = item.willConnect(
-        test, request
-    )
+    val storage = item.willConnect(request)
     return test.TestWebSocket(item, request, storage).also {
-        item.didConnect(it.server)
+        with(it.server) { item.didConnect() }
     }
 }
 context(test: TestRunner<*>) public suspend fun <STORAGE, A> Locationed<PathSpec1<A>, WebSocketHandler<PathSpec1<A>, STORAGE>>.test(
@@ -64,10 +62,10 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A> Locationed<PathSpec
         protocol = protocol,
         sourceIp = sourceIp,
     )
-    val storage = item.willConnect(
-        test, request
-    )
-    return test.TestWebSocket(item, request, storage)
+    val storage = with(test) { item.willConnect(request) }
+    return test.TestWebSocket(item, request, storage).also {
+        with(it.server) { item.didConnect() }
+    }
 }
 context(test: TestRunner<*>) public suspend fun <STORAGE, A, B> Locationed<PathSpec2<A, B>, WebSocketHandler<PathSpec2<A, B>, STORAGE>>.test(
     path1: A,
@@ -86,10 +84,10 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A, B> Locationed<PathS
         protocol = protocol,
         sourceIp = sourceIp,
     )
-    val storage = item.willConnect(
-        test, request
-    )
-    return test.TestWebSocket(item, request, storage)
+    val storage = with(test) { item.willConnect(request) }
+    return test.TestWebSocket(item, request, storage).also {
+        with(it.server) { item.didConnect() }
+    }
 }
 context(test: TestRunner<*>) public suspend fun <STORAGE, A, B, C> Locationed<PathSpec3<A, B, C>, WebSocketHandler<PathSpec3<A, B, C>, STORAGE>>.test(
     path1: A,
@@ -109,10 +107,10 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A, B, C> Locationed<Pa
         protocol = protocol,
         sourceIp = sourceIp,
     )
-    val storage = item.willConnect(
-        test, request
-    )
-    return test.TestWebSocket(item, request, storage)
+    val storage = with(test) { item.willConnect(request) }
+    return test.TestWebSocket(item, request, storage).also {
+        with(it.server) { item.didConnect() }
+    }
 }
 context(test: TestRunner<*>) public suspend fun Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>>.test(
     queryParameters: List<Pair<String, String>> = listOf(),

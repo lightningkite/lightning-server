@@ -66,14 +66,14 @@ public class TestRunner<SERVER: ServerBuilder>(
         }
 
         public suspend fun send(frame: WebSocketFrame) {
-            handler.messageFromClient(server, frame)
+            with(server) { handler.messageFromClient(frame) }
         }
 
         public val server: ServerSide = ServerSide()
         public inner class ServerSide(): WebSocketConnection<PATH, STORAGE>, ServerRuntime by this@TestRunner {
             private val changeQueue = ArrayList<(STORAGE)->STORAGE>()
             private val sub: suspend (WebSocketSubscriptionMessage<*, *>) -> Unit = {
-                handler.messageFromSubscription(this, it)
+                handler.messageFromSubscription(it)
             }
 
             override val currentState: STORAGE
@@ -119,7 +119,7 @@ public class TestRunner<SERVER: ServerBuilder>(
             }
 
             override suspend fun close(reason: WebSocketClose) {
-                handler.disconnect(this, reason)
+                handler.disconnect(reason)
             }
 
             internal fun clean() {

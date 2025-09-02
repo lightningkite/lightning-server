@@ -20,7 +20,7 @@ public interface StartupTask {
 public fun StartupTask(
     dependencies: Collection<StartupTask> = emptyList(),
     timeout: Duration = 5.minutes,
-    handler: suspend ServerRuntime.() -> Unit
+    handler: suspend context(ServerRuntime) () -> Unit
 ): StartupTask =
     object : StartupTask {
         override val timeout: Duration = timeout

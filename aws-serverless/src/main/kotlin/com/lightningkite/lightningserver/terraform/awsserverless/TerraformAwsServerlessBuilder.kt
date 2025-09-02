@@ -5,7 +5,7 @@ import com.lightningkite.DataSize.Companion.gibibytes
 import com.lightningkite.EmailAddress
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.terraform.BaseTerraformEmitter
-import com.lightningkite.services.terraform.PolicyStatement
+import com.lightningkite.services.terraform.AwsPolicyStatement
 import com.lightningkite.services.terraform.TerraformEmitterAws
 import com.lightningkite.services.terraform.TerraformEmitterAwsDomain
 import com.lightningkite.services.terraform.TerraformProvider
@@ -46,7 +46,7 @@ public open class TerraformAwsServerlessBuilder(
 ) : BaseTerraformEmitter(), TerraformEmitterAws {
 
     override val applicationRegion: String get() = region.id()
-    override val policyStatements: MutableCollection<PolicyStatement> = ArrayList()
+    override val policyStatements: MutableCollection<AwsPolicyStatement> = ArrayList()
     init {
         fulfillSetting(generalSettings.name, buildJsonObject {
             put("projectName", displayName)
@@ -229,7 +229,7 @@ public open class TerraformAwsServerlessBuilder(
                     "create_before_destroy" - false
                 }
             }
-            emitter.policyStatements += PolicyStatement(
+            emitter.policyStatements += AwsPolicyStatement(
                 action = listOf("execute-api:ManageConnections"),
                 resource = listOf("*")
             )
@@ -424,20 +424,20 @@ public open class TerraformAwsServerlessBuilder(
                     }
                 })
             }
-            emitter.policyStatements += PolicyStatement(
+            emitter.policyStatements += AwsPolicyStatement(
                 action = listOf("s3:GetObject"),
                 resource = listOf(
                     $$"${aws_s3_bucket.lambda_bucket.arn}",
                     $$"${aws_s3_bucket.lambda_bucket.arn}/*",
                 )
             )
-            emitter.policyStatements += PolicyStatement(
+            emitter.policyStatements += AwsPolicyStatement(
                 action = listOf("dynamodb:*"),
                 resource = listOf(
                     "*" // TODO: constrain this
                 )
             )
-            emitter.policyStatements += PolicyStatement(
+            emitter.policyStatements += AwsPolicyStatement(
                 action = listOf("lambda:InvokeFunction"),
                 resource = listOf(
                     "*" // TODO: constrain this - how?  circular dependency?!

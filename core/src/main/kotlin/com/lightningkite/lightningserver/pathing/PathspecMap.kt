@@ -5,19 +5,24 @@ import com.lightningkite.services.data.StringArrayFormat
 
 public interface PathSpecMap<out V> : Map<PathSpec, V> {
     public fun match(format: StringArrayFormat, pathParts: List<String>, endingSlash: Boolean): Match<V>?
-    public fun match(format: StringArrayFormat, string: String): Match<V>? = match(format, string.split('/').filter { it.isNotEmpty() }, string.endsWith('/'))
+        = match(format, pathParts, endingSlash) { it }
+    public fun <T> match(format: StringArrayFormat, pathParts: List<String>, endingSlash: Boolean, getter: (V)->T?): Match<T>?
+    public fun match(format: StringArrayFormat, string: String): Match<V>?
+        = match(format, string.split('/').filter { it.isNotEmpty() }, string.endsWith('/'))
+    public fun <T> match(format: StringArrayFormat, string: String, getter: (V)->T?): Match<T>?
+        = match(format, string.split('/').filter { it.isNotEmpty() }, string.endsWith('/'), getter)
     public fun asSequence(): Sequence<Locationed<PathSpec, V>>
 
     public class Match<out V>(
         override val path: ConcretePath<PathSpec>,
-        public val value: V?
+        public val value: V
     ): HasConcretePath<PathSpec> {
         public constructor(
             pathSpec: PathSpec,
             rawPathArguments: List<Any?>,
             trailingSlash: Boolean,
             wildcard: List<String>?,
-            value: V?
+            value: V
         ) : this(
             ConcretePath(pathSpec, rawPathArguments, wildcard?.let { ConcretePath.TrailingSegments(it, trailingSlash) }),
             value
@@ -59,6 +64,19 @@ public class MutablePathSpecMap<V>(): PathSpecMap<V> {
             PathSpec.Afterwards.None -> pathValue
             PathSpec.Afterwards.TrailingSlash -> trailingSlashValue
             PathSpec.Afterwards.TrailingSegments -> chainedWildcardValue
+        }
+
+        override fun toString(): String {
+            return """
+                MutablePathSpecMap.Node(
+                    path = $path, 
+                    pathValue = $pathValue, 
+                    trailingSlash = $trailingSlash, 
+                    trailingSlashValue = $trailingSlashValue, 
+                    chainedWildcard = $chainedWildcard, 
+                    chainedWildcardValue = $chainedWildcardValue, 
+                )
+                """.trimIndent().lines().joinToString(" ") { it.trim() }
         }
     }
     private val root = Node()
@@ -157,15 +175,16 @@ public class MutablePathSpecMap<V>(): PathSpecMap<V> {
         traverse(root)
     }
 
-    public override fun match(format: StringArrayFormat, pathParts: List<String>, endingSlash: Boolean): PathSpecMap.Match<V>? {
+    public override fun <T> match(format: StringArrayFormat, pathParts: List<String>, endingSlash: Boolean, getter: (V)->T?): PathSpecMap.Match<T>? {
         if (pathParts.isEmpty())
             return (root.path ?: root.trailingSlash ?: root.chainedWildcard)?.let {
-                PathSpecMap.Match<V>(
+                val value = root[it.after]?.let(getter) ?: return@let null
+                PathSpecMap.Match<T>(
                     pathSpec = PathSpec.root,
                     rawPathArguments = emptyList(),
                     trailingSlash = endingSlash,
                     wildcard = if (it.after == PathSpec.Afterwards.TrailingSegments) emptyList() else null,
-                    value = root[it.after]
+                    value = value
                 )
             }
 
@@ -195,12 +214,13 @@ public class MutablePathSpecMap<V>(): PathSpecMap<V> {
 //            println("Searching for wildcard ending")
             soFar.asReversed().asSequence().mapNotNull {
                 it.chainedWildcard?.let { spec ->
-                    PathSpecMap.Match<V>(
+                    val value = it.chainedWildcardValue?.let(getter) ?: return@let null
+                    PathSpecMap.Match<T>(
                         pathSpec = spec,
                         rawPathArguments = wildcards.zip(spec.wildcards) { v, s -> format.decodeFromString(s.serializer, v) },
                         trailingSlash = endingSlash,
                         wildcard = pathParts.drop(spec.segments.size),
-                        value = it.chainedWildcardValue,
+                        value = value,
                     )
                 }
             }.firstOrNull()
@@ -208,35 +228,40 @@ public class MutablePathSpecMap<V>(): PathSpecMap<V> {
             if (endingSlash) {
         //            println("Pulling trailingSlash")
                 current.trailingSlash?.let { spec ->
-                    PathSpecMap.Match<V>(
+                    val value = current.trailingSlashValue?.let(getter) ?: return@let null
+                    PathSpecMap.Match<T>(
                         pathSpec = spec,
                         rawPathArguments = wildcards.zip(spec.wildcards) { v, s -> format.decodeFromString(s.serializer, v) },
                         trailingSlash = true,
                         wildcard = null,
-                        value = current.trailingSlashValue,
+                        value = value,
                     )
                 }
             } else {
         //            println("Pulling path")
-                current.path?.let { it ->
-                    PathSpecMap.Match<V>(
-                        pathSpec = it,
-                        rawPathArguments = wildcards.zip(it.wildcards) { v, s -> format.decodeFromString(s.serializer, v) },
+                current.path?.let { spec ->
+                    val value = current.pathValue?.let(getter) ?: return@let null
+                    PathSpecMap.Match<T>(
+                        pathSpec = spec,
+                        rawPathArguments = wildcards.zip(spec.wildcards) { v, s -> format.decodeFromString(s.serializer, v) },
                         trailingSlash = false,
                         wildcard = null,
-                        value = current.pathValue
+                        value = value,
                     )
                 }
             } ?: run {
-        //            println("Searching for wildcard ending")
+//                println("Searching for wildcard ending")
                 soFar.asReversed().asSequence().mapNotNull {
+//                    println("Checking $it")
                     it.chainedWildcard?.let { spec ->
-                        PathSpecMap.Match<V>(
+                        val value = it.chainedWildcardValue?.let(getter) ?: return@let null
+//                        println("Found value $value")
+                        PathSpecMap.Match<T>(
                             pathSpec = spec,
                             rawPathArguments = wildcards.zip(spec.wildcards) { v, s -> format.decodeFromString(s.serializer, v) },
                             trailingSlash = endingSlash,
                             wildcard = pathParts.drop(spec.segments.size),
-                            value = it.chainedWildcardValue
+                            value = value,
                         )
                     }
                 }.firstOrNull()

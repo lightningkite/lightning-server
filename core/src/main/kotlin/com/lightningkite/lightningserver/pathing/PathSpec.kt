@@ -22,7 +22,7 @@ public sealed class PathSpec(public val segments: List<Segment>, public val afte
     override fun equals(other: Any?): Boolean =
         other is PathSpec && this.segments == other.segments && this.after == other.after
 
-    override fun toString(): String = "/" + segments.joinToString("/") + when (after) {
+    override fun toString(): String = if(segments.isEmpty()) "/" else "/" + segments.joinToString("/") + when (after) {
         Afterwards.None -> ""
         Afterwards.TrailingSlash -> "/"
         Afterwards.TrailingSegments -> "/{...}"
