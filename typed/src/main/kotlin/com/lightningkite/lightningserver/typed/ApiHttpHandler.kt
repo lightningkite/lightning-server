@@ -22,6 +22,9 @@ public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT
     public val successCode: HttpStatus
     public val errorCases: List<LSError>
     public val examples: List<Example<INPUT, OUTPUT>>
+    public val implements: List<InterfaceInfo>
+
+    public data class InterfaceInfo(val fullyQualifiedName: String, val typeArguments: List<KSerializer<*>>)
 
     context(server: ServerRuntime)
     public suspend fun handle(access: HttpAccess<PATH, USER>, input: INPUT): OUTPUT

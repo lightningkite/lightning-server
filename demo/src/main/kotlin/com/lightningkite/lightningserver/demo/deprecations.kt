@@ -57,6 +57,14 @@ fun PathSpec0.websocket(handler: WebSocketHandler<PathSpec0, *>): Locationed<Pat
 @Deprecated("Use standard syntax", ReplaceWith("path.path(string).options")) fun ServerBuilder.options(string: String): HttpEndpoint<PathSpec0> = PathSpec.root.path(string).options
 @Deprecated("Use standard syntax", ReplaceWith("path.path(string).head")) fun ServerBuilder.head(string: String): HttpEndpoint<PathSpec0> = PathSpec.root.path(string).head
 
+@Deprecated("Use standard syntax", ReplaceWith("path.get")) val ServerBuilder.get: HttpEndpoint<PathSpec0> get() = PathSpec.root.get
+@Deprecated("Use standard syntax", ReplaceWith("path.post")) val ServerBuilder.post: HttpEndpoint<PathSpec0> get() = PathSpec.root.post
+@Deprecated("Use standard syntax", ReplaceWith("path.put")) val ServerBuilder.put: HttpEndpoint<PathSpec0> get() = PathSpec.root.put
+@Deprecated("Use standard syntax", ReplaceWith("path.patch")) val ServerBuilder.patch: HttpEndpoint<PathSpec0> get() = PathSpec.root.patch
+@Deprecated("Use standard syntax", ReplaceWith("path.delete")) val ServerBuilder.delete: HttpEndpoint<PathSpec0> get() = PathSpec.root.delete
+@Deprecated("Use standard syntax", ReplaceWith("path.options")) val ServerBuilder.options: HttpEndpoint<PathSpec0> get() = PathSpec.root.options
+@Deprecated("Use standard syntax", ReplaceWith("path.head")) val ServerBuilder.head: HttpEndpoint<PathSpec0> get() = PathSpec.root.head
+
 @Deprecated("Use the standard syntax", ReplaceWith("path.path(name) bind ScheduledTask(schedule, handler = action)")) fun ServerBuilder.schedule(name: String, schedule: Schedule, action: suspend ServerRuntime.()->Unit) = PathSpec.root.path(name) bind ScheduledTask(schedule, handler = action)
 @Deprecated("Use the standard syntax", ReplaceWith("path.path(name) bind ScheduledTask(frequency = frequency, handler = action)")) fun ServerBuilder.schedule(name: String, frequency: Duration, action: suspend ServerRuntime.()->Unit) = PathSpec.root.path(name) bind ScheduledTask(Schedule.Frequency(frequency), handler = action)
 

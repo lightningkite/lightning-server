@@ -24,6 +24,7 @@ dependencies {
 //    api(project(":sessions-oauth-shared"))
     api(project(":sessions-shared"))
     api(project(":sessions-sms"))
+    api(project(":files"))
     api(libs.serviceAbstractionsPubsub)
     api(libs.serviceAbstractionsPubsubRedis)
     api(libs.serviceAbstractionsPubsubTest)

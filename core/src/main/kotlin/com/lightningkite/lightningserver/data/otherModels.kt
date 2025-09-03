@@ -10,7 +10,7 @@ import kotlin.time.Instant
 @Serializable
 public data class Expiring<T>(
     val value: T,
-    @Contextual val expiresAt: Instant?
+    val expiresAt: Instant?
 ) {
     context(server: ServerRuntime)
     public val expired: Boolean get() = expiresAt != null && expiresAt <= server.clock.now()

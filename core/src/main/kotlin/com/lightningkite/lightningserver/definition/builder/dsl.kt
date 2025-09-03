@@ -203,6 +203,40 @@ public infix fun PathSpec0.bind(import: ServerDefinition): Locationed<PathSpec0,
     return Locationed(this, import)
 }
 
+//@LightningServerDsl
+//context(builder: ServerBuilder)
+//public infix fun <T : ServerBuilder> PathSpec0.include(module: T): T {
+//    builder.internalSerialization.include(module.internalSerialization)
+//    builder.externalSerialization.include(module.externalSerialization)
+//    builder.settings.include(module.settings)
+//    builder.http.include(module.http)
+//    builder.websockets.include(module.websockets)
+//    builder.exceptionHandler.include(module.exceptionHandler)
+//    builder.startupTasks.include(module.startupTasks)
+//    builder.schedules.include(module.schedules)
+//    builder.tasks.include(module.tasks)
+//    builder.mediaTypeDecoders.include(module.mediaTypeDecoders)
+//    builder.mediaTypeEncoders.include(module.mediaTypeEncoders)
+//    builder.extensions.include(module.extensions)
+//    builder.imports.include(module.imports)
+//    builder.modules.include(module.modules)
+//}
+
+
+@LightningServerDsl
+context(builder: ServerBuilder)
+public infix fun PathSpec0.include(import: ModularServerDefinition): Locationed<PathSpec0, ModularServerDefinition> {
+    builder.imports.register(this, import)
+    return Locationed(this, import)
+}
+
+@LightningServerDsl
+context(builder: ServerBuilder)
+public infix fun PathSpec0.include(import: ServerDefinition): Locationed<PathSpec0, ServerDefinition> {
+    builder.imports.register(this, ModularServerDefinition(import))
+    return Locationed(this, import)
+}
+
 public fun ServerBuilder.register(coder: MediaTypeCoder) {
     mediaTypeDecoders.register(coder)
     mediaTypeEncoders.register(coder)

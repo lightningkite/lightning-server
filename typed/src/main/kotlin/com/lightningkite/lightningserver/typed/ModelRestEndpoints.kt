@@ -12,7 +12,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec.Segment
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpec1
 import com.lightningkite.lightningserver.pathing.first
-import com.lightningkite.lightningserver.runtime.test.serverRuntime
+import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.sdk.titleCase
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList

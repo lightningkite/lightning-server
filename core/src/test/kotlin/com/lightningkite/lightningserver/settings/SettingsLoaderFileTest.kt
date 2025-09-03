@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.definition.builder.setting
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.definition.metricsSettings
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.modules.EmptySerializersModule
 import java.io.File
 import kotlin.test.Test
 
@@ -45,7 +46,7 @@ class SettingsLoaderFileTest {
             )
         }
         ServerSettings(allSettings)
-            .apply { loadFromFile(file, Server.internalSerialization) }
+            .apply { loadFromFile(file, EmptySerializersModule()) }
             .allSerializable()
             .forEach { println("${it.key.name}: ${it.value}") }
     }
@@ -71,7 +72,7 @@ class SettingsLoaderFileTest {
             )
         }
         ServerSettings(allSettings)
-            .apply { loadFromFile(file, Server.internalSerialization) }
+            .apply { loadFromFile(file, EmptySerializersModule()) }
             .allSerializable()
             .forEach { println("${it.key.name}: ${it.value}") }
     }
@@ -84,7 +85,7 @@ class SettingsLoaderFileTest {
         }
         try {
             ServerSettings(allSettings)
-                .apply { loadFromFile(file, Server.internalSerialization) }
+                .apply { loadFromFile(file, EmptySerializersModule()) }
                 .allSerializable()
                 .forEach { println("${it.key.name}: ${it.value}") }
         } catch(e: IncompleteSettingsException) {
@@ -92,7 +93,7 @@ class SettingsLoaderFileTest {
             e.suggestedFile.copyRecursively(file, overwrite = true)
         }
         ServerSettings(allSettings)
-            .apply { loadFromFile(file, Server.internalSerialization) }
+            .apply { loadFromFile(file, EmptySerializersModule()) }
             .allSerializable()
             .forEach { println("${it.key.name}: ${it.value}") }
     }
@@ -105,7 +106,7 @@ class SettingsLoaderFileTest {
         }
         try {
             ServerSettings(allSettings)
-                .apply { loadFromFile(file, Server.internalSerialization) }
+                .apply { loadFromFile(file, EmptySerializersModule()) }
                 .allSerializable()
                 .forEach { println("${it.key.name}: ${it.value}") }
         } catch(e: IncompleteSettingsException) {
@@ -113,7 +114,7 @@ class SettingsLoaderFileTest {
             e.suggestedFile.copyRecursively(file, overwrite = true)
         }
         ServerSettings(allSettings)
-            .apply { loadFromFile(file, Server.internalSerialization) }
+            .apply { loadFromFile(file, EmptySerializersModule()) }
             .allSerializable()
             .forEach { println("${it.key.name}: ${it.value}") }
     }

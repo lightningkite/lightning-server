@@ -30,6 +30,7 @@ import com.lightningkite.lightningserver.serialization.MediaTypeEncoderRegistry
 import com.lightningkite.lightningserver.websockets.WebSocketsBuilder
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
+import com.lightningkite.lightningserver.definition.Runtime
 
 /**
  * [ServerBuilder] provides a fluent, type-safe API for defining your server configuration.
@@ -76,10 +77,10 @@ import kotlinx.serialization.modules.SerializersModule
  * ```
  * */
 public abstract class ServerBuilder : Extendable {
-    public open val internalSerialization: SerializersModule get() = EmptySerializersModule()
-    public open val externalSerialization: SerializersModule get() = EmptySerializersModule()
+    public open val internalSerialization: Runtime<SerializersModule> get() = Runtime.Constant(EmptySerializersModule())
+    public open val externalSerialization: Runtime<SerializersModule> get() = Runtime.Constant(EmptySerializersModule())
 
-    protected open val path: PathSpec0 get() = PathSpec.root // just for convenience
+    protected val path: PathSpec0 get() = PathSpec.root // just for convenience
 
     public val settings: ListRegistry<ServerSetting<*, *>> = ListRegistry()
 

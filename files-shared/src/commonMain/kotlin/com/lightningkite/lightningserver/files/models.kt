@@ -1,5 +1,3 @@
-@file:UseContextualSerialization(Uuid::class, Instant::class)
-
 package com.lightningkite.lightningserver.files
 
 import com.lightningkite.services.data.GenerateDataClassPaths

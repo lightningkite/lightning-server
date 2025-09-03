@@ -16,6 +16,7 @@ dependencies {
     api(project(":typed-shared"))
     api(libs.serviceAbstractionsDatabase)
     api(libs.serviceAbstractionsCache)
+    api(libs.serviceAbstractionsHttpClient)
     api(libs.kotlinReflect)
     testImplementation(libs.kotlinTestJunit)
 }

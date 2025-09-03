@@ -37,6 +37,7 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
                 }
             } catch (e: Exception) {
                 println("exception handler fail $e")
+                e.printStackTrace()
                 try {
                     return@handle topLevelReportingContext("exceptionHandler") {
                         this.server.exceptionHandler.handle(

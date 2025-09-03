@@ -26,7 +26,7 @@ internal class AwsAdapterTask(val root: AwsAdapter) {
     val format: KotlinBytesFormat get() = root.internalSerialization.kotlinBytesFormat
 
     @Serializable
-    data class TaskInvoke(val taskName: String, @Contextual val input: AnonType)
+    data class TaskInvoke(val taskName: String, val input: AnonType)
 
     suspend fun <T> launchTask(task: Locationed<PathSpec0, Task<T>>, input: T) {
         try {

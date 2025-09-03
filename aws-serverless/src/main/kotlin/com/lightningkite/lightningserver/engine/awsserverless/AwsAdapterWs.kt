@@ -44,13 +44,13 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
     data class WebSocketDidConnect(
         val socketId: String,
         val connection: WebSocketConnectRequest<Nothing>,
-        @Contextual val storage: AnonType
+        val storage: AnonType
     )
 
     @Serializable
     data class WebSocketPublish(
         val topic: String,
-        @Contextual val data: AnonType,
+        val data: AnonType,
     )
 
     private suspend inline fun <P: PathSpec, T, R> withMid(

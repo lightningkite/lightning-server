@@ -33,8 +33,8 @@ import kotlin.time.Instant
 @Serializable
 data class ActionHasOccurred(
     override val _id: String,
-    @Contextual val started: Instant? = null,
-    @Contextual val completed: Instant? = null,
+    val started: Instant? = null,
+    val completed: Instant? = null,
     val errorMessage: String? = null,
 ) : HasId<String>
 

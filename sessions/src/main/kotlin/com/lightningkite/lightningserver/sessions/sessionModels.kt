@@ -1,4 +1,3 @@
-@file:UseContextualSerialization(Instant::class, Uuid::class)
 package com.lightningkite.lightningserver.sessions
 
 import com.lightningkite.lightningserver.auth.RequestPredicates

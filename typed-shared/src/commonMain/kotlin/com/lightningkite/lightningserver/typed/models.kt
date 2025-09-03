@@ -1,5 +1,3 @@
-@file:UseContextualSerialization(Uuid::class, Instant::class, LocalDate::class)
-
 package com.lightningkite.lightningserver.typed
 
 import kotlinx.serialization.Serializable

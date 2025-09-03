@@ -86,8 +86,8 @@ import kotlinx.serialization.modules.plus
  * @see ServerPathEndpoints for the structure of endpoint definitions
  */
 public data class ServerDefinition(
-    public val internalSerializersModule: SerializersModule,
-    public val externalSerializersModule: SerializersModule,
+    public val internalSerializersModule: Runtime<SerializersModule>,
+    public val externalSerializersModule: Runtime<SerializersModule>,
 
     public val endpoints: PathSpecMap<ServerPathEndpoints>,
     public val exceptionHandler: ExceptionHttpHandler = DefaultExceptionHttpHandler,
@@ -293,8 +293,8 @@ public data class ModularServerDefinition(
         }
 
         return ServerDefinition(
-            internalSerializersModule = flattenedModules.values.fold(definition.internalSerializersModule) { acc, module -> acc + module.internalSerializersModule },
-            externalSerializersModule = flattenedModules.values.fold(definition.externalSerializersModule) { acc, module -> acc + module.externalSerializersModule },
+            internalSerializersModule = Runtime.Cached { flattenedModules.values.fold(definition.internalSerializersModule()) { acc, module -> acc + module.internalSerializersModule() } },
+            externalSerializersModule = Runtime.Cached { flattenedModules.values.fold(definition.externalSerializersModule()) { acc, module -> acc + module.externalSerializersModule() } },
             endpoints = flattenPathSpec { it.endpoints },
             schedules = flatten { it.schedules },
             tasks = flatten { it.tasks },

@@ -30,7 +30,7 @@ It is strongly recommended you define the primary key yourself by making the cla
 @Serializable
 @DatabaseModel
 data class Post(
-    @Contextual override val _id: UUID = UUID.randomUUID(),
+    override val _id: UUID = UUID.randomUUID(),
     val title: String,
     val poster: String,
     val body: String,

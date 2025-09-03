@@ -56,3 +56,7 @@ context(serverRuntime: ServerRuntime) public suspend operator fun <T> Locationed
 
 context(server: ServerRuntime)
 public fun now(): Instant = server.clock.now()
+
+
+context(runner: ServerRuntime)
+public val serverRuntime: ServerRuntime get() = runner

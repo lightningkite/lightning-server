@@ -1,0 +1,31 @@
+import java.io.File
+
+fun File.update() {
+    writeText(readText()
+        .replace("ServerPathGroup(ServerPath.root)", "ServerBuilder()") 
+        .replace("DatabaseSettings", "Database.Settings") 
+        .replace("EmailSettings", "EmailService.Settings") 
+        .replace("SMSSettings", "SMS.Settings") 
+        .replace("FilesSettings", "PublicFileSystem.Settings") 
+        .replace("CacheSettings", "Cache.Settings") 
+        .replace("CloudwatchMetrics", "CloudwatchMetricReporter") 
+        .replace("S3FileSystem", "S3PublicFileSystem") 
+        .replace("UUID", "Uuid") 
+        .replace("import kotlinx.datetime.Instant", "import kotlin.time.Instant") 
+        .replace("import com.lightningkite.Uuid", "")
+        .replace("serialization = ModelSerializationInfo(),", "")
+        .replace(".handler { ", " bind HttpHandler {") 
+        .replace("(path: ServerPath): ServerPathGroup(path) {", ": ServerBuilder() {") 
+        .replace("authOptions = authOptions(),", "auth = UserAuth.auth(),") 
+        .replace("authOptions =", "auth =") 
+        .replace(".websocket(", " bind WebSocketHandler(")
+        .replace(Regex("task\\(\"\$path/([a-zA-Z 0-9]+)\"\\) \\{"), "path(\"$1\") bind Task {")
+        .replace(".api(", " bind ApiHttpHandler(") 
+        .replace("ApiExample", "ApiHttpHandler.Example") 
+        .replace("OneTimePasswordProofEndpoints", "TimeBasedOTPProofEndpoints") 
+        .replace("SentryExceptionReporter", "SentryExceptionReporter") 
+    )
+}
+
+File("/Users/jivie/Projects/lightning-server/files/src/main/kotlin/com/lightningkite/lightningserver/files/UploadEarlyEndpoints.kt")
+    .update()

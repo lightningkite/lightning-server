@@ -1,5 +1,3 @@
-@file:UseContextualSerialization(Duration::class, Instant::class, Uuid::class)
-
 package com.lightningkite.lightningserver.sessions
 
 import com.lightningkite.lightningserver.sessions.proofs.TotpHashAlgorithm

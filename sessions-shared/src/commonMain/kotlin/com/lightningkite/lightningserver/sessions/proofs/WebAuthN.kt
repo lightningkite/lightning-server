@@ -1,4 +1,3 @@
-@file:UseContextualSerialization(Instant::class)
 @file:OptIn(ExperimentalSerializationApi::class)
 
 package com.lightningkite.lightningserver.sessions.proofs

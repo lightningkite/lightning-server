@@ -33,6 +33,10 @@ public fun interface Runtime<out T> : RuntimeDeferred<T> {
         override operator fun invoke(): T =
             cache?.value ?: wraps.invoke().also { cache = NullWrapper(it) }
     }
+    public data class Constant<out T>(public val value: T) : Runtime<T> {
+        context(server: ServerRuntime)
+        override operator fun invoke(): T = value
+    }
 }
 
 public fun <T, R> Runtime<T>.map(transform: context(ServerRuntime) (T) -> R): Runtime<R> = Runtime { transform(this()) }

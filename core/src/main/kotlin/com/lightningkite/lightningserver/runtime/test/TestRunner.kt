@@ -142,6 +142,3 @@ public inline fun <SERVER: ServerBuilder> SERVER.test(
     }
     action(runner, this)
 }
-
-context(runner: ServerRuntime)
-public val serverRuntime: ServerRuntime get() = runner

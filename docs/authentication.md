@@ -11,7 +11,6 @@ We've built authentication out for you, but it is also extremely customizable.  
 Here's a most basic example.  This is the absolute minimum required to use the built-in authentication endpoints with magic-link / PIN auth.
 
 ```kotlin
-@file:UseContextualSerialization(UUID::class, Instant::class)
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.*

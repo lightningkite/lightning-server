@@ -16,11 +16,13 @@ public fun interface AuthRequirement<out SUBJECT : HasId<*>?> {
 
         @Suppress("UNCHECKED_CAST")
         public fun <SUBJECT : HasId<*>> typed(): AuthRequirement<SUBJECT?> = this as AuthRequirement<SUBJECT?>
+        override fun toString(): String = "Not Authenticated"
     }
 
     public data object AnyAuth : AuthRequirement<HasId<AnyId>> {
         context(server: ServerRuntime)
         override suspend fun accepts(auth: Authentication<*>?): Boolean = auth != null
+        override fun toString(): String = "Any Authenticated"
     }
 
     public abstract class AuthSetting(
@@ -51,6 +53,7 @@ public fun interface AuthRequirement<out SUBJECT : HasId<*>?> {
 
             return true
         }
+        override fun toString(): String = "Any Authenticated with $scopes and max age of $maxAge"
     }
 
     public data class AuthenticatedAs<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
@@ -73,6 +76,7 @@ public fun interface AuthRequirement<out SUBJECT : HasId<*>?> {
             @Suppress("UNCHECKED_CAST") // typecheck done when principal type was checked
             return requirement?.invoke(server, auth as Authentication<SUBJECT>) ?: true
         }
+        override fun toString(): String = "${principalType.name} with $scopes and max age of $maxAge"
     }
 
     public data class Options<out SUBJECT : HasId<*>?>(
@@ -88,3 +92,5 @@ public fun interface AuthRequirement<out SUBJECT : HasId<*>?> {
 
     public companion object;
 }
+
+public fun <T : HasId<*>?> AuthRequirement<T>.options(): Set<AuthRequirement<T>> = if (this is AuthRequirement.Options) options else setOf(this)

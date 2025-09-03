@@ -15,8 +15,8 @@ import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 
 public abstract class ServerRuntimeBase(override val server: ServerDefinition): ServerRuntime {
-    override val internalSerialization: Serialization = Serialization(server.internalSerializersModule)
-    override val externalSerialization: Serialization = Serialization(server.externalSerializersModule)
+    override val internalSerialization: Serialization = Serialization(server.internalSerializersModule())
+    override val externalSerialization: Serialization = Serialization(server.externalSerializersModule())
 
     override val settings: ServerSettings = ServerSettings(server.settings.plus(listOf(
         generalSettings,

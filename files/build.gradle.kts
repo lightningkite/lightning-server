@@ -11,6 +11,7 @@ plugins {
 
 dependencies {
     api(project(":typed"))
+    api(project(":files-shared"))
     api(libs.serviceAbstractionsDatabase)
     api(libs.serviceAbstractionsFiles)
     api(libs.kotlinReflect)

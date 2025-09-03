@@ -17,6 +17,10 @@ public interface MapRegistry<L, V : Any> : Map<L, V> {
 public class DuplicateRegistrationError(message: String, public val initial: Any, public val overwrite: Any) : Error(message)
 
 
+public fun <L, V : Any> MapRegistry<L, V>.include(map: Map<L, V>) {
+    for ((k, v) in map) register(k, v)
+}
+
 private class BasicMapRegistry<L, V : Any>(
     private val registry: HashMap<L, V> = HashMap()
 ) : MapRegistry<L, V>, Map<L, V> by registry {
