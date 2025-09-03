@@ -5,6 +5,10 @@ import kotlinx.serialization.UseContextualSerialization
 import com.lightningkite.services.HealthStatus
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.database.HasId
+import com.lightningkite.services.database.VirtualAlias
+import com.lightningkite.services.database.VirtualEnum
+import com.lightningkite.services.database.VirtualStruct
+import com.lightningkite.services.database.VirtualTypeReference
 import kotlinx.datetime.LocalDate
 import kotlin.math.roundToInt
 import kotlin.time.Instant
@@ -105,3 +109,35 @@ public data class ServerHealth(
             }
     }
 }
+
+@Serializable
+public data class LightningServerKSchema(
+    val baseUrl: String,
+    val baseWsUrl: String,
+    val structures: Map<String, VirtualStruct>,
+    val enums: Map<String, VirtualEnum>,
+    val aliases: Map<String, VirtualAlias> = mapOf(),
+    val endpoints: List<LightningServerKSchemaEndpoint>,
+    val interfaces: List<LightningServerKSchemaInterface>,
+)
+
+@Serializable
+public data class LightningServerKSchemaInterface(
+    val matches: VirtualTypeReference,
+    val docGroup: String? = null,
+    val path: String,
+)
+
+@Serializable
+public data class LightningServerKSchemaEndpoint(
+    val group: String? = null,
+    val description: String,
+    val summary: String,
+    val method: String,
+    val path: String,
+    val routes: Map<String, VirtualTypeReference>,
+    val input: VirtualTypeReference,
+    val output: VirtualTypeReference,
+    val docGroup: String?,
+    val belongsToInterface: VirtualTypeReference?,
+)

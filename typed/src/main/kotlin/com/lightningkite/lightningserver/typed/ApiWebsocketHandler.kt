@@ -14,6 +14,7 @@ import com.lightningkite.lightningserver.serialization.encoder
 import com.lightningkite.lightningserver.serialization.parse
 import com.lightningkite.lightningserver.serialization.queryParameters
 import com.lightningkite.lightningserver.serialization.toTypedData
+import com.lightningkite.lightningserver.typed.Documentable.InterfaceInfo
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketConnection
@@ -29,12 +30,15 @@ import kotlinx.serialization.Transient
 import kotlinx.serialization.builtins.serializer
 
 public interface ApiWebsocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?, INPUT, OUTPUT> :
+    Documentable,
     WebSocketHandler<PATH, ApiWebsocketStorage<STORAGE>> {
-    public val auth: AuthRequirement<USER>
-    public val inputType: KSerializer<INPUT>
-    public val outputType: KSerializer<OUTPUT>
-    public val summary: String
-    public val description: String
+    override val auth: AuthRequirement<USER>
+    override val inputType: KSerializer<INPUT>
+    override val outputType: KSerializer<OUTPUT>
+    override val summary: String
+    override val description: String
+    override val belongsToInterface: InterfaceInfo?
+
     public val errorCases: List<LSError>
     public val innerStorageSerializer: KSerializer<STORAGE>
 

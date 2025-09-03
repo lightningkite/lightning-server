@@ -12,6 +12,7 @@ import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpStatus
+import com.lightningkite.lightningserver.http.intercept
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpecMap
@@ -61,7 +62,7 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
         cache = request.cache,
         body = request.body,
     )
-    val handler = match.value
+    val handler = server.httpInterceptors.fold(match.value) { a, b -> b.intercept(a) }
     @Suppress("UNCHECKED_CAST")
     handler as HttpHandler<PathSpec>
     return try {

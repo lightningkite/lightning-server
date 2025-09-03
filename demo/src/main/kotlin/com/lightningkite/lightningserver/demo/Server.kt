@@ -27,10 +27,12 @@ import com.lightningkite.services.metrics.cloudwatch.*
 import com.lightningkite.services.sms.*
 import io.ktor.client.request.*
 import io.ktor.server.plugins.NotFoundException
+import io.ktor.websocket.Serializer
 import kotlinx.coroutines.*
 import kotlinx.html.*
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.*
+import kotlinx.serialization.modules.SerializersModule
 import kotlin.random.*
 import kotlin.time.*
 import kotlin.time.Duration.Companion.minutes
@@ -59,8 +61,6 @@ object Server : ServerBuilder() {
                 )
             )
         }
-
-        registerBasicMediaTypeCoders()
     }
 
     object UserAuth: PrincipalType<User, Uuid> {
@@ -69,18 +69,28 @@ object Server : ServerBuilder() {
 
         context(server: ServerRuntime)
         override suspend fun fetch(id: Uuid): User = userInfo.collection().get(id) ?: throw NotFoundException()
+
+        context(server: ServerRuntime)
+        override suspend fun fetchByProperty(property: String, value: String): User? {
+            return when(property) {
+                "email" -> return userInfo.collection().findOne(condition { it.email eq value })
+                else -> super.fetchByProperty(property, value)
+            }
+        }
+
     }
 
-    val userInfo = database.modelInfo<User, User, Uuid>(
-        auth = UserAuth.auth(),
+    val userInfo = database.modelInfo<User?, User, Uuid>(
+        auth = UserAuth.auth() or noAuth,
         permissions = {
-            val user = auth.fetch()
+            val user = authOrNull?.fetch()
             val everyone: Condition<User> = Condition.Always
-            val self: Condition<User> = condition { it._id eq user._id }
-            val admin: Condition<User> = if (user.isSuperUser) Condition.Always else Condition.Never
+            val self: Condition<User> = condition { it._id eqNn user?._id }
+            val admin: Condition<User> = if (user?.isSuperUser == true) Condition.Always else Condition.Never
             ModelPermissions(
-                create = everyone,
-                read = self or admin,
+                create = Condition.Never,
+                read = everyone,
+//                read = self or admin,
                 update = self or admin,
                 delete = self or admin
             )
@@ -192,7 +202,7 @@ object Server : ServerBuilder() {
     val proofOtp = path.path("proof").path("otp") bind TimeBasedOTPProofEndpoints(database, cache)
     val proofPassword = path.path("proof").path("password") bind PasswordProofEndpoints(database, cache)
     val proofDevices = path.path("proof").path("devices") bind KnownDeviceProofEndpoints(database, cache)
-    val subjects = object: AuthEndpoints<User, Uuid>(
+    val subjects = path.path("auth") bind object: AuthEndpoints<User, Uuid>(
         principal = UserAuth,
         database = database,
     ) {
@@ -240,5 +250,14 @@ object Server : ServerBuilder() {
 //        HttpResponse.json(testModel.info.collection().all().toList())
         val auth = it.auth(UserAuth.auth())
         HttpResponse.plainText(auth.id.toString())
+    }
+
+    override val externalSerialization: Runtime<SerializersModule> = Runtime.Cached {
+        SerializersModule {
+            contextual(ServerFile::class, uploadEarly.serializer())
+        }
+    }
+    init {
+        registerBasicMediaTypeCoders()
     }
 }

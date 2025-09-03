@@ -13,18 +13,17 @@ import com.lightningkite.services.database.HasId
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
 
-public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> : HttpHandler<PATH> {
-    public val auth: AuthRequirement<USER>
-    public val inputType: KSerializer<INPUT>
-    public val outputType: KSerializer<OUTPUT>
-    public val summary: String
-    public val description: String
+public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> : Documentable, HttpHandler<PATH> {
+    override val auth: AuthRequirement<USER>
+    override val inputType: KSerializer<INPUT>
+    override val outputType: KSerializer<OUTPUT>
+    override val summary: String
+    override val description: String
+    override val belongsToInterface: Documentable.InterfaceInfo?
+
     public val successCode: HttpStatus
     public val errorCases: List<LSError>
     public val examples: List<Example<INPUT, OUTPUT>>
-    public val implements: List<InterfaceInfo>
-
-    public data class InterfaceInfo(val fullyQualifiedName: String, val typeArguments: List<KSerializer<*>>)
 
     context(server: ServerRuntime)
     public suspend fun handle(access: HttpAccess<PATH, USER>, input: INPUT): OUTPUT

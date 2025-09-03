@@ -1,4 +1,6 @@
 # TODO
 
- - [ ] AWS Handler manual load settings shouldn't be needed
- - [ ] Destatic?
+ - [ ] Generate Kotlin SDK
+ - [ ] Generate OpenAPI spec
+ - [ ] Generate Lightning Server spec
+ - [ ] Test AWS deployment

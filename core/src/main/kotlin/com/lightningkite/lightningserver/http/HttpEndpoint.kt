@@ -3,7 +3,9 @@ package com.lightningkite.lightningserver.http
 import com.lightningkite.lightningserver.pathing.PathSpec
 
 
-public class HttpEndpoint<Path : PathSpec>(public val path: Path, public val method: HttpMethod)
+public data class HttpEndpoint<Path : PathSpec>(public val path: Path, public val method: HttpMethod) {
+    override fun toString(): String = "$method $path"
+}
 
 public val <T : PathSpec> T.get: HttpEndpoint<T> get() = HttpEndpoint(this, HttpMethod.GET)
 public val <T : PathSpec> T.post: HttpEndpoint<T> get() = HttpEndpoint(this, HttpMethod.POST)

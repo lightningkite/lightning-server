@@ -19,7 +19,7 @@ public fun <PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT> ApiHttpHandler(
     successCode: HttpStatus = HttpStatus.OK,
     errorCases: List<LSError> = emptyList(),
     examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = emptyList(),
-    implements: List<ApiHttpHandler.InterfaceInfo> = emptyList(),
+    belongsToInterface: Documentable.InterfaceInfo? = null,
     implementation: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT
 ): ApiHttpHandler<PATH, USER, INPUT, OUTPUT> =
     object : ApiHttpHandler<PATH, USER, INPUT, OUTPUT> {
@@ -31,7 +31,7 @@ public fun <PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT> ApiHttpHandler(
         override val successCode: HttpStatus = successCode
         override val errorCases: List<LSError> = errorCases
         override val examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = examples
-        override val implements: List<ApiHttpHandler.InterfaceInfo> get() = implements
+        override val belongsToInterface: Documentable.InterfaceInfo? get() = belongsToInterface
 
         context(server: ServerRuntime)
         override suspend fun handle(access: HttpAccess<PATH, USER>, input: INPUT): OUTPUT = access.implementation(input)
@@ -44,10 +44,10 @@ public inline fun <PATH: PathSpec, USER: HasId<*>?, reified INPUT, reified OUTPU
     successCode: HttpStatus = HttpStatus.OK,
     errorCases: List<LSError> = emptyList(),
     examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = emptyList(),
-    implements: List<ApiHttpHandler.InterfaceInfo> = emptyList(),
+    belongsToInterface: Documentable.InterfaceInfo? = null,
     noinline implementation: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT
 ): ApiHttpHandler<PATH, USER, INPUT, OUTPUT> =
-    ApiHttpHandler(summary, description, serializerOrContextual<INPUT>(), serializerOrContextual<OUTPUT>(), auth, successCode, errorCases, examples, implements, implementation)
+    ApiHttpHandler(summary, description, serializerOrContextual<INPUT>(), serializerOrContextual<OUTPUT>(), auth, successCode, errorCases, examples, belongsToInterface, implementation)
 
 context(server: ServerRuntime, access: HttpAccess<PATH, out USER>)
 public suspend operator fun <PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.invoke(input: INPUT): OUTPUT {

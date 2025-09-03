@@ -8,10 +8,12 @@ import com.lightningkite.lightningserver.pathing.plus
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.DefaultExceptionHttpHandler
 import com.lightningkite.lightningserver.http.ExceptionHttpHandler
+import com.lightningkite.lightningserver.http.HttpInterceptor
 import com.lightningkite.lightningserver.serialization.MediaTypeDecoder
 import com.lightningkite.lightningserver.serialization.MediaTypeDecoderRegistry
 import com.lightningkite.lightningserver.serialization.MediaTypeEncoder
 import com.lightningkite.lightningserver.serialization.MediaTypeEncoderRegistry
+import com.lightningkite.lightningserver.websockets.WebSocketHandlerInterceptor
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.plus
@@ -90,6 +92,8 @@ public data class ServerDefinition(
     public val externalSerializersModule: Runtime<SerializersModule>,
 
     public val endpoints: PathSpecMap<ServerPathEndpoints>,
+    public val httpInterceptors: List<HttpInterceptor>,
+    public val websocketInterceptors: List<WebSocketHandlerInterceptor>,
     public val exceptionHandler: ExceptionHttpHandler = DefaultExceptionHttpHandler,
 
     public val startupTasks: Map<PathSpec0, StartupTask>,
@@ -278,6 +282,13 @@ public data class ModularServerDefinition(
 
         val flattenedModules = modules.mapValues { (_, module) -> module.flatten() }
 
+        fun <T> flattenList(registry: (ServerDefinition) -> List<T>): List<T> = buildList {
+            addAll(registry(definition))
+            for ((modPath, module) in flattenedModules) {
+                addAll(registry(module))
+            }
+        }
+
         fun <T> flatten(registry: (ServerDefinition) -> Map<PathSpec0, T>): Map<PathSpec0, T> = buildMap {
             putAll(registry(definition))
             for ((modPath, module) in flattenedModules) {
@@ -295,6 +306,8 @@ public data class ModularServerDefinition(
         return ServerDefinition(
             internalSerializersModule = Runtime.Cached { flattenedModules.values.fold(definition.internalSerializersModule()) { acc, module -> acc + module.internalSerializersModule() } },
             externalSerializersModule = Runtime.Cached { flattenedModules.values.fold(definition.externalSerializersModule()) { acc, module -> acc + module.externalSerializersModule() } },
+            httpInterceptors = flattenList { it.httpInterceptors },
+            websocketInterceptors = flattenList { it.websocketInterceptors },
             endpoints = flattenPathSpec { it.endpoints },
             schedules = flatten { it.schedules },
             tasks = flatten { it.tasks },

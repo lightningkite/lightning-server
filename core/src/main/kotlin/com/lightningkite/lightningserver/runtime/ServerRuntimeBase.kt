@@ -15,15 +15,14 @@ import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 
 public abstract class ServerRuntimeBase(override val server: ServerDefinition): ServerRuntime {
-    override val internalSerialization: Serialization = Serialization(server.internalSerializersModule())
-    override val externalSerialization: Serialization = Serialization(server.externalSerializersModule())
-
     override val settings: ServerSettings = ServerSettings(server.settings.plus(listOf(
         generalSettings,
         metricsSettings,
         exceptionSettings,
         secretBasis
     )).toSet())
+    override val internalSerialization: Serialization by lazy { Serialization(server.internalSerializersModule()) }
+    override val externalSerialization: Serialization by lazy { Serialization(server.externalSerializersModule()) }
     override val metrics: MetricReporter by lazy { metricsSettings() }
     override val projectName: String by lazy { generalSettings().projectName }
 //    override val secretBasis: ByteArray by lazy { com.lightningkite.lightningserver.definition.secretBasis().bytes }

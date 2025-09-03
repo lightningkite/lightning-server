@@ -137,4 +137,4 @@ public interface ListRegistryExtension<V> : MutableExtensions.DegradingKey<ListR
     }
 }
 
-public fun Extensions.toMutableExtensions(): MutableExtensions = this as? MutableExtensions ?: MutableExtensions(this)
+public fun Extensions.toMutableExtensions(): MutableExtensions = MutableExtensions(this)

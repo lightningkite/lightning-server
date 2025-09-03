@@ -26,7 +26,13 @@ import kotlin.time.Duration.Companion.days
 
 
 private fun serve() {
-    KtorEngine(Server.build()).apply {
+    println("---")
+    println(Server.extensions.entries.joinToString("\n") { "${it.key}: ${it.value}" })
+    val built = Server.build()
+    println("--- ${System.identityHashCode(built)}")
+    println(built.extensions.entries.joinToString("\n") { "${it.key}: ${it.value}" })
+    println("---")
+    KtorEngine(built).apply {
         settings.loadFromFile(File("settings.json"), internalSerializersModule)
         start(Netty)
     }

@@ -1,4 +1,3 @@
-@file:UseContextualSerialization(Instant::class)
 package com.lightningkite.lightningserver.sessions.proofs.oauth
 
 import com.lightningkite.services.data.GenerateDataClassPaths

@@ -55,6 +55,10 @@ public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
         override val outputType: KSerializer<CollectionUpdates<T, ID>> = CollectionUpdates.serializer(info.serializer, info.idSerializer)
         override val summary: String = "Updates"
         override val description: String = "Streams updates about items that fulfill your condition."
+        override val belongsToInterface: Documentable.InterfaceInfo = Documentable.InterfaceInfo("ClientModelRestEndpoints", listOf(
+            info.serializer,
+            info.idSerializer
+        ))
         override val errorCases: List<LSError> get() = listOf()
         override val innerStorageSerializer: KSerializer<ModelRestUpdatesWebsocketData<T, ID>> = ModelRestUpdatesWebsocketData.serializer(info.serializer, info.idSerializer)
 

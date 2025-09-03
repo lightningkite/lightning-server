@@ -16,4 +16,10 @@ public open class Serialization(public val serializersModule: SerializersModule 
         isLenient = true
         encodeDefaults = true
     }
+    public open val jsonWithoutDefaults: Json = Json {
+        this.serializersModule = this@Serialization.serializersModule
+        ignoreUnknownKeys = true
+        isLenient = true
+        encodeDefaults = false
+    }
 }

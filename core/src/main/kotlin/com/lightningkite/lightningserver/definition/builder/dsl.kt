@@ -183,7 +183,6 @@ public inline fun <reified Result> setting(
 context(builder: ServerBuilder)
 public infix fun <T : ServerBuilder> PathSpec0.bind(module: T): T {
     module.modulePath = this
-    module.extensions.include(builder.extensions)
     builder.modules.register(this, module)
     return module
 }
@@ -221,21 +220,6 @@ public infix fun PathSpec0.bind(import: ServerDefinition): Locationed<PathSpec0,
 //    builder.imports.include(module.imports)
 //    builder.modules.include(module.modules)
 //}
-
-
-@LightningServerDsl
-context(builder: ServerBuilder)
-public infix fun PathSpec0.include(import: ModularServerDefinition): Locationed<PathSpec0, ModularServerDefinition> {
-    builder.imports.register(this, import)
-    return Locationed(this, import)
-}
-
-@LightningServerDsl
-context(builder: ServerBuilder)
-public infix fun PathSpec0.include(import: ServerDefinition): Locationed<PathSpec0, ServerDefinition> {
-    builder.imports.register(this, ModularServerDefinition(import))
-    return Locationed(this, import)
-}
 
 public fun ServerBuilder.register(coder: MediaTypeCoder) {
     mediaTypeDecoders.register(coder)

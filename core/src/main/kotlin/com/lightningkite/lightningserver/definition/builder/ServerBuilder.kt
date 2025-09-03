@@ -163,22 +163,17 @@ public abstract class ServerBuilder : Extendable {
     public fun shallowBuild(): ServerDefinition = ServerDefinition(
         internalSerializersModule = internalSerialization,
         externalSerializersModule = externalSerialization,
+        httpInterceptors = http.interceptors.interceptors,
+        websocketInterceptors = websockets.interceptors.interceptors,
         endpoints = MutablePathSpecMap<ServerPathEndpoints>().apply {
-            val httpInterceptor = http.interceptors.build()
-            val websocketInterceptor = websockets.interceptors.build()
-
             for (path in http.handlers.keys + websockets.handlers.keys) {
                 put(path, ServerPathEndpoints(
                     http = http
                         .handlers[path]
-                        ?.mapValues { (_, handler) ->
-                            httpInterceptor.intercept(handler)
-                        }
                         ?: emptyMap(),
 
                     websocket = websockets
                         .handlers[path]
-                        ?.let(websocketInterceptor::invoke)
                 ))
             }
         },

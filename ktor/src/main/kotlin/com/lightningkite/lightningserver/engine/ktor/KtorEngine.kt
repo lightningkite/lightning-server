@@ -142,8 +142,7 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
                     } ?: call.request.origin.remoteAddress,
                 )
 
-                val match = server.endpoints.match(externalSerialization.stringArrayFormat, request.path.string)
-                val socketHandler = match?.value?.websocket ?: run {
+                val match = server.endpoints.match(externalSerialization.stringArrayFormat, request.path.string) { it.websocket } ?: run {
                     this@webSocket.close(
                         CloseReason(
                             CloseReason.Codes.CANNOT_ACCEPT,
@@ -152,6 +151,7 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
                     )
                     return@webSocket
                 }
+                val socketHandler = server.websocketInterceptors.fold(match.value) { a, b -> b(a) }
 
                 @Suppress("UNCHECKED_CAST")
                 socketHandler as WebSocketHandler<PathSpec, Any?>

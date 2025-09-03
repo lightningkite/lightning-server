@@ -21,6 +21,7 @@ import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
+import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.sessions.proofs.Proof
 import com.lightningkite.lightningserver.sessions.proofs.ProofOption
 import com.lightningkite.lightningserver.sessions.proofs.extensions.verify
@@ -39,7 +40,7 @@ import kotlin.time.Duration.Companion.hours
 public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     principal: PrincipalType<SUBJECT, ID>,
     database: Runtime<Database>,
-    private val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proofs"),
+    private val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
     tokenFormat: Runtime<TokenFormat> = Runtime { PrivateTinyTokenFormat() },
 ) : SessionManager<SUBJECT, ID>(principal, database, tokenFormat) {
 
@@ -69,7 +70,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     private val errorNonexistentMethod = LSError(
         400,
         detail = "nonexistent-proof-method",
-        message = "A given proof has a via with no corresponding proof-method"
+        message = "Could not find proof method for given proof."
     )
 
     private val errors = listOf(
@@ -110,7 +111,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             description = "Attempt to log in as a ${principal.name} using various proofs.",
             errorCases = errors,
             implementation = { proofs: List<Proof> ->
-                login2(LogInRequest(proofs, scopes = emptySet())) // Uses empty set so that enforced limitations don't conflict. May still be granted root access
+                login2(LogInRequest(proofs))
             }
         )
 
@@ -172,7 +173,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                         throw errorIrrelevantProof.toException(data = it.via)
                 }
 
-                val methods = proofMethods
+                val methods = serverRuntime.proofMethods
                     .filter { it.established(principal, subject) }
                     .associateBy { it.info.via }
 
