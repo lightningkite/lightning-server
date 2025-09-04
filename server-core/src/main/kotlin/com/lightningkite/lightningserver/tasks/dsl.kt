@@ -1,4 +1,4 @@
-
+@file:UseContextualSerialization(Instant::class)
 
 package com.lightningkite.lightningserver.tasks
 
@@ -45,8 +45,8 @@ fun defineAfterSettings(priority: Double = 0.0, action: suspend () -> Unit) = Ta
 @Serializable
 data class ActionHasOccurred(
     override val _id: String,
-    val started: Instant? = null,
-    val completed: Instant? = null,
+    @Contextual val started: Instant? = null,
+    @Contextual val completed: Instant? = null,
     val errorMessage: String? = null,
 ) : HasId<String>
 

@@ -23,7 +23,7 @@ import java.util.zip.GZIPOutputStream
 class AwsAdapterTask(val root: AwsAdapter) {
 
     @Serializable
-    data class TaskInvoke(val taskName: String, val input: AnonType)
+    data class TaskInvoke(val taskName: String, @Contextual val input: AnonType)
 
     suspend fun launchTask(task: Task<Any?>, input: Any?) {
         try {

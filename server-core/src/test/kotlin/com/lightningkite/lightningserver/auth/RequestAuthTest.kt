@@ -1,4 +1,4 @@
-
+@file:UseContextualSerialization(UUID::class)
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningdb.HasId

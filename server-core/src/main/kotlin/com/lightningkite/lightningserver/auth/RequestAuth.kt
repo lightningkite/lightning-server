@@ -1,4 +1,4 @@
-
+@file:UseContextualSerialization(Instant::class)
 
 package com.lightningkite.lightningserver.auth
 
@@ -35,7 +35,7 @@ data class RequestAuth<out SUBJECT : HasId<*>>(
     val subject: Authentication.SubjectHandler<@UnsafeVariance SUBJECT, *>,
     val sessionId: UUID?,
     val rawId: Comparable<*>,
-    val issuedAt: Instant,
+    @Contextual val issuedAt: Instant,
     @Description("The scopes permitted.  * indicates root access.")
     val scopes: Set<String> = setOf("*"),
     val thirdParty: String? = null,
@@ -139,7 +139,7 @@ data class RequestAuth<out SUBJECT : HasId<*>>(
     }
 
     @Serializable
-    data class ExpiringValue<T>(val value: T, val expiresAt: Instant)
+    data class ExpiringValue<T>(val value: T, @Contextual val expiresAt: Instant)
 
     val cache: HashMap<CacheKey<@UnsafeVariance SUBJECT, *, *>, ExpiringValue<*>> =
         HashMap<CacheKey<SUBJECT, *, *>, ExpiringValue<*>>()

@@ -86,7 +86,7 @@ class RateLimiter(
     data class RateLimitInfo(
         val remainingTime: Duration,
         val id: String,
-        val availableAfter: Instant
+        @Contextual val availableAfter: Instant
     )
 
     @OptIn(ExperimentalContracts::class)

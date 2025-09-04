@@ -1,4 +1,4 @@
-
+@file:UseContextualSerialization(Instant::class, Duration::class)
 
 package com.lightningkite.lightningserver.metrics
 
@@ -21,7 +21,7 @@ data class MetricSpanStats(
     override val _id: String,
     @Index val endpoint: String,
     @Index val type: String,
-    val timeStamp: Instant = Instant.DISTANT_PAST,
+    @Contextual val timeStamp: Instant = Instant.DISTANT_PAST,
     @Index val timeSpan: Duration = 1.minutes,
     val min: Double,
     val max: Double,

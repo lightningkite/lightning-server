@@ -1,4 +1,4 @@
-
+@file:UseContextualSerialization(Duration::class)
 
 package com.lightningkite.lightningserver.metrics
 

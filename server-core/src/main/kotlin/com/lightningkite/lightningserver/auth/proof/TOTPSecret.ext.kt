@@ -1,4 +1,4 @@
-
+@file:UseContextualSerialization(Duration::class)
 @file:OptIn(ExperimentalLightningServer::class)
 
 package com.lightningkite.lightningserver.auth.proof

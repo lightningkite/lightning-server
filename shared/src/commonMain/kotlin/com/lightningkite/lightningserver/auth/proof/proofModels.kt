@@ -1,4 +1,4 @@
-
+@file:UseContextualSerialization(Instant::class)
 package com.lightningkite.lightningserver.auth.proof
 
 import kotlinx.serialization.Serializable

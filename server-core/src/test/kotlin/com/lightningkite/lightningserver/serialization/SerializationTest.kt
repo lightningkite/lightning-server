@@ -1,4 +1,4 @@
-
+@file:UseContextualSerialization(Instant::class, UUID::class)
 package com.lightningkite.lightningserver.serialization
 
 import com.lightningkite.DeferToContextualUuidSerializer

@@ -1,4 +1,4 @@
-
+@file:UseContextualSerialization(ServerFile::class)
 package com.lightningkite.lightningserver.media
 
 import com.lightningkite.lightningserver.files.*

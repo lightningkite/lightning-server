@@ -1,5 +1,5 @@
 
-
+@file:UseContextualSerialization(UUID::class, ServerFile::class, Instant::class)
 
 package com.lightningkite.lightningserver.files
 

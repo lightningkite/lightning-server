@@ -1,4 +1,4 @@
-
+@file:UseContextualSerialization(Instant::class)
 package com.lightningkite.lightningserver.exceptions
 
 import com.lightningkite.lightningdb.*

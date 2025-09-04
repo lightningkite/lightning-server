@@ -30,7 +30,7 @@ data class MultiplexWebSocketHandlerState(
 
 @Serializable
 data class MultiplexWebSocketHandlerConnectionInfo(
-    val storage: AnonType,
+    @Contextual val storage: AnonType,
     val topics: Set<String> = setOf(),
     val request: WebSocketConnectRequest,
 ) {

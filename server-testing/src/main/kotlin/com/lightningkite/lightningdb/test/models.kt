@@ -1,4 +1,4 @@
-
+@file:UseContextualSerialization(UUID::class, Instant::class, ServerFile::class)
 package com.lightningkite.lightningdb.test
 
 import com.lightningkite.GeoCoordinate
@@ -134,7 +134,7 @@ data class LargeTestModel(
     var char: Char = ' ',
     var string: String = "",
     var uuid: UUID = UUID(0L, 0L),
-    var instant: Instant = Instant.fromEpochMilliseconds(0L),
+    @Contextual var instant: Instant = Instant.fromEpochMilliseconds(0L),
     var list: List<Int> = listOf(),
     var listEmbedded: List<ClassUsedForEmbedding> = listOf(),
     var set: Set<Int> = setOf(),
@@ -151,7 +151,7 @@ data class LargeTestModel(
     var charNullable: Char? = null,
     var stringNullable: String? = null,
     var uuidNullable: UUID? = null,
-    var instantNullable: Instant? = null,
+    @Contextual var instantNullable: Instant? = null,
     var listNullable: List<Int>? = null,
     var mapNullable: Map<String, Int>? = null,
     var embeddedNullable: ClassUsedForEmbedding? = null,
@@ -173,7 +173,7 @@ data class SimpleLargeTestModel(
     var char: Char = ' ',
     var string: String = "",
     var uuid: UUID = UUID(0L, 0L),
-    var instant: Instant = Instant.fromEpochMilliseconds(0L),
+    @Contextual var instant: Instant = Instant.fromEpochMilliseconds(0L),
     var listEmbedded: List<ClassUsedForEmbedding> = listOf(),
 ) : HasId<UUID> {
     companion object

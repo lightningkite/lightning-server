@@ -18,7 +18,7 @@ class FileValidationTest {
 
     @Serializable
     data class SampleItem(
-        @MimeType("text/plain", maxSize = 50) val file: ServerFile? = null
+        @Contextual @MimeType("text/plain", maxSize = 50) val file: ServerFile? = null
     )
 
     @Test fun test() = runBlocking {

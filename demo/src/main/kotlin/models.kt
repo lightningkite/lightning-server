@@ -1,4 +1,4 @@
-
+@file:UseContextualSerialization(UUID::class, ServerFile::class)
 package com.lightningkite.lightningserverdemo
 
 import com.lightningkite.lightningdb.*
@@ -18,7 +18,7 @@ import kotlinx.serialization.Contextual
 @Description("A model for testing Lightning Server.")
 data class TestModel(
     override val _id: UUID = UUID.random(),
-    val timestamp: Instant = now(),
+    @Contextual val timestamp: Instant = now(),
     val name: String = "No Name",
     @Description("The number") val number: Int = 3123,
     @MimeType("text/html") @Multiline val content: String = "",

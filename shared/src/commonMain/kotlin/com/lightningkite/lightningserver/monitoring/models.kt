@@ -1,4 +1,4 @@
-
+@file:UseContextualSerialization(UUID::class, ServerFile::class)
 package com.lightningkite.lightningserver.monitoring
 
 import com.lightningkite.EmailAddress
