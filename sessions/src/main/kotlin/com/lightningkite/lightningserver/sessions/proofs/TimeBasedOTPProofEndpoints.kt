@@ -48,6 +48,7 @@ public class TimeBasedOTPProofEndpoints(
 
     init {
         proofMethods.register(this)
+        path.docGroup = "OneTimePasswordProof"
     }
 
     override val info: ProofMethodInfo = ProofMethodInfo(
@@ -55,6 +56,8 @@ public class TimeBasedOTPProofEndpoints(
         property = null,
         strength = 10
     )
+    public val loggedInInterfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo("AuthenticatedOneTimePasswordProofClientEndpoints", listOf()) // Version 5: Rename to "AuthenticatedTimeBasedOneTimePasswordProofClientEndpoints"
+    public val interfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo("OneTimePasswordProofClientEndpoints", listOf()) // Version 5: Rename to "TimeBasedOneTimePasswordProofClientEndpoints"
 
     context(_: ServerRuntime)
     private val active
@@ -91,15 +94,16 @@ public class TimeBasedOTPProofEndpoints(
         }
     )
 
-    public val rest: ModelRestEndpoints<HasId<AnyId>, TotpSecret, Uuid> = ModelRestEndpoints(modelInfo)
+    public val rest: ModelRestEndpoints<HasId<AnyId>, TotpSecret, Uuid> = path.path("secrets") bind ModelRestEndpoints(modelInfo)
 
-    public val establish: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, EstablishOtp, String>> =
+    public val establish: ApiHttpHandler<PathSpec0, HasId<AnyId>, EstablishOtp, String> =
         path.path("establish").post bind ApiHttpHandler(
             summary = "Establish Time Based One Time Password",
             inputType = EstablishOtp.serializer(),
             outputType = String.serializer(),
             description = "Generates a new Time Based One Time Password configuration.",
             auth = proofMethodAuth,
+            belongsToInterface = loggedInInterfaceInfo,
             errorCases = listOf(),
             examples = listOf(),
             implementation = { input: EstablishOtp ->
@@ -122,9 +126,10 @@ public class TimeBasedOTPProofEndpoints(
             }
         )
 
-    override val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, IdentificationAndPassword, Proof>> =
+    override val prove: ApiHttpHandler<PathSpec0, HasId<AnyId>?, IdentificationAndPassword, Proof> =
         path.path("prove").post bind ApiHttpHandler(
             auth = noAuth,
+            belongsToInterface = interfaceInfo,
             summary = "Prove TOTP",
             description = "Logs in to the given account with an TOTP code.  Limits to 10 attempts per hour.",
             errorCases = listOf(),
@@ -179,13 +184,14 @@ public class TimeBasedOTPProofEndpoints(
             }
         )
 
-    public val confirm: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, String, Unit>> =
+    public val confirm: ApiHttpHandler<PathSpec0, HasId<AnyId>, String, Unit> =
         path.path("existing").post bind ApiHttpHandler(
             summary = "Confirm Time Based One Time Password",
             inputType = String.serializer(),
             outputType = Unit.serializer(),
             description = "Confirms your TOTP, making it fully active",
             auth = proofMethodAuth,
+            belongsToInterface = loggedInInterfaceInfo,
             errorCases = listOf(),
             examples = listOf(),
             implementation = { code: String ->

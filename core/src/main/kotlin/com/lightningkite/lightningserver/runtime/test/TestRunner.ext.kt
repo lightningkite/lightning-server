@@ -14,6 +14,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec2
 import com.lightningkite.lightningserver.pathing.PathSpec3
 import com.lightningkite.lightningserver.pathing.RawPath
 import com.lightningkite.lightningserver.runtime.invoke
+import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
@@ -26,7 +27,7 @@ public suspend fun <PATH: PathSpec, T> sendWebSocketSubscriptionMessage(message:
 }
 
 context(test: TestRunner<*>)
-public suspend fun <STORAGE> Locationed<PathSpec0, WebSocketHandler<PathSpec0, STORAGE>>.test(
+public suspend fun <STORAGE> WebSocketHandler<PathSpec0, STORAGE>.test(
     queryParameters: List<Pair<String, String>> = listOf(),
     headers: HttpHeaders = HttpHeaders.EMPTY,
     domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
@@ -34,19 +35,19 @@ public suspend fun <STORAGE> Locationed<PathSpec0, WebSocketHandler<PathSpec0, S
     sourceIp: String = "local",
 ): TestRunner<*>.TestWebSocket<PathSpec0, STORAGE> {
     val request = WebSocketConnectRequest(
-        RawPath(this.location),
+        RawPath(location),
         queryParameters = queryParameters,
         headers = headers,
         domain = domain,
         protocol = protocol,
         sourceIp = sourceIp,
     )
-    val storage = item.willConnect(request)
-    return test.TestWebSocket(item, request, storage).also {
-        with(it.server) { item.didConnect() }
+    val storage = willConnect(request)
+    return test.TestWebSocket(this, request, storage).also {
+        with(it.server) { didConnect() }
     }
 }
-context(test: TestRunner<*>) public suspend fun <STORAGE, A> Locationed<PathSpec1<A>, WebSocketHandler<PathSpec1<A>, STORAGE>>.test(
+context(test: TestRunner<*>) public suspend fun <STORAGE, A> WebSocketHandler<PathSpec1<A>, STORAGE>.test(
     path1: A,
     queryParameters: List<Pair<String, String>> = listOf(),
     headers: HttpHeaders = HttpHeaders.EMPTY,
@@ -55,19 +56,19 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A> Locationed<PathSpec
     sourceIp: String = "local",
 ): TestRunner<*>.TestWebSocket<PathSpec1<A>, STORAGE> {
     val request = WebSocketConnectRequest(
-        RawPath(this.location, path1),
+        RawPath(location, path1),
         queryParameters = queryParameters,
         headers = headers,
         domain = domain,
         protocol = protocol,
         sourceIp = sourceIp,
     )
-    val storage = with(test) { item.willConnect(request) }
-    return test.TestWebSocket(item, request, storage).also {
-        with(it.server) { item.didConnect() }
+    val storage = with(test) { willConnect(request) }
+    return test.TestWebSocket(this, request, storage).also {
+        with(it.server) { didConnect() }
     }
 }
-context(test: TestRunner<*>) public suspend fun <STORAGE, A, B> Locationed<PathSpec2<A, B>, WebSocketHandler<PathSpec2<A, B>, STORAGE>>.test(
+context(test: TestRunner<*>) public suspend fun <STORAGE, A, B> WebSocketHandler<PathSpec2<A, B>, STORAGE>.test(
     path1: A,
     path2: B,
     queryParameters: List<Pair<String, String>> = listOf(),
@@ -77,19 +78,19 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A, B> Locationed<PathS
     sourceIp: String = "local",
 ): TestRunner<*>.TestWebSocket<PathSpec2<A, B>, STORAGE> {
     val request = WebSocketConnectRequest(
-        RawPath(this.location, path1, path2),
+        RawPath(location, path1, path2),
         queryParameters = queryParameters,
         headers = headers,
         domain = domain,
         protocol = protocol,
         sourceIp = sourceIp,
     )
-    val storage = with(test) { item.willConnect(request) }
-    return test.TestWebSocket(item, request, storage).also {
-        with(it.server) { item.didConnect() }
+    val storage = with(test) { willConnect(request) }
+    return test.TestWebSocket(this, request, storage).also {
+        with(it.server) { didConnect() }
     }
 }
-context(test: TestRunner<*>) public suspend fun <STORAGE, A, B, C> Locationed<PathSpec3<A, B, C>, WebSocketHandler<PathSpec3<A, B, C>, STORAGE>>.test(
+context(test: TestRunner<*>) public suspend fun <STORAGE, A, B, C> WebSocketHandler<PathSpec3<A, B, C>, STORAGE>.test(
     path1: A,
     path2: B,
     path3: C,
@@ -100,19 +101,19 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A, B, C> Locationed<Pa
     sourceIp: String = "local",
 ): TestRunner<*>.TestWebSocket<PathSpec3<A, B, C>, STORAGE> {
     val request = WebSocketConnectRequest(
-        RawPath(this.location, path1, path2, path3),
+        RawPath(location, path1, path2, path3),
         queryParameters = queryParameters,
         headers = headers,
         domain = domain,
         protocol = protocol,
         sourceIp = sourceIp,
     )
-    val storage = with(test) { item.willConnect(request) }
-    return test.TestWebSocket(item, request, storage).also {
-        with(it.server) { item.didConnect() }
+    val storage = with(test) { willConnect(request) }
+    return test.TestWebSocket(this, request, storage).also {
+        with(it.server) { didConnect() }
     }
 }
-context(test: TestRunner<*>) public suspend fun Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>>.test(
+context(test: TestRunner<*>) public suspend fun HttpHandler<PathSpec0>.test(
     queryParameters: List<Pair<String, String>> = listOf(),
     headers: HttpHeaders = HttpHeaders.EMPTY,
     domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
@@ -120,10 +121,10 @@ context(test: TestRunner<*>) public suspend fun Locationed<HttpEndpoint<PathSpec
     sourceIp: String = "local",
     body: TypedData? = null,
 ): HttpResponse {
-    return this.item.handle(
+    return handle(
         HttpRequest(
-            RawPath(this.location.path),
-            method = this.location.method,
+            RawPath(location.path),
+            method = location.method,
             queryParameters = queryParameters,
             headers = headers,
             domain = domain,
@@ -134,7 +135,7 @@ context(test: TestRunner<*>) public suspend fun Locationed<HttpEndpoint<PathSpec
     )
 }
 
-context(test: TestRunner<*>) public suspend fun <A> Locationed<HttpEndpoint<PathSpec1<A>>, HttpHandler<PathSpec1<A>>>.test(
+context(test: TestRunner<*>) public suspend fun <A> HttpHandler<PathSpec1<A>>.test(
     path1: A,
     queryParameters: List<Pair<String, String>> = listOf(),
     headers: HttpHeaders = HttpHeaders.EMPTY,
@@ -143,10 +144,10 @@ context(test: TestRunner<*>) public suspend fun <A> Locationed<HttpEndpoint<Path
     sourceIp: String = "local",
     body: TypedData? = null,
 ): HttpResponse {
-    return this.item.handle(
+    return handle(
         HttpRequest(
-            RawPath(this.location.path, path1),
-            method = this.location.method,
+            RawPath(location.path, path1),
+            method = location.method,
             queryParameters = queryParameters,
             headers = headers,
             domain = domain,
@@ -156,7 +157,7 @@ context(test: TestRunner<*>) public suspend fun <A> Locationed<HttpEndpoint<Path
         )
     )
 }
-context(test: TestRunner<*>) public suspend fun <A, B> Locationed<HttpEndpoint<PathSpec2<A, B>>, HttpHandler<PathSpec2<A, B>>>.test(
+context(test: TestRunner<*>) public suspend fun <A, B> HttpHandler<PathSpec2<A, B>>.test(
     path1: A,
     path2: B,
     queryParameters: List<Pair<String, String>> = listOf(),
@@ -166,10 +167,10 @@ context(test: TestRunner<*>) public suspend fun <A, B> Locationed<HttpEndpoint<P
     sourceIp: String = "local",
     body: TypedData? = null,
 ): HttpResponse {
-    return this.item.handle(
+    return handle(
         HttpRequest(
-            RawPath(this.location.path, path1, path2),
-            method = this.location.method,
+            RawPath(location.path, path1, path2),
+            method = location.method,
             queryParameters = queryParameters,
             headers = headers,
             domain = domain,
@@ -179,7 +180,7 @@ context(test: TestRunner<*>) public suspend fun <A, B> Locationed<HttpEndpoint<P
         )
     )
 }
-context(test: TestRunner<*>) public suspend fun <A, B, C> Locationed<HttpEndpoint<PathSpec3<A, B, C>>, HttpHandler<PathSpec3<A, B, C>>>.test(
+context(test: TestRunner<*>) public suspend fun <A, B, C> HttpHandler<PathSpec3<A, B, C>>.test(
     path1: A,
     path2: B,
     path3: C,
@@ -190,10 +191,10 @@ context(test: TestRunner<*>) public suspend fun <A, B, C> Locationed<HttpEndpoin
     sourceIp: String = "local",
     body: TypedData? = null,
 ): HttpResponse {
-    return this.item.handle(
+    return handle(
         HttpRequest(
-            RawPath(this.location.path, path1, path2, path3),
-            method = this.location.method,
+            RawPath(location.path, path1, path2, path3),
+            method = location.method,
             queryParameters = queryParameters,
             headers = headers,
             domain = domain,

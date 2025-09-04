@@ -19,6 +19,7 @@ import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.sessions.proofs.extensions.constrainAttemptRate
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
+import com.lightningkite.lightningserver.typed.Documentable
 import com.lightningkite.services.database.HasId
 
 public abstract class PinBasedProofEndpoints(
@@ -27,6 +28,7 @@ public abstract class PinBasedProofEndpoints(
     public val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
     public val pin: PinHandler,
     public val exampleTarget: String,
+    public val interfaceInfo: Documentable.InterfaceInfo ,
     public val strength: Int = 10,
 ) : ServerBuilder(), StartedProofMethod {
 
@@ -45,9 +47,10 @@ public abstract class PinBasedProofEndpoints(
         strength = strength
     )
 
-    public override val start: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, String>> =
+    public override val start: ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, String> =
         path.path("start").post bind ApiHttpHandler(
             auth = noAuth,
+            belongsToInterface = interfaceInfo,
             summary = "Begin $name Ownership Proof",
             description = "Sends a login code to the given ${name.lowercase()}.  The message will contain both a PIN that can be combined with the returned key to log in.",
             errorCases = emptyList(),
@@ -75,9 +78,10 @@ public abstract class PinBasedProofEndpoints(
         )
     }
 
-    override val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, FinishProof, Proof>> =
+    override val prove: ApiHttpHandler<PathSpec0, HasId<AnyId>?, FinishProof, Proof> =
         path.path("prove").post bind ApiHttpHandler(
             auth = noAuth,
+            belongsToInterface = interfaceInfo,
             summary = "Prove ${info.property} ownership",
             description = "Logs in to the given account with a PIN that was sent earlier and the key from that request.  Note that the PIN expires in ${pin.expiration.inWholeMinutes} minutes, and you are only permitted ${pin.maxAttempts} attempts.",
             errorCases = emptyList(),

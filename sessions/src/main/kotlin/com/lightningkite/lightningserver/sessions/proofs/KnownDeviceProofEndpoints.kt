@@ -39,6 +39,7 @@ public class KnownDeviceProofEndpoints(
 ) : ServerBuilder(), StringProofMethod {
     init {
         proofMethods.register(this)
+        path.docGroup = "KnownDeviceProof"
     }
 
     override val info: ProofMethodInfo = ProofMethodInfo(
@@ -46,6 +47,8 @@ public class KnownDeviceProofEndpoints(
         property = null,
         strength = 3
     )
+    public val interfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo("KnownDeviceProofClientEndpoints", listOf())
+    public val loggedInInterfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo("AuthenticatedKnownDeviceProofClientEndpoints", listOf())
 
     context(_: ServerRuntime)
     private val active
@@ -86,7 +89,7 @@ public class KnownDeviceProofEndpoints(
         }
     )
 
-    public val rest: ModelRestEndpoints<HasId<AnyId>, KnownDeviceSecret, Uuid> = ModelRestEndpoints(modelInfo)
+    public val rest: ModelRestEndpoints<HasId<AnyId>, KnownDeviceSecret, Uuid> = path.path("secrets") bind ModelRestEndpoints(modelInfo)
 
     context(_: ServerRuntime)
     public suspend fun <SUBJECT : HasId<ID>, ID: Comparable<ID>> establish(
@@ -110,13 +113,14 @@ public class KnownDeviceProofEndpoints(
         return KnownDeviceSecretAndExpiration("$secretId/$secretValue", exp)
     }
 
-    public val establish: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, Unit, String>> =
+    public val establish: ApiHttpHandler<PathSpec0, HasId<AnyId>, Unit, String> =
         path.path("establish").post bind ApiHttpHandler(
             summary = "Establish Known Device",
             inputType = Unit.serializer(),
             outputType = String.serializer(),
             description = "Establishes a new known device.  You can use the returned string to gain partial authentication later.",
             auth = proofMethodAuth,
+            belongsToInterface = loggedInInterfaceInfo,
             errorCases = listOf(),
             examples = listOf(),
             implementation = { _: Unit ->
@@ -132,13 +136,14 @@ public class KnownDeviceProofEndpoints(
             }
         )
 
-    public val establish2: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, Unit, KnownDeviceSecretAndExpiration>> =
+    public val establish2: ApiHttpHandler<PathSpec0, HasId<AnyId>, Unit, KnownDeviceSecretAndExpiration> =
         path.path("establish2").post bind ApiHttpHandler(
             summary = "Establish Known Device V2",
             inputType = Unit.serializer(),
             outputType = KnownDeviceSecretAndExpiration.serializer(),
             description = "Establishes a new known device.  You can use the returned string to gain partial authentication later.",
             auth = proofMethodAuth,
+            belongsToInterface = loggedInInterfaceInfo,
             errorCases = listOf(),
             examples = listOf(),
             implementation = { _: Unit ->
@@ -154,13 +159,14 @@ public class KnownDeviceProofEndpoints(
             }
         )
 
-    public val options: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, Unit, KnownDeviceOptions>> =
+    public val options: ApiHttpHandler<PathSpec0, HasId<AnyId>?, Unit, KnownDeviceOptions> =
         path.path("options").get bind ApiHttpHandler(
             summary = "Known Device Options",
             inputType = Unit.serializer(),
             outputType = KnownDeviceOptions.serializer(),
             description = "Gives information about how valuable working from a known device is and for how long it works.",
             auth = noAuth,
+            belongsToInterface = interfaceInfo,
             errorCases = listOf(),
             examples = listOf(),
             implementation = { _: Unit ->
@@ -171,9 +177,10 @@ public class KnownDeviceProofEndpoints(
             }
         )
 
-    public override val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, Proof>> =
+    public override val prove: ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, Proof> =
         path.path("prove").post bind ApiHttpHandler(
             auth = noAuth,
+            belongsToInterface = interfaceInfo,
             summary = "Prove Known Device",
             description = "Get proof that your device is known.",
             errorCases = listOf(),

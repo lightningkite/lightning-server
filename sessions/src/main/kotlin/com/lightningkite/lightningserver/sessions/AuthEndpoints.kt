@@ -1,22 +1,15 @@
 package com.lightningkite.lightningserver.sessions
 
-import com.lightningkite.lightningserver.BadRequestException
-import com.lightningkite.lightningserver.ForbiddenException
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.AnyId
 import com.lightningkite.lightningserver.auth.PrincipalType
-import com.lightningkite.lightningserver.auth.RequestPredicates
-import com.lightningkite.lightningserver.auth.acceptsAllScopes
-import com.lightningkite.lightningserver.auth.acceptsAnyScopes
 import com.lightningkite.lightningserver.auth.noAuth
-import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.signer
-import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -30,12 +23,16 @@ import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.sessions.token.TokenFormat
 import com.lightningkite.lightningserver.toException
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
+import com.lightningkite.lightningserver.typed.Documentable
+import com.lightningkite.lightningserver.typed.ModelRestEndpoints
+import com.lightningkite.lightningserver.typed.docGroup
 import com.lightningkite.lightningserver.typed.invoke
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.builtins.ListSerializer
 import kotlin.math.min
 import kotlin.time.Duration.Companion.hours
+import kotlin.uuid.Uuid
 
 public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     principal: PrincipalType<SUBJECT, ID>,
@@ -43,6 +40,9 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     private val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
     tokenFormat: Runtime<TokenFormat> = Runtime { PrivateTinyTokenFormat() },
 ) : SessionManager<SUBJECT, ID>(principal, database, tokenFormat) {
+    init {
+        path.docGroup = "${principal.name}Auth"
+    }
 
     context(server: ServerRuntime)
     public abstract suspend fun requiredProofStrengthFor(subject: SUBJECT): Int
@@ -102,7 +102,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         else null
     }
     
-    public val login: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, List<Proof>, IdAndAuthMethods<ID>>> =
+    public val login: ApiHttpHandler<PathSpec0, HasId<AnyId>?, List<Proof>, IdAndAuthMethods<ID>> =
         path.path("login").post bind ApiHttpHandler(
             auth = noAuth,
             inputType = ListSerializer(Proof.serializer()),
@@ -110,12 +110,13 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             summary = "Log In",
             description = "Attempt to log in as a ${principal.name} using various proofs.",
             errorCases = errors,
+            belongsToInterface = belongsToInterface,
             implementation = { proofs: List<Proof> ->
                 login2(LogInRequest(proofs))
             }
         )
 
-    public val login2: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, LogInRequest, IdAndAuthMethods<ID>>> =
+    public val login2: ApiHttpHandler<PathSpec0, HasId<AnyId>?, LogInRequest, IdAndAuthMethods<ID>> =
         path.path("login2").post bind ApiHttpHandler(
             auth = noAuth,
             inputType = LogInRequest.serializer(),
@@ -123,6 +124,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             summary = "Log In With Limitations",
             description = "Attempt to log in as a ${principal.name} using various proofs.",
             errorCases = errors,
+            belongsToInterface = belongsToInterface,
             implementation = { input: LogInRequest ->
                 proofsCheck(input.proofs).let {
                     IdAndAuthMethods(
@@ -135,7 +137,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             }
         )
 
-    public val proofsCheck: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, List<Proof>, ProofsCheckResult<ID>>> =
+    public val proofsCheck: ApiHttpHandler<PathSpec0, HasId<AnyId>?, List<Proof>, ProofsCheckResult<ID>> =
         path.path("proofs-check").post bind ApiHttpHandler(
             auth = noAuth,
             inputType = ListSerializer(Proof.serializer()),
@@ -143,6 +145,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             summary = "Check Proofs",
             description = "Check if you can log in as a ${principal.name} using various proofs.",
             errorCases = errors,
+            belongsToInterface = belongsToInterface,
             implementation = { proofs: List<Proof> ->
                 proofs.forEach {
                     if (!proofSigner.await().verify(it)) throw errorInvalidProof.toException(data = it.via)
@@ -210,4 +213,6 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 )
             }
         )
+
+    public val sessions: ModelRestEndpoints<SUBJECT, Session<SUBJECT, ID>, Uuid> = path.path("sessions") bind ModelRestEndpoints(info = sessionInfo)
 }

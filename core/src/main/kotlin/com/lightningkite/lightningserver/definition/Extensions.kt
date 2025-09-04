@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.definition
 
+import com.lightningkite.lightningserver.pathing.PathSpec0
+
 
 /**
  * [Extensions] provides read-only access to strongly-typed extension values. Extension values
@@ -102,7 +104,7 @@ public class MutableExtensions(start: Extensions? = null): Extensions {
      * */
     public interface DegradingKey<WRITE : READ, READ : Any> : Extensions.Key<READ> {
         public fun default(): WRITE
-        public fun WRITE.include(other: READ)
+        public fun WRITE.include(other: READ, pathSpec: PathSpec0)
     }
 
     private val map: MutableMap<Extensions.Key<*>, Any> = HashMap()
@@ -135,14 +137,14 @@ public class MutableExtensions(start: Extensions? = null): Extensions {
     override val entries: Set<Map.Entry<Extensions.Key<*>, Any>>
         get() = map.entries
 
-    public fun include(extensions: Extensions) {
+    public fun include(extensions: Extensions, pathSpec: PathSpec0) {
         for ((key, value) in extensions.entries) {
             if (key is DegradingKey<*, *>) {
                 @Suppress("UNCHECKED_CAST")
                 key as DegradingKey<Any, Any>
                 val including = extensions[key] ?: continue
                 val existing = get(key)
-                key.run { existing.include(including) }
+                key.run { existing.include(including, pathSpec) }
             }
             else map.putIfAbsent(key, value)
         }

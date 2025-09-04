@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawPath
+import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.handle
 import com.lightningkite.lightningserver.settings.ServerSettings
@@ -262,7 +263,7 @@ private abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
         subscriptions[topic.topic] = scope.launch {
             pubSub(topic).collect { value ->
                 handler.messageFromSubscription(
-                    WebSocketSubscriptionMessage(topic.topic, topic.path.rawPathArguments, value),
+                    WebSocketSubscriptionMessage(topic.topic, topic.pathInContext.rawPathArguments, value),
                 )
             }
             yield()

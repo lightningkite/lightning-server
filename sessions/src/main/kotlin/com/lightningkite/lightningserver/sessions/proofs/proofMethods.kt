@@ -36,20 +36,20 @@ public interface ProofMethod {
 }
 
 public interface DirectProofMethod : ProofMethod {
-    public val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, IdentificationAndPassword, Proof>>
+    public val prove: ApiHttpHandler<PathSpec0, HasId<AnyId>?, IdentificationAndPassword, Proof>
 }
 
 public interface StringProofMethod : ProofMethod {
-    public val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, Proof>>
+    public val prove: ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, Proof>
 }
 
 public interface StartedProofMethod : ProofMethod {
-    public val start: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, String>>
-    public val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, FinishProof, Proof>>
+    public val start: ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, String>
+    public val prove: ApiHttpHandler<PathSpec0, HasId<AnyId>?, FinishProof, Proof>
 }
 
 public interface ExternalProofMethod : ProofMethod {
-    public val start: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, String>>
+    public val start: ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, String>
     public val indirectLink: PathSpec
 }
 

@@ -112,11 +112,11 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
         }
 
         override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-            webSocketDynamo.subscribe(path.toString(), topic.path.toString(internalSerialization.stringArrayFormat), socketId)
+            webSocketDynamo.subscribe(path.toString(), topic.path(internalSerialization.stringArrayFormat), socketId)
         }
 
         override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-            webSocketDynamo.unsubscribe(topic.path.toString(internalSerialization.stringArrayFormat), socketId)
+            webSocketDynamo.unsubscribe(topic.path(internalSerialization.stringArrayFormat), socketId)
         }
 
         override suspend fun send(frame: WebSocketFrame) {

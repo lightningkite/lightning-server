@@ -43,6 +43,7 @@ public class PasswordProofEndpoints(
 
     init {
         proofMethods.register(this)
+        path.docGroup = "PasswordProof"
     }
 
     override val info: ProofMethodInfo = ProofMethodInfo(
@@ -50,6 +51,8 @@ public class PasswordProofEndpoints(
         property = null,
         strength = 10
     )
+    public val loggedInInterfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo("AuthenticatedPasswordProofClientEndpoints", listOf())
+    public val interfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo("PasswordProofClientEndpoints", listOf())
 
     context(_: ServerRuntime)
     private val active
@@ -93,7 +96,7 @@ public class PasswordProofEndpoints(
         )
 
     public val rest: ModelRestEndpoints<HasId<AnyId>, PasswordSecret, Uuid> =
-        path.path("rest") bind ModelRestEndpoints(modelInfo)
+        path.path("secrets") bind ModelRestEndpoints(modelInfo)
 
     context(_: ServerRuntime)
     public suspend fun <SUBJECT : HasId<ID>, ID: Comparable<ID>> establish(
@@ -122,13 +125,14 @@ public class PasswordProofEndpoints(
         modelInfo.collection().insertOne(secret)
     }
 
-    public val establish: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, EstablishPassword, Unit>> =
+    public val establish: ApiHttpHandler<PathSpec0, HasId<AnyId>, EstablishPassword, Unit> =
         path.path("establish").post bind ApiHttpHandler(
             summary = "Establish Password",
             inputType = EstablishPassword.serializer(),
             outputType = Unit.serializer(),
             description = "Set your password",
             auth = proofMethodAuth,
+            belongsToInterface = loggedInInterfaceInfo,
             errorCases = emptyList(),
             implementation = { value: EstablishPassword ->
                 establish(
@@ -140,9 +144,10 @@ public class PasswordProofEndpoints(
             }
         )
 
-    public override val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, IdentificationAndPassword, Proof>> =
+    public override val prove: ApiHttpHandler<PathSpec0, HasId<AnyId>?, IdentificationAndPassword, Proof> =
         path.path("prove").post bind ApiHttpHandler(
             auth = noAuth,
+            belongsToInterface = interfaceInfo,
             summary = "Prove password ownership",
             description = "Logs in to the given account with a password.",
             errorCases = listOf(),

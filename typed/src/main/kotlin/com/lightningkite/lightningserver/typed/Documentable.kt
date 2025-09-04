@@ -2,9 +2,23 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.definition.Locationed
+import com.lightningkite.lightningserver.definition.MutableExtensions
+import com.lightningkite.lightningserver.definition.ScheduledTask
 import com.lightningkite.lightningserver.definition.ServerDefinition
+import com.lightningkite.lightningserver.definition.StartupTask
+import com.lightningkite.lightningserver.definition.Task
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.definition.getValue
 import com.lightningkite.lightningserver.http.HttpEndpoint
+import com.lightningkite.lightningserver.http.HttpHandler
+import com.lightningkite.lightningserver.pathing.MutablePathSpecMap
 import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.pathing.PathSpecMap
+import com.lightningkite.lightningserver.pathing.commonPrefix
+import com.lightningkite.lightningserver.runtime.location
+import com.lightningkite.lightningserver.websockets.WebSocketHandler
+import com.lightningkite.lightningserver.websockets.WebSocketTopic
 import kotlinx.serialization.KSerializer
 
 public interface Documentable {
@@ -16,7 +30,17 @@ public interface Documentable {
 
     public val belongsToInterface: InterfaceInfo?
 
-    public data class InterfaceInfo(val fullyQualifiedName: String, val typeArguments: List<KSerializer<*>>)
+    public class InterfaceInfo(public val fullyQualifiedName: String, public val typeArguments: List<KSerializer<*>>)
+}
+
+internal fun ServerDefinition.location(documentable: Documentable): PathSpec = when (documentable) {
+    is HttpHandler<*> -> location(documentable).path
+    is WebSocketHandler<*, *> -> location(documentable)
+    is WebSocketTopic<*, *> -> location(documentable)
+    is Task<*> -> location(documentable)
+    is StartupTask -> location(documentable)
+    is ScheduledTask -> location(documentable)
+    else -> throw IllegalStateException()
 }
 
 internal val Documentable.functionName: String
@@ -40,11 +64,33 @@ internal val ServerDefinition.locationedApiWebsocketHandlers: List<Locationed<Pa
 }
     .sortedBy { it.location.toString() }
 
-internal val ServerDefinition.interfaces
-    get() = endpoints
-        .values
-        .asSequence()
-        // TODO: include websockets
-        .filterIsInstance<ApiHttpHandler<*, *, *, *>>()
-        .mapNotNull { it.belongsToInterface }
-        .distinct()
+internal val ServerDefinition.apiHttpHandlers: List<ApiHttpHandler<*, *, *, *>>
+    get() = endpoints.values.flatMap { it.http.values.filterIsInstance<ApiHttpHandler<*, *, *, *>>() }
+internal val ServerDefinition.apiWebsocketHandlers: List<ApiWebsocketHandler<*, *, *, *, *>>
+    get() = endpoints.values.mapNotNull { it.websocket as? ApiWebsocketHandler<*, *, *, *, *> }
+
+internal val ServerDefinition.interfaces: List<Locationed<PathSpec, Documentable.InterfaceInfo>>
+    get() {
+        val e = endpoints
+            .values
+            .asSequence()
+            .flatMap { it.http.values.asSequence() }
+            .filterIsInstance<ApiHttpHandler<*, *, *, *>>()
+        val w = endpoints
+            .values
+            .asSequence()
+            .mapNotNull { it.websocket }
+            .filterIsInstance<ApiWebsocketHandler<*, *, *, *, *>>()
+        return (w + e)
+            .filter { it.belongsToInterface != null }
+            .groupBy { it.belongsToInterface!! }
+            .map {
+                Locationed(it.value.mapNotNull { documentable ->
+                    when (documentable) {
+                        is ApiHttpHandler<*, *, *, *> -> location(documentable).path
+                        is ApiWebsocketHandler<*, *, *, *, *> -> location(documentable)
+                        else -> null
+                    }
+                }.reduce { a, b -> a commonPrefix b }, it.key)
+            }
+    }

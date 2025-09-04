@@ -1,4 +1,4 @@
-package com.lightningkite.lightningserver.sdk
+package com.lightningkite.lightningserver.typed.sdk
 
 import java.util.*
 
@@ -14,10 +14,10 @@ private inline fun String.caseAlter(crossinline update: (after: String) -> Strin
 private fun String.capitalize(): String = replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
 private fun String.decapitalize(): String = replaceFirstChar { if (it.isUpperCase()) it.lowercase(Locale.getDefault()) else it.toString() }
 
-public fun String.titleCase(): String = caseAlter { " " + it.capitalize() }.capitalize()
-public fun String.spaceCase(): String = caseAlter { " $it" }.decapitalize()
-public fun String.kabobCase(): String = caseAlter { "-$it" }.lowercase()
-public fun String.snakeCase(): String = caseAlter { "_$it" }.lowercase()
-public fun String.screamingSnakeCase(): String = caseAlter { "_$it" }.uppercase()
-public fun String.camelCase(): String = caseAlter { it.capitalize() }.decapitalize()
-public fun String.pascalCase(): String = caseAlter { it.capitalize() }.capitalize()
+internal fun String.titleCase(): String = caseAlter { " " + it.capitalize() }.capitalize()
+internal fun String.spaceCase(): String = caseAlter { " $it" }.decapitalize()
+internal fun String.kabobCase(): String = caseAlter { "-$it" }.lowercase()
+internal fun String.snakeCase(): String = caseAlter { "_$it" }.lowercase()
+internal fun String.screamingSnakeCase(): String = caseAlter { "_$it" }.uppercase()
+internal fun String.camelCase(): String = caseAlter { it.capitalize() }.decapitalize()
+internal fun String.pascalCase(): String = caseAlter { it.capitalize() }.capitalize()

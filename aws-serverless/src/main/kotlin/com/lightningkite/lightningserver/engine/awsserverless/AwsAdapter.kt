@@ -7,7 +7,9 @@ import com.amazonaws.services.lambda.runtime.RequestStreamHandler
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
+import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.settings.SettingsSerializer
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.services.Service
@@ -104,8 +106,8 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
 
     private val backgroundReportingActions = ArrayList<suspend () -> Unit>()
 
-    override suspend fun <T> Locationed<PathSpec0, Task<T>>.invoke(input: T) {
-        tasks.launchTask(this, input)
+    override suspend fun <T> Task<T>.invoke(input: T) {
+        tasks.launchTask(location, this, input)
     }
 
     override val serverId: String
@@ -114,7 +116,7 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
         get() = System.getenv("AWS_LAMBDA_FUNCTION_VERSION")
 
     override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>) {
-        ws.publish(event.path.toString(internalSerialization.stringArrayFormat), event.topic.type, event.value)
+        ws.publish(event.path(internalSerialization.stringArrayFormat), event.topic.type, event.value)
     }
 
     override fun beforeCheckpoint(context: org.crac.Context<out Resource>?) {

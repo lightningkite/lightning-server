@@ -6,36 +6,34 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.pathing.ConcretePath
 import com.lightningkite.lightningserver.pathing.HasConcretePath
+import com.lightningkite.lightningserver.pathing.HasContextualPath
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawPath
+import com.lightningkite.lightningserver.runtime.location
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 
 
 public class WebSocketTopic<PATH: PathSpec, T> internal constructor(
-    private val path: () -> PATH,
     public val type: KSerializer<T>
 ) {
-    public val pathSpec: PATH get() = path()
-
-    override fun equals(other: Any?): Boolean = other is WebSocketTopic<*, *> && other.pathSpec == pathSpec
-    override fun hashCode(): Int = pathSpec.hashCode() + 1
-    override fun toString(): String = pathSpec.toString()
 }
 
 public data class WebSocketSubscriptionRequest<PATH: PathSpec, T>(
     val topic: WebSocketTopic<PATH, T>,
-    private val rawPathArguments: List<Any?>,
-): HasConcretePath<PATH> {
-    override val path: ConcretePath<PATH> = ConcretePath(topic.pathSpec, rawPathArguments)
+    val rawPathArguments: List<Any?>,
+): HasContextualPath<PATH> {
+    context(server: ServerRuntime)
+    override val pathInContext: ConcretePath<PATH> get() = ConcretePath(topic.location, rawPathArguments)
 }
 
 public data class WebSocketSubscriptionMessage<PATH: PathSpec, T>(
     val topic: WebSocketTopic<PATH, T>,
-    private val rawPathArguments: List<Any?>,
+    val rawPathArguments: List<Any?>,
     val value: T
-): HasConcretePath<PATH> {
-    override val path: ConcretePath<PATH> = ConcretePath(topic.pathSpec, rawPathArguments)
+): HasContextualPath<PATH> {
+    context(server: ServerRuntime)
+    override val pathInContext: ConcretePath<PATH> get() = ConcretePath(topic.location, rawPathArguments)
 }
 
 

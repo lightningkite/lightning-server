@@ -8,11 +8,16 @@ import com.lightningkite.lightningserver.pathing.plus
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.DefaultExceptionHttpHandler
 import com.lightningkite.lightningserver.http.ExceptionHttpHandler
+import com.lightningkite.lightningserver.http.HttpEndpoint
+import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpInterceptor
+import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.serialization.MediaTypeDecoder
 import com.lightningkite.lightningserver.serialization.MediaTypeDecoderRegistry
 import com.lightningkite.lightningserver.serialization.MediaTypeEncoder
 import com.lightningkite.lightningserver.serialization.MediaTypeEncoderRegistry
+import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketHandlerInterceptor
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
 import kotlinx.serialization.modules.SerializersModule
@@ -106,7 +111,41 @@ public data class ServerDefinition(
     public val webSocketTopics: PathSpecMap<WebSocketTopic<*, *>>,
     public val settings: List<ServerSetting<*, *>>,
     public override val extensions: Extensions,
-): Extended
+): Extended {
+    private val reverseLookupHttpHandler: Map<HttpHandler<*>, HttpEndpoint<*>> = endpoints.entries.flatMap { (path, group) ->
+        group.http.entries.map { (method, handler) ->
+            handler to HttpEndpoint(path, method)
+        }
+    }.associate { it }
+    @Suppress("UNCHECKED_CAST")
+    public fun <P: PathSpec> location(handler: HttpHandler<P>): HttpEndpoint<P>
+        = reverseLookupHttpHandler[handler] as HttpEndpoint<P>
+
+    private val reverseLookupWebSocketHandler: Map<WebSocketHandler<*, *>, PathSpec> = endpoints.entries.mapNotNull {
+        (it.value.websocket ?: return@mapNotNull null) to it.key
+    }.associate { it }
+    @Suppress("UNCHECKED_CAST")
+    public fun <P: PathSpec> location(handler: WebSocketHandler<P, *>): P
+        = reverseLookupWebSocketHandler[handler] as P
+
+    private val reverseLookupWebSocketTopic: Map<WebSocketTopic<*, *>, PathSpec> = webSocketTopics.entries.associate { it.value to it.key }
+    @Suppress("UNCHECKED_CAST")
+    public fun <P: PathSpec> location(handler: WebSocketTopic<P, *>): P
+        = reverseLookupWebSocketTopic[handler] as P
+
+    private val reverseLookupTask: Map<Task<*>, PathSpec0> = tasks.entries.associate { it.value to it.key }
+    public fun location(handler: Task<*>): PathSpec0
+        = reverseLookupTask[handler]!!
+
+    private val reverseLookupStartupTask: Map<StartupTask, PathSpec0> = startupTasks.entries.associate { it.value to it.key }
+    public fun location(handler: StartupTask): PathSpec0
+        = reverseLookupStartupTask[handler]!!
+
+    private val reverseLookupScheduledTask: Map<ScheduledTask, PathSpec0> = schedules.entries.associate { it.value to it.key }
+    public fun location(handler: ScheduledTask): PathSpec0
+        = reverseLookupScheduledTask[handler]!!
+
+}
 
 
 /**
@@ -314,7 +353,7 @@ public data class ModularServerDefinition(
             webSocketTopics = flattenPathSpec { it.webSocketTopics },
             settings = (definition.settings + flattenedModules.values.flatMap { it.settings }).distinctBy { it.name },
             extensions = definition.extensions.toMutableExtensions().apply {
-                flattenedModules.values.forEach { include(it.extensions) }
+                flattenedModules.entries.forEach { include(it.value.extensions, it.key) }
             },
             mediaTypeDecoders = MediaTypeDecoderRegistry().apply {
                 include(definition.mediaTypeDecoders)

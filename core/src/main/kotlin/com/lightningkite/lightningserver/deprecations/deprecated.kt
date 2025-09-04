@@ -1,7 +1,6 @@
 package com.lightningkite.lightningserver.deprecations
 
 import com.lightningkite.lightningserver.data.Schedule
-import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.ScheduledTask
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.builder.bind
@@ -42,7 +41,7 @@ public fun PathSpec0.options(string: String): HttpEndpoint<PathSpec0> = path(str
 public fun PathSpec0.head(string: String): HttpEndpoint<PathSpec0> = path(string).head
 
 context(builder: ServerBuilder)
-public fun PathSpec0.websocket(handler: WebSocketHandler<PathSpec0, *>): Locationed<PathSpec0, WebSocketHandler<PathSpec0, *>> =
+public fun PathSpec0.websocket(handler: WebSocketHandler<PathSpec0, *>): WebSocketHandler<PathSpec0, *> =
     bind(handler)
 
 @Deprecated("Use standard syntax", ReplaceWith("path.path(string)"))
@@ -78,13 +77,13 @@ public val ServerBuilder.options: HttpEndpoint<PathSpec0> get() = PathSpec.root.
 public val ServerBuilder.head: HttpEndpoint<PathSpec0> get() = PathSpec.root.head
 
 @Deprecated("Use the standard syntax", ReplaceWith("path.path(name) bind ScheduledTask(schedule, handler = action)"))
-public fun ServerBuilder.schedule(name: String, schedule: Schedule, action: suspend ServerRuntime.() -> Unit): Locationed<PathSpec0, ScheduledTask> =
+public fun ServerBuilder.schedule(name: String, schedule: Schedule, action: suspend ServerRuntime.() -> Unit): ScheduledTask =
     PathSpec.root.path(name) bind ScheduledTask(schedule, handler = action)
 
 @Deprecated(
     "Use the standard syntax",
     ReplaceWith("path.path(name) bind ScheduledTask(frequency = frequency, handler = action)")
 )
-public fun ServerBuilder.schedule(name: String, frequency: Duration, action: suspend ServerRuntime.() -> Unit): Locationed<PathSpec0, ScheduledTask> =
+public fun ServerBuilder.schedule(name: String, frequency: Duration, action: suspend ServerRuntime.() -> Unit): ScheduledTask =
     PathSpec.root.path(name) bind ScheduledTask(Schedule.Frequency(frequency), handler = action)
 

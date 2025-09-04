@@ -51,7 +51,7 @@ public class FunnelEndpoints(
         path.path("instance").path("rest") bind ModelRestEndpoints(info)
 
 
-    public val summaries: Locationed<HttpEndpoint<PathSpec1<LocalDate>>, ApiHttpHandler<PathSpec1<LocalDate>, HasId<*>?, Unit, java.util.HashSet<FunnelSummary>>> =
+    public val summaries: ApiHttpHandler<PathSpec1<LocalDate>, HasId<*>?, Unit, java.util.HashSet<FunnelSummary>> =
         path.path("summaries").arg<LocalDate>("date").get bind ApiHttpHandler(
             auth = read,
             summary = "Get Funnel Health",
@@ -117,12 +117,12 @@ public class FunnelEndpoints(
         })
     }
 
-    public val summarizeOnSchedule: Locationed<PathSpec0, ScheduledTask> =
+    public val summarizeOnSchedule: ScheduledTask =
         path.path("summarize") bind ScheduledTask(timeOfDay = LocalTime(8, 0, 0), timeZone = zone) {
             summarize()
         }
 
-    public val summarizeNow: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<*>?, LocalDate?, Unit>> =
+    public val summarizeNow: ApiHttpHandler<PathSpec0, HasId<*>?, LocalDate?, Unit> =
         path.path("summarize-now").post bind ApiHttpHandler(
             summary = "Summarize Funnels Now",
             description = "",
@@ -134,7 +134,7 @@ public class FunnelEndpoints(
             }
         )
 
-    public val start: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<*>?, FunnelStart, Uuid>> =
+    public val start:  ApiHttpHandler<PathSpec0, HasId<*>?, FunnelStart, Uuid> =
         path.path("start").post bind ApiHttpHandler(
             auth = read or noAuth,
             summary = "Start Funnel Instance"
@@ -151,7 +151,7 @@ public class FunnelEndpoints(
             )!!._id
         }
 
-    public val error: Locationed<HttpEndpoint<PathSpec1<Uuid>>, ApiHttpHandler<PathSpec1<Uuid>, HasId<AnyId>?, String, Unit>> =
+    public val error: ApiHttpHandler<PathSpec1<Uuid>, HasId<AnyId>?, String, Unit> =
         path.path("error").arg<Uuid>("id").post bind ApiHttpHandler(
             auth = noAuth,
             summary = "Error Funnel Instance"
@@ -163,7 +163,7 @@ public class FunnelEndpoints(
         }
 
 
-    public val step: Locationed<HttpEndpoint<PathSpec1<Uuid>>, ApiHttpHandler<PathSpec1<Uuid>, HasId<AnyId>?, Int, Unit>> =
+    public val step: ApiHttpHandler<PathSpec1<Uuid>, HasId<AnyId>?, Int, Unit> =
         path.path("step").arg<Uuid>("id").post bind ApiHttpHandler(
             auth = noAuth,
             summary = "Set Step Funnel Instance"
@@ -174,7 +174,7 @@ public class FunnelEndpoints(
             Unit
         }
 
-    public val success: Locationed<HttpEndpoint<PathSpec1<Uuid>>, ApiHttpHandler<PathSpec1<Uuid>, HasId<AnyId>?, Unit, Unit>> =
+    public val success: ApiHttpHandler<PathSpec1<Uuid>, HasId<AnyId>?, Unit, Unit> =
         path.path("success").arg<Uuid>("id").post bind ApiHttpHandler(
             auth = noAuth,
             summary = "Success Funnel Instance"

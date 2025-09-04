@@ -28,7 +28,7 @@ internal class AwsAdapterTask(val root: AwsAdapter) {
     @Serializable
     data class TaskInvoke(val taskName: String, val input: AnonType)
 
-    suspend fun <T> launchTask(task: Locationed<PathSpec0, Task<T>>, input: T) {
+    suspend fun <T> launchTask(location: PathSpec0, task: Task<T>, input: T) {
         try {
             root.lambdaClient.invoke {
                 it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
@@ -38,7 +38,7 @@ internal class AwsAdapterTask(val root: AwsAdapter) {
                     SdkBytes.fromUtf8String(
                         json.encodeToString(
                             TaskInvoke.serializer(),
-                            TaskInvoke(task.location.toString(), AnonType(format, input, task.item.serializer))
+                            TaskInvoke(location.toString(), AnonType(format, input, task.serializer))
                         )
                     )
                 )
@@ -46,7 +46,7 @@ internal class AwsAdapterTask(val root: AwsAdapter) {
                 it.logResult()
             }
         } catch (e: Exception) {
-            throw Exception("Failed to call ${task.location}", e)
+            throw Exception("Failed to call ${task}", e)
         }
     }
     suspend fun handleTask(event: TaskInvoke): APIGatewayV2HTTPResponse {

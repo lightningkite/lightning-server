@@ -44,13 +44,13 @@ public class TestRunner<SERVER: ServerBuilder>(
 
     private val subscriptions = ConcurrentHashMap<WebSocketSubscriptionRequest<*, *>, ArrayList<suspend (WebSocketSubscriptionMessage<*, *>)->Unit>>()
     override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>) {
-        subscriptions[WebSocketSubscriptionRequest(topic = event.topic, rawPathArguments = event.path.rawPathArguments)]?.forEach {
+        subscriptions[WebSocketSubscriptionRequest(topic = event.topic, rawPathArguments = event.rawPathArguments)]?.forEach {
             it(event)
         }
     }
 
-    override suspend fun <T> Locationed<PathSpec0, Task<T>>.invoke(input: T) {
-        this.item.execute(input)
+    override suspend fun <T> Task<T>.invoke(input: T) {
+        this.execute(input)
     }
 
     public inner class TestWebSocket<PATH: PathSpec, STORAGE>(

@@ -142,3 +142,8 @@ public val <A, B, C> HasContextualPath<PathSpec3<A, B, C>>.second: B get() = pat
 @get:JvmName("third3")
 context(serverRuntime: ServerRuntime)
 public val <A, B, C> HasContextualPath<PathSpec3<A, B, C>>.third: C get() = pathInContext.third
+
+context(serverRuntime: ServerRuntime)
+public fun HasContextualPath<*>.pathSegments(stringArrayFormat: StringArrayFormat): List<String> = pathInContext.pathSegments(stringArrayFormat)
+context(serverRuntime: ServerRuntime)
+public fun HasContextualPath<*>.path(stringArrayFormat: StringArrayFormat): String = pathInContext.path(stringArrayFormat)

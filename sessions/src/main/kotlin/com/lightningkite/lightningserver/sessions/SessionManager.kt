@@ -33,6 +33,7 @@ import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.sessions.token.TokenException
 import com.lightningkite.lightningserver.sessions.token.TokenFormat
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
+import com.lightningkite.lightningserver.typed.Documentable
 import com.lightningkite.lightningserver.typed.ModelInfo
 import com.lightningkite.lightningserver.typed.auth
 import com.lightningkite.lightningserver.typed.modelInfo
@@ -57,7 +58,7 @@ import kotlin.uuid.Uuid
 public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     public val principal: PrincipalType<SUBJECT, ID>,
     database: Runtime<Database>,
-    public val tokenFormat: Runtime<TokenFormat> = Runtime { PrivateTinyTokenFormat() }
+    public val tokenFormat: Runtime<TokenFormat> = Runtime { PrivateTinyTokenFormat() },
 ) : ServerBuilder(), Authentication.Reader<SUBJECT> {
     init { register(principal) }
     init { authReaders.register(this) }
@@ -69,6 +70,12 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     public abstract suspend fun sessionStaleAfter(subject: SUBJECT): Duration?
 
     private val spath = Session.path(principal.subjectSerializer, principal.idSerializer)
+
+    public val belongsToInterface: Documentable.InterfaceInfo = Documentable.InterfaceInfo( "UserAuthClientEndpoints", listOf(principal.idSerializer))
+    public val loggedInBelongsToInterface: Documentable.InterfaceInfo = Documentable.InterfaceInfo(
+        "AuthenticatedUserAuthClientEndpoints",
+        listOf(principal.subjectSerializer, principal.idSerializer)
+    )
 
     public val sessionInfo: ModelInfo<SUBJECT, Session<SUBJECT, ID>, Uuid> =
         database.modelInfo(
@@ -219,9 +226,10 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         return session
     }
 
-    public val tokenSimple: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, String>> =
+    public val tokenSimple: ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, String> =
         path.path("token").path("simple").post bind ApiHttpHandler(
             auth = noAuth,
+            belongsToInterface = belongsToInterface,
             summary = "Get Token Simple",
             implementation = { refresh: String ->
                 val session = RefreshToken(refresh).session(request)
@@ -231,9 +239,10 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             }
         )
 
-    public val createSubSession: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, SUBJECT, SubSessionRequest, String>> =
+    public val createSubSession: ApiHttpHandler<PathSpec0, SUBJECT, SubSessionRequest, String> =
         path.path("sub-session").post bind ApiHttpHandler(
             auth = principal.auth(scopes = setOf("self")),
+            belongsToInterface = loggedInBelongsToInterface,
             inputType = SubSessionRequest.serializer(),
             outputType = String.serializer(),
             summary = "Create Sub Session",
@@ -257,10 +266,11 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             }
         )
 
-    public val self: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, SUBJECT, Unit, SUBJECT>> =
+    public val self: ApiHttpHandler<PathSpec0, SUBJECT, Unit, SUBJECT> =
         path.path("self").get bind ApiHttpHandler(
             summary = "Get Self",
             auth = principal.auth(scopes = setOf("self")),
+            belongsToInterface = loggedInBelongsToInterface,
             inputType = Unit.serializer(),
             outputType = principal.subjectSerializer,
             implementation = { _ -> auth.fetch() }

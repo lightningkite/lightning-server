@@ -75,7 +75,7 @@ public class ApiDocs(private val packageName: String) : ServerBuilder() {
 //            )
 //        }
 
-    public val index: Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>> = path.get bind HttpHandler { _ ->
+    public val index: HttpHandler<PathSpec0> = path.slash.get bind HttpHandler { _ ->
 
         val module = serverRuntime.externalSerialization.serializersModule
 

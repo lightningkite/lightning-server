@@ -3,8 +3,6 @@ package com.lightningkite.lightningserver.definition.builder
 import com.lightningkite.lightningserver.LightningServerDsl
 import com.lightningkite.lightningserver.definition.ScheduledTask
 import com.lightningkite.lightningserver.definition.Task
-import com.lightningkite.lightningserver.definition.Locationed
-import com.lightningkite.lightningserver.definition.DynamicLocation
 import com.lightningkite.lightningserver.definition.ModularServerDefinition
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
@@ -22,11 +20,11 @@ import com.lightningkite.services.Setting
 import com.lightningkite.services.SettingContext
 import kotlinx.serialization.KSerializer
 
-private fun <Location, Item> locate(item: Item, location: () -> Location): Locationed<Location, Item> = DynamicLocation(location, item)
+private fun <Location, Item> locate(item: Item, location: () -> Location) = item
 
 @LightningServerDsl
 context(builder: ServerBuilder)
-public infix fun <PATH : PathSpec, HANDLER : HttpHandler<PATH>> HttpEndpoint<PATH>.bind(handler: HANDLER): Locationed<HttpEndpoint<PATH>, HANDLER> {
+public infix fun <PATH : PathSpec, HANDLER : HttpHandler<PATH>> HttpEndpoint<PATH>.bind(handler: HANDLER): HANDLER {
     builder.http.register(this, handler)
     return locate(handler) {
         HttpEndpoint(builder.modulePath + this.path, this.method)
@@ -35,28 +33,28 @@ public infix fun <PATH : PathSpec, HANDLER : HttpHandler<PATH>> HttpEndpoint<PAT
 
 @LightningServerDsl
 context(builder: ServerBuilder)
-public infix fun <PATH : PathSpec, STORAGE> PATH.bind(handler: WebSocketHandler<PATH, STORAGE>): Locationed<PATH, WebSocketHandler<PATH, STORAGE>> {
+public infix fun <PATH : PathSpec, STORAGE> PATH.bind(handler: WebSocketHandler<PATH, STORAGE>): WebSocketHandler<PATH, STORAGE> {
     builder.websockets.register(this, handler)
     return locate(handler) { builder.modulePath + this }
 }
 
 @LightningServerDsl
 context(builder: ServerBuilder)
-public infix fun <T> PathSpec0.bind(task: Task<T>): Locationed<PathSpec0, Task<T>> {
+public infix fun <T> PathSpec0.bind(task: Task<T>): Task<T> {
     builder.tasks.register(this, task)
     return locate(task) { builder.modulePath + this }
 }
 
 @LightningServerDsl
 context(builder: ServerBuilder)
-public infix fun PathSpec0.bind(startupTask: StartupTask): Locationed<PathSpec0, StartupTask> {
+public infix fun PathSpec0.bind(startupTask: StartupTask): StartupTask {
     builder.startupTasks.register(this, startupTask)
     return locate(startupTask) { builder.modulePath + this }
 }
 
 @LightningServerDsl
 context(builder: ServerBuilder)
-public infix fun PathSpec0.bind(schedule: ScheduledTask): Locationed<PathSpec0, ScheduledTask> {
+public infix fun PathSpec0.bind(schedule: ScheduledTask): ScheduledTask {
     builder.schedules.register(this, schedule)
     return locate(schedule) { builder.modulePath + this }
 }
@@ -64,8 +62,7 @@ public infix fun PathSpec0.bind(schedule: ScheduledTask): Locationed<PathSpec0, 
 @LightningServerDsl
 context(builder: ServerBuilder)
 public fun <PATH : PathSpec, T> PATH.topic(type: KSerializer<T>): WebSocketTopic<PATH, T> =
-    WebSocketTopic(
-        path = { builder.modulePath + this },
+    WebSocketTopic<PATH, T>(
         type
     ).also { builder.websockets.topics.register(this, it) }
 
@@ -190,16 +187,16 @@ public infix fun <T : ServerBuilder> PathSpec0.bind(module: T): T {
 
 @LightningServerDsl
 context(builder: ServerBuilder)
-public infix fun PathSpec0.bind(import: ModularServerDefinition): Locationed<PathSpec0, ModularServerDefinition> {
+public infix fun PathSpec0.bind(import: ModularServerDefinition): ModularServerDefinition {
     builder.imports.register(this, import)
-    return Locationed(this, import)
+    return import
 }
 
 @LightningServerDsl
 context(builder: ServerBuilder)
-public infix fun PathSpec0.bind(import: ServerDefinition): Locationed<PathSpec0, ServerDefinition> {
+public infix fun PathSpec0.bind(import: ServerDefinition): ServerDefinition {
     builder.imports.register(this, ModularServerDefinition(import))
-    return Locationed(this, import)
+    return import
 }
 
 //@LightningServerDsl

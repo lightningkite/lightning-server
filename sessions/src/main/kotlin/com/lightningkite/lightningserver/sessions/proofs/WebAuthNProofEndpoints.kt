@@ -57,6 +57,7 @@ public class WebAuthNProofEndpoints(
 
     init {
         proofMethods.register(this)
+        path.docGroup = "WebAuthNProof"
     }
 
     override val info: ProofMethodInfo = ProofMethodInfo(
@@ -64,6 +65,8 @@ public class WebAuthNProofEndpoints(
         property = null,
         strength = 10
     )
+    public val registerInterface: Documentable.InterfaceInfo = Documentable.InterfaceInfo("WebAuthNRegistrationEndpoints", listOf())
+    public val proveInterface: Documentable.InterfaceInfo = Documentable.InterfaceInfo("WebAuthNProofEndpoints", listOf())
 
 
     context(_: ServerRuntime)
@@ -105,7 +108,7 @@ public class WebAuthNProofEndpoints(
         }
     )
 
-    public val rest: ModelRestEndpoints<HasId<AnyId>, WebAuthNCredential, String> = ModelRestEndpoints(modelInfo)
+    public val rest: ModelRestEndpoints<HasId<AnyId>, WebAuthNCredential, String> = path.path("credentials") bind ModelRestEndpoints(modelInfo)
 
 
     private fun challengeCacheKey(key: String): String =
@@ -164,9 +167,10 @@ public class WebAuthNProofEndpoints(
             .toList()
 
     @OptIn(ExperimentalEncodingApi::class)
-    public val registerStart: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, WebAuthN.GeneralPreference, WebAuthN.Registration.RegistrationResponse>> =
+    public val registerStart: ApiHttpHandler<PathSpec0, HasId<AnyId>, WebAuthN.GeneralPreference, WebAuthN.Registration.RegistrationResponse> =
         path.path("register-start").post bind ApiHttpHandler(
             auth = proofMethodAuth,
+            belongsToInterface = registerInterface,
             summary = "Issue WebAuthN creation challenge",
             description = "Returns a challenge to be passed on to a client authenticator for the creation of a new Public Key Credential.",
             errorCases = listOf(),
@@ -214,9 +218,10 @@ public class WebAuthNProofEndpoints(
         )
 
     @OptIn(ExperimentalEncodingApi::class)
-    public val registerFinish: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>, WebAuthN.Registration.RegisterRequest, Unit>> =
+    public val registerFinish: ApiHttpHandler<PathSpec0, HasId<AnyId>, WebAuthN.Registration.RegisterRequest, Unit> =
         path.path("register-finish").post bind ApiHttpHandler(
             auth = proofMethodAuth,
+            belongsToInterface = registerInterface,
             summary = "Establish WebAuthN Credential",
             description = "Validates and Accepts a public key credential created from a previously issued creation challenge.",
             errorCases = listOf(),
@@ -300,9 +305,10 @@ public class WebAuthNProofEndpoints(
     // keys. If they do, then we must return the subjects existing credential IDs. If a user hits this endpoint WITH
     // authentication, then they are re-authenticating, and we will return the existing credential ids regardless of
     // identity provided.
-    public val start: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, Identification, WebAuthN.Authentication.StartResponse>> =
+    public val start: ApiHttpHandler<PathSpec0, HasId<AnyId>?, Identification, WebAuthN.Authentication.StartResponse> =
         path.path("start").post bind ApiHttpHandler(
             auth = anyAuth or noAuth,
+            belongsToInterface = proveInterface,
             summary = "Begin WebAuthN challenge",
             description = "Returns a challenge to be passed on to a client authenticator for signing.",
             errorCases = listOf(),
@@ -373,9 +379,10 @@ public class WebAuthNProofEndpoints(
 
 
     @OptIn(ExperimentalEncodingApi::class)
-    public val prove: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, WebAuthN.Authentication.ProveRequest, Proof>> =
+    public val prove: ApiHttpHandler<PathSpec0, HasId<AnyId>?, WebAuthN.Authentication.ProveRequest, Proof> =
         path.path("prove").post bind ApiHttpHandler(
             auth = noAuth,
+            belongsToInterface = proveInterface,
             summary = "Prove WebAuthN ownership",
             description = "Returns a challenge to be passed on to a client authenticator for signing.",
             errorCases = listOf(),

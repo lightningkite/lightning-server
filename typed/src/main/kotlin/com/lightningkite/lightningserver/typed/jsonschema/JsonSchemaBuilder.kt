@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.typed.jsonschema
 
-import com.lightningkite.lightningserver.sdk.titleCase
+import com.lightningkite.lightningserver.typed.sdk.titleCase
 import com.lightningkite.services.data.*
 import com.lightningkite.services.database.ConditionSerializer
 import com.lightningkite.services.database.KSerializerKey

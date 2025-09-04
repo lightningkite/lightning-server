@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.engine.ktor.KtorEngine
 import com.lightningkite.lightningserver.settings.loadFromFile
 import com.lightningkite.lightningserver.terraform.awsserverless.TerraformAwsServerlessDomainBuilder
 import com.lightningkite.lightningserver.terraform.generated
+import com.lightningkite.lightningserver.typed.sdk.writeKiteUiSdk
 import com.lightningkite.services.ExceptionReporter
 import com.lightningkite.services.MetricReporter
 import com.lightningkite.services.cache.dynamodb.awsDynamoDb
@@ -71,9 +72,13 @@ fun terraform() {
     }.write(File("demo/terraform/example-new").also { it.mkdirs() })
 }
 
+fun sdk() {
+    Server.build().writeKiteUiSdk("com.lightningkite.lightningserver.demo", File("demo/build/sdk"))
+}
+
 fun main(vararg args: String) {
     cli(
         arguments = args,
-        available = listOf(::serve, ::terraform),
+        available = listOf(::serve, ::terraform, ::sdk),
     )
 }

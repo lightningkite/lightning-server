@@ -28,7 +28,6 @@ import com.lightningkite.services.topLevelReportingContext
 public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpResponse {
     val match = this.server.endpoints.match(externalSerialization.stringArrayFormat, request.path.string) { it.http[request.method] }
         ?: run {
-            println("NO match found")
             try {
                 return@handle topLevelReportingContext("exceptionHandler") {
                     this.server.exceptionHandler.handle(
@@ -37,8 +36,6 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
                     )
                 }
             } catch (e: Exception) {
-                println("exception handler fail $e")
-                e.printStackTrace()
                 try {
                     return@handle topLevelReportingContext("exceptionHandler") {
                         this.server.exceptionHandler.handle(

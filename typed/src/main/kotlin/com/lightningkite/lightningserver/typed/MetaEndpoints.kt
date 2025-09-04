@@ -29,7 +29,7 @@ public class MetaEndpoints(
     private val cache: RuntimeDeferred<Cache>,
 ) : ServerBuilder() {
 
-    public val root: Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>> = path.get bind HttpHandler {
+    public val root: HttpHandler<PathSpec0> = path.get bind HttpHandler {
         HttpResponse(body = TypedData.html {
             head { title("${generalSettings().projectName} - Meta Information") }
             body {
@@ -46,7 +46,7 @@ public class MetaEndpoints(
         })
     }
 
-    public val isOnline: Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>> =
+    public val isOnline: HttpHandler<PathSpec0> =
         path.path("online").get bind HttpHandler { HttpResponse.plainText("Server is running.") }
 
     context(server: ServerRuntime)
@@ -76,7 +76,7 @@ public class MetaEndpoints(
 
     public val docs: ApiDocs = path.path("docs") bind ApiDocs(packageName)
 
-    public val health: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<AnyId>?, Unit, ServerHealth>> =
+    public val health: ApiHttpHandler<PathSpec0, HasId<AnyId>?, Unit, ServerHealth> =
         path.path("health").get bind ApiHttpHandler(
             auth = noAuth,
             inputType = Unit.serializer(),
@@ -115,7 +115,7 @@ public class MetaEndpoints(
             }
         )
 
-    public val kschema: Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>> =
+    public val kschema: HttpHandler<PathSpec0> =
         path.path("kschema").get bind HttpHandler {
             HttpResponse(
                 body = TypedData.text(
@@ -125,7 +125,7 @@ public class MetaEndpoints(
             )
         }
 
-    public val openApi: Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>> =
+    public val openApi: HttpHandler<PathSpec0> =
         path.path("openapi").get bind HttpHandler {
             val desiredFormat = it.headers.accept.firstOrNull() ?: MediaType.Application.Json
             when {
@@ -185,7 +185,7 @@ public class MetaEndpoints(
                 )
             }
         }
-    public val openApiJson: Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>> =
+    public val openApiJson: HttpHandler<PathSpec0> =
         path.path("openapi.json").get bind HttpHandler {
             HttpResponse(
                 body = TypedData.text(
@@ -195,7 +195,7 @@ public class MetaEndpoints(
                 status = HttpStatus.OK
             )
         }
-    public val paths: Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>> =
+    public val paths: HttpHandler<PathSpec0> =
         path.path("paths").get bind HttpHandler {
             val definition = contextOf<ServerRuntime>().server
             HttpResponse(body = TypedData.html {
@@ -221,7 +221,7 @@ public class MetaEndpoints(
             })
         }
 
-    public val wsTester: Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>> =
+    public val wsTester: HttpHandler<PathSpec0> =
         path.path("ws-tester").get bind HttpHandler {
             //language=HTML
             HttpResponse.html(
@@ -309,7 +309,7 @@ public class MetaEndpoints(
             )
         }
 
-    private val endpoints: List<Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>>> = listOf(
+    private val endpoints: List<HttpHandler<PathSpec0>> = listOf(
         docs.index,
         isOnline,
         health,

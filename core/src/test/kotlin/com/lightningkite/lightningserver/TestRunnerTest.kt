@@ -15,6 +15,7 @@ import com.lightningkite.lightningserver.pathing.first
 import com.lightningkite.lightningserver.runtime.test.TestRunner
 import com.lightningkite.lightningserver.runtime.send
 import com.lightningkite.lightningserver.runtime.invoke
+import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.websockets.WebSocketClose
@@ -164,12 +165,5 @@ class TestRunnerTest {
                 rootSocket.close()
             }
         }
-    }
-
-    @Test
-    fun testPathString() {
-        println(TestModelEndpoints.describePerson.location.path)
-        println(TestModelEndpoints.describePerson.location.path.concrete("hunter"))
-        println(TestModelEndpoints.describePerson.location.path.concrete("hunter").toString(StringArrayFormat(EmptySerializersModule())))
     }
 }

@@ -7,6 +7,8 @@ import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.typed.Documentable
+import com.lightningkite.lightningserver.typed.docGroup
 import com.lightningkite.services.sms.SMS
 import com.lightningkite.toPhoneNumber
 
@@ -22,8 +24,12 @@ public class SmsProofEndpoints(
     proofSigner = proofSigner,
     pin = pin,
     exampleTarget = "800-1000-100",
+    interfaceInfo = Documentable.InterfaceInfo("SmsProofClientEndpoints", listOf()),
     strength = 5,
 ) {
+    init {
+        path.docGroup = "SmsProof"
+    }
     override fun normalize(to: String): String = to
         .removePrefix("+")
         .substringBefore('x')

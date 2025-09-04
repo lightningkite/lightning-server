@@ -82,10 +82,10 @@ val lightningServerKSchema: LightningServerKSchema
                 },
             )
         },
-        interfaces = runtime.server.interfaces.map {
+        interfaces = runtime.server.interfaces.map { (path, it) ->
             LightningServerKSchemaInterface(
-                path = TODO("Was: it.path.toString()"),
-                docGroup = TODO("Was: it.path.docGroup"),
+                path = path.toString(),
+                docGroup = context(runtime.server) { path.docGroup },
                 matches = VirtualTypeReference(it.fullyQualifiedName, it.typeArguments.map { it.virtualTypeReference(registry) }, false)
             )
         }.toList(),

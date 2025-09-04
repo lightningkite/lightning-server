@@ -91,7 +91,7 @@ public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
                 hashTopic.request(it)
             } ?: setOf(generalTopic.request())
             connection.queueStateUpdate { data ->
-                data.copy(condition = c, topics = newTopics.mapTo(HashSet()) { it.path.toString() })
+                data.copy(condition = c, topics = newTopics.mapTo(HashSet()) { it.pathInContext.path(connection.internalSerialization.stringArrayFormat) })
             }
             (oldTopics - newTopics.toHashSet()).forEach { connection.unsubscribe(it) }
             newTopics.filter { it !in oldTopics }.forEach { connection.subscribe(it) }

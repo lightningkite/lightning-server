@@ -112,6 +112,13 @@ tasks.create("rebuildTerraform", JavaExec::class.java) {
     workingDir(project.rootDir)
     inputs.files(*file("terraform").walkTopDown().filter { it.name == "project.json" }.toList().toTypedArray())
 }
+tasks.create("sdk", JavaExec::class.java) {
+    group = "deploy"
+    classpath(sourceSets.main.get().runtimeClasspath)
+    mainClass.set("com.lightningkite.lightningserver.demo.MainKt")
+    args("sdk")
+    workingDir(project.rootDir)
+}
 
 fun env(name: String, profile: String) {
     val mongoProfile = file("${System.getProperty("user.home")}/.mongo/profiles/$profile.env")

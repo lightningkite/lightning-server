@@ -46,7 +46,7 @@ fun PathSpec0.options(string: String): HttpEndpoint<PathSpec0> = path(string).op
 fun PathSpec0.head(string: String): HttpEndpoint<PathSpec0> = path(string).head
 
 context(builder: ServerBuilder)
-fun PathSpec0.websocket(handler: WebSocketHandler<PathSpec0, *>): Locationed<PathSpec0, WebSocketHandler<PathSpec0, *>> = bind(handler)
+fun PathSpec0.websocket(handler: WebSocketHandler<PathSpec0, *>): WebSocketHandler<PathSpec0, *> = bind(handler)
 
 @Deprecated("Use standard syntax", ReplaceWith("path.path(string)")) fun ServerBuilder.path(string: String): PathSpec0 = PathSpec.root.path(string)
 @Deprecated("Use standard syntax", ReplaceWith("path.path(string).get")) fun ServerBuilder.get(string: String): HttpEndpoint<PathSpec0> = PathSpec.root.path(string).get

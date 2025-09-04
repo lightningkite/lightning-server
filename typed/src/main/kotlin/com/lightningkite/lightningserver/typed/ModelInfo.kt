@@ -25,7 +25,7 @@ public interface ModelInfo<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     public val auth: AuthRequirement<SUBJECT>
 
     public val collectionName: String
-        get() = serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
+        get() = serializer.descriptor.serialName.substringBefore('/').substringBefore('<').substringAfterLast('.')
 
     public fun registerChangeListener(action: suspend context(ServerRuntime) (CollectionChanges<T>) -> Unit)
 
@@ -41,7 +41,7 @@ public interface ModelInfo<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<I
 
 public inline fun <reified USER : HasId<*>?, reified T : HasId<ID>, reified ID : Comparable<ID>> Runtime<Database>.modelInfo(
     auth: AuthRequirement<USER>,
-    collectionName: String = serializerOrContextual<T>().descriptor.serialName.substringBefore('<').substringAfterLast('.'),
+    collectionName: String = serializerOrContextual<T>().descriptor.serialName.substringBefore('/').substringBefore('<').substringAfterLast('.'),
     crossinline signals: context(ServerRuntime) (Table<T>) -> Table<T> = { it },
     crossinline log: context(ServerRuntime) AuthAccess<USER>?.(Table<T>) -> Table<T> = { it },
     crossinline systemAccess: context(ServerRuntime) (Table<T>) -> Table<T> = { it },
@@ -56,6 +56,9 @@ public inline fun <reified USER : HasId<*>?, reified T : HasId<ID>, reified ID :
 
     context(server: ServerRuntime)
     override fun baseCollection(): Table<T> = this@modelInfo().collection(serializer, collectionName)
+
+    override val collectionName: String
+        get() = collectionName
 
     val changeListeners = ArrayList<suspend context(ServerRuntime) (CollectionChanges<T>) -> Unit>()
     override fun registerChangeListener(action: suspend context(ServerRuntime) (CollectionChanges<T>) -> Unit) {
@@ -99,6 +102,9 @@ public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> Runtime<Databa
 
     context(server: ServerRuntime)
     override fun baseCollection(): Table<T> = this@modelInfo().collection(serializer, collectionName)
+
+    override val collectionName: String
+        get() = collectionName
 
     val changeListeners = ArrayList<suspend context(ServerRuntime) (CollectionChanges<T>) -> Unit>()
     override fun registerChangeListener(action: suspend context(ServerRuntime) (CollectionChanges<T>) -> Unit) {

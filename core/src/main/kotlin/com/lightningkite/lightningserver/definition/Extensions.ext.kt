@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.definition
 
 import com.lightningkite.lightningserver.definition.builder.ListRegistry
 import com.lightningkite.lightningserver.definition.builder.MapRegistry
+import com.lightningkite.lightningserver.pathing.PathSpec0
 import kotlin.collections.component1
 import kotlin.collections.component2
 import kotlin.collections.iterator
@@ -109,7 +110,7 @@ public operator fun <WRITE : READ, READ : Any> MutableExtensions.DegradingKey<WR
  */
 public interface MapRegistryExtension<L, V : Any> : MutableExtensions.DegradingKey<MapRegistry<L, V>, Map<L, V>> {
     override fun default(): MapRegistry<L, V> = MapRegistry()
-    override fun MapRegistry<L, V>.include(other: Map<L, V>) {
+    override fun MapRegistry<L, V>.include(other: Map<L, V>, pathSpec: PathSpec0) {
         for ((key, value) in other) register(key, value)
     }
 }
@@ -132,7 +133,7 @@ public interface MapRegistryExtension<L, V : Any> : MutableExtensions.DegradingK
  */
 public interface ListRegistryExtension<V> : MutableExtensions.DegradingKey<ListRegistry<V>, List<V>> {
     override fun default(): ListRegistry<V> = ListRegistry()
-    override fun ListRegistry<V>.include(other: List<V>) {
+    override fun ListRegistry<V>.include(other: List<V>, pathSpec: PathSpec0) {
         for (value in other) register(value)
     }
 }

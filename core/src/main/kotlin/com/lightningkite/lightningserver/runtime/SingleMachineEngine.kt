@@ -28,7 +28,7 @@ import kotlin.time.Instant
 public abstract class SingleMachineEngine(server: ServerDefinition): ServerRuntimeBase(server) {
     private val subscriptions = ConcurrentHashMap<WebSocketSubscriptionRequest<*, *>, ArrayList<suspend (WebSocketSubscriptionMessage<*, *>)->Unit>>()
     override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>) {
-        subscriptions[WebSocketSubscriptionRequest(topic = event.topic, rawPathArguments = event.path.rawPathArguments)]?.forEach {
+        subscriptions[WebSocketSubscriptionRequest(topic = event.topic, rawPathArguments = event.rawPathArguments)]?.forEach {
             GlobalScope.launch {
                 it(event)
             }
@@ -43,9 +43,9 @@ public abstract class SingleMachineEngine(server: ServerDefinition): ServerRunti
         ?: "?"
     public override val serverVersion:String =  "Unknown"
 
-    override suspend fun <T> Locationed<PathSpec0, Task<T>>.invoke(input: T) {
+    override suspend fun <T> Task<T>.invoke(input: T) {
         GlobalScope.launch {
-            item.executeWithMetrics(location, input)
+            executeWithMetrics(location, input)
         }
     }
 

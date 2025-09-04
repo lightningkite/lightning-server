@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
 import com.lightningkite.lightningserver.runtime.executeWithMetrics
+import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
@@ -76,10 +77,10 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
         pubSubChannel(event).collect(collector)
     }
 
-    override suspend fun <T> Locationed<PathSpec0, Task<T>>.invoke(input: T) {
+    override suspend fun <T> Task<T>.invoke(input: T) {
         scope.launch {
             try {
-                item.executeWithMetrics(location, input)
+                executeWithMetrics(location, input)
             } catch (e: Exception) {
                 /*squish; already reported*/
             }

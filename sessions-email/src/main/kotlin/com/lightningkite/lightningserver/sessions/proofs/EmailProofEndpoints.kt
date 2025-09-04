@@ -6,6 +6,8 @@ import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.typed.Documentable
+import com.lightningkite.lightningserver.typed.docGroup
 import com.lightningkite.services.email.Email
 import com.lightningkite.services.email.EmailService
 
@@ -20,8 +22,10 @@ public class EmailProofEndpoints(
     property = "email",
     proofSigner = proofSigner,
     pin = pin,
+    interfaceInfo = Documentable.InterfaceInfo("EmailProofClientEndpoints", listOf()),
     exampleTarget = "test@test.com"
 ) {
+    init { path.docGroup = "EmailProof" }
 
     context(_: ServerRuntime)
     override suspend fun send(to: String, pin: String) {

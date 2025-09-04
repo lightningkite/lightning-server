@@ -8,13 +8,15 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.getValue
 import com.lightningkite.lightningserver.pathing.MutablePathSpecMap
 import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpecMap
+import com.lightningkite.services.database.path
 
 
-private object DocGroupExtension : MutableExtensions.DegradingKey<MutablePathSpecMap<String>, PathSpecMap<String>> {
+public object DocGroupExtension : MutableExtensions.DegradingKey<MutablePathSpecMap<String>, PathSpecMap<String>> {
     override fun default(): MutablePathSpecMap<String> = MutablePathSpecMap()
-    override fun MutablePathSpecMap<String>.include(other: PathSpecMap<String>) {
-        for(entry in other.entries) this[entry.key] = entry.value
+    override fun MutablePathSpecMap<String>.include(other: PathSpecMap<String>, pathSpec: PathSpec0) {
+        putAll(pathSpec, other)
     }
 }
 

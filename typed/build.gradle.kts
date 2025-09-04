@@ -12,7 +12,6 @@ plugins {
 dependencies {
     api(project(":core"))
     api(project(":auth"))
-    api(project(":sdk"))
     api(project(":typed-shared"))
     api(libs.serviceAbstractionsDatabase)
     api(libs.serviceAbstractionsCache)

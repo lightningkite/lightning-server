@@ -13,7 +13,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpec1
 import com.lightningkite.lightningserver.pathing.first
 import com.lightningkite.lightningserver.runtime.serverRuntime
-import com.lightningkite.lightningserver.sdk.titleCase
+import com.lightningkite.lightningserver.typed.sdk.titleCase
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.KSerializer
@@ -29,12 +29,13 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
     private val detailPath = path.arg(Segment.Wildcard("id", info.idSerializer))
     private val bulkPath = path.path("bulk")
 
+    init { path.docGroup = info.collectionName }
     private val belongsToInterface = Documentable.InterfaceInfo("ClientModelRestEndpoints", listOf(
         info.serializer,
         info.idSerializer
     ))
 
-    public val permissions: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, Unit, ModelPermissions<T>>> =
+    public val permissions: ApiHttpHandler<PathSpec0, USER, Unit, ModelPermissions<T>> =
         path.path("_permissions_").get bind ApiHttpHandler(
             summary = "Permissions",
             description = "Returns the user's permissions for this collection.",
@@ -50,7 +51,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         )
 
 
-    public val list: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, Query<T>, List<T>>> =
+    public val list: ApiHttpHandler<PathSpec0, USER, Query<T>, List<T>> =
         path.get bind ApiHttpHandler(
             summary = "List",
             description = "Gets a list of ${info.collectionName}s.",
@@ -68,7 +69,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         )
 
 
-    public val query: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, Query<T>, List<T>>> =
+    public val query: ApiHttpHandler<PathSpec0, USER, Query<T>, List<T>> =
         path.path("query").post bind ApiHttpHandler(
             summary = "Query",
             description = "Gets a list of ${info.collectionName}s that match the given query.",
@@ -86,7 +87,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         )
 
 
-    public val queryPartial: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, QueryPartial<T>, List<Partial<T>>>> =
+    public val queryPartial: ApiHttpHandler<PathSpec0, USER, QueryPartial<T>, List<Partial<T>>> =
         path.path("query-partial").post bind ApiHttpHandler(
             summary = "QueryPartial",
             description = "Gets parts of ${info.collectionName}s that match the given query.",
@@ -104,7 +105,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         )
 
 
-    public val detail: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, Unit, T>> =
+    public val detail: ApiHttpHandler<PathSpec1<ID>, USER, Unit, T> =
         detailPath.get bind ApiHttpHandler(
             summary = "Detail",
             description = "Gets the ${info.collectionName} for the provided id.",
@@ -127,7 +128,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         )
 
 
-    public val insertBulk: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, List<T>, List<T>>> =
+    public val insertBulk: ApiHttpHandler<PathSpec0, USER, List<T>, List<T>> =
         bulkPath.post bind ApiHttpHandler(
             summary = "Insert Bulk",
             description = "Creates multiple ${info.collectionName}s at the same time.",
@@ -151,7 +152,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         )
 
 
-    public val insert: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, T, T>> =
+    public val insert: ApiHttpHandler<PathSpec0, USER, T, T> =
         path.post bind ApiHttpHandler(
             summary = "Insert",
             description = "Creates a new ${info.collectionName}",
@@ -176,7 +177,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         )
 
 
-    public val upsert: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, T, T>> =
+    public val upsert: ApiHttpHandler<PathSpec1<ID>, USER, T, T> =
         detailPath.post bind ApiHttpHandler(
             summary = "Upsert",
             description = "Creates or updates a ${info.collectionName}",
@@ -203,7 +204,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         )
 
 
-    public val bulkReplace: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, List<T>, List<T>>> =
+    public val bulkReplace: ApiHttpHandler<PathSpec0, USER, List<T>, List<T>> =
         bulkPath.put bind ApiHttpHandler(
             summary = "Bulk Replace",
             description = "Modifies many ${info.collectionName}s at the same time by ID.",
@@ -228,7 +229,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         )
 
 
-    public val replace: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, T, T>> =
+    public val replace: ApiHttpHandler<PathSpec1<ID>, USER, T, T> =
         detailPath.put bind ApiHttpHandler(
             summary = "Replace",
             description = "Replaces a single ${info.collectionName} by ID.",
@@ -255,7 +256,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         )
 
 
-    public val bulkModify: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, MassModification<T>, Int>> =
+    public val bulkModify: ApiHttpHandler<PathSpec0, USER, MassModification<T>, Int> =
         bulkPath.patch bind ApiHttpHandler(
             summary = "Bulk Modify",
             description = "Modifies many ${info.collectionName}s at the same time.  Returns the number of changed items.",
@@ -280,7 +281,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         )
 
 
-    public val modifyWithDiff: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, Modification<T>, EntryChange<T>>> =
+    public val modifyWithDiff: ApiHttpHandler<PathSpec1<ID>, USER, Modification<T>, EntryChange<T>> =
         detailPath.patch bind ApiHttpHandler(
             summary = "Modify with Diff",
             description = "Modifies a ${info.collectionName} by ID, returning both the previous value and new value.",
@@ -313,7 +314,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         )
 
 
-    public val modify: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, Modification<T>, T>> =
+    public val modify: ApiHttpHandler<PathSpec1<ID>, USER, Modification<T>, T> =
         detailPath.path("delta").patch bind ApiHttpHandler(
             summary = "Modify with Diff",
             description = "Modifies a ${info.collectionName} by ID, returning both the previous value and new value.",
@@ -347,7 +348,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         )
 
 
-    public val modifySimple: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, Partial<T>, T>> =
+    public val modifySimple: ApiHttpHandler<PathSpec1<ID>, USER, Partial<T>, T> =
         detailPath.path("simplified").patch bind ApiHttpHandler(
             summary = "Modify with Diff",
             description = "Modifies a ${info.collectionName} by ID, returning both the previous value and new value.",
@@ -381,7 +382,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         )
 
 
-    public val bulkDelete: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, Condition<T>, Int>> =
+    public val bulkDelete: ApiHttpHandler<PathSpec0, USER, Condition<T>, Int> =
         path.path("bulk-delete").post bind ApiHttpHandler(
             summary = "Bulk Delete",
             description = "Deletes all matching ${info.collectionName}s, returning the number of deleted items.",
@@ -397,7 +398,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         )
 
 
-    public val deleteItem: Locationed<HttpEndpoint<PathSpec1<ID>>, ApiHttpHandler<PathSpec1<ID>, USER, Unit, Unit>> =
+    public val deleteItem: ApiHttpHandler<PathSpec1<ID>, USER, Unit, Unit> =
         detailPath.delete bind ApiHttpHandler(
             summary = "Delete",
             description = "Deletes a ${info.collectionName} by id.",
@@ -423,7 +424,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         )
 
 
-    public val countGet: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, Condition<T>, Int>> =
+    public val countGet: ApiHttpHandler<PathSpec0, USER, Condition<T>, Int> =
         path.path("count").get bind ApiHttpHandler(
             summary = "Count",
             description = "Gets the total number of ${info.collectionName}s matching the given condition.",
@@ -439,7 +440,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         )
 
 
-    public val count: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, Condition<T>, Int>> =
+    public val count: ApiHttpHandler<PathSpec0, USER, Condition<T>, Int> =
         path.path("count").post bind ApiHttpHandler(
             summary = "Count",
             description = "Gets the total number of ${info.collectionName}s matching the given condition.",
@@ -455,7 +456,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         )
 
 
-    public val groupCount: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, GroupCountQuery<T>, Map<String, Int>>> =
+    public val groupCount: ApiHttpHandler<PathSpec0, USER, GroupCountQuery<T>, Map<String, Int>> =
         path.path("group-count").post bind ApiHttpHandler(
             summary = "Group Count",
             description = "Gets the total number of ${info.collectionName}s matching the given condition divided by group.",
@@ -474,7 +475,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         )
 
 
-    public val aggregate: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, AggregateQuery<T>, Double?>> =
+    public val aggregate: ApiHttpHandler<PathSpec0, USER, AggregateQuery<T>, Double?> =
         path.path("aggregate").post bind ApiHttpHandler(
             summary = "Aggregate",
             description = "Aggregates a property of ${info.collectionName}s matching the given condition.",
@@ -496,7 +497,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         )
 
 
-    public val groupAggregate: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, GroupAggregateQuery<T>, Map<String, Double?>>> =
+    public val groupAggregate: ApiHttpHandler<PathSpec0, USER, GroupAggregateQuery<T>, Map<String, Double?>> =
         path.path("group-aggregate").post bind ApiHttpHandler(
             summary = "Group Aggregate",
             description = "Aggregates a property of ${info.collectionName}s matching the given condition divided by group.",
@@ -520,7 +521,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         )
 
 
-    public val groupCount2: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, GroupCountQuery<T>, Map<String, Int>>> =
+    public val groupCount2: ApiHttpHandler<PathSpec0, USER, GroupCountQuery<T>, Map<String, Int>> =
         path.path("group-count-2").post bind ApiHttpHandler(
             summary = "Group Count 2",
             description = "Gets the total number of ${info.collectionName}s matching the given condition divided by group.",
@@ -541,7 +542,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         )
 
 
-    public val groupAggregate2: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, USER, GroupAggregateQuery<T>, Map<String, Double?>>> =
+    public val groupAggregate2: ApiHttpHandler<PathSpec0, USER, GroupAggregateQuery<T>, Map<String, Double?>> =
         path.path("group-aggregate-2").post bind ApiHttpHandler(
             summary = "Group Aggregate 2",
             description = "Aggregates a property of ${info.collectionName}s matching the given condition divided by group.",

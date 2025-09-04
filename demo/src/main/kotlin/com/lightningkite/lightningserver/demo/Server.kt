@@ -66,6 +66,7 @@ object Server : ServerBuilder() {
     object UserAuth: PrincipalType<User, Uuid> {
         override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
         override val subjectSerializer: KSerializer<User> = User.Companion.serializer()
+        override val name: String get() = User.serializer().descriptor.serialName.substringAfterLast('.')
 
         context(server: ServerRuntime)
         override suspend fun fetch(id: Uuid): User = userInfo.collection().get(id) ?: throw NotFoundException()

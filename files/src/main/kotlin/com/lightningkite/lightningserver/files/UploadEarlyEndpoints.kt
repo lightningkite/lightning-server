@@ -53,7 +53,7 @@ public class UploadEarlyEndpoint(
         )
     }
 
-    public val endpoint: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<*>?, Unit, UploadInformation>> =
+    public val endpoint: ApiHttpHandler<PathSpec0, HasId<*>?, Unit, UploadInformation> =
         path.get bind ApiHttpHandler(
         auth = authOptions,
         summary = "Upload File for Request",
@@ -87,7 +87,7 @@ public class UploadEarlyEndpoint(
         }
     )
 
-    public val verify: Locationed<HttpEndpoint<PathSpec0>, ApiHttpHandler<PathSpec0, HasId<*>?, String, String>> =
+    public val verify: ApiHttpHandler<PathSpec0, HasId<*>?, String, String> =
         path.path("verify").post bind ApiHttpHandler(
         auth = authOptions,
         summary = "Verify uploaded file",
@@ -98,7 +98,7 @@ public class UploadEarlyEndpoint(
         }
     )
 
-    public val cleanupSchedule: Locationed<PathSpec0, ScheduledTask> = path.path("cleanupUploads") bind ScheduledTask(frequency = 1.days) {
+    public val cleanupSchedule: ScheduledTask = path.path("cleanupUploads") bind ScheduledTask(frequency = 1.days) {
         database().collection<UploadForNextRequest>().deleteMany(condition { it.expires lt now() }).forEach {
             try {
                 files().parseInternalUrl(it.file.location)!!.delete()
