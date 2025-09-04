@@ -1,4 +1,4 @@
-@file:UseContextualSerialization(ServerFile::class)
+
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*

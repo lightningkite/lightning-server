@@ -1,4 +1,4 @@
-@file:UseContextualSerialization(LocalDate::class, Instant::class, UUID::class, ServerFile::class)
+
 
 package com.lightningkite.lightningserver.jsonschema
 

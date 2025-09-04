@@ -1,4 +1,4 @@
-@file:UseContextualSerialization(UUID::class)
+
 package com.lightningkite.lightningserver.auth.subject
 
 import com.lightningkite.UUID
@@ -15,9 +15,9 @@ import kotlin.time.Duration.Companion.minutes
 internal data class FutureSession<ID>(
     val subjectId: ID,
     val scopes: Set<String>,
-    @Contextual val expires: Instant = now().plus(5.minutes),
+    val expires: Instant = now().plus(5.minutes),
     val originalSessionId: UUID?,
     val label: String? = null,
-    @Contextual val sessionExpiration: Instant? = null,
+    val sessionExpiration: Instant? = null,
     @References(OauthClient::class) val oauthClient: String? = null
 )

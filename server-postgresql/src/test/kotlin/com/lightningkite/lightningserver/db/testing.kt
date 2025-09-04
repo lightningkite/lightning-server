@@ -117,8 +117,8 @@ class BasicTest() {
 class CodingTest() {
     @Serializable
     data class TestModel(
-        @Contextual val uuid: UUID = UUID.random(),
-        @Contextual val time: Instant,
+        val uuid: UUID = UUID.random(),
+        val time: Instant,
         val x: String?,
         val y: Int,
         val z: ClassUsedForEmbedding?,

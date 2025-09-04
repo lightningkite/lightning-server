@@ -17,7 +17,7 @@ import kotlin.test.assertEquals
 @GenerateDataClassPaths
 @Serializable
 data class TestModelWithImage(
-    @Contextual override val _id: UUID = UUID.random(),
+    override val _id: UUID = UUID.random(),
     val name: String = "Test",
     val image: ServerFileWithMetadata? = null
 ) : HasId<UUID>

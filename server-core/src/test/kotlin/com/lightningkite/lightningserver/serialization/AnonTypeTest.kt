@@ -149,7 +149,7 @@ class AnonTypeTest {
         }
     }
 
-    @Serializable data class AnonContainer(@Contextual val anon: AnonType)
+    @Serializable data class AnonContainer(val anon: AnonType)
     @Test fun binaryStaysSmall() {
         engine = LocalEngine(LocalPubSub, InternalCommunicationEncoding.JavaData)
         var current = AnonContainer(AnonType(ComplexWithId(UUID.random(), 42, "asdf"), ComplexWithId.serializer()))

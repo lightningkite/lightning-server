@@ -1,4 +1,4 @@
-@file:UseContextualSerialization(Instant::class, UUID::class, ServerFile::class)
+
 
 package com.lightningkite.lightningserverdemo
 

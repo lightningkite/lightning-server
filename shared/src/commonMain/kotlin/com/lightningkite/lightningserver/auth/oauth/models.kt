@@ -1,4 +1,4 @@
-@file:UseContextualSerialization(ServerFile::class, Instant::class)
+
 package com.lightningkite.lightningserver.auth.oauth
 
 import com.lightningkite.UUID

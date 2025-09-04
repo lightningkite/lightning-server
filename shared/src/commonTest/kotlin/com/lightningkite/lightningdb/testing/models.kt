@@ -1,5 +1,5 @@
 
-@file:UseContextualSerialization(UUID::class, Instant::class)
+
 package com.lightningkite.lightningdb.testing
 
 import com.lightningkite.*

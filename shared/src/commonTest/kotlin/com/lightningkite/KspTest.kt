@@ -38,8 +38,8 @@ class KspTest {
 @GenerateDataClassPaths
 @Serializable
 data class KspTestType(
-    @Contextual val a: Instant = Instant.fromEpochMilliseconds(0),
-    val b: @Contextual Instant = Instant.fromEpochMilliseconds(0),
+    val a: Instant = Instant.fromEpochMilliseconds(0),
+    val b: Instant = Instant.fromEpochMilliseconds(0),
     @Serializable(WeirdSerializer::class) val c: Int = 0,
     val d: @Serializable(WeirdSerializer::class) Int = 0,
     val e: @Serializable(NullAsMinIntSerializer::class) (Int?) = null,

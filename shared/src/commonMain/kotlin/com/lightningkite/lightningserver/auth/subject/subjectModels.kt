@@ -1,4 +1,4 @@
-@file:UseContextualSerialization(Instant::class, UUID::class)
+
 package com.lightningkite.lightningserver.auth.subject
 
 import com.lightningkite.lightningdb.GenerateDataClassPaths

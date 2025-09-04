@@ -1,5 +1,5 @@
 
-@file:UseContextualSerialization(Instant::class)
+
 package com.lightningkite.lightningserver.serverhealth
 
 

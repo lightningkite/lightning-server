@@ -9,7 +9,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class QueryParamWebSocketHandlerData(val request: WebSocketConnectRequest, @Contextual val underlyingData: AnonType) {
+data class QueryParamWebSocketHandlerData(val request: WebSocketConnectRequest, val underlyingData: AnonType) {
     val handler get() = WebSockets.handlers[request.path]
     val handlerPath get() = request.path
 }

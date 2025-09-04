@@ -9,6 +9,6 @@ data class MetricEvent(
     val metricType: MetricType,
     val entryPoint: String?,
 //    val otherDimensions: Map<String, String> = mapOf(),
-    @Contextual val time: Instant,
+    val time: Instant,
     val value: Double
 )
