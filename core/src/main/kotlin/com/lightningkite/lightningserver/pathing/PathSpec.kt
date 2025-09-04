@@ -17,7 +17,7 @@ import kotlinx.serialization.encoding.Encoder
  * A `PathSpec` also defines what comes after the segments, as nothing, a trailing slash, or arbitrary trailing path segments.
  */
 @Serializable(DummyPathSpecSerializer::class)
-public sealed class PathSpec(public val segments: List<Segment>, public val after: Afterwards) {
+public sealed class PathSpec protected constructor (public val segments: List<Segment>, public val after: Afterwards) {
     override fun hashCode(): Int = segments.hashCode() * 31 + after.hashCode()
     override fun equals(other: Any?): Boolean =
         other is PathSpec && this.segments == other.segments && this.after == other.after
@@ -32,6 +32,8 @@ public sealed class PathSpec(public val segments: List<Segment>, public val afte
     public abstract fun <T> arg(wildcard: Segment.Wildcard<T>): PathSpec
 
     public abstract val wildcards: List<Segment.Wildcard<*>>
+
+    public val parent: PathSpec? get() = if(segments.isEmpty()) null else PathSpec.make(segments.dropLast(1), after)
 
     /**
      * What comes after the URL segments.
@@ -107,8 +109,19 @@ public sealed class PathSpec(public val segments: List<Segment>, public val afte
 
     public companion object {
         public val root: PathSpec0 = PathSpec0(emptyList(), Afterwards.None)
+        internal fun make(segments: List<PathSpec.Segment>, after: PathSpec.Afterwards): PathSpec {
+            val wildcards = segments.filterIsInstance<PathSpec.Segment.Wildcard<*>>()
+            return when(wildcards.size) {
+                0 -> PathSpec0(segments, after)
+                1 -> PathSpec1(segments, after, wildcards[0])
+                2 -> PathSpec2(segments, after, wildcards[0], wildcards[1])
+                3 -> PathSpec3(segments, after, wildcards[0], wildcards[1], wildcards[2])
+                else -> PathSpecMany(segments, after, wildcards)
+            }
+        }
     }
 }
+
 
 public object DummyPathSpecSerializer : KSerializer<PathSpec> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("PathSpec", PrimitiveKind.STRING)

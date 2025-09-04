@@ -9,8 +9,12 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.ApiWebsocketHandler
+import com.lightningkite.lightningserver.typed.docGroup
 import com.lightningkite.lightningserver.typed.locationedApiHttpHandlers
 import com.lightningkite.lightningserver.typed.functionName
+import com.lightningkite.lightningserver.typed.jsonschema.openApi
+import com.lightningkite.services.database.HasId
+import com.lightningkite.services.database.default
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -157,8 +161,14 @@ private fun <T> make(type: KSerializer<T>, item: T): Map<String, OpenApiExample>
 }
 
 context(runtime: ServerRuntime)
-private fun Locationed<HttpEndpoint<PathSpec>, ApiHttpHandler<*, *, *, *>>.openApi(builder: JsonSchemaBuilder): OpenApiOperation = with(value) {
-    val docGroup: String? = null
+private fun Locationed<HttpEndpoint<PathSpec>, ApiHttpHandler<*, *, *, *>>.openApiUntyped(builder: JsonSchemaBuilder): OpenApiOperation =
+    (this as Locationed<HttpEndpoint<PathSpec>, ApiHttpHandler<PathSpec, HasId<*>?, Any?, Any?>>).openApi(builder)
+
+context(runtime: ServerRuntime)
+private fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> Locationed<HttpEndpoint<PathSpec>, ApiHttpHandler<PATH, USER, INPUT, OUTPUT>>.openApi(
+    builder: JsonSchemaBuilder
+): OpenApiOperation = with(value) {
+    val docGroup: String? = context(runtime.server) { key.path.docGroup }
     OpenApiOperation(
         summary = summary,
         description = description,
@@ -169,27 +179,29 @@ private fun Locationed<HttpEndpoint<PathSpec>, ApiHttpHandler<*, *, *, *>>.openA
             content = mapOf(
                 MediaType.Application.Json.toString() to OpenApiMediaType(
                     schema = builder[this.inputType],
-                    example = examples.firstOrNull()
-                        ?.let { example ->
+                    example = (examples.firstOrNull() ?: ApiHttpHandler.Example(
+                        inputType.default(),
+                        outputType.default()
+                    ))
+                        .let { example ->
                             @Suppress("UNCHECKED_CAST")
                             runtime.externalSerialization.json.encodeToJsonElement(
                                 inputType as KSerializer<Any?>,
                                 example.input
                             )
+                        },
+                    examples = examples.groupBy { it.name }.flatMap {
+                        if (it.value.size == 1) it.value else it.value.mapIndexed { index, it ->
+                            it.copy(
+                                name = it.name + " " + index.plus(1)
+                            )
                         }
-                        ?: JsonNull,
-//                    examples = examples.groupBy { it.name }.flatMap {
-//                        if (it.value.size == 1) it.value else it.value.mapIndexed { index, it ->
-//                            it.copy(
-//                                name = it.name + " " + index.plus(1)
-//                            )
-//                        }
-//                    }.associate { example ->
-//                        example.name to OpenApiExample(
-//                            example.name,
-//                            value = Serialization.json.encodeToJsonElement(inputType, example.input)
-//                        )
-//                    }
+                    }.associate { example ->
+                        example.name to OpenApiExample(
+                            example.name,
+                            value = runtime.externalSerialization.json.encodeToJsonElement(inputType, example.input)
+                        )
+                    }
                 )
             ),
             required = true
@@ -203,25 +215,30 @@ private fun Locationed<HttpEndpoint<PathSpec>, ApiHttpHandler<*, *, *, *>>.openA
                 content = mapOf(
                     MediaType.Application.Json.toString() to OpenApiMediaType(
                         schema = builder[this.outputType],
-                        example = examples.firstOrNull()
-                            ?.let { example ->
+                        example = (examples.firstOrNull() ?: ApiHttpHandler.Example(
+                            inputType.default(),
+                            outputType.default()
+                        ))
+                            .let { example ->
                                 @Suppress("UNCHECKED_CAST")
                                 runtime.externalSerialization.json.encodeToJsonElement(
                                     outputType as KSerializer<Any?>,
                                     example.output
                                 )
+                            },
+                        examples = examples.groupBy { it.name }.flatMap {
+                            if (it.value.size == 1) it.value else it.value.mapIndexed { index, it ->
+                                it.copy(name = it.name + " " + index.plus(1))
                             }
-                            ?: JsonNull,
-//                        examples = examples.groupBy { it.name }.flatMap {
-//                            if (it.value.size == 1) it.value else it.value.mapIndexed { index, it ->
-//                                it.copy(name = it.name + " " + index.plus(1))
-//                            }
-//                        }.associate { example ->
-//                            example.name to OpenApiExample(
-//                                example.name,
-//                                value = Serialization.json.encodeToJsonElement(outputType, example.output)
-//                            )
-//                        }
+                        }.associate { example ->
+                            example.name to OpenApiExample(
+                                example.name,
+                                value = runtime.externalSerialization.json.encodeToJsonElement(
+                                    outputType,
+                                    example.output
+                                )
+                            )
+                        }
                     )
                 )
             ))
@@ -298,22 +315,22 @@ val openApiDescription: OpenApiRoot
                 .associate {
                     it.key to OpenApiPath(
                         parameters = it.value.first().location.path.wildcards.map { seg ->
-                                val name = seg.name
+                            val name = seg.name
                             val ser = seg.serializer
-                                OpenApiParameter(
-                                    name = name,
-                                    inside = OpenApiParameterType.path,
-                                    description = name,
-                                    required = true,
-                                    schema = builder[ser],
-                                    allowEmptyValue = false
-                                )
-                            },
-                        get = it.value.find { it.location.method == HttpMethod.GET }?.openApi(builder),
-                        post = it.value.find { it.location.method == HttpMethod.POST }?.openApi(builder),
-                        put = it.value.find { it.location.method == HttpMethod.PUT }?.openApi(builder),
-                        patch = it.value.find { it.location.method == HttpMethod.PATCH }?.openApi(builder),
-                        delete = it.value.find { it.location.method == HttpMethod.DELETE }?.openApi(builder),
+                            OpenApiParameter(
+                                name = name,
+                                inside = OpenApiParameterType.path,
+                                description = name,
+                                required = true,
+                                schema = builder[ser],
+                                allowEmptyValue = false
+                            )
+                        },
+                        get = it.value.find { it.location.method == HttpMethod.GET }?.openApiUntyped(builder),
+                        post = it.value.find { it.location.method == HttpMethod.POST }?.openApiUntyped(builder),
+                        put = it.value.find { it.location.method == HttpMethod.PUT }?.openApiUntyped(builder),
+                        patch = it.value.find { it.location.method == HttpMethod.PATCH }?.openApiUntyped(builder),
+                        delete = it.value.find { it.location.method == HttpMethod.DELETE }?.openApiUntyped(builder),
                     )
                 }
         )

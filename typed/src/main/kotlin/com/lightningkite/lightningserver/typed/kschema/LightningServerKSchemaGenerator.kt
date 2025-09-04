@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.LightningServerKSchema
 import com.lightningkite.lightningserver.typed.LightningServerKSchemaEndpoint
 import com.lightningkite.lightningserver.typed.LightningServerKSchemaInterface
+import com.lightningkite.lightningserver.typed.docGroup
 import com.lightningkite.lightningserver.typed.interfaces
 import com.lightningkite.lightningserver.typed.locationedApiHttpHandlers
 import com.lightningkite.lightningserver.typed.locationedApiWebsocketHandlers
@@ -49,7 +50,7 @@ val lightningServerKSchema: LightningServerKSchema
         baseUrl = generalSettings().publicUrl,
         baseWsUrl = generalSettings().wsUrl,
         endpoints = runtime.server.locationedApiHttpHandlers.map {
-            val docGroup: String? = null // TODO
+            val docGroup: String? = context(runtime.server) { it.key.path.docGroup }
             LightningServerKSchemaEndpoint(
                 group = docGroup,
                 method = it.location.method.toString(),
@@ -65,7 +66,7 @@ val lightningServerKSchema: LightningServerKSchema
                 },
             )
         }.toList() + runtime.server.locationedApiWebsocketHandlers.map {
-            val docGroup: String? = null // TODO
+            val docGroup: String? = context(runtime.server) { it.key.docGroup }
             LightningServerKSchemaEndpoint(
                 group = docGroup,
                 method = "WEBSOCKET",
