@@ -1,36 +1,25 @@
 package com.lightningkite.lightningserver.definition.builder
 
-import com.lightningkite.lightningserver.definition.ScheduledTask
-import com.lightningkite.lightningserver.definition.Task
-import com.lightningkite.lightningserver.definition.Extendable
-import com.lightningkite.lightningserver.definition.ModularServerDefinition
-import com.lightningkite.lightningserver.definition.MutableExtensions
-import com.lightningkite.lightningserver.definition.ServerDefinition
-import com.lightningkite.lightningserver.definition.ServerPathEndpoints
-import com.lightningkite.lightningserver.definition.ServerSetting
-import com.lightningkite.lightningserver.definition.StartupTask
-import com.lightningkite.lightningserver.http.DefaultExceptionHttpHandler
-import com.lightningkite.lightningserver.http.ExceptionHttpHandler
-import com.lightningkite.lightningserver.http.HttpBuilder
-import com.lightningkite.lightningserver.http.HttpEndpoint
-import com.lightningkite.lightningserver.http.HttpHandler
-import com.lightningkite.lightningserver.http.delete
-import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.http.head
-import com.lightningkite.lightningserver.http.intercept
-import com.lightningkite.lightningserver.http.options
-import com.lightningkite.lightningserver.http.patch
-import com.lightningkite.lightningserver.http.post
-import com.lightningkite.lightningserver.http.put
+import com.lightningkite.lightningserver.LightningServerDsl
+import com.lightningkite.lightningserver.definition.*
+import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.MutablePathSpecMap
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.serialization.MediaTypeCoder
+import com.lightningkite.lightningserver.serialization.MediaTypeDecoder
 import com.lightningkite.lightningserver.serialization.MediaTypeDecoderRegistry
+import com.lightningkite.lightningserver.serialization.MediaTypeEncoder
 import com.lightningkite.lightningserver.serialization.MediaTypeEncoderRegistry
+import com.lightningkite.lightningserver.serialization.serializerOrContextual
+import com.lightningkite.lightningserver.websockets.WebSocketHandler
+import com.lightningkite.lightningserver.websockets.WebSocketTopic
 import com.lightningkite.lightningserver.websockets.WebSocketsBuilder
+import com.lightningkite.services.Setting
+import com.lightningkite.services.SettingContext
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
-import com.lightningkite.lightningserver.definition.Runtime
 
 /**
  * [ServerBuilder] provides a fluent, type-safe API for defining your server configuration.
@@ -39,8 +28,8 @@ import com.lightningkite.lightningserver.definition.Runtime
  * resources and their locations. Once the definition is complete the [build] method is used to construct an immutable
  * [ServerDefinition] for runtime use.
  *
- * You don't typically use the registries inside of [ServerBuilder] directly, instead there is a provided builder dsl to do this
- * registration for you and in a safe manner. This dsl is accessed by subclassing [ServerBuilder] into your server definition.
+ * Registration is done through the provided builder dsl. Endpoints and tasks are registered using [bind] and settings are registered
+ * using [setting].
  *
  * Example:
  * ```kotlin
@@ -82,23 +71,192 @@ public abstract class ServerBuilder : Extendable {
 
     protected val path: PathSpec0 get() = PathSpec.root // just for convenience
 
-    public val settings: ListRegistry<ServerSetting<*, *>> = ListRegistry()
+    private val settings: ListRegistry<ServerSetting<*, *>> = ListRegistry()
 
-    public val http: HttpBuilder = HttpBuilder()
-    public val websockets: WebSocketsBuilder = WebSocketsBuilder()
-    public var exceptionHandler: ExceptionHttpHandler = DefaultExceptionHttpHandler
+    private val http: HttpBuilder = HttpBuilder()
+    private val websockets: WebSocketsBuilder = WebSocketsBuilder()
+    private var exceptionHandler: ExceptionHttpHandler = DefaultExceptionHttpHandler
 
-    public val startupTasks: MapRegistry<PathSpec0, StartupTask> = MapRegistry()
-    public val schedules: MapRegistry<PathSpec0, ScheduledTask> = MapRegistry()
-    public val tasks: MapRegistry<PathSpec0, Task<*>> = MapRegistry()
+    private val startupTasks: MapRegistry<PathSpec0, StartupTask> = MapRegistry()
+    private val schedules: MapRegistry<PathSpec0, ScheduledTask> = MapRegistry()
+    private val tasks: MapRegistry<PathSpec0, Task<*>> = MapRegistry()
 
-    public val mediaTypeDecoders: MediaTypeDecoderRegistry = MediaTypeDecoderRegistry()
-    public val mediaTypeEncoders: MediaTypeEncoderRegistry = MediaTypeEncoderRegistry()
+    private val mediaTypeDecoders: MediaTypeDecoderRegistry = MediaTypeDecoderRegistry()
+    private val mediaTypeEncoders: MediaTypeEncoderRegistry = MediaTypeEncoderRegistry()
 
     public override val extensions: MutableExtensions = MutableExtensions()
 
-    public val imports: MapRegistry<PathSpec0, ModularServerDefinition> = MapRegistry()
-    public val modules: MapRegistry<PathSpec0, ServerBuilder> = MapRegistry()
+    private val imports: MapRegistry<PathSpec0, ModularServerDefinition> = MapRegistry()
+    private val modules: MapRegistry<PathSpec0, ServerBuilder> = MapRegistry()
+
+    @LightningServerDsl
+    protected infix fun <PATH : PathSpec, HANDLER : HttpHandler<PATH>> HttpEndpoint<PATH>.bind(handler: HANDLER): HANDLER {
+        http.register(this, handler)
+        return handler
+    }
+
+    @LightningServerDsl
+    protected infix fun <PATH : PathSpec, STORAGE> PATH.bind(handler: WebSocketHandler<PATH, STORAGE>): WebSocketHandler<PATH, STORAGE> {
+        websockets.register(this, handler)
+        return handler
+    }
+
+    @LightningServerDsl
+    protected infix fun <T> PathSpec0.bind(task: Task<T>): Task<T> {
+        tasks.register(this, task)
+        return task
+    }
+
+    @LightningServerDsl
+    protected infix fun PathSpec0.bind(startupTask: StartupTask): StartupTask {
+        startupTasks.register(this, startupTask)
+        return startupTask
+    }
+
+    @LightningServerDsl
+    protected infix fun PathSpec0.bind(schedule: ScheduledTask): ScheduledTask {
+        schedules.register(this, schedule)
+        return schedule
+    }
+
+    @LightningServerDsl
+    protected fun <PATH : PathSpec, T> PATH.topic(type: KSerializer<T>): WebSocketTopic<PATH, T> {
+        val topic = WebSocketTopic<PATH, T>(type)
+        websockets.topics.register(this, topic)
+        return topic
+    }
+
+    @LightningServerDsl
+    protected fun <Setting, Result> setting(setting: ServerSetting<Setting, Result>): ServerSetting<Setting, Result> {
+        settings.register(setting)
+        return setting
+    }
+
+    @LightningServerDsl
+    protected fun <Setting, Result> setting(
+        name: String,
+        default: Setting,
+        serializer: KSerializer<Setting>,
+        optional: Boolean = false,
+        getter: SettingContext.(Setting) -> Result,
+    ): ServerSetting<Setting, Result> =
+        setting(
+            ServerSetting(
+                name,
+                default,
+                serializer,
+                optional,
+            ) { value -> getter(this, value) }
+        )
+
+    @LightningServerDsl
+    protected fun <SETTING : Setting<RESULT>, RESULT> setting(
+        name: String,
+        default: SETTING,
+        serializer: KSerializer<SETTING>,
+        optional: Boolean = false,
+    ): ServerSetting<SETTING, RESULT> =
+        setting(
+            ServerSetting(
+                name,
+                default,
+                serializer,
+                optional,
+            )
+        )
+
+    @LightningServerDsl
+    protected inline fun <reified SETTING : Setting<RESULT>, RESULT> setting(
+        name: String,
+        default: SETTING,
+        optional: Boolean = false,
+    ): ServerSetting<SETTING, RESULT> =
+        setting(
+            ServerSetting(
+                name,
+                default,
+                serializerOrContextual<SETTING>(),
+                optional,
+            )
+        )
+
+    @LightningServerDsl
+    protected fun <Result> setting(
+        name: String,
+        default: Result,
+        serializer: KSerializer<Result>,
+        optional: Boolean = false,
+    ): ServerSetting.Direct<Result> {
+        val setting = ServerSetting(
+            name,
+            default,
+            serializer,
+            optional,
+        )
+        settings.register(setting)
+        return setting
+    }
+
+    @LightningServerDsl
+    protected inline fun <reified Setting, Result> setting(
+        name: String,
+        default: Setting,
+        optional: Boolean = false,
+        crossinline getter: SettingContext.(Setting) -> Result,
+    ): ServerSetting<Setting, Result> =
+        setting(
+            ServerSetting(
+                name,
+                default,
+                serializerOrContextual<Setting>(),
+                optional,
+            ) { value -> getter(this, value) }
+        )
+
+    @LightningServerDsl
+    protected inline fun <reified Result> setting(
+        name: String,
+        default: Result,
+        optional: Boolean = false,
+    ): ServerSetting.Direct<Result> =
+        setting(
+            name,
+            default,
+            serializerOrContextual<Result>(),
+            optional,
+        )
+
+    @LightningServerDsl
+    protected infix fun <T : ServerBuilder> PathSpec0.bind(module: T): T {
+        modules.register(this, module)
+        return module
+    }
+
+    @LightningServerDsl
+    protected infix fun PathSpec0.bind(import: ModularServerDefinition): ModularServerDefinition {
+        imports.register(this, import)
+        return import
+    }
+
+    @LightningServerDsl
+    protected infix fun PathSpec0.bind(import: ServerDefinition): ServerDefinition {
+        imports.register(this, ModularServerDefinition(import))
+        return import
+    }
+
+    protected fun register(decoder: MediaTypeDecoder) {
+        mediaTypeDecoders.register(decoder)
+    }
+
+    protected fun register(decoder: MediaTypeEncoder) {
+        mediaTypeEncoders.register(decoder)
+    }
+
+    protected fun register(coder: MediaTypeCoder) {
+        mediaTypeDecoders.register(coder)
+        mediaTypeEncoders.register(coder)
+    }
+
 
     /**
      * Builds a complete, flattened [ServerDefinition] ready for runtime use.
@@ -160,7 +318,7 @@ public abstract class ServerBuilder : Extendable {
      * @see build
      * @see modularBuild
      */
-    public fun shallowBuild(): ServerDefinition = ServerDefinition(
+    private fun shallowBuild(): ServerDefinition = ServerDefinition(
         internalSerializersModule = internalSerialization,
         externalSerializersModule = externalSerialization,
         httpInterceptors = http.interceptors.interceptors,
@@ -187,6 +345,4 @@ public abstract class ServerBuilder : Extendable {
         mediaTypeDecoders = mediaTypeDecoders,
         mediaTypeEncoders = mediaTypeEncoders,
     )
-
-    internal var modulePath: PathSpec0 = PathSpec.root
 }
