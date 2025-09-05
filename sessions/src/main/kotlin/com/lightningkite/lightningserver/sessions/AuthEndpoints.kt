@@ -82,7 +82,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     )
 
     context(_: ServerRuntime)
-    private suspend fun newSession(
+    protected suspend fun newSession(
         request: LogInRequest,
         result: ProofsCheckResult<ID>
     ): Pair<Session<SUBJECT, ID>, RefreshToken>? {

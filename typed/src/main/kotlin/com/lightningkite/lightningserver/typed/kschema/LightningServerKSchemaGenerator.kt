@@ -18,8 +18,7 @@ import com.lightningkite.services.database.virtualTypeReference
 
 
 public context(runtime: ServerRuntime)
-val lightningServerKSchema: LightningServerKSchema
-    get() {
+val lightningServerKSchema: LightningServerKSchema get() {
     val registry = SerializationRegistry(runtime.externalSerialization.serializersModule).also {
         it.registerShared()
     }
