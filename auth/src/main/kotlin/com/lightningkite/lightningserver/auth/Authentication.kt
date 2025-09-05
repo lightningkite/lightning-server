@@ -22,11 +22,13 @@ import kotlinx.serialization.encodeToString
 import kotlin.String
 import kotlin.time.Duration
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 context(server: ServerRuntime)
 public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
     principalType: PrincipalType<SUBJECT, ID>,
     id: ID,
+    sessionId: Uuid?,
     issuedAt: Instant = server.clock.now(),
     limitTo: RequestPredicates? = null,
     forbid: RequestPredicates? = null,
@@ -36,6 +38,7 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
     principalType = principalType,
     id = id,
     rawId = principalType.idString(id),
+    sessionId = sessionId,
     issuedAt = issuedAt,
     limitTo = limitTo,
     forbid = forbid,
@@ -47,6 +50,7 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
 public class Authentication<SUBJECT : HasId<*>> private constructor(
     public val principalName: String,
     public val rawId: String,
+    public val sessionId: Uuid?,
     public val issuedAt: Instant,
     public val limitTo: RequestPredicates? = null,
     public val forbid: RequestPredicates? = null,
@@ -57,6 +61,7 @@ public class Authentication<SUBJECT : HasId<*>> private constructor(
         principalType: PrincipalType<SUBJECT, *>,
         id: Comparable<*>,
         rawId: String,
+        sessionId: Uuid?,
         issuedAt: Instant,
         limitTo: RequestPredicates?,
         forbid: RequestPredicates?,
@@ -65,6 +70,7 @@ public class Authentication<SUBJECT : HasId<*>> private constructor(
     ) : this(
         principalName = principalType.name,
         rawId = rawId,
+        sessionId,
         issuedAt,
         limitTo,
         forbid,
@@ -157,6 +163,7 @@ public class Authentication<SUBJECT : HasId<*>> private constructor(
                     val mask = Authentication<HasId<AnyId>>(
                         principal,
                         rawId = masquerade.substringAfter('/'),
+                        sessionId = null,
                         issuedAt = server.clock.now(),
                         limitTo = auth.limitTo,
                         forbid = auth.forbid,
@@ -196,6 +203,7 @@ public class Authentication<SUBJECT : HasId<*>> private constructor(
         Authentication(
             principalName,
             rawId,
+            sessionId,
             issuedAt,
             limitTo = limitTo?.copy(builder = builder) ?: RequestPredicates.Builder().apply(builder).build().takeUnless { it.isEmpty() },
             forbid,
@@ -207,6 +215,7 @@ public class Authentication<SUBJECT : HasId<*>> private constructor(
         Authentication(
             principalName,
             rawId,
+            sessionId,
             issuedAt,
             limitTo,
             forbid = forbid?.copy(builder = builder) ?: RequestPredicates.Builder().apply(builder).build().takeUnless { it.isEmpty() },

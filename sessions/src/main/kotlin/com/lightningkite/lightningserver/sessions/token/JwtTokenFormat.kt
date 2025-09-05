@@ -16,7 +16,6 @@ import com.lightningkite.lightningserver.encryption.verify
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.sessions.Authentication
-import com.lightningkite.lightningserver.sessions.sessionId
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.json.Json
 import kotlin.io.encoding.Base64
@@ -25,7 +24,7 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 public class JwtTokenFormat(
-    public val hasher: RuntimeDeferred<Signer.WithId> = secretBasis.signer("jwt"),
+    public val hasher: RuntimeDeferred<Signer> = secretBasis.signer("jwt"),
     public val expiration: Duration = 5.minutes,
     public val issuerOverride: String? = null,
     public val audienceOverride: String? = null,
@@ -79,13 +78,13 @@ public class JwtTokenFormat(
 
 
     context(server: ServerRuntime)
-    private suspend fun Signer.WithId.signJwt(claims: JwtClaims): String = buildString {
+    private suspend fun Signer.signJwt(claims: JwtClaims): String = buildString {
         val withDefaults = Json(server.internalSerialization.json) { encodeDefaults = true; explicitNulls = false }
         val encoder = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
 
         append(
             encoder.encode(
-                withDefaults.encodeToString(JwtHeader(alg = id)).encodeToByteArray()
+                withDefaults.encodeToString(JwtHeader(alg = name)).encodeToByteArray()
             )
         )
         append('.')
@@ -101,8 +100,8 @@ public class JwtTokenFormat(
     }
 
     context(server: ServerRuntime)
-    private suspend fun Signer.WithId.verifyJwt(token: String, requiredAudience: String? = null): JwtClaims? {
-        val decoder = Base64.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
+    private suspend fun Signer.verifyJwt(token: String, requiredAudience: String? = null): JwtClaims? {
+        val decoder = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
 
         val parts = token.split('.')
 

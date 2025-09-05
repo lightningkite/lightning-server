@@ -168,7 +168,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         label,
         expires,
         stale,
-        limitTo = RequestPredicates(scopes = scopes),
+        limitTo = if(scopes.isEmpty() || scopes == setOf("*")) null else RequestPredicates(scopes = scopes),
         forbid = null,
         oauthClient,
         derivedFrom
@@ -308,6 +308,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             principal, Authentication(
                 principalType = principal,
                 id = id,
+                sessionId = null,
                 issuedAt = now(),
                 limitTo = limitTo,
                 forbid = forbid

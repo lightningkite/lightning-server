@@ -27,7 +27,7 @@ class SignerTests {
             repeat(100) {
                 val signer = getSigner(it.toString())
 
-                println("Testing ${signer.id}($it)")
+                println("Testing ${signer.name}($it)")
                 signer.test()
             }
         }

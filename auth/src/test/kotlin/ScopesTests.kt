@@ -66,7 +66,7 @@ class ScopesTests {
         test: context(ServerRuntime) (Authentication<*>) -> Unit
     ) {
         TestRunner(Server).run {
-            test(Authentication(User, Uuid.random(), limitTo = limitTo, forbid = forbid))
+            test(Authentication(User, Uuid.random(), null, limitTo = limitTo, forbid = forbid))
         }
     }
 

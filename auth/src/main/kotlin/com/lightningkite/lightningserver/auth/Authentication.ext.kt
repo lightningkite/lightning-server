@@ -31,4 +31,4 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>
     issuedAt: Instant = server.clock.now(),
     limitTo: RequestPredicates? = null,
     forbid: RequestPredicates? = null,
-): Authentication<SUBJECT> = Authentication(this, subject._id, issuedAt, limitTo, forbid)
+): Authentication<SUBJECT> = Authentication(this, subject._id, null, issuedAt, limitTo, forbid)

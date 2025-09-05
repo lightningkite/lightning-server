@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.sessions.proofs.Proof
 import com.lightningkite.lightningserver.sessions.proofs.ProofOption
 import com.lightningkite.services.data.AdminTableColumns
 import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.IndexSet
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -39,6 +40,7 @@ public data class SubSessionRequest(
 @GenerateDataClassPaths
 @Serializable
 @AdminTableColumns(["label", "subjectId", "scopes"])
+@IndexSet(["subjectId", "terminated", "expires", "stale"])
 public data class Session<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     override val _id: Uuid = Uuid.random(),
     val secretHash: String,
@@ -55,13 +57,7 @@ public data class Session<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     val limitTo: RequestPredicates? = null,
     val forbid: RequestPredicates? = null
 //    @References(OauthClient::class) val oauthClient: String? = null,
-) : HasId<Uuid> {
-    public object Id : SerializableCache.Key<Uuid> {
-        override val id: String = "session-id"
-        override val serializer: KSerializer<Uuid> = Uuid.serializer()
-    }
-}
-
+) : HasId<Uuid>
 
 @Serializable
 public data class LogInRequest(
