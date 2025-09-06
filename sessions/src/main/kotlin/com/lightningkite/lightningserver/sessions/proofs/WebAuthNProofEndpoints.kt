@@ -5,10 +5,8 @@ import com.lightningkite.lightningserver.ForbiddenException
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.signer
-import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
@@ -65,8 +63,8 @@ public class WebAuthNProofEndpoints(
         property = null,
         strength = 10
     )
-    public val registerInterface: Documentable.InterfaceInfo = Documentable.InterfaceInfo("WebAuthNRegistrationEndpoints", listOf())
-    public val proveInterface: Documentable.InterfaceInfo = Documentable.InterfaceInfo("WebAuthNProofEndpoints", listOf())
+    public val registerInterface: Documentable.OldInterfaceInfo = Documentable.OldInterfaceInfo("WebAuthNRegistrationEndpoints", listOf())
+    public val proveInterface: Documentable.OldInterfaceInfo = Documentable.OldInterfaceInfo("WebAuthNProofEndpoints", listOf())
 
 
     context(_: ServerRuntime)

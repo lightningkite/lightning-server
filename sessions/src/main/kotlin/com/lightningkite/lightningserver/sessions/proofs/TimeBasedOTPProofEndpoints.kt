@@ -5,10 +5,8 @@ import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.signer
-import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
@@ -28,7 +26,6 @@ import kotlinx.serialization.builtins.serializer
 import java.security.SecureRandom
 import java.util.concurrent.TimeUnit
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.minutes
 import kotlin.time.toJavaInstant
 import kotlin.uuid.Uuid
 
@@ -56,8 +53,8 @@ public class TimeBasedOTPProofEndpoints(
         property = null,
         strength = 10
     )
-    public val loggedInInterfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo("AuthenticatedOneTimePasswordProofClientEndpoints", listOf()) // Version 5: Rename to "AuthenticatedTimeBasedOneTimePasswordProofClientEndpoints"
-    public val interfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo("OneTimePasswordProofClientEndpoints", listOf()) // Version 5: Rename to "TimeBasedOneTimePasswordProofClientEndpoints"
+    public val loggedInInterfaceInfo: Documentable.OldInterfaceInfo = Documentable.OldInterfaceInfo("AuthenticatedOneTimePasswordProofClientEndpoints", listOf()) // Version 5: Rename to "AuthenticatedTimeBasedOneTimePasswordProofClientEndpoints"
+    public val interfaceInfo: Documentable.OldInterfaceInfo = Documentable.OldInterfaceInfo("OneTimePasswordProofClientEndpoints", listOf()) // Version 5: Rename to "TimeBasedOneTimePasswordProofClientEndpoints"
 
     context(_: ServerRuntime)
     private val active

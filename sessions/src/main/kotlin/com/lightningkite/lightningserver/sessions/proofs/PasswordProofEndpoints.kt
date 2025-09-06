@@ -2,15 +2,12 @@ package com.lightningkite.lightningserver.sessions.proofs
 
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.auth.*
-import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.signer
-import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
@@ -51,8 +48,8 @@ public class PasswordProofEndpoints(
         property = null,
         strength = 10
     )
-    public val loggedInInterfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo("AuthenticatedPasswordProofClientEndpoints", listOf())
-    public val interfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo("PasswordProofClientEndpoints", listOf())
+    public val loggedInInterfaceInfo: Documentable.OldInterfaceInfo = Documentable.OldInterfaceInfo("AuthenticatedPasswordProofClientEndpoints", listOf())
+    public val interfaceInfo: Documentable.OldInterfaceInfo = Documentable.OldInterfaceInfo("PasswordProofClientEndpoints", listOf())
 
     context(_: ServerRuntime)
     private val active

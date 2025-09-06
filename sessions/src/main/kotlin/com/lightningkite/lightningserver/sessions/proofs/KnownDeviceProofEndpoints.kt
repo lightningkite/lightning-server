@@ -2,11 +2,9 @@ package com.lightningkite.lightningserver.sessions.proofs
 
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.auth.*
-import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.signer
@@ -47,8 +45,8 @@ public class KnownDeviceProofEndpoints(
         property = null,
         strength = 3
     )
-    public val interfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo("KnownDeviceProofClientEndpoints", listOf())
-    public val loggedInInterfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo("AuthenticatedKnownDeviceProofClientEndpoints", listOf())
+    public val interfaceInfo: Documentable.OldInterfaceInfo = Documentable.OldInterfaceInfo("KnownDeviceProofClientEndpoints", listOf())
+    public val loggedInInterfaceInfo: Documentable.OldInterfaceInfo = Documentable.OldInterfaceInfo("AuthenticatedKnownDeviceProofClientEndpoints", listOf())
 
     context(_: ServerRuntime)
     private val active

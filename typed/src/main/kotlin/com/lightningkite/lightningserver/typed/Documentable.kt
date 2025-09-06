@@ -2,21 +2,14 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.definition.Locationed
-import com.lightningkite.lightningserver.definition.MutableExtensions
 import com.lightningkite.lightningserver.definition.ScheduledTask
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.definition.Task
-import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.getValue
 import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpHandler
-import com.lightningkite.lightningserver.pathing.MutablePathSpecMap
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.pathing.PathSpecMap
 import com.lightningkite.lightningserver.pathing.commonPrefix
-import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
 import kotlinx.serialization.KSerializer
@@ -28,9 +21,9 @@ public interface Documentable {
     public val summary: String
     public val description: String
 
-    public val belongsToInterface: InterfaceInfo?
+    public val belongsToInterface: OldInterfaceInfo?
 
-    public class InterfaceInfo(public val fullyQualifiedName: String, public val typeArguments: List<KSerializer<*>>)
+    public class OldInterfaceInfo(public val fullyQualifiedName: String, public val typeArguments: List<KSerializer<*>>)
 }
 
 internal fun ServerDefinition.location(documentable: Documentable): PathSpec = when (documentable) {
@@ -69,7 +62,7 @@ internal val ServerDefinition.apiHttpHandlers: List<ApiHttpHandler<*, *, *, *>>
 internal val ServerDefinition.apiWebsocketHandlers: List<ApiWebsocketHandler<*, *, *, *, *>>
     get() = endpoints.values.mapNotNull { it.websocket as? ApiWebsocketHandler<*, *, *, *, *> }
 
-internal val ServerDefinition.interfaces: List<Locationed<PathSpec, Documentable.InterfaceInfo>>
+internal val ServerDefinition.interfaces: List<Locationed<PathSpec, Documentable.OldInterfaceInfo>>
     get() {
         val e = endpoints
             .values

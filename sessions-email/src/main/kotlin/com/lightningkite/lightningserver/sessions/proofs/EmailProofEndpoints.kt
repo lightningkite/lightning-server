@@ -22,7 +22,7 @@ public class EmailProofEndpoints(
     property = "email",
     proofSigner = proofSigner,
     pin = pin,
-    interfaceInfo = Documentable.InterfaceInfo("EmailProofClientEndpoints", listOf()),
+    interfaceInfo = Documentable.OldInterfaceInfo("EmailProofClientEndpoints", listOf()),
     exampleTarget = "test@test.com"
 ) {
     init { path.docGroup = "EmailProof" }

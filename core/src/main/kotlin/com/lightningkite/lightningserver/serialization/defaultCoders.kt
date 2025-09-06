@@ -3,7 +3,6 @@ package com.lightningkite.lightningserver.serialization
 import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.register
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.services.data.Data

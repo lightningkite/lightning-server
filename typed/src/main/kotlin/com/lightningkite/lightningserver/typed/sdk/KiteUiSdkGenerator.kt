@@ -77,12 +77,10 @@ private object KiteUiSdkGenerator {
         ?: (this as? DataClassPathSerializer<*>)?.inner?.let { arrayOf(it) }
         ?: arrayOf()
 
-    context(definition: ServerDefinition)
+//    context(definition: ServerDefinition)
     private fun KSerializer<*>.kotlinTypeString(): String {
         return when (this.descriptor.kind) {
-            StructureKind.MAP -> "Map<String, ${
-                this.mapValueElement()!!.kotlinTypeString()
-            }>"
+            StructureKind.MAP -> "Map<String, ${this.mapValueElement()!!.kotlinTypeString()}>"
 
             StructureKind.LIST -> "List<${this.listElement()!!.kotlinTypeString()}>"
             SerialKind.CONTEXTUAL -> descriptor.capturedKClass!!.qualifiedName!!

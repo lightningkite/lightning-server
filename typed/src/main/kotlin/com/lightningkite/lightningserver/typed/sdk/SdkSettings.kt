@@ -1,4 +1,4 @@
-package com.lightningkite.lightningserver.sdk
+package com.lightningkite.lightningserver.typed.sdk
 
 import com.lightningkite.lightningserver.definition.Extendable
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder

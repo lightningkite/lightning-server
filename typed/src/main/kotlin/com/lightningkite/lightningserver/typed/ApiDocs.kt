@@ -3,7 +3,6 @@ package com.lightningkite.lightningserver.typed
 import com.lightningkite.lightningserver.auth.options
 import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.html
 import com.lightningkite.lightningserver.http.HttpEndpoint

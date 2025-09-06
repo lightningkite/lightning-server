@@ -11,16 +11,12 @@ import com.lightningkite.lightningserver.auth.auth
 import com.lightningkite.lightningserver.auth.authReaders
 import com.lightningkite.lightningserver.auth.fetch
 import com.lightningkite.lightningserver.auth.id
-import com.lightningkite.lightningserver.auth.isSuperUser
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.auth.register
 import com.lightningkite.lightningserver.data.Request
-import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.definition.generalSettings
-import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
@@ -71,8 +67,8 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     private val spath = Session.path(principal.subjectSerializer, principal.idSerializer)
 
-    public val belongsToInterface: Documentable.InterfaceInfo = Documentable.InterfaceInfo( "UserAuthClientEndpoints", listOf(principal.idSerializer))
-    public val loggedInBelongsToInterface: Documentable.InterfaceInfo = Documentable.InterfaceInfo(
+    public val belongsToInterface: Documentable.OldInterfaceInfo = Documentable.OldInterfaceInfo( "UserAuthClientEndpoints", listOf(principal.idSerializer))
+    public val loggedInBelongsToInterface: Documentable.OldInterfaceInfo = Documentable.OldInterfaceInfo(
         "AuthenticatedUserAuthClientEndpoints",
         listOf(principal.subjectSerializer, principal.idSerializer)
     )

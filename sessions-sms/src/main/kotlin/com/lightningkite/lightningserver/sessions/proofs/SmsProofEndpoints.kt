@@ -24,7 +24,7 @@ public class SmsProofEndpoints(
     proofSigner = proofSigner,
     pin = pin,
     exampleTarget = "800-1000-100",
-    interfaceInfo = Documentable.InterfaceInfo("SmsProofClientEndpoints", listOf()),
+    interfaceInfo = Documentable.OldInterfaceInfo("SmsProofClientEndpoints", listOf()),
     strength = 5,
 ) {
     init {

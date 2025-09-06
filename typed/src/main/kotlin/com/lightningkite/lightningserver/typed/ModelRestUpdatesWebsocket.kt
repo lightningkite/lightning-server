@@ -3,17 +3,13 @@ package com.lightningkite.lightningserver.typed
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.auth.auth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.topic
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpec1
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.send
-import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.websockets.WebSocketClose
-import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
@@ -29,8 +25,6 @@ import com.lightningkite.services.database.SerializableProperty
 import com.lightningkite.services.database.simplify
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.serializer
-import kotlin.time.Duration.Companion.days
 
 
 // Condition<T>, CollectionUpdates<T, ID>
@@ -55,7 +49,7 @@ public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
         override val outputType: KSerializer<CollectionUpdates<T, ID>> = CollectionUpdates.serializer(info.serializer, info.idSerializer)
         override val summary: String = "Updates"
         override val description: String = "Streams updates about items that fulfill your condition."
-        override val belongsToInterface: Documentable.InterfaceInfo = Documentable.InterfaceInfo("ClientModelRestEndpoints", listOf(
+        override val belongsToInterface: Documentable.OldInterfaceInfo = Documentable.OldInterfaceInfo("ClientModelRestEndpoints", listOf(
             info.serializer,
             info.idSerializer
         ))

@@ -19,7 +19,7 @@ public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT
     override val outputType: KSerializer<OUTPUT>
     override val summary: String
     override val description: String
-    override val belongsToInterface: Documentable.InterfaceInfo?
+    override val belongsToInterface: Documentable.OldInterfaceInfo?
 
     public val successCode: HttpStatus
     public val errorCases: List<LSError>

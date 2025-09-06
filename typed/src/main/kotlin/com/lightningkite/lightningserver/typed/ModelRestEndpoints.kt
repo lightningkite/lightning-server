@@ -4,16 +4,21 @@ import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.ForbiddenException
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.NotFoundException
-import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec.Segment
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpec1
 import com.lightningkite.lightningserver.pathing.first
 import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.typed.sdk.InterfaceInfo
+import com.lightningkite.lightningserver.typed.sdk.SdkModuleInfo
+import com.lightningkite.lightningserver.typed.sdk.clientInterface
+import com.lightningkite.lightningserver.typed.sdk.defaultInfo
+import com.lightningkite.lightningserver.typed.sdk.pascalCase
+import com.lightningkite.lightningserver.typed.sdk.sdk
 import com.lightningkite.lightningserver.typed.sdk.titleCase
+import com.lightningkite.lightningserver.typed.sdk.withParams
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.KSerializer
@@ -25,15 +30,16 @@ import kotlinx.serialization.builtins.serializer
 public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     public val info: ModelInfo<USER, T, ID>,
 ) : ServerBuilder() {
+    init {
+        sdk.clientInterface = ClientModelRestEndpoints::class.withParams(info.serializer, info.idSerializer)
+        sdk.defaultInfo = SdkModuleInfo(
+            interfaceName = info.collectionName.pascalCase() + "RestEndpoints",
+            valueName = "rest"
+        )
+    }
 
     private val detailPath = path.arg(Segment.Wildcard("id", info.idSerializer))
     private val bulkPath = path.path("bulk")
-
-    init { path.docGroup = info.collectionName }
-    private val belongsToInterface = Documentable.InterfaceInfo("ClientModelRestEndpoints", listOf(
-        info.serializer,
-        info.idSerializer
-    ))
 
     public val permissions: ApiHttpHandler<PathSpec0, USER, Unit, ModelPermissions<T>> =
         path.path("_permissions_").get bind ApiHttpHandler(
@@ -42,7 +48,6 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = Unit.serializer(),
             outputType = ModelPermissions.serializer(info.serializer),
             auth = info.auth,
-            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { _: Unit ->
@@ -58,7 +63,6 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = Query.serializer(info.serializer),
             outputType = ListSerializer(info.serializer),
             auth = info.auth,
-            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { input: Query<T> ->
@@ -76,7 +80,6 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = Query.serializer(info.serializer),
             outputType = ListSerializer(info.serializer),
             auth = info.auth,
-            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { input: Query<T> ->
@@ -94,7 +97,6 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = QueryPartial.serializer(info.serializer),
             outputType = ListSerializer(PartialSerializer(info.serializer)),
             auth = info.auth,
-            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { input: QueryPartial<T> ->
@@ -112,7 +114,6 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = Unit.serializer(),
             outputType = info.serializer,
             auth = info.auth,
-            belongsToInterface = belongsToInterface,
             errorCases = listOf(
                 LSError(
                     http = HttpStatus.NotFound.code,
@@ -135,7 +136,6 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = ListSerializer(info.serializer),
             outputType = ListSerializer(info.serializer),
             auth = info.auth,
-            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { values: List<T> ->
@@ -159,7 +159,6 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = info.serializer,
             outputType = info.serializer,
             auth = info.auth,
-            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { value: T ->
@@ -184,7 +183,6 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = info.serializer,
             outputType = info.serializer,
             auth = info.auth,
-            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { value: T ->
@@ -211,7 +209,6 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = ListSerializer(info.serializer),
             outputType = ListSerializer(info.serializer),
             auth = info.auth,
-            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { values: List<T> ->
@@ -236,7 +233,6 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = info.serializer,
             outputType = info.serializer,
             auth = info.auth,
-            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { value: T ->
@@ -263,7 +259,6 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = MassModification.serializer(info.serializer),
             outputType = Int.serializer(),
             auth = info.auth,
-            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { input: MassModification<T> ->
@@ -288,7 +283,6 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = Modification.serializer(info.serializer),
             outputType = EntryChange.serializer(info.serializer),
             auth = info.auth,
-            belongsToInterface = belongsToInterface,
             errorCases = listOf(
                 LSError(
                     http = HttpStatus.NotFound.code,
@@ -321,7 +315,6 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = Modification.serializer(info.serializer),
             outputType = info.serializer,
             auth = info.auth,
-            belongsToInterface = belongsToInterface,
             errorCases = listOf(
                 LSError(
                     http = HttpStatus.NotFound.code,
@@ -355,7 +348,6 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = Partial.serializer(info.serializer),
             outputType = info.serializer,
             auth = info.auth,
-            belongsToInterface = belongsToInterface,
             errorCases = listOf(
                 LSError(
                     http = HttpStatus.NotFound.code,
@@ -389,7 +381,6 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = Condition.serializer(info.serializer),
             outputType = Int.serializer(),
             auth = info.auth,
-            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { filter: Condition<T> ->
@@ -405,7 +396,6 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = Unit.serializer(),
             outputType = Unit.serializer(),
             auth = info.auth,
-            belongsToInterface = belongsToInterface,
             errorCases = listOf(
                 LSError(
                     http = HttpStatus.NotFound.code,
@@ -431,7 +421,6 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = Condition.serializer(info.serializer),
             outputType = Int.serializer(),
             auth = info.auth,
-            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { condition: Condition<T> ->
@@ -447,7 +436,6 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = Condition.serializer(info.serializer),
             outputType = Int.serializer(),
             auth = info.auth,
-            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { condition: Condition<T> ->
@@ -463,7 +451,6 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = GroupCountQuery.serializer(info.serializer),
             outputType = MapSerializer(String.serializer(), Int.serializer()),
             auth = info.auth,
-            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { condition: GroupCountQuery<T> ->
@@ -482,7 +469,6 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = AggregateQuery.serializer(info.serializer),
             outputType = Double.serializer().nullable,
             auth = info.auth,
-            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { condition: AggregateQuery<T> ->
@@ -504,7 +490,6 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = GroupAggregateQuery.serializer(info.serializer),
             outputType = MapSerializer(String.serializer(), Double.serializer().nullable),
             auth = info.auth,
-            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { condition: GroupAggregateQuery<T> ->
@@ -528,7 +513,6 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = GroupCountQuery.serializer(info.serializer),
             outputType = MapSerializer(String.serializer(), Int.serializer()),
             auth = info.auth,
-            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { condition: GroupCountQuery<T> ->
@@ -549,7 +533,6 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = GroupAggregateQuery.serializer(info.serializer),
             outputType = MapSerializer(String.serializer(), Double.serializer().nullable),
             auth = info.auth,
-            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { condition: GroupAggregateQuery<T> ->

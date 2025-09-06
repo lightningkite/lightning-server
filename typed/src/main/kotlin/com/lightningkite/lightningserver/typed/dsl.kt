@@ -19,7 +19,7 @@ public fun <PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT> ApiHttpHandler(
     successCode: HttpStatus = HttpStatus.OK,
     errorCases: List<LSError> = emptyList(),
     examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = emptyList(),
-    belongsToInterface: Documentable.InterfaceInfo? = null,
+    belongsToInterface: Documentable.OldInterfaceInfo? = null,
     implementation: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT
 ): ApiHttpHandler<PATH, USER, INPUT, OUTPUT> =
     object : ApiHttpHandler<PATH, USER, INPUT, OUTPUT> {
@@ -31,7 +31,7 @@ public fun <PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT> ApiHttpHandler(
         override val successCode: HttpStatus = successCode
         override val errorCases: List<LSError> = errorCases
         override val examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = examples
-        override val belongsToInterface: Documentable.InterfaceInfo? get() = belongsToInterface
+        override val belongsToInterface: Documentable.OldInterfaceInfo? get() = belongsToInterface
 
         context(server: ServerRuntime)
         override suspend fun handle(access: HttpAccess<PATH, USER>, input: INPUT): OUTPUT = access.implementation(input)
@@ -44,7 +44,7 @@ public inline fun <PATH: PathSpec, USER: HasId<*>?, reified INPUT, reified OUTPU
     successCode: HttpStatus = HttpStatus.OK,
     errorCases: List<LSError> = emptyList(),
     examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = emptyList(),
-    belongsToInterface: Documentable.InterfaceInfo? = null,
+    belongsToInterface: Documentable.OldInterfaceInfo? = null,
     noinline implementation: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT
 ): ApiHttpHandler<PATH, USER, INPUT, OUTPUT> =
     ApiHttpHandler(summary, description, serializerOrContextual<INPUT>(), serializerOrContextual<OUTPUT>(), auth, successCode, errorCases, examples, belongsToInterface, implementation)

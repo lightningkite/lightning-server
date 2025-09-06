@@ -3,14 +3,11 @@ package com.lightningkite.lightningserver.sessions.proofs
 import com.lightningkite.lightningserver.auth.AnyId
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.noAuth
-import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.signer
-import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
@@ -28,7 +25,7 @@ public abstract class PinBasedProofEndpoints(
     public val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
     public val pin: PinHandler,
     public val exampleTarget: String,
-    public val interfaceInfo: Documentable.InterfaceInfo ,
+    public val interfaceInfo: Documentable.OldInterfaceInfo,
     public val strength: Int = 10,
 ) : ServerBuilder(), StartedProofMethod {
 

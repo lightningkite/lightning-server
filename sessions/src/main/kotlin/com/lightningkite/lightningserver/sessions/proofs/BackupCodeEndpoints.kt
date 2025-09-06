@@ -2,15 +2,12 @@ package com.lightningkite.lightningserver.sessions.proofs
 
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.auth.*
-import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.signer
-import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
@@ -35,12 +32,10 @@ import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.UseContextualSerialization
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import java.security.SecureRandom
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.Uuid
 
 @Serializable
@@ -67,10 +62,10 @@ public class BackupCodeEndpoints(
         proofMethods.register(this)
     }
 
-    public val loggedInInterfaceInfo: Documentable.InterfaceInfo =
-        Documentable.InterfaceInfo("AuthenticatedBackupCodeProofClientEndpoints", listOf())
-    public val interfaceInfo: Documentable.InterfaceInfo =
-        Documentable.InterfaceInfo("BackupCodeProofClientEndpoints", listOf())
+    public val loggedInInterfaceInfo: Documentable.OldInterfaceInfo =
+        Documentable.OldInterfaceInfo("AuthenticatedBackupCodeProofClientEndpoints", listOf())
+    public val interfaceInfo: Documentable.OldInterfaceInfo =
+        Documentable.OldInterfaceInfo("BackupCodeProofClientEndpoints", listOf())
 
     override val info: ProofMethodInfo = ProofMethodInfo(
         via = "backupcode",

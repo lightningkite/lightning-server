@@ -244,15 +244,15 @@ public abstract class ServerBuilder : Extendable {
         return import
     }
 
-    protected fun register(decoder: MediaTypeDecoder) {
+    public fun register(decoder: MediaTypeDecoder) {
         mediaTypeDecoders.register(decoder)
     }
 
-    protected fun register(decoder: MediaTypeEncoder) {
+    public fun register(decoder: MediaTypeEncoder) {
         mediaTypeEncoders.register(decoder)
     }
 
-    protected fun register(coder: MediaTypeCoder) {
+    public fun register(coder: MediaTypeCoder) {
         mediaTypeDecoders.register(coder)
         mediaTypeEncoders.register(coder)
     }
@@ -309,16 +309,11 @@ public abstract class ServerBuilder : Extendable {
      *
      * This method called in both the [build] and [modularBuild] methods.
      *
-     * The build process includes:
-     * - Applying HTTP and WebSocket interceptors to all handlers
-     * - Combining HTTP and WebSocket endpoints into [ServerPathEndpoints]
-     * - Converting all registries into their corresponding read-only versions
-     *
      * @return A [ServerDefinition] containing only this builder's direct configuration
      * @see build
      * @see modularBuild
      */
-    private fun shallowBuild(): ServerDefinition = ServerDefinition(
+    public fun shallowBuild(): ServerDefinition = ServerDefinition(
         internalSerializersModule = internalSerialization,
         externalSerializersModule = externalSerialization,
         httpInterceptors = http.interceptors.interceptors,
@@ -326,12 +321,8 @@ public abstract class ServerBuilder : Extendable {
         endpoints = MutablePathSpecMap<ServerPathEndpoints>().apply {
             for (path in http.handlers.keys + websockets.handlers.keys) {
                 put(path, ServerPathEndpoints(
-                    http = http
-                        .handlers[path]
-                        ?: emptyMap(),
-
-                    websocket = websockets
-                        .handlers[path]
+                    http = http.handlers[path] ?: emptyMap(),
+                    websocket = websockets.handlers[path]
                 ))
             }
         },
