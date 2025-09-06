@@ -2,8 +2,9 @@ package com.lightningkite.lightningserver.sessions
 
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.Authentication
+import com.lightningkite.lightningserver.auth.GrantedScope
+import com.lightningkite.lightningserver.auth.GrantedScopes
 import com.lightningkite.lightningserver.auth.PrincipalType
-import com.lightningkite.lightningserver.auth.RequestPredicates
 import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.data.get
 import com.lightningkite.lightningserver.data.set
@@ -19,16 +20,14 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
     id: ID,
     sessionId: Uuid?,
     issuedAt: Instant = server.clock.now(),
-    limitTo: RequestPredicates? = null,
-    forbid: RequestPredicates? = null,
+    scopes: Set<GrantedScope> = GrantedScopes.root,
     cache: SerializableCache? = null
 ): Authentication<SUBJECT> =
     Authentication(
-        principalType,
-        id,
-        sessionId,
-        issuedAt,
-        limitTo,
-        forbid,
+        principalType = principalType,
+        id = id,
+        sessionId = sessionId,
+        issuedAt = issuedAt,
+        scopes = scopes,
         cache = cache
     )

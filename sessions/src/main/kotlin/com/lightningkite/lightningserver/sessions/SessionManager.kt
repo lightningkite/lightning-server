@@ -5,8 +5,10 @@ import com.lightningkite.lightningserver.UnauthorizedException
 import com.lightningkite.lightningserver.auth.AnyId
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.Authentication
+import com.lightningkite.lightningserver.auth.GrantedScope
+import com.lightningkite.lightningserver.auth.GrantedScopes
 import com.lightningkite.lightningserver.auth.PrincipalType
-import com.lightningkite.lightningserver.auth.RequestPredicates
+import com.lightningkite.lightningserver.auth.RequiredScope
 import com.lightningkite.lightningserver.auth.auth
 import com.lightningkite.lightningserver.auth.authReaders
 import com.lightningkite.lightningserver.auth.fetch
@@ -60,8 +62,17 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     database: Runtime<Database>,
     public val tokenFormat: Runtime<TokenFormat> = Runtime { PrivateTinyTokenFormat() },
 ) : ServerBuilder(), Authentication.Reader<SUBJECT> {
-    init { register(principal) }
-    init { authReaders.register(this) }
+    public companion object {
+        public val sessionsScope: RequiredScope = RequiredScope("auth:sessions")
+        public val selfScope: RequiredScope = RequiredScope("auth:self")
+    }
+    init {
+        register(principal)
+    }
+
+    init {
+        authReaders.register(this)
+    }
 
     context(server: ServerRuntime)
     public abstract suspend fun sessionExpiration(subject: SUBJECT): Instant?
@@ -71,7 +82,8 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     private val spath = Session.path(principal.subjectSerializer, principal.idSerializer)
 
-    public val belongsToInterface: Documentable.InterfaceInfo = Documentable.InterfaceInfo( "UserAuthClientEndpoints", listOf(principal.idSerializer))
+    public val belongsToInterface: Documentable.InterfaceInfo =
+        Documentable.InterfaceInfo("UserAuthClientEndpoints", listOf(principal.idSerializer))
     public val loggedInBelongsToInterface: Documentable.InterfaceInfo = Documentable.InterfaceInfo(
         "AuthenticatedUserAuthClientEndpoints",
         listOf(principal.subjectSerializer, principal.idSerializer)
@@ -79,7 +91,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     public val sessionInfo: ModelInfo<SUBJECT, Session<SUBJECT, ID>, Uuid> =
         database.modelInfo(
-            auth = principal.auth(scopes = setOf("auth:sessions")),
+            auth = principal.auth(scopes = setOf(sessionsScope)),
             serializer = Session.serializer(principal.subjectSerializer, principal.idSerializer),
             idSerializer = Uuid.serializer(),
             collectionName = principal.name + "Session",
@@ -130,8 +142,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         label: String? = null,
         expires: Instant? = null,
         stale: Instant? = null,
-        limitTo: RequestPredicates? = null,
-        forbid: RequestPredicates? = null,
+        scopes: Set<GrantedScope> = GrantedScopes.root,
         oauthClient: String? = null,
         derivedFrom: Uuid? = null,
     ): Pair<Session<SUBJECT, ID>, RefreshToken> {
@@ -143,8 +154,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             label = label,
             expires = expires,
             stale = stale,
-            limitTo = limitTo,
-            forbid = forbid,
+            scopes = scopes,
             createdAt = now(),
             lastUsed = now(),
 //            oauthClient = oauthClient,  TODO: OAuth
@@ -154,34 +164,13 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         }
     }
 
-    context(_: ServerRuntime)
-    protected suspend fun newSession(
-        subjectId: ID,
-        label: String? = null,
-        expires: Instant? = null,
-        stale: Instant? = null,
-        scopes: Set<String>,
-        oauthClient: String? = null,
-        derivedFrom: Uuid? = null,
-    ): Pair<Session<SUBJECT, ID>, RefreshToken> = newSession(
-        subjectId,
-        label,
-        expires,
-        stale,
-        limitTo = if(scopes.isEmpty() || scopes == setOf("*")) null else RequestPredicates(scopes = scopes),
-        forbid = null,
-        oauthClient,
-        derivedFrom
-    )
-
     context(server: ServerRuntime)
     public fun Session<SUBJECT, ID>.toAuth(): Authentication<SUBJECT> = Authentication(
         principalType = principal,
         id = subjectId,
         sessionId = _id,
         issuedAt = createdAt,
-        limitTo = limitTo,
-        forbid = forbid
+        scopes = scopes,
     )
 
     context(server: ServerRuntime)
@@ -241,7 +230,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     public val createSubSession: ApiHttpHandler<PathSpec0, SUBJECT, SubSessionRequest, String> =
         path.path("sub-session").post bind ApiHttpHandler(
-            auth = principal.auth(scopes = setOf("self")),
+            auth = sessionInfo.auth.subscope(ModelInfo.createSubscope),
             belongsToInterface = loggedInBelongsToInterface,
             inputType = SubSessionRequest.serializer(),
             outputType = String.serializer(),
@@ -255,8 +244,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                     label = request.label,
                     subjectId = auth.id,
                     derivedFrom = auth.sessionId,
-                    limitTo = request.limitTo,
-                    forbid = request.forbid,
+                    scopes = request.scopes,
                     expires = session.expires
                         ?.let { minOf(it, request.expires ?: Instant.DISTANT_FUTURE) }
                         ?: request.expires,
@@ -269,50 +257,41 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     public val self: ApiHttpHandler<PathSpec0, SUBJECT, Unit, SUBJECT> =
         path.path("self").get bind ApiHttpHandler(
             summary = "Get Self",
-            auth = principal.auth(scopes = setOf("self")),
+            auth = principal.auth(scopes = setOf(selfScope)),
             belongsToInterface = loggedInBelongsToInterface,
             inputType = Unit.serializer(),
             outputType = principal.subjectSerializer,
             implementation = { _ -> auth.fetch() }
         )
 
-    context(_: ServerRuntime)
-    public suspend fun presignToken(
-        session: Session<SUBJECT, ID>,
-        limitTo: RequestPredicates?,
-        forbid: RequestPredicates? = null
-    ): String {
-        require(limitTo != null || forbid != null) { "presignToken must provide limitations or forbids" }
-
-        return tokenFormat().create(
-            principal, Authentication(
-                principalType = principal,
-                id = session.subjectId,
-                sessionId = session._id,
-                issuedAt = now(),
-                limitTo = limitTo,
-                forbid = forbid
-            )
-        )
-    }
-
-    context(_: ServerRuntime)
-    public suspend fun presignToken(
-        id: ID,
-        limitTo: RequestPredicates?,
-        forbid: RequestPredicates? = null
-    ): String {
-        require(limitTo != null || forbid != null) { "presignToken must provide limitations or forbids" }
-
-        return tokenFormat().create(
-            principal, Authentication(
-                principalType = principal,
-                id = id,
-                sessionId = null,
-                issuedAt = now(),
-                limitTo = limitTo,
-                forbid = forbid
-            )
-        )
-    }
+//    context(_: ServerRuntime)
+//    public suspend fun presignToken(
+//        session: Session<SUBJECT, ID>,
+//        scopes: Set<GrantedScope> = GrantedScopes.root,
+//    ): String {
+//        return tokenFormat().create(
+//            principal, Authentication(
+//                principalType = principal,
+//                id = session.subjectId,
+//                sessionId = session._id,
+//                issuedAt = now(),
+//                scopes = scopes
+//            )
+//        )
+//    }
+//
+//    context(_: ServerRuntime)
+//    public suspend fun presignToken(
+//        id: ID,
+//        scopes: Set<GrantedScope> = GrantedScopes.root,
+//    ): String {
+//        return tokenFormat().create(
+//            principal, Authentication(
+//                principalType = principal,
+//                id = id,
+//                issuedAt = now(),
+//                scopes = scopes
+//            )
+//        )
+//    }
 }

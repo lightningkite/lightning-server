@@ -1,10 +1,7 @@
 import com.lightningkite.lightningserver.auth.Authentication
+import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.auth.PrincipalType
-import com.lightningkite.lightningserver.auth.RequestPredicates
-import com.lightningkite.lightningserver.auth.Scope
-import com.lightningkite.lightningserver.auth.acceptsScope
-import com.lightningkite.lightningserver.auth.acceptsAllScopes
-import com.lightningkite.lightningserver.auth.acceptsScopes
+import com.lightningkite.lightningserver.auth.meetsRequirements
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.TestRunner
@@ -19,29 +16,29 @@ import kotlin.uuid.Uuid
 class ScopesTests {
     @Test
     fun singleScopeAcceptance() {
-        assert("auth".acceptsScope("auth"))
-        assert("auth".acceptsScope("auth:sub"))
-        assert("auth:sub".acceptsScope("auth:sub"))
-        assert(!"auth:sub".acceptsScope("auth"))
-        assert("auth".acceptsScope("auth:sub1:sub2:sub3"))
+        assert(GrantedScope("auth").meetsRequirements(RequiredScope("auth")))
+        assert(GrantedScope("auth").meetsRequirements(RequiredScope("auth:sub")))
+        assert(GrantedScope("auth:sub").meetsRequirements(RequiredScope("auth:sub")))
+        assert(!GrantedScope("auth:sub").meetsRequirements(RequiredScope("auth")))
+        assert(GrantedScope("auth").meetsRequirements(RequiredScope("auth:sub1:sub2:sub3")))
     }
 
     @Test
     fun multiScopeAcceptance() {
         assert(
-            setOf("auth", "scope").acceptsAllScopes(setOf("auth", "scope"))
+            setOf("auth", "scope").mapTo(HashSet(), ::GrantedScope).meetsRequirements(setOf("auth", "scope").mapTo(HashSet(), ::RequiredScope))
         )
         assert(
-            setOf("auth", "scope").acceptsAllScopes(setOf("auth:sub", "scope:sub"))
+            setOf("auth", "scope").mapTo(HashSet(), ::GrantedScope).meetsRequirements(setOf("auth:sub", "scope:sub").mapTo(HashSet(), ::RequiredScope))
         )
         assert(
-            setOf("auth:sub", "scope").acceptsAllScopes(setOf("auth:sub", "scope:sub"))
+            setOf("auth:sub", "scope").mapTo(HashSet(), ::GrantedScope).meetsRequirements(setOf("auth:sub", "scope:sub").mapTo(HashSet(), ::RequiredScope))
         )
         assert(
-            setOf("*").acceptsAllScopes(setOf("auth", "scope", "*"))
+            setOf("*").mapTo(HashSet(), ::GrantedScope).meetsRequirements(setOf("auth", "scope", "*").mapTo(HashSet(), ::RequiredScope))
         )
         assert(
-            !setOf("auth:sub", "scope").acceptsAllScopes(setOf("*"))
+            !setOf("auth:sub", "scope").mapTo(HashSet(), ::GrantedScope).meetsRequirements(setOf("*").mapTo(HashSet(), ::RequiredScope))
         )
     }
 
@@ -61,56 +58,68 @@ class ScopesTests {
     }
 
     private fun testAuth(
-        limitTo: RequestPredicates? = null,
-        forbid: RequestPredicates? = null,
+        scopes: Set<GrantedScope> = GrantedScopes.root,
         test: context(ServerRuntime) (Authentication<*>) -> Unit
     ) {
         TestRunner(Server).run {
-            test(Authentication(User, Uuid.random(), null, limitTo = limitTo, forbid = forbid))
+            test(Authentication(User, Uuid.random(), scopes = scopes))
         }
     }
 
     @Test
     fun limitToScopes() {
-        fun testLimits(limits: Set<Scope>, actual: Set<Scope>, expected: Boolean) {
+        fun testLimits(required: Set<String>, granted: Set<String>, permitted: Boolean) {
             testAuth(
-                limitTo = RequestPredicates(scopes = limits)
+                scopes = granted.mapTo(HashSet(), ::GrantedScope)
             ) {
-                assertEquals(expected, it.acceptsScopes(actual), "limits: ${it.limitTo?.scopes}  actual: $actual")
+                assertEquals(permitted, it.meetsRequirements(required.mapTo(HashSet(), ::RequiredScope)), "limits: ${it.scopes}  actual: $required")
             }
         }
 
-        testLimits(setOf("auth"), setOf("auth"), true)
-        testLimits(setOf("auth"), setOf("auth:sub"), true)
-        testLimits(setOf("auth"), setOf("auth:sub:sub"), true)
-        testLimits(setOf("auth:sub"), setOf("auth:sub:sub"), true)
-        testLimits(setOf("auth:sub", "other"), setOf("auth:sub:sub"), true)
-        testLimits(setOf("auth:sub"), setOf("other"), false)
-        testLimits(setOf("other:sub"), setOf("other"), false)
-        testLimits(setOf("*"), setOf("other"), true)
-        testLimits(setOf("other"), setOf("*", "other"), false)
-    }
-
-    @Test
-    fun forbidScopes() {
-        fun testForbidden(forbid: Set<Scope>, actual: Set<Scope>, expected: Boolean) {
-            testAuth(
-                forbid = RequestPredicates(scopes = forbid)
-            ) {
-                assertEquals(expected, it.acceptsScopes(actual), "forbid: ${it.limitTo?.scopes}  actual: $actual")
-            }
-        }
-
-        testForbidden(setOf("auth"), setOf("some", "other", "scopes", "auth:sub"), false)
-
-        testForbidden(setOf("auth"), setOf("auth"), false)
-        testForbidden(setOf("auth"), setOf("auth:sub"), false)
-        testForbidden(setOf("auth"), setOf("auth:sub:sub"), false)
-        testForbidden(setOf("auth:sub"), setOf("auth:sub:sub"), false)
-        testForbidden(setOf("auth:sub", "other"), setOf("auth:sub:sub"), false)
-        testForbidden(setOf("auth:sub"), setOf("other"), true)
-        testForbidden(setOf("other:sub"), setOf("other"), true)
-        testForbidden(setOf("*"), setOf("other"), false)
-        testForbidden(setOf("other"), setOf("*", "other"), false)
+        testLimits(
+            granted = setOf("auth"),
+            required = setOf("auth"),
+            permitted = true
+        )
+        testLimits(
+            granted = setOf("auth"),
+            required = setOf("auth:sub"),
+            permitted = true
+        )
+        testLimits(
+            granted = setOf("auth"),
+            required = setOf("auth:sub:sub"),
+            permitted = true
+        )
+        testLimits(
+            granted = setOf("auth:sub"),
+            required = setOf("auth:sub:sub"),
+            permitted = true
+        )
+        testLimits(
+            granted = setOf("auth:sub", "other"),
+            required = setOf("auth:sub:sub"),
+            permitted = true
+        )
+        testLimits(
+            granted = setOf("auth:sub"),
+            required = setOf("other"),
+            permitted = false
+        )
+        testLimits(
+            granted = setOf("other:sub"),
+            required = setOf("other"),
+            permitted = false
+        )
+        testLimits(
+            granted = setOf("*"),
+            required = setOf("other"),
+            permitted = true
+        )
+        testLimits(
+            granted = setOf("other"),
+            required = setOf("*", "other"),
+            permitted = false
+        )
     }
 }

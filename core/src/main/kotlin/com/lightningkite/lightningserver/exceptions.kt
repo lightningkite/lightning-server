@@ -6,15 +6,6 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.RawPath
 import kotlinx.serialization.Serializable
 
-@Serializable
-public data class LSError(
-    val http: Int,
-    val detail: String = "",
-    val message: String = "",
-    val data: String = "",
-    val stackTrace: String? = null,
-)
-
 public fun LSError.toException(
     message: String = this.message,
     data: String = this.data

@@ -23,6 +23,7 @@ import com.lightningkite.services.database.*
 import com.lightningkite.services.files.*
 import dev.whyoleg.cryptography.algorithms.HMAC
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.modules.SerializersModule
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.uuid.Uuid
@@ -51,6 +52,12 @@ public class UploadEarlyEndpoint(
             },
             key = secretBasis().HMAC_Blocking("upload-files")
         )
+    }
+
+    override val externalSerialization: Runtime<SerializersModule> = Runtime.Cached {
+        SerializersModule {
+            contextual(ServerFile::class, serializer())
+        }
     }
 
     public val endpoint: ApiHttpHandler<PathSpec0, HasId<*>?, Unit, UploadInformation> =

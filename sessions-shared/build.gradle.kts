@@ -48,6 +48,9 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
+                api(project(":core-shared"))
+                api(project(":auth-shared"))
+                api(project(":typed-shared"))
                 api(libs.kotlinXJson)
                 api(libs.kotlinXDatetime)
                 api(libs.serviceAbstractionsDatabase)

@@ -4,6 +4,8 @@ import com.lightningkite.lightningserver.auth.AnyId
 import com.lightningkite.lightningserver.auth.AuthAny
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.PrincipalType
+import com.lightningkite.lightningserver.auth.RequiredScope
+import com.lightningkite.lightningserver.auth.Subscope
 import com.lightningkite.lightningserver.definition.ListRegistryExtension
 import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.ServerDefinition
@@ -14,6 +16,7 @@ import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.sessions.proofs.ProofMethod.Companion.baseScope
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.services.database.HasId
 import kotlin.time.Duration.Companion.minutes
@@ -27,6 +30,10 @@ public val ServerRuntime.proofMethods: List<ProofMethod> get() = server.proofMet
 
 public interface ProofMethod {
     public val info: ProofMethodInfo
+
+    public companion object {
+        public val baseScope: RequiredScope = RequiredScope("auth:proofs")
+    }
 
     context(server: ServerRuntime)
     public suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> established(
@@ -55,6 +62,6 @@ public interface ExternalProofMethod : ProofMethod {
 
 public val ProofMethod.proofMethodAuth: AuthRequirement.Authenticated get() =
     AuthRequirement.Authenticated(
-        scopes = setOf("auth:proofs:${info.via}"),
+        scopes = setOf(baseScope.subscope(Subscope(info.via))),
         maxAge = 10.minutes
     )

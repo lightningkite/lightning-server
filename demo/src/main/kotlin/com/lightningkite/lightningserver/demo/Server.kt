@@ -253,11 +253,6 @@ object Server : ServerBuilder() {
         HttpResponse.plainText(auth.id.toString())
     }
 
-    override val externalSerialization: Runtime<SerializersModule> = Runtime.Cached {
-        SerializersModule {
-            contextual(ServerFile::class, uploadEarly.serializer())
-        }
-    }
     init {
         registerBasicMediaTypeCoders()
     }

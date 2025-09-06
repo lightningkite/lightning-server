@@ -1,8 +1,8 @@
 package com.lightningkite.lightningserver.sessions.token
 
 import com.lightningkite.lightningserver.auth.Authentication
+import com.lightningkite.lightningserver.auth.GrantedScope
 import com.lightningkite.lightningserver.auth.PrincipalType
-import com.lightningkite.lightningserver.auth.RequestPredicates
 import com.lightningkite.lightningserver.auth.id
 import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.definition.Runtime
@@ -46,7 +46,7 @@ public class JwtTokenFormat(
                 exp = now().plus(expiration).epochSeconds,
                 iat = auth.issuedAt.epochSeconds,
                 nbf = now().epochSeconds,
-                scope = auth.limitTo?.scopes?.joinToString(" "),
+                scope = auth.scopes.joinToString(" "),
                 thp = null, // TODO: Third parties
                 cache = server.internalSerialization.json.encodeToString(auth.cache)
             )
@@ -71,7 +71,7 @@ public class JwtTokenFormat(
             id = server.internalSerialization.json.decodeFromString(handler.idSerializer, sub),
             sessionId = claims.sid,
             issuedAt = Instant.fromEpochSeconds(claims.iat),
-            limitTo = claims.scope?.let { RequestPredicates(scopes = it.split(' ').toSet()) },
+            scopes = claims.scope!!.split(' ').mapTo(HashSet(), ::GrantedScope),
             cache = claims.cache?.let { server.internalSerialization.json.decodeFromString<SerializableCache>(it) }
         )
     }

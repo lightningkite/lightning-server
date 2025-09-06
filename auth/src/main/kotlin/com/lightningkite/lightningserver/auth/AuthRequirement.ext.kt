@@ -24,20 +24,26 @@ public typealias NoAuth = AuthRequirement<HasId<AnyId>?>
 public typealias AuthAny = AuthRequirement<HasId<AnyId>>
 
 public val noAuth: AuthRequirement.None = AuthRequirement.None
-public val anyAuth: AuthRequirement.AnyAuth = AuthRequirement.AnyAuth
+public val anyAuth: AuthAny = AuthRequirement.Authenticated()
 
 public val recentRootAuth: AuthAny =
     AuthRequirement.Authenticated(
-        scopes = setOf("*"), // root access
+        scopes = RequiredScopes.root, // root access
         maxAge = 10.minutes
     )
 
 public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.auth(
-    scopes: Set<String> = setOf("*"),
+    scopes: Set<RequiredScope> = RequiredScopes.root,
     maxAge: Duration? = null,
     requirement: (suspend context(ServerRuntime) (Authentication<SUBJECT>) -> Boolean)? = null
 ): AuthRequirement<SUBJECT> =
     AuthRequirement.AuthenticatedAs(this, scopes, maxAge, requirement)
+public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.auth(
+    scope: RequiredScope,
+    maxAge: Duration? = null,
+    requirement: (suspend context(ServerRuntime) (Authentication<SUBJECT>) -> Boolean)? = null
+): AuthRequirement<SUBJECT> =
+    AuthRequirement.AuthenticatedAs(this, setOf(scope), maxAge, requirement)
 
 
 private val <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.options: Set<AuthRequirement<SUBJECT>>

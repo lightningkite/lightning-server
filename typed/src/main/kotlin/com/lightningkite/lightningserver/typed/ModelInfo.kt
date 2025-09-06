@@ -2,6 +2,8 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.Authentication
+import com.lightningkite.lightningserver.auth.RequiredScope
+import com.lightningkite.lightningserver.auth.Subscope
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.CollectionChanges
@@ -22,7 +24,14 @@ import kotlinx.serialization.KSerializer
 public interface ModelInfo<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> {
     public val serializer: KSerializer<T>
     public val idSerializer: KSerializer<ID>
+
     public val auth: AuthRequirement<SUBJECT>
+    public companion object {
+        public val createSubscope: Subscope = Subscope("create")
+        public val readSubscope: Subscope = Subscope("read")
+        public val updateSubscope: Subscope = Subscope("update")
+        public val deleteSubscope: Subscope = Subscope("delete")
+    }
 
     public val collectionName: String
         get() = serializer.descriptor.serialName.substringBefore('/').substringBefore('<').substringAfterLast('.')
@@ -42,6 +51,7 @@ public interface ModelInfo<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<I
 public inline fun <reified USER : HasId<*>?, reified T : HasId<ID>, reified ID : Comparable<ID>> Runtime<Database>.modelInfo(
     auth: AuthRequirement<USER>,
     collectionName: String = serializerOrContextual<T>().descriptor.serialName.substringBefore('/').substringBefore('<').substringAfterLast('.'),
+    scopeName: Subscope = Subscope(collectionName.lowercase()),
     crossinline signals: context(ServerRuntime) (Table<T>) -> Table<T> = { it },
     crossinline log: context(ServerRuntime) AuthAccess<USER>?.(Table<T>) -> Table<T> = { it },
     crossinline systemAccess: context(ServerRuntime) (Table<T>) -> Table<T> = { it },
@@ -52,7 +62,7 @@ public inline fun <reified USER : HasId<*>?, reified T : HasId<ID>, reified ID :
     override val serializer: KSerializer<T> = serializerOrContextual<T>()
     override val idSerializer: KSerializer<ID> = serializerOrContextual<ID>()
 
-    override val auth: AuthRequirement<USER> = auth
+    override val auth: AuthRequirement<USER> = auth.subscope(scopeName)
 
     context(server: ServerRuntime)
     override fun baseCollection(): Table<T> = this@modelInfo().collection(serializer, collectionName)
@@ -88,6 +98,7 @@ public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> Runtime<Databa
     serializer: KSerializer<T>,
     idSerializer: KSerializer<ID>,
     collectionName: String = serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.'),
+    scopeName: Subscope = Subscope(collectionName.lowercase()),
     signals: context(ServerRuntime) (Table<T>) -> Table<T> = { it },
     log: context(ServerRuntime) AuthAccess<USER>?.(Table<T>) -> Table<T> = { it },
     systemAccess: context(ServerRuntime) (Table<T>) -> Table<T> = { it },
@@ -98,7 +109,7 @@ public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> Runtime<Databa
     override val serializer: KSerializer<T> = serializer
     override val idSerializer: KSerializer<ID> = idSerializer
 
-    override val auth: AuthRequirement<USER> = auth
+    override val auth: AuthRequirement<USER> = auth.subscope(scopeName)
 
     context(server: ServerRuntime)
     override fun baseCollection(): Table<T> = this@modelInfo().collection(serializer, collectionName)

@@ -18,7 +18,8 @@ dependencies {
     api(libs.serviceAbstractionsBasis)
     api(libs.serviceAbstractionsShouldBeStandardLibrary)
     api(libs.kotlinHtmlJvm)
-    
+    api(project(":core-shared"))
+
     // Multiplatform cryptography libraries
     api(libs.kotlinxCryptoCore)
     api(libs.kotlinxCryptoOptimal)
