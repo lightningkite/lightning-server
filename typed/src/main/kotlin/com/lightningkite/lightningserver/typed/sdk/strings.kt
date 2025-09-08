@@ -10,7 +10,7 @@ import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.descriptors.capturedKClass
 
 @OptIn(ExperimentalSerializationApi::class)
-context(_: SdkFormat)
+context(_: SdkFormat) // to avoid namespace pollution
 public fun KSerializer<*>.kotlinTypeString(): String {
     return when (this.descriptor.kind) {
         StructureKind.MAP -> "Map<String, ${this.mapValueElement()!!.kotlinTypeString()}>"

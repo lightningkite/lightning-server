@@ -10,9 +10,6 @@ import com.lightningkite.lightningserver.definition.getValue
 import com.lightningkite.lightningserver.definition.setValue
 import com.lightningkite.lightningserver.definition.toMutableExtensions
 import com.lightningkite.lightningserver.pathing.PathSpec0
-import kotlin.collections.component1
-import kotlin.collections.component2
-import kotlin.collections.iterator
 import kotlin.collections.set
 import kotlin.uuid.Uuid
 
@@ -37,7 +34,7 @@ private fun ServerDefinition.withSdkId(): Pair<ServerDefinition, Uuid> {
 private object ModuleRegistry : MutableExtensions.DegradingKey<MutableMap<Uuid, SdkModuleInfo>, Map<Uuid, SdkModuleInfo>> {
     override fun default(): MutableMap<Uuid, SdkModuleInfo> = HashMap()
     override fun MutableMap<Uuid, SdkModuleInfo>.include(other: Map<Uuid, SdkModuleInfo>, pathSpec: PathSpec0) {
-        for ((key, value) in other) if (!containsKey(key)) put(key, value)
+        /*No-op, we want to keep registered modules specific per-module, not cascading.*/
     }
 }
 
@@ -54,8 +51,8 @@ public var SdkSettings.defaultInfo: SdkModuleInfo? by DefaultInterfaceName
 context(builder: ServerBuilder)
 public fun <S : ServerBuilder> module(
     module: S,
-    interfaceName: String = module.sdk.defaultInfo?.interfaceName ?: module::class.simpleName?.let { it.pascalCase() + "Api" } ?: throw IllegalArgumentException("Cannot infer name for anonymous object"),
-    valueName: String = module.sdk.defaultInfo?.valueName ?: interfaceName.camelCase().removeSuffix("Api")
+    interfaceName: String = module.sdkSettings.defaultInfo?.interfaceName ?: module::class.simpleName?.let { it.pascalCase() + "Api" } ?: throw IllegalArgumentException("Cannot infer name for anonymous object"),
+    valueName: String = module.sdkSettings.defaultInfo?.valueName ?: interfaceName.camelCase().removeSuffix("Api")
 ) : S {
     builder.extensions[ModuleRegistry][module.sdkId] = SdkModuleInfo(interfaceName, valueName)
     return module

@@ -1,10 +1,7 @@
 package com.lightningkite.lightningserver.typed.sdk
 
-import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.typed.functionName
 import com.lightningkite.services.data.KFile
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.builtins.serializer
 
 public object FetcherSdk : SdkFormat {
     override fun write(data: SdkServerDefinition, folder: KFile, packageName: String) {
@@ -22,54 +19,96 @@ public object FetcherSdk : SdkFormat {
         append('\n')
     }
 
-    private fun Appendable.writeInterface(data: SdkServerDefinition, packageName: String) {
+    public fun Appendable.writeInterface(data: SdkServerDefinition, packageName: String) {
         appendLine("package $packageName")
-        appendLine()
 
         data.asSequence()
             .flatMap { it.module.endpoints.keys.filterNotNull() }
             .flatMap { it.imports }
             .distinct()
-            .joinTo(this, "\n") { "import $it" }
+            .toList()
+            .takeUnless { it.isEmpty() }
+            ?.joinTo(this, "\n", prefix = "\n", postfix = "\n") { "import $it" }
 
-        appendLine()
-
-        data.traverse { (depth, _, module) ->
+        data.traverse { (depth, absPath, module) ->
             val extends = module.endpoints.keys.filterNotNull()
 
-            val functions = module.endpoints[null]?.asSequence()?.flatMap { (path, endpoints) ->
-                endpoints.http.map { (_, endpoint) ->
-                    val args = path.wildcards
-                        .map { "${it.name}: ${it.serializer.kotlinTypeString()}" }
-                        .plus(
-                            if (endpoint.inputType.isUnit()) emptyList()
-                            else listOf("input: ${endpoint.inputType.kotlinTypeString()}")
-                        )
+            val declaredFunctions = module.endpoints[null] // null is top-level endpoints, not part of an interface
+                ?.asSequence()
+                ?.flatMap { (path, endpoints) ->
+                    endpoints.http.map { (_, endpoint) ->
+                        val args = path.wildcards
+                            .map { "${it.name}: ${it.serializer.kotlinTypeString()}" }
+                            .plus(
+                                if (endpoint.inputType.isUnit()) emptyList()
+                                else listOf("input: ${endpoint.inputType.kotlinTypeString()}")
+                            )
 
-                    "suspend fun ${endpoint.functionName}(${args.joinToString()})" +
-                            if (endpoint.outputType.isUnit()) "" else ": ${endpoint.outputType.kotlinTypeString()}"
+                        "suspend fun ${endpoint.functionName}(${args.joinToString()})" +
+                                if (endpoint.outputType.isUnit()) "" else ": ${endpoint.outputType.kotlinTypeString()}"
+                    }
                 }
-            }?.toList() ?: emptyList()
+                ?.run { // making sure duplicate functions have distinct names
+                    val seen = HashMap<String, Int>()
+                    map {
+                        val count = seen[it]
 
-            if (functions.isNotEmpty() || extends.size != 1) {
+                        if (count == null) {
+                            seen[it] = 1
+                            return@map it
+                        }
+
+                        seen[it] = count + 1
+                        it.substringBefore('(') + (count + 1) + '(' + it.substringAfter('(')
+                    }
+                }
+                ?.toList()
+                ?: emptyList()
+
+            val isSingleInterface = declaredFunctions.isEmpty() && extends.size == 1
+
+            val interfaceRecurrence = siblings
+                .filter { it.module.info.interfaceName == module.info.interfaceName }
+                .takeUnless { it.isEmpty() }
+                ?.map { it.absolutePath.toString() }
+                ?.plus(absPath.toString())
+                ?.sorted()
+                ?.indexOf(absPath.toString())
+                ?: 0
+
+            if (!isSingleInterface) {
                 appendLine()
 
-                val interfaces = extends
+                val extendsInterfaces = extends
+                    .distinct()
                     .takeUnless { it.isEmpty() }
                     ?.joinToString(prefix = ": ") { it.kotlinString() }
                     ?: ""
 
-                appendDepth(depth, "interface ${module.info.interfaceName}$interfaces {")
+                val interfaceName = module.info.interfaceName + (interfaceRecurrence.takeUnless { it == 0 }?.plus(1) ?: "")
+                appendDepth(depth, "interface $interfaceName$extendsInterfaces {")
 
-                for (func in functions) appendDepth(depth + 1, func)
+                for (func in declaredFunctions) appendDepth(depth + 1, func)
 
-                traverseChildren()
+                traverseChildrenRecursively()
 
                 appendDepth(depth, "}")
             }
 
+            val valueRecurrence = siblings
+                .filter { it.module.info.valueName == module.info.valueName }
+                .takeUnless { it.isEmpty() }
+                ?.map { it.absolutePath.toString() }
+                ?.plus(absPath.toString())
+                ?.sorted()
+                ?.indexOf(absPath.toString())
+                ?: 0
+
             if (depth > 0) {
-                appendDepth(depth, "val ${module.info.valueName}: ${if (extends.size == 1) extends.first().kotlinString() else module.info.interfaceName}")
+                val valueName = module.info.valueName + (valueRecurrence.takeUnless { it == 0 }?.plus(1) ?: "")
+                appendDepth(depth,
+                    "val $valueName: ${if (isSingleInterface) extends.first().kotlinString() else module.info.interfaceName}"
+                )
             }
         }
     }

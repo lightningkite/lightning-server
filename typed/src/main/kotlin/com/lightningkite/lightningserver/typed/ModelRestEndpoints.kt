@@ -11,14 +11,13 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpec1
 import com.lightningkite.lightningserver.pathing.first
 import com.lightningkite.lightningserver.runtime.serverRuntime
-import com.lightningkite.lightningserver.typed.sdk.InterfaceInfo
 import com.lightningkite.lightningserver.typed.sdk.SdkModuleInfo
 import com.lightningkite.lightningserver.typed.sdk.clientInterface
 import com.lightningkite.lightningserver.typed.sdk.defaultInfo
 import com.lightningkite.lightningserver.typed.sdk.pascalCase
-import com.lightningkite.lightningserver.typed.sdk.sdk
+import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.lightningserver.typed.sdk.titleCase
-import com.lightningkite.lightningserver.typed.sdk.withParams
+import com.lightningkite.lightningserver.typed.sdk.info
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.KSerializer
@@ -31,8 +30,8 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
     public val info: ModelInfo<USER, T, ID>,
 ) : ServerBuilder() {
     init {
-        sdk.clientInterface = ClientModelRestEndpoints::class.withParams(info.serializer, info.idSerializer)
-        sdk.defaultInfo = SdkModuleInfo(
+        sdkSettings.clientInterface = ClientModelRestEndpoints::class.info(info.serializer, info.idSerializer)
+        sdkSettings.defaultInfo = SdkModuleInfo(
             interfaceName = info.collectionName.pascalCase() + "RestEndpoints",
             valueName = "rest"
         )
@@ -412,22 +411,6 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
                 Unit
             }
         )
-
-
-    public val countGet: ApiHttpHandler<PathSpec0, USER, Condition<T>, Int> =
-        path.path("count").get bind ApiHttpHandler(
-            summary = "Count",
-            description = "Gets the total number of ${info.collectionName}s matching the given condition.",
-            inputType = Condition.serializer(info.serializer),
-            outputType = Int.serializer(),
-            auth = info.auth,
-            errorCases = emptyList(),
-            examples = emptyList(),
-            implementation = { condition: Condition<T> ->
-                info.collection(this).count(condition)
-            }
-        )
-
 
     public val count: ApiHttpHandler<PathSpec0, USER, Condition<T>, Int> =
         path.path("count").post bind ApiHttpHandler(

@@ -64,7 +64,11 @@ object Module : ServerBuilder() {
 
     val inline = path.path("inline") bind Inlined
 
+    val inline2 = path.path("inline").path("again") bind Inlined
+
     val nest = path.path("second") bind module(SecondModule)
+
+    val duplicate = path.path("duplicate") bind module(SecondModule)
 
     val endpoint = path.path("endpoint").arg<String>("first").post bind testEndpoint
 }

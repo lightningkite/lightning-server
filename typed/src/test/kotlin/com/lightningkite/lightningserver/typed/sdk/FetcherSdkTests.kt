@@ -4,7 +4,7 @@ import com.lightningkite.services.data.KFile
 import kotlin.test.Test
 
 class FetcherSdkTests {
-    private val testPath = "C:\\Users\\huntd\\Lightning\\Projects\\lightning-server\\typed\\src\\test\\kotlin\\com\\lightningkite\\lightningserver\\typed\\sdk"
+    private val folder = KFile("./src/test/kotlin/com/lightningkite/lightningserver/typed/sdk/generated")
 
     private fun Appendable.appendDepth(depth: Int, value: CharSequence) {
         repeat(depth) { append('\t') }
@@ -28,13 +28,18 @@ class FetcherSdkTests {
         buildString {
             sdk.traverse {
                 appendDepth(it.depth, it.module.toString())
-                traverseChildren()
+                traverseChildrenRecursively()
             }
         }.let(::println)
     }
 
+    private fun KFile.overwrite(action: Appendable.() -> Unit) {
+        parent?.createDirectories()
+        sink().useAsAppendable(action)
+    }
+
     @Test
-    fun writeInterface() {
-        FetcherSdk.write(Server.modularBuild().sdk(), KFile("$testPath\\fetcher\\basic"), "com.lightningkite.lightningserver.typed.sdk")
+    fun testInterface() {
+        folder.then("Api.kt").overwrite { FetcherSdk.run { writeInterface(Server.modularBuild().sdk(), "com.lightningkite.lightningserver.typed.sdk") } }
     }
 }
