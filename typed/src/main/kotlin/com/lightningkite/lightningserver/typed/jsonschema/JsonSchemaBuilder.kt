@@ -6,11 +6,11 @@ import com.lightningkite.services.database.ConditionSerializer
 import com.lightningkite.services.database.KSerializerKey
 import com.lightningkite.services.database.ModificationSerializer
 import com.lightningkite.services.database.WrappingSerializer
+import com.lightningkite.services.database.childSerializersOrNull
 import com.lightningkite.services.database.innerElement
 import com.lightningkite.services.database.innerElement2
 import com.lightningkite.services.database.nullElement
 import com.lightningkite.services.database.serializableProperties
-import com.lightningkite.services.database.tryChildSerializers
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ArraySerializer
 import kotlinx.serialization.descriptors.*
@@ -64,6 +64,7 @@ public enum class JavascriptCoreType(public val isPrimitive: Boolean) {
 public data class JavascriptCoreTypeWithNullability(val inner: JavascriptCoreType, val nullable: Boolean = false)
 
 internal object JavascriptCoreTypeWithNullabilitySerializer : KSerializer<JavascriptCoreTypeWithNullability> {
+    @OptIn(ExperimentalSerializationApi::class)
     val multi = ArraySerializer(JavascriptCoreType.serializer())
     val single = JavascriptCoreType.serializer()
 
@@ -286,6 +287,7 @@ internal class JsonSchemaBuilder(
         }
     }
 
+    @OptIn(ExperimentalSerializationApi::class)
     operator fun get(
         serializer: KSerializer<*>,
         annotationsToApply: List<Annotation> = listOf(),
@@ -385,7 +387,7 @@ internal class JsonSchemaBuilder(
                             ).copy(
                                 title = propTitle
                             )
-                        } ?: ser.tryChildSerializers()?.withIndex()?.associate {
+                        } ?: ser.childSerializersOrNull()?.withIndex()?.associate {
                             val name = ser.descriptor.getElementName(it.index)
                             val propTitle = name.titleCase()
                             name to get(
@@ -425,6 +427,7 @@ internal class JsonSchemaBuilder(
         return current
     }
 
+    @OptIn(ExperimentalSerializationApi::class)
     @Suppress("UNCHECKED_CAST")
     fun KSerializer<*>.unwrap(): KSerializer<*> {
         return if(this.descriptor.isNullable) this.innerElement()

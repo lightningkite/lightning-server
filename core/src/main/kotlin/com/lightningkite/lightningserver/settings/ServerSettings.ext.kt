@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import kotlinx.serialization.DeserializationStrategy
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.StringFormat
 import kotlinx.serialization.json.Json
@@ -22,6 +23,7 @@ public infix fun <RESULT> ServerSetting<*, RESULT>.setStatic(value: RESULT) {
     with(builder) { this@setStatic setStatic value }
 }
 
+@OptIn(ExperimentalSerializationApi::class)
 public fun ServerSettings.loadFromFile(
     file: File,
     module: SerializersModule,

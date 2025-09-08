@@ -65,7 +65,7 @@ public inline fun <reified USER : HasId<*>?, reified T : HasId<ID>, reified ID :
     override val auth: AuthRequirement<USER> = auth.subscope(scopeName)
 
     context(server: ServerRuntime)
-    override fun baseCollection(): Table<T> = this@modelInfo().collection(serializer, collectionName)
+    override fun baseCollection(): Table<T> = this@modelInfo().table(serializer, collectionName)
 
     override val collectionName: String
         get() = collectionName
@@ -112,7 +112,7 @@ public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> Runtime<Databa
     override val auth: AuthRequirement<USER> = auth.subscope(scopeName)
 
     context(server: ServerRuntime)
-    override fun baseCollection(): Table<T> = this@modelInfo().collection(serializer, collectionName)
+    override fun baseCollection(): Table<T> = this@modelInfo().table(serializer, collectionName)
 
     override val collectionName: String
         get() = collectionName

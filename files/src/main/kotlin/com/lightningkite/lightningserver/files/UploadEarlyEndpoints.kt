@@ -46,7 +46,7 @@ public class UploadEarlyEndpoint(
             fileSystems = listOf(files()),
             onUse = { fileObject ->
                 runBlocking {
-                    database().collection<UploadForNextRequest>()
+                    database().table<UploadForNextRequest>()
                         .deleteManyIgnoringOld(condition { it.file eq ServerFile(fileObject.url) })
                 }
             },
@@ -74,7 +74,7 @@ public class UploadEarlyEndpoint(
                     expires = now().plus(expiration),
                     file = ServerFile(newFile.url)
                 )
-                database().collection<UploadForNextRequest>().insertOne(newItem)
+                database().table<UploadForNextRequest>().insertOne(newItem)
                 UploadInformation(
                     uploadUrl = newFile.uploadUrl(expiration),
                     futureCallToken = serializer().certifyForUse(newFile, expiration)
@@ -85,7 +85,7 @@ public class UploadEarlyEndpoint(
                     expires = now().plus(expiration),
                     file = ServerFile(newFile.url)
                 )
-                database().collection<UploadForNextRequest>().insertOne(newItem)
+                database().table<UploadForNextRequest>().insertOne(newItem)
                 UploadInformation(
                     uploadUrl = newFile.uploadUrl(expiration),
                     futureCallToken = serializer().certifyForUse(newFile, expiration)
@@ -106,7 +106,7 @@ public class UploadEarlyEndpoint(
     )
 
     public val cleanupSchedule: ScheduledTask = path.path("cleanupUploads") bind ScheduledTask(frequency = 1.days) {
-        database().collection<UploadForNextRequest>().deleteMany(condition { it.expires lt now() }).forEach {
+        database().table<UploadForNextRequest>().deleteMany(condition { it.expires lt now() }).forEach {
             try {
                 files().parseInternalUrl(it.file.location)!!.delete()
             } catch (e: Exception) {

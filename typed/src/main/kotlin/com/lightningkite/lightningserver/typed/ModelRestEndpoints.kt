@@ -259,7 +259,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
     public val bulkModify: ApiHttpHandler<PathSpec0, USER, MassModification<T>, Int> =
         bulkPath.patch bind ApiHttpHandler(
             summary = "Bulk Modify",
-            description = "Modifies many ${info.collectionName}s at the same time.  Returns the number of changed items.",
+            description = "Modifies many ${info.collectionName}s at the same time. Returns the number of changed items.",
             inputType = MassModification.serializer(info.serializer),
             outputType = Int.serializer(),
             auth = info.auth.subscope(ModelInfo.updateSubscope),
@@ -282,7 +282,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
 
     public val modifyWithDiff: ApiHttpHandler<PathSpec1<ID>, USER, Modification<T>, EntryChange<T>> =
-        detailPath.patch bind ApiHttpHandler(
+        detailPath.path("delta").patch bind ApiHttpHandler(
             summary = "Modify with Diff",
             description = "Modifies a ${info.collectionName} by ID, returning both the previous value and new value.",
             inputType = Modification.serializer(info.serializer),
@@ -315,9 +315,9 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
 
     public val modify: ApiHttpHandler<PathSpec1<ID>, USER, Modification<T>, T> =
-        detailPath.path("delta").patch bind ApiHttpHandler(
-            summary = "Modify with Diff",
-            description = "Modifies a ${info.collectionName} by ID, returning both the previous value and new value.",
+        detailPath.patch bind ApiHttpHandler(
+            summary = "Modify",
+            description = "Modifies a ${info.collectionName} by ID, returning the new value.",
             inputType = Modification.serializer(info.serializer),
             outputType = info.serializer,
             auth = info.auth.subscope(ModelInfo.updateSubscope),
@@ -350,9 +350,9 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
     public val modifySimple: ApiHttpHandler<PathSpec1<ID>, USER, Partial<T>, T> =
         detailPath.path("simplified").patch bind ApiHttpHandler(
-            summary = "Modify with Diff",
-            description = "Modifies a ${info.collectionName} by ID, returning both the previous value and new value.",
-            inputType = Partial.serializer(info.serializer),
+            summary = "Simplified Modify",
+            description = "Modifies a ${info.collectionName} by ID, returning the new value.",
+            inputType = PartialSerializer(info.serializer),
             outputType = info.serializer,
             auth = info.auth.subscope(ModelInfo.updateSubscope),
             belongsToInterface = belongsToInterface,
