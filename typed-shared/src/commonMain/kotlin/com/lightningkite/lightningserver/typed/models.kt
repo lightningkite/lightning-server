@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.typed
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import com.lightningkite.services.HealthStatus
+import com.lightningkite.services.data.Description
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.VirtualAlias
@@ -13,6 +14,9 @@ import kotlinx.datetime.LocalDate
 import kotlin.math.roundToInt
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
+import com.lightningkite.lightningserver.LSError
+import com.lightningkite.lightningserver.auth.RequiredScope
+import com.lightningkite.lightningserver.auth.RequiredScopes
 
 @Serializable
 public data class FunnelStart(
@@ -135,9 +139,26 @@ public data class LightningServerKSchemaEndpoint(
     val summary: String,
     val method: String,
     val path: String,
+    val scopes: Set<RequiredScope> = RequiredScopes.root,
     val routes: Map<String, VirtualTypeReference>,
     val input: VirtualTypeReference,
     val output: VirtualTypeReference,
     val docGroup: String?,
     val belongsToInterface: VirtualTypeReference?,
+)
+
+@Serializable
+public data class BulkRequest(
+    val path: String,
+    val method: String,
+    @Description("JSON")
+    val body: String? = null
+)
+
+@Serializable
+public data class BulkResponse(
+    @Description("JSON")
+    val result: String? = null,
+    val error: LSError? = null,
+    val durationMs: Long = 0L
 )

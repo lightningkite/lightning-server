@@ -10,6 +10,7 @@ plugins {
 }
 
 dependencies {
+    api(project(":auth-shared"))
     api(project(":core"))
     api(libs.serviceAbstractionsDatabase)
     api(libs.kotlinReflect)

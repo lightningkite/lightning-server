@@ -124,6 +124,7 @@ public class JsonMediaTypeCoder(
     }
 }
 
+@OptIn(ExperimentalSerializationApi::class)
 public fun ServerBuilder.registerBasicMediaTypeCoders(serializersModule: Runtime<SerializersModule> = externalSerialization) {
     register(JsonMediaTypeCoder { Json {
         this.serializersModule = serializersModule()

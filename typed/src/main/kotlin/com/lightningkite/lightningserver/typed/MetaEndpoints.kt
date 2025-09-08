@@ -3,13 +3,13 @@ package com.lightningkite.lightningserver.typed
 import com.lightningkite.*
 import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
-import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.*
+import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.typed.jsonschema.*
 import com.lightningkite.lightningserver.typed.kschema.*
 import com.lightningkite.services.*
@@ -21,6 +21,8 @@ import kotlinx.html.*
 import kotlinx.serialization.builtins.*
 import java.lang.Runtime
 import java.lang.management.*
+import kotlin.text.get
+import kotlin.time.TimeSource
 
 
 public class MetaEndpoints(
@@ -309,6 +311,49 @@ public class MetaEndpoints(
             )
         }
 
+    public val bulk: ApiHttpHandler<PathSpec0, HasId<AnyId>?, Map<String, BulkRequest>, Map<String, BulkResponse>> = path.path("bulk").post bind ApiHttpHandler(
+        summary = "Bulk Request",
+        description = "Performs multiple requests at once, returning the results in the same order.",
+        auth = noAuth,
+        implementation = { requests: Map<String, BulkRequest> ->
+            val originalRequest = request
+            coroutineScope {
+                requests.entries.map { entry ->
+                    async {
+                        val start = TimeSource.Monotonic.markNow()
+                        val request = entry.value
+                        val pathAlone = request.path.substringBefore('?')
+                        val queryParameters = request.path.substringAfter('?', "").split('&').map { it.substringBefore('=') to it.substringAfter('=', "") }
+                        val match = serverRuntime.server.endpoints.match(serverRuntime.externalSerialization.stringArrayFormat, pathAlone) { it.http[HttpMethod(request.method)] }
+                            ?: return@async entry.key to BulkResponse(
+                                error = LSError(404, detail = "no-match", message = "No matching route found", data = request.method + " " + pathAlone),
+                                durationMs = start.elapsedNow().inWholeMilliseconds
+                            )
+                        val properRequest = originalRequest.copy(
+                            path = RawPath(asString = pathAlone, match = match),
+                            queryParameters = queryParameters,
+                            method = HttpMethod(request.method),
+                            body = request.body?.let { TypedData.text(it, MediaType.Application.Json) }
+                        )
+                        @Suppress("UNCHECKED_CAST") val handler = match.value as HttpHandler<PathSpec0>
+                        try {
+                            entry.key to topLevelReportingContext(match.path.toString()) { handler.handle(properRequest) }.let {
+                                BulkResponse(result = it.body?.text())
+                            }
+                        } catch (e: Exception) {
+                            entry.key to BulkResponse(
+                                error = when (e) {
+                                    is HttpStatusException -> e.toLSError()
+                                    else -> LSError(500, "unknown", "An unknown server error occurred.")
+                                }
+                            )
+                        }
+                    }
+                }.awaitAll().associate { it }
+            }
+        }
+    )
+
     private val endpoints: List<HttpHandler<PathSpec0>> = listOf(
         docs.index,
         isOnline,
@@ -321,3 +366,16 @@ public class MetaEndpoints(
     )
 
 }
+
+
+internal fun HttpRequest<*>.castPathSpec0(): HttpRequest<PathSpec0> = HttpRequest(
+    path = RawPath(path.string),
+    queryParameters = queryParameters,
+    headers = headers,
+    domain = domain,
+    protocol = protocol,
+    sourceIp = sourceIp,
+    method = method,
+    cache = cache,
+    body = body,
+)

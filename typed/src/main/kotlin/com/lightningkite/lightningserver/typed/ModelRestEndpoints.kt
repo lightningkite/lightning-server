@@ -46,7 +46,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             description = "Returns the user's permissions for this collection.",
             inputType = Unit.serializer(),
             outputType = ModelPermissions.serializer(info.serializer),
-            auth = info.auth,
+            auth = info.auth.subscope(ModelInfo.readSubscope),
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { _: Unit ->
@@ -61,7 +61,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             description = "Gets a list of ${info.collectionName}s.",
             inputType = Query.serializer(info.serializer),
             outputType = ListSerializer(info.serializer),
-            auth = info.auth,
+            auth = info.auth.subscope(ModelInfo.readSubscope),
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { input: Query<T> ->
@@ -78,7 +78,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             description = "Gets a list of ${info.collectionName}s that match the given query.",
             inputType = Query.serializer(info.serializer),
             outputType = ListSerializer(info.serializer),
-            auth = info.auth,
+            auth = info.auth.subscope(ModelInfo.readSubscope),
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { input: Query<T> ->
@@ -95,7 +95,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             description = "Gets parts of ${info.collectionName}s that match the given query.",
             inputType = QueryPartial.serializer(info.serializer),
             outputType = ListSerializer(PartialSerializer(info.serializer)),
-            auth = info.auth,
+            auth = info.auth.subscope(ModelInfo.readSubscope),
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { input: QueryPartial<T> ->
@@ -112,7 +112,8 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             description = "Gets the ${info.collectionName} for the provided id.",
             inputType = Unit.serializer(),
             outputType = info.serializer,
-            auth = info.auth,
+            auth = info.auth.subscope(ModelInfo.readSubscope),
+            belongsToInterface = belongsToInterface,
             errorCases = listOf(
                 LSError(
                     http = HttpStatus.NotFound.code,
@@ -134,7 +135,8 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             description = "Creates multiple ${info.collectionName}s at the same time.",
             inputType = ListSerializer(info.serializer),
             outputType = ListSerializer(info.serializer),
-            auth = info.auth,
+            auth = info.auth.subscope(ModelInfo.createSubscope),
+            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { values: List<T> ->
@@ -157,7 +159,8 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             description = "Creates a new ${info.collectionName}",
             inputType = info.serializer,
             outputType = info.serializer,
-            auth = info.auth,
+            auth = info.auth.subscope(ModelInfo.createSubscope),
+            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { value: T ->
@@ -181,7 +184,8 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             description = "Creates or updates a ${info.collectionName}",
             inputType = info.serializer,
             outputType = info.serializer,
-            auth = info.auth,
+            auth = info.auth.subscope(ModelInfo.createSubscope, ModelInfo.updateSubscope),
+            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { value: T ->
@@ -207,7 +211,8 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             description = "Modifies many ${info.collectionName}s at the same time by ID.",
             inputType = ListSerializer(info.serializer),
             outputType = ListSerializer(info.serializer),
-            auth = info.auth,
+            auth = info.auth.subscope(ModelInfo.updateSubscope),
+            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { values: List<T> ->
@@ -231,7 +236,8 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             description = "Replaces a single ${info.collectionName} by ID.",
             inputType = info.serializer,
             outputType = info.serializer,
-            auth = info.auth,
+            auth = info.auth.subscope(ModelInfo.updateSubscope),
+            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { value: T ->
@@ -254,10 +260,11 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
     public val bulkModify: ApiHttpHandler<PathSpec0, USER, MassModification<T>, Int> =
         bulkPath.patch bind ApiHttpHandler(
             summary = "Bulk Modify",
-            description = "Modifies many ${info.collectionName}s at the same time.  Returns the number of changed items.",
+            description = "Modifies many ${info.collectionName}s at the same time. Returns the number of changed items.",
             inputType = MassModification.serializer(info.serializer),
             outputType = Int.serializer(),
-            auth = info.auth,
+            auth = info.auth.subscope(ModelInfo.updateSubscope),
+            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { input: MassModification<T> ->
@@ -276,12 +283,13 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
 
     public val modifyWithDiff: ApiHttpHandler<PathSpec1<ID>, USER, Modification<T>, EntryChange<T>> =
-        detailPath.patch bind ApiHttpHandler(
+        detailPath.path("delta").patch bind ApiHttpHandler(
             summary = "Modify with Diff",
             description = "Modifies a ${info.collectionName} by ID, returning both the previous value and new value.",
             inputType = Modification.serializer(info.serializer),
             outputType = EntryChange.serializer(info.serializer),
-            auth = info.auth,
+            auth = info.auth.subscope(ModelInfo.updateSubscope),
+            belongsToInterface = belongsToInterface,
             errorCases = listOf(
                 LSError(
                     http = HttpStatus.NotFound.code,
@@ -308,12 +316,13 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
 
     public val modify: ApiHttpHandler<PathSpec1<ID>, USER, Modification<T>, T> =
-        detailPath.path("delta").patch bind ApiHttpHandler(
-            summary = "Modify with Diff",
-            description = "Modifies a ${info.collectionName} by ID, returning both the previous value and new value.",
+        detailPath.patch bind ApiHttpHandler(
+            summary = "Modify",
+            description = "Modifies a ${info.collectionName} by ID, returning the new value.",
             inputType = Modification.serializer(info.serializer),
             outputType = info.serializer,
-            auth = info.auth,
+            auth = info.auth.subscope(ModelInfo.updateSubscope),
+            belongsToInterface = belongsToInterface,
             errorCases = listOf(
                 LSError(
                     http = HttpStatus.NotFound.code,
@@ -342,11 +351,12 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
     public val modifySimple: ApiHttpHandler<PathSpec1<ID>, USER, Partial<T>, T> =
         detailPath.path("simplified").patch bind ApiHttpHandler(
-            summary = "Modify with Diff",
-            description = "Modifies a ${info.collectionName} by ID, returning both the previous value and new value.",
-            inputType = Partial.serializer(info.serializer),
+            summary = "Simplified Modify",
+            description = "Modifies a ${info.collectionName} by ID, returning the new value.",
+            inputType = PartialSerializer(info.serializer),
             outputType = info.serializer,
-            auth = info.auth,
+            auth = info.auth.subscope(ModelInfo.updateSubscope),
+            belongsToInterface = belongsToInterface,
             errorCases = listOf(
                 LSError(
                     http = HttpStatus.NotFound.code,
@@ -379,7 +389,8 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             description = "Deletes all matching ${info.collectionName}s, returning the number of deleted items.",
             inputType = Condition.serializer(info.serializer),
             outputType = Int.serializer(),
-            auth = info.auth,
+            auth = info.auth.subscope(ModelInfo.deleteSubscope),
+            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { filter: Condition<T> ->
@@ -394,7 +405,8 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             description = "Deletes a ${info.collectionName} by id.",
             inputType = Unit.serializer(),
             outputType = Unit.serializer(),
-            auth = info.auth,
+            auth = info.auth.subscope(ModelInfo.deleteSubscope),
+            belongsToInterface = belongsToInterface,
             errorCases = listOf(
                 LSError(
                     http = HttpStatus.NotFound.code,
@@ -418,7 +430,8 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             description = "Gets the total number of ${info.collectionName}s matching the given condition.",
             inputType = Condition.serializer(info.serializer),
             outputType = Int.serializer(),
-            auth = info.auth,
+            auth = info.auth.subscope(ModelInfo.readSubscope),
+            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { condition: Condition<T> ->
@@ -433,7 +446,8 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             description = "Gets the total number of ${info.collectionName}s matching the given condition divided by group.",
             inputType = GroupCountQuery.serializer(info.serializer),
             outputType = MapSerializer(String.serializer(), Int.serializer()),
-            auth = info.auth,
+            auth = info.auth.subscope(ModelInfo.readSubscope),
+            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { condition: GroupCountQuery<T> ->
@@ -451,7 +465,8 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             description = "Aggregates a property of ${info.collectionName}s matching the given condition.",
             inputType = AggregateQuery.serializer(info.serializer),
             outputType = Double.serializer().nullable,
-            auth = info.auth,
+            auth = info.auth.subscope(ModelInfo.readSubscope),
+            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { condition: AggregateQuery<T> ->
@@ -472,7 +487,8 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             description = "Aggregates a property of ${info.collectionName}s matching the given condition divided by group.",
             inputType = GroupAggregateQuery.serializer(info.serializer),
             outputType = MapSerializer(String.serializer(), Double.serializer().nullable),
-            auth = info.auth,
+            auth = info.auth.subscope(ModelInfo.readSubscope),
+            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { condition: GroupAggregateQuery<T> ->
@@ -495,7 +511,8 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             description = "Gets the total number of ${info.collectionName}s matching the given condition divided by group.",
             inputType = GroupCountQuery.serializer(info.serializer),
             outputType = MapSerializer(String.serializer(), Int.serializer()),
-            auth = info.auth,
+            auth = info.auth.subscope(ModelInfo.readSubscope),
+            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { condition: GroupCountQuery<T> ->
@@ -515,7 +532,8 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             description = "Aggregates a property of ${info.collectionName}s matching the given condition divided by group.",
             inputType = GroupAggregateQuery.serializer(info.serializer),
             outputType = MapSerializer(String.serializer(), Double.serializer().nullable),
-            auth = info.auth,
+            auth = info.auth.subscope(ModelInfo.readSubscope),
+            belongsToInterface = belongsToInterface,
             errorCases = emptyList(),
             examples = emptyList(),
             implementation = { condition: GroupAggregateQuery<T> ->

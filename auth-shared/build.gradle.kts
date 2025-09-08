@@ -1,6 +1,4 @@
 import com.lightningkite.deployhelpers.*
-import org.gradle.kotlin.dsl.api
-import org.gradle.kotlin.dsl.project
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -51,9 +49,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 api(libs.kotlinXDatetime)
-                api(libs.serviceAbstractionsDatabase)
                 api(project(":core-shared"))
-                api(project(":auth-shared"))
             }
             kotlin {
                 srcDir(file("build/generated/ksp/common/commonMain/kotlin"))

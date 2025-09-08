@@ -22,23 +22,24 @@ import kotlinx.serialization.encodeToString
 import kotlin.String
 import kotlin.time.Duration
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 context(server: ServerRuntime)
 public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
     principalType: PrincipalType<SUBJECT, ID>,
     id: ID,
+    sessionId: Uuid?,
     issuedAt: Instant = server.clock.now(),
-    limitTo: RequestPredicates? = null,
-    forbid: RequestPredicates? = null,
+    scopes: Set<GrantedScope> = GrantedScopes.root,
     fromMasquerade: Authentication<*>? = null,
     cache: SerializableCache? = null
 ): Authentication<SUBJECT> = Authentication(
     principalType = principalType,
     id = id,
     rawId = principalType.idString(id),
+    sessionId = sessionId,
     issuedAt = issuedAt,
-    limitTo = limitTo,
-    forbid = forbid,
+    scopes = scopes,
     fromMasquerade = fromMasquerade,
     cache = cache
 )
@@ -47,9 +48,9 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
 public class Authentication<SUBJECT : HasId<*>> private constructor(
     public val principalName: String,
     public val rawId: String,
+    public val sessionId: Uuid?,
     public val issuedAt: Instant,
-    public val limitTo: RequestPredicates? = null,
-    public val forbid: RequestPredicates? = null,
+    public val scopes: Set<GrantedScope> = GrantedScopes.root,
     public val fromMasquerade: Authentication<*>? = null,
     override val cache: SerializableCache = SerializableCache()
 ) : Caching {
@@ -57,31 +58,22 @@ public class Authentication<SUBJECT : HasId<*>> private constructor(
         principalType: PrincipalType<SUBJECT, *>,
         id: Comparable<*>,
         rawId: String,
+        sessionId: Uuid?,
         issuedAt: Instant,
-        limitTo: RequestPredicates?,
-        forbid: RequestPredicates?,
+        scopes: Set<GrantedScope>,
         fromMasquerade: Authentication<*>?,
         cache: SerializableCache?
     ) : this(
         principalName = principalType.name,
         rawId = rawId,
-        issuedAt,
-        limitTo,
-        forbid,
-        fromMasquerade,
-        cache ?: SerializableCache()
+        sessionId = sessionId,
+        issuedAt = issuedAt,
+        scopes = scopes,
+        fromMasquerade = fromMasquerade,
+        cache = cache ?: SerializableCache()
     ) {
         cachedId = id
         cachedType = principalType
-    }
-
-    // check for contradictions
-    init {
-        if (limitTo != null && forbid != null) limitTo.intersect(forbid).let { intersection ->
-            if (intersection.isNotEmpty()) throw IllegalArgumentException(
-                "Authentication limitTo and forbid cannot have any common predicates, as this leads to a contradiction. Intersection: $intersection"
-            )
-        }
     }
 
     // typed parameters
@@ -141,13 +133,6 @@ public class Authentication<SUBJECT : HasId<*>> private constructor(
             for (reader in server.server.extensions[Reader] ?: emptyList()) {
                 val auth = reader.read(input) ?: continue
 
-                auth.limitTo?.let {
-                    if (!it.matchesAll(input)) throw ForbiddenException(detail = "limitTo-violated", message = "Request outside limitations", data = it.toString())
-                }
-                auth.forbid?.let {
-                    if (it.matchesAny(input)) throw ForbiddenException(detail = "forbid-violated", message = "Request touches forbidden resources", data = it.toString())
-                }
-
                 input.headers[HttpHeader.XMasquerade]?.root?.let { masquerade ->
                     val principal = masquerade.substringBefore('/')
 
@@ -157,9 +142,9 @@ public class Authentication<SUBJECT : HasId<*>> private constructor(
                     val mask = Authentication<HasId<AnyId>>(
                         principal,
                         rawId = masquerade.substringAfter('/'),
+                        sessionId = null,
                         issuedAt = server.clock.now(),
-                        limitTo = auth.limitTo,
-                        forbid = auth.forbid,
+                        scopes = auth.scopes,
                         fromMasquerade = auth,
                     )
 
@@ -191,28 +176,6 @@ public class Authentication<SUBJECT : HasId<*>> private constructor(
 
         public companion object : ListRegistryExtension<Reader<*>>
     }
-
-    public fun limitTo(builder: RequestPredicates.Builder.() -> Unit): Authentication<SUBJECT> =
-        Authentication(
-            principalName,
-            rawId,
-            issuedAt,
-            limitTo = limitTo?.copy(builder = builder) ?: RequestPredicates.Builder().apply(builder).build().takeUnless { it.isEmpty() },
-            forbid,
-            fromMasquerade,
-            cache
-        )
-
-    public fun forbid(builder: RequestPredicates.Builder.() -> Unit): Authentication<SUBJECT> =
-        Authentication(
-            principalName,
-            rawId,
-            issuedAt,
-            limitTo,
-            forbid = forbid?.copy(builder = builder) ?: RequestPredicates.Builder().apply(builder).build().takeUnless { it.isEmpty() },
-            fromMasquerade,
-            cache
-        )
 }
 
 @Suppress("UNCHECKED_CAST")

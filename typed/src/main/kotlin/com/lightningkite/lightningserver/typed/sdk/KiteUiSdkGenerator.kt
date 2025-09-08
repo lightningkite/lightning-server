@@ -22,7 +22,7 @@ import com.lightningkite.services.database.listElement
 import com.lightningkite.services.database.mapValueElement
 import com.lightningkite.services.database.nullElement
 import com.lightningkite.services.database.serializableProperties
-import com.lightningkite.services.database.tryTypeParameterSerializers3
+import com.lightningkite.services.database.typeParametersSerializersOrNull
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -87,7 +87,7 @@ private object KiteUiSdkGenerator {
             else -> {
                 descriptor.serialName
                     .substringBefore('/')
-                    .substringBefore('<') + (tryTypeParameterSerializers3()?.takeUnless { it.isEmpty() }
+                    .substringBefore('<') + (typeParametersSerializersOrNull()?.takeUnless { it.isEmpty() }
                     ?.joinToString(", ", "<", ">") { it.kotlinTypeString() } ?: "")
             }
         }
@@ -109,7 +109,7 @@ private object KiteUiSdkGenerator {
                     .substringBefore('/')
                     .substringBefore('<')
                     .plus(".serializer")
-                    .plus(tryTypeParameterSerializers3()?.joinToString(", ", "(", ")") { it.kotlinSerializer() }
+                    .plus(typeParametersSerializersOrNull()?.joinToString(", ", "(", ")") { it.kotlinSerializer() }
                         ?: "()")
             }
         }

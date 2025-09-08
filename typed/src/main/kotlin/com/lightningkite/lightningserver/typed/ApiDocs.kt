@@ -1,11 +1,9 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.auth.options
-import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.html
-import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.get
@@ -13,34 +11,15 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.services.data.Description
 import com.lightningkite.services.data.TypedData
+import com.lightningkite.services.database.childSerializersOrNull
 import com.lightningkite.services.database.nullElement
 import com.lightningkite.services.database.serializableProperties
-import com.lightningkite.services.database.tryChildSerializers
-import com.lightningkite.services.database.tryTypeParameterSerializers3
-import kotlinx.html.FlowContent
-import kotlinx.html.a
-import kotlinx.html.body
-import kotlinx.html.details
-import kotlinx.html.div
-import kotlinx.html.h1
-import kotlinx.html.h2
-import kotlinx.html.h3
-import kotlinx.html.head
-import kotlinx.html.id
-import kotlinx.html.li
-import kotlinx.html.ol
-import kotlinx.html.p
-import kotlinx.html.span
-import kotlinx.html.summary
-import kotlinx.html.title
-import kotlinx.html.ul
+import com.lightningkite.services.database.typeParametersSerializersOrNull
+import kotlinx.html.*
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.SerialKind
-import kotlinx.serialization.descriptors.StructureKind
-import kotlinx.serialization.descriptors.capturedKClass
-import kotlinx.serialization.descriptors.elementNames
+import kotlinx.serialization.descriptors.*
+
 
 public class ApiDocs(private val packageName: String) : ServerBuilder() {
 
@@ -117,7 +96,7 @@ public class ApiDocs(private val packageName: String) : ServerBuilder() {
                 return
             }
             val baseName = type.descriptor.serialName.substringBefore('<').substringAfterLast('.')
-            val arguments: Array<KSerializer<*>> = type.tryTypeParameterSerializers3() ?: arrayOf()
+            val arguments: Array<KSerializer<*>> = type.typeParametersSerializersOrNull() ?: arrayOf()
             span {
                 a(href = "#$baseName") {
                     +(baseName)
@@ -155,8 +134,8 @@ public class ApiDocs(private val packageName: String) : ServerBuilder() {
                     fun traverse(type: KSerializer<*>) {
                         if (type in this) return
                         this += type
-                        type.tryChildSerializers()?.forEach { traverse(type) }
-                        type.tryTypeParameterSerializers3()?.forEach { traverse(type) }
+                        type.childSerializersOrNull()?.forEach { traverse(type) }
+                        type.typeParametersSerializersOrNull()?.forEach { traverse(type) }
                     }
                     endpoints.forEach { traverse(it.value.inputType); traverse(it.value.outputType) }
                 }
@@ -269,7 +248,7 @@ public class ApiDocs(private val packageName: String) : ServerBuilder() {
                                                 }
                                         }
                                     } ?: run {
-                                        for ((index, part) in (serializer.tryChildSerializers()
+                                        for ((index, part) in (serializer.childSerializersOrNull()
                                             ?: arrayOf()).withIndex()) {
                                             p {
                                                 +desc.getElementName(index)

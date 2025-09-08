@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.websockets
 
 import com.lightningkite.lightningserver.AnonType
+import com.lightningkite.lightningserver.MultiplexMessage
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
@@ -27,17 +28,6 @@ public data class MultiplexWebSocketHandlerConnectionInfo(
     val storage: AnonType,
     val topics: Set<String> = setOf(),
     val request: WebSocketConnectRequest<*>,
-)
-
-@Serializable
-public data class MultiplexMessage(
-    val channel: String,
-    val path: String? = null,
-    val queryParams: Map<String, List<String>>? = null,
-    val start: Boolean = false,
-    val end: Boolean = false,
-    val data: String? = null,
-    val error: String? = null
 )
 
 public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, MultiplexWebSocketHandlerState> {
@@ -158,7 +148,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                     @Suppress("UNCHECKED_CAST")
                     otherHandler as WebSocketHandler<PathSpec, Any?>
                     val r = WebSocketConnectRequest<PathSpec>(
-                        path = RawPath<PathSpec>(message.path, match),
+                        path = RawPath<PathSpec>(message.path!!, match),
                         queryParameters = connection.request.queryParameters + (message.queryParams?.entries?.flatMap { it.value.map { v -> it.key to v } } ?: listOf()),
                         headers = connection.request.headers,
                         domain = connection.request.domain,

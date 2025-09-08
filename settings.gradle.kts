@@ -14,9 +14,11 @@ pluginManagement {
 }
 
 include(":auth")
+include(":auth-shared")
 include(":aws")
 include(":aws-serverless")
 include(":core")
+include(":core-shared")
 include(":demo")
 include(":engine-local")
 include(":ktor")
