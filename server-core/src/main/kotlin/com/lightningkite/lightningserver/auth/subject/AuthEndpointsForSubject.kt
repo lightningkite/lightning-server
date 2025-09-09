@@ -56,7 +56,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     val handler: Authentication.SubjectHandler<SUBJECT, ID>,
     val database: () -> Database,
     val proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
-    val tokenFormat: () -> TokenFormat = { PrivateTinyTokenFormat() },
+    val tokenFormat: () -> TokenFormat = ::PrivateTinyTokenFormat,
 ) : ServerPathGroup(path), Authentication.Reader {
 
     init {
@@ -257,7 +257,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         oauthClient: String? = null,
         derivedFrom: UUID? = null,
     ): Pair<Session<SUBJECT, ID>, RefreshToken> {
-        val secret = Base64.getEncoder().encodeToString(ByteArray(24) { 0 }.apply {
+        val secret = Base64.getEncoder().encodeToString(ByteArray(24).apply {
             SecureRandom.getInstanceStrong().nextBytes(this)
         })
         return Session<SUBJECT, ID>(
@@ -322,7 +322,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             }
             val used = proofs.map { it.via }.toSet()
             val users = proofs.mapNotNull { handler.findUser(it.property, it.value) }.distinctBy { it._id }
-            val identity = proofs.filter { it.property == "email" || it.property == "phone" }.firstOrNull()
+            val identity = proofs.firstOrNull { it.property == "email" || it.property == "phone" }
             val subject = users.singleOrNull() ?: throw HttpStatusException(
                 errorNoSingleUser.copy(
                     message = "No user was found with the ${identity?.property ?: "given ID"} ${identity?.value ?: ""}."

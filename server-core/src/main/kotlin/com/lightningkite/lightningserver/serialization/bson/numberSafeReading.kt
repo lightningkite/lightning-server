@@ -51,13 +51,9 @@ fun AbstractBsonReader.readShortSafe(): Short = when(currentBsonType) {
     else -> throw IllegalStateException("Expected number type but got ${currentBsonType}")
 }
 fun AbstractBsonReader.readFloatSafe(): Float = when(currentBsonType) {
-    BsonType.DOUBLE -> readDouble().toInt().toFloat()
+    BsonType.DOUBLE -> readDouble().toFloat()
     BsonType.INT32 -> readInt32().toFloat()
     BsonType.INT64 -> readInt64().toFloat()
     BsonType.DECIMAL128 -> readDecimal128().toFloat()
     else -> throw IllegalStateException("Expected number type but got ${currentBsonType}")
-}
-
-fun test(x: AbstractBsonReader) {
-    
 }
