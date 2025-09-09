@@ -5,8 +5,10 @@ import com.lightningkite.GeoCoordinate
 import com.lightningkite.IsRawString
 import com.lightningkite.Length
 import com.lightningkite.Length.Companion.miles
+import com.lightningkite.lightningserver.StringArrayFormat
 import com.lightningkite.serialization.*
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.serializer
 import kotlin.js.JsName
 import kotlin.jvm.JvmName
@@ -70,3 +72,15 @@ fun <T> Partial<T>.toCondition(serializer: KSerializer<T>): Condition<T> {
     perPath(DataClassPathSelf(serializer)) { out += it.eq() }
     return Condition.And(out)
 }
+
+private val f = StringArrayFormat(EmptySerializersModule())
+private fun <T: Enum<T>> KSerializer<T>.entries(): List<T> {
+    return (0..<descriptor.elementsCount).map {
+        f.decodeFromString(this, descriptor.getElementName(it))
+    }
+}
+
+infix fun <K, T: Enum<T>> DataClassPath<K, T>.gt(value: T) = mapCondition(Condition.Inside(serializer.entries().filter { it > value }))
+infix fun <K, T: Enum<T>> DataClassPath<K, T>.lt(value: T) = mapCondition(Condition.Inside(serializer.entries().filter { it < value }))
+infix fun <K, T: Enum<T>> DataClassPath<K, T>.gte(value: T) = mapCondition(Condition.Inside(serializer.entries().filter { it >= value }))
+infix fun <K, T: Enum<T>> DataClassPath<K, T>.lte(value: T) = mapCondition(Condition.Inside(serializer.entries().filter { it <= value }))

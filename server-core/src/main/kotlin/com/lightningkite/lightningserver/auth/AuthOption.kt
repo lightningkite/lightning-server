@@ -37,7 +37,8 @@ inline fun <reified USER : HasId<*>> authRequired(
                 limitationDescription,
                 {
                     @Suppress("UNCHECKED_CAST")
-                    additionalRequirement(it as RequestAuth<USER>)
+                    additionalRequirement(it as RequestAuth<USER>
+                    )
                 }
             )
         )
