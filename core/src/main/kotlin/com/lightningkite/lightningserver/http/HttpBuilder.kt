@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.http
 
+import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationError
 import com.lightningkite.lightningserver.pathing.MutablePathSpecMap
 import com.lightningkite.lightningserver.pathing.PathSpec

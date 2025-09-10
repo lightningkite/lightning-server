@@ -59,7 +59,7 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
         cache = request.cache,
         body = request.body,
     )
-    val handler = server.httpInterceptors.fold(match.value) { a, b -> b.intercept(a) }
+    val handler = server.httpInterceptors.intercept(match.value)
     @Suppress("UNCHECKED_CAST")
     handler as HttpHandler<PathSpec>
     return try {

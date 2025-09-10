@@ -19,6 +19,16 @@ public object FetcherSdk : SdkFormat {
         append('\n')
     }
 
+    context(traverser: SdkServerDefinition.Traverser)
+    private fun <T> SdkServerDefinition.Node.recurrenceOf(value: (SdkModuleInfo) -> T): Int = traverser.siblings
+        .filter { value(it.module.info) == value(this.module.info) }
+        .takeUnless { it.isEmpty() }
+        ?.map { it.absolutePath.toString() }
+        ?.plus(absolutePath.toString())
+        ?.sorted()
+        ?.indexOf(absolutePath.toString())
+        ?: 0
+
     public fun Appendable.writeInterface(data: SdkServerDefinition, packageName: String) {
         appendLine("package $packageName")
 
@@ -30,7 +40,10 @@ public object FetcherSdk : SdkFormat {
             .takeUnless { it.isEmpty() }
             ?.joinTo(this, "\n", prefix = "\n", postfix = "\n") { "import $it" }
 
-        data.traverse { (depth, absPath, module) ->
+        data.traverse { node ->
+            val module = node.module
+            val depth = node.depth
+
             val extends = module.endpoints.keys.filterNotNull()
 
             val declaredFunctions = module.endpoints[null] // null is top-level endpoints, not part of an interface
@@ -67,15 +80,6 @@ public object FetcherSdk : SdkFormat {
 
             val isSingleInterface = declaredFunctions.isEmpty() && extends.size == 1
 
-            val interfaceRecurrence = siblings
-                .filter { it.module.info.interfaceName == module.info.interfaceName }
-                .takeUnless { it.isEmpty() }
-                ?.map { it.absolutePath.toString() }
-                ?.plus(absPath.toString())
-                ?.sorted()
-                ?.indexOf(absPath.toString())
-                ?: 0
-
             if (!isSingleInterface) {
                 appendLine()
 
@@ -85,7 +89,8 @@ public object FetcherSdk : SdkFormat {
                     ?.joinToString(prefix = ": ") { it.kotlinString() }
                     ?: ""
 
-                val interfaceName = module.info.interfaceName + (interfaceRecurrence.takeUnless { it == 0 }?.plus(1) ?: "")
+                val interfaceName = module.info.interfaceName + (node.recurrenceOf { it.interfaceName }.takeUnless { it == 0 }?.plus(1) ?: "")
+
                 appendDepth(depth, "interface $interfaceName$extendsInterfaces {")
 
                 for (func in declaredFunctions) appendDepth(depth + 1, func)
@@ -95,17 +100,8 @@ public object FetcherSdk : SdkFormat {
                 appendDepth(depth, "}")
             }
 
-            val valueRecurrence = siblings
-                .filter { it.module.info.valueName == module.info.valueName }
-                .takeUnless { it.isEmpty() }
-                ?.map { it.absolutePath.toString() }
-                ?.plus(absPath.toString())
-                ?.sorted()
-                ?.indexOf(absPath.toString())
-                ?: 0
-
             if (depth > 0) {
-                val valueName = module.info.valueName + (valueRecurrence.takeUnless { it == 0 }?.plus(1) ?: "")
+                val valueName = module.info.valueName + (node.recurrenceOf { it.valueName }.takeUnless { it == 0 }?.plus(1) ?: "")
                 appendDepth(depth,
                     "val $valueName: ${if (isSingleInterface) extends.first().kotlinString() else module.info.interfaceName}"
                 )

@@ -3,7 +3,7 @@ package com.lightningkite.lightningserver.typed.sdk
 import com.lightningkite.lightningserver.definition.ModularServerDefinition
 import com.lightningkite.lightningserver.definition.ServerPathEndpoints
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.http.HttpMethod
+import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.pathing.MutablePathSpecMap
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0

@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.BadRequestException
+import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.http.*

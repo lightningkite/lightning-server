@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.typed.sdk
 
 import com.lightningkite.lightningserver.definition.ServerDefinition
-import com.lightningkite.lightningserver.http.HttpMethod
+import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.ApiWebsocketHandler

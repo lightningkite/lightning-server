@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.definition
 
 import com.lightningkite.lightningserver.http.HttpHandler
-import com.lightningkite.lightningserver.http.HttpMethod
+import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 
 public interface ServerPathEndpoints {

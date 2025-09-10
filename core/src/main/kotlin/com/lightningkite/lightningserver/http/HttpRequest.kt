@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.http
 
+import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.pathing.RawPath
 import com.lightningkite.lightningserver.pathing.PathSpec
