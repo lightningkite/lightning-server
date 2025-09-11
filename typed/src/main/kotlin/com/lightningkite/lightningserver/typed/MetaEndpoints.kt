@@ -9,7 +9,6 @@ import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.*
-import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.typed.jsonschema.*
 import com.lightningkite.lightningserver.typed.kschema.*
 import com.lightningkite.services.*
@@ -21,7 +20,6 @@ import kotlinx.html.*
 import kotlinx.serialization.builtins.*
 import java.lang.Runtime
 import java.lang.management.*
-import kotlin.text.get
 import kotlin.time.TimeSource
 
 
@@ -76,7 +74,7 @@ public class MetaEndpoints(
         )
     }
 
-    public val docs: ApiDocs = path.path("docs") bind ApiDocs(packageName)
+    public val docs: ApiDocs = path.path("docs") include ApiDocs(packageName)
 
     public val health: ApiHttpHandler<PathSpec0, HasId<AnyId>?, Unit, ServerHealth> =
         path.path("health").get bind ApiHttpHandler(

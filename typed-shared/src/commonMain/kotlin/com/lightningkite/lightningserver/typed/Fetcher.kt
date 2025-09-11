@@ -16,4 +16,6 @@ public interface Fetcher {
     ): O
 
     public fun <I, O> websocket(url: String, inSerializer: KSerializer<I>, outSerializer: KSerializer<O>): TypedWebSocket<I, O>
+
+    public fun <T> url(value: T, serializer: KSerializer<T>): String
 }

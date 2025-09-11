@@ -91,7 +91,7 @@ public class TimeBasedOTPProofEndpoints(
         }
     )
 
-    public val rest: ModelRestEndpoints<HasId<AnyId>, TotpSecret, Uuid> = path.path("secrets") bind ModelRestEndpoints(modelInfo)
+    public val rest: ModelRestEndpoints<HasId<AnyId>, TotpSecret, Uuid> = path.path("secrets") include ModelRestEndpoints(modelInfo)
 
     public val establish: ApiHttpHandler<PathSpec0, HasId<AnyId>, EstablishOtp, String> =
         path.path("establish").post bind ApiHttpHandler(

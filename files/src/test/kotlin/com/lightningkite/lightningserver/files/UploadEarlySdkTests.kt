@@ -22,13 +22,13 @@ class UploadEarlySdkTests {
         val database = setting("database", Database.Settings())
         val files = setting("files", PublicFileSystem.Settings())
 
-        val uploadEarly = path.path("upload") bind module(UploadEarlyEndpoint(
+        val uploadEarly = path.path("upload") module UploadEarlyEndpoint(
             files = files,
             database = database,
             fileScanner = Runtime.Constant(emptyList())
-        ))
+        )
 
-        val module = path.path("module") bind module(Module)
+        val module = path.path("module") module Module
     }
 
     @Serializable
@@ -43,7 +43,7 @@ class UploadEarlySdkTests {
             permissions = { ModelPermissions.allowAll<Model>() }
         )
 
-        val rest = path.path("rest") bind ModelRestEndpoints(info)
+        val rest = path.path("rest") include ModelRestEndpoints(info)
     }
 
     @Test

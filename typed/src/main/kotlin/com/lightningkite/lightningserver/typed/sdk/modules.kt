@@ -1,22 +1,79 @@
 package com.lightningkite.lightningserver.typed.sdk
 
 import com.lightningkite.lightningserver.LightningServerDsl
-import com.lightningkite.lightningserver.definition.ModularServerDefinition
-import com.lightningkite.lightningserver.definition.MutableExtensions
-import com.lightningkite.lightningserver.definition.ServerDefinition
+import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.getOrPut
-import com.lightningkite.lightningserver.definition.getValue
-import com.lightningkite.lightningserver.definition.setValue
-import com.lightningkite.lightningserver.definition.toMutableExtensions
 import com.lightningkite.lightningserver.pathing.PathSpec0
-import kotlin.collections.set
+import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.withSdkInfo
 import kotlin.uuid.Uuid
 
-public data class SdkModuleInfo(
-    val interfaceName: String,
-    val valueName: String = interfaceName.camelCase()
-)
+public data class SdkModule<S>(
+    val value: S,
+    val info: Info,
+) {
+    public data class Info(
+        val interfaceName: String,
+        val valueName: String = interfaceName.camelCase()
+    )
+
+    public constructor(value: S, interfaceName: String, valueName: String) : this(value, Info(interfaceName, valueName))
+
+    private object Default : MutableExtensions.Key<Info>
+
+    public companion object {
+        public var SdkSettings.defaultInfo: Info? by Default
+
+        public fun <S : ServerBuilder> S.withSdkInfo(
+            interfaceName: String = sdkSettings.defaultInfo?.interfaceName ?: this::class.simpleName?.let { it.pascalCase() + "Api" } ?: throw IllegalArgumentException("Cannot infer name for anonymous object"),
+            valueName: String = sdkSettings.defaultInfo?.valueName ?: interfaceName.camelCase().removeSuffix("Api")
+        ) : SdkModule<S> =
+            SdkModule(this, interfaceName, valueName)
+
+        public fun ServerDefinition.withSdkInfo(
+            interfaceName: String,
+            valueName: String = interfaceName.camelCase()
+        ) : SdkModule<ServerDefinition> =
+            SdkModule(this, interfaceName, valueName)
+
+        public fun ModularServerDefinition.withSdkInfo(
+            interfaceName: String,
+            valueName: String = interfaceName.camelCase()
+        ) : SdkModule<ModularServerDefinition> =
+            SdkModule(this, interfaceName, valueName)
+    }
+}
+
+@LightningServerDsl
+context(builder: ServerBuilder)
+public infix fun <S : ServerBuilder> PathSpec0.module(module: SdkModule<S>): S {
+    builder.extensions[ModuleRegistry][module.value.sdkId] = module.info
+    return with(builder) { include(module.value) }
+}
+
+@LightningServerDsl
+context(builder: ServerBuilder)
+public infix fun <S : ServerBuilder> PathSpec0.module(module: S): S = module(module.withSdkInfo())
+
+
+@LightningServerDsl
+context(builder: ServerBuilder)
+public infix fun PathSpec0.module(module: SdkModule<ModularServerDefinition>): ModularServerDefinition {
+    val (def, id) = module.value.definition.withSdkId()
+    builder.extensions[ModuleRegistry][id] = module.info
+    return with(builder) { include(module.value.copy(definition = def)) }
+}
+
+@LightningServerDsl
+context(builder: ServerBuilder)
+public infix fun PathSpec0.module(module: SdkModule<ServerDefinition>): ServerDefinition {
+    val (mod, id) = module.value.withSdkId()
+    builder.extensions[ModuleRegistry][id] = module.info
+    return with(builder) { include(mod) }
+}
+
+
+
+// Implementation details
 
 private object SdkId : MutableExtensions.Key<Uuid>
 
@@ -31,53 +88,14 @@ private fun ServerDefinition.withSdkId(): Pair<ServerDefinition, Uuid> {
     return copied to id
 }
 
-private object ModuleRegistry : MutableExtensions.DegradingKey<MutableMap<Uuid, SdkModuleInfo>, Map<Uuid, SdkModuleInfo>> {
-    override fun default(): MutableMap<Uuid, SdkModuleInfo> = HashMap()
-    override fun MutableMap<Uuid, SdkModuleInfo>.include(other: Map<Uuid, SdkModuleInfo>, pathSpec: PathSpec0) {
+private object ModuleRegistry : MutableExtensions.DegradingKey<MutableMap<Uuid, SdkModule.Info>, Map<Uuid, SdkModule.Info>> {
+    override fun default(): MutableMap<Uuid, SdkModule.Info> = HashMap()
+    override fun MutableMap<Uuid, SdkModule.Info>.include(other: Map<Uuid, SdkModule.Info>, pathSpec: PathSpec0) {
         /*No-op, we want to keep registered modules specific per-module, not cascading.*/
     }
 }
 
-internal fun ServerDefinition.getModuleInfo(other: ServerDefinition): SdkModuleInfo? {
+internal fun ServerDefinition.getModuleInfo(other: ServerDefinition): SdkModule.Info? {
     val id = other.sdkId ?: return null
     return extensions[ModuleRegistry]?.get(id)
-}
-
-private object DefaultInterfaceName : MutableExtensions.Key<SdkModuleInfo>
-public var SdkSettings.defaultInfo: SdkModuleInfo? by DefaultInterfaceName
-
-
-@LightningServerDsl
-context(builder: ServerBuilder)
-public fun <S : ServerBuilder> module(
-    module: S,
-    interfaceName: String = module.sdkSettings.defaultInfo?.interfaceName ?: module::class.simpleName?.let { it.pascalCase() + "Api" } ?: throw IllegalArgumentException("Cannot infer name for anonymous object"),
-    valueName: String = module.sdkSettings.defaultInfo?.valueName ?: interfaceName.camelCase().removeSuffix("Api")
-) : S {
-    builder.extensions[ModuleRegistry][module.sdkId] = SdkModuleInfo(interfaceName, valueName)
-    return module
-}
-
-@LightningServerDsl
-context(builder: ServerBuilder)
-public fun module(
-    module: ModularServerDefinition,
-    interfaceName: String,
-    valueName: String = interfaceName.camelCase()
-) : ModularServerDefinition {
-    val (def, id) = module.definition.withSdkId()
-    builder.extensions[ModuleRegistry][id] = SdkModuleInfo(interfaceName, valueName)
-    return module.copy(definition = def)
-}
-
-@LightningServerDsl
-context(builder: ServerBuilder)
-public fun module(
-    module: ServerDefinition,
-    interfaceName: String,
-    valueName: String = interfaceName.camelCase()
-) : ServerDefinition {
-    val (mod, id) = module.withSdkId()
-    builder.extensions[ModuleRegistry][id] = SdkModuleInfo(interfaceName, valueName)
-    return mod
 }

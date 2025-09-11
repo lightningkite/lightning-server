@@ -28,7 +28,7 @@ import kotlinx.serialization.modules.SerializersModule
  * resources and their locations. Once the definition is complete the [build] method is used to construct an immutable
  * [ServerDefinition] for runtime use.
  *
- * Registration is done through the provided builder dsl. Endpoints and tasks are registered using [bind] and settings are registered
+ * Registration is done through the provided builder dsl. Endpoints and tasks are registered using [include] and settings are registered
  * using [setting].
  *
  * Example:
@@ -90,50 +90,50 @@ public abstract class ServerBuilder : Extendable {
     private val modules: MapRegistry<PathSpec0, ServerBuilder> = MapRegistry()
 
     @LightningServerDsl
-    protected infix fun <PATH : PathSpec, HANDLER : HttpHandler<PATH>> HttpEndpoint<PATH>.bind(handler: HANDLER): HANDLER {
+    public infix fun <PATH : PathSpec, HANDLER : HttpHandler<PATH>> HttpEndpoint<PATH>.bind(handler: HANDLER): HANDLER {
         http.register(this, handler)
         return handler
     }
 
     @LightningServerDsl
-    protected infix fun <PATH : PathSpec, STORAGE> PATH.bind(handler: WebSocketHandler<PATH, STORAGE>): WebSocketHandler<PATH, STORAGE> {
+    public infix fun <PATH : PathSpec, STORAGE> PATH.bind(handler: WebSocketHandler<PATH, STORAGE>): WebSocketHandler<PATH, STORAGE> {
         websockets.register(this, handler)
         return handler
     }
 
     @LightningServerDsl
-    protected infix fun <T> PathSpec0.bind(task: Task<T>): Task<T> {
+    public infix fun <T> PathSpec0.bind(task: Task<T>): Task<T> {
         tasks.register(this, task)
         return task
     }
 
     @LightningServerDsl
-    protected infix fun PathSpec0.bind(startupTask: StartupTask): StartupTask {
+    public infix fun PathSpec0.bind(startupTask: StartupTask): StartupTask {
         startupTasks.register(this, startupTask)
         return startupTask
     }
 
     @LightningServerDsl
-    protected infix fun PathSpec0.bind(schedule: ScheduledTask): ScheduledTask {
+    public infix fun PathSpec0.bind(schedule: ScheduledTask): ScheduledTask {
         schedules.register(this, schedule)
         return schedule
     }
 
     @LightningServerDsl
-    protected fun <PATH : PathSpec, T> PATH.topic(type: KSerializer<T>): WebSocketTopic<PATH, T> {
+    public fun <PATH : PathSpec, T> PATH.topic(type: KSerializer<T>): WebSocketTopic<PATH, T> {
         val topic = WebSocketTopic<PATH, T>(type)
         websockets.topics.register(this, topic)
         return topic
     }
 
     @LightningServerDsl
-    protected fun <Setting, Result> setting(setting: ServerSetting<Setting, Result>): ServerSetting<Setting, Result> {
+    public fun <Setting, Result> setting(setting: ServerSetting<Setting, Result>): ServerSetting<Setting, Result> {
         settings.register(setting)
         return setting
     }
 
     @LightningServerDsl
-    protected fun <Setting, Result> setting(
+    public fun <Setting, Result> setting(
         name: String,
         default: Setting,
         serializer: KSerializer<Setting>,
@@ -150,7 +150,7 @@ public abstract class ServerBuilder : Extendable {
         )
 
     @LightningServerDsl
-    protected fun <SETTING : Setting<RESULT>, RESULT> setting(
+    public fun <SETTING : Setting<RESULT>, RESULT> setting(
         name: String,
         default: SETTING,
         serializer: KSerializer<SETTING>,
@@ -166,7 +166,7 @@ public abstract class ServerBuilder : Extendable {
         )
 
     @LightningServerDsl
-    protected inline fun <reified SETTING : Setting<RESULT>, RESULT> setting(
+    public inline fun <reified SETTING : Setting<RESULT>, RESULT> setting(
         name: String,
         default: SETTING,
         optional: Boolean = false,
@@ -181,7 +181,7 @@ public abstract class ServerBuilder : Extendable {
         )
 
     @LightningServerDsl
-    protected fun <Result> setting(
+    public fun <Result> setting(
         name: String,
         default: Result,
         serializer: KSerializer<Result>,
@@ -198,7 +198,7 @@ public abstract class ServerBuilder : Extendable {
     }
 
     @LightningServerDsl
-    protected inline fun <reified Setting, Result> setting(
+    public inline fun <reified Setting, Result> setting(
         name: String,
         default: Setting,
         optional: Boolean = false,
@@ -214,7 +214,7 @@ public abstract class ServerBuilder : Extendable {
         )
 
     @LightningServerDsl
-    protected inline fun <reified Result> setting(
+    public inline fun <reified Result> setting(
         name: String,
         default: Result,
         optional: Boolean = false,
@@ -227,19 +227,19 @@ public abstract class ServerBuilder : Extendable {
         )
 
     @LightningServerDsl
-    protected infix fun <T : ServerBuilder> PathSpec0.bind(module: T): T {
+    public infix fun <T : ServerBuilder> PathSpec0.include(module: T): T {
         modules.register(this, module)
         return module
     }
 
     @LightningServerDsl
-    protected infix fun PathSpec0.bind(import: ModularServerDefinition): ModularServerDefinition {
+    public infix fun PathSpec0.include(import: ModularServerDefinition): ModularServerDefinition {
         imports.register(this, import)
         return import
     }
 
     @LightningServerDsl
-    protected infix fun PathSpec0.bind(import: ServerDefinition): ServerDefinition {
+    public infix fun PathSpec0.include(import: ServerDefinition): ServerDefinition {
         imports.register(this, ModularServerDefinition(import))
         return import
     }

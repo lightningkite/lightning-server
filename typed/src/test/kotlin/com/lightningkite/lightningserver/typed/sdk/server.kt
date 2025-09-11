@@ -9,6 +9,8 @@ import com.lightningkite.lightningserver.pathing.PathSpec1
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.ModelRestEndpoints
 import com.lightningkite.lightningserver.typed.modelInfo
+import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
+import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.withSdkInfo
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.ModelPermissions
@@ -27,11 +29,13 @@ object Server : ServerBuilder() {
         implementation = { _: Unit -> 0 }
     )
 
-    val first = path.path("m1") bind module(Module)
-    val second = path.path("m2") bind module(SecondModule, "CustomEndpoints", "custom")
-    val third = path.path("third") bind module(ThirdModule, "OtherEndpoints", "other")
+    val first = path.path("m1") include Module
+    val second = path.path("m2") module SecondModule.withSdkInfo("CustomEndpoints", "custom")
+    val third = path.path("third") module ThirdModule.withSdkInfo("OtherEndpoints", "other")
 
-    val inline = path.path("inline") bind Inlined
+    val predefined = path.path("predefined") module preDefinedModule.withSdkInfo("PredefinedEndpoints")
+
+    val inline = path.path("inline") include Inlined
 }
 
 @Serializable
@@ -60,25 +64,25 @@ object Module : ServerBuilder() {
         permissions = { ModelPermissions.allowAll<TestModel>() }
     )
 
-    val rest = path.path("rest") bind ModelRestEndpoints(info)
+    val rest = path.path("rest") include ModelRestEndpoints(info)
 
-    val inline = path.path("inline") bind Inlined
+    val inline = path.path("inline") include Inlined
 
-    val inline2 = path.path("inline").path("again") bind Inlined
+    val inline2 = path.path("inline").path("again") include Inlined
 
-    val nest = path.path("second") bind module(SecondModule)
+    val nest = path.path("second") module SecondModule
 
-    val duplicate = path.path("duplicate") bind module(SecondModule)
+    val duplicate = path.path("duplicate") module SecondModule
 
     val endpoint = path.path("endpoint").arg<String>("first").post bind testEndpoint
 }
 
 object SecondModule : ServerBuilder() {
     init {
-        sdkSettings.defaultInfo = SdkModuleInfo("DefaultEndpoints", "default")
+        sdkSettings.defaultInfo = SdkModule.Info("DefaultEndpoints", "default")
     }
 
-    val nonInlined = path.path("noinline") bind module(Inlined, "NotInlinedApi")
+    val nonInlined = path.path("noinline") module Inlined.withSdkInfo("NotInlinedApi")
 
     val endpoint = path.path("endpoint").arg<String>("second").post bind testEndpoint
 }
@@ -89,11 +93,11 @@ object ThirdModule : ServerBuilder() {
         permissions = { ModelPermissions.allowAll<TestModel>() }
     )
 
-    val rest = path.path("rest") bind module(ModelRestEndpoints(info))
+    val rest = path.path("rest") module ModelRestEndpoints(info)
 
-    val rest2 = path.path("rest2") bind module(ModelRestEndpoints(info))
+    val rest2 = path.path("rest2") module ModelRestEndpoints(info)
 
-    val inline = path.path("inline") bind Inlined
+    val inline = path.path("inline") include Inlined
 
     val endpoint = path.path("endpoint").arg<String>("third").post bind testEndpoint
 }
@@ -105,4 +109,12 @@ object Inlined : ServerBuilder() {
         implementation = { _: Unit -> 42 }
     )
 }
+
+val preDefinedModule = object : ServerBuilder() {
+    val endpoints = path.path("foo").post bind ApiHttpHandler(
+        summary = "Foo",
+        auth = noAuth,
+        implementation = { input: Int -> input * 2 }
+    )
+}.build()
 

@@ -6,7 +6,6 @@ import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
-import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.signer
@@ -23,7 +22,6 @@ import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.sessions.token.TokenFormat
 import com.lightningkite.lightningserver.toException
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.lightningserver.typed.Documentable
 import com.lightningkite.lightningserver.typed.ModelRestEndpoints
 import com.lightningkite.lightningserver.typed.docGroup
 import com.lightningkite.lightningserver.typed.invoke
@@ -214,5 +212,5 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             }
         )
 
-    public val sessions: ModelRestEndpoints<SUBJECT, Session<SUBJECT, ID>, Uuid> = path.path("sessions") bind ModelRestEndpoints(info = sessionInfo)
+    public val sessions: ModelRestEndpoints<SUBJECT, Session<SUBJECT, ID>, Uuid> = path.path("sessions") include ModelRestEndpoints(info = sessionInfo)
 }

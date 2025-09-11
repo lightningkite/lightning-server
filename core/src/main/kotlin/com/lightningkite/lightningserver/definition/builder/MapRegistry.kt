@@ -30,7 +30,7 @@ public fun <L, V> MapRegistry<L, V>.getOrRegister(location: L, defaultValue: () 
     }
 
 private class BasicMapRegistry<L, V>(
-    private val registry: HashMap<L, V> = HashMap()
+    private val registry: LinkedHashMap<L, V> = LinkedHashMap()
 ) : MapRegistry<L, V>, Map<L, V> by registry {
     override fun register(location: L, value: V) {
         if (registry.containsKey(location)) registry.getValue(location).let {

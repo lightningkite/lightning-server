@@ -87,7 +87,7 @@ public class KnownDeviceProofEndpoints(
         }
     )
 
-    public val rest: ModelRestEndpoints<HasId<AnyId>, KnownDeviceSecret, Uuid> = path.path("secrets") bind ModelRestEndpoints(modelInfo)
+    public val rest: ModelRestEndpoints<HasId<AnyId>, KnownDeviceSecret, Uuid> = path.path("secrets") include ModelRestEndpoints(modelInfo)
 
     context(_: ServerRuntime)
     public suspend fun <SUBJECT : HasId<ID>, ID: Comparable<ID>> establish(

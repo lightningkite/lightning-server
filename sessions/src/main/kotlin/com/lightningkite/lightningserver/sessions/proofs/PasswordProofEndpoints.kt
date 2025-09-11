@@ -93,7 +93,7 @@ public class PasswordProofEndpoints(
         )
 
     public val rest: ModelRestEndpoints<HasId<AnyId>, PasswordSecret, Uuid> =
-        path.path("secrets") bind ModelRestEndpoints(modelInfo)
+        path.path("secrets") include ModelRestEndpoints(modelInfo)
 
     context(_: ServerRuntime)
     public suspend fun <SUBJECT : HasId<ID>, ID: Comparable<ID>> establish(

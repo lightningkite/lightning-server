@@ -35,7 +35,6 @@ public object FetcherSdk : SDK.Format {
             "com.lightningkite.lightningserver.HttpMethod",
             "com.lightningkite.lightningserver.typed.Fetcher",
             "kotlinx.serialization.builtins.serializer",
-            "com.lightningkite.lightningserver.typed.urlifyToCommaString",
         )
 
         (always + imports())
@@ -78,7 +77,7 @@ public object FetcherSdk : SDK.Format {
         fun PathSpec.toCodeString() = segments.joinToString("/", prefix = "\"", postfix = "\"") {
             when (it) {
                 is PathSpec.Segment.Constant -> it.value
-                is PathSpec.Segment.Wildcard<*> -> $$"${$${it.name}.urlifyToCommaString()}"
+                is PathSpec.Segment.Wildcard<*> -> $$"${fetcher.url($${it.name}, $${it.serializer.kotlinSerializer()})}"
             }
         }
 

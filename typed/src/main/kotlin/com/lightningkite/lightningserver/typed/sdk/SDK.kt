@@ -36,7 +36,7 @@ public object SDK { // namespace object
         val children: Map<PathSpec0, Data>
     ) {
         public data class Layer(
-            val info: SdkModuleInfo,
+            val info: SdkModule.Info,
             val endpoints: Map<InterfaceInfo?, PathSpecMap<ServerApiEndpoints>>
         )
 
@@ -95,7 +95,7 @@ public object SDK { // namespace object
     }
 
     public data class Module(
-        val info: SdkModuleInfo,
+        val info: SdkModule.Info,
         /**The relative path of the module to its parent module*/
         val path: PathSpec0,
         val extends: List<InterfaceInfo>,
@@ -106,7 +106,7 @@ public object SDK { // namespace object
         public val functionOverrides: List<Function> get() = functions.filter { it.fromInterface != null }
     }
 
-    public fun ModularServerDefinition.sdk(root: SdkModuleInfo = SdkModuleInfo("Api")): Data {
+    public fun ModularServerDefinition.sdk(root: SdkModule.Info = SdkModule.Info("Api")): Data {
         data class ApiEndpoints(
             override val http: Map<HttpMethod, ApiHttpHandler<*, *, *, *>>,
             override val websocket: ApiWebsocketHandler<*, *, *, *, *>?
@@ -123,7 +123,7 @@ public object SDK { // namespace object
             fun isNotEmpty() = http.isNotEmpty() || websocket != null
         }
 
-        class Builder(val info: SdkModuleInfo) {
+        class Builder(val info: SdkModule.Info) {
             val endpoints = HashMap<InterfaceInfo?, MutablePathSpecMap<ServerApiEndpoints>>()
             val modules = HashMap<PathSpec0, Builder>()
 

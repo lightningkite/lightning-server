@@ -27,12 +27,10 @@ import com.lightningkite.services.metrics.cloudwatch.*
 import com.lightningkite.services.sms.*
 import io.ktor.client.request.*
 import io.ktor.server.plugins.NotFoundException
-import io.ktor.websocket.Serializer
 import kotlinx.coroutines.*
 import kotlinx.html.*
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.*
-import kotlinx.serialization.modules.SerializersModule
 import kotlin.random.*
 import kotlin.time.*
 import kotlin.time.Duration.Companion.minutes
@@ -97,11 +95,11 @@ object Server : ServerBuilder() {
             )
         }
     )
-    val user = path.path("user") bind object : ServerBuilder() {
-        val rest = path.path("rest") bind ModelRestEndpoints(userInfo)
+    val user = path.path("user") include object : ServerBuilder() {
+        val rest = path.path("rest") include ModelRestEndpoints(userInfo)
     }
-    val uploadEarly = path.path("upload") bind UploadEarlyEndpoint(files, database, Runtime.Constant(listOf()))
-    val testModel = path.path("test-model") bind TestModelEndpoints()
+    val uploadEarly = path.path("upload") include UploadEarlyEndpoint(files, database, Runtime.Constant(listOf()))
+    val testModel = path.path("test-model") include TestModelEndpoints()
 
     val root = path.get bind HttpHandler {
         HttpResponse.plainText("Hello ${it.auth(UserAuth.auth() or noAuth)?.fetch()}")
@@ -189,21 +187,21 @@ object Server : ServerBuilder() {
 
     val multiplex = path.path("multiplex").websocket(MultiplexWebSocketHandler())
 
-    val meta = path.path("meta") bind MetaEndpoints("com.lightningkite.lightningserver.demo", database, cache)
+    val meta = path.path("meta") include MetaEndpoints("com.lightningkite.lightningserver.demo", database, cache)
 
     val pins = PinHandler(cache, "pins")
-    val proofPhone = path.path("proof").path("phone") bind SmsProofEndpoints(pins, sms)
-    val proofEmail = path.path("proof").path("email") bind EmailProofEndpoints(pins, email, { to, pin ->
+    val proofPhone = path.path("proof").path("phone") include SmsProofEndpoints(pins, sms)
+    val proofEmail = path.path("proof").path("email") include EmailProofEndpoints(pins, email, { to, pin ->
         Email(
             subject = "Log In Code",
             to = listOf(EmailAddressWithName(to)),
             plainText = "Your PIN is $pin."
         )
     })
-    val proofOtp = path.path("proof").path("otp") bind TimeBasedOTPProofEndpoints(database, cache)
-    val proofPassword = path.path("proof").path("password") bind PasswordProofEndpoints(database, cache)
-    val proofDevices = path.path("proof").path("devices") bind KnownDeviceProofEndpoints(database, cache)
-    val subjects = path.path("auth") bind object: AuthEndpoints<User, Uuid>(
+    val proofOtp = path.path("proof").path("otp") include TimeBasedOTPProofEndpoints(database, cache)
+    val proofPassword = path.path("proof").path("password") include PasswordProofEndpoints(database, cache)
+    val proofDevices = path.path("proof").path("devices") include KnownDeviceProofEndpoints(database, cache)
+    val subjects = path.path("auth") include object: AuthEndpoints<User, Uuid>(
         principal = UserAuth,
         database = database,
     ) {

@@ -11,9 +11,9 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpec1
 import com.lightningkite.lightningserver.pathing.first
 import com.lightningkite.lightningserver.runtime.serverRuntime
-import com.lightningkite.lightningserver.typed.sdk.SdkModuleInfo
+import com.lightningkite.lightningserver.typed.sdk.SdkModule
+import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
 import com.lightningkite.lightningserver.typed.sdk.clientInterface
-import com.lightningkite.lightningserver.typed.sdk.defaultInfo
 import com.lightningkite.lightningserver.typed.sdk.pascalCase
 import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.lightningserver.typed.sdk.titleCase
@@ -31,7 +31,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 ) : ServerBuilder() {
     init {
         sdkSettings.clientInterface = ClientModelRestEndpoints::class.info(info.serializer, info.idSerializer)
-        sdkSettings.defaultInfo = SdkModuleInfo(
+        sdkSettings.defaultInfo = SdkModule.Info(
             interfaceName = info.collectionName.pascalCase() + "RestEndpoints",
             valueName = "rest"
         )

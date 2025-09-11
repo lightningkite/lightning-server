@@ -106,7 +106,7 @@ public class WebAuthNProofEndpoints(
         }
     )
 
-    public val rest: ModelRestEndpoints<HasId<AnyId>, WebAuthNCredential, String> = path.path("credentials") bind ModelRestEndpoints(modelInfo)
+    public val rest: ModelRestEndpoints<HasId<AnyId>, WebAuthNCredential, String> = path.path("credentials") include ModelRestEndpoints(modelInfo)
 
 
     private fun challengeCacheKey(key: String): String =
