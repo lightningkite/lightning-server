@@ -19,15 +19,14 @@ import com.lightningkite.lightningserver.typed.functionName
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.services.data.KFile
 import kotlinx.serialization.KSerializer
-import org.jetbrains.annotations.TestOnly
 import kotlin.collections.component1
 import kotlin.collections.component2
 import kotlin.collections.iterator
 import kotlin.sequences.forEach
 
-public object SDK {
+public object SDK { // namespace object
     public interface Format {
-        context(sdk: ServerRuntime)
+        context(server: ServerRuntime)
         public fun write(data: ModularServerDefinition, folder: KFile, packageName: String)
     }
 
@@ -103,7 +102,7 @@ public object SDK {
         val children: List<Module>
     ) {
         public val declaredFunctions: List<Function> get() = functions.filter { it.fromInterface == null }
-        public val overrides: List<Function> get() = functions.filter { it.fromInterface != null }
+        public val functionOverrides: List<Function> get() = functions.filter { it.fromInterface != null }
     }
 
     public fun ModularServerDefinition.sdk(root: SdkModuleInfo = SdkModuleInfo("Api")): Data {

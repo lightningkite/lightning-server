@@ -91,6 +91,8 @@ object ThirdModule : ServerBuilder() {
 
     val rest = path.path("rest") bind module(ModelRestEndpoints(info))
 
+    val rest2 = path.path("rest2") bind module(ModelRestEndpoints(info))
+
     val inline = path.path("inline") bind Inlined
 
     val endpoint = path.path("endpoint").arg<String>("third").post bind testEndpoint

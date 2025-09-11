@@ -6,9 +6,7 @@ import com.lightningkite.lightningserver.pathing.plus
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.sdk.SDK.sdk
 import com.lightningkite.lightningserver.typed.sdk.SDK.toModule
-import com.lightningkite.lightningserver.typed.urlifyToCommaString
 import com.lightningkite.services.data.KFile
-import kotlinx.serialization.builtins.serializer
 
 public object FetcherSdk : SDK.Format {
     context(server: ServerRuntime)
@@ -89,7 +87,7 @@ public object FetcherSdk : SDK.Format {
         fun SDK.Module.writeLive(chain: List<SDK.Module>) {
             val depth = chain.size
 
-            val pathPrefix = chain.fold(PathSpec.root) { acc, mod -> acc + mod.path }
+            val pathPrefix = (chain + this).fold(PathSpec.root) { acc, mod -> acc + mod.path }
             fun PathSpec.absolute(): PathSpec = pathPrefix + this
 
             val singleInterface = extends.singleOrNull()?.takeIf { declaredFunctions.isEmpty() && depth > 0 }
@@ -162,7 +160,7 @@ public object FetcherSdk : SDK.Format {
                     }
                 }
             }
-            .plus(overrides),
+            .plus(functionOverrides),
 
         children = children
             .map { it.ensureUniqueNames() }
