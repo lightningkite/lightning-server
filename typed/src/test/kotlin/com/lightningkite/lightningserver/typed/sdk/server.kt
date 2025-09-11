@@ -28,8 +28,8 @@ object Server : ServerBuilder() {
     )
 
     val first = path.path("m1") bind module(Module)
-    val second = path.path("m2") bind module(SecondModule)
-    val third = path.path("third") bind module(ThirdModule)
+    val second = path.path("m2") bind module(SecondModule, "CustomEndpoints", "custom")
+    val third = path.path("third") bind module(ThirdModule, "OtherEndpoints", "other")
 
     val inline = path.path("inline") bind Inlined
 }
@@ -74,6 +74,10 @@ object Module : ServerBuilder() {
 }
 
 object SecondModule : ServerBuilder() {
+    init {
+        sdkSettings.defaultInfo = SdkModuleInfo("DefaultEndpoints", "default")
+    }
+
     val nonInlined = path.path("noinline") bind module(Inlined, "NotInlinedApi")
 
     val endpoint = path.path("endpoint").arg<String>("second").post bind testEndpoint

@@ -13,8 +13,9 @@ public data class InterfaceInfo(
 ) {
     public companion object : MutableExtensions.Key<InterfaceInfo>
 
+    public val name: String = type.qualifiedName ?: type.simpleName ?: throw IllegalStateException("cannot retrieve name for InterfaceInfo class $type")
+
     public fun kotlinString(): String {
-        val name = type.qualifiedName ?: type.simpleName ?: return ""
         val params = typeParameters
             .takeUnless { it.isEmpty() }
             ?.joinToString(prefix = "<", postfix = ">") { it.descriptor.serialName }

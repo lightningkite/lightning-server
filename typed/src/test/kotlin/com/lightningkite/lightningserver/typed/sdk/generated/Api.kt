@@ -1,15 +1,20 @@
 package com.lightningkite.lightningserver.typed.sdk
 
+import com.lightningkite.lightningserver.HttpMethod
+import com.lightningkite.lightningserver.typed.Fetcher
+import kotlinx.serialization.builtins.serializer
+import com.lightningkite.lightningserver.typed.urlifyToCommaString
+
 interface Api {
 	suspend fun index(): kotlin.Int
 	suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int
 
-	interface ModuleApi: com.lightningkite.lightningserver.typed.ClientModelRestEndpoints<com.lightningkite.lightningserver.typed.sdk.TestModel, kotlin.uuid.Uuid> {
+	interface ModuleApi : com.lightningkite.lightningserver.typed.ClientModelRestEndpoints<com.lightningkite.lightningserver.typed.sdk.TestModel, kotlin.uuid.Uuid> {
 		suspend fun test(first: kotlin.String, input: com.lightningkite.lightningserver.typed.sdk.TestInput): kotlin.String
 		suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int
 		suspend fun inlinedEndpoint2(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int
 
-		interface SecondModuleApi {
+		interface DefaultEndpoints {
 			suspend fun test(second: kotlin.String, input: com.lightningkite.lightningserver.typed.sdk.TestInput): kotlin.String
 
 			interface NotInlinedApi {
@@ -17,9 +22,9 @@ interface Api {
 			}
 			val notInlined: NotInlinedApi
 		}
-		val secondModule: SecondModuleApi
+		val default: DefaultEndpoints
 
-		interface SecondModuleApi2 {
+		interface DefaultEndpoints2 {
 			suspend fun test(second: kotlin.String, input: com.lightningkite.lightningserver.typed.sdk.TestInput): kotlin.String
 
 			interface NotInlinedApi {
@@ -27,11 +32,11 @@ interface Api {
 			}
 			val notInlined: NotInlinedApi
 		}
-		val secondModule2: SecondModuleApi
+		val default2: DefaultEndpoints2
 	}
 	val module: ModuleApi
 
-	interface SecondModuleApi {
+	interface CustomEndpoints {
 		suspend fun test(second: kotlin.String, input: com.lightningkite.lightningserver.typed.sdk.TestInput): kotlin.String
 
 		interface NotInlinedApi {
@@ -39,12 +44,13 @@ interface Api {
 		}
 		val notInlined: NotInlinedApi
 	}
-	val secondModule: SecondModuleApi
+	val custom: CustomEndpoints
 
-	interface ThirdModuleApi {
+	interface OtherEndpoints {
 		suspend fun test(third: kotlin.String, input: com.lightningkite.lightningserver.typed.sdk.TestInput): kotlin.String
 		suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int
+
 		val rest: com.lightningkite.lightningserver.typed.ClientModelRestEndpoints<com.lightningkite.lightningserver.typed.sdk.TestModel, kotlin.uuid.Uuid>
 	}
-	val thirdModule: ThirdModuleApi
+	val other: OtherEndpoints
 }
