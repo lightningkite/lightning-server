@@ -13,6 +13,7 @@ import com.lightningkite.lightningserver.pathing.PathSpecMap
 import com.lightningkite.lightningserver.pathing.plus
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
+import com.lightningkite.lightningserver.settings.preload
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.ApiWebsocketHandler
 import com.lightningkite.lightningserver.typed.functionName

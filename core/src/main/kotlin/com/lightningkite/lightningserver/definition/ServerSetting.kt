@@ -58,7 +58,7 @@ public interface ServerSetting<SETTING, RESULT> : Runtime<RESULT>, TerraformNeed
     }
 
     context(server: ServerRuntime)
-    override fun invoke(): RESULT = server.settings.get(this, server)
+    override fun invoke(): RESULT = server.settings.get(this)
 }
 
 @JvmInline
@@ -79,7 +79,7 @@ private data class BasicServerSetting<SETTING, RESULT>(
 
     context(server: ServerRuntime)
     override fun invoke(): RESULT =
-        cached?.value ?: server.settings.get(this, server)
+        cached?.value ?: server.settings.get(this)
 }
 
 public fun <SETTING, RESULT> ServerSetting(
@@ -109,7 +109,7 @@ private data class BasicDirectServerSetting<SETTING>(
 
     context(server: ServerRuntime)
     override fun invoke(): SETTING =
-        cached?.value ?: server.settings.get(this, server).also { cached = NullWrapper(it) }
+        cached?.value ?: server.settings.get(this).also { cached = NullWrapper(it) }
 }
 
 public fun <SETTING> ServerSetting(

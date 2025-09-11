@@ -4,7 +4,7 @@ package com.lightningkite.lightningserver.definition.builder
  * An [Map] that allows you to add items to it. Once an item is added
  * to a [MapRegistry], it is considered immutable. It cannot be overwritten or removed.
  * */
-public interface MapRegistry<L, V : Any> : Map<L, V> {
+public interface MapRegistry<L, V> : Map<L, V> {
     /**
      * Adds the [value] to the underlying [Map] with the given [location].
      *
@@ -14,22 +14,30 @@ public interface MapRegistry<L, V : Any> : Map<L, V> {
     public fun register(location: L, value: V)
 }
 
-public class DuplicateRegistrationError(message: String, public val initial: Any, public val overwrite: Any) : Error(message)
+public class DuplicateRegistrationError(message: String, public val initial: Any?, public val overwrite: Any?) : Error(message)
 
 
-public fun <L, V : Any> MapRegistry<L, V>.include(map: Map<L, V>) {
+public fun <L, V> MapRegistry<L, V>.include(map: Map<L, V>) {
     for ((k, v) in map) register(k, v)
 }
 
-private class BasicMapRegistry<L, V : Any>(
+public fun <L, V> MapRegistry<L, V>.getOrRegister(location: L, defaultValue: () -> V): V =
+    if (containsKey(location)) getValue(location)
+    else {
+        val default = defaultValue()
+        register(location, default)
+        default
+    }
+
+private class BasicMapRegistry<L, V>(
     private val registry: HashMap<L, V> = HashMap()
 ) : MapRegistry<L, V>, Map<L, V> by registry {
     override fun register(location: L, value: V) {
-        registry[location]?.let {
+        if (registry.containsKey(location)) registry.getValue(location).let {
             throw DuplicateRegistrationError("Location $location already has a registered value: $it", it, value)
         }
         registry[location] = value
     }
 }
 
-public fun <L, V : Any> MapRegistry(): MapRegistry<L, V> = BasicMapRegistry()
+public fun <L, V> MapRegistry(): MapRegistry<L, V> = BasicMapRegistry()

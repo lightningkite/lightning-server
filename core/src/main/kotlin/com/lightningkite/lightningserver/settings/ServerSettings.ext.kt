@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.settings
 
 import com.lightningkite.lightningserver.definition.ServerSetting
+import com.lightningkite.lightningserver.definition.builder.include
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import kotlinx.serialization.DeserializationStrategy
@@ -90,7 +91,7 @@ public fun ServerSettings.loadFromFile(
         suggestedFile.writeText(format.encodeToString(serializer, loaded))
         throw IncompleteSettingsException(missingKeys, suggestedFile)
     }
-    this.serializable.putAll(loaded)
+    this.serializable.include(loaded)
 }
 
 context(server: ServerRuntime)
@@ -98,7 +99,7 @@ public fun ServerSettings.preload() {
     val errors = mutableMapOf<ServerSetting<*, *>, Exception>()
     serializable.keys.forEach { setting ->
         try {
-            get(setting, server)
+            get(setting)
         } catch (e: Exception) {
             errors[setting] = e
         }

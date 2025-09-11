@@ -126,7 +126,7 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
         }
         logger.debug("beforeCheckpoint() - Preparing all connections...")
         runBlocking {
-            settings.allGoals(this@AwsAdapter).entries.forEachConcurrent {
+            settings.allGoals().entries.forEachConcurrent {
                 (it.value as? Service)?.let {
                     logger.debug("Initially connecting to ${it.name}...")
                     it.connect()
@@ -142,7 +142,7 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
     override fun afterRestore(context: org.crac.Context<out Resource>?) {
         logger.debug("afterRestore() - opening all connections")
         runBlocking {
-            settings.allGoals(this@AwsAdapter).entries.forEachConcurrent {
+            settings.allGoals().entries.forEachConcurrent {
                 (it.value as? Service)?.let {
                     logger.debug("Connecting ${it.name}...")
                     runBlocking { it.connect() }
