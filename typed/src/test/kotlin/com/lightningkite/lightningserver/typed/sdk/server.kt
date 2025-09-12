@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.typed.sdk
 
 import com.lightningkite.lightningserver.auth.AnyId
+import com.lightningkite.lightningserver.auth.anyAuth
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.get
@@ -8,6 +9,8 @@ import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec1
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.ModelRestEndpoints
+import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebsocket.Companion.plus
+import com.lightningkite.lightningserver.typed.ModelRestUpdatesWebsocket
 import com.lightningkite.lightningserver.typed.modelInfo
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.withSdkInfo
@@ -29,7 +32,7 @@ object Server : ServerBuilder() {
         implementation = { _: Unit -> 0 }
     )
 
-    val first = path.path("m1") include Module
+    val first = path.path("m1") module Module
     val second = path.path("m2") module SecondModule.withSdkInfo("CustomEndpoints", "custom")
     val third = path.path("third") module ThirdModule.withSdkInfo("OtherEndpoints", "other")
 
@@ -81,6 +84,13 @@ object SecondModule : ServerBuilder() {
     init {
         sdkSettings.defaultInfo = SdkModule.Info("DefaultEndpoints", "default")
     }
+
+    val info = Server.database.modelInfo(
+        auth = anyAuth,
+        permissions = { ModelPermissions.allowAll<TestModel>() }
+    )
+
+    val rest = path.path("rest") include ModelRestEndpoints(info) + ModelRestUpdatesWebsocket(info)
 
     val nonInlined = path.path("noinline") module Inlined.withSdkInfo("NotInlinedApi")
 

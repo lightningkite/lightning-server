@@ -1,19 +1,22 @@
 package com.lightningkite.lightningserver.typed.sdk
 
-import com.lightningkite.lightningserver.definition.ModularServerDefinition
+import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.plus
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.typed.LiveVersion
 import com.lightningkite.lightningserver.typed.sdk.SDK.sdk
-import com.lightningkite.lightningserver.typed.sdk.SDK.toModule
+import com.lightningkite.lightningserver.typed.sdk.SDK.processToModules
 import com.lightningkite.services.data.KFile
+import kotlin.reflect.KClass
 
 public object FetcherSdk : SDK.Format {
     context(server: ServerRuntime)
-    override fun write(data: ModularServerDefinition, folder: KFile, packageName: String) {
-        val parsed = data.sdk().toModule().ensureUniqueNames()
-        folder.then("Api.kt").overwrite { writeInterface(parsed, packageName) }
-        folder.then("LiveApi.kt").overwrite { writeLive(parsed, packageName) }
+    override fun write(data: ServerDefinition, folder: KFile, packageName: String) {
+        val processed = data.sdk().processToModules().ensureUniqueNames()
+
+        folder.then("Api.kt").overwrite { writeInterface(processed, packageName) }
+        folder.then("LiveApi.kt").overwrite { writeLive(processed, packageName) }
     }
 
     private fun KFile.overwrite(action: Appendable.() -> Unit) {
@@ -29,7 +32,7 @@ public object FetcherSdk : SDK.Format {
 
     private fun SDK.Module.appendImportsTo(buffer: Appendable) {
         fun SDK.Module.imports(): List<String> =
-            extends.flatMap { it.imports } + children.flatMap { it.imports() }
+            extendsInterfaces.flatMap { it.imports } + children.flatMap { it.imports() }
 
         val always = listOf(
             "com.lightningkite.lightningserver.HttpMethod",
@@ -48,6 +51,8 @@ public object FetcherSdk : SDK.Format {
         module.appendImportsTo(this)
 
         fun SDK.Module.writeInterface(depth: Int) {
+
+            val extends = extendsInterfaces.filterSupertypes()
             val singleInterface = extends.singleOrNull()?.takeIf { declaredFunctions.isEmpty() && depth > 0 }
 
             appendLine()
@@ -81,7 +86,16 @@ public object FetcherSdk : SDK.Format {
             }
         }
 
-        fun InterfaceInfo.liveString(path: PathSpec) = "${name}Live(fetcher, ${path.toCodeString()}, ${typeParameters.joinToString { it.kotlinSerializer() }})"
+        fun InterfaceInfo.liveString(path: PathSpec): String {
+            val live = type.annotations
+                .filterIsInstance<LiveVersion>()
+                .firstOrNull()
+                ?.live
+                ?.let { it.qualifiedName ?: it.simpleName ?: throw SDK.GenerationException("No qualified name found for live version of $name: $it") }
+                ?: throw SDK.GenerationException("FetcherSdk.Live annotation required on client interfaces, please provide a live version of $name.")
+
+            return "$live(fetcher, ${path.toCodeString()}, ${typeParameters.joinToString { it.kotlinSerializer() }})"
+        }
 
         fun SDK.Module.writeLive(chain: List<SDK.Module>) {
             val depth = chain.size
@@ -89,12 +103,12 @@ public object FetcherSdk : SDK.Format {
             val pathPrefix = (chain + this).fold(PathSpec.root) { acc, mod -> acc + mod.path }
             fun PathSpec.absolute(): PathSpec = pathPrefix + this
 
-            val singleInterface = extends.singleOrNull()?.takeIf { declaredFunctions.isEmpty() && depth > 0 }
+            val singleInterface = extendsInterfaces.singleOrNull()?.takeIf { declaredFunctions.isEmpty() && depth > 0 }
 
             appendLine()
 
             if (singleInterface == null) {
-                val extendsInterfaces = listOf((chain + this).joinToString(".") { it.info.interfaceName }) + extends.map { inter ->
+                val extendsInterfaces = listOf((chain + this).joinToString(".") { it.info.interfaceName }) + extendsInterfaces.filterSupertypes().map { inter ->
                     "${inter.kotlinString()} by ${inter.liveString(pathPrefix)}"
                 }
 
@@ -134,6 +148,10 @@ public object FetcherSdk : SDK.Format {
         module.writeLive(emptyList())
     }
 
+    private fun List<InterfaceInfo>.filterSupertypes(): List<InterfaceInfo> {
+        val supertypes = flatMap { it.type.supertypes }.mapNotNull { it.classifier as? KClass<*> }
+        return filter { it.type !in supertypes }
+    }
 
     private fun SDK.Function.kotlinString(): String {
         val argString = arguments.joinToString { "${it.name}: ${it.type.kotlinTypeString()}" }
@@ -145,36 +163,4 @@ public object FetcherSdk : SDK.Format {
                 "fun $name($argString): TypedWebSocket<${inputType.kotlinTypeString()}, ${outputType.kotlinTypeString()}>"
         }
     }
-
-    public fun SDK.Module.ensureUniqueNames(): SDK.Module = copy(
-        functions = declaredFunctions
-            .groupBy { Triple(it.name, it.arguments, it is SDK.Function.Endpoint) }
-            .values
-            .flatMap { similar ->
-                similar.mapIndexed { idx, it ->
-                    if (idx == 0) it
-                    else when (it) {
-                        is SDK.Function.Endpoint -> it.copy(name = it.name + (idx + 1))
-                        is SDK.Function.Websocket -> it.copy(name = it.name + (idx + 1))
-                    }
-                }
-            }
-            .plus(functionOverrides),
-
-        children = children
-            .map { it.ensureUniqueNames() }
-            .groupBy { it.info.interfaceName }
-            .values
-            .flatMap { similar ->
-                similar.mapIndexed { idx, it ->
-                    if (idx == 0) it
-                    else it.copy(
-                        info = it.info.copy(
-                            interfaceName = it.info.interfaceName + (idx + 1),
-                            valueName = it.info.valueName + (idx + 1)
-                        )
-                    )
-                }
-            }
-    )
 }

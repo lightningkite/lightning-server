@@ -29,7 +29,7 @@ public fun ServerSettings.loadFromFile(
     file: File,
     module: SerializersModule,
 ) {
-    val serializer = SettingsSerializer(keys.sortedBy { it.name })
+    val serializer = SettingsSerializer(settings.sortedBy { it.name })
     val format = if (file.name.contains(".properties")) {
         object : StringFormat {
             val properties = Properties(module)
@@ -63,7 +63,7 @@ public fun ServerSettings.loadFromFile(
     }
 
     if (!file.exists()) {
-        file.writeText(format.encodeToString(serializer, keys.associateWith { it.default }))
+        file.writeText(format.encodeToString(serializer, settings.associateWith { it.default }))
         throw MissingSettingFile(file)
     }
 
@@ -77,7 +77,7 @@ public fun ServerSettings.loadFromFile(
     val text = decryptedBytes.decodeToString()
     val loaded: MutableMap<ServerSetting<*, *>, Any?> = format.decodeFromString(serializer, text).toMutableMap()
     val missingKeys = HashSet<ServerSetting<*, *>>()
-    for (key in keys) {
+    for (key in settings) {
         if (key !in loaded) {
             loaded[key] = key.default
             if (!key.optional) {

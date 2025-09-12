@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.services.database.AggregateQuery
+import com.lightningkite.services.database.CollectionUpdates
 import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.EntryChange
 import com.lightningkite.services.database.GroupAggregateQuery
@@ -21,13 +22,12 @@ import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer
 
 
-public open class ClientModelRestEndpointsLive<T : HasId<ID>, ID : Comparable<ID>>(
+public open class LiveClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
     public val fetcher: Fetcher,
     public val subpath: String,
     public val serializer: KSerializer<T>,
     public val idSerializer: KSerializer<ID>,
 ): ClientModelRestEndpoints<T, ID> {
-
     override suspend fun default(): T = fetcher(
         "$subpath/_default_",
         HttpMethod.GET,
@@ -61,7 +61,7 @@ public open class ClientModelRestEndpointsLive<T : HasId<ID>, ID : Comparable<ID
     )
 
     override suspend fun detail(id: ID): T = fetcher(
-        "$subpath/${id.urlifyToCommaString()}",
+        "$subpath/${id.url()}",
         HttpMethod.GET,
         Unit.serializer(),
         Unit,
@@ -85,7 +85,7 @@ public open class ClientModelRestEndpointsLive<T : HasId<ID>, ID : Comparable<ID
     )
 
     override suspend fun upsert(id: ID, input: T): T = fetcher(
-        "$subpath/${id.urlifyToCommaString()}",
+        "$subpath/${id.url()}",
         HttpMethod.POST,
         serializer,
         input,
@@ -101,7 +101,7 @@ public open class ClientModelRestEndpointsLive<T : HasId<ID>, ID : Comparable<ID
     )
 
     override suspend fun replace(id: ID, input: T): T = fetcher(
-        "$subpath/${id.urlifyToCommaString()}",
+        "$subpath/${id.url()}",
         HttpMethod.PUT,
         serializer,
         input,
@@ -117,7 +117,7 @@ public open class ClientModelRestEndpointsLive<T : HasId<ID>, ID : Comparable<ID
     )
 
     override suspend fun modifyWithDiff(id: ID, input: Modification<T>): EntryChange<T> = fetcher(
-        "$subpath/${id.urlifyToCommaString()}/delta",
+        "$subpath/${id.url()}/delta",
         HttpMethod.PATCH,
         Modification.Companion.serializer(serializer),
         input,
@@ -126,7 +126,7 @@ public open class ClientModelRestEndpointsLive<T : HasId<ID>, ID : Comparable<ID
 
     override suspend fun modify(id: ID, input: Modification<T>): T {
         return fetcher(
-            "$subpath/${id.urlifyToCommaString()}",
+            "$subpath/${id.url()}",
             HttpMethod.PATCH,
             Modification.Companion.serializer(serializer),
             input,
@@ -143,7 +143,7 @@ public open class ClientModelRestEndpointsLive<T : HasId<ID>, ID : Comparable<ID
     )
 
     override suspend fun delete(id: ID): Unit = fetcher(
-        "$subpath/${id.urlifyToCommaString()}",
+        "$subpath/${id.url()}",
         HttpMethod.DELETE,
         Unit.serializer(),
         Unit,
@@ -197,8 +197,25 @@ public open class ClientModelRestEndpointsLive<T : HasId<ID>, ID : Comparable<ID
         input,
         MapSerializer(String.serializer(), Double.serializer().nullable)
     )
-
-    private fun ID.urlifyToCommaString(): String {
-        TODO()
-    }
+    
+    private fun ID.url() = fetcher.url(this, idSerializer)
 }
+
+public open class LiveClientModelRestUpdatesWebsocket<T : HasId<ID>, ID : Comparable<ID>>(
+    private val fetcher: Fetcher,
+    private val subpath: String,
+    private val serializer: KSerializer<T>,
+    private val idSerializer: KSerializer<ID>,
+) : ClientModelRestUpdatesWebsocket<T, ID> {
+    override fun updates(): TypedWebSocket<Condition<T>, CollectionUpdates<T, ID>> =
+        fetcher.websocket(subpath, Condition.serializer(serializer), CollectionUpdates.serializer(serializer, idSerializer))
+}
+
+public class LiveClientModelRestEndpointsAndUpdatesWebsocket<T : HasId<ID>, ID : Comparable<ID>>(
+    public val fetcher: Fetcher,
+    public val subpath: String,
+    public val serializer: KSerializer<T>,
+    public val idSerializer: KSerializer<ID>,
+) : ClientModelRestEndpointsAndUpdatesWebsocket<T, ID>,
+        ClientModelRestEndpoints<T, ID> by LiveClientModelRestEndpoints(fetcher, subpath, serializer, idSerializer),
+        ClientModelRestUpdatesWebsocket<T, ID> by LiveClientModelRestUpdatesWebsocket(fetcher, subpath, serializer, idSerializer)

@@ -1,12 +1,16 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.auth.options
+import com.lightningkite.lightningserver.definition.Locationed
+import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.html
+import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.get
+import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.services.data.Description
@@ -114,7 +118,7 @@ public class ApiDocs(private val packageName: String) : ServerBuilder() {
             }
         }
 
-        HttpResponse(body = TypedData.Companion.html {
+        HttpResponse(body = TypedData.html {
             head { title("${generalSettings().projectName} - Generated Documentation") }
             body {
                 h1 { +"API Docs" }
@@ -324,3 +328,18 @@ public class ApiDocs(private val packageName: String) : ServerBuilder() {
         })
     }
 }
+
+internal val ServerDefinition.locationedApiHttpHandlers: List<Locationed<HttpEndpoint<PathSpec>, ApiHttpHandler<*, *, *, *>>>
+    get() = endpoints.entries.flatMap {
+        it.value.http.entries
+            .filter { it.value is ApiHttpHandler<*, *, *, *> }
+            .map { h -> Locationed(HttpEndpoint(it.key, h.key), h.value as ApiHttpHandler<*, *, *, *>) }
+    }
+        .sortedBy { it.location.run { "$method $path"} }
+
+internal val ServerDefinition.locationedApiWebsocketHandlers: List<Locationed<PathSpec, ApiWebsocketHandler<*, *, *, *, *>>>
+    get() = endpoints.entries.mapNotNull {
+        (it.value.websocket as? ApiWebsocketHandler<*, *, *, *, *>)
+            ?.let { h -> Locationed(it.key, h) }
+    }
+        .sortedBy { it.location.toString() }

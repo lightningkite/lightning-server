@@ -1,15 +1,12 @@
 package com.lightningkite.lightningserver.demo
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.UseContextualSerialization
 import kotlin.time.Instant
 import com.lightningkite.services.data.*
-import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.services.database.HasEmail
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.HasPassword
 import com.lightningkite.services.files.ServerFile
-import kotlinx.serialization.Contextual
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 

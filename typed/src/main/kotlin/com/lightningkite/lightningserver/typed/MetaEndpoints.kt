@@ -86,7 +86,7 @@ public class MetaEndpoints(
             errorCases = listOf(),
             implementation = { _: Unit ->
                 serverHealth(
-                    features = serverRuntime.settings.keys
+                    features = serverRuntime.settings.settings
                         .map { it() }
                         .mapNotNull { it ->
                             val checkable =

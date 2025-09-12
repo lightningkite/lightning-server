@@ -200,12 +200,12 @@ public class PasswordProofEndpoints(
     context(server: ServerRuntime)
     public override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> established(
         principal: PrincipalType<SUBJECT, ID>,
-        item: SUBJECT,
+        subject: SUBJECT,
     ): Boolean {
         @Suppress("UNCHECKED_CAST")
         return modelInfo.collection().count(condition {
             Condition.And(
-                it.subjectId eq principal.idString(item._id),
+                it.subjectId eq principal.idString(subject._id),
                 it.subjectType eq principal.name,
                 active
             )

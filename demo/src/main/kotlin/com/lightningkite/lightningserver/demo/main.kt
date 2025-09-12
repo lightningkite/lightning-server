@@ -8,10 +8,12 @@ import com.lightningkite.lightningserver.engine.ktor.KtorEngine
 import com.lightningkite.lightningserver.settings.loadFromFile
 import com.lightningkite.lightningserver.terraform.awsserverless.TerraformAwsServerlessDomainBuilder
 import com.lightningkite.lightningserver.terraform.generated
-import com.lightningkite.lightningserver.typed.sdk.writeKiteUiSdk
+import com.lightningkite.lightningserver.typed.sdk.FetcherSdk
+import com.lightningkite.lightningserver.typed.sdk.SDK.writeSdk
 import com.lightningkite.services.ExceptionReporter
 import com.lightningkite.services.MetricReporter
 import com.lightningkite.services.cache.dynamodb.awsDynamoDb
+import com.lightningkite.services.data.KFile
 import com.lightningkite.services.database.mongodb.mongodbAtlas
 import com.lightningkite.services.database.mongodb.mongodbAtlasFree
 import com.lightningkite.services.email.javasmtp.awsSesSmtp
@@ -73,7 +75,7 @@ fun terraform() {
 }
 
 fun sdk() {
-    Server.build().writeKiteUiSdk("com.lightningkite.lightningserver.demo", File("demo/build/sdk"))
+    Server.writeSdk(FetcherSdk, KFile("demo/build/sdk"), "com.lightningkite.lightningserver.demo")
 }
 
 fun main(vararg args: String) {

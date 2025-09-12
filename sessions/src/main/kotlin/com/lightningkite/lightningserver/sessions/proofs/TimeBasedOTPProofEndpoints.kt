@@ -214,11 +214,11 @@ public class TimeBasedOTPProofEndpoints(
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> established(
         principal: PrincipalType<SUBJECT, ID>,
-        item: SUBJECT,
+        subject: SUBJECT,
     ): Boolean {
         @Suppress("UNCHECKED_CAST")
         return modelInfo.collection().count(condition {
-            it.subjectId.eq(principal.idString(item._id)) and
+            it.subjectId.eq(principal.idString(subject._id)) and
                     it.subjectType.eq(principal.name) and
                     active and
                     it.lastUsedAt.neq(null)

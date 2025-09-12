@@ -34,12 +34,6 @@ public data class SdkModule<S>(
             valueName: String = interfaceName.camelCase()
         ) : SdkModule<ServerDefinition> =
             SdkModule(this, interfaceName, valueName)
-
-        public fun ModularServerDefinition.withSdkInfo(
-            interfaceName: String,
-            valueName: String = interfaceName.camelCase()
-        ) : SdkModule<ModularServerDefinition> =
-            SdkModule(this, interfaceName, valueName)
     }
 }
 
@@ -53,15 +47,6 @@ public infix fun <S : ServerBuilder> PathSpec0.module(module: SdkModule<S>): S {
 @LightningServerDsl
 context(builder: ServerBuilder)
 public infix fun <S : ServerBuilder> PathSpec0.module(module: S): S = module(module.withSdkInfo())
-
-
-@LightningServerDsl
-context(builder: ServerBuilder)
-public infix fun PathSpec0.module(module: SdkModule<ModularServerDefinition>): ModularServerDefinition {
-    val (def, id) = module.value.definition.withSdkId()
-    builder.extensions[ModuleRegistry][id] = module.info
-    return with(builder) { include(module.value.copy(definition = def)) }
-}
 
 @LightningServerDsl
 context(builder: ServerBuilder)
@@ -78,12 +63,15 @@ public infix fun PathSpec0.module(module: SdkModule<ServerDefinition>): ServerDe
 private object SdkId : MutableExtensions.Key<Uuid>
 
 private val ServerBuilder.sdkId get() = extensions.getOrPut(SdkId) { Uuid.random() }
-private val ServerDefinition.sdkId get() = extensions[SdkId]
+
+private val ServerDefinition.Module.sdkId get() = extensions[SdkId]
 private fun ServerDefinition.withSdkId(): Pair<ServerDefinition, Uuid> {
-    extensions[SdkId]?.let { return this to it }
+    thisLayer.extensions[SdkId]?.let { return this to it }
     val id = Uuid.random()
     val copied = copy(
-        extensions = extensions.toMutableExtensions().apply { set(SdkId, id) }
+        thisLayer = thisLayer.copy(
+            extensions = extensions.toMutableExtensions().apply { set(SdkId, id) }
+        ),
     )
     return copied to id
 }
@@ -95,7 +83,7 @@ private object ModuleRegistry : MutableExtensions.DegradingKey<MutableMap<Uuid, 
     }
 }
 
-internal fun ServerDefinition.getModuleInfo(other: ServerDefinition): SdkModule.Info? {
+internal fun ServerDefinition.Module.getModuleInfo(other: ServerDefinition.Module): SdkModule.Info? {
     val id = other.sdkId ?: return null
     return extensions[ModuleRegistry]?.get(id)
 }

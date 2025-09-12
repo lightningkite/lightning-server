@@ -23,8 +23,10 @@ import com.lightningkite.lightningserver.sessions.token.TokenFormat
 import com.lightningkite.lightningserver.toException
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.ModelRestEndpoints
-import com.lightningkite.lightningserver.typed.docGroup
 import com.lightningkite.lightningserver.typed.invoke
+import com.lightningkite.lightningserver.typed.sdk.SdkModule
+import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
+import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.builtins.ListSerializer
@@ -39,7 +41,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     tokenFormat: Runtime<TokenFormat> = Runtime { PrivateTinyTokenFormat() },
 ) : SessionManager<SUBJECT, ID>(principal, database, tokenFormat) {
     init {
-        path.docGroup = "${principal.name}Auth"
+        sdkSettings.defaultInfo = SdkModule.Info(principal.name + "Auth")
     }
 
     context(server: ServerRuntime)
@@ -108,7 +110,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             summary = "Log In",
             description = "Attempt to log in as a ${principal.name} using various proofs.",
             errorCases = errors,
-            belongsToInterface = belongsToInterface,
+//            belongsToInterface = belongsToInterface,
             implementation = { proofs: List<Proof> ->
                 login2(LogInRequest(proofs))
             }
@@ -122,7 +124,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             summary = "Log In With Limitations",
             description = "Attempt to log in as a ${principal.name} using various proofs.",
             errorCases = errors,
-            belongsToInterface = belongsToInterface,
+//            belongsToInterface = belongsToInterface,
             implementation = { input: LogInRequest ->
                 proofsCheck(input.proofs).let {
                     IdAndAuthMethods(
@@ -143,7 +145,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             summary = "Check Proofs",
             description = "Check if you can log in as a ${principal.name} using various proofs.",
             errorCases = errors,
-            belongsToInterface = belongsToInterface,
+//            belongsToInterface = belongsToInterface,
             implementation = { proofs: List<Proof> ->
                 proofs.forEach {
                     if (!proofSigner.await().verify(it)) throw errorInvalidProof.toException(data = it.via)

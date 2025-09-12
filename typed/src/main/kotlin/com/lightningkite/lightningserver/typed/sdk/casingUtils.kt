@@ -21,3 +21,9 @@ public fun String.snakeCase(): String = caseAlter { "_$it" }.lowercase()
 public fun String.screamingSnakeCase(): String = caseAlter { "_$it" }.uppercase()
 public fun String.camelCase(): String = caseAlter { it.capitalize() }.decapitalize()
 public fun String.pascalCase(): String = caseAlter { it.capitalize() }.capitalize()
+
+public fun String.functionCase(): String = this
+    .replace(Regex("""[^0-9a-zA-Z]+(?<following>.)?""")) { match ->
+        match.groups["following"]?.value?.uppercase() ?: ""
+    }
+    .decapitalize()

@@ -8,7 +8,8 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.serialization.decoder
 import com.lightningkite.lightningserver.serialization.encoder
-import com.lightningkite.lightningserver.typed.Documentable.OldInterfaceInfo
+import com.lightningkite.lightningserver.typed.sdk.camelCase
+import com.lightningkite.lightningserver.typed.sdk.functionCase
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketConnection
@@ -20,15 +21,13 @@ import com.lightningkite.services.database.HasId
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 
-public interface ApiWebsocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?, INPUT, OUTPUT> :
-    Documentable,
-    WebSocketHandler<PATH, ApiWebsocketStorage<STORAGE>> {
-    override val auth: AuthRequirement<USER>
-    override val inputType: KSerializer<INPUT>
-    override val outputType: KSerializer<OUTPUT>
-    override val summary: String
-    override val description: String
-    override val belongsToInterface: OldInterfaceInfo?
+public interface ApiWebsocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?, INPUT, OUTPUT> : WebSocketHandler<PATH, ApiWebsocketStorage<STORAGE>> {
+    public val auth: AuthRequirement<USER>
+    public val inputType: KSerializer<INPUT>
+    public val outputType: KSerializer<OUTPUT>
+    public val summary: String
+    public val functionName: String get() = summary.functionCase()
+    public val description: String
 
     public val errorCases: List<LSError>
     public val innerStorageSerializer: KSerializer<STORAGE>

@@ -3,7 +3,6 @@ package com.lightningkite.lightningserver.files
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.typed.Fetcher
 import kotlinx.serialization.builtins.serializer
-import com.lightningkite.lightningserver.typed.urlifyToCommaString
 
 class LiveApi(val fetcher: Fetcher) : Api {
 
@@ -15,5 +14,5 @@ class LiveApi(val fetcher: Fetcher) : Api {
 	}
 	override val uploadEarlyEndpoint = LiveUploadEarlyEndpointApi()
 
-	override val module = com.lightningkite.lightningserver.typed.ClientModelRestEndpointsLive(fetcher, "module", com.lightningkite.lightningserver.files.UploadEarlySdkTests.Model.serializer(), kotlin.uuid.Uuid.serializer())
+	override val module = com.lightningkite.lightningserver.typed.LiveClientModelRestEndpoints(fetcher, "module", com.lightningkite.lightningserver.files.UploadEarlySdkTests.Model.serializer(), kotlin.uuid.Uuid.serializer())
 }

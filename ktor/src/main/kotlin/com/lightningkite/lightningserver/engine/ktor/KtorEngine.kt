@@ -10,7 +10,6 @@ import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawPath
-import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.handle
 import com.lightningkite.lightningserver.settings.ServerSettings
@@ -51,7 +50,7 @@ internal val ktorRunConfig: ServerSetting.Direct<KtorRuntimeSettings> = ServerSe
 
 public class KtorEngine(server: ServerDefinition, override val clock: Clock = Clock.System) : LocalEngine(server) {
 
-    override val settings: ServerSettings = ServerSettings(super.settings.keys.plus(ktorRunConfig).toSet())
+    override val settings: ServerSettings = ServerSettings(super.settings.settings.plus(ktorRunConfig).toSet())
 
     private fun Application.adapt() {
         install(WebSockets)

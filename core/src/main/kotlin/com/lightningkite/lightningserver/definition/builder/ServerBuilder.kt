@@ -86,8 +86,8 @@ public abstract class ServerBuilder : Extendable {
 
     public override val extensions: MutableExtensions = MutableExtensions()
 
-    private val imports: MapRegistry<PathSpec0, ModularServerDefinition> = MapRegistry()
-    private val modules: MapRegistry<PathSpec0, ServerBuilder> = MapRegistry()
+    private val imports: ListRegistry<Locationed<PathSpec0, ServerDefinition>> = ListRegistry()
+    private val modules: ListRegistry<Locationed<PathSpec0, ServerBuilder>> = ListRegistry()
 
     @LightningServerDsl
     public infix fun <PATH : PathSpec, HANDLER : HttpHandler<PATH>> HttpEndpoint<PATH>.bind(handler: HANDLER): HANDLER {
@@ -96,7 +96,7 @@ public abstract class ServerBuilder : Extendable {
     }
 
     @LightningServerDsl
-    public infix fun <PATH : PathSpec, STORAGE> PATH.bind(handler: WebSocketHandler<PATH, STORAGE>): WebSocketHandler<PATH, STORAGE> {
+    public infix fun <PATH : PathSpec, STORAGE, T : WebSocketHandler<PATH, STORAGE>> PATH.bind(handler: T): T {
         websockets.register(this, handler)
         return handler
     }
@@ -228,19 +228,13 @@ public abstract class ServerBuilder : Extendable {
 
     @LightningServerDsl
     public infix fun <T : ServerBuilder> PathSpec0.include(module: T): T {
-        modules.register(this, module)
+        modules.register(Locationed(this, module))
         return module
     }
 
     @LightningServerDsl
-    public infix fun PathSpec0.include(import: ModularServerDefinition): ModularServerDefinition {
-        imports.register(this, import)
-        return import
-    }
-
-    @LightningServerDsl
     public infix fun PathSpec0.include(import: ServerDefinition): ServerDefinition {
-        imports.register(this, ModularServerDefinition(import))
+        imports.register(Locationed(this, import))
         return import
     }
 
@@ -268,52 +262,13 @@ public abstract class ServerBuilder : Extendable {
      * 3. Flattens the modular structure into a single [ServerDefinition]
      *
      * @return A complete [ServerDefinition] with all modules flattened and ready for deployment
-     * @see modularBuild
-     * @see shallowBuild
      */
-    public fun build(): ServerDefinition = modularBuild().flatten()
+    public fun build(): ServerDefinition = ServerDefinition(
+        thisLayer = shallowBuild(),
+        modules = imports + modules.mapItems { it.build() }
+    )
 
-    /**
-     * Builds a [ModularServerDefinition] that preserves the modular structure.
-     *
-     * This method creates a hierarchical server definition that maintains the separation
-     * between the current builder's configuration and its nested modules. The resulting
-     * structure can be inspected for debugging or flattened later using [ModularServerDefinition.flatten].
-     *
-     * The build process:
-     * 1. Creates a [shallowBuild] of this builder's direct configuration
-     * 2. Recursively builds all imported modules
-     * 3. Combines them into a hierarchical structure with proper path mounting
-     *
-     * @return A [ModularServerDefinition] containing this builder's configuration and all nested modules
-     * @see build
-     * @see shallowBuild
-     */
-    public fun modularBuild(): ModularServerDefinition =
-        ModularServerDefinition(
-            definition = shallowBuild(),
-            modules = imports + modules.mapValues { it.value.modularBuild() }
-        )
-
-    /**
-     * Builds a [ServerDefinition] containing only this builder's direct configuration.
-     *
-     * This method creates a server definition that includes only the endpoints, settings,
-     * and other configurations defined directly in this builder. It does not include
-     * any nested modules or imported definitions.
-     *
-     * Use this when you need to:
-     * - Inspect only the current builder's configuration
-     * - Build a partial definition for testing
-     * - Create a base definition that will be extended elsewhere
-     *
-     * This method called in both the [build] and [modularBuild] methods.
-     *
-     * @return A [ServerDefinition] containing only this builder's direct configuration
-     * @see build
-     * @see modularBuild
-     */
-    public fun shallowBuild(): ServerDefinition = ServerDefinition(
+    private fun shallowBuild(): ServerDefinition.Module = ServerDefinition.Module(
         internalSerializersModule = internalSerialization,
         externalSerializersModule = externalSerialization,
         httpInterceptors = http.interceptors.interceptors,

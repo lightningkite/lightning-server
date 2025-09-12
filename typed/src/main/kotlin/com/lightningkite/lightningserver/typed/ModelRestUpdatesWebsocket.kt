@@ -9,6 +9,12 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpec1
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.send
+import com.lightningkite.lightningserver.typed.sdk.SdkModule
+import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
+import com.lightningkite.lightningserver.typed.sdk.clientInterface
+import com.lightningkite.lightningserver.typed.sdk.info
+import com.lightningkite.lightningserver.typed.sdk.pascalCase
+import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
@@ -25,6 +31,7 @@ import com.lightningkite.services.database.SerializableProperty
 import com.lightningkite.services.database.simplify
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlin.reflect.typeOf
 
 
 // Condition<T>, CollectionUpdates<T, ID>
@@ -43,16 +50,20 @@ public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
     public val info: ModelInfo<USER, T, ID>,
     public val key: SerializableProperty<T, *>? = null,
 ): ServerBuilder() {
-    public val websocket: ApiWebsocketHandler<PathSpec0, ModelRestUpdatesWebsocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>> = object: ApiWebsocketHandler<PathSpec0, ModelRestUpdatesWebsocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>> {
+    init {
+        sdkSettings.clientInterface = ClientModelRestUpdatesWebsocket::class.info(info.serializer, info.idSerializer)
+        sdkSettings.defaultInfo = SdkModule.Info(
+            interfaceName = info.collectionName.pascalCase() + "RestUpdatesWebsocket",
+            valueName = "websocket"
+        )
+    }
+
+    private inner class Websocket : ApiWebsocketHandler<PathSpec0, ModelRestUpdatesWebsocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>> {
         override val auth: AuthRequirement<USER> = info.auth
         override val inputType: KSerializer<Condition<T>> = Condition.serializer(info.serializer)
         override val outputType: KSerializer<CollectionUpdates<T, ID>> = CollectionUpdates.serializer(info.serializer, info.idSerializer)
         override val summary: String = "Updates"
         override val description: String = "Streams updates about items that fulfill your condition."
-        override val belongsToInterface: Documentable.OldInterfaceInfo = Documentable.OldInterfaceInfo("ClientModelRestEndpoints", listOf(
-            info.serializer,
-            info.idSerializer
-        ))
         override val errorCases: List<LSError> get() = listOf()
         override val innerStorageSerializer: KSerializer<ModelRestUpdatesWebsocketData<T, ID>> = ModelRestUpdatesWebsocketData.serializer(info.serializer, info.idSerializer)
 
@@ -95,9 +106,9 @@ public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
         context(connection: ApiWebsocketHandler.Connection<PathSpec0, ModelRestUpdatesWebsocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>>)
         override suspend fun messageFromSubscriptionTyped(topic: WebSocketSubscriptionMessage<*, *>) {
             val message = when(topic.topic) {
-                 generalTopic -> topic.value
-                 hashTopic -> topic.value
-                 else -> return
+                generalTopic -> topic.value
+                hashTopic -> topic.value
+                else -> return
             } as CollectionChanges<T>
             val toSend = message.changes.map { entry ->
                 ListChange(
@@ -124,9 +135,10 @@ public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
         }
 
         context(connection: ApiWebsocketHandler.Connection<PathSpec0, ModelRestUpdatesWebsocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>>)
-        override suspend fun disconnectTyped(reason: WebSocketClose) {
-        }
+        override suspend fun disconnectTyped(reason: WebSocketClose) {}
     }
+
+    public val websocket: ApiWebsocketHandler<PathSpec0, ModelRestUpdatesWebsocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>> = path bind Websocket()
 
     public val generalTopic: WebSocketTopic<PathSpec0, CollectionChanges<T>> = path.path("general").topic(CollectionChanges.serializer(info.serializer))
     public val hashTopic: WebSocketTopic<PathSpec1<Int>, CollectionChanges<T>> = path.arg<Int>("id").topic(CollectionChanges.serializer(info.serializer))

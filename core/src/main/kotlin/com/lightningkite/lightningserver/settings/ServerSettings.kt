@@ -5,7 +5,7 @@ import com.lightningkite.lightningserver.definition.builder.MapRegistry
 import com.lightningkite.lightningserver.definition.builder.getOrRegister
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 
-public class ServerSettings(public val keys: Set<ServerSetting<*, *>>) {
+public class ServerSettings(public val settings: Set<ServerSetting<*, *>>) {
     public val serializable: MapRegistry<ServerSetting<*, *>, Any?> = MapRegistry()
     public val goal: MapRegistry<ServerSetting<*, *>, Any?> = MapRegistry()
 
@@ -21,14 +21,14 @@ public class ServerSettings(public val keys: Set<ServerSetting<*, *>>) {
     context(_: ServerRuntime)
     public fun <SERIALIZABLE, RESULT> get(key: ServerSetting<SERIALIZABLE, RESULT>): RESULT {
         return goal.getOrRegister(key) {
-            val setting = serializable.getOrElse(key) { key.default } as SERIALIZABLE
-
-            key.get(setting)
+            key.get(
+                serializable.getOrElse(key) { key.default } as SERIALIZABLE
+            )
         } as RESULT
     }
 
-    public fun allSerializable(): Map<ServerSetting<*, *>, Any?> = keys.associateWith { serializable[it] ?: it.default }
+    public fun allSerializable(): Map<ServerSetting<*, *>, Any?> = settings.associateWith { serializable[it] ?: it.default }
 
     context(_: ServerRuntime)
-    public fun allGoals(): Map<ServerSetting<*, *>, Any?> = keys.associateWith { get(it) }
+    public fun allGoals(): Map<ServerSetting<*, *>, Any?> = settings.associateWith { get(it) }
 }
