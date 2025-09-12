@@ -18,7 +18,7 @@ public data class JwtClaims(
     val userId: String? = null,
     val scope: String? = null,
     val thp: String? = null,
-    val sid: Uuid? = null,
+    val sid: String? = null,
     val cache: String? = null,
 )
 

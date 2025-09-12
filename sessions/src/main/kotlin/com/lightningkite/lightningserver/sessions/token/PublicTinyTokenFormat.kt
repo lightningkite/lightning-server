@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.encryption.sign
 import com.lightningkite.lightningserver.encryption.verify
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.services.database.HasId
 import kotlin.io.encoding.Base64
 import kotlin.time.Duration
@@ -28,7 +29,7 @@ public class PublicTinyTokenFormat(
         "tt/${handler.name}/" + server.internalSerialization.kotlinBytesFormat
             .encodeToByteArray(
                 Authentication.serializer(handler.subjectSerializer),
-                auth
+                auth.copy(expiration = now().plus(expiration))
             )
             .let { hasher.await().sign(it) + it }
             .let(Base64.UrlSafe::encode)
@@ -48,9 +49,11 @@ public class PublicTinyTokenFormat(
 
         if (!hasher.await().verify(data, signature)) throw TokenException("Incorrect signature")
 
-        return server.internalSerialization.kotlinBytesFormat.decodeFromByteArray(
+        val auth = server.internalSerialization.kotlinBytesFormat.decodeFromByteArray(
             Authentication.serializer(handler.subjectSerializer),
             data
         )
+        if (auth.expiration != null && now() > auth.expiration!!) throw TokenException("Token has expired")
+        return auth
     }
 }

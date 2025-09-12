@@ -13,16 +13,13 @@ import com.lightningkite.lightningserver.auth.auth
 import com.lightningkite.lightningserver.auth.authReaders
 import com.lightningkite.lightningserver.auth.fetch
 import com.lightningkite.lightningserver.auth.id
-import com.lightningkite.lightningserver.auth.isSuperUser
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.auth.register
 import com.lightningkite.lightningserver.data.Request
-import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.definition.generalSettings
-import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
@@ -120,8 +117,11 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     context(server: ServerRuntime)
     override suspend fun read(request: Request<*>): Authentication<SUBJECT>? {
+        print("Headers: ${request.headers}")
+
+        val rawHeader = request.headers[HttpHeader.Authorization]
         val token =
-            request.headers[HttpHeader.Authorization]?.root?.removePrefix("bearer ")?.removePrefix("Bearer ")
+            rawHeader?.root?.removePrefix("bearer ")?.removePrefix("Bearer ")
                 ?: request.queryParameters.find {
                     it.first.equals(HttpHeader.Authorization, ignoreCase = true)
                 }?.second?.replace(' ', '+')
@@ -237,13 +237,14 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             summary = "Create Sub Session",
             description = "Creates a session with more limited authorization",
             implementation = { request: SubSessionRequest ->
-                val session = sessionInfo.collection().get(this.auth.sessionId ?: throw UnauthorizedException())
+                val sessionUuid = this.auth.sessionId?.let(Uuid::parse) ?: throw UnauthorizedException()
+                val session = sessionInfo.collection().get(sessionUuid)
                     ?: throw UnauthorizedException()
 
                 newSession(
                     label = request.label,
                     subjectId = auth.id,
-                    derivedFrom = auth.sessionId,
+                    derivedFrom = sessionUuid,
                     scopes = request.scopes,
                     expires = session.expires
                         ?.let { minOf(it, request.expires ?: Instant.DISTANT_FUTURE) }

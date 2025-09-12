@@ -15,7 +15,6 @@ import com.lightningkite.lightningserver.encryption.sign
 import com.lightningkite.lightningserver.encryption.verify
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
-import com.lightningkite.lightningserver.sessions.Authentication
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.json.Json
 import kotlin.io.encoding.Base64
@@ -63,14 +62,12 @@ public class JwtTokenFormat(
         val rawSub = claims.sub!!
         val sub = if(rawSub.startsWith(prefix)) rawSub.removePrefix(prefix) else return null
 
-        if (now() > Instant.fromEpochSeconds(claims.exp)) throw TokenException("Token has expired")
-        if (claims.nbf?.let { now() < Instant.fromEpochSeconds(it) } == true) throw TokenException("Token not valid yet")
-
         return Authentication(
             principalType = handler,
             id = server.internalSerialization.json.decodeFromString(handler.idSerializer, sub),
             sessionId = claims.sid,
             issuedAt = Instant.fromEpochSeconds(claims.iat),
+            expiration = Instant.fromEpochSeconds(claims.exp),
             scopes = claims.scope!!.split(' ').mapTo(HashSet(), ::GrantedScope),
             cache = claims.cache?.let { server.internalSerialization.json.decodeFromString<SerializableCache>(it) }
         )
@@ -116,7 +113,8 @@ public class JwtTokenFormat(
 
         requiredAudience?.let { if (claims.aud != it) return null }  // It's for someone else.  Ignore it.
 
-        if (System.currentTimeMillis() / 1000L > claims.exp) throw JwtExpiredException("JWT has expired.")
+        if (now() > Instant.fromEpochSeconds(claims.exp)) throw TokenException("JWT has expired.")
+        if (claims.nbf?.let { now() < Instant.fromEpochSeconds(it) } == true) throw TokenException("Token not valid yet")
 
         if (!verify(token.substringBeforeLast('.').toByteArray(), signature))
             throw JwtSignatureException("JWT Signature is incorrect.")

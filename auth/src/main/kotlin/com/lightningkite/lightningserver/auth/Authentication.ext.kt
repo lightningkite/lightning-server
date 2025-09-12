@@ -30,6 +30,6 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>
     subject: SUBJECT,
     issuedAt: Instant = server.clock.now(),
     scopes: Set<GrantedScope> = GrantedScopes.root
-): Authentication<SUBJECT> = Authentication(this, id = subject._id, issuedAt = issuedAt, scopes = scopes, sessionId = null)
+): Authentication<SUBJECT> = Authentication(this, id = subject._id, issuedAt = issuedAt, expiration = null, scopes = scopes, sessionId = null)
 
 public fun Authentication<*>.meetsRequirements(scopes: Set<RequiredScope>): Boolean = this.scopes.meetsRequirements(scopes)

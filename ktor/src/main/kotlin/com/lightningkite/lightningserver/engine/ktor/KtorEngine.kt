@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.engine.local.LocalEngine
 import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
+import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawPath
 import com.lightningkite.lightningserver.pathing.path
@@ -72,7 +73,7 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
                         protocol = call.request.origin.scheme,
                         sourceIp = runConfig.realIpHeader?.let {
                             call.request.header(it)
-                                ?: throw Exception("Real IP address header for proxy '$it' was missing from the request.")
+                                ?: run { logger.warn { "Real IP address header for proxy '$it' was missing from the request." }; null }
                         } ?: call.request.origin.remoteAddress,
                         method = HttpMethod(call.request.httpMethod.value),
                         body = run {
@@ -139,7 +140,7 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
                     protocol = call.request.origin.scheme,
                     sourceIp = runConfig.realIpHeader?.let {
                         call.request.header(it)
-                            ?: throw Exception("Real IP address header for proxy '$it' was missing from the request.")
+                            ?: run { logger.warn { "Real IP address header for proxy '$it' was missing from the request." }; null }
                     } ?: call.request.origin.remoteAddress,
                 )
 

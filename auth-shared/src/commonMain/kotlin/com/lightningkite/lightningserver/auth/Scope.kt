@@ -32,6 +32,8 @@ public value class GrantedScope(public val asString: String) {
 
     public fun restrict(sub: Subscope): GrantedScope =
         if (this == root) GrantedScope(sub.asString) else GrantedScope("$asString:${sub.asString}")
+
+    override fun toString(): String = asString
 }
 
 public object GrantedScopes {
@@ -59,6 +61,8 @@ public value class RequiredScope(public val asString: String) {
 
     public operator fun contains(scope: RequiredScope): Boolean =
         this == root || scope.subscopes.startsWith(this.subscopes)
+
+    override fun toString(): String = asString
 }
 
 public fun Iterable<RequiredScope>.simplify(): Set<RequiredScope> {
