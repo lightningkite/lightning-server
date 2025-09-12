@@ -17,6 +17,7 @@ import com.lightningkite.lightningserver.serialization.MediaTypeDecoder
 import com.lightningkite.lightningserver.serialization.MediaTypeDecoderRegistry
 import com.lightningkite.lightningserver.serialization.MediaTypeEncoder
 import com.lightningkite.lightningserver.serialization.MediaTypeEncoderRegistry
+import com.lightningkite.lightningserver.serialization.debugString
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketHandlerInterceptor
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
@@ -111,39 +112,43 @@ public data class ServerDefinition(
     public val webSocketTopics: PathSpecMap<WebSocketTopic<*, *>>,
     public val settings: List<ServerSetting<*, *>>,
     public override val extensions: Extensions,
-): Extended {
-    private val reverseLookupHttpHandler: Map<HttpHandler<*>, HttpEndpoint<*>> = endpoints.entries.flatMap { (path, group) ->
-        group.http.entries.map { (method, handler) ->
-            handler to HttpEndpoint(path, method)
-        }
-    }.associate { it }
+) : Extended {
+    private val reverseLookupHttpHandler: Map<HttpHandler<*>, HttpEndpoint<*>> =
+        endpoints.entries.flatMap { (path, group) ->
+            group.http.entries.map { (method, handler) ->
+                handler to HttpEndpoint(path, method)
+            }
+        }.associate { it }
+
     @Suppress("UNCHECKED_CAST")
-    public fun <P: PathSpec> location(handler: HttpHandler<P>): HttpEndpoint<P>
-        = reverseLookupHttpHandler[handler] as HttpEndpoint<P>
+    public fun <P : PathSpec> location(handler: HttpHandler<P>): HttpEndpoint<P> =
+        reverseLookupHttpHandler[handler] as HttpEndpoint<P>
 
     private val reverseLookupWebSocketHandler: Map<WebSocketHandler<*, *>, PathSpec> = endpoints.entries.mapNotNull {
         (it.value.websocket ?: return@mapNotNull null) to it.key
     }.associate { it }
-    @Suppress("UNCHECKED_CAST")
-    public fun <P: PathSpec> location(handler: WebSocketHandler<P, *>): P
-        = reverseLookupWebSocketHandler[handler] as P
 
-    private val reverseLookupWebSocketTopic: Map<WebSocketTopic<*, *>, PathSpec> = webSocketTopics.entries.associate { it.value to it.key }
     @Suppress("UNCHECKED_CAST")
-    public fun <P: PathSpec> location(handler: WebSocketTopic<P, *>): P
-        = reverseLookupWebSocketTopic[handler] as P
+    public fun <P : PathSpec> location(handler: WebSocketHandler<P, *>): P = reverseLookupWebSocketHandler[handler] as P
+
+    private val reverseLookupWebSocketTopic: Map<WebSocketTopic<*, *>, PathSpec> =
+        webSocketTopics.entries.associate { it.value to it.key }
+
+    @Suppress("UNCHECKED_CAST")
+    public fun <P : PathSpec> location(handler: WebSocketTopic<P, *>): P = reverseLookupWebSocketTopic[handler] as P
 
     private val reverseLookupTask: Map<Task<*>, PathSpec0> = tasks.entries.associate { it.value to it.key }
-    public fun location(handler: Task<*>): PathSpec0
-        = reverseLookupTask[handler]!!
+    public fun location(handler: Task<*>): PathSpec0 = reverseLookupTask[handler]!!
 
-    private val reverseLookupStartupTask: Map<StartupTask, PathSpec0> = startupTasks.entries.associate { it.value to it.key }
-    public fun location(handler: StartupTask): PathSpec0
-        = reverseLookupStartupTask[handler]!!
+    private val reverseLookupStartupTask: Map<StartupTask, PathSpec0> =
+        startupTasks.entries.associate { it.value to it.key }
 
-    private val reverseLookupScheduledTask: Map<ScheduledTask, PathSpec0> = schedules.entries.associate { it.value to it.key }
-    public fun location(handler: ScheduledTask): PathSpec0
-        = reverseLookupScheduledTask[handler]!!
+    public fun location(handler: StartupTask): PathSpec0 = reverseLookupStartupTask[handler]!!
+
+    private val reverseLookupScheduledTask: Map<ScheduledTask, PathSpec0> =
+        schedules.entries.associate { it.value to it.key }
+
+    public fun location(handler: ScheduledTask): PathSpec0 = reverseLookupScheduledTask[handler]!!
 
 }
 
@@ -335,12 +340,13 @@ public data class ModularServerDefinition(
             }
         }
 
-        fun <T> flattenPathSpec(registry: (ServerDefinition) -> PathSpecMap<T>): PathSpecMap<T> = MutablePathSpecMap<T>().apply {
-            putAll(com.lightningkite.lightningserver.pathing.PathSpec.root, registry(definition))
-            for ((modPath, module) in flattenedModules) {
-                putAll(modPath, registry(module))
+        fun <T> flattenPathSpec(registry: (ServerDefinition) -> PathSpecMap<T>): PathSpecMap<T> =
+            MutablePathSpecMap<T>().apply {
+                putAll(com.lightningkite.lightningserver.pathing.PathSpec.root, registry(definition))
+                for ((modPath, module) in flattenedModules) {
+                    putAll(modPath, registry(module))
+                }
             }
-        }
 
         return ServerDefinition(
             internalSerializersModule = Runtime.Cached { flattenedModules.values.fold(definition.internalSerializersModule()) { acc, module -> acc + module.internalSerializersModule() } },

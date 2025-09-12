@@ -43,6 +43,8 @@ public class UploadEarlyEndpoint(
         ExternalServerFileSerializer(
             clock = rt.clock,
             scanners = fileScanner(),
+            jail = files().root.then(jailFilePath),
+            ready = files().root.then(filePath),
             fileSystems = listOf(files()),
             onUse = { fileObject ->
                 runBlocking {
@@ -68,8 +70,9 @@ public class UploadEarlyEndpoint(
         errorCases = listOf(),
         implementation = { _: Unit ->
             val id = Uuid.random()
+            val key = "$id.file"
             if (fileScanner().isEmpty()) {
-                val newFile = files().root.resolve(filePath).resolve("$id.file")
+                val newFile = serializer().ready.then(key)
                 val newItem = UploadForNextRequest(
                     expires = now().plus(expiration),
                     file = ServerFile(newFile.url)
@@ -77,10 +80,10 @@ public class UploadEarlyEndpoint(
                 database().table<UploadForNextRequest>().insertOne(newItem)
                 UploadInformation(
                     uploadUrl = newFile.uploadUrl(expiration),
-                    futureCallToken = serializer().certifyForUse(newFile, expiration)
+                    futureCallToken = serializer().certifyAlreadyScannedForUse(key, expiration)
                 )
             } else {
-                val newFile = files().root.resolve(jailFilePath).resolve("$id.file")
+                val newFile = serializer().jail.then(key)
                 val newItem = UploadForNextRequest(
                     expires = now().plus(expiration),
                     file = ServerFile(newFile.url)
@@ -88,7 +91,7 @@ public class UploadEarlyEndpoint(
                 database().table<UploadForNextRequest>().insertOne(newItem)
                 UploadInformation(
                     uploadUrl = newFile.uploadUrl(expiration),
-                    futureCallToken = serializer().certifyForUse(newFile, expiration)
+                    futureCallToken = serializer().certifyForUse(key, expiration)
                 )
             }
         }

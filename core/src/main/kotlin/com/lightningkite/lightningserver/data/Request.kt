@@ -21,6 +21,8 @@ public abstract class Request<PATH: PathSpec>: HasContextualPath<PATH>, Caching 
         get() = path.pathInContext
 
     public fun queryParameter(key: String): String? = queryParameters.find { it.first == key }?.second
+
+    public val queryParametersAsString: String get() = queryParameters.joinToString("&") { "${it.first}=${it.second}" }  // TODO: Encode
 }
 
 context(server: ServerRuntime)

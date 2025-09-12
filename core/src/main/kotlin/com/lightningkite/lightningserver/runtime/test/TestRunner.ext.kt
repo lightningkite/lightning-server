@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
+import com.lightningkite.lightningserver.pathing.ConcretePath
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpec1
@@ -30,6 +31,7 @@ context(test: TestRunner<*>)
 public suspend fun <STORAGE> WebSocketHandler<PathSpec0, STORAGE>.test(
     queryParameters: List<Pair<String, String>> = listOf(),
     headers: HttpHeaders = HttpHeaders.EMPTY,
+    trailingWildcard: ConcretePath.TrailingSegments? = null,
     domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
     protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
@@ -51,6 +53,7 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A> WebSocketHandler<Pa
     path1: A,
     queryParameters: List<Pair<String, String>> = listOf(),
     headers: HttpHeaders = HttpHeaders.EMPTY,
+    trailingWildcard: ConcretePath.TrailingSegments? = null,
     domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
     protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
@@ -73,6 +76,7 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A, B> WebSocketHandler
     path2: B,
     queryParameters: List<Pair<String, String>> = listOf(),
     headers: HttpHeaders = HttpHeaders.EMPTY,
+    trailingWildcard: ConcretePath.TrailingSegments? = null,
     domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
     protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
@@ -96,6 +100,7 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A, B, C> WebSocketHand
     path3: C,
     queryParameters: List<Pair<String, String>> = listOf(),
     headers: HttpHeaders = HttpHeaders.EMPTY,
+    trailingWildcard: ConcretePath.TrailingSegments? = null,
     domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
     protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
@@ -116,6 +121,7 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A, B, C> WebSocketHand
 context(test: TestRunner<*>) public suspend fun HttpHandler<PathSpec0>.test(
     queryParameters: List<Pair<String, String>> = listOf(),
     headers: HttpHeaders = HttpHeaders.EMPTY,
+    trailingWildcard: ConcretePath.TrailingSegments? = null,
     domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
     protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
@@ -123,7 +129,7 @@ context(test: TestRunner<*>) public suspend fun HttpHandler<PathSpec0>.test(
 ): HttpResponse {
     return handle(
         HttpRequest(
-            RawPath(location.path),
+            RawPath(location.path, trailingWildcard),
             method = location.method,
             queryParameters = queryParameters,
             headers = headers,
@@ -139,6 +145,7 @@ context(test: TestRunner<*>) public suspend fun <A> HttpHandler<PathSpec1<A>>.te
     path1: A,
     queryParameters: List<Pair<String, String>> = listOf(),
     headers: HttpHeaders = HttpHeaders.EMPTY,
+    trailingWildcard: ConcretePath.TrailingSegments? = null,
     domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
     protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
@@ -146,7 +153,7 @@ context(test: TestRunner<*>) public suspend fun <A> HttpHandler<PathSpec1<A>>.te
 ): HttpResponse {
     return handle(
         HttpRequest(
-            RawPath(location.path, path1),
+            RawPath(location.path, path1, trailingWildcard),
             method = location.method,
             queryParameters = queryParameters,
             headers = headers,
@@ -162,6 +169,7 @@ context(test: TestRunner<*>) public suspend fun <A, B> HttpHandler<PathSpec2<A, 
     path2: B,
     queryParameters: List<Pair<String, String>> = listOf(),
     headers: HttpHeaders = HttpHeaders.EMPTY,
+    trailingWildcard: ConcretePath.TrailingSegments? = null,
     domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
     protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
@@ -169,7 +177,7 @@ context(test: TestRunner<*>) public suspend fun <A, B> HttpHandler<PathSpec2<A, 
 ): HttpResponse {
     return handle(
         HttpRequest(
-            RawPath(location.path, path1, path2),
+            RawPath(location.path, path1, path2, trailingWildcard),
             method = location.method,
             queryParameters = queryParameters,
             headers = headers,
@@ -186,6 +194,7 @@ context(test: TestRunner<*>) public suspend fun <A, B, C> HttpHandler<PathSpec3<
     path3: C,
     queryParameters: List<Pair<String, String>> = listOf(),
     headers: HttpHeaders = HttpHeaders.EMPTY,
+    trailingWildcard: ConcretePath.TrailingSegments? = null,
     domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
     protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
@@ -193,7 +202,7 @@ context(test: TestRunner<*>) public suspend fun <A, B, C> HttpHandler<PathSpec3<
 ): HttpResponse {
     return handle(
         HttpRequest(
-            RawPath(location.path, path1, path2, path3),
+            RawPath(location.path, path1, path2, path3, trailingWildcard),
             method = location.method,
             queryParameters = queryParameters,
             headers = headers,

@@ -10,7 +10,6 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlinx.serialization.modules.EmptySerializersModule
 
 /**
  * A pattern for a [PathSpec] or a [ConcretePath] to match against. Both [PathSpec]
@@ -65,8 +64,8 @@ public class PathPredicate private constructor(
     public constructor(path: PathSpec) : this(path.segments.map(::Segment).toTypedArray(), path.after)
 
     public constructor(path: ConcretePath<*>, format: StringArrayFormat) : this(
-        path.segments.map { Segment(it, format) }.toTypedArray() + (path.wildcard?.segments?.map(::Segment) ?: emptyList()),
-        after = if (path.wildcard?.trailingSlash == true) Afterwards.TrailingSlash else Afterwards.None
+        path.segments.map { Segment(it, format) }.toTypedArray() + (path.trailingSegments?.segments?.map(::Segment) ?: emptyList()),
+        after = if (path.trailingSegments?.trailingSlash == true) Afterwards.TrailingSlash else Afterwards.None
     )
 
     override fun equals(other: Any?): Boolean =

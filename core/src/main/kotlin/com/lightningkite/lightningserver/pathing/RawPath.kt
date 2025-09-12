@@ -57,16 +57,17 @@ public class RawPath<PATH: PathSpec>(public val string: String): HasContextualPa
 context(server: ServerRuntime)
 public fun <PATH : PathSpec> RawPath(path: ConcretePath<PATH>): RawPath<PATH> = RawPath(path.path(server.internalSerialization.stringArrayFormat))
 
-public fun RawPath(spec: PathSpec0): RawPath<PathSpec0> = RawPath(spec.segments.joinToString("/"))
+context(serverRuntime: ServerRuntime)
+public fun RawPath(spec: PathSpec0, trailingSegments: ConcretePath.TrailingSegments? = null): RawPath<PathSpec0> = RawPath(ConcretePath(spec, trailingSegments))
 
 context(serverRuntime: ServerRuntime)
-public fun <A> RawPath(spec: PathSpec1<A>, path1: A): RawPath<PathSpec1<A>> =
-    RawPath(ConcretePath(spec, path1))
+public fun <A> RawPath(spec: PathSpec1<A>, path1: A, trailingSegments: ConcretePath.TrailingSegments? = null): RawPath<PathSpec1<A>> =
+    RawPath(ConcretePath(spec, path1, trailingSegments))
 
 context(serverRuntime: ServerRuntime)
-public fun <A, B> RawPath(spec: PathSpec2<A, B>, path1: A, path2: B): RawPath<PathSpec2<A, B>> =
-    RawPath(ConcretePath(spec, path1, path2))
+public fun <A, B> RawPath(spec: PathSpec2<A, B>, path1: A, path2: B, trailingSegments: ConcretePath.TrailingSegments? = null): RawPath<PathSpec2<A, B>> =
+    RawPath(ConcretePath(spec, path1, path2, trailingSegments))
 
 context(serverRuntime: ServerRuntime)
-public fun <A, B, C> RawPath(spec: PathSpec3<A, B, C>, path1: A, path2: B, path3: C): RawPath<PathSpec3<A, B, C>> =
-    RawPath(ConcretePath(spec, path1, path2, path3))
+public fun <A, B, C> RawPath(spec: PathSpec3<A, B, C>, path1: A, path2: B, path3: C, trailingSegments: ConcretePath.TrailingSegments? = null): RawPath<PathSpec3<A, B, C>> =
+    RawPath(ConcretePath(spec, path1, path2, path3, trailingSegments))
