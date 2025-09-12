@@ -1,14 +1,12 @@
 package com.lightningkite.lightningserver.runtime
 
 import com.lightningkite.lightningserver.definition.ServerDefinition
-import com.lightningkite.lightningserver.definition.exceptionSettings
 import com.lightningkite.lightningserver.definition.generalSettings
-import com.lightningkite.lightningserver.definition.metricsSettings
 import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.runtime.invoke
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.ServerSettings
-import com.lightningkite.services.MetricReporter
+import com.lightningkite.services.SharedResources
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.joinAll
@@ -17,13 +15,11 @@ import kotlinx.coroutines.launch
 public abstract class ServerRuntimeBase(override val server: ServerDefinition): ServerRuntime {
     override val settings: ServerSettings = ServerSettings(server.settings.plus(listOf(
         generalSettings,
-        metricsSettings,
-        exceptionSettings,
         secretBasis
     )).toSet())
     override val internalSerialization: Serialization by lazy { Serialization(server.internalSerializersModule()) }
     override val externalSerialization: Serialization by lazy { Serialization(server.externalSerializersModule()) }
-    override val metrics: MetricReporter by lazy { metricsSettings() }
+    override val sharedResources: SharedResources = SharedResources()
     override val projectName: String by lazy { generalSettings().projectName }
 //    override val secretBasis: ByteArray by lazy { com.lightningkite.lightningserver.definition.secretBasis().bytes }
 

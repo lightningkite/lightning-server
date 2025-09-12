@@ -13,7 +13,7 @@ import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
-import com.lightningkite.services.MetricReporter
+import com.lightningkite.services.OpenTelemetry
 import com.lightningkite.services.SettingContext
 import kotlinx.serialization.modules.SerializersModule
 import kotlin.time.Clock
@@ -23,7 +23,8 @@ public interface ServerRuntime: SettingContext {
 
     public val externalSerialization: Serialization
     public val internalSerialization: Serialization
-    public val metrics: MetricReporter
+    override val openTelemetry: OpenTelemetry?
+        get() = null // TODO
 
     override val clock: Clock get() = Clock.System
     public val settings: ServerSettings

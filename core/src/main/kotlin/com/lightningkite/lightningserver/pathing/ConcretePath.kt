@@ -13,7 +13,7 @@ import kotlinx.serialization.StringFormat
 public class ConcretePath<PATH: PathSpec> internal constructor(
     public val pathSpec: PATH,
     public val rawPathArguments: List<Any?>,
-    public val wildcard: TrailingSegments? = null,
+    public val trailingSegments: TrailingSegments? = null,
 ) {
     public val segments: List<Segment> by lazy {
         var index = 0
@@ -22,11 +22,11 @@ public class ConcretePath<PATH: PathSpec> internal constructor(
                 is PathSpec.Segment.Constant -> Segment.Constant(it)
                 is PathSpec.Segment.Wildcard<*> -> Segment.WildcardWithValue(it as PathSpec.Segment.Wildcard<Any?>, rawPathArguments[index++])
             }
-        } + (wildcard?.segments?.map(Segment::Constant) ?: emptyList())
+        } + (trailingSegments?.segments?.map(Segment::Constant) ?: emptyList())
     }
 
     public val hasTrailingSlash: Boolean get() =
-        wildcard?.trailingSlash ?: (pathSpec.after == PathSpec.Afterwards.TrailingSlash)
+        trailingSegments?.trailingSlash ?: (pathSpec.after == PathSpec.Afterwards.TrailingSlash)
 
     public data class TrailingSegments(val segments: List<String>, val trailingSlash: Boolean){
         override fun toString(): String = segments.joinToString("/", postfix = if(trailingSlash) "/" else "")
@@ -53,7 +53,7 @@ public class ConcretePath<PATH: PathSpec> internal constructor(
         segments.joinToString(prefix = "/", separator = "/", postfix = if (hasTrailingSlash) "/" else "")
 
     public fun pathSegments(stringArrayFormat: StringArrayFormat): List<String> =
-        segments.map { it.toString(stringArrayFormat) } + (wildcard?.segments ?: emptyList())
+        segments.map { it.toString(stringArrayFormat) } + (trailingSegments?.segments ?: emptyList())
 
     public fun path(stringArrayFormat: StringArrayFormat): String =
         segments.joinToString(prefix = "/", separator = "/", postfix = if (hasTrailingSlash) "/" else "") { it.toString(stringArrayFormat) }
@@ -100,6 +100,9 @@ public inline val <A, B, C> ConcretePath<PathSpec3<A, B, C>>.second: B get() = r
 public inline val <A, B, C> ConcretePath<PathSpec3<A, B, C>>.third: C get() = rawPathArguments[1] as C
 
 
+
+public val HasConcretePath<*>.trailingSegments: ConcretePath.TrailingSegments? get() = path.trailingSegments
+
 @get:JvmName("first1")
 public val <A> HasConcretePath<PathSpec1<A>>.first: A get() = path.first
 
@@ -118,6 +121,9 @@ public val <A, B, C> HasConcretePath<PathSpec3<A, B, C>>.second: B get() = path.
 @get:JvmName("third3")
 public val <A, B, C> HasConcretePath<PathSpec3<A, B, C>>.third: C get() = path.third
 
+
+context(serverRuntime: ServerRuntime)
+public val HasContextualPath<*>.trailingSegments: ConcretePath.TrailingSegments? get() = pathInContext.trailingSegments
 
 @get:JvmName("first1")
 context(serverRuntime: ServerRuntime)

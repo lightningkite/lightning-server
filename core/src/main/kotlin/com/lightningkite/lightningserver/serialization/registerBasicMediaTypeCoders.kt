@@ -1,9 +1,11 @@
 package com.lightningkite.lightningserver.serialization
 
 import com.lightningkite.MediaType
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.services.data.Data
 import com.lightningkite.services.data.KotlinBytesFormat
@@ -13,7 +15,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.io.decodeFromSource
 import kotlinx.serialization.json.io.encodeToSink
 import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.SerializersModuleCollector
 import kotlin.io.encoding.Base64
+import kotlin.reflect.KClass
 
 public open class BinaryFormatMediaTypeCoder(
     private val format: context(ServerRuntime) () -> BinaryFormat,
@@ -125,7 +129,7 @@ public class JsonMediaTypeCoder(
 }
 
 @OptIn(ExperimentalSerializationApi::class)
-public fun ServerBuilder.registerBasicMediaTypeCoders(serializersModule: Runtime<SerializersModule> = externalSerialization) {
+public fun ServerBuilder.registerBasicMediaTypeCoders(serializersModule: Runtime<SerializersModule> = Runtime { serverRuntime.externalSerialization.serializersModule }) {
     register(JsonMediaTypeCoder { Json {
         this.serializersModule = serializersModule()
         encodeDefaults = true
@@ -140,7 +144,7 @@ public fun ServerBuilder.registerBasicMediaTypeCoders(serializersModule: Runtime
         decodeEnumsCaseInsensitive = true
         allowTrailingComma = true
         allowComments = true
-    } })
+    }})
     register(
         StringFormatMediaTypeCoder(
             format = { FormDataFormat(serializersModule()) },
@@ -153,4 +157,41 @@ public fun ServerBuilder.registerBasicMediaTypeCoders(serializersModule: Runtime
             mediaType = MediaType("application", "x-lightningserver-kotlin-bytes")
         )
     )
+}
+
+@InternalLightningServerApi
+public fun SerializersModule.debugString(): String = buildString {
+    dumpTo(object: SerializersModuleCollector {
+        override fun <T : Any> contextual(
+            kClass: KClass<T>,
+            provider: (typeArgumentsSerializers: List<KSerializer<*>>) -> KSerializer<*>
+        ) {
+            append("contextual($kClass), ")
+        }
+
+        override fun <Base : Any, Sub : Base> polymorphic(
+            baseClass: KClass<Base>,
+            actualClass: KClass<Sub>,
+            actualSerializer: KSerializer<Sub>
+        ) {
+            append("polymorphic($baseClass, $actualClass), ")
+        }
+
+        override fun <Base : Any> polymorphicDefaultSerializer(
+            baseClass: KClass<Base>,
+            defaultSerializerProvider: (value: Base) -> SerializationStrategy<Base>?
+        ) {
+            append("polymorphicDefaultSerializer($baseClass), ")
+        }
+
+        override fun <Base : Any> polymorphicDefaultDeserializer(
+            baseClass: KClass<Base>,
+            defaultDeserializerProvider: (className: String?) -> DeserializationStrategy<Base>?
+        ) {
+            append("polymorphicDefaultDeserializer($baseClass), ")
+        }
+    })
+    if(this.length > 2) {
+        this.setLength(this.length - 2)
+    }
 }

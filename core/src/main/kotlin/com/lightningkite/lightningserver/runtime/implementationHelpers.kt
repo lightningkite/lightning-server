@@ -5,8 +5,6 @@ import com.lightningkite.lightningserver.definition.ScheduledTask
 import com.lightningkite.lightningserver.definition.ServerPathEndpoints
 import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.definition.Task
-import com.lightningkite.lightningserver.definition.exceptionSettings
-import com.lightningkite.lightningserver.definition.metricsSettings
 import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpRequest
@@ -23,7 +21,6 @@ import com.lightningkite.lightningserver.websockets.WebSocketConnection
 import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
-import com.lightningkite.services.topLevelReportingContext
 
 public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpResponse {
     val match = this.server.endpoints.match(externalSerialization.stringArrayFormat, request.path.string) { it.http[request.method] }
@@ -181,12 +178,7 @@ public suspend fun ScheduledTask.executeWithMetrics(location: PathSpec0, ) {
 }
 
 context(runtime: ServerRuntime)
-public suspend inline fun <T> topLevelReportingContext(context: String, crossinline action: suspend () -> T): T =
-    topLevelReportingContext(
-        context = context,
-        metrics = metricsSettings(),
-        exceptions = exceptionSettings(),
-        action = {
-            action()
-        }
-    )
+public suspend inline fun <T> topLevelReportingContext(context: String, crossinline action: suspend () -> T): T {
+    return action()
+    //TODO: Open telemetry
+}

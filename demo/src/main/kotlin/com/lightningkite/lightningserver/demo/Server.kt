@@ -155,13 +155,13 @@ object Server : ServerBuilder() {
         val system = files()
         var endAt = System.currentTimeMillis() + 1000
         while(System.currentTimeMillis() < endAt)
-            system.root.resolve("test.txt").signedUrl
+            system.root.then("test.txt").signedUrl
         var count = 0
         endAt = System.currentTimeMillis() + 1000
         var last = ""
         while(System.currentTimeMillis() < endAt) {
             count++
-            last = system.root.resolve("test.txt").signedUrl
+            last = system.root.then("test.txt").signedUrl
         }
         HttpResponse.plainText("$count - $last")
     }
