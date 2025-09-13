@@ -18,9 +18,16 @@ import kotlinx.io.asSource
 internal fun ContentType.adapt(): MediaType =
     MediaType(type = contentType, subtype = contentSubtype, parameters = parameters.associate { it.name to it.value })
 
-internal fun Headers.adapt(): HttpHeaders = HttpHeaders(entry = flattenEntries().flatMap {
-    it.second.split(',').map { it.trim() }.map { s -> it.first to s }
-}.toTypedArray())
+internal fun Headers.adapt(): HttpHeaders = HttpHeaders(
+    entry = flattenEntries()
+        .flatMap { (key, value) ->
+            value
+                .split(',')
+                .map { it.trim() }
+                .map { s -> key to s }
+        }
+        .toTypedArray()
+)
 
 context(server: ServerRuntimeBase)
 internal suspend fun ApplicationCall.adapt(): HttpRequest<PathSpec> {
@@ -38,7 +45,7 @@ internal suspend fun ApplicationCall.adapt(): HttpRequest<PathSpec> {
             // MutliPart Support?
             val stream = receiveStream()
 
-            TypedData.sink( request.contentType().adapt(), request.contentLength() ?: -1) {
+            TypedData.sink(request.contentType().adapt(), request.contentLength() ?: -1) {
                 it.transferFrom(stream.asSource())
             }
         },

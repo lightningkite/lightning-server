@@ -109,8 +109,11 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     context(server: ServerRuntime)
     override suspend fun read(request: Request<*>): Authentication<SUBJECT>? {
+        print("Headers: ${request.headers}")
+
+        val rawHeader = request.headers[HttpHeader.Authorization]
         val token =
-            request.headers[HttpHeader.Authorization]?.root?.removePrefix("bearer ")?.removePrefix("Bearer ")
+            rawHeader?.root?.removePrefix("bearer ")?.removePrefix("Bearer ")
                 ?: request.queryParameters.find {
                     it.first.equals(HttpHeader.Authorization, ignoreCase = true)
                 }?.second?.replace(' ', '+')
@@ -226,13 +229,14 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             summary = "Create Sub Session",
             description = "Creates a session with more limited authorization",
             implementation = { request: SubSessionRequest ->
-                val session = sessionInfo.collection().get(this.auth.sessionId ?: throw UnauthorizedException())
+                val sessionUuid = this.auth.sessionId?.let(Uuid::parse) ?: throw UnauthorizedException()
+                val session = sessionInfo.collection().get(sessionUuid)
                     ?: throw UnauthorizedException()
 
                 newSession(
                     label = request.label,
                     subjectId = auth.id,
-                    derivedFrom = auth.sessionId,
+                    derivedFrom = sessionUuid,
                     scopes = request.scopes,
                     expires = session.expires
                         ?.let { minOf(it, request.expires ?: Instant.DISTANT_FUTURE) }

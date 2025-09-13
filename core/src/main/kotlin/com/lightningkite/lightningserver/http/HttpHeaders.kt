@@ -1,7 +1,13 @@
 package com.lightningkite.lightningserver.http
 
 import com.lightningkite.MediaType
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import kotlin.String
@@ -9,7 +15,7 @@ import kotlin.collections.Map
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
 
-@Serializable
+@Serializable(HttpHeadersSerializer::class)
 public class HttpHeaders internal constructor (public val normalizedEntries: Map<String, List<HttpHeaderValue>>) {
     override fun equals(other: Any?): Boolean = other is HttpHeaders && other.normalizedEntries == this.normalizedEntries
     override fun hashCode(): Int = normalizedEntries.hashCode() + 1
@@ -59,7 +65,7 @@ public class HttpHeaders internal constructor (public val normalizedEntries: Map
     public class Builder(start: HttpHeaders? = null) {
         private val entries = HashMap<String, ArrayList<HttpHeaderValue>>()
         public fun set(key: String, value: String) {
-            entries.getOrPut(key.lowercase(), ::ArrayList).add(HttpHeaderValue.parse(value))
+            entries.getOrPut(key.lowercase(), ::ArrayList).add(HttpHeaderValue.parse(key, value))
         }
 
         public fun set(key: String, value: HttpHeaderValue) {
@@ -131,6 +137,29 @@ public class HttpHeaders internal constructor (public val normalizedEntries: Map
     }
 }
 
-public fun HttpHeaders(entry: Iterable<Pair<String, String>>): HttpHeaders = HttpHeaders(entry.groupBy { it.first.lowercase() }.mapValues { it.value.map { HttpHeaderValue.Companion.parse(it.second) }})
-public fun HttpHeaders(vararg entry: Pair<String, String>): HttpHeaders = HttpHeaders(entry.groupBy { it.first.lowercase() }.mapValues { it.value.map { HttpHeaderValue.Companion.parse(it.second) }})
+public fun HttpHeaders(entry: Iterable<Pair<String, String>>): HttpHeaders = HttpHeaders(entry.groupBy { it.first.lowercase() }.mapValues { (key, value) -> value.map { HttpHeaderValue.parse(key, it.second) }})
+public fun HttpHeaders(vararg entry: Pair<String, String>): HttpHeaders = HttpHeaders(entry.groupBy { it.first.lowercase() }.mapValues { (key, value) -> value.map { HttpHeaderValue.parse(key, it.second) }})
 public inline fun HttpHeaders(setup: HttpHeaders.Builder.() -> Unit): HttpHeaders = HttpHeaders.Builder().apply(setup).build()
+
+public object HttpHeadersSerializer : KSerializer<HttpHeaders> {
+    private val defer = MapSerializer(String.serializer(), String.serializer())
+
+    override val descriptor: SerialDescriptor get() = defer.descriptor
+
+    private fun HttpHeaders.toStringMap() = normalizedEntries.mapValues { entry ->
+        entry.value.joinToString { it.toHttpString() }
+    }
+
+    override fun serialize(
+        encoder: Encoder,
+        value: HttpHeaders,
+    ) {
+        defer.serialize(encoder, value.toStringMap())
+    }
+
+    override fun deserialize(decoder: Decoder): HttpHeaders = HttpHeaders(
+        defer.deserialize(decoder).flatMap { entry ->
+            entry.value.split(',').map { entry.key to it }
+        }
+    )
+}

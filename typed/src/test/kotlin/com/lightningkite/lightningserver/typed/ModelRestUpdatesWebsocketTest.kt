@@ -12,6 +12,7 @@ import com.lightningkite.lightningserver.runtime.test.sendWebSocketSubscriptionM
 import com.lightningkite.lightningserver.runtime.send
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.websockets.WebSocketFrame
+import com.lightningkite.lightningserver.websockets.text
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.runBlocking

@@ -62,7 +62,7 @@ class ScopesTests {
         test: context(ServerRuntime) (Authentication<*>) -> Unit
     ) {
         TestRunner(Server).run {
-            test(Authentication(User, Uuid.random(), scopes = scopes))
+            test(Authentication(User, Uuid.random(), sessionId = null, scopes = scopes))
         }
     }
 

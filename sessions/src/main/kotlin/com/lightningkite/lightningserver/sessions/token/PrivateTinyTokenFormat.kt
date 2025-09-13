@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.encryption.cipher
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.services.database.HasId
 import dev.whyoleg.cryptography.operations.Cipher
 import java.lang.Exception
@@ -25,7 +26,7 @@ public class PrivateTinyTokenFormat(
         handler.name + '/' + cipher.await().encrypt(
             server.internalSerialization.kotlinBytesFormat.encodeToByteArray(
                 Authentication.serializer(handler.subjectSerializer),
-                auth
+                auth.copy(expiration = now().plus(expiration))
             )
         ).let(Base64.UrlSafe::encode)
 
@@ -39,10 +40,12 @@ public class PrivateTinyTokenFormat(
             val decoded = Base64.UrlSafe.decode(value.substringAfter('/'))
             val decrypted = cipher.await().decrypt(decoded)
 
-            return server.internalSerialization.kotlinBytesFormat.decodeFromByteArray(
+            val auth = server.internalSerialization.kotlinBytesFormat.decodeFromByteArray(
                 Authentication.serializer(handler.subjectSerializer),
                 decrypted
             )
+            if (auth.expiration != null && now() > auth.expiration!!) throw TokenException("Token has expired")
+            return auth
         } catch (e: AEADBadTagException) {
             throw TokenException("Invalid Token", e)
         }

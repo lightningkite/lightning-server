@@ -137,8 +137,6 @@ public fun ServerBuilder.registerBasicMediaTypeCoders(serializersModule: Runtime
         isLenient = true
         allowStructuredMapKeys = true
         prettyPrint = false
-        explicitNulls = false
-        coerceInputValues = true
         allowSpecialFloatingPointValues = true
         useAlternativeNames = true
         decodeEnumsCaseInsensitive = true
