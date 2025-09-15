@@ -15,7 +15,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.sessions.proofs.extensions.constrainAttemptRate
-import com.lightningkite.lightningserver.auth.findUserIdString
+import com.lightningkite.lightningserver.auth.fetchUserIdString
 import com.lightningkite.lightningserver.auth.idString
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
@@ -191,7 +191,7 @@ public class BackupCodeEndpoints(
                     val handler = serverRuntime.server.principalTypes.values.find { it.name == subject }
                         ?: throw IllegalArgumentException("No subject $subject recognized")
 
-                    val subjectId = handler.findUserIdString(input.property, input.value)
+                    val subjectId = handler.fetchUserIdString(input.property, input.value)
                         ?: throw BadRequestException("Invalid Backup Code")
 
                     val secrets = modelInfo.collection().find(condition {

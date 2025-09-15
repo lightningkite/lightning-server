@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.definition
 
 import com.lightningkite.MediaType
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.serialization.MediaTypeDecoder
@@ -13,6 +14,17 @@ import com.lightningkite.lightningserver.websockets.WebSocketTopic
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.plus
 
+
+/**
+ * The immutable, runtime representation of a server's structure and resources.
+ *
+ * [ServerDefinition] is produced by building a [ServerBuilder] and contains all endpoints, tasks, schedules, settings,
+ * and other server resources, organized in a modular fashion. It is used by the server engine to route requests,
+ * execute tasks, and provide runtime lookups for handlers and resources.
+ *
+ * The server is composed of a root [Module] (thisLayer) and any number of submodules (modules), each of which may
+ * contain their own endpoints, tasks, schedules, settings, and other resources.
+ */
 public data class ServerDefinition(
     val thisLayer: Module,
     val modules: List<Locationed<PathSpec0, ServerDefinition>> = emptyList(),

@@ -10,18 +10,17 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.serialization.parse
 import com.lightningkite.lightningserver.serialization.queryParameters
 import com.lightningkite.lightningserver.serialization.toTypedData
+import com.lightningkite.lightningserver.typed.sdk.SDK
 import com.lightningkite.lightningserver.typed.sdk.functionCase
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
 
-public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> : HttpHandler<PATH> {
-    public val auth: AuthRequirement<USER>
-    public val inputType: KSerializer<INPUT>
-    public val outputType: KSerializer<OUTPUT>
-    public val summary: String
-    public val functionName: String get() = summary.functionCase()
-    public val description: String
+public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> : HttpHandler<PATH>, SDK.Documentable {
+    override val auth: AuthRequirement<USER>
+
+    override val inputType: KSerializer<INPUT>
+    override val outputType: KSerializer<OUTPUT>
 
     public val successCode: HttpStatus
     public val errorCases: List<LSError>

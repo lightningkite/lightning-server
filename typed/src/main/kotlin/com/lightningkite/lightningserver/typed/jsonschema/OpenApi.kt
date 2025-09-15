@@ -9,8 +9,9 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.ApiWebsocketHandler
 import com.lightningkite.lightningserver.typed.sdk.SDK.sdk
-import com.lightningkite.lightningserver.typed.sdk.groupName
+import com.lightningkite.lightningserver.typed.sdk.docGroup
 import com.lightningkite.lightningserver.typed.sdk.filterSafeEndpoints
+import com.lightningkite.lightningserver.typed.sdk.functionCase
 import com.lightningkite.lightningserver.typed.sdk.isUnit
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.default
@@ -155,7 +156,7 @@ private fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PA
     summary = summary,
     description = description,
     tags = listOfNotNull(docGroup),
-    operationId = if (docGroup == null) functionName else (docGroup + "_" + functionName),
+    operationId = if (docGroup == null) functionName.functionCase() else (docGroup + "_" + functionName.functionCase()),
     parameters = listOf(),
     requestBody = if (method == HttpMethod.GET) null else if (this.inputType.isUnit()) null else OpenApiRequestBody(
         content = mapOf(
@@ -292,7 +293,7 @@ public val openApiDescription: OpenApiRoot get() {
             .filterSafeEndpoints()
             .asSequence()
             .flatMap { node ->
-                val docGroup = node.groupName
+                val docGroup = node.docGroup
 
                 node.layer.endpoints.flatMap { (_, pathSpecMap) ->
                     pathSpecMap.asSequence().map { (path, endpoints) ->

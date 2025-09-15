@@ -10,7 +10,7 @@ import com.lightningkite.lightningserver.typed.LightningServerKSchemaEndpoint
 import com.lightningkite.lightningserver.typed.LightningServerKSchemaInterface
 import com.lightningkite.lightningserver.typed.sdk.InterfaceInfo
 import com.lightningkite.lightningserver.typed.sdk.SDK.sdk
-import com.lightningkite.lightningserver.typed.sdk.groupName
+import com.lightningkite.lightningserver.typed.sdk.docGroup
 import com.lightningkite.lightningserver.typed.sdk.filterSafeEndpoints
 import com.lightningkite.services.database.SerializationRegistry
 import com.lightningkite.services.database.VirtualAlias
@@ -57,7 +57,7 @@ val lightningServerKSchema: LightningServerKSchema get() {
         baseUrl = generalSettings().publicUrl,
         baseWsUrl = generalSettings().wsUrl,
         endpoints = sdk.asSequence().flatMap { node ->
-            val docGroup = node.groupName
+            val docGroup = node.docGroup
 
             node.layer.endpoints.flatMap { (interfaceInfo, pathSpecMap) ->
                 val interfaceType = interfaceInfo?.virtualTypeReference(registry)
@@ -100,7 +100,7 @@ val lightningServerKSchema: LightningServerKSchema get() {
             }
         }.toList(),
         interfaces = sdk.asSequence().flatMap { node ->
-            val docGroup = node.groupName
+            val docGroup = node.docGroup
 
             node.layer.endpoints.mapNotNull { (interfaceInfo, _) ->
                 if (interfaceInfo == null) return@mapNotNull null

@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.typed.sdk
 
+import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.Task
@@ -13,14 +14,27 @@ import com.lightningkite.lightningserver.pathing.PathSpecMap
 import com.lightningkite.lightningserver.pathing.plus
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
+import com.lightningkite.lightningserver.typed.ApiHttpHandler
+import com.lightningkite.lightningserver.typed.ApiWebsocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.services.data.KFile
 import kotlinx.serialization.KSerializer
 import kotlin.collections.component1
 import kotlin.collections.component2
+import kotlin.reflect.KClass
 import kotlin.sequences.forEach
 
 public object SDK { // namespace object
+    public interface Documentable {
+        public val summary: String
+        public val functionName: String get() = summary.functionCase()
+        public val description: String
+        public val auth: AuthRequirement<*>
+
+        public val inputType: KSerializer<*>
+        public val outputType: KSerializer<*>
+    }
+
     public interface Format {
         context(server: ServerRuntime)
         public fun write(data: ServerDefinition, folder: KFile, packageName: String)
@@ -55,8 +69,7 @@ public object SDK { // namespace object
         }
     }
 
-    public sealed interface Function {
-        public val name: String
+    public sealed interface Function : Documentable {
         public val path: PathSpec
         public val fromInterface: InterfaceInfo?
         public val arguments: List<Argument>
@@ -64,29 +77,27 @@ public object SDK { // namespace object
         public data class Argument(val name: String, val type: KSerializer<*>)
 
         public data class Endpoint(
-            override val name: String,
+            val handler: ApiHttpHandler<*, *, *, *>,
             val endpoint: HttpEndpoint<PathSpec>,
             override val fromInterface: InterfaceInfo?,
-            val input: KSerializer<*>,
-            val output: KSerializer<*>
-        ) : Function {
+            override val functionName: String = handler.functionName.functionCase()
+        ) : Function, Documentable by handler {
             override val path: PathSpec get() = endpoint.path
 
             override val arguments: List<Argument> get() = path.wildcards
                 .map { Argument(it.name, it.serializer) }
                 .plus(
-                    if (input.isUnit()) emptyList()
-                    else listOf(Argument("input", input))
+                    if (inputType.isUnit()) emptyList()
+                    else listOf(Argument("input", inputType))
                 )
         }
 
         public data class Websocket(
-            override val name: String,
+            val handler: ApiWebsocketHandler<*, *, *, *, *>,
             override val path: PathSpec,
             override val fromInterface: InterfaceInfo?,
-            val inputType: KSerializer<*>,
-            val outputType: KSerializer<*>
-        ) : Function {
+            override val functionName: String = handler.functionName.functionCase()
+        ) : Function, Documentable by handler {
             override val arguments: List<Argument> get() =
                 path.wildcards.map { Argument(it.name, it.serializer) }
         }
@@ -151,29 +162,31 @@ public object SDK { // namespace object
         return root.build()
     }
 
+
+    private fun List<InterfaceInfo>.filterSupertypes(): List<InterfaceInfo> {
+        val supertypes = flatMap { it.type.supertypes }.mapNotNull { it.classifier as? KClass<*> }
+        return filter { it.type !in supertypes }
+    }
+
     private fun Data.processToModules(path: PathSpec0): Module = Module(
         info = layer.info,
         path = path,
-        extendsInterfaces = layer.endpoints.keys.filterNotNull(),
+        extendsInterfaces = layer.endpoints.keys.filterNotNull().filterSupertypes(),
         functions = layer.endpoints.flatMap { (inter, endpoints) ->
             endpoints.flatMap { (path, endpoints) ->
                 val websocket = endpoints.websocket?.let {
                     Function.Websocket(
-                        name = it.functionName,
+                        handler = it,
                         path = path,
                         fromInterface = inter,
-                        inputType = it.inputType,
-                        outputType = it.outputType
                     )
                 }
 
                 val http = endpoints.http.map { (method, api) ->
                     Function.Endpoint(
-                        name = api.functionName,
+                        handler = api,
                         endpoint = HttpEndpoint(path, method),
                         fromInterface = inter,
-                        input = api.inputType,
-                        output = api.outputType
                     )
                 }
 

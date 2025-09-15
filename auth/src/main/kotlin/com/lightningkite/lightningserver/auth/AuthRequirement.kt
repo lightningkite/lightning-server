@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.definition.MutableExtensions
+import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.services.database.HasId
@@ -9,14 +10,13 @@ import kotlin.time.Duration
 public interface AuthRequirement<out SUBJECT : HasId<*>?> {
     context(server: ServerRuntime)
     public suspend fun accepts(auth: Authentication<*>?): Boolean
-    public val scopes: Set<RequiredScope>
+
+    public val requiredScopes: Runtime<Set<RequiredScope>>
     public fun subscope(subscopes: Iterable<Subscope>): AuthRequirement<SUBJECT>
-    public fun subscope(subscope: Subscope): AuthRequirement<SUBJECT> = subscope(listOf(subscope))
-    public fun subscope(subscopeA: Subscope, subscopeB: Subscope): AuthRequirement<SUBJECT> = subscope(listOf(subscopeA, subscopeB))
 
     public data object None : AuthRequirement<HasId<AnyId>?> {
-        override fun subscope(subscopes: Iterable<Subscope>): AuthRequirement<HasId<AnyId>?> = this
-        override val scopes: Set<RequiredScope> = setOf()
+        override val requiredScopes: Runtime.Constant<Set<RequiredScope>> = Runtime.Constant(emptySet())
+        override fun subscope(subscopes: Iterable<Subscope>): None = this
 
         context(server: ServerRuntime)
         override suspend fun accepts(auth: Authentication<*>?): Boolean = true
@@ -26,15 +26,33 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
         override fun toString(): String = "Not Authenticated"
     }
 
-    // TODO: this doesn't subscope properly
     public abstract class AuthSetting(
         public val default: AuthRequirement<*>? = null
     ) : AuthRequirement<HasId<AnyId>>, MutableExtensions.Key<AuthRequirement<*>> {
-        override val scopes: Set<RequiredScope> = setOf()
-        override fun subscope(subscopes: Iterable<Subscope>): AuthRequirement<HasId<AnyId>> = this
+        context(server: ServerRuntime)
+        public fun setting(): AuthRequirement<*>? = server.server.extensions[this]
+
+        override val requiredScopes: Runtime<Set<RequiredScope>> = Runtime { setting()?.requiredScopes() ?: emptySet() }
+        override fun subscope(subscopes: Iterable<Subscope>): Scoped = Scoped(this, subscopes)
+
         context(server: ServerRuntime)
         override suspend fun accepts(auth: Authentication<*>?): Boolean =
-            server.server.extensions[this]?.accepts(auth) ?: default?.accepts(auth) ?: false
+            setting()?.accepts(auth) ?: default?.accepts(auth) ?: false
+
+        public data class Scoped(
+            val wraps: AuthSetting,
+            val subscopes: Iterable<Subscope>
+        ) : AuthRequirement<HasId<AnyId>> {
+            override val requiredScopes: Runtime<Set<RequiredScope>> =
+                Runtime { wraps.setting()?.requiredScopes()?.subscope(subscopes) ?: emptySet() }
+
+            override fun subscope(subscopes: Iterable<Subscope>): Scoped =
+                copy(subscopes = this.subscopes + subscopes)
+
+            context(server: ServerRuntime)
+            override suspend fun accepts(auth: Authentication<*>?): Boolean =
+                wraps.setting()?.subscope(subscopes)?.accepts(auth) ?: wraps.accepts(auth)
+        }
     }
 
     public data object IsSuperUser : AuthSetting()
@@ -43,17 +61,15 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
 
     public data class Authenticated(
         /**The required scopes. Empty set indicates no requirements and * indicates root access.*/
-        override val scopes: Set<RequiredScope> = RequiredScopes.root,
+        val scopes: Set<RequiredScope> = RequiredScopes.root,
         val maxAge: Duration? = null,
         val requirement: (suspend context(ServerRuntime) (Authentication<*>) -> Boolean)? = null
     ) : AuthRequirement<HasId<AnyId>> {
-        override fun subscope(subscopes: Iterable<Subscope>): AuthRequirement<HasId<AnyId>> = copy(
-            scopes = scopes.flatMapTo(HashSet()) {
-                subscopes.map { sub ->
-                    it.subscope(sub)
-                }
-            }
-        )
+        override val requiredScopes: Runtime.Constant<Set<RequiredScope>>
+            get() = Runtime.Constant(scopes)
+
+        override fun subscope(subscopes: Iterable<Subscope>): Authenticated =
+            copy(scopes = scopes.subscope(subscopes))
 
         context(server: ServerRuntime)
         override suspend fun accepts(auth: Authentication<*>?): Boolean {
@@ -62,23 +78,26 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
             if (maxAge != null && now() - auth.issuedAt > maxAge) return false
             return true
         }
-        override fun toString(): String = "Any Authenticated with $scopes and max age of $maxAge"
+
+        override fun toString(): String = listOfNotNull(
+            "Authenticated",
+            scopes.takeIf { it.isNotEmpty() }?.let { if (it.size > 1) "scopes $it" else "scope ${it.first()}" },
+            maxAge?.let { "max age of $it" }
+        ).joinToString(" and ").replaceFirst("and", "with")
     }
 
     public data class AuthenticatedAs<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         val principalType: PrincipalType<SUBJECT, ID>,
         /**The required scopes. Empty set indicates no requirements and * indicates root access.*/
-        override val scopes: Set<RequiredScope> = RequiredScopes.root,
+        val scopes: Set<RequiredScope> = RequiredScopes.root,
         val maxAge: Duration? = null,
         val requirement: (suspend context(ServerRuntime) (Authentication<SUBJECT>) -> Boolean)? = null
     ) : AuthRequirement<SUBJECT> {
-        override fun subscope(subscopes: Iterable<Subscope>): AuthRequirement<SUBJECT> = copy(
-            scopes = scopes.flatMapTo(HashSet()) {
-                subscopes.map { sub ->
-                    it.subscope(sub)
-                }
-            }
-        )
+        override val requiredScopes: Runtime.Constant<Set<RequiredScope>>
+            get() = Runtime.Constant(scopes)
+
+        override fun subscope(subscopes: Iterable<Subscope>): AuthenticatedAs<SUBJECT, ID> =
+            copy(scopes = scopes.subscope(subscopes))
 
         context(server: ServerRuntime)
         override suspend fun accepts(auth: Authentication<*>?): Boolean {
@@ -89,15 +108,24 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
             @Suppress("UNCHECKED_CAST") // typecheck done when principal type was checked
             return requirement?.invoke(server, auth as Authentication<SUBJECT>) ?: true
         }
-        override fun toString(): String = "${principalType.name} with $scopes and max age of $maxAge"
+
+        override fun toString(): String = listOfNotNull(
+            principalType.name,
+            scopes.takeIf { it.isNotEmpty() }?.let { if (it.size > 1) "scopes $it" else "scope ${it.first()}" },
+            maxAge?.let { "max age of $it" }
+        ).joinToString(" and ").replaceFirst("and", "with")
     }
 
     public data class Options<out SUBJECT : HasId<*>?>(
         public val options: Set<AuthRequirement<SUBJECT>>
     ) : AuthRequirement<SUBJECT> {
-        override val scopes: Set<RequiredScope> = options.flatMapTo(HashSet()) { it.scopes }
-        override fun subscope(subscopes: Iterable<Subscope>): AuthRequirement<SUBJECT> = Options(options.mapTo(HashSet()) { it.subscope(subscopes) })
         public constructor(vararg requirements: AuthRequirement<SUBJECT>) : this(requirements.toSet())
+
+        override val requiredScopes: Runtime<Set<RequiredScope>> =
+            Runtime.Cached { options.flatMap { it.requiredScopes() }.toSet() }
+
+        override fun subscope(subscopes: Iterable<Subscope>): Options<SUBJECT> =
+            Options(options.map { it.subscope(subscopes) }.toSet())
 
         context(server: ServerRuntime)
         override suspend fun accepts(auth: Authentication<*>?): Boolean = options.any { it.accepts(auth) }
@@ -108,4 +136,5 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
     public companion object;
 }
 
-public fun <T : HasId<*>?> AuthRequirement<T>.options(): Set<AuthRequirement<T>> = if (this is AuthRequirement.Options) options else setOf(this)
+public fun <T : HasId<*>?> AuthRequirement<T>.options(): Set<AuthRequirement<T>> =
+    if (this is AuthRequirement.Options) options else setOf(this)

@@ -28,3 +28,4 @@ public data class InterfaceInfo(
 public fun KClass<*>.info(vararg typeParams: KSerializer<*>): InterfaceInfo = InterfaceInfo(this, typeParams.toList())
 
 public var SdkSettings.clientInterface: InterfaceInfo? by InterfaceInfo
+

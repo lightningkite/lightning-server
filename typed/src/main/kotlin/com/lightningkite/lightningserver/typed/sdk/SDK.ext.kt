@@ -3,7 +3,7 @@ package com.lightningkite.lightningserver.typed.sdk
 import com.lightningkite.lightningserver.definition.mapItems
 import com.lightningkite.lightningserver.pathing.MutablePathSpecMap
 
-internal val SDK.Data.Node.groupName: String?
+internal val SDK.Data.Node.docGroup: String?
     get() = (ancestors + layer).drop(1).takeUnless { it.isEmpty() }?.joinToString(".") { it.info.interfaceName }
 
 public fun SDK.Data.filterSafeEndpoints(): SDK.Data = copy(
@@ -21,14 +21,14 @@ public fun SDK.Data.filterSafeEndpoints(): SDK.Data = copy(
 
 public fun SDK.Module.ensureUniqueNames(): SDK.Module = copy(
     functions = declaredFunctions
-        .groupBy { Triple(it.name, it.arguments, it is SDK.Function.Endpoint) }
+        .groupBy { it.functionName to it.arguments }
         .values
         .flatMap { similar ->
             similar.mapIndexed { idx, it ->
                 if (idx == 0) it
                 else when (it) {
-                    is SDK.Function.Endpoint -> it.copy(name = it.name + (idx + 1))
-                    is SDK.Function.Websocket -> it.copy(name = it.name + (idx + 1))
+                    is SDK.Function.Endpoint -> it.copy(functionName = it.functionName + (idx + 1))
+                    is SDK.Function.Websocket -> it.copy(functionName = it.functionName + (idx + 1))
                 }
             }
         }

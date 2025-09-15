@@ -41,13 +41,13 @@ public open class LiveClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID
         HttpMethod.GET,
         Unit.serializer(),
         Unit,
-        ModelPermissions.Companion.serializer(serializer)
+        ModelPermissions.serializer(serializer)
     )
 
     override suspend fun query(input: Query<T>): List<T> = fetcher(
         "$subpath/query",
         HttpMethod.POST,
-        Query.Companion.serializer(serializer),
+        Query.serializer(serializer),
         input,
         ListSerializer(serializer)
     )
@@ -55,7 +55,7 @@ public open class LiveClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID
     override suspend fun queryPartial(input: QueryPartial<T>): List<Partial<T>> = fetcher(
         "$subpath/query-partial",
         HttpMethod.POST,
-        QueryPartial.Companion.serializer(serializer),
+        QueryPartial.serializer(serializer),
         input,
         ListSerializer(PartialSerializer(serializer))
     )
@@ -111,7 +111,7 @@ public open class LiveClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID
     override suspend fun bulkModify(input: MassModification<T>): Int = fetcher(
         "$subpath/bulk",
         HttpMethod.PATCH,
-        MassModification.Companion.serializer(serializer),
+        MassModification.serializer(serializer),
         input,
         Int.serializer()
     )
@@ -119,16 +119,16 @@ public open class LiveClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID
     override suspend fun modifyWithDiff(id: ID, input: Modification<T>): EntryChange<T> = fetcher(
         "$subpath/${id.url()}/delta",
         HttpMethod.PATCH,
-        Modification.Companion.serializer(serializer),
+        Modification.serializer(serializer),
         input,
-        EntryChange.Companion.serializer(serializer)
+        EntryChange.serializer(serializer)
     )
 
     override suspend fun modify(id: ID, input: Modification<T>): T {
         return fetcher(
             "$subpath/${id.url()}",
             HttpMethod.PATCH,
-            Modification.Companion.serializer(serializer),
+            Modification.serializer(serializer),
             input,
             serializer
         )
@@ -137,7 +137,7 @@ public open class LiveClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID
     override suspend fun bulkDelete(input: Condition<T>): Int = fetcher(
         "$subpath/bulk-delete",
         HttpMethod.POST,
-        Condition.Companion.serializer(serializer),
+        Condition.serializer(serializer),
         input,
         Int.serializer()
     )
@@ -153,7 +153,7 @@ public open class LiveClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID
     override suspend fun count(input: Condition<T>): Int = fetcher(
         "$subpath/count",
         HttpMethod.POST,
-        Condition.Companion.serializer(serializer),
+        Condition.serializer(serializer),
         input,
         Int.serializer()
     )
@@ -161,7 +161,7 @@ public open class LiveClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID
     override suspend fun groupCount(input: GroupCountQuery<T>): Map<String, Int> = fetcher(
         "$subpath/group-count",
         HttpMethod.POST,
-        GroupCountQuery.Companion.serializer(serializer),
+        GroupCountQuery.serializer(serializer),
         input,
         MapSerializer(String.serializer(), Int.serializer())
     )
@@ -169,7 +169,7 @@ public open class LiveClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID
     override suspend fun groupCount2(input: GroupCountQuery<T>): Map<String, Int> = fetcher(
         "$subpath/group-count-2",
         HttpMethod.POST,
-        GroupCountQuery.Companion.serializer(serializer),
+        GroupCountQuery.serializer(serializer),
         input,
         MapSerializer(String.serializer(), Int.serializer())
     )
@@ -177,7 +177,7 @@ public open class LiveClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID
     override suspend fun aggregate(input: AggregateQuery<T>): Double? = fetcher(
         "$subpath/aggregate",
         HttpMethod.POST,
-        AggregateQuery.Companion.serializer(serializer),
+        AggregateQuery.serializer(serializer),
         input,
         Double.serializer().nullable
     )
@@ -185,7 +185,7 @@ public open class LiveClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID
     override suspend fun groupAggregate(input: GroupAggregateQuery<T>): Map<String, Double?> = fetcher(
         "$subpath/group-aggregate",
         HttpMethod.POST,
-        GroupAggregateQuery.Companion.serializer(serializer),
+        GroupAggregateQuery.serializer(serializer),
         input,
         MapSerializer(String.serializer(), Double.serializer().nullable)
     )
@@ -193,7 +193,7 @@ public open class LiveClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID
     override suspend fun groupAggregate2(input: GroupAggregateQuery<T>): Map<String, Double?> = fetcher(
         "$subpath/group-aggregate-2",
         HttpMethod.POST,
-        GroupAggregateQuery.Companion.serializer(serializer),
+        GroupAggregateQuery.serializer(serializer),
         input,
         MapSerializer(String.serializer(), Double.serializer().nullable)
     )
@@ -202,10 +202,10 @@ public open class LiveClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID
 }
 
 public open class LiveClientModelRestUpdatesWebsocket<T : HasId<ID>, ID : Comparable<ID>>(
-    private val fetcher: Fetcher,
-    private val subpath: String,
-    private val serializer: KSerializer<T>,
-    private val idSerializer: KSerializer<ID>,
+    public val fetcher: Fetcher,
+    public val subpath: String,
+    public val serializer: KSerializer<T>,
+    public val idSerializer: KSerializer<ID>,
 ) : ClientModelRestUpdatesWebsocket<T, ID> {
     override fun updates(): TypedWebSocket<Condition<T>, CollectionUpdates<T, ID>> =
         fetcher.websocket(subpath, Condition.serializer(serializer), CollectionUpdates.serializer(serializer, idSerializer))

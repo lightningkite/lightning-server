@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.typed.sdk
 
+import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.plus
@@ -45,6 +46,7 @@ public object FetcherSdk : SDK.Format {
             .joinTo(buffer, "\n", prefix = "\n", postfix = "\n") { "import $it" }
     }
 
+    context(_: ServerRuntime)
     private fun Appendable.writeInterface(module: SDK.Module, packageName: String) {
         appendLine("package $packageName")
 
@@ -52,15 +54,28 @@ public object FetcherSdk : SDK.Format {
 
         fun SDK.Module.writeInterface(depth: Int) {
 
-            val extends = extendsInterfaces.filterSupertypes()
-            val singleInterface = extends.singleOrNull()?.takeIf { declaredFunctions.isEmpty() && depth > 0 }
+            val singleInterface = extendsInterfaces.singleOrNull()?.takeIf { declaredFunctions.isEmpty() && depth > 0 }
 
             appendLine()
 
             if (singleInterface == null) {
-                appendDepth(depth, "interface ${info.interfaceName}" + (if (extends.isEmpty()) "" else " : ${extends.joinToString { it.kotlinString() }}") + " {")
+                appendDepth(depth, "interface ${info.interfaceName}" + (if (extendsInterfaces.isEmpty()) "" else " : ${extendsInterfaces.joinToString { it.kotlinString() }}") + " {")
 
-                for (function in declaredFunctions) appendDepth(depth + 1, function.kotlinString())
+                for (function in declaredFunctions) {
+                    val docs = buildList {
+                        fun line(string: String) { add(string); add("") }
+                        if (function.summary.isNotBlank()) line(function.summary)
+                        if (function.description.isNotBlank()) line(function.description)
+
+                        add("**Auth Requirements:** ${function.auth.docString().replace("[", "[[").replace("]", "]]")}")
+                    }
+
+                    appendDepth(depth + 1, "/**")
+                    for (line in docs) appendDepth(depth + 1, " * $line")
+                    appendDepth(depth + 1, " * */")
+
+                    appendDepth(depth + 1, function.kotlinString())
+                }
 
                 for (module in children) module.writeInterface(depth + 1)
 
@@ -91,8 +106,8 @@ public object FetcherSdk : SDK.Format {
                 .filterIsInstance<LiveVersion>()
                 .firstOrNull()
                 ?.live
-                ?.let { it.qualifiedName ?: it.simpleName ?: throw SDK.GenerationException("No qualified name found for live version of $name: $it") }
-                ?: throw SDK.GenerationException("FetcherSdk.Live annotation required on client interfaces, please provide a live version of $name.")
+                ?.let { it.qualifiedName ?: throw SDK.GenerationException("No qualified name found for live version of $this: $it") }
+                ?: throw SDK.GenerationException("LiveVersion annotation required on client interfaces, please provide a live version of $name.")
 
             return "$live(fetcher, ${path.toCodeString()}, ${typeParameters.joinToString { it.kotlinSerializer() }})"
         }
@@ -108,7 +123,7 @@ public object FetcherSdk : SDK.Format {
             appendLine()
 
             if (singleInterface == null) {
-                val extendsInterfaces = listOf((chain + this).joinToString(".") { it.info.interfaceName }) + extendsInterfaces.filterSupertypes().map { inter ->
+                val extendsInterfaces = listOf((chain + this).joinToString(".") { it.info.interfaceName }) + extendsInterfaces.map { inter ->
                     "${inter.kotlinString()} by ${inter.liveString(pathPrefix)}"
                 }
 
@@ -123,9 +138,9 @@ public object FetcherSdk : SDK.Format {
                             is SDK.Function.Endpoint -> "fetcher(" + listOf(
                                 function.path.absolute().toCodeString(),
                                 "HttpMethod.${function.endpoint.method}",
-                                function.input.kotlinSerializer(),
-                                if (function.input.isUnit()) "kotlin.Unit" else "input",
-                                function.output.kotlinSerializer()
+                                function.inputType.kotlinSerializer(),
+                                if (function.inputType.isUnit()) "kotlin.Unit" else "input",
+                                function.outputType.kotlinSerializer()
                             ).joinToString() + ')'
 
                             is SDK.Function.Websocket -> "fetcher.websocket(" + listOf(
@@ -148,19 +163,22 @@ public object FetcherSdk : SDK.Format {
         module.writeLive(emptyList())
     }
 
-    private fun List<InterfaceInfo>.filterSupertypes(): List<InterfaceInfo> {
-        val supertypes = flatMap { it.type.supertypes }.mapNotNull { it.classifier as? KClass<*> }
-        return filter { it.type !in supertypes }
-    }
-
     private fun SDK.Function.kotlinString(): String {
         val argString = arguments.joinToString { "${it.name}: ${it.type.kotlinTypeString()}" }
         return when (this) {
             is SDK.Function.Endpoint ->
-                "suspend fun $name($argString)" + if (output.isUnit()) "" else ": ${output.kotlinTypeString()}"
+                "suspend fun $functionName($argString)" + if (outputType.isUnit()) "" else ": ${outputType.kotlinTypeString()}"
 
             is SDK.Function.Websocket ->
-                "fun $name($argString): TypedWebSocket<${inputType.kotlinTypeString()}, ${outputType.kotlinTypeString()}>"
+                "fun $functionName($argString): TypedWebSocket<${inputType.kotlinTypeString()}, ${outputType.kotlinTypeString()}>"
         }
+    }
+
+
+    context(_: ServerRuntime)
+    private fun AuthRequirement<*>.docString(): String = when (this) {
+        is AuthRequirement.Options -> options.joinToString(" *or* ") { it.docString() }
+        is AuthRequirement.AuthSetting -> setting()?.let { "$this (${it.docString()})" } ?: toString()
+        else -> this.toString()
     }
 }

@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.ForbiddenException
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.NotFoundException
+import com.lightningkite.lightningserver.auth.subscope
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec.Segment

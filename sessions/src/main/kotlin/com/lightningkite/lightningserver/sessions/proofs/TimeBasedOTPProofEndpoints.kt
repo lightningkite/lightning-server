@@ -157,7 +157,7 @@ public class TimeBasedOTPProofEndpoints(
                     val subject = input.type
                     val handler = serverRuntime.server.principalTypes[subject]
                         ?: throw IllegalArgumentException("No subject $subject recognized")
-                    val subjectId = handler.findUserIdString(input.property, input.value)
+                    val subjectId = handler.fetchUserIdString(input.property, input.value)
                         ?: throw BadRequestException("User ID and code do not match")
 
                     val active = modelInfo.collection().find(condition {

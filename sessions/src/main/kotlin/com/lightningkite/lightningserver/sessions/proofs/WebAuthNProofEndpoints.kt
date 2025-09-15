@@ -12,7 +12,7 @@ import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
-import com.lightningkite.lightningserver.auth.findUserIdString
+import com.lightningkite.lightningserver.auth.fetchUserIdString
 import com.lightningkite.lightningserver.auth.idString
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
@@ -323,7 +323,7 @@ public class WebAuthNProofEndpoints(
 
                 val subjectId = subjectProperty?.let { property ->
                     value?.let { value ->
-                        val id = handler.findUserIdString(property, value)
+                        val id = handler.fetchUserIdString(property, value)
                         if (id == null || authOrNull != null && id != authOrNull?.rawId)
                         // Something didn't add up properly. Return a valid looking useless response
                             return@ApiHttpHandler WebAuthN.Authentication.StartResponse(

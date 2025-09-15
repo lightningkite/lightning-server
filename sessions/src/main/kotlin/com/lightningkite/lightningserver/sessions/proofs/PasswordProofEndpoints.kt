@@ -15,7 +15,7 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.sessions.proofs.extensions.constrainAttemptRate
-import com.lightningkite.lightningserver.auth.findUserIdString
+import com.lightningkite.lightningserver.auth.fetchUserIdString
 import com.lightningkite.lightningserver.auth.idString
 import com.lightningkite.lightningserver.encryption.checkAgainstHash
 import com.lightningkite.lightningserver.encryption.secureHash
@@ -173,7 +173,7 @@ public class PasswordProofEndpoints(
                     val subject = input.type
                     val handler = serverRuntime.server.principalTypes.values.find { it.name == subject }
                         ?: throw IllegalArgumentException("No subject $subject recognized")
-                    val subjectId = handler.findUserIdString(input.property, input.value)
+                    val subjectId = handler.fetchUserIdString(input.property, input.value)
                         ?: throw BadRequestException("User ID and code do not match")
 
                     val active = modelInfo.collection().find(condition {

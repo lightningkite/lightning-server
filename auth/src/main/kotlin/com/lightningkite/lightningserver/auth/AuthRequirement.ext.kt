@@ -18,6 +18,10 @@ public suspend fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.assert(
     if (accepts(auth)) auth?.let { it as Authentication<SUBJECT & Any> }
     else throw ForbiddenException("You do not meet the authorization criteria.")
 
+public fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.subscope(subscope: Subscope): AuthRequirement<SUBJECT> = subscope(listOf(subscope))
+
+@Suppress("FINAL_UPPER_BOUND")
+public fun <SUBJECT : HasId<*>?, S : Subscope> AuthRequirement<SUBJECT>.subscope(vararg subscopes: S): AuthRequirement<SUBJECT> = subscope(subscopes.toList())
 
 public typealias AnyId = Comparable<Any?>
 public typealias NoAuth = AuthRequirement<HasId<AnyId>?>
@@ -38,6 +42,7 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>
     requirement: (suspend context(ServerRuntime) (Authentication<SUBJECT>) -> Boolean)? = null
 ): AuthRequirement<SUBJECT> =
     AuthRequirement.AuthenticatedAs(this, scopes, maxAge, requirement)
+
 public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.auth(
     scope: RequiredScope,
     maxAge: Duration? = null,
@@ -46,20 +51,17 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>
     AuthRequirement.AuthenticatedAs(this, setOf(scope), maxAge, requirement)
 
 
-private val <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.options: Set<AuthRequirement<SUBJECT>>
-    get() = if (this is Options) this.options else setOf(this)
-
 public infix fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.or(
     other: AuthRequirement<SUBJECT>
-): AuthRequirement<SUBJECT> = Options(options + other.options)
+): AuthRequirement<SUBJECT> = Options(options() + other.options())
 
 public infix fun <SUBJECT : HasId<*>> AuthRequirement<SUBJECT>.or(
     other: AuthRequirement.None
-): AuthRequirement<SUBJECT?> = Options(options + other.typed())
+): AuthRequirement<SUBJECT?> = Options(options() + other.typed())
 
 public infix fun <SUBJECT : HasId<*>> AuthRequirement.None.or(
     other: AuthRequirement<SUBJECT>
-): AuthRequirement<SUBJECT?> = Options(other.options + this.typed())
+): AuthRequirement<SUBJECT?> = Options(other.options() + this.typed())
 
 
 public val AuthRequirement.Companion.isSuperUser: AuthAny

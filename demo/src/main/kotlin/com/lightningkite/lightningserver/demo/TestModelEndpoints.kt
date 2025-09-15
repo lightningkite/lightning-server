@@ -14,5 +14,5 @@ class TestModelEndpoints: ServerBuilder() {
     )
 
     val rest = path.path("rest") include ModelRestEndpoints(info)
-    val sockets = path.path("rest-socket") include ModelRestUpdatesWebsocket(info)
+    val sockets = path.path("rest") include ModelRestUpdatesWebsocket(info)
 }

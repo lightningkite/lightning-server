@@ -2,7 +2,6 @@ package com.lightningkite.lightningserver.data
 
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration
 import kotlin.time.Instant

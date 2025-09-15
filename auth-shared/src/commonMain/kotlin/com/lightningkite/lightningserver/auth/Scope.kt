@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.auth
 import kotlinx.serialization.Serializable
 import kotlin.jvm.JvmInline
 
+
 /**
  * A scope used for authentication. Scopes can contain subscopes delimited
  * by a colon `:`.
@@ -14,6 +15,23 @@ import kotlin.jvm.JvmInline
  * On the other hand, [Authentication] limited to a sub-scope like `foo:bar`
  * will not be able to access parent scopes (`foo`).
  * */
+@JvmInline
+@Serializable
+public value class RequiredScope(public val asString: String) {
+    public companion object {
+        public val root: RequiredScope = RequiredScope("*")
+    }
+
+    internal val subscopes: List<String> get() = asString.split(':')
+
+    public fun subscope(sub: Subscope): RequiredScope =
+        if (this == root) RequiredScope(sub.asString) else RequiredScope("$asString:${sub.asString}")
+
+    public operator fun contains(scope: RequiredScope): Boolean =
+        this == root || scope.subscopes.startsWith(this.subscopes)
+
+    override fun toString(): String = asString
+}
 
 @JvmInline
 @Serializable
@@ -23,6 +41,7 @@ public value class GrantedScope(public val asString: String) {
     }
 
     internal val subscopes: List<String> get() = asString.split(':')
+
     public fun meetsRequirements(other: RequiredScope): Boolean {
         if (this.asString == "*") return true
         if (other.asString == "*") return false // we already checked that we don't have root access
@@ -48,22 +67,20 @@ public object RequiredScopes {
 @Serializable
 public value class Subscope(public val asString: String)
 
-@JvmInline
-@Serializable
-public value class RequiredScope(public val asString: String) {
-    public companion object {
-        public val root: RequiredScope = RequiredScope("*")
+public fun Set<RequiredScope>.subscope(subscopes: Iterable<Subscope>): Set<RequiredScope> =
+    flatMapTo(HashSet()) { required ->
+        subscopes.map { required.subscope(it) }
     }
 
-    internal val subscopes: List<String> get() = asString.split(':')
-    public fun subscope(sub: Subscope): RequiredScope =
-        if (this == root) RequiredScope(sub.asString) else RequiredScope("$asString:${sub.asString}")
+public fun Set<GrantedScope>.restrict(subscopes: Iterable<Subscope>): Set<GrantedScope> =
+    flatMapTo(HashSet()) { granted ->
+        subscopes.map { granted.restrict(it) }
+    }
 
-    public operator fun contains(scope: RequiredScope): Boolean =
-        this == root || scope.subscopes.startsWith(this.subscopes)
-
-    override fun toString(): String = asString
-}
+public fun Set<GrantedScope>.meetsRequirements(other: Set<RequiredScope>): Boolean =
+    other.all { scope ->
+        this.any { it.meetsRequirements(scope) }
+    }
 
 public fun Iterable<RequiredScope>.simplify(): Set<RequiredScope> {
     val current = HashSet<RequiredScope>()
@@ -85,8 +102,3 @@ private fun <T> List<T>.startsWith(other: List<T>): Boolean {
     }
     return true
 }
-
-public fun Set<GrantedScope>.meetsRequirements(other: Set<RequiredScope>): Boolean =
-    other.all { scope ->
-        this.any { it.meetsRequirements(scope) }
-    }

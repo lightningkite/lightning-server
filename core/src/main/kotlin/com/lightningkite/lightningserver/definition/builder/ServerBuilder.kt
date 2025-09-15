@@ -22,14 +22,14 @@ import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
 
 /**
- * [ServerBuilder] provides a fluent, type-safe API for defining your server configuration.
+ * The primary entrypoint for creating and defining servers.
  *
  * [ServerBuilder] is essentially a collection of registries for your endpoints, tasks, schedules, etc. You build a server by registering
  * resources and their locations. Once the definition is complete the [build] method is used to construct an immutable
  * [ServerDefinition] for runtime use.
  *
- * Registration is done through the provided builder dsl. Endpoints and tasks are registered using [include] and settings are registered
- * using [setting].
+ * Registration is done through the provided builder dsl. Http handlers, websockets, tasks, and schedules are registered using [bind]
+ * and settings are registered using [setting].
  *
  * Example:
  * ```kotlin
@@ -50,8 +50,8 @@ import kotlinx.serialization.modules.SerializersModule
  * }
  * ```
  *
- * Additionally, [ServerBuilder] is designed to be modular. This means that you can use it to define both your root server definition, and
- * also to define endpoints for specific models.
+ * Additionally, [ServerBuilder] is designed to be modular. It is used to define your root server definition, and
+ * also endpoint groups, such as endpoints for specific models. Modules are registered using [include].
  *
  * ```kotlin
  * object ModelEndpoints : ServerBuilder() {
@@ -61,7 +61,7 @@ import kotlinx.serialization.modules.SerializersModule
  * object Server : ServerBuilder() {
  *     // ...
  *
- *     val modelEndpoints = path.path("model") bind ModelEndpoints
+ *     val modelEndpoints = path.path("model") include ModelEndpoints
  * }
  * ```
  * */

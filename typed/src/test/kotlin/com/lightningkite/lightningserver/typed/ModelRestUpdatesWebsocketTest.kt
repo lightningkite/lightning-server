@@ -3,8 +3,6 @@ package com.lightningkite.lightningserver.typed
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.GeneralServerSettings
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
-import com.lightningkite.lightningserver.definition.builder.setting
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.runtime.test.TestRunner
 import com.lightningkite.lightningserver.runtime.test.test
@@ -33,8 +31,8 @@ class ModelRestUpdatesWebsocketTest {
             auth = noAuth,
             permissions = { ModelPermissions.allowAll() }
         )
-        val rest = path.path("model") bind ModelRestEndpoints(info)
-        val ws = path.path("model").path("updates") bind ModelRestUpdatesWebsocket(info)
+        val rest = path.path("model") include ModelRestEndpoints(info)
+        val ws = path.path("model").path("updates") include ModelRestUpdatesWebsocket(info)
     }
 
     @Test

@@ -4,7 +4,6 @@ import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders

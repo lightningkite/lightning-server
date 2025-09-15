@@ -14,7 +14,6 @@ import kotlinx.serialization.descriptors.capturedKClass
 import kotlinx.serialization.modules.SerializersModule
 
 @OptIn(ExperimentalSerializationApi::class)
-context(_: SDK.Format) // to avoid namespace pollution
 public fun KSerializer<*>.kotlinTypeString(): String {
     return when (this.descriptor.kind) {
         StructureKind.MAP -> "Map<String, ${this.mapValueElement()!!.kotlinTypeString()}>"
@@ -32,7 +31,7 @@ public fun KSerializer<*>.kotlinTypeString(): String {
 }
 
 @OptIn(ExperimentalSerializationApi::class)
-context(_: SDK.Format, server: ServerRuntime)
+context(server: ServerRuntime)
 public fun KSerializer<*>.kotlinSerializer(): String {
     fun KSerializer<*>.uncontextualize(): KSerializer<*> {
         return if (this.descriptor.kind == SerialKind.CONTEXTUAL) {
