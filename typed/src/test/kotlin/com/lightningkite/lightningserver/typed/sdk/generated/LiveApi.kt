@@ -3,6 +3,8 @@ package com.lightningkite.lightningserver.typed.sdk
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.typed.Fetcher
 import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.ListSerializer
 
 class LiveApi(val fetcher: Fetcher) : Api {
 	override suspend fun improperSDKFunctionName(): kotlin.Int =

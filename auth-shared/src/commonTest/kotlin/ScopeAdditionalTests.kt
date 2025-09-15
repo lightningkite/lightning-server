@@ -27,17 +27,17 @@ class ScopeAdditionalTests {
     @Test
     fun restrictBehavior() {
         // Restrict from root replaces with the sub
-        assertEquals(GrantedScope("a"), GrantedScope.root.restrict("a"))
-        assertEquals(GrantedScope("a:b"), GrantedScope("a").restrict("b"))
-        assertEquals(GrantedScope("a:b:c"), GrantedScope("a:b").restrict("c"))
+        assertEquals(GrantedScope("a"), GrantedScope.root.restrict(Subscope("a")))
+        assertEquals(GrantedScope("a:b"), GrantedScope("a").restrict(Subscope("b")))
+        assertEquals(GrantedScope("a:b:c"), GrantedScope("a:b").restrict(Subscope("c")))
     }
 
     @Test
     fun subscopeBehavior() {
         // subscope from root drops to the provided sub only
-        assertEquals(RequiredScope("a"), RequiredScope.root.subscope("a"))
-        assertEquals(RequiredScope("a:b"), RequiredScope("a").subscope("b"))
-        assertEquals(RequiredScope("a:b:c"), RequiredScope("a:b").subscope("c"))
+        assertEquals(RequiredScope("a"), RequiredScope.root.subscope(Subscope("a")))
+        assertEquals(RequiredScope("a:b"), RequiredScope("a").subscope(Subscope("b")))
+        assertEquals(RequiredScope("a:b:c"), RequiredScope("a:b").subscope(Subscope("c")))
     }
 
     @Test
