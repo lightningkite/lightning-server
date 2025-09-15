@@ -135,7 +135,7 @@ public object SerializableCacheSerializer : KSerializer<SerializableCache> {
     private val defer = MapSerializer(String.serializer(), ByteArraySerializer())
 
     override val descriptor: SerialDescriptor
-        get() = SerialDescriptor("com.lightningkite.lightningserver.KeyedSerializableCache", defer.descriptor)
+        get() = SerialDescriptor("com.lightningkite.lightningserver.SerializableCache", defer.descriptor)
 
     override fun serialize(encoder: Encoder, value: SerializableCache) { defer.serialize(encoder, value.bytes) }
     override fun deserialize(decoder: Decoder): SerializableCache = SerializableCache(decoder.decodeSerializableValue(defer))
