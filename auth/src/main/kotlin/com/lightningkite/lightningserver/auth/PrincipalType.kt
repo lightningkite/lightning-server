@@ -17,7 +17,7 @@ public interface PrincipalType<SUBJECT : HasId<ID>, ID : Comparable<ID>> {
     public val idSerializer: KSerializer<ID>
     public val subjectSerializer: KSerializer<SUBJECT>
 
-    public val name: String get() = subjectSerializer.descriptor.serialName
+    public val name: String get() = subjectSerializer.descriptor.serialName.substringAfterLast('.')
 
     public val subjectCacheExpiration: Duration? get() = 5.minutes
 

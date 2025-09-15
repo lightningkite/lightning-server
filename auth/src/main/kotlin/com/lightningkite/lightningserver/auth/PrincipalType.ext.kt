@@ -2,13 +2,6 @@ package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.HasId
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.SerialKind
-import kotlinx.serialization.descriptors.capturedKClass
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonPrimitive
 
 
 context(server: ServerRuntime)
@@ -16,7 +9,7 @@ public fun <ID : Comparable<ID>> PrincipalType<*, ID>.idString(id: ID): String =
     server.internalSerialization.stringArrayFormat.encodeToString(idSerializer, id)
 
 context(server: ServerRuntime)
-public suspend fun <T : HasId<ID>, ID : Comparable<ID>> PrincipalType<T, ID>.findUserIdString(
+public suspend fun <T : HasId<ID>, ID : Comparable<ID>> PrincipalType<T, ID>.fetchUserIdString(
     property: String,
     value: String,
 ): String? {

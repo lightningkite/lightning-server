@@ -1,4 +1,5 @@
-import com.lightningkite.lightningserver.auth.PrincipalType
+package com.lightningkite.lightningserver.auth
+
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.KSerializer

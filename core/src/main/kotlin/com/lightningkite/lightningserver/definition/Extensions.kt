@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.definition
 
+import com.lightningkite.SealableMap
+import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 
 
@@ -39,7 +41,7 @@ public interface Extensions {
  * [MutableExtensions] provides read-write access to strongly-typed extension values.
  * Write access is provided in two ways: [MutableExtensions.Key] and [MutableExtensions.DegradingKey].
  * */
-public class MutableExtensions(start: Extensions? = null): Extensions {
+public class MutableExtensions: Extensions {
     /**
      * Provides mutable access to an extension value of type `T`.
      *
@@ -107,9 +109,9 @@ public class MutableExtensions(start: Extensions? = null): Extensions {
         public fun WRITE.include(other: READ, pathSpec: PathSpec0)
     }
 
-    private val map: MutableMap<Extensions.Key<*>, Any> = HashMap()
+    private val map: SealableMap<Extensions.Key<*>, Any> = SealableMap(HashMap())
 
-    init {
+    public constructor(start: Extensions? = null) {
         start?.entries?.let { entries ->
             for ((key, value) in entries) {
                 map[key] = value
@@ -149,6 +151,11 @@ public class MutableExtensions(start: Extensions? = null): Extensions {
             else map.putIfAbsent(key, value)
         }
     }
+
+    /**
+     * Returns an immutable read-only [Extensions] instance with copied data
+     * */
+    public fun toSealedExtensions(): Extensions = MutableExtensions(this).also { it.map.seal() }
 }
 
 /**

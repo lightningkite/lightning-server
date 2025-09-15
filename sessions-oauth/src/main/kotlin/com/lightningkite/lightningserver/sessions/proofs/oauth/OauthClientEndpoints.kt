@@ -5,7 +5,6 @@ import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec1

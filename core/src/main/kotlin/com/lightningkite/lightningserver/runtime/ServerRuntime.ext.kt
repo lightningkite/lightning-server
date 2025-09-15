@@ -20,7 +20,7 @@ import kotlin.time.Instant
 
 context(server: ServerRuntime)
 public operator fun <SERIALIZABLE, GOAL> ServerSetting<SERIALIZABLE, GOAL>.invoke(): GOAL =
-    server.settings.get(this, server)
+    server.settings.get(this)
 
 context(serverRuntime: ServerRuntime)
 public suspend fun <T> WebSocketTopic<PathSpec0, T>.send(value: T): Unit =

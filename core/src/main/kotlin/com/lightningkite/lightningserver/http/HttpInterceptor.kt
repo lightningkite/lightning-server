@@ -40,16 +40,10 @@ public fun interface HttpInterceptor {
         private val _interceptors = ArrayList(interceptors)
         public val interceptors: List<HttpInterceptor> get() = _interceptors
 
-        private var fullInterceptor: HttpInterceptor =
-            interceptors
-                .reduceOrNull { acc, interceptor -> acc.then(interceptor) }
-                ?: None
-
         /**
          * Adds the provided [interceptor] to the end of the interception list.
          * */
         public fun register(interceptor: HttpInterceptor) {
-            fullInterceptor = fullInterceptor.then(interceptor)
             _interceptors.add(interceptor)
         }
 
@@ -58,7 +52,7 @@ public fun interface HttpInterceptor {
          * */
         public operator fun plusAssign(interceptor: HttpInterceptor) { register(interceptor) }
 
-        public fun build(): HttpInterceptor = fullInterceptor
+        public fun build(): HttpInterceptor = interceptors.reduce { a, b -> a.then(b) }
     }
 }
 
@@ -79,3 +73,6 @@ private data class InterceptedHandler<PATH : PathSpec>(
 
 public fun <PATH : PathSpec> HttpInterceptor.intercept(handler: HttpHandler<PATH>): HttpHandler<PATH> =
     if (this === HttpInterceptor.None) handler else InterceptedHandler(handler, this)
+
+public fun <PATH : PathSpec> List<HttpInterceptor>.intercept(handler: HttpHandler<PATH>): HttpHandler<PATH> =
+    fold(handler) { h, i -> i.intercept(h) }

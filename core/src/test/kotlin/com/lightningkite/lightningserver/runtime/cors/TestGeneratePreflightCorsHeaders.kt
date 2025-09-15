@@ -3,7 +3,7 @@ package com.lightningkite.lightningserver.runtime.cors
 import com.lightningkite.lightningserver.definition.CorsSettings
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders
-import com.lightningkite.lightningserver.http.HttpMethod
+import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.runtime.generatePreflightCorsHeaders
 import org.junit.Test
 import kotlin.test.assertEquals

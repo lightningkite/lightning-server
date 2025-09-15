@@ -7,7 +7,7 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.getValue
 import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpHeaders
-import com.lightningkite.lightningserver.http.HttpMethod
+import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.toPredicate
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -29,7 +29,7 @@ context(server: ServerRuntime)
 public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.testAuth(
     subject: SUBJECT,
     issuedAt: Instant = server.clock.now(),
-    scopes: Set<GrantedScope> = GrantedScopes.root
+    scopes: Set<GrantedScope> = setOf(GrantedScope.root)
 ): Authentication<SUBJECT> = Authentication(this, id = subject._id, issuedAt = issuedAt, expiration = null, scopes = scopes, sessionId = null)
 
 public fun Authentication<*>.meetsRequirements(scopes: Set<RequiredScope>): Boolean = this.scopes.meetsRequirements(scopes)

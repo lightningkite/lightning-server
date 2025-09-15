@@ -7,7 +7,6 @@ import com.lightningkite.lightningserver.data.Schedule
 import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.ScheduledTask
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.delete
 import com.lightningkite.lightningserver.http.get
@@ -46,7 +45,7 @@ fun PathSpec0.options(string: String): HttpEndpoint<PathSpec0> = path(string).op
 fun PathSpec0.head(string: String): HttpEndpoint<PathSpec0> = path(string).head
 
 context(builder: ServerBuilder)
-fun PathSpec0.websocket(handler: WebSocketHandler<PathSpec0, *>): WebSocketHandler<PathSpec0, *> = bind(handler)
+fun PathSpec0.websocket(handler: WebSocketHandler<PathSpec0, *>): WebSocketHandler<PathSpec0, *> = with(builder) { bind(handler) }
 
 @Deprecated("Use standard syntax", ReplaceWith("path.path(string)")) fun ServerBuilder.path(string: String): PathSpec0 = PathSpec.root.path(string)
 @Deprecated("Use standard syntax", ReplaceWith("path.path(string).get")) fun ServerBuilder.get(string: String): HttpEndpoint<PathSpec0> = PathSpec.root.path(string).get

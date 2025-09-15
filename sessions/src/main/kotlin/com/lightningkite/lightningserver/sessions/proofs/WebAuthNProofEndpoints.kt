@@ -5,20 +5,23 @@ import com.lightningkite.lightningserver.ForbiddenException
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.signer
-import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
-import com.lightningkite.lightningserver.auth.findUserIdString
+import com.lightningkite.lightningserver.auth.fetchUserIdString
 import com.lightningkite.lightningserver.auth.idString
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.lightningserver.typed.sdk.SdkModule
+import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
+import com.lightningkite.lightningserver.typed.sdk.clientInterface
+import com.lightningkite.lightningserver.typed.sdk.info
+import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.cache.get
 import com.lightningkite.services.cache.set
@@ -57,7 +60,9 @@ public class WebAuthNProofEndpoints(
 
     init {
         proofMethods.register(this)
-        path.docGroup = "WebAuthNProof"
+
+        sdkSettings.defaultInfo = SdkModule.Info("WebAuthNProof", "webAuthN")
+        sdkSettings.clientInterface = ProofClientEndpoints.WebAuthN::class.info()
     }
 
     override val info: ProofMethodInfo = ProofMethodInfo(
@@ -65,9 +70,6 @@ public class WebAuthNProofEndpoints(
         property = null,
         strength = 10
     )
-    public val registerInterface: Documentable.InterfaceInfo = Documentable.InterfaceInfo("WebAuthNRegistrationEndpoints", listOf())
-    public val proveInterface: Documentable.InterfaceInfo = Documentable.InterfaceInfo("WebAuthNProofEndpoints", listOf())
-
 
     context(_: ServerRuntime)
     private val active
@@ -108,7 +110,7 @@ public class WebAuthNProofEndpoints(
         }
     )
 
-    public val rest: ModelRestEndpoints<HasId<AnyId>, WebAuthNCredential, String> = path.path("credentials") bind ModelRestEndpoints(modelInfo)
+    public val rest: ModelRestEndpoints<HasId<AnyId>, WebAuthNCredential, String> = path.path("credentials") include ModelRestEndpoints(modelInfo)
 
 
     private fun challengeCacheKey(key: String): String =
@@ -139,11 +141,11 @@ public class WebAuthNProofEndpoints(
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> established(
         principal: PrincipalType<SUBJECT, ID>,
-        item: SUBJECT,
+        subject: SUBJECT,
     ): Boolean {
         return modelInfo.collection().findOne(condition {
             Condition.And(
-                it.subjectId eq principal.idString(item._id),
+                it.subjectId eq principal.idString(subject._id),
                 it.subjectType eq principal.name,
                 active
             )
@@ -170,7 +172,6 @@ public class WebAuthNProofEndpoints(
     public val registerStart: ApiHttpHandler<PathSpec0, HasId<AnyId>, WebAuthN.GeneralPreference, WebAuthN.Registration.RegistrationResponse> =
         path.path("register-start").post bind ApiHttpHandler(
             auth = proofMethodAuth,
-            belongsToInterface = registerInterface,
             summary = "Issue WebAuthN creation challenge",
             description = "Returns a challenge to be passed on to a client authenticator for the creation of a new Public Key Credential.",
             errorCases = listOf(),
@@ -221,7 +222,6 @@ public class WebAuthNProofEndpoints(
     public val registerFinish: ApiHttpHandler<PathSpec0, HasId<AnyId>, WebAuthN.Registration.RegisterRequest, Unit> =
         path.path("register-finish").post bind ApiHttpHandler(
             auth = proofMethodAuth,
-            belongsToInterface = registerInterface,
             summary = "Establish WebAuthN Credential",
             description = "Validates and Accepts a public key credential created from a previously issued creation challenge.",
             errorCases = listOf(),
@@ -308,7 +308,6 @@ public class WebAuthNProofEndpoints(
     public val start: ApiHttpHandler<PathSpec0, HasId<AnyId>?, Identification, WebAuthN.Authentication.StartResponse> =
         path.path("start").post bind ApiHttpHandler(
             auth = anyAuth or noAuth,
-            belongsToInterface = proveInterface,
             summary = "Begin WebAuthN challenge",
             description = "Returns a challenge to be passed on to a client authenticator for signing.",
             errorCases = listOf(),
@@ -325,7 +324,7 @@ public class WebAuthNProofEndpoints(
 
                 val subjectId = subjectProperty?.let { property ->
                     value?.let { value ->
-                        val id = handler.findUserIdString(property, value)
+                        val id = handler.fetchUserIdString(property, value)
                         if (id == null || authOrNull != null && id != authOrNull?.rawId)
                         // Something didn't add up properly. Return a valid looking useless response
                             return@ApiHttpHandler WebAuthN.Authentication.StartResponse(
@@ -382,7 +381,6 @@ public class WebAuthNProofEndpoints(
     public val prove: ApiHttpHandler<PathSpec0, HasId<AnyId>?, WebAuthN.Authentication.ProveRequest, Proof> =
         path.path("prove").post bind ApiHttpHandler(
             auth = noAuth,
-            belongsToInterface = proveInterface,
             summary = "Prove WebAuthN ownership",
             description = "Returns a challenge to be passed on to a client authenticator for signing.",
             errorCases = listOf(),

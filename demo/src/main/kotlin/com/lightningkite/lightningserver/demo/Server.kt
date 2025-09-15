@@ -13,6 +13,10 @@ import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCod
 import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.sessions.proofs.*
 import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.lightningserver.typed.sdk.SdkModule
+import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
+import com.lightningkite.lightningserver.typed.sdk.module
+import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.cache.*
 import com.lightningkite.services.cache.dynamodb.*
@@ -23,16 +27,13 @@ import com.lightningkite.services.email.*
 import com.lightningkite.services.files.*
 import com.lightningkite.services.files.s3.*
 import com.lightningkite.services.http.*
-import com.lightningkite.services.metrics.cloudwatch.*
 import com.lightningkite.services.sms.*
 import io.ktor.client.request.*
 import io.ktor.server.plugins.NotFoundException
-import io.ktor.websocket.Serializer
 import kotlinx.coroutines.*
 import kotlinx.html.*
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.*
-import kotlinx.serialization.modules.SerializersModule
 import kotlin.random.*
 import kotlin.time.*
 import kotlin.time.Duration.Companion.minutes
@@ -47,7 +48,6 @@ object Server : ServerBuilder() {
     val cache = setting("cache", Cache.Settings())
 
     init {
-        CloudwatchMetricReporter
         DynamoDbCache
         MongoDatabase
         MemcachedCache
@@ -78,7 +78,6 @@ object Server : ServerBuilder() {
                 else -> super.fetchByProperty(property, value)
             }
         }
-
     }
 
     val userInfo = database.modelInfo<User?, User, Uuid>(
@@ -97,11 +96,14 @@ object Server : ServerBuilder() {
             )
         }
     )
-    val user = path.path("user") bind object : ServerBuilder() {
-        val rest = path.path("rest") bind ModelRestEndpoints(userInfo)
+    val user = path.path("user") module object : ServerBuilder() {
+        init {
+            sdkSettings.defaultInfo = SdkModule.Info("UserEndpoints")
+        }
+        val rest = path.path("rest") include ModelRestEndpoints(userInfo)
     }
-    val uploadEarly = path.path("upload") bind UploadEarlyEndpoint(files, database, Runtime.Constant(listOf()))
-    val testModel = path.path("test-model") bind TestModelEndpoints()
+    val uploadEarly = path.path("upload") module UploadEarlyEndpoint(files, database, Runtime.Constant(listOf()))
+    val testModel = path.path("test-model") module TestModelEndpoints()
 
     val root = path.get bind HttpHandler {
         HttpResponse.plainText("Hello ${it.auth(UserAuth.auth() or noAuth)?.fetch()}")
@@ -151,7 +153,7 @@ object Server : ServerBuilder() {
             TestModel()
         }
     )
-    val die = path.path("die").get bind HttpHandler {  throw Exception("OUCH") }
+    val die = path.path("die").get bind HttpHandler { throw Exception("OUCH") }
 
     val fileSignPerfCheck = path.path("file-sign-perf-check").get bind HttpHandler {
         val system = files()
@@ -189,21 +191,21 @@ object Server : ServerBuilder() {
 
     val multiplex = path.path("multiplex").websocket(MultiplexWebSocketHandler())
 
-    val meta = path.path("meta") bind MetaEndpoints("com.lightningkite.lightningserver.demo", database, cache)
+    val meta = path.path("meta") include MetaEndpoints("com.lightningkite.lightningserver.demo", database, cache)
 
     val pins = PinHandler(cache, "pins")
-    val proofPhone = path.path("proof").path("phone") bind SmsProofEndpoints(pins, sms)
-    val proofEmail = path.path("proof").path("email") bind EmailProofEndpoints(pins, email, { to, pin ->
+    val proofPhone = path.path("proof").path("phone") module SmsProofEndpoints(pins, sms)
+    val proofEmail = path.path("proof").path("email") module EmailProofEndpoints(pins, email, { to, pin ->
         Email(
             subject = "Log In Code",
             to = listOf(EmailAddressWithName(to)),
             plainText = "Your PIN is $pin."
         )
     })
-    val proofOtp = path.path("proof").path("otp") bind TimeBasedOTPProofEndpoints(database, cache)
-    val proofPassword = path.path("proof").path("password") bind PasswordProofEndpoints(database, cache)
-    val proofDevices = path.path("proof").path("devices") bind KnownDeviceProofEndpoints(database, cache)
-    val subjects = path.path("auth") bind object: AuthEndpoints<User, Uuid>(
+    val proofOtp = path.path("proof").path("otp") module TimeBasedOTPProofEndpoints(database, cache)
+    val proofPassword = path.path("proof").path("password") module PasswordProofEndpoints(database, cache)
+    val proofDevices = path.path("proof").path("devices") module KnownDeviceProofEndpoints(database, cache)
+    val subjects = path.path("auth") module object: AuthEndpoints<User, Uuid>(
         principal = UserAuth,
         database = database,
     ) {

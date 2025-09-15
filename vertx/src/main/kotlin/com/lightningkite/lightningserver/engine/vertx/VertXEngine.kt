@@ -5,19 +5,13 @@ import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.engine.local.LocalEngine
 import com.lightningkite.lightningserver.http.HttpHandler
-import com.lightningkite.lightningserver.http.HttpHeader
-import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.settings.ServerSettings
-import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
-import com.lightningkite.services.data.Data
 import io.vertx.core.Vertx
-import io.vertx.core.buffer.Buffer
 import io.vertx.core.http.HttpServerOptions
 import io.vertx.core.http.ServerWebSocket
-import io.vertx.core.streams.ReadStream
 import io.vertx.ext.web.Route
 import io.vertx.ext.web.Router
 import io.vertx.ext.web.RoutingContext
@@ -26,8 +20,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.io.asSink
-import kotlinx.io.buffered
 import kotlinx.serialization.Serializable
 
 
@@ -88,7 +80,7 @@ public class VertXEngine(server: ServerDefinition) : LocalEngine(server) {
 
     private val vertx: Vertx = Vertx.vertx()
 
-    override val settings: ServerSettings = ServerSettings(super.settings.keys.plus(vertxRunConfig).toSet())
+    override val settings: ServerSettings = ServerSettings(super.settings.settings.plus(vertxRunConfig).toSet())
     private val vertXScope = CoroutineScope(SupervisorJob() + Vertx.vertx().dispatcher())
 
     private var httpServer: io.vertx.core.http.HttpServer? = null

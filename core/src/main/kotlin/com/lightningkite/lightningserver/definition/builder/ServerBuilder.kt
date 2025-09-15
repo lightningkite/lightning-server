@@ -1,46 +1,38 @@
 package com.lightningkite.lightningserver.definition.builder
 
-import com.lightningkite.lightningserver.definition.ScheduledTask
-import com.lightningkite.lightningserver.definition.Task
-import com.lightningkite.lightningserver.definition.Extendable
-import com.lightningkite.lightningserver.definition.ModularServerDefinition
-import com.lightningkite.lightningserver.definition.MutableExtensions
-import com.lightningkite.lightningserver.definition.ServerDefinition
-import com.lightningkite.lightningserver.definition.ServerPathEndpoints
-import com.lightningkite.lightningserver.definition.ServerSetting
-import com.lightningkite.lightningserver.definition.StartupTask
-import com.lightningkite.lightningserver.http.DefaultExceptionHttpHandler
-import com.lightningkite.lightningserver.http.ExceptionHttpHandler
-import com.lightningkite.lightningserver.http.HttpBuilder
-import com.lightningkite.lightningserver.http.HttpEndpoint
-import com.lightningkite.lightningserver.http.HttpHandler
-import com.lightningkite.lightningserver.http.delete
-import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.http.head
-import com.lightningkite.lightningserver.http.intercept
-import com.lightningkite.lightningserver.http.options
-import com.lightningkite.lightningserver.http.patch
-import com.lightningkite.lightningserver.http.post
-import com.lightningkite.lightningserver.http.put
+import com.lightningkite.lightningserver.LightningServerDsl
+import com.lightningkite.lightningserver.definition.*
+import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.MutablePathSpecMap
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.pathing.toSealedPathSpecMap
+import com.lightningkite.lightningserver.serialization.MediaTypeCoder
+import com.lightningkite.lightningserver.serialization.MediaTypeDecoder
 import com.lightningkite.lightningserver.serialization.MediaTypeDecoderRegistry
+import com.lightningkite.lightningserver.serialization.MediaTypeEncoder
 import com.lightningkite.lightningserver.serialization.MediaTypeEncoderRegistry
+import com.lightningkite.lightningserver.serialization.serializerOrContextual
+import com.lightningkite.lightningserver.websockets.WebSocketHandler
+import com.lightningkite.lightningserver.websockets.WebSocketTopic
 import com.lightningkite.lightningserver.websockets.WebSocketsBuilder
+import com.lightningkite.services.Setting
+import com.lightningkite.services.SettingContext
+import com.lightningkite.toSealedList
+import com.lightningkite.toSealedMap
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
-import com.lightningkite.lightningserver.definition.Runtime
 
 /**
- * [ServerBuilder] provides a fluent, type-safe API for defining your server configuration.
+ * The primary entrypoint for creating and defining servers.
  *
  * [ServerBuilder] is essentially a collection of registries for your endpoints, tasks, schedules, etc. You build a server by registering
  * resources and their locations. Once the definition is complete the [build] method is used to construct an immutable
  * [ServerDefinition] for runtime use.
  *
- * You don't typically use the registries inside of [ServerBuilder] directly, instead there is a provided builder dsl to do this
- * registration for you and in a safe manner. This dsl is accessed by subclassing [ServerBuilder] into your server definition.
+ * Registration is done through the provided builder dsl. Http handlers, websockets, tasks, and schedules are registered using [bind]
+ * and settings are registered using [setting].
  *
  * Example:
  * ```kotlin
@@ -61,8 +53,8 @@ import com.lightningkite.lightningserver.definition.Runtime
  * }
  * ```
  *
- * Additionally, [ServerBuilder] is designed to be modular. This means that you can use it to define both your root server definition, and
- * also to define endpoints for specific models.
+ * Additionally, [ServerBuilder] is designed to be modular. It is used to define your root server definition, and
+ * also endpoint groups, such as endpoints for specific models. Modules are registered using [include].
  *
  * ```kotlin
  * object ModelEndpoints : ServerBuilder() {
@@ -72,7 +64,7 @@ import com.lightningkite.lightningserver.definition.Runtime
  * object Server : ServerBuilder() {
  *     // ...
  *
- *     val modelEndpoints = path.path("model") bind ModelEndpoints
+ *     val modelEndpoints = path.path("model") include ModelEndpoints
  * }
  * ```
  * */
@@ -82,111 +74,221 @@ public abstract class ServerBuilder : Extendable {
 
     protected val path: PathSpec0 get() = PathSpec.root // just for convenience
 
-    public val settings: ListRegistry<ServerSetting<*, *>> = ListRegistry()
+    private val settings: ListRegistry<ServerSetting<*, *>> = ListRegistry()
 
-    public val http: HttpBuilder = HttpBuilder()
-    public val websockets: WebSocketsBuilder = WebSocketsBuilder()
-    public var exceptionHandler: ExceptionHttpHandler = DefaultExceptionHttpHandler
+    private val http: HttpBuilder = HttpBuilder()
+    private val websockets: WebSocketsBuilder = WebSocketsBuilder()
+    private var exceptionHandler: ExceptionHttpHandler = DefaultExceptionHttpHandler
 
-    public val startupTasks: MapRegistry<PathSpec0, StartupTask> = MapRegistry()
-    public val schedules: MapRegistry<PathSpec0, ScheduledTask> = MapRegistry()
-    public val tasks: MapRegistry<PathSpec0, Task<*>> = MapRegistry()
+    private val startupTasks: MapRegistry<PathSpec0, StartupTask> = MapRegistry()
+    private val schedules: MapRegistry<PathSpec0, ScheduledTask> = MapRegistry()
+    private val tasks: MapRegistry<PathSpec0, Task<*>> = MapRegistry()
 
-    public val mediaTypeDecoders: MediaTypeDecoderRegistry = MediaTypeDecoderRegistry()
-    public val mediaTypeEncoders: MediaTypeEncoderRegistry = MediaTypeEncoderRegistry()
+    private val mediaTypeDecoders: MediaTypeDecoderRegistry = MediaTypeDecoderRegistry()
+    private val mediaTypeEncoders: MediaTypeEncoderRegistry = MediaTypeEncoderRegistry()
 
     public override val extensions: MutableExtensions = MutableExtensions()
 
-    public val imports: MapRegistry<PathSpec0, ModularServerDefinition> = MapRegistry()
-    public val modules: MapRegistry<PathSpec0, ServerBuilder> = MapRegistry()
+    private val imports: ListRegistry<Locationed<PathSpec0, ServerDefinition>> = ListRegistry()
+    private val modules: ListRegistry<Locationed<PathSpec0, ServerBuilder>> = ListRegistry()
+
+    @LightningServerDsl
+    public infix fun <PATH : PathSpec, HANDLER : HttpHandler<PATH>> HttpEndpoint<PATH>.bind(handler: HANDLER): HANDLER {
+        http.register(this, handler)
+        return handler
+    }
+
+    @LightningServerDsl
+    public infix fun <PATH : PathSpec, STORAGE, T : WebSocketHandler<PATH, STORAGE>> PATH.bind(handler: T): T {
+        websockets.register(this, handler)
+        return handler
+    }
+
+    @LightningServerDsl
+    public infix fun <T> PathSpec0.bind(task: Task<T>): Task<T> {
+        tasks.register(this, task)
+        return task
+    }
+
+    @LightningServerDsl
+    public infix fun PathSpec0.bind(startupTask: StartupTask): StartupTask {
+        startupTasks.register(this, startupTask)
+        return startupTask
+    }
+
+    @LightningServerDsl
+    public infix fun PathSpec0.bind(schedule: ScheduledTask): ScheduledTask {
+        schedules.register(this, schedule)
+        return schedule
+    }
+
+    @LightningServerDsl
+    public fun <PATH : PathSpec, T> PATH.topic(type: KSerializer<T>): WebSocketTopic<PATH, T> {
+        val topic = WebSocketTopic<PATH, T>(type)
+        websockets.topics.register(this, topic)
+        return topic
+    }
+
+    @LightningServerDsl
+    public fun <Setting, Result> setting(setting: ServerSetting<Setting, Result>): ServerSetting<Setting, Result> {
+        settings.register(setting)
+        return setting
+    }
+
+    @LightningServerDsl
+    public fun <Setting, Result> setting(
+        name: String,
+        default: Setting,
+        serializer: KSerializer<Setting>,
+        optional: Boolean = false,
+        getter: SettingContext.(Setting) -> Result,
+    ): ServerSetting<Setting, Result> =
+        setting(
+            ServerSetting(
+                name,
+                default,
+                serializer,
+                optional,
+            ) { value -> getter(this, value) }
+        )
+
+    @LightningServerDsl
+    public fun <SETTING : Setting<RESULT>, RESULT> setting(
+        name: String,
+        default: SETTING,
+        serializer: KSerializer<SETTING>,
+        optional: Boolean = false,
+    ): ServerSetting<SETTING, RESULT> =
+        setting(
+            ServerSetting(
+                name,
+                default,
+                serializer,
+                optional,
+            )
+        )
+
+    @LightningServerDsl
+    public inline fun <reified SETTING : Setting<RESULT>, RESULT> setting(
+        name: String,
+        default: SETTING,
+        optional: Boolean = false,
+    ): ServerSetting<SETTING, RESULT> =
+        setting(
+            ServerSetting(
+                name,
+                default,
+                serializerOrContextual<SETTING>(),
+                optional,
+            )
+        )
+
+    @LightningServerDsl
+    public fun <Result> setting(
+        name: String,
+        default: Result,
+        serializer: KSerializer<Result>,
+        optional: Boolean = false,
+    ): ServerSetting.Direct<Result> {
+        val setting = ServerSetting(
+            name,
+            default,
+            serializer,
+            optional,
+        )
+        settings.register(setting)
+        return setting
+    }
+
+    @LightningServerDsl
+    public inline fun <reified Setting, Result> setting(
+        name: String,
+        default: Setting,
+        optional: Boolean = false,
+        crossinline getter: SettingContext.(Setting) -> Result,
+    ): ServerSetting<Setting, Result> =
+        setting(
+            ServerSetting(
+                name,
+                default,
+                serializerOrContextual<Setting>(),
+                optional,
+            ) { value -> getter(this, value) }
+        )
+
+    @LightningServerDsl
+    public inline fun <reified Result> setting(
+        name: String,
+        default: Result,
+        optional: Boolean = false,
+    ): ServerSetting.Direct<Result> =
+        setting(
+            name,
+            default,
+            serializerOrContextual<Result>(),
+            optional,
+        )
+
+    @LightningServerDsl
+    public infix fun <T : ServerBuilder> PathSpec0.include(module: T): T {
+        modules.register(Locationed(this, module))
+        return module
+    }
+
+    @LightningServerDsl
+    public infix fun PathSpec0.include(import: ServerDefinition): ServerDefinition {
+        imports.register(Locationed(this, import))
+        return import
+    }
+
+    public fun register(decoder: MediaTypeDecoder) {
+        mediaTypeDecoders.register(decoder)
+    }
+
+    public fun register(decoder: MediaTypeEncoder) {
+        mediaTypeEncoders.register(decoder)
+    }
+
+    public fun register(coder: MediaTypeCoder) {
+        mediaTypeDecoders.register(coder)
+        mediaTypeEncoders.register(coder)
+    }
+
 
     /**
      * Builds a complete, flattened [ServerDefinition] ready for runtime use.
      *
      * This is the primary method for converting a [ServerBuilder] into a deployable server configuration.
      * It performs a full build process that involves:
-     * 1. Creating a [shallowBuild] of this builder's direct configuration
-     * 2. Recursively builds all imported modules
-     * 3. Flattens the modular structure into a single [ServerDefinition]
+     * 1. Creating a [ServerDefinition.Module] of this builder's direct configuration
+     * 2. Recursively building all imported modules
      *
      * @return A complete [ServerDefinition] with all modules flattened and ready for deployment
-     * @see modularBuild
-     * @see shallowBuild
      */
-    public fun build(): ServerDefinition = modularBuild().flatten()
-
-    /**
-     * Builds a [ModularServerDefinition] that preserves the modular structure.
-     *
-     * This method creates a hierarchical server definition that maintains the separation
-     * between the current builder's configuration and its nested modules. The resulting
-     * structure can be inspected for debugging or flattened later using [ModularServerDefinition.flatten].
-     *
-     * The build process:
-     * 1. Creates a [shallowBuild] of this builder's direct configuration
-     * 2. Recursively builds all imported modules
-     * 3. Combines them into a hierarchical structure with proper path mounting
-     *
-     * @return A [ModularServerDefinition] containing this builder's configuration and all nested modules
-     * @see build
-     * @see shallowBuild
-     */
-    public fun modularBuild(): ModularServerDefinition =
-        ModularServerDefinition(
-            definition = shallowBuild(),
-            modules = imports + modules.mapValues { it.value.modularBuild() }
-        )
-
-    /**
-     * Builds a [ServerDefinition] containing only this builder's direct configuration.
-     *
-     * This method creates a server definition that includes only the endpoints, settings,
-     * and other configurations defined directly in this builder. It does not include
-     * any nested modules or imported definitions.
-     *
-     * Use this when you need to:
-     * - Inspect only the current builder's configuration
-     * - Build a partial definition for testing
-     * - Create a base definition that will be extended elsewhere
-     *
-     * This method called in both the [build] and [modularBuild] methods.
-     *
-     * The build process includes:
-     * - Applying HTTP and WebSocket interceptors to all handlers
-     * - Combining HTTP and WebSocket endpoints into [ServerPathEndpoints]
-     * - Converting all registries into their corresponding read-only versions
-     *
-     * @return A [ServerDefinition] containing only this builder's direct configuration
-     * @see build
-     * @see modularBuild
-     */
-    public fun shallowBuild(): ServerDefinition = ServerDefinition(
-        internalSerializersModule = internalSerialization,
-        externalSerializersModule = externalSerialization,
-        httpInterceptors = http.interceptors.interceptors,
-        websocketInterceptors = websockets.interceptors.interceptors,
-        endpoints = MutablePathSpecMap<ServerPathEndpoints>().apply {
-            for (path in http.handlers.keys + websockets.handlers.keys) {
-                put(path, ServerPathEndpoints(
-                    http = http
-                        .handlers[path]
-                        ?: emptyMap(),
-
-                    websocket = websockets
-                        .handlers[path]
-                ))
-            }
-        },
-        schedules = schedules,
-        tasks = tasks,
-        webSocketTopics = websockets.topics.registered,
-        settings = settings,
-        extensions = extensions,
-        exceptionHandler = exceptionHandler,
-        startupTasks = startupTasks,
-        mediaTypeDecoders = mediaTypeDecoders,
-        mediaTypeEncoders = mediaTypeEncoders,
+    public fun build(): ServerDefinition = ServerDefinition(
+        thisLayer = ServerDefinition.Module(
+            internalSerializersModule = internalSerialization,
+            externalSerializersModule = externalSerialization,
+            httpInterceptors = http.interceptors.interceptors.toSealedList(),
+            websocketInterceptors = websockets.interceptors.interceptors.toSealedList(),
+            endpoints = MutablePathSpecMap<ServerPathEndpoints>().apply {
+                for (path in http.handlers.keys + websockets.handlers.keys) {
+                    put(path, ServerPathEndpoints(
+                        http = http.handlers[path] ?: emptyMap(),
+                        websocket = websockets.handlers[path]
+                    ))
+                }
+            }.toSealedPathSpecMap(),
+            schedules = schedules.toSealedMap(),
+            tasks = tasks.toSealedMap(),
+            webSocketTopics = websockets.topics.registered.toSealedPathSpecMap(),
+            settings = settings.toSealedList(),
+            extensions = extensions.toSealedExtensions(),
+            exceptionHandler = exceptionHandler,
+            startupTasks = startupTasks.toSealedMap(),
+            mediaTypeDecoders = mediaTypeDecoders.toSealedMap(),
+            mediaTypeEncoders = mediaTypeEncoders.toSealedMap(),
+        ),
+        modules = (imports + modules.mapItems { it.build() }).toSealedList()
     )
-
-    internal var modulePath: PathSpec0 = PathSpec.root
 }

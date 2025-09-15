@@ -1,26 +1,27 @@
 package com.lightningkite.lightningserver.typed.jsonschema
 
 import com.lightningkite.MediaType
-import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.generalSettings
-import com.lightningkite.lightningserver.http.HttpEndpoint
-import com.lightningkite.lightningserver.http.HttpMethod
+import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.pathing.plus
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.ApiWebsocketHandler
-import com.lightningkite.lightningserver.typed.docGroup
-import com.lightningkite.lightningserver.typed.locationedApiHttpHandlers
-import com.lightningkite.lightningserver.typed.functionName
-import com.lightningkite.lightningserver.typed.jsonschema.openApi
+import com.lightningkite.lightningserver.typed.sdk.SDK.sdk
+import com.lightningkite.lightningserver.typed.sdk.docGroup
+import com.lightningkite.lightningserver.typed.sdk.filterSafeEndpoints
+import com.lightningkite.lightningserver.typed.sdk.functionCase
+import com.lightningkite.lightningserver.typed.sdk.isUnit
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.default
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
+import kotlin.collections.component1
+import kotlin.collections.component2
 
 @Serializable
 public data class OpenApiRoot(
@@ -145,72 +146,53 @@ public data class OpenApiContact(
     val email: String = "",
 )
 
-context(runtime: ServerRuntime)
-private fun <T> make(type: KSerializer<T>, item: T): Map<String, OpenApiExample> {
-    return mapOf(
-        "application/json" to OpenApiExample(
-            value = runtime.externalSerialization.json.encodeToJsonElement(type, item)
-        ),
-//        "text/csv" to OpenApiExample(
-//            value = JsonPrimitive(Serialization.csv.encodeToString(type, item))
-//        ),
-//        ContentType.Application.FormUrlEncoded.toString() to OpenApiExample(
-//            value = JsonPrimitive(Serialization.properties.encodeToFormData(type, item))
-//        )
-    )
-}
 
 context(runtime: ServerRuntime)
-private fun Locationed<HttpEndpoint<PathSpec>, ApiHttpHandler<*, *, *, *>>.openApiUntyped(builder: JsonSchemaBuilder): OpenApiOperation =
-    (this as Locationed<HttpEndpoint<PathSpec>, ApiHttpHandler<PathSpec, HasId<*>?, Any?, Any?>>).openApi(builder)
-
-context(runtime: ServerRuntime)
-private fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> Locationed<HttpEndpoint<PathSpec>, ApiHttpHandler<PATH, USER, INPUT, OUTPUT>>.openApi(
-    builder: JsonSchemaBuilder
-): OpenApiOperation = with(value) {
-    val docGroup: String? = context(runtime.server) { key.path.docGroup }
-    OpenApiOperation(
-        summary = summary,
-        description = description,
-        tags = listOfNotNull(docGroup),
-        operationId = (docGroup ?: "") + "_" + this.functionName,
-        parameters = listOf(),
-        requestBody = if (location.method == HttpMethod.GET) null else if (this.inputType == Unit.serializer()) null else OpenApiRequestBody(
-            content = mapOf(
-                MediaType.Application.Json.toString() to OpenApiMediaType(
-                    schema = builder[this.inputType],
-                    example = (examples.firstOrNull() ?: ApiHttpHandler.Example(
-                        inputType.default(),
-                        outputType.default()
-                    ))
-                        .let { example ->
-                            @Suppress("UNCHECKED_CAST")
-                            runtime.externalSerialization.json.encodeToJsonElement(
-                                inputType as KSerializer<Any?>,
-                                example.input
-                            )
-                        },
-                    examples = examples.groupBy { it.name }.flatMap {
-                        if (it.value.size == 1) it.value else it.value.mapIndexed { index, it ->
-                            it.copy(
-                                name = it.name + " " + index.plus(1)
-                            )
-                        }
-                    }.associate { example ->
-                        example.name to OpenApiExample(
-                            example.name,
-                            value = runtime.externalSerialization.json.encodeToJsonElement(inputType, example.input)
+private fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.openApi(
+    builder: JsonSchemaBuilder,
+    method: HttpMethod,
+    docGroup: String?
+) = OpenApiOperation(
+    summary = summary,
+    description = description,
+    tags = listOfNotNull(docGroup),
+    operationId = if (docGroup == null) functionName.functionCase() else (docGroup + "_" + functionName.functionCase()),
+    parameters = listOf(),
+    requestBody = if (method == HttpMethod.GET) null else if (this.inputType.isUnit()) null else OpenApiRequestBody(
+        content = mapOf(
+            MediaType.Application.Json.toString() to OpenApiMediaType(
+                schema = builder[this.inputType],
+                example = (examples.firstOrNull() ?: ApiHttpHandler.Example(
+                    inputType.default(),
+                    outputType.default()
+                ))
+                    .let { example ->
+                        @Suppress("UNCHECKED_CAST")
+                        runtime.externalSerialization.json.encodeToJsonElement(
+                            inputType as KSerializer<Any?>,
+                            example.input
+                        )
+                    },
+                examples = examples.groupBy { it.name }.flatMap {
+                    if (it.value.size == 1) it.value else it.value.mapIndexed { index, it ->
+                        it.copy(
+                            name = it.name + " " + index.plus(1)
                         )
                     }
-                )
-            ),
-            required = true
+                }.associate { example ->
+                    example.name to OpenApiExample(
+                        example.name,
+                        value = runtime.externalSerialization.json.encodeToJsonElement(inputType, example.input)
+                    )
+                }
+            )
         ),
-        responses = mapOf(
-            successCode.code.toString() to (if (this.outputType == Unit.serializer()) OpenApiResponse(
-                "Success",
-                mapOf()
-            ) else OpenApiResponse(
+        required = true
+    ),
+    responses = run {
+        val response =
+            if (this.outputType.isUnit()) OpenApiResponse("Success", emptyMap())
+            else OpenApiResponse(
                 description = "Success",
                 content = mapOf(
                     MediaType.Application.Json.toString() to OpenApiMediaType(
@@ -241,97 +223,102 @@ private fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> Locationed<HttpEn
                         }
                     )
                 )
-            ))
-            // TODO: Error codes
-        )
-    )
-}
+            )
 
-public context(runtime: ServerRuntime)
-val openApiDescription: OpenApiRoot
-    get() {
-        val builder =
-            JsonSchemaBuilder(runtime.externalSerialization.json, "#/components/schemas/", useNullableProperty = true)
+        mapOf(successCode.code.toString() to response)
+    }
+    // TODO: Error codes
+)
 
-        runtime.server.endpoints.entries.forEach { (path, endpoints) ->
-            endpoints.http.entries.forEach { (method, handler) ->
-                if (handler is ApiHttpHandler<*, *, *, *>) {
-                    builder[handler.inputType]
-                    builder[handler.outputType]
-                }
-                path.wildcards.forEach { builder[it.serializer] }
-            }
-            endpoints.websocket?.let { handler ->
-                if (handler is ApiWebsocketHandler<*, *, *, *, *>) {
-                    builder[handler.inputType]
-                    builder[handler.outputType]
-                }
+context(runtime: ServerRuntime)
+public val openApiDescription: OpenApiRoot get() {
+    val builder = JsonSchemaBuilder(runtime.externalSerialization.json, "#/components/schemas/", useNullableProperty = true)
+
+    runtime.server.endpoints.forEach { (path, endpoints) ->
+        path.wildcards.forEach { builder[it.serializer] }
+        endpoints.http.entries.forEach { (_, handler) ->
+            if (handler is ApiHttpHandler<*, *, *, *>) {
+                builder[handler.inputType]
+                builder[handler.outputType]
             }
         }
-
-        return OpenApiRoot(
-            openapi = "3.0.2",
-            info = OpenApiInfo(
-                title = generalSettings().projectName,
-                version = "current",
-            ),
-            components = OpenApiComponents(
-                schemas = builder.definitions,
-                securitySchemes = mapOf(
-                    "header" to OpenApiSecurity(
-                        type = OpenApiSecurityType.http,
-                        description = "Authorization Header",
-                        scheme = "bearer",
-                        bearerFormat = "JWT",
-                    ),
-                    "param" to OpenApiSecurity(
-                        type = OpenApiSecurityType.apiKey,
-                        description = "Parameter",
-                        name = "jwt",
-                        inside = OpenApiParameterType.query
-                    ),
-                    "cookie" to OpenApiSecurity(
-                        type = OpenApiSecurityType.apiKey,
-                        description = "Cookie",
-                        name = "Authorization",
-                        inside = OpenApiParameterType.cookie
-                    )
-                )
-            ),
-            servers = listOf(
-                OpenApiServer(url = generalSettings().publicUrl, description = "Current Server")
-            ),
-            security = listOf(
-                mapOf(),
-                mapOf("header" to listOf()),
-                mapOf("param" to listOf()),
-                mapOf("cookie" to listOf()),
-            ),
-            paths = runtime.server.locationedApiHttpHandlers
-                .filter { it.location.method != HttpMethod.GET || it.value.inputType == Unit.serializer() }
-                .groupBy { it.location.path.toString() }
-                .entries
-                .sortedBy { it.key }
-                .associate {
-                    it.key to OpenApiPath(
-                        parameters = it.value.first().location.path.wildcards.map { seg ->
-                            val name = seg.name
-                            val ser = seg.serializer
-                            OpenApiParameter(
-                                name = name,
-                                inside = OpenApiParameterType.path,
-                                description = name,
-                                required = true,
-                                schema = builder[ser],
-                                allowEmptyValue = false
-                            )
-                        },
-                        get = it.value.find { it.location.method == HttpMethod.GET }?.openApiUntyped(builder),
-                        post = it.value.find { it.location.method == HttpMethod.POST }?.openApiUntyped(builder),
-                        put = it.value.find { it.location.method == HttpMethod.PUT }?.openApiUntyped(builder),
-                        patch = it.value.find { it.location.method == HttpMethod.PATCH }?.openApiUntyped(builder),
-                        delete = it.value.find { it.location.method == HttpMethod.DELETE }?.openApiUntyped(builder),
-                    )
-                }
-        )
+        endpoints.websocket?.let { handler ->
+            if (handler is ApiWebsocketHandler<*, *, *, *, *>) {
+                builder[handler.inputType]
+                builder[handler.outputType]
+            }
+        }
     }
+
+    return OpenApiRoot(
+        openapi = "3.0.2",
+        info = OpenApiInfo(
+            title = generalSettings().projectName,
+            version = runtime.serverVersion
+        ),
+        components = OpenApiComponents(
+            schemas = builder.definitions,
+            securitySchemes = mapOf(
+                "header" to OpenApiSecurity(
+                    type = OpenApiSecurityType.http,
+                    description = "Authorization Header",
+                    scheme = "bearer",
+                    bearerFormat = "JWT",
+                ),
+                "param" to OpenApiSecurity(
+                    type = OpenApiSecurityType.apiKey,
+                    description = "Parameter",
+                    name = "jwt",
+                    inside = OpenApiParameterType.query
+                ),
+                "cookie" to OpenApiSecurity(
+                    type = OpenApiSecurityType.apiKey,
+                    description = "Cookie",
+                    name = "Authorization",
+                    inside = OpenApiParameterType.cookie
+                )
+            )
+        ),
+        servers = listOf(
+            OpenApiServer(url = generalSettings().publicUrl, description = "Current Server")
+        ),
+        security = listOf(
+            mapOf(),
+            mapOf("header" to emptyList()),
+            mapOf("param" to emptyList()),
+            mapOf("cookie" to emptyList()),
+        ),
+        paths = runtime.server
+            .sdk()
+            .filterSafeEndpoints()
+            .asSequence()
+            .flatMap { node ->
+                val docGroup = node.docGroup
+
+                node.layer.endpoints.flatMap { (_, pathSpecMap) ->
+                    pathSpecMap.asSequence().map { (path, endpoints) ->
+                        fun find(method: HttpMethod) = endpoints.http[method]?.openApi(builder, method, docGroup)
+
+                        (node.absolutePath + path).toString() to OpenApiPath(
+                            parameters = path.wildcards.map { segment ->
+                                OpenApiParameter(
+                                    name = segment.name,
+                                    inside = OpenApiParameterType.path,
+                                    description = segment.name,
+                                    required = true,
+                                    schema = builder[segment.serializer],
+                                    allowEmptyValue = false
+                                )
+                            },
+                            get = find(HttpMethod.GET),
+                            post = find(HttpMethod.POST),
+                            put = find(HttpMethod.PUT),
+                            patch = find(HttpMethod.PATCH),
+                            delete = find(HttpMethod.DELETE)
+                        )
+                    }
+                }
+            }
+            .toMap()
+    )
+}

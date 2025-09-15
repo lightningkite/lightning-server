@@ -1,7 +1,6 @@
 package com.lightningkite.lightningserver.typed
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.UseContextualSerialization
 import com.lightningkite.services.HealthStatus
 import com.lightningkite.services.data.Description
 import com.lightningkite.services.data.GenerateDataClassPaths
@@ -16,7 +15,6 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.RequiredScope
-import com.lightningkite.lightningserver.auth.RequiredScopes
 
 @Serializable
 public data class FunnelStart(
@@ -134,16 +132,15 @@ public data class LightningServerKSchemaInterface(
 
 @Serializable
 public data class LightningServerKSchemaEndpoint(
-    val group: String? = null,
+    val docGroup: String? = null,
     val description: String,
     val summary: String,
     val method: String,
     val path: String,
-    val scopes: Set<RequiredScope> = RequiredScopes.root,
+    val scopes: Set<RequiredScope> = setOf(RequiredScope.root),
     val routes: Map<String, VirtualTypeReference>,
     val input: VirtualTypeReference,
     val output: VirtualTypeReference,
-    val docGroup: String?,
     val belongsToInterface: VirtualTypeReference?,
 )
 

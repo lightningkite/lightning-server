@@ -5,6 +5,7 @@ package com.lightningkite.lightningserver.engine.awsserverless
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.RequestStreamHandler
 import com.lightningkite.lightningserver.definition.*
+import com.lightningkite.lightningserver.definition.builder.include
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.path
@@ -79,7 +80,7 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
                 OpenSsl.decryptAesCbcPkcs5Sha256(bytes, sha256Password.toByteArray())
             }
             ?: bytes
-        this.settings.serializable.putAll(
+        this.settings.serializable.include(
             internalSerialization.json.decodeFromString(
                 SettingsSerializer(server.settings),
                 decryptedBytes.toString(Charsets.UTF_8)
@@ -126,7 +127,7 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
         }
         logger.debug("beforeCheckpoint() - Preparing all connections...")
         runBlocking {
-            settings.allGoals(this@AwsAdapter).entries.forEachConcurrent {
+            settings.allGoals().entries.forEachConcurrent {
                 (it.value as? Service)?.let {
                     logger.debug("Initially connecting to ${it.name}...")
                     it.connect()
@@ -142,7 +143,7 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
     override fun afterRestore(context: org.crac.Context<out Resource>?) {
         logger.debug("afterRestore() - opening all connections")
         runBlocking {
-            settings.allGoals(this@AwsAdapter).entries.forEachConcurrent {
+            settings.allGoals().entries.forEachConcurrent {
                 (it.value as? Service)?.let {
                     logger.debug("Connecting ${it.name}...")
                     runBlocking { it.connect() }

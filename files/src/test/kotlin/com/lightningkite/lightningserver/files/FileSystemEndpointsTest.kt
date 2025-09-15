@@ -3,8 +3,6 @@ package com.lightningkite.lightningserver.files
 import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
-import com.lightningkite.lightningserver.definition.builder.setting
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
@@ -19,13 +17,13 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.uuid.Uuid
 
-class FileSystemServerTest {
+class FileSystemEndpointsTest {
 
     object Server: ServerBuilder() {
         val files = setting("files", PublicFileSystem.Settings())
         val database = setting("database", Database.Settings())
-        val served = path.path("files") bind  FileSystemServer(files)
-        val uploadEarly = path.path("upload") bind UploadEarlyEndpoint(
+        val served = path.path("files") include FileSystemEndpoints(files)
+        val uploadEarly = path.path("upload") include UploadEarlyEndpoint(
             files = files,
             database = database,
             fileScanner = { listOf() }

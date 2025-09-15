@@ -2,32 +2,23 @@ package com.lightningkite.lightningserver
 
 import com.lightningkite.lightningserver.definition.GeneralServerSettings
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
-import com.lightningkite.lightningserver.definition.builder.setting
-import com.lightningkite.lightningserver.definition.builder.topic
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.HttpHandler
-import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.first
 import com.lightningkite.lightningserver.runtime.test.TestRunner
 import com.lightningkite.lightningserver.runtime.send
-import com.lightningkite.lightningserver.runtime.invoke
-import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.websockets.WebSocketClose
-import com.lightningkite.lightningserver.websockets.WebSocketConnection
 import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.lightningserver.websockets.subscribe
 import com.lightningkite.lightningserver.websockets.text
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
-import com.lightningkite.services.data.StringArrayFormat
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.modules.EmptySerializersModule
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -64,7 +55,7 @@ class TestRunnerTest {
             disconnect = {}
         )
 
-        val modelEndpoints = path.path("model") bind TestModelEndpoints
+        val modelEndpoints = path.path("model") include TestModelEndpoints
     }
 
     object TestModelEndpoints : ServerBuilder() {

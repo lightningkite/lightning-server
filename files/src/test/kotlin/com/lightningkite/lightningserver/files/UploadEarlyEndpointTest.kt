@@ -3,15 +3,10 @@ package com.lightningkite.lightningserver.files
 import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
-import com.lightningkite.lightningserver.definition.builder.setting
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.runtime.test.test
-import com.lightningkite.lightningserver.serialization.parse
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
-import com.lightningkite.lightningserver.serialization.toTypedData
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.test
@@ -24,14 +19,9 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.decodeFromJsonElement
-import kotlinx.serialization.json.encodeToJsonElement
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.modules.serializersModuleOf
 import kotlin.test.Test
 import kotlin.uuid.Uuid
@@ -41,8 +31,8 @@ class UploadEarlyEndpointTest {
     object Server: ServerBuilder() {
         val files = setting("files", PublicFileSystem.Settings())
         val database = setting("database", Database.Settings())
-        val served = path.path("files") bind  FileSystemServer(files)
-        val uploadEarly = path.path("upload") bind UploadEarlyEndpoint(
+        val served = path.path("files") include FileSystemEndpoints(files)
+        val uploadEarly = path.path("upload") include UploadEarlyEndpoint(
             files = files,
             database = database,
             fileScanner = { listOf() }

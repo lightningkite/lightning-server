@@ -2,15 +2,12 @@ package com.lightningkite.lightningserver.sessions.proofs
 
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.auth.*
-import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.signer
-import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
@@ -18,13 +15,18 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.sessions.proofs.extensions.constrainAttemptRate
-import com.lightningkite.lightningserver.auth.findUserIdString
+import com.lightningkite.lightningserver.auth.fetchUserIdString
 import com.lightningkite.lightningserver.auth.idString
 import com.lightningkite.lightningserver.encryption.checkAgainstHash
 import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.lightningserver.typed.sdk.SdkModule
+import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
+import com.lightningkite.lightningserver.typed.sdk.clientInterface
+import com.lightningkite.lightningserver.typed.sdk.info
+import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
@@ -43,7 +45,9 @@ public class PasswordProofEndpoints(
 
     init {
         proofMethods.register(this)
-        path.docGroup = "PasswordProof"
+
+        sdkSettings.defaultInfo = SdkModule.Info("PasswordProof", "password")
+        sdkSettings.clientInterface = ProofClientEndpoints.Password::class.info()
     }
 
     override val info: ProofMethodInfo = ProofMethodInfo(
@@ -51,8 +55,6 @@ public class PasswordProofEndpoints(
         property = null,
         strength = 10
     )
-    public val loggedInInterfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo("AuthenticatedPasswordProofClientEndpoints", listOf())
-    public val interfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo("PasswordProofClientEndpoints", listOf())
 
     context(_: ServerRuntime)
     private val active
@@ -96,7 +98,7 @@ public class PasswordProofEndpoints(
         )
 
     public val rest: ModelRestEndpoints<HasId<AnyId>, PasswordSecret, Uuid> =
-        path.path("secrets") bind ModelRestEndpoints(modelInfo)
+        path.path("secrets") include ModelRestEndpoints(modelInfo)
 
     context(_: ServerRuntime)
     public suspend fun <SUBJECT : HasId<ID>, ID: Comparable<ID>> establish(
@@ -132,7 +134,6 @@ public class PasswordProofEndpoints(
             outputType = Unit.serializer(),
             description = "Set your password",
             auth = proofMethodAuth,
-            belongsToInterface = loggedInInterfaceInfo,
             errorCases = emptyList(),
             implementation = { value: EstablishPassword ->
                 establish(
@@ -147,7 +148,6 @@ public class PasswordProofEndpoints(
     public override val prove: ApiHttpHandler<PathSpec0, HasId<AnyId>?, IdentificationAndPassword, Proof> =
         path.path("prove").post bind ApiHttpHandler(
             auth = noAuth,
-            belongsToInterface = interfaceInfo,
             summary = "Prove password ownership",
             description = "Logs in to the given account with a password.",
             errorCases = listOf(),
@@ -176,7 +176,7 @@ public class PasswordProofEndpoints(
                     val subject = input.type
                     val handler = serverRuntime.server.principalTypes.values.find { it.name == subject }
                         ?: throw IllegalArgumentException("No subject $subject recognized")
-                    val subjectId = handler.findUserIdString(input.property, input.value)
+                    val subjectId = handler.fetchUserIdString(input.property, input.value)
                         ?: throw BadRequestException("User ID and code do not match")
 
                     val active = modelInfo.collection().find(condition {
@@ -203,12 +203,12 @@ public class PasswordProofEndpoints(
     context(server: ServerRuntime)
     public override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> established(
         principal: PrincipalType<SUBJECT, ID>,
-        item: SUBJECT,
+        subject: SUBJECT,
     ): Boolean {
         @Suppress("UNCHECKED_CAST")
         return modelInfo.collection().count(condition {
             Condition.And(
-                it.subjectId eq principal.idString(item._id),
+                it.subjectId eq principal.idString(subject._id),
                 it.subjectType eq principal.name,
                 active
             )

@@ -2,15 +2,12 @@ package com.lightningkite.lightningserver.sessions.proofs
 
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.auth.*
-import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.signer
-import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
@@ -18,16 +15,19 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.sessions.proofs.extensions.constrainAttemptRate
-import com.lightningkite.lightningserver.auth.findUserIdString
+import com.lightningkite.lightningserver.auth.fetchUserIdString
 import com.lightningkite.lightningserver.auth.idString
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.lightningserver.typed.Documentable
 import com.lightningkite.lightningserver.typed.ModelInfo
 import com.lightningkite.lightningserver.typed.auth
-import com.lightningkite.lightningserver.typed.docGroup
 import com.lightningkite.lightningserver.typed.modelInfo
+import com.lightningkite.lightningserver.typed.sdk.SdkModule
+import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
+import com.lightningkite.lightningserver.typed.sdk.clientInterface
+import com.lightningkite.lightningserver.typed.sdk.info
+import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.data.IndexSet
@@ -35,12 +35,10 @@ import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.UseContextualSerialization
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import java.security.SecureRandom
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.Uuid
 
 @Serializable
@@ -62,15 +60,12 @@ public class BackupCodeEndpoints(
     private val generateCount: Int = 10, // The number of codes to generate
 ) : ServerBuilder(), DirectProofMethod {
 
-    init { path.docGroup = "BackupCodeProof" }
     init {
         proofMethods.register(this)
-    }
 
-    public val loggedInInterfaceInfo: Documentable.InterfaceInfo =
-        Documentable.InterfaceInfo("AuthenticatedBackupCodeProofClientEndpoints", listOf())
-    public val interfaceInfo: Documentable.InterfaceInfo =
-        Documentable.InterfaceInfo("BackupCodeProofClientEndpoints", listOf())
+        sdkSettings.defaultInfo = SdkModule.Info("BackupCodeProof", "backupCode")
+        sdkSettings.clientInterface = ProofClientEndpoints.BackupCode::class.info()
+    }
 
     override val info: ProofMethodInfo = ProofMethodInfo(
         via = "backupcode",
@@ -93,7 +88,6 @@ public class BackupCodeEndpoints(
             outputType = ListSerializer(String.serializer()),
             description = "Reset your existing backup codes with new ones. Input how many codes you wish to generate",
             auth = proofMethodAuth,
-            belongsToInterface = loggedInInterfaceInfo,
             errorCases = listOf(),
             examples = listOf(),
             implementation = { _: Unit ->
@@ -131,7 +125,6 @@ public class BackupCodeEndpoints(
             outputType = Unit.serializer(),
             description = "Removes all backup codes for the user",
             auth = proofMethodAuth,
-            belongsToInterface = loggedInInterfaceInfo,
             errorCases = listOf(),
             examples = listOf(),
             implementation = { _: Unit ->
@@ -151,7 +144,6 @@ public class BackupCodeEndpoints(
             outputType = Boolean.serializer(),
             description = "Returns whether or a user has valid backup codes established",
             auth = proofMethodAuth,
-            belongsToInterface = loggedInInterfaceInfo,
             errorCases = listOf(),
             examples = listOf(),
             implementation = { _: Unit ->
@@ -164,7 +156,6 @@ public class BackupCodeEndpoints(
     public override val prove: ApiHttpHandler<PathSpec0, HasId<AnyId>?, IdentificationAndPassword, Proof> =
         path.path("prove").post bind ApiHttpHandler(
             auth = noAuth,
-            belongsToInterface = interfaceInfo,
             summary = "Prove With Backup Code",
             description = "Use an established backup code as an authentication method.",
             errorCases = listOf(),
@@ -196,7 +187,7 @@ public class BackupCodeEndpoints(
                     val handler = serverRuntime.server.principalTypes.values.find { it.name == subject }
                         ?: throw IllegalArgumentException("No subject $subject recognized")
 
-                    val subjectId = handler.findUserIdString(input.property, input.value)
+                    val subjectId = handler.fetchUserIdString(input.property, input.value)
                         ?: throw BadRequestException("Invalid Backup Code")
 
                     val secrets = modelInfo.collection().find(condition {
@@ -224,10 +215,10 @@ public class BackupCodeEndpoints(
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> established(
         principal: PrincipalType<SUBJECT, ID>,
-        item: SUBJECT,
+        subject: SUBJECT,
     ): Boolean = modelInfo.collection()
         .findOne(condition {
-            it.subjectId.eq(principal.idString(item._id)) and
+            it.subjectId.eq(principal.idString(subject._id)) and
                     it.subjectType.eq(principal.name)
         }) != null
 }

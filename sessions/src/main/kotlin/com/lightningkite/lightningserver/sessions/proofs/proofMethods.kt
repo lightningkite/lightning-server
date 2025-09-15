@@ -1,18 +1,15 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
 import com.lightningkite.lightningserver.auth.AnyId
-import com.lightningkite.lightningserver.auth.AuthAny
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.RequiredScope
 import com.lightningkite.lightningserver.auth.Subscope
 import com.lightningkite.lightningserver.definition.ListRegistryExtension
-import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.builder.ListRegistry
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.getValue
-import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -38,8 +35,8 @@ public interface ProofMethod {
     context(server: ServerRuntime)
     public suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> established(
         principal: PrincipalType<SUBJECT, ID>,
-        item: SUBJECT,
-    ): Boolean = info.property?.let { principal.getProperty(item, it) != null } ?: false
+        subject: SUBJECT,
+    ): Boolean = info.property?.let { principal.getProperty(subject, it) != null } ?: false
 }
 
 public interface DirectProofMethod : ProofMethod {

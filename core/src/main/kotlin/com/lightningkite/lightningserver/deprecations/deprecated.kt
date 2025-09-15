@@ -3,7 +3,6 @@ package com.lightningkite.lightningserver.deprecations
 import com.lightningkite.lightningserver.data.Schedule
 import com.lightningkite.lightningserver.definition.ScheduledTask
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.delete
 import com.lightningkite.lightningserver.http.get
@@ -40,12 +39,13 @@ public fun PathSpec0.options(string: String): HttpEndpoint<PathSpec0> = path(str
 @Deprecated("Use standard system", ReplaceWith("path(string).head"))
 public fun PathSpec0.head(string: String): HttpEndpoint<PathSpec0> = path(string).head
 
-context(builder: ServerBuilder)
-public fun PathSpec0.websocket(handler: WebSocketHandler<PathSpec0, *>): WebSocketHandler<PathSpec0, *> =
-    bind(handler)
 
-@Deprecated("Use standard syntax", ReplaceWith("path.path(string)"))
-public fun ServerBuilder.path(string: String): PathSpec0 = PathSpec.root.path(string)
+@Deprecated("Use standard syntax", ReplaceWith("path.path(string)"), DeprecationLevel.ERROR)
+context(builder: ServerBuilder)
+public fun PathSpec0.websocket(handler: WebSocketHandler<PathSpec0, *>): WebSocketHandler<PathSpec0, *> = TODO()
+
+@Deprecated("Use standard syntax", ReplaceWith("path.path(string)"), DeprecationLevel.ERROR)
+public fun ServerBuilder.path(string: String): PathSpec0 = TODO()
 @Deprecated("Use standard syntax", ReplaceWith("path.path(string).get"))
 public fun ServerBuilder.get(string: String): HttpEndpoint<PathSpec0> = PathSpec.root.path(string).get
 @Deprecated("Use standard syntax", ReplaceWith("path.path(string).post"))
@@ -76,14 +76,13 @@ public val ServerBuilder.options: HttpEndpoint<PathSpec0> get() = PathSpec.root.
 @Deprecated("Use standard syntax", ReplaceWith("path.head"))
 public val ServerBuilder.head: HttpEndpoint<PathSpec0> get() = PathSpec.root.head
 
-@Deprecated("Use the standard syntax", ReplaceWith("path.path(name) bind ScheduledTask(schedule, handler = action)"))
-public fun ServerBuilder.schedule(name: String, schedule: Schedule, action: suspend ServerRuntime.() -> Unit): ScheduledTask =
-    PathSpec.root.path(name) bind ScheduledTask(schedule, handler = action)
+@Deprecated("Use the standard syntax", ReplaceWith("path.path(name) bind ScheduledTask(schedule, handler = action)"), DeprecationLevel.ERROR)
+public fun ServerBuilder.schedule(name: String, schedule: Schedule, action: suspend ServerRuntime.() -> Unit): ScheduledTask = TODO()
 
 @Deprecated(
     "Use the standard syntax",
-    ReplaceWith("path.path(name) bind ScheduledTask(frequency = frequency, handler = action)")
+    ReplaceWith("path.path(name) bind ScheduledTask(frequency = frequency, handler = action)"),
+    DeprecationLevel.ERROR
 )
-public fun ServerBuilder.schedule(name: String, frequency: Duration, action: suspend ServerRuntime.() -> Unit): ScheduledTask =
-    PathSpec.root.path(name) bind ScheduledTask(Schedule.Frequency(frequency), handler = action)
+public fun ServerBuilder.schedule(name: String, frequency: Duration, action: suspend ServerRuntime.() -> Unit): ScheduledTask = TODO()
 

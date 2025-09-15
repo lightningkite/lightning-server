@@ -2,20 +2,13 @@ package com.lightningkite.lightningserver.websockets
 
 import com.lightningkite.lightningserver.MultiplexMessage
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
-import com.lightningkite.lightningserver.definition.builder.topic
-import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.deprecations.websocket
-import com.lightningkite.lightningserver.pathing.first
 import com.lightningkite.lightningserver.runtime.send
-import com.lightningkite.lightningserver.runtime.test.TestRunner
 import com.lightningkite.lightningserver.runtime.test.test
-import com.lightningkite.lightningserver.websockets.subscribe
-import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.json.Json
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class MultiplexWebSocketHandlerTest {
 
@@ -42,7 +35,7 @@ class MultiplexWebSocketHandlerTest {
             },
             disconnect = {}
         )
-        val multiplex = path.path("multiplex").websocket(MultiplexWebSocketHandler())
+        val multiplex = path.path("multiplex") bind MultiplexWebSocketHandler()
     }
 
     @Test

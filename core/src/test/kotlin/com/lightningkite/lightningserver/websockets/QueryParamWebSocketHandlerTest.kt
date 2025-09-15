@@ -1,18 +1,11 @@
 package com.lightningkite.lightningserver.websockets
 
 import com.lightningkite.lightningserver.NotFoundException
-import com.lightningkite.lightningserver.data.get
 import com.lightningkite.lightningserver.data.set
-import com.lightningkite.lightningserver.deprecations.websocket
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
-import com.lightningkite.lightningserver.definition.builder.topic
+import com.lightningkite.lightningserver.deprecations.websocket
 import com.lightningkite.lightningserver.http.HttpHeaders
-import com.lightningkite.lightningserver.runtime.send
 import com.lightningkite.lightningserver.runtime.test.test
-import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
-import com.lightningkite.lightningserver.websockets.WebSocketFrame
-import com.lightningkite.lightningserver.websockets.subscribe
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.builtins.serializer
 import kotlin.test.Test
@@ -57,7 +50,7 @@ class QueryParamWebSocketHandlerTest {
             disconnect = {}
         )
 
-        val qp = path.path("qp").websocket(QueryParamWebSocketHandler())
+        val qp = path.path("qp") bind QueryParamWebSocketHandler()
 
         object CacheKey : com.lightningkite.lightningserver.data.SerializableCache.Key<String> {
             override val id: String = "qp-test-cache"

@@ -1,7 +1,6 @@
 package com.lightningkite.lightningserver.engine.awsserverless
 
 import com.lightningkite.lightningserver.*
-import com.lightningkite.lightningserver.definition.exceptionSettings
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.pathing.*

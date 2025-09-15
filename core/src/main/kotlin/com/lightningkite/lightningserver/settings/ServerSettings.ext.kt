@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.settings
 
 import com.lightningkite.lightningserver.definition.ServerSetting
+import com.lightningkite.lightningserver.definition.builder.include
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import kotlinx.serialization.DeserializationStrategy
@@ -28,7 +29,7 @@ public fun ServerSettings.loadFromFile(
     file: File,
     module: SerializersModule,
 ) {
-    val serializer = SettingsSerializer(keys.sortedBy { it.name })
+    val serializer = SettingsSerializer(settings.sortedBy { it.name })
     val format = if (file.name.contains(".properties")) {
         object : StringFormat {
             val properties = Properties(module)
@@ -62,7 +63,7 @@ public fun ServerSettings.loadFromFile(
     }
 
     if (!file.exists()) {
-        file.writeText(format.encodeToString(serializer, keys.associateWith { it.default }))
+        file.writeText(format.encodeToString(serializer, settings.associateWith { it.default }))
         throw MissingSettingFile(file)
     }
 
@@ -76,7 +77,7 @@ public fun ServerSettings.loadFromFile(
     val text = decryptedBytes.decodeToString()
     val loaded: MutableMap<ServerSetting<*, *>, Any?> = format.decodeFromString(serializer, text).toMutableMap()
     val missingKeys = HashSet<ServerSetting<*, *>>()
-    for (key in keys) {
+    for (key in settings) {
         if (key !in loaded) {
             loaded[key] = key.default
             if (!key.optional) {
@@ -90,7 +91,7 @@ public fun ServerSettings.loadFromFile(
         suggestedFile.writeText(format.encodeToString(serializer, loaded))
         throw IncompleteSettingsException(missingKeys, suggestedFile)
     }
-    this.serializable.putAll(loaded)
+    this.serializable.include(loaded)
 }
 
 context(server: ServerRuntime)
@@ -98,7 +99,7 @@ public fun ServerSettings.preload() {
     val errors = mutableMapOf<ServerSetting<*, *>, Exception>()
     serializable.keys.forEach { setting ->
         try {
-            get(setting, server)
+            get(setting)
         } catch (e: Exception) {
             errors[setting] = e
         }

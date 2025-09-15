@@ -2,7 +2,6 @@ package com.lightningkite.lightningserver.sessions
 
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.GrantedScope
-import com.lightningkite.lightningserver.auth.GrantedScopes
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -17,7 +16,7 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
     sessionId: Uuid?,
     issuedAt: Instant = server.clock.now(),
     expiration: Instant? = null,
-    scopes: Set<GrantedScope> = GrantedScopes.root,
+    scopes: Set<GrantedScope> = setOf(GrantedScope.root),
     cache: SerializableCache? = null,
 ): Authentication<SUBJECT> =
     Authentication(

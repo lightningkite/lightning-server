@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.RequiredScope
 import com.lightningkite.lightningserver.auth.Subscope
+import com.lightningkite.lightningserver.auth.subscope
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.CollectionChanges
@@ -26,11 +27,12 @@ public interface ModelInfo<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     public val idSerializer: KSerializer<ID>
 
     public val auth: AuthRequirement<SUBJECT>
-    public companion object {
-        public val createSubscope: Subscope = Subscope("create")
-        public val readSubscope: Subscope = Subscope("read")
-        public val updateSubscope: Subscope = Subscope("update")
-        public val deleteSubscope: Subscope = Subscope("delete")
+
+    public object Scopes {
+        public val create: Subscope = Subscope("create")
+        public val read: Subscope = Subscope("read")
+        public val update: Subscope = Subscope("update")
+        public val delete: Subscope = Subscope("delete")
     }
 
     public val collectionName: String

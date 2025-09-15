@@ -108,7 +108,7 @@ public operator fun <WRITE : READ, READ : Any> MutableExtensions.DegradingKey<WR
  * val MyClass.handlers: Map<String, RequestHandler> by HandlersKey
  * ```
  */
-public interface MapRegistryExtension<L, V : Any> : MutableExtensions.DegradingKey<MapRegistry<L, V>, Map<L, V>> {
+public interface MapRegistryExtension<L, V> : MutableExtensions.DegradingKey<MapRegistry<L, V>, Map<L, V>> {
     override fun default(): MapRegistry<L, V> = MapRegistry()
     override fun MapRegistry<L, V>.include(other: Map<L, V>, pathSpec: PathSpec0) {
         for ((key, value) in other) register(key, value)

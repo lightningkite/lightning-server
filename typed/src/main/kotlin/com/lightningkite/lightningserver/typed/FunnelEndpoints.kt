@@ -6,12 +6,9 @@ import com.lightningkite.lightningserver.auth.AnyId
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.auth.or
-import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.ScheduledTask
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
-import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
@@ -40,7 +37,7 @@ public class FunnelEndpoints(
     )
 
     public val summaryRest: ModelRestEndpoints<HasId<*>, FunnelSummary, Uuid> =
-        path.path("summary").path("rest") bind ModelRestEndpoints(summaryInfo)
+        path.path("summary").path("rest") include ModelRestEndpoints(summaryInfo)
 
     public val info: ModelInfo<HasId<*>, FunnelInstance, Uuid> = database.modelInfo(
         auth = read,
@@ -48,7 +45,7 @@ public class FunnelEndpoints(
     )
 
     public val rest: ModelRestEndpoints<HasId<*>, FunnelInstance, Uuid> =
-        path.path("instance").path("rest") bind ModelRestEndpoints(info)
+        path.path("instance").path("rest") include ModelRestEndpoints(info)
 
 
     public val summaries: ApiHttpHandler<PathSpec1<LocalDate>, HasId<*>?, Unit, java.util.HashSet<FunnelSummary>> =

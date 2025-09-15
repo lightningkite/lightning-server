@@ -1,20 +1,16 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.MediaType
-import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.decoder
 import com.lightningkite.lightningserver.serialization.encoder
-import com.lightningkite.lightningserver.serialization.parse
-import com.lightningkite.lightningserver.serialization.queryParameters
-import com.lightningkite.lightningserver.serialization.toTypedData
-import com.lightningkite.lightningserver.typed.Documentable.InterfaceInfo
+import com.lightningkite.lightningserver.typed.sdk.SDK
+import com.lightningkite.lightningserver.typed.sdk.camelCase
+import com.lightningkite.lightningserver.typed.sdk.functionCase
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketConnection
@@ -22,22 +18,16 @@ import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
-import com.lightningkite.services.data.MimeType
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
-import kotlinx.serialization.builtins.serializer
 
-public interface ApiWebsocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?, INPUT, OUTPUT> :
-    Documentable,
-    WebSocketHandler<PATH, ApiWebsocketStorage<STORAGE>> {
+public interface ApiWebsocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?, INPUT, OUTPUT>
+    : WebSocketHandler<PATH, ApiWebsocketStorage<STORAGE>>, SDK.Documentable
+{
     override val auth: AuthRequirement<USER>
     override val inputType: KSerializer<INPUT>
     override val outputType: KSerializer<OUTPUT>
-    override val summary: String
-    override val description: String
-    override val belongsToInterface: InterfaceInfo?
 
     public val errorCases: List<LSError>
     public val innerStorageSerializer: KSerializer<STORAGE>

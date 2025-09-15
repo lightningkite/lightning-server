@@ -6,7 +6,6 @@ import com.lightningkite.lightningserver.auth.AnyId
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.GrantedScope
-import com.lightningkite.lightningserver.auth.GrantedScopes
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.RequiredScope
 import com.lightningkite.lightningserver.auth.auth
@@ -15,10 +14,10 @@ import com.lightningkite.lightningserver.auth.fetch
 import com.lightningkite.lightningserver.auth.id
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.auth.register
+import com.lightningkite.lightningserver.auth.subscope
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.get
@@ -32,7 +31,6 @@ import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.sessions.token.TokenException
 import com.lightningkite.lightningserver.sessions.token.TokenFormat
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.lightningserver.typed.Documentable
 import com.lightningkite.lightningserver.typed.ModelInfo
 import com.lightningkite.lightningserver.typed.auth
 import com.lightningkite.lightningserver.typed.modelInfo
@@ -63,6 +61,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         public val sessionsScope: RequiredScope = RequiredScope("auth:sessions")
         public val selfScope: RequiredScope = RequiredScope("auth:self")
     }
+
     init {
         register(principal)
     }
@@ -78,13 +77,6 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     public abstract suspend fun sessionStaleAfter(subject: SUBJECT): Duration?
 
     private val spath = Session.path(principal.subjectSerializer, principal.idSerializer)
-
-    public val belongsToInterface: Documentable.InterfaceInfo =
-        Documentable.InterfaceInfo("UserAuthClientEndpoints", listOf(principal.idSerializer))
-    public val loggedInBelongsToInterface: Documentable.InterfaceInfo = Documentable.InterfaceInfo(
-        "AuthenticatedUserAuthClientEndpoints",
-        listOf(principal.subjectSerializer, principal.idSerializer)
-    )
 
     public val sessionInfo: ModelInfo<SUBJECT, Session<SUBJECT, ID>, Uuid> =
         database.modelInfo(
@@ -142,7 +134,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         label: String? = null,
         expires: Instant? = null,
         stale: Instant? = null,
-        scopes: Set<GrantedScope> = GrantedScopes.root,
+        scopes: Set<GrantedScope> = setOf(GrantedScope.root),
         oauthClient: String? = null,
         derivedFrom: Uuid? = null,
     ): Pair<Session<SUBJECT, ID>, RefreshToken> {
@@ -218,7 +210,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     public val tokenSimple: ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, String> =
         path.path("token").path("simple").post bind ApiHttpHandler(
             auth = noAuth,
-            belongsToInterface = belongsToInterface,
+//            belongsToInterface = belongsToInterface,
             summary = "Get Token Simple",
             implementation = { refresh: String ->
                 val session = RefreshToken(refresh).session(request)
@@ -230,8 +222,8 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     public val createSubSession: ApiHttpHandler<PathSpec0, SUBJECT, SubSessionRequest, String> =
         path.path("sub-session").post bind ApiHttpHandler(
-            auth = sessionInfo.auth.subscope(ModelInfo.createSubscope),
-            belongsToInterface = loggedInBelongsToInterface,
+            auth = sessionInfo.auth.subscope(ModelInfo.Scopes.create),
+//            belongsToInterface = loggedInBelongsToInterface,
             inputType = SubSessionRequest.serializer(),
             outputType = String.serializer(),
             summary = "Create Sub Session",
@@ -259,7 +251,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         path.path("self").get bind ApiHttpHandler(
             summary = "Get Self",
             auth = principal.auth(scopes = setOf(selfScope)),
-            belongsToInterface = loggedInBelongsToInterface,
+//            belongsToInterface = loggedInBelongsToInterface,
             inputType = Unit.serializer(),
             outputType = principal.subjectSerializer,
             implementation = { _ -> auth.fetch() }
@@ -268,7 +260,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 //    context(_: ServerRuntime)
 //    public suspend fun presignToken(
 //        session: Session<SUBJECT, ID>,
-//        scopes: Set<GrantedScope> = GrantedScopes.root,
+//        scopes: Set<GrantedScope> = setOf(GrantedScope.root),
 //    ): String {
 //        return tokenFormat().create(
 //            principal, Authentication(
@@ -284,7 +276,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 //    context(_: ServerRuntime)
 //    public suspend fun presignToken(
 //        id: ID,
-//        scopes: Set<GrantedScope> = GrantedScopes.root,
+//        scopes: Set<GrantedScope> = setOf(GrantedScope.root),
 //    ): String {
 //        return tokenFormat().create(
 //            principal, Authentication(

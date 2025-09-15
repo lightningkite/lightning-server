@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.BadRequestException
+import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.http.*
@@ -9,17 +10,17 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.serialization.parse
 import com.lightningkite.lightningserver.serialization.queryParameters
 import com.lightningkite.lightningserver.serialization.toTypedData
+import com.lightningkite.lightningserver.typed.sdk.SDK
+import com.lightningkite.lightningserver.typed.sdk.functionCase
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
 
-public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> : Documentable, HttpHandler<PATH> {
+public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> : HttpHandler<PATH>, SDK.Documentable {
     override val auth: AuthRequirement<USER>
+
     override val inputType: KSerializer<INPUT>
     override val outputType: KSerializer<OUTPUT>
-    override val summary: String
-    override val description: String
-    override val belongsToInterface: Documentable.InterfaceInfo?
 
     public val successCode: HttpStatus
     public val errorCases: List<LSError>

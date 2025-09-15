@@ -5,10 +5,8 @@ import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.signer
-import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
@@ -18,6 +16,11 @@ import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.sessions.proofs.extensions.*
 import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.lightningserver.typed.sdk.SdkModule
+import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
+import com.lightningkite.lightningserver.typed.sdk.clientInterface
+import com.lightningkite.lightningserver.typed.sdk.info
+import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.database.*
 import dev.turingcomplete.kotlinonetimepassword.HmacAlgorithm
@@ -28,7 +31,6 @@ import kotlinx.serialization.builtins.serializer
 import java.security.SecureRandom
 import java.util.concurrent.TimeUnit
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.minutes
 import kotlin.time.toJavaInstant
 import kotlin.uuid.Uuid
 
@@ -48,7 +50,9 @@ public class TimeBasedOTPProofEndpoints(
 
     init {
         proofMethods.register(this)
-        path.docGroup = "OneTimePasswordProof"
+
+        sdkSettings.defaultInfo = SdkModule.Info("TimeBasedOTPProof", "totp")
+        sdkSettings.clientInterface = ProofClientEndpoints.TimeBasedOTP::class.info()
     }
 
     override val info: ProofMethodInfo = ProofMethodInfo(
@@ -56,8 +60,6 @@ public class TimeBasedOTPProofEndpoints(
         property = null,
         strength = 10
     )
-    public val loggedInInterfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo("AuthenticatedOneTimePasswordProofClientEndpoints", listOf()) // Version 5: Rename to "AuthenticatedTimeBasedOneTimePasswordProofClientEndpoints"
-    public val interfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo("OneTimePasswordProofClientEndpoints", listOf()) // Version 5: Rename to "TimeBasedOneTimePasswordProofClientEndpoints"
 
     context(_: ServerRuntime)
     private val active
@@ -94,7 +96,7 @@ public class TimeBasedOTPProofEndpoints(
         }
     )
 
-    public val rest: ModelRestEndpoints<HasId<AnyId>, TotpSecret, Uuid> = path.path("secrets") bind ModelRestEndpoints(modelInfo)
+    public val rest: ModelRestEndpoints<HasId<AnyId>, TotpSecret, Uuid> = path.path("secrets") include ModelRestEndpoints(modelInfo)
 
     public val establish: ApiHttpHandler<PathSpec0, HasId<AnyId>, EstablishOtp, String> =
         path.path("establish").post bind ApiHttpHandler(
@@ -103,7 +105,6 @@ public class TimeBasedOTPProofEndpoints(
             outputType = String.serializer(),
             description = "Generates a new Time Based One Time Password configuration.",
             auth = proofMethodAuth,
-            belongsToInterface = loggedInInterfaceInfo,
             errorCases = listOf(),
             examples = listOf(),
             implementation = { input: EstablishOtp ->
@@ -129,7 +130,6 @@ public class TimeBasedOTPProofEndpoints(
     override val prove: ApiHttpHandler<PathSpec0, HasId<AnyId>?, IdentificationAndPassword, Proof> =
         path.path("prove").post bind ApiHttpHandler(
             auth = noAuth,
-            belongsToInterface = interfaceInfo,
             summary = "Prove TOTP",
             description = "Logs in to the given account with an TOTP code.  Limits to 10 attempts per hour.",
             errorCases = listOf(),
@@ -160,7 +160,7 @@ public class TimeBasedOTPProofEndpoints(
                     val subject = input.type
                     val handler = serverRuntime.server.principalTypes[subject]
                         ?: throw IllegalArgumentException("No subject $subject recognized")
-                    val subjectId = handler.findUserIdString(input.property, input.value)
+                    val subjectId = handler.fetchUserIdString(input.property, input.value)
                         ?: throw BadRequestException("User ID and code do not match")
 
                     val active = modelInfo.collection().find(condition {
@@ -191,7 +191,6 @@ public class TimeBasedOTPProofEndpoints(
             outputType = Unit.serializer(),
             description = "Confirms your TOTP, making it fully active",
             auth = proofMethodAuth,
-            belongsToInterface = loggedInInterfaceInfo,
             errorCases = listOf(),
             examples = listOf(),
             implementation = { code: String ->
@@ -217,11 +216,11 @@ public class TimeBasedOTPProofEndpoints(
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> established(
         principal: PrincipalType<SUBJECT, ID>,
-        item: SUBJECT,
+        subject: SUBJECT,
     ): Boolean {
         @Suppress("UNCHECKED_CAST")
         return modelInfo.collection().count(condition {
-            it.subjectId.eq(principal.idString(item._id)) and
+            it.subjectId.eq(principal.idString(subject._id)) and
                     it.subjectType.eq(principal.name) and
                     active and
                     it.lastUsedAt.neq(null)

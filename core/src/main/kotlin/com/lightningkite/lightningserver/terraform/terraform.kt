@@ -31,9 +31,9 @@ public abstract class BaseTerraformEmitter: TerraformEmitter {
         settings[settingName] = element
     }
 
-    public fun <S: ServerBuilder> settings(builder: S, build: S.()->Unit) {
-        val required = builder.settings.map { it.name }.toSet()
-        with(builder) { build() }
+    public fun <S: ServerBuilder> settings(builder: S, configure: S.()->Unit) {
+        val required = builder.build().settings.map { it.name }.toSet()
+        with(builder) { configure() }
         val missing = required - settings.keys
         if(missing.isNotEmpty()) throw IllegalStateException("Missing settings: $missing")
     }

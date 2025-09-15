@@ -43,12 +43,10 @@ public class SerializableCache private constructor(
 
     context(server: ServerRuntime)
     private fun <T> retrieve(key: Key<T>): Expiring<T>? {
-        cache[key.id]?.let {
-            if (it.key !== key) throw IllegalStateException("KeyedSerializableCache encountered keys with duplicate ids. ID: ${key.id}")
-        }
-
         @Suppress("UNCHECKED_CAST")
         cache[key.id]?.let {
+            if (it.key != key) throw IllegalStateException("SerializableCache encountered keys with duplicate ids. ID: ${key.id}")
+
             return if (it.result.expired) null
             else it.result as Expiring<T>
         }
@@ -96,12 +94,12 @@ public class SerializableCache private constructor(
         val b = other.bytes
         if (a.size != b.size) return false
         for ((key, value) in a) {
-            if (!b.containsKey(key) || !value.contentEquals(b[key]!!)) return false
+            if (b[key]?.let { it contentEquals value } != true) return false
         }
         return true
     }
-
     override fun hashCode(): Int = bytes.hashCode()
+
     override fun toString(): String = cache
         .map { entry ->
             entry.key to entry.value.result.let { if (it.expiresAt == null) it.value else it }

@@ -1,7 +1,5 @@
-import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.auth.*
-import com.lightningkite.lightningserver.auth.PrincipalType
-import com.lightningkite.lightningserver.auth.meetsRequirements
+package com.lightningkite.lightningserver.auth
+
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.TestRunner
@@ -58,7 +56,7 @@ class ScopesTests {
     }
 
     private fun testAuth(
-        scopes: Set<GrantedScope> = GrantedScopes.root,
+        scopes: Set<GrantedScope> = setOf(GrantedScope.root),
         test: context(ServerRuntime) (Authentication<*>) -> Unit
     ) {
         TestRunner(Server).run {

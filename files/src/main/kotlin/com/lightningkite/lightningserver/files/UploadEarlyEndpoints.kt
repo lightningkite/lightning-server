@@ -4,7 +4,7 @@ import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.ScheduledTask
-import com.lightningkite.lightningserver.definition.builder.bind
+import com.lightningkite.lightningserver.deprecations.*
 import com.lightningkite.lightningserver.encryption.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.*
