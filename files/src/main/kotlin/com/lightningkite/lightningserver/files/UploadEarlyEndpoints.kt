@@ -2,25 +2,18 @@ package com.lightningkite.lightningserver.files
 
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.builder.*
-import com.lightningkite.lightningserver.data.*
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.ScheduledTask
 import com.lightningkite.lightningserver.deprecations.*
+import com.lightningkite.lightningserver.definition.builder.bind
 import com.lightningkite.lightningserver.encryption.*
-import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.*
-import com.lightningkite.lightningserver.serialization.*
-import com.lightningkite.lightningserver.settings.*
-import com.lightningkite.lightningserver.terraform.*
-import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.lightningserver.typed.*
-import com.lightningkite.lightningserver.deprecations.*
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.services.database.*
 import com.lightningkite.services.files.*
-import dev.whyoleg.cryptography.algorithms.HMAC
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.modules.SerializersModule
 import kotlin.time.Duration
@@ -103,7 +96,17 @@ public class UploadEarlyEndpoint(
         description = "Checks out a file and moves it out of jail if it's safe.  Makes for significantly faster subsequent requests.",
         errorCases = listOf(),
         implementation = { url: String ->
-            serializer().scan(url, expiration)
+            val url = serializer().scan(url, expiration)
+
+            val filePath = url.substringAfter("future-prescanned:").substringBefore('?')
+            val safe = serializer().ready.then(filePath)
+            val newItem = UploadForNextRequest(
+                expires = now().plus(expiration),
+                file = ServerFile(safe.url)
+            )
+            database().table<UploadForNextRequest>().insertOne(newItem)
+
+            url
         }
     )
 

@@ -13,6 +13,7 @@ import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.head
 import com.lightningkite.lightningserver.http.put
+import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.trailingSegments
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -34,23 +35,34 @@ public class FileSystemEndpoints(
         // We use !! on the line below since the URL in question ALWAYS matches the file system.
         // If you ever see a NPE, logic itself has broken and the universe will cease to exist shortly.
         // ... or your file system implementation is broken and doesn't recognize its own root URL.
-        val head = files().parseExternalUrl(files().rootUrls[0] + filePath)!!.head() ?: throw NotFoundException("No file $filePath found")
+        val head = try {
+            files().parseExternalUrl(files().rootUrls[0] + filePath)!!.head() ?: throw NotFoundException("No file $filePath found")
+        } catch (e: Exception) {
+            throw BadRequestException("Invalid file URL")
+        }
+
         HttpResponse(
             body = null,
             status = HttpStatus.NoContent,
-            headers = HttpHeaders(listOf(
-                HttpHeader.ContentType to head.type.toString(),
-                HttpHeader.ContentLength to head.size.toString(),
-            ))
+            headers = HttpHeaders(
+                listOf(
+                    HttpHeader.ContentType to head.type.toString(),
+                    HttpHeader.ContentLength to head.size.toString(),
+                )
+            )
         )
     }
 
     public val fetch: HttpHandler<PathSpec0> = path.any.get bind HttpHandler {
         val filePath = it.filePath()
-        val file = files().parseExternalUrl(files().rootUrls[0] + filePath)!!
+        val file = try {
+            files().parseExternalUrl(files().rootUrls[0] + filePath)!!
+        } catch (e: Exception) {
+            throw BadRequestException("Invalid file URL")
+        }
         val range = it.headers[HttpHeader.ContentRange] ?: it.headers[HttpHeader.Range]
         if (range != null) {
-            throw NotImplementedError("Range headers not yet implemented")
+            throw BadRequestException("Range headers not yet implemented")
         } else {
             val data = file.get() ?: throw NotFoundException("No file $filePath found")
             HttpResponse(
@@ -62,7 +74,11 @@ public class FileSystemEndpoints(
     public val upload: HttpHandler<PathSpec0> = path.any.put bind HttpHandler {
         val kotlinx = files() as? KotlinxIoPublicFileSystem
         if (kotlinx != null) {
-            kotlinx.parseUploadUrl(files().rootUrls[0] + it.filePath())!!.put(it.body!!)
+            try {
+                kotlinx.parseUploadUrl(files().rootUrls[0] + it.filePath())!!.put(it.body!!)
+            } catch (e: Exception) {
+                throw BadRequestException("Invalid file Upload URL")
+            }
         } else {
             throw BadRequestException("You can't upload files to this reflection of the real file system.")
         }
