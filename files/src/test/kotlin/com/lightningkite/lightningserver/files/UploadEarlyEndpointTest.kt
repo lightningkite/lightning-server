@@ -31,7 +31,7 @@ class UploadEarlyEndpointTest {
     object Server: ServerBuilder() {
         val files = setting("files", PublicFileSystem.Settings())
         val database = setting("database", Database.Settings())
-        val served = path.path("files") include  FileSystemServer(files)
+        val served = path.path("files") include FileSystemEndpoints(files)
         val uploadEarly = path.path("upload") include UploadEarlyEndpoint(
             files = files,
             database = database,

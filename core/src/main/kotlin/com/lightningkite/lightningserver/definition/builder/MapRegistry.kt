@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.definition.builder
 
+import com.lightningkite.toSealedMap
+
 /**
  * An [Map] that allows you to add items to it. Once an item is added
  * to a [MapRegistry], it is considered immutable. It cannot be overwritten or removed.

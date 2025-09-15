@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.MutablePathSpecMap
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.pathing.toSealedPathSpecMap
 import com.lightningkite.lightningserver.serialization.MediaTypeCoder
 import com.lightningkite.lightningserver.serialization.MediaTypeDecoder
 import com.lightningkite.lightningserver.serialization.MediaTypeDecoderRegistry
@@ -17,6 +18,8 @@ import com.lightningkite.lightningserver.websockets.WebSocketTopic
 import com.lightningkite.lightningserver.websockets.WebSocketsBuilder
 import com.lightningkite.services.Setting
 import com.lightningkite.services.SettingContext
+import com.lightningkite.toSealedList
+import com.lightningkite.toSealedMap
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
@@ -257,38 +260,35 @@ public abstract class ServerBuilder : Extendable {
      *
      * This is the primary method for converting a [ServerBuilder] into a deployable server configuration.
      * It performs a full build process that involves:
-     * 1. Creating a [shallowBuild] of this builder's direct configuration
-     * 2. Recursively builds all imported modules
-     * 3. Flattens the modular structure into a single [ServerDefinition]
+     * 1. Creating a [ServerDefinition.Module] of this builder's direct configuration
+     * 2. Recursively building all imported modules
      *
      * @return A complete [ServerDefinition] with all modules flattened and ready for deployment
      */
     public fun build(): ServerDefinition = ServerDefinition(
-        thisLayer = shallowBuild(),
-        modules = imports + modules.mapItems { it.build() }
-    )
-
-    private fun shallowBuild(): ServerDefinition.Module = ServerDefinition.Module(
-        internalSerializersModule = internalSerialization,
-        externalSerializersModule = externalSerialization,
-        httpInterceptors = http.interceptors.interceptors,
-        websocketInterceptors = websockets.interceptors.interceptors,
-        endpoints = MutablePathSpecMap<ServerPathEndpoints>().apply {
-            for (path in http.handlers.keys + websockets.handlers.keys) {
-                put(path, ServerPathEndpoints(
-                    http = http.handlers[path] ?: emptyMap(),
-                    websocket = websockets.handlers[path]
-                ))
-            }
-        },
-        schedules = schedules,
-        tasks = tasks,
-        webSocketTopics = websockets.topics.registered,
-        settings = settings,
-        extensions = extensions,
-        exceptionHandler = exceptionHandler,
-        startupTasks = startupTasks,
-        mediaTypeDecoders = mediaTypeDecoders,
-        mediaTypeEncoders = mediaTypeEncoders,
+        thisLayer = ServerDefinition.Module(
+            internalSerializersModule = internalSerialization,
+            externalSerializersModule = externalSerialization,
+            httpInterceptors = http.interceptors.interceptors.toSealedList(),
+            websocketInterceptors = websockets.interceptors.interceptors.toSealedList(),
+            endpoints = MutablePathSpecMap<ServerPathEndpoints>().apply {
+                for (path in http.handlers.keys + websockets.handlers.keys) {
+                    put(path, ServerPathEndpoints(
+                        http = http.handlers[path] ?: emptyMap(),
+                        websocket = websockets.handlers[path]
+                    ))
+                }
+            }.toSealedPathSpecMap(),
+            schedules = schedules.toSealedMap(),
+            tasks = tasks.toSealedMap(),
+            webSocketTopics = websockets.topics.registered.toSealedPathSpecMap(),
+            settings = settings.toSealedList(),
+            extensions = extensions.toSealedExtensions(),
+            exceptionHandler = exceptionHandler,
+            startupTasks = startupTasks.toSealedMap(),
+            mediaTypeDecoders = mediaTypeDecoders.toSealedMap(),
+            mediaTypeEncoders = mediaTypeEncoders.toSealedMap(),
+        ),
+        modules = (imports + modules.mapItems { it.build() }).toSealedList()
     )
 }

@@ -2,9 +2,7 @@ package com.lightningkite.lightningserver.settings
 
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.setting
 import com.lightningkite.lightningserver.definition.generalSettings
-import com.lightningkite.lightningserver.definition.metricsSettings
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.EmptySerializersModule
 import java.io.File
@@ -22,9 +20,8 @@ class SettingsLoaderFileTest {
         val processed = setting("processed", "x", getter = { it.repeat(2) })
         val complex = setting("complex", Complex("asdf", 42))
     }
-    val allSettings = (Server.settings + listOf<ServerSetting<*, *>>(
+    val allSettings = (Server.build().settings + listOf<ServerSetting<*, *>>(
         generalSettings,
-        metricsSettings,
         com.lightningkite.lightningserver.definition.secretBasis,
     )).toSet()
 
