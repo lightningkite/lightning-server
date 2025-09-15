@@ -15,7 +15,7 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
     public fun subscope(subscopes: Iterable<Subscope>): AuthRequirement<SUBJECT>
 
     public data object None : AuthRequirement<HasId<AnyId>?> {
-        override val requiredScopes: Runtime.Constant<Set<RequiredScope>> = Runtime.Constant(emptySet())
+        override val requiredScopes: Runtime.Constant<Set<RequiredScope>> get() = Runtime.Constant(emptySet())
         override fun subscope(subscopes: Iterable<Subscope>): None = this
 
         context(server: ServerRuntime)
@@ -60,8 +60,7 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
     public data object IsDeveloper : AuthSetting(default = IsSuperUser)
 
     public data class Authenticated(
-        /**The required scopes. Empty set indicates no requirements and * indicates root access.*/
-        val scopes: Set<RequiredScope> = RequiredScopes.root,
+        val scopes: Set<RequiredScope> = setOf(RequiredScope.root),
         val maxAge: Duration? = null,
         val requirement: (suspend context(ServerRuntime) (Authentication<*>) -> Boolean)? = null
     ) : AuthRequirement<HasId<AnyId>> {
@@ -76,20 +75,20 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
             if (auth == null) return false
             if (!auth.meetsRequirements(scopes)) return false
             if (maxAge != null && now() - auth.issuedAt > maxAge) return false
-            return true
+            return requirement?.invoke(server, auth) ?: true
         }
 
         override fun toString(): String = listOfNotNull(
             "Authenticated",
             scopes.takeIf { it.isNotEmpty() }?.let { if (it.size > 1) "scopes $it" else "scope ${it.first()}" },
-            maxAge?.let { "max age of $it" }
+            maxAge?.let { "max age of $it" },
+            requirement?.let { "an additional requirement" }
         ).joinToString(" and ").replaceFirst("and", "with")
     }
 
     public data class AuthenticatedAs<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         val principalType: PrincipalType<SUBJECT, ID>,
-        /**The required scopes. Empty set indicates no requirements and * indicates root access.*/
-        val scopes: Set<RequiredScope> = RequiredScopes.root,
+        val scopes: Set<RequiredScope> = setOf(RequiredScope.root),
         val maxAge: Duration? = null,
         val requirement: (suspend context(ServerRuntime) (Authentication<SUBJECT>) -> Boolean)? = null
     ) : AuthRequirement<SUBJECT> {
@@ -112,7 +111,8 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
         override fun toString(): String = listOfNotNull(
             principalType.name,
             scopes.takeIf { it.isNotEmpty() }?.let { if (it.size > 1) "scopes $it" else "scope ${it.first()}" },
-            maxAge?.let { "max age of $it" }
+            maxAge?.let { "max age of $it" },
+            requirement?.let { "an additional requirement" }
         ).joinToString(" and ").replaceFirst("and", "with")
     }
 

@@ -24,7 +24,7 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
     sessionId: String?,
     issuedAt: Instant = server.clock.now(),
     expiration: Instant? = null,
-    scopes: Set<GrantedScope> = GrantedScopes.root,
+    scopes: Set<GrantedScope> = setOf(GrantedScope.root),
     fromMasquerade: Authentication<*>? = null,
     cache: SerializableCache? = null,
 ): Authentication<SUBJECT> = Authentication(
@@ -46,7 +46,7 @@ public class Authentication<SUBJECT : HasId<*>> private constructor(
     public val sessionId: String?,
     public val issuedAt: Instant,
     public val expiration: Instant? = null,
-    public val scopes: Set<GrantedScope> = GrantedScopes.root,
+    public val scopes: Set<GrantedScope> = setOf(GrantedScope.root),
     public val fromMasquerade: Authentication<*>? = null,
     override val cache: SerializableCache = SerializableCache(),
 ) : Caching {

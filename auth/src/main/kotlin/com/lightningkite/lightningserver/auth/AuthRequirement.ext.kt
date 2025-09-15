@@ -20,9 +20,6 @@ public suspend fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.assert(
 
 public fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.subscope(subscope: Subscope): AuthRequirement<SUBJECT> = subscope(listOf(subscope))
 
-@Suppress("FINAL_UPPER_BOUND")
-public fun <SUBJECT : HasId<*>?, S : Subscope> AuthRequirement<SUBJECT>.subscope(vararg subscopes: S): AuthRequirement<SUBJECT> = subscope(subscopes.toList())
-
 public typealias AnyId = Comparable<Any?>
 public typealias NoAuth = AuthRequirement<HasId<AnyId>?>
 public typealias AuthAny = AuthRequirement<HasId<AnyId>>
@@ -32,12 +29,12 @@ public val anyAuth: AuthAny = AuthRequirement.Authenticated()
 
 public val recentRootAuth: AuthAny =
     AuthRequirement.Authenticated(
-        scopes = RequiredScopes.root, // root access
+        scopes = setOf(RequiredScope.root), // root access
         maxAge = 10.minutes
     )
 
 public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.auth(
-    scopes: Set<RequiredScope> = RequiredScopes.root,
+    scopes: Set<RequiredScope> = setOf(RequiredScope.root),
     maxAge: Duration? = null,
     requirement: (suspend context(ServerRuntime) (Authentication<SUBJECT>) -> Boolean)? = null
 ): AuthRequirement<SUBJECT> =

@@ -43,8 +43,8 @@ public value class GrantedScope(public val asString: String) {
     internal val subscopes: List<String> get() = asString.split(':')
 
     public fun meetsRequirements(other: RequiredScope): Boolean {
-        if (this.asString == "*") return true
-        if (other.asString == "*") return false // we already checked that we don't have root access
+        if (this == root) return true
+        if (other == RequiredScope.root) return false // we already checked that we don't have root access
 
         return other.subscopes.startsWith(subscopes)
     }
@@ -53,14 +53,6 @@ public value class GrantedScope(public val asString: String) {
         if (this == root) GrantedScope(sub.asString) else GrantedScope("$asString:${sub.asString}")
 
     override fun toString(): String = asString
-}
-
-public object GrantedScopes {
-    public val root: Set<GrantedScope> = setOf(GrantedScope.root)
-}
-
-public object RequiredScopes {
-    public val root: Set<RequiredScope> = setOf(RequiredScope.root)
 }
 
 @JvmInline

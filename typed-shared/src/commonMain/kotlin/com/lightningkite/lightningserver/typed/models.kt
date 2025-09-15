@@ -138,7 +138,7 @@ public data class LightningServerKSchemaEndpoint(
     val summary: String,
     val method: String,
     val path: String,
-    val scopes: Set<RequiredScope> = RequiredScopes.root,
+    val scopes: Set<RequiredScope> = setOf(RequiredScope.root),
     val routes: Map<String, VirtualTypeReference>,
     val input: VirtualTypeReference,
     val output: VirtualTypeReference,

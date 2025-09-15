@@ -29,7 +29,7 @@ context(server: ServerRuntime)
 public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.testAuth(
     subject: SUBJECT,
     issuedAt: Instant = server.clock.now(),
-    scopes: Set<GrantedScope> = GrantedScopes.root
+    scopes: Set<GrantedScope> = setOf(GrantedScope.root)
 ): Authentication<SUBJECT> = Authentication(this, id = subject._id, issuedAt = issuedAt, expiration = null, scopes = scopes, sessionId = null)
 
 public fun Authentication<*>.meetsRequirements(scopes: Set<RequiredScope>): Boolean = this.scopes.meetsRequirements(scopes)

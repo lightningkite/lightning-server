@@ -28,11 +28,11 @@ public interface ModelInfo<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<I
 
     public val auth: AuthRequirement<SUBJECT>
 
-    public companion object {
-        public val createSubscope: Subscope = Subscope("create")
-        public val readSubscope: Subscope = Subscope("read")
-        public val updateSubscope: Subscope = Subscope("update")
-        public val deleteSubscope: Subscope = Subscope("delete")
+    public object Scopes {
+        public val create: Subscope = Subscope("create")
+        public val read: Subscope = Subscope("read")
+        public val update: Subscope = Subscope("update")
+        public val delete: Subscope = Subscope("delete")
     }
 
     public val collectionName: String

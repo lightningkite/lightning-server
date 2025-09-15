@@ -16,7 +16,7 @@ import com.lightningkite.lightningserver.auth.*
 @Serializable
 public data class SubSessionRequest(
     val label: String,
-    val scopes: Set<GrantedScope> = GrantedScopes.root,
+    val scopes: Set<GrantedScope> = setOf(GrantedScope.root),
     val oauthClient: String? = null,
     val expires: Instant? = null,
 ) {
@@ -39,7 +39,7 @@ public data class Session<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     val terminated: Instant? = null,
     val ips: Set<String> = setOf(),
     val userAgents: Set<String> = setOf(),
-    val scopes: Set<GrantedScope> = GrantedScopes.root,
+    val scopes: Set<GrantedScope> = setOf(GrantedScope.root),
 //    @References(OauthClient::class) val oauthClient: String? = null,
 ) : HasId<Uuid>
 
@@ -47,7 +47,7 @@ public data class Session<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 public data class LogInRequest(
     val proofs: List<Proof>,
     val label: String = "Root Session",
-    val scopes: Set<GrantedScope> = GrantedScopes.root,
+    val scopes: Set<GrantedScope> = setOf(GrantedScope.root),
     val expires: Instant? = null,
 )
 

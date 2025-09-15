@@ -134,7 +134,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         label: String? = null,
         expires: Instant? = null,
         stale: Instant? = null,
-        scopes: Set<GrantedScope> = GrantedScopes.root,
+        scopes: Set<GrantedScope> = setOf(GrantedScope.root),
         oauthClient: String? = null,
         derivedFrom: Uuid? = null,
     ): Pair<Session<SUBJECT, ID>, RefreshToken> {
@@ -222,7 +222,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     public val createSubSession: ApiHttpHandler<PathSpec0, SUBJECT, SubSessionRequest, String> =
         path.path("sub-session").post bind ApiHttpHandler(
-            auth = sessionInfo.auth.subscope(ModelInfo.createSubscope),
+            auth = sessionInfo.auth.subscope(ModelInfo.Scopes.create),
 //            belongsToInterface = loggedInBelongsToInterface,
             inputType = SubSessionRequest.serializer(),
             outputType = String.serializer(),
@@ -260,7 +260,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 //    context(_: ServerRuntime)
 //    public suspend fun presignToken(
 //        session: Session<SUBJECT, ID>,
-//        scopes: Set<GrantedScope> = GrantedScopes.root,
+//        scopes: Set<GrantedScope> = setOf(GrantedScope.root),
 //    ): String {
 //        return tokenFormat().create(
 //            principal, Authentication(
@@ -276,7 +276,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 //    context(_: ServerRuntime)
 //    public suspend fun presignToken(
 //        id: ID,
-//        scopes: Set<GrantedScope> = GrantedScopes.root,
+//        scopes: Set<GrantedScope> = setOf(GrantedScope.root),
 //    ): String {
 //        return tokenFormat().create(
 //            principal, Authentication(

@@ -36,6 +36,8 @@ public fun interface Runtime<out T> : RuntimeDeferred<T> {
     public data class Constant<out T>(public val value: T) : Runtime<T> {
         context(server: ServerRuntime)
         override operator fun invoke(): T = value
+
+        public operator fun invoke(): T = value
     }
 }
 

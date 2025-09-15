@@ -19,9 +19,9 @@ class ScopeAdditionalTests {
         assertFalse(GrantedScope("a:b").meetsRequirements(RequiredScope("*")))
 
         // Set variant
-        assertTrue(GrantedScopes.root.meetsRequirements(RequiredScopes.root))
-        assertTrue(GrantedScopes.root.meetsRequirements(setOf(RequiredScope("x"))))
-        assertFalse(setOf(GrantedScope("x")).meetsRequirements(RequiredScopes.root))
+        assertTrue(setOf(GrantedScope.root).meetsRequirements(setOf(RequiredScope.root)))
+        assertTrue(setOf(GrantedScope.root).meetsRequirements(setOf(RequiredScope("x"))))
+        assertFalse(setOf(GrantedScope("x")).meetsRequirements(setOf(RequiredScope.root)))
     }
 
     @Test
