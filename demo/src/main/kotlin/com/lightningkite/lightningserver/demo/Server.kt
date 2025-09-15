@@ -13,7 +13,10 @@ import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCod
 import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.sessions.proofs.*
 import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.lightningserver.typed.sdk.SdkModule
+import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
 import com.lightningkite.lightningserver.typed.sdk.module
+import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.cache.*
 import com.lightningkite.services.cache.dynamodb.*
@@ -93,11 +96,14 @@ object Server : ServerBuilder() {
             )
         }
     )
-    val user = path.path("user") include object : ServerBuilder() {
+    val user = path.path("user") module object : ServerBuilder() {
+        init {
+            sdkSettings.defaultInfo = SdkModule.Info("UserEndpoints")
+        }
         val rest = path.path("rest") include ModelRestEndpoints(userInfo)
     }
-    val uploadEarly = path.path("upload") include UploadEarlyEndpoint(files, database, Runtime.Constant(listOf()))
-    val testModel = path.path("test-model") include TestModelEndpoints()
+    val uploadEarly = path.path("upload") module UploadEarlyEndpoint(files, database, Runtime.Constant(listOf()))
+    val testModel = path.path("test-model") module TestModelEndpoints()
 
     val root = path.get bind HttpHandler {
         HttpResponse.plainText("Hello ${it.auth(UserAuth.auth() or noAuth)?.fetch()}")

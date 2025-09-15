@@ -3,7 +3,6 @@ package com.lightningkite.lightningserver.engine.awsserverless
 import com.lightningkite.lightningserver.AnonType
 import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.Task
-import com.lightningkite.lightningserver.definition.exceptionSettings
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.handleWithMetrics
 import com.lightningkite.lightningserver.serialization.Serialization

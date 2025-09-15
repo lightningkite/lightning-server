@@ -60,7 +60,7 @@ public object FetcherSdk : SDK.Format {
             appendLine()
 
             if (singleInterface == null) {
-                appendDepth(depth, "interface ${info.interfaceName}" + (if (extendsInterfaces.isEmpty()) "" else " : ${extendsInterfaces.joinToString { it.kotlinString(qualified = false) }}") + " {")
+                appendDepth(depth, "interface ${info.interfaceName}" + (if (extendsInterfaces.isEmpty()) "" else " : ${extendsInterfaces.joinToString { it.kotlinString() }}") + " {")
 
                 for (function in declaredFunctions) {
                     val docs = buildList {
@@ -97,6 +97,8 @@ public object FetcherSdk : SDK.Format {
             "com.lightningkite.lightningserver.HttpMethod",
             "com.lightningkite.lightningserver.typed.Fetcher",
             "kotlinx.serialization.builtins.serializer",
+            "kotlinx.serialization.builtins.MapSerializer",
+            "kotlinx.serialization.builtins.ListSerializer",
         )
 
         fun PathSpec.toCodeString() = segments.joinToString("/", prefix = "\"", postfix = "\"") {
@@ -166,34 +168,6 @@ public object FetcherSdk : SDK.Format {
         }
 
         module.writeLive(emptyList())
-    }
-
-    context(buffer: Appendable)
-    private fun SDK.Data.appendImports(
-        vararg imports: String
-    ) {
-        fun SDK.Data.imports(): List<String> = buildList {
-            addAll(layer.endpoints.keys.filterNotNull().mapNotNull { it.type.qualifiedName })
-            layer.endpoints.values.forEach { map ->
-                map.forEach { (path, endpoints) ->
-                    path.wildcards.forEach { add(it.serializer.descriptor.serialName)
-                    }
-                    endpoints.http.values.forEach {
-                        add(it.inputType.descriptor.serialName)
-                        add(it.outputType.descriptor.serialName)
-                    }
-                    endpoints.websocket?.let {
-                        add(it.inputType.descriptor.serialName)
-                        add(it.outputType.descriptor.serialName)
-                    }
-                }
-            }
-            addAll(children.flatMap { it.item.imports() })
-        }
-
-        (imports.toList() + imports())
-            .distinct()
-            .joinTo(buffer, "\n", prefix = "\n", postfix = "\n") { "import $it" }
     }
 
     private fun SDK.Function.kotlinString(): String {

@@ -155,10 +155,7 @@ public class MutableExtensions: Extensions {
     /**
      * Returns an immutable read-only [Extensions] instance with copied data
      * */
-    public fun toSealedExtensions(): Extensions = MutableExtensions().also {
-        it.include(this, PathSpec.root)
-        it.map.seal()
-    }
+    public fun toSealedExtensions(): Extensions = MutableExtensions(this).also { it.map.seal() }
 }
 
 /**

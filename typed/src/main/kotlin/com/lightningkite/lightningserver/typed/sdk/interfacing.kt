@@ -26,7 +26,7 @@ public data class InterfaceInfo(
     public fun kotlinString(qualified: Boolean = true): String {
         val params = typeParameters
             .takeUnless { it.isEmpty() }
-            ?.joinToString(prefix = "<", postfix = ">") { it.descriptor.serialName }
+            ?.joinToString(prefix = "<", postfix = ">") { it.kotlinTypeString() }
             ?: ""
 
         val name = (if (qualified) type.qualifiedName else type.simpleName)

@@ -49,7 +49,7 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
         server.settings.plus(
             listOf(
                 generalSettings,
-                metricsSettings,
+//                metricsSettings,
                 secretBasis,
                 enginePubSub,
                 engineCache,

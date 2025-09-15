@@ -3,8 +3,7 @@ package com.lightningkite.lightningserver.demo
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.bind
-import com.lightningkite.lightningserver.definition.exceptionSettings
+import com.lightningkite.lightningserver.demo.Server.bind
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
@@ -22,6 +21,7 @@ import com.lightningkite.services.database.modification
 import com.lightningkite.services.database.notNull
 import com.lightningkite.services.database.or
 import com.lightningkite.services.database.updateOneById
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration
@@ -73,7 +73,7 @@ suspend fun doOnce(
             }
         )
     } catch (e: Exception) {
-        exceptionSettings().report(DoOnceException(cause = e), "doOnce: $name")
+        KotlinLogging.logger("com.lightningkite.lightningserver.demo").error(DoOnceException(cause = e)) { "doOnce: $name" }
         a.updateOneById(
             name,
             modification {
@@ -85,7 +85,7 @@ suspend fun doOnce(
 }
 
 context(builder: ServerBuilder)
-inline fun startupOnce(key: String, database: Runtime<Database>, noinline action: suspend ServerRuntime.() -> Unit) {
+fun startupOnce(key: String, database: Runtime<Database>, action: suspend ServerRuntime.() -> Unit) = with(builder) {
     PathSpec.root.path(key) bind StartupTask {
         doOnce(key, database, action = action)
     }
