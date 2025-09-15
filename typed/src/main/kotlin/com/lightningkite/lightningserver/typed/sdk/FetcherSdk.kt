@@ -2,14 +2,18 @@ package com.lightningkite.lightningserver.typed.sdk
 
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.definition.ServerDefinition
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.plus
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.LiveVersion
 import com.lightningkite.lightningserver.typed.sdk.SDK.sdk
 import com.lightningkite.lightningserver.typed.sdk.SDK.processToModules
+import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
 import com.lightningkite.services.data.KFile
+import kotlinx.serialization.KSerializer
 import kotlin.reflect.KClass
+import kotlin.reflect.KType
 
 public object FetcherSdk : SDK.Format {
     context(server: ServerRuntime)
@@ -31,17 +35,14 @@ public object FetcherSdk : SDK.Format {
         append('\n')
     }
 
-    private fun SDK.Module.appendImportsTo(buffer: Appendable) {
+    context(buffer: Appendable)
+    private fun SDK.Module.appendImports(
+        vararg imports: String
+    ) {
         fun SDK.Module.imports(): List<String> =
             extendsInterfaces.flatMap { it.imports } + children.flatMap { it.imports() }
 
-        val always = listOf(
-            "com.lightningkite.lightningserver.HttpMethod",
-            "com.lightningkite.lightningserver.typed.Fetcher",
-            "kotlinx.serialization.builtins.serializer",
-        )
-
-        (always + imports())
+        (imports.toList() + imports())
             .distinct()
             .joinTo(buffer, "\n", prefix = "\n", postfix = "\n") { "import $it" }
     }
@@ -50,7 +51,7 @@ public object FetcherSdk : SDK.Format {
     private fun Appendable.writeInterface(module: SDK.Module, packageName: String) {
         appendLine("package $packageName")
 
-        module.appendImportsTo(this)
+        module.appendImports()
 
         fun SDK.Module.writeInterface(depth: Int) {
 
@@ -59,7 +60,7 @@ public object FetcherSdk : SDK.Format {
             appendLine()
 
             if (singleInterface == null) {
-                appendDepth(depth, "interface ${info.interfaceName}" + (if (extendsInterfaces.isEmpty()) "" else " : ${extendsInterfaces.joinToString { it.kotlinString() }}") + " {")
+                appendDepth(depth, "interface ${info.interfaceName}" + (if (extendsInterfaces.isEmpty()) "" else " : ${extendsInterfaces.joinToString { it.kotlinString(qualified = false) }}") + " {")
 
                 for (function in declaredFunctions) {
                     val docs = buildList {
@@ -92,7 +93,11 @@ public object FetcherSdk : SDK.Format {
     private fun Appendable.writeLive(module: SDK.Module, packageName: String) {
         appendLine("package $packageName")
 
-        module.appendImportsTo(this)
+        module.appendImports(
+            "com.lightningkite.lightningserver.HttpMethod",
+            "com.lightningkite.lightningserver.typed.Fetcher",
+            "kotlinx.serialization.builtins.serializer",
+        )
 
         fun PathSpec.toCodeString() = segments.joinToString("/", prefix = "\"", postfix = "\"") {
             when (it) {
@@ -107,7 +112,7 @@ public object FetcherSdk : SDK.Format {
                 .firstOrNull()
                 ?.live
                 ?.let { it.qualifiedName ?: throw SDK.GenerationException("No qualified name found for live version of $this: $it") }
-                ?: throw SDK.GenerationException("LiveVersion annotation required on client interfaces, please provide a live version of $name.")
+                ?: throw SDK.GenerationException("LiveVersion annotation required on client interfaces, please provide a live version of ${type.qualifiedName}.")
 
             return "$live(fetcher, ${path.toCodeString()}, ${typeParameters.joinToString { it.kotlinSerializer() }})"
         }
@@ -163,6 +168,34 @@ public object FetcherSdk : SDK.Format {
         module.writeLive(emptyList())
     }
 
+    context(buffer: Appendable)
+    private fun SDK.Data.appendImports(
+        vararg imports: String
+    ) {
+        fun SDK.Data.imports(): List<String> = buildList {
+            addAll(layer.endpoints.keys.filterNotNull().mapNotNull { it.type.qualifiedName })
+            layer.endpoints.values.forEach { map ->
+                map.forEach { (path, endpoints) ->
+                    path.wildcards.forEach { add(it.serializer.descriptor.serialName)
+                    }
+                    endpoints.http.values.forEach {
+                        add(it.inputType.descriptor.serialName)
+                        add(it.outputType.descriptor.serialName)
+                    }
+                    endpoints.websocket?.let {
+                        add(it.inputType.descriptor.serialName)
+                        add(it.outputType.descriptor.serialName)
+                    }
+                }
+            }
+            addAll(children.flatMap { it.item.imports() })
+        }
+
+        (imports.toList() + imports())
+            .distinct()
+            .joinTo(buffer, "\n", prefix = "\n", postfix = "\n") { "import $it" }
+    }
+
     private fun SDK.Function.kotlinString(): String {
         val argString = arguments.joinToString { "${it.name}: ${it.type.kotlinTypeString()}" }
         return when (this) {
@@ -173,7 +206,6 @@ public object FetcherSdk : SDK.Format {
                 "fun $functionName($argString): TypedWebSocket<${inputType.kotlinTypeString()}, ${outputType.kotlinTypeString()}>"
         }
     }
-
 
     context(_: ServerRuntime)
     private fun AuthRequirement<*>.docString(): String = when (this) {

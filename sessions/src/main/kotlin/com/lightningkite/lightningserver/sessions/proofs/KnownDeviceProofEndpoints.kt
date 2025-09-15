@@ -42,10 +42,12 @@ public class KnownDeviceProofEndpoints(
 ) : ServerBuilder(), StringProofMethod {
     init {
         proofMethods.register(this)
+
         sdkSettings.defaultInfo = SdkModule.Info(
             interfaceName = "KnownDeviceProof",
             valueName = "knownDevice"
         )
+        sdkSettings.clientInterface = ProofClientEndpoints.KnownDevice::class.info()
     }
 
     override val info: ProofMethodInfo = ProofMethodInfo(
@@ -116,10 +118,6 @@ public class KnownDeviceProofEndpoints(
         return KnownDeviceSecretAndExpiration("$secretId/$secretValue", exp)
     }
 
-    init {
-        sdkSettings.clientInterface = ProofClientEndpoints.KnownDevice::class.info()
-    }
-
     public val options: ApiHttpHandler<PathSpec0, HasId<AnyId>?, Unit, KnownDeviceOptions> =
         path.path("options").get bind ApiHttpHandler(
             summary = "Known Device Options",
@@ -184,60 +182,49 @@ public class KnownDeviceProofEndpoints(
             }
         )
 
-    private inner class AuthenticatedEndpoints : ServerBuilder() {
-        init {
-            sdkSettings.clientInterface = ProofClientEndpoints.KnownDevice.Authenticated::class.info()
-        }
+    public val establish: ApiHttpHandler<PathSpec0, HasId<AnyId>, Unit, String> =
+        path.path("establish").post bind ApiHttpHandler(
+            summary = "Establish Known Device",
+            inputType = Unit.serializer(),
+            outputType = String.serializer(),
+            description = "Establishes a new known device.  You can use the returned string to gain partial authentication later.",
+            auth = proofMethodAuth,
+            errorCases = listOf(),
+            examples = listOf(),
+            implementation = { _: Unit ->
+                establish(
+                    auth.principalType,
+                    auth.id,
+                    run {
+                        val agent = request.headers[HttpHeader.UserAgent]
+                        val ip = request.sourceIp
+                        "$agent / $ip"
+                    }
+                ).secret
+            }
+        )
 
-        val establish: ApiHttpHandler<PathSpec0, HasId<AnyId>, Unit, String> =
-            path.path("establish").post bind ApiHttpHandler(
-                summary = "Establish Known Device",
-                inputType = Unit.serializer(),
-                outputType = String.serializer(),
-                description = "Establishes a new known device.  You can use the returned string to gain partial authentication later.",
-                auth = proofMethodAuth,
-                errorCases = listOf(),
-                examples = listOf(),
-                implementation = { _: Unit ->
-                    establish(
-                        auth.principalType,
-                        auth.id,
-                        run {
-                            val agent = request.headers[HttpHeader.UserAgent]
-                            val ip = request.sourceIp
-                            "$agent / $ip"
-                        }
-                    ).secret
-                }
-            )
-
-        val establish2: ApiHttpHandler<PathSpec0, HasId<AnyId>, Unit, KnownDeviceSecretAndExpiration> =
-            path.path("establish2").post bind ApiHttpHandler(
-                summary = "Establish Known Device V2",
-                inputType = Unit.serializer(),
-                outputType = KnownDeviceSecretAndExpiration.serializer(),
-                description = "Establishes a new known device.  You can use the returned string to gain partial authentication later.",
-                auth = proofMethodAuth,
-                errorCases = listOf(),
-                examples = listOf(),
-                implementation = { _: Unit ->
-                    establish(
-                        auth.principalType,
-                        auth.id,
-                        run {
-                            val agent = request.headers[HttpHeader.UserAgent]
-                            val ip = request.sourceIp
-                            "$agent / $ip"
-                        }
-                    )
-                }
-            )
-    }
-
-    private val authenticated = path include AuthenticatedEndpoints()
-
-    public val establish: ApiHttpHandler<PathSpec0, HasId<AnyId>, Unit, String> get() = authenticated.establish
-    public val establish2: ApiHttpHandler<PathSpec0, HasId<AnyId>, Unit, KnownDeviceSecretAndExpiration> get() = authenticated.establish2
+    public val establish2: ApiHttpHandler<PathSpec0, HasId<AnyId>, Unit, KnownDeviceSecretAndExpiration> =
+        path.path("establish2").post bind ApiHttpHandler(
+            summary = "Establish Known Device V2",
+            inputType = Unit.serializer(),
+            outputType = KnownDeviceSecretAndExpiration.serializer(),
+            description = "Establishes a new known device.  You can use the returned string to gain partial authentication later.",
+            auth = proofMethodAuth,
+            errorCases = listOf(),
+            examples = listOf(),
+            implementation = { _: Unit ->
+                establish(
+                    auth.principalType,
+                    auth.id,
+                    run {
+                        val agent = request.headers[HttpHeader.UserAgent]
+                        val ip = request.sourceIp
+                        "$agent / $ip"
+                    }
+                )
+            }
+        )
 
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> established(

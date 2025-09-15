@@ -62,26 +62,21 @@ public object LiveProofClientEndpoints {
             outSerializer = Proof.serializer()
         )
 
-        public open class Authenticated(
-            public val fetcher: Fetcher,
-            public val subpath: String,
-        ) : ProofClientEndpoints.TimeBasedOTP.Authenticated {
-            override suspend fun establishOneTimePassword(input: EstablishOtp): String = fetcher(
-                url = "$subpath/establish",
-                method = HttpMethod.POST,
-                inSerializer = EstablishOtp.serializer(),
-                body = input,
-                outSerializer = String.serializer()
-            )
+        override suspend fun establishOneTimePassword(input: EstablishOtp): String = fetcher(
+            url = "$subpath/establish",
+            method = HttpMethod.POST,
+            inSerializer = EstablishOtp.serializer(),
+            body = input,
+            outSerializer = String.serializer()
+        )
 
-            override suspend fun confirmOneTimePassword(input: String): Unit = fetcher(
-                url = "$subpath/existing",
-                method = HttpMethod.POST,
-                inSerializer = String.serializer(),
-                body = input,
-                outSerializer = Unit.serializer()
-            )
-        }
+        override suspend fun confirmOneTimePassword(input: String): Unit = fetcher(
+            url = "$subpath/existing",
+            method = HttpMethod.POST,
+            inSerializer = String.serializer(),
+            body = input,
+            outSerializer = Unit.serializer()
+        )
     }
 
     public open class Password(
@@ -96,18 +91,13 @@ public object LiveProofClientEndpoints {
             outSerializer = Proof.serializer()
         )
 
-        public open class Authenticated(
-            public val fetcher: Fetcher,
-            public val subpath: String,
-        ) : ProofClientEndpoints.Password.Authenticated {
-            override suspend fun establishPassword(input: EstablishPassword): Unit = fetcher(
-                url = "$subpath/establish",
-                method = HttpMethod.POST,
-                inSerializer = EstablishPassword.serializer(),
-                body = input,
-                outSerializer = Unit.serializer()
-            )
-        }
+        override suspend fun establishPassword(input: EstablishPassword): Unit = fetcher(
+            url = "$subpath/establish",
+            method = HttpMethod.POST,
+            inSerializer = EstablishPassword.serializer(),
+            body = input,
+            outSerializer = Unit.serializer()
+        )
     }
 
     public open class BackupCode(
@@ -122,34 +112,29 @@ public object LiveProofClientEndpoints {
             outSerializer = Proof.serializer()
         )
 
-        public open class Authenticated(
-            public val fetcher: Fetcher,
-            public val subpath: String,
-        ) : ProofClientEndpoints.BackupCode.Authenticated {
-            override suspend fun resetCodes(): List<String> = fetcher(
-                url = "$subpath/reset-codes",
-                method = HttpMethod.POST,
-                inSerializer = Unit.serializer(),
-                body = Unit,
-                outSerializer = ListSerializer(String.serializer())
-            )
+        override suspend fun resetCodes(): List<String> = fetcher(
+            url = "$subpath/reset-codes",
+            method = HttpMethod.POST,
+            inSerializer = Unit.serializer(),
+            body = Unit,
+            outSerializer = ListSerializer(String.serializer())
+        )
 
-            override suspend fun clearCodes(): Unit = fetcher(
-                url = "$subpath/clear-codes",
-                method = HttpMethod.POST,
-                inSerializer = Unit.serializer(),
-                body = Unit,
-                outSerializer = Unit.serializer(),
-            )
+        override suspend fun clearCodes(): Unit = fetcher(
+            url = "$subpath/clear-codes",
+            method = HttpMethod.POST,
+            inSerializer = Unit.serializer(),
+            body = Unit,
+            outSerializer = Unit.serializer(),
+        )
 
-            override suspend fun established(): Boolean = fetcher(
-                url = "$subpath/established",
-                method = HttpMethod.GET,
-                inSerializer = Unit.serializer(),
-                body = Unit,
-                outSerializer = Boolean.serializer()
-            )
-        }
+        override suspend fun established(): Boolean = fetcher(
+            url = "$subpath/established",
+            method = HttpMethod.GET,
+            inSerializer = Unit.serializer(),
+            body = Unit,
+            outSerializer = Boolean.serializer()
+        )
     }
 
     public open class WebAuthNEndpoints(
@@ -173,27 +158,22 @@ public object LiveProofClientEndpoints {
             outSerializer = Proof.serializer()
         )
 
-        public open class Registration(
-            public val fetcher: Fetcher,
-            public val subpath: String,
-        ) : ProofClientEndpoints.WebAuthN.Registration {
-            override suspend fun registerStart(input: WebAuthN.GeneralPreference): WebAuthN.Registration.RegistrationResponse =
-                fetcher(
-                    url = "$subpath/register-start",
-                    method = HttpMethod.POST,
-                    inSerializer = WebAuthN.GeneralPreference.serializer(),
-                    body = input,
-                    outSerializer = WebAuthN.Registration.RegistrationResponse.serializer()
-                )
-
-            override suspend fun registerFinish(input: WebAuthN.Registration.RegisterRequest): Unit = fetcher(
-                url = "$subpath/register-finish",
+        override suspend fun registerStart(input: WebAuthN.GeneralPreference): WebAuthN.Registration.RegistrationResponse =
+            fetcher(
+                url = "$subpath/register-start",
                 method = HttpMethod.POST,
-                inSerializer = WebAuthN.Registration.RegisterRequest.serializer(),
+                inSerializer = WebAuthN.GeneralPreference.serializer(),
                 body = input,
-                outSerializer = Unit.serializer(),
+                outSerializer = WebAuthN.Registration.RegistrationResponse.serializer()
             )
-        }
+
+        override suspend fun registerFinish(input: WebAuthN.Registration.RegisterRequest): Unit = fetcher(
+            url = "$subpath/register-finish",
+            method = HttpMethod.POST,
+            inSerializer = WebAuthN.Registration.RegisterRequest.serializer(),
+            body = input,
+            outSerializer = Unit.serializer(),
+        )
     }
 
     public open class KnownDevice(
@@ -216,25 +196,20 @@ public object LiveProofClientEndpoints {
             outSerializer = KnownDeviceOptions.serializer()
         )
 
-        public open class Authenticated(
-            public val fetcher: Fetcher,
-            public val subpath: String,
-        ) : ProofClientEndpoints.KnownDevice.Authenticated {
-            override suspend fun establishKnownDevice(): String = fetcher(
-                url = "$subpath/establish",
-                method = HttpMethod.POST,
-                inSerializer = Unit.serializer(),
-                body = Unit,
-                outSerializer = String.serializer()
-            )
+        override suspend fun establishKnownDevice(): String = fetcher(
+            url = "$subpath/establish",
+            method = HttpMethod.POST,
+            inSerializer = Unit.serializer(),
+            body = Unit,
+            outSerializer = String.serializer()
+        )
 
-            override suspend fun establishKnownDeviceV2(): KnownDeviceSecretAndExpiration = fetcher(
-                url = "$subpath/establish2",
-                method = HttpMethod.POST,
-                inSerializer = Unit.serializer(),
-                body = Unit,
-                outSerializer = KnownDeviceSecretAndExpiration.serializer()
-            )
-        }
+        override suspend fun establishKnownDeviceV2(): KnownDeviceSecretAndExpiration = fetcher(
+            url = "$subpath/establish2",
+            method = HttpMethod.POST,
+            inSerializer = Unit.serializer(),
+            body = Unit,
+            outSerializer = KnownDeviceSecretAndExpiration.serializer()
+        )
     }
 }

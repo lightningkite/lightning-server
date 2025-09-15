@@ -17,13 +17,13 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.uuid.Uuid
 
-class FileSystemServerTest {
+class FileSystemEndpointsTest {
 
     object Server: ServerBuilder() {
         val files = setting("files", PublicFileSystem.Settings())
         val database = setting("database", Database.Settings())
-        val served = path.path("files") bind  FileSystemEndpoints(files)
-        val uploadEarly = path.path("upload") bind UploadEarlyEndpoint(
+        val served = path.path("files") include FileSystemEndpoints(files)
+        val uploadEarly = path.path("upload") include UploadEarlyEndpoint(
             files = files,
             database = database,
             fileScanner = { listOf() }

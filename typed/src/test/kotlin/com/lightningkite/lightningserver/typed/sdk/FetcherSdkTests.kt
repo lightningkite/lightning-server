@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.typed.sdk
 
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.typed.ModelRestEndpoints
 import com.lightningkite.lightningserver.typed.jsonschema.openApiDescription
 import com.lightningkite.lightningserver.typed.sdk.SDK.writeSdk
 import com.lightningkite.services.data.KFile

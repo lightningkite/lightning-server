@@ -32,11 +32,9 @@ public sealed interface ProofClientEndpoints {
 
         public suspend fun proveOTP(input: IdentificationAndPassword): Proof
 
-        @LiveVersion(LiveProofClientEndpoints.TimeBasedOTP.Authenticated::class)
-        public interface Authenticated {
-            public suspend fun establishOneTimePassword(input: EstablishOtp): String
-            public suspend fun confirmOneTimePassword(input: String)
-        }
+        // required auth
+        public suspend fun establishOneTimePassword(input: EstablishOtp): String
+        public suspend fun confirmOneTimePassword(input: String)
     }
 
     @LiveVersion(LiveProofClientEndpoints.Password::class)
@@ -45,10 +43,8 @@ public sealed interface ProofClientEndpoints {
 
         public suspend fun provePasswordOwnership(input: IdentificationAndPassword): Proof
 
-        @LiveVersion(LiveProofClientEndpoints.Password.Authenticated::class)
-        public interface Authenticated {
-            public suspend fun establishPassword(input: EstablishPassword)
-        }
+        // requires auth
+        public suspend fun establishPassword(input: EstablishPassword)
     }
 
     @LiveVersion(LiveProofClientEndpoints.BackupCode::class)
@@ -57,12 +53,10 @@ public sealed interface ProofClientEndpoints {
 
         public suspend fun proveBackupCode(input: IdentificationAndPassword): Proof
 
-        @LiveVersion(LiveProofClientEndpoints.BackupCode.Authenticated::class)
-        public interface Authenticated {
-            public suspend fun resetCodes(): List<String>
-            public suspend fun clearCodes()
-            public suspend fun established(): Boolean
-        }
+        // requires auth
+        public suspend fun resetCodes(): List<String>
+        public suspend fun clearCodes()
+        public suspend fun established(): Boolean
     }
 
     @LiveVersion(LiveProofClientEndpoints.WebAuthNEndpoints::class)
@@ -72,11 +66,9 @@ public sealed interface ProofClientEndpoints {
         public suspend fun start(input: Identification): WebAuthN.Authentication.StartResponse
         public suspend fun prove(input: WebAuthN.Authentication.ProveRequest): Proof
 
-        @LiveVersion(LiveProofClientEndpoints.WebAuthNEndpoints.Registration::class)
-        public interface Registration {
-            public suspend fun registerStart(input: WebAuthN.GeneralPreference): WebAuthN.Registration.RegistrationResponse
-            public suspend fun registerFinish(input: WebAuthN.Registration.RegisterRequest)
-        }
+        // requires auth
+        public suspend fun registerStart(input: WebAuthN.GeneralPreference): WebAuthN.Registration.RegistrationResponse
+        public suspend fun registerFinish(input: WebAuthN.Registration.RegisterRequest)
     }
 
     @LiveVersion(LiveProofClientEndpoints.KnownDevice::class)
@@ -86,10 +78,8 @@ public sealed interface ProofClientEndpoints {
         public suspend fun knownDeviceOptions(): KnownDeviceOptions
         public suspend fun proveKnownDevice(input: String): Proof
 
-        @LiveVersion(LiveProofClientEndpoints.KnownDevice.Authenticated::class)
-        public interface Authenticated {
-            public suspend fun establishKnownDevice(): String
-            public suspend fun establishKnownDeviceV2(): KnownDeviceSecretAndExpiration
-        }
+        // requires auth
+        public suspend fun establishKnownDevice(): String
+        public suspend fun establishKnownDeviceV2(): KnownDeviceSecretAndExpiration
     }
 }

@@ -11,15 +11,26 @@ public data class InterfaceInfo(
     val typeParameters: List<KSerializer<*>> = emptyList(),
     val imports: Set<String> = emptySet()
 ) {
+    init {
+        require(type.typeParameters.size == typeParameters.size) {
+            """
+                InterfaceInfo requires a KSerializer for each type parameter.
+                
+                Type parameters: ${type.typeParameters}, provided: ${typeParameters.joinToString { "KSerializer(${it.descriptor.serialName})" }}
+            """.trimIndent()
+        }
+    }
+
     public companion object : MutableExtensions.Key<InterfaceInfo>
 
-    public val name: String = type.qualifiedName ?: type.simpleName ?: throw IllegalStateException("cannot retrieve name for InterfaceInfo class $type")
-
-    public fun kotlinString(): String {
+    public fun kotlinString(qualified: Boolean = true): String {
         val params = typeParameters
             .takeUnless { it.isEmpty() }
             ?.joinToString(prefix = "<", postfix = ">") { it.descriptor.serialName }
             ?: ""
+
+        val name = (if (qualified) type.qualifiedName else type.simpleName)
+            ?: throw IllegalArgumentException("Cannot find ${if (qualified) "qualified " else ""}name for $type")
 
         return name + params
     }

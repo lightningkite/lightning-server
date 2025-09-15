@@ -14,6 +14,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.sessions.proofs.AuthClientEndpoints
 import com.lightningkite.lightningserver.sessions.proofs.Proof
 import com.lightningkite.lightningserver.sessions.proofs.ProofOption
 import com.lightningkite.lightningserver.sessions.proofs.extensions.verify
@@ -26,6 +27,8 @@ import com.lightningkite.lightningserver.typed.ModelRestEndpoints
 import com.lightningkite.lightningserver.typed.invoke
 import com.lightningkite.lightningserver.typed.sdk.SdkModule
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
+import com.lightningkite.lightningserver.typed.sdk.clientInterface
+import com.lightningkite.lightningserver.typed.sdk.info
 import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
@@ -42,6 +45,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 ) : SessionManager<SUBJECT, ID>(principal, database, tokenFormat) {
     init {
         sdkSettings.defaultInfo = SdkModule.Info(principal.name + "Auth")
+        sdkSettings.clientInterface = AuthClientEndpoints::class.info(principal.idSerializer)
     }
 
     context(server: ServerRuntime)

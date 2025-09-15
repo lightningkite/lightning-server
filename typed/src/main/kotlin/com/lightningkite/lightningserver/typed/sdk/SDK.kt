@@ -203,10 +203,10 @@ public object SDK { // namespace object
         override val serverId: String = "SDK Runtime"
         override val serverVersion: String = "0.0.0"
 
-        override suspend fun <T> Task<T>.invoke(input: T) =
+        override suspend fun <T> Task<T>.invoke(input: T): Nothing =
             throw NotImplementedError("SDK Runner only exists to retrieve serialization information")
 
-        override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>) =
+        override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>): Nothing =
             throw NotImplementedError("SDK Runner only exists to retrieve serialization information")
     }
 

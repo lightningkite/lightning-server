@@ -22,6 +22,11 @@ import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.lightningserver.typed.sdk.SdkModule
+import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
+import com.lightningkite.lightningserver.typed.sdk.clientInterface
+import com.lightningkite.lightningserver.typed.sdk.info
+import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
@@ -40,7 +45,9 @@ public class PasswordProofEndpoints(
 
     init {
         proofMethods.register(this)
-        path.docGroup = "PasswordProof"
+
+        sdkSettings.defaultInfo = SdkModule.Info("PasswordProof", "password")
+        sdkSettings.clientInterface = ProofClientEndpoints.Password::class.info()
     }
 
     override val info: ProofMethodInfo = ProofMethodInfo(
@@ -48,8 +55,6 @@ public class PasswordProofEndpoints(
         property = null,
         strength = 10
     )
-    public val loggedInInterfaceInfo: Documentable.OldInterfaceInfo = Documentable.OldInterfaceInfo("AuthenticatedPasswordProofClientEndpoints", listOf())
-    public val interfaceInfo: Documentable.OldInterfaceInfo = Documentable.OldInterfaceInfo("PasswordProofClientEndpoints", listOf())
 
     context(_: ServerRuntime)
     private val active
@@ -129,7 +134,6 @@ public class PasswordProofEndpoints(
             outputType = Unit.serializer(),
             description = "Set your password",
             auth = proofMethodAuth,
-            belongsToInterface = loggedInInterfaceInfo,
             errorCases = emptyList(),
             implementation = { value: EstablishPassword ->
                 establish(
@@ -144,7 +148,6 @@ public class PasswordProofEndpoints(
     public override val prove: ApiHttpHandler<PathSpec0, HasId<AnyId>?, IdentificationAndPassword, Proof> =
         path.path("prove").post bind ApiHttpHandler(
             auth = noAuth,
-            belongsToInterface = interfaceInfo,
             summary = "Prove password ownership",
             description = "Logs in to the given account with a password.",
             errorCases = listOf(),

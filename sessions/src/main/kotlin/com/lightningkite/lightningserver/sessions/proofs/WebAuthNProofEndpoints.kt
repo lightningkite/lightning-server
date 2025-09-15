@@ -17,6 +17,11 @@ import com.lightningkite.lightningserver.auth.idString
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.lightningserver.typed.sdk.SdkModule
+import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
+import com.lightningkite.lightningserver.typed.sdk.clientInterface
+import com.lightningkite.lightningserver.typed.sdk.info
+import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.cache.get
 import com.lightningkite.services.cache.set
@@ -55,7 +60,9 @@ public class WebAuthNProofEndpoints(
 
     init {
         proofMethods.register(this)
-        path.docGroup = "WebAuthNProof"
+
+        sdkSettings.defaultInfo = SdkModule.Info("WebAuthNProof", "webAuthN")
+        sdkSettings.clientInterface = ProofClientEndpoints.WebAuthN::class.info()
     }
 
     override val info: ProofMethodInfo = ProofMethodInfo(
@@ -63,9 +70,6 @@ public class WebAuthNProofEndpoints(
         property = null,
         strength = 10
     )
-    public val registerInterface: Documentable.OldInterfaceInfo = Documentable.OldInterfaceInfo("WebAuthNRegistrationEndpoints", listOf())
-    public val proveInterface: Documentable.OldInterfaceInfo = Documentable.OldInterfaceInfo("WebAuthNProofEndpoints", listOf())
-
 
     context(_: ServerRuntime)
     private val active
@@ -168,7 +172,6 @@ public class WebAuthNProofEndpoints(
     public val registerStart: ApiHttpHandler<PathSpec0, HasId<AnyId>, WebAuthN.GeneralPreference, WebAuthN.Registration.RegistrationResponse> =
         path.path("register-start").post bind ApiHttpHandler(
             auth = proofMethodAuth,
-            belongsToInterface = registerInterface,
             summary = "Issue WebAuthN creation challenge",
             description = "Returns a challenge to be passed on to a client authenticator for the creation of a new Public Key Credential.",
             errorCases = listOf(),
@@ -219,7 +222,6 @@ public class WebAuthNProofEndpoints(
     public val registerFinish: ApiHttpHandler<PathSpec0, HasId<AnyId>, WebAuthN.Registration.RegisterRequest, Unit> =
         path.path("register-finish").post bind ApiHttpHandler(
             auth = proofMethodAuth,
-            belongsToInterface = registerInterface,
             summary = "Establish WebAuthN Credential",
             description = "Validates and Accepts a public key credential created from a previously issued creation challenge.",
             errorCases = listOf(),
@@ -306,7 +308,6 @@ public class WebAuthNProofEndpoints(
     public val start: ApiHttpHandler<PathSpec0, HasId<AnyId>?, Identification, WebAuthN.Authentication.StartResponse> =
         path.path("start").post bind ApiHttpHandler(
             auth = anyAuth or noAuth,
-            belongsToInterface = proveInterface,
             summary = "Begin WebAuthN challenge",
             description = "Returns a challenge to be passed on to a client authenticator for signing.",
             errorCases = listOf(),
@@ -380,7 +381,6 @@ public class WebAuthNProofEndpoints(
     public val prove: ApiHttpHandler<PathSpec0, HasId<AnyId>?, WebAuthN.Authentication.ProveRequest, Proof> =
         path.path("prove").post bind ApiHttpHandler(
             auth = noAuth,
-            belongsToInterface = proveInterface,
             summary = "Prove WebAuthN ownership",
             description = "Returns a challenge to be passed on to a client authenticator for signing.",
             errorCases = listOf(),

@@ -6,7 +6,6 @@ import com.lightningkite.lightningserver.auth.AnyId
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.GrantedScope
-import com.lightningkite.lightningserver.auth.GrantedScopes
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.RequiredScope
 import com.lightningkite.lightningserver.auth.auth
@@ -15,6 +14,7 @@ import com.lightningkite.lightningserver.auth.fetch
 import com.lightningkite.lightningserver.auth.id
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.auth.register
+import com.lightningkite.lightningserver.auth.subscope
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder

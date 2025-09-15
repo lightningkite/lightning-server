@@ -15,7 +15,6 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.RequiredScope
-import com.lightningkite.lightningserver.auth.RequiredScopes
 
 @Serializable
 public data class FunnelStart(
