@@ -16,6 +16,7 @@ dependencies {
     api(libs.serializationProperties)
     api(libs.serviceAbstractionsData)
     api(libs.serviceAbstractionsBasis)
+    api(libs.serviceAbstractionsOtelJvm)
     api(libs.serviceAbstractionsShouldBeStandardLibrary)
     api(libs.kotlinHtmlJvm)
     api(project(":core-shared"))

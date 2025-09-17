@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 
 @Serializable
-public class RawHttpEndpoint<out PATH: PathSpec>(public val asString: String, public val method: HttpMethod): HasContextualPath<PATH> {
+public data class RawHttpEndpoint<out PATH: PathSpec>(val asString: String, val method: HttpMethod): HasContextualPath<PATH> {
     @Suppress("UNCHECKED_CAST")
     context(server: ServerRuntime)
     override val pathInContext: ConcretePath<PATH> get() = match.path as ConcretePath<PATH>

@@ -1,7 +1,9 @@
 package com.lightningkite.lightningserver.terraform
 
+import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.encryption.SecretBasis
+import com.lightningkite.services.Setting
 import com.lightningkite.services.terraform.TerraformEmitter
 import com.lightningkite.services.terraform.TerraformEmitterAws
 import com.lightningkite.services.terraform.TerraformJsonObject
@@ -17,6 +19,7 @@ import java.io.File
 
 public abstract class BaseTerraformEmitter<S: ServerBuilder>: TerraformEmitter {
     protected abstract val builder: S
+    protected open val additionalSettings: Set<ServerSetting<*, *>> get() = setOf()
     protected val terraformProviderImports: MutableSet<TerraformProviderImport> = HashSet()
     override fun require(provider: TerraformProviderImport) {
         terraformProviderImports += provider
@@ -33,7 +36,7 @@ public abstract class BaseTerraformEmitter<S: ServerBuilder>: TerraformEmitter {
     }
 
     public fun settings(setSettings: S.()->Unit) {
-        val required = builder.build().settings.map { it.name }.toSet()
+        val required = builder.build().settings.map { it.name }.toSet() + additionalSettings.map { it.name }
         setSettings(builder)
         val missing = required - settings.keys
         if(missing.isNotEmpty()) throw IllegalStateException("Missing settings: $missing")

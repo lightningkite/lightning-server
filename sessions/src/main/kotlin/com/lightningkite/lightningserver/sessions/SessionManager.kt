@@ -116,8 +116,6 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     context(server: ServerRuntime)
     override suspend fun read(request: Request<*>): Authentication<SUBJECT>? {
-        print("Headers: ${request.headers}")
-
         val rawHeader = request.headers[HttpHeader.Authorization]
         val token =
             rawHeader?.root?.removePrefix("bearer ")?.removePrefix("Bearer ")

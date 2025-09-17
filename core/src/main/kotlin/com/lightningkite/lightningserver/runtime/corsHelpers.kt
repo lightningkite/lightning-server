@@ -25,6 +25,7 @@ internal fun originMatches(allowed: List<String>, origin: String): Boolean {
                             (allowedTrimmed.startsWith('*') && originTrimmed.endsWith(allowedTrimmed.removePrefix("*"))))
         }
 }
+// TODO: include Access-Control-Max-Age for extra performance?
 
 @InternalLightningServerApi
 public fun CorsSettings?.generateCorsHeaders(incomingHeaders: HttpHeaders): Map<String, List<HttpHeaderValue>> {

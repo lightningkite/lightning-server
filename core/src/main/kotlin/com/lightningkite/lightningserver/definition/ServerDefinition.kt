@@ -11,6 +11,7 @@ import com.lightningkite.lightningserver.serialization.MediaTypeEncoderRegistry
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketHandlerInterceptor
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
+import com.lightningkite.lightningserver.websockets.compileAndInstrument
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.plus
 
@@ -57,7 +58,9 @@ public data class ServerDefinition(
 
     public val endpoints: PathSpecMap<ServerPathEndpoints> get() = flattened.endpoints
     public val httpInterceptors: List<HttpInterceptor> get() = flattened.httpInterceptors
+    public val compiledHttpInterceptors: HttpInterceptor by lazy { httpInterceptors.compileAndInstrument() }
     public val websocketInterceptors: List<WebSocketHandlerInterceptor> get() = flattened.websocketInterceptors
+    public val compiledWebsocketInterceptors: WebSocketHandlerInterceptor by lazy { websocketInterceptors.compileAndInstrument() }
     public val exceptionHandler: ExceptionHttpHandler get() = flattened.exceptionHandler
 
     public val startupTasks: Map<PathSpec0, StartupTask> get() = flattened.startupTasks

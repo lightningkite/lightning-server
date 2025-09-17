@@ -6,7 +6,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpecMap
 
 public class WebSocketsBuilder {
-    public val interceptors: WebSocketHandlerInterceptor.Builder = WebSocketHandlerInterceptor.Builder()
+    public val interceptors: MutableList<WebSocketHandlerInterceptor> = mutableListOf()
     public val topics: WebSocketTopicsBuilder = WebSocketTopicsBuilder()
 
     private val _handlers = MutablePathSpecMap<WebSocketHandler<*, *>>()

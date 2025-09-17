@@ -4,6 +4,7 @@ package com.lightningkite.lightningserver.demo
 
 import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.cors.CorsInterceptor
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
@@ -46,6 +47,13 @@ object Server : ServerBuilder() {
     val sms = setting("sms", SMS.Settings())
     val files = setting("files", PublicFileSystem.Settings())
     val cache = setting("cache", Cache.Settings())
+    val cors = setting("cors", CorsSettings())
+
+    val corsInterceptor = CorsInterceptor(cors)
+    init {
+        http.interceptors += corsInterceptor
+        websockets.interceptors += corsInterceptor
+    }
 
     init {
         JavaSmtpEmailService

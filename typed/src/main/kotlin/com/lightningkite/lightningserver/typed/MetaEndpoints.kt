@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.*
+import com.lightningkite.lightningserver.runtime.instrument
 import com.lightningkite.lightningserver.typed.jsonschema.*
 import com.lightningkite.lightningserver.typed.kschema.*
 import com.lightningkite.services.*
@@ -328,9 +329,9 @@ public class MetaEndpoints(
                             body = request.body?.let { TypedData.text(it, MediaType.Application.Json) }
                         )
                         try {
-                            entry.key to topLevelReportingContext(properRequest.path.toString()) {
-                                @Suppress("UNCHECKED_CAST")
-                                (properRequest.path.match.value as HttpHandler<PathSpec>).handle(properRequest)
+                            entry.key to instrument(properRequest.path.toString()) {
+                                (@Suppress("UNCHECKED_CAST")
+                                (properRequest.path.match.value as HttpHandler<PathSpec>).handle(properRequest))
                             }.let {
                                 BulkResponse(
                                     durationMs = start.elapsedNow().inWholeMilliseconds,

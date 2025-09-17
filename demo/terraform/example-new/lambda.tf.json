@@ -169,6 +169,15 @@
     },
     "locals": {
         "settings_raw": {
+            "awsLambdaRuntimeSettings": {
+                "cors": {
+                    "limitToDomains": null,
+                    "limitToHeaders": null,
+                    "limitToMethods": null,
+                    "exposedHeaders": [],
+                    "allowCredentials": true
+                }
+            },
             "general": {
                 "projectName": "Demo Example",
                 "publicUrl": "https://example.demo.ivieleague.com",
@@ -181,6 +190,22 @@
             "secretBasis": "${random_password.secretBasis.result}",
             "sms": "console",
             "files": "s3://${aws_s3_bucket.files.bucket}.s3-${aws_s3_bucket.files.region}.amazonaws.com/?signedUrlDuration=1d",
+            "logging": {
+                "default": {
+                    "filePattern": null,
+                    "toConsole": true,
+                    "level": "INFO",
+                    "additive": false
+                },
+                "logger": null
+            },
+            "telemetry": {
+                "url": "print",
+                "reportFrequency": null,
+                "metricReportFrequency": null,
+                "traceReportFrequency": null,
+                "logReportFrequency": null
+            },
             "email": "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587?fromEmail=noreply@example.demo.ivieleague.com"
         },
         "is_windows": "${substr(pathexpand(\"~\"), 0, 1) == \"/\" ? false : true}",

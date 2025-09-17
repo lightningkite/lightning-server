@@ -1,25 +1,16 @@
 package com.lightningkite.lightningserver.engine.awsserverless
 
 import com.lightningkite.lightningserver.AnonType
-import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.runtime.handleWithMetrics
-import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.runtime.executeWithMetrics
 import com.lightningkite.services.data.KotlinBytesFormat
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.future.await
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import software.amazon.awssdk.core.SdkBytes
 import software.amazon.awssdk.services.lambda.model.InvocationType
 import software.amazon.awssdk.services.lambda.model.InvokeRequest
-import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
-import java.util.Base64
-import java.util.zip.GZIPInputStream
-import java.util.zip.GZIPOutputStream
 
 internal class AwsAdapterTask(val root: AwsAdapter) {
     val json: Json get() = root.internalSerialization.json
@@ -58,7 +49,10 @@ internal class AwsAdapterTask(val root: AwsAdapter) {
                 @Suppress("UNCHECKED_CAST")
                 task as Task<Any?>
                 with(root) {
-                    task.handleWithMetrics(p, event.input.value(root.internalSerialization.kotlinBytesFormat, task.serializer))
+                    task.executeWithMetrics(
+                        p,
+                        event.input.value(root.internalSerialization.kotlinBytesFormat, task.serializer)
+                    )
                 }
                 APIGatewayV2HTTPResponse(statusCode = 204)
             } catch (e: Exception) {

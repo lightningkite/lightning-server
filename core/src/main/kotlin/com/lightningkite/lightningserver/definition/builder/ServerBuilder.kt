@@ -269,8 +269,8 @@ public abstract class ServerBuilder : Extendable {
         thisLayer = ServerDefinition.Module(
             internalSerializersModule = internalSerialization,
             externalSerializersModule = externalSerialization,
-            httpInterceptors = http.interceptors.interceptors.toSealedList(),
-            websocketInterceptors = websockets.interceptors.interceptors.toSealedList(),
+            httpInterceptors = http.interceptors.toSealedList(),
+            websocketInterceptors = websockets.interceptors.toSealedList(),
             endpoints = MutablePathSpecMap<ServerPathEndpoints>().apply {
                 for (path in http.handlers.keys + websockets.handlers.keys) {
                     put(path, ServerPathEndpoints(

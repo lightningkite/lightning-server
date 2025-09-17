@@ -7,7 +7,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpecMap
 
 public class HttpBuilder {
-    public val interceptors: HttpInterceptor.Builder = HttpInterceptor.Builder()
+    public val interceptors: MutableList<HttpInterceptor> = mutableListOf()
 
     private val _handlers = MutablePathSpecMap<HashMap<HttpMethod, HttpHandler<*>>>()
     public val handlers: PathSpecMap<Map<HttpMethod, HttpHandler<*>>> get() = _handlers
