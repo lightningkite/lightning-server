@@ -15,7 +15,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import java.io.File
 
-public abstract class BaseTerraformEmitter: TerraformEmitter {
+public abstract class BaseTerraformEmitter<S: ServerBuilder>: TerraformEmitter {
+    protected abstract val builder: S
     protected val terraformProviderImports: MutableSet<TerraformProviderImport> = HashSet()
     override fun require(provider: TerraformProviderImport) {
         terraformProviderImports += provider
@@ -31,9 +32,9 @@ public abstract class BaseTerraformEmitter: TerraformEmitter {
         settings[settingName] = element
     }
 
-    public fun <S: ServerBuilder> settings(builder: S, configure: S.()->Unit) {
+    public fun settings(setSettings: S.()->Unit) {
         val required = builder.build().settings.map { it.name }.toSet()
-        with(builder) { configure() }
+        setSettings(builder)
         val missing = required - settings.keys
         if(missing.isNotEmpty()) throw IllegalStateException("Missing settings: $missing")
     }

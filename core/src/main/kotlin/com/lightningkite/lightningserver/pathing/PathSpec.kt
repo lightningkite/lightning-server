@@ -166,6 +166,10 @@ public class PathSpec0(segments: List<Segment>, after: Afterwards) : PathSpec(se
 
     public inline fun <reified T> arg(name: String): PathSpec1<T> =
         arg(Segment.Wildcard(name, serializerOrContextual<T>()))
+
+    public companion object {
+        public fun fromString(string: String): PathSpec0 = PathSpec0(string.split('/').map { Segment.Constant(it) }, Afterwards.fromString(string))
+    }
 }
 
 /**

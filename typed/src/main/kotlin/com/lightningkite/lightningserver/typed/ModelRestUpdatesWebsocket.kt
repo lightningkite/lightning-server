@@ -71,7 +71,7 @@ public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
         override suspend fun willConnectTyped(access: WebSocketConnectRequestAccess<PathSpec0, USER>): ModelRestUpdatesWebsocketData<T, ID> {
             @Suppress("UNCHECKED_CAST")
             return ModelRestUpdatesWebsocketData(
-                user = access.authOrNull as Authentication<Nothing>,
+                user = access.authOrNull as? Authentication<Nothing>,
                 mask = info.collection(access).mask()
             )
         }

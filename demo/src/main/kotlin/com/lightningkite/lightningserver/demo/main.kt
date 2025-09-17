@@ -4,6 +4,7 @@ import com.lightningkite.kotlinercli.cli
 import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.engine.ktor.KtorEngine
 import com.lightningkite.lightningserver.settings.loadFromFile
+import com.lightningkite.lightningserver.terraform.awsserverless.TerraformAwsServerlessDomainBuilder
 //import com.lightningkite.lightningserver.terraform.awsserverless.TerraformAwsServerlessDomainBuilder
 import com.lightningkite.lightningserver.terraform.generated
 import com.lightningkite.lightningserver.typed.sdk.FetcherSdk
@@ -20,15 +21,13 @@ import io.ktor.server.netty.*
 import software.amazon.awssdk.regions.Region
 import java.io.File
 import kotlin.time.Duration.Companion.days
+import kotlin.time.TimeSource
 
 
 private fun serve() {
-    println("---")
-    println(Server.extensions.entries.joinToString("\n") { "${it.key}: ${it.value}" })
+    val before = TimeSource.Monotonic.markNow()
     val built = Server.build()
-    println("--- ${System.identityHashCode(built)}")
-    println(built.extensions.entries.joinToString("\n") { "${it.key}: ${it.value}" })
-    println("---")
+    println("Server built in ${before.elapsedNow()}")
     KtorEngine(built).apply {
         settings.loadFromFile(File("settings.json"), internalSerializersModule)
         start(Netty)
@@ -37,35 +36,33 @@ private fun serve() {
 
 fun terraform() {
     Server
-//    TerraformAwsServerlessDomainBuilder(
-//        handlerFullyQualifiedName = "com.lightningkite.lightningserver.demo.AwsHandler",
-//
-//        storageBucket = "ivieleague-deployment-states",
-//        storageBucketPathOverride = "demo/example",
-//        projectPrefix = "demo-example",
-//        deploymentTag = "demo-example",
-//
-//        displayName = "Demo Example",
-//        debug = true,
-//        emergencyContact = "josephivie@gmail.com".toEmailAddress(),
-//
-//        region = Region.US_WEST_2,
-//        domain = "example.demo.ivieleague.com",
-//        domainZone = "ivieleague.com",
-////        purchaseDomain = true,
-//    ).apply {
-////        settings(Server) {
-//        with(Server) {
-//            database.mongodbAtlasFree(orgId = "6323a65c43d66b56a2ea5aea")
-//            email.awsSesSmtp(emergencyContact)
-//            sms.direct(SMS.Settings())
-//            files.awsS3Bucket(signedUrlDuration = 1.days)
-//            cache.awsDynamoDb()
-//            secretBasis.generated()
-////            metricsSettings.direct(MetricReporter.Settings("none"))
-////            exceptionSettings.direct(ExceptionReporter.Settings("none"))
-//        }
-//    }.write(File("demo/terraform/example-new").also { it.mkdirs() })
+    TerraformAwsServerlessDomainBuilder(
+        builder = Server,
+        handlerFullyQualifiedName = "com.lightningkite.lightningserver.demo.AwsHandler",
+
+        storageBucket = "ivieleague-deployment-states",
+        storageBucketPathOverride = "demo/example",
+        projectPrefix = "demo-example",
+        deploymentTag = "demo-example",
+
+        displayName = "Demo Example",
+        debug = true,
+        emergencyContact = "josephivie@gmail.com".toEmailAddress(),
+
+        region = Region.US_WEST_2,
+        domain = "example.demo.ivieleague.com",
+        domainZone = "ivieleague.com",
+//        purchaseDomain = true,
+    ).apply {
+        settings {
+            database.mongodbAtlasFree(orgId = "6323a65c43d66b56a2ea5aea", zoneName = "Zone 1")
+            email.awsSesSmtp(emergencyContact)
+            sms.direct(SMS.Settings())
+            files.awsS3Bucket(signedUrlDuration = 1.days)
+            cache.awsDynamoDb()
+            secretBasis.generated()
+        }
+    }.write(File("demo/terraform/example-new").also { it.mkdirs() })
 }
 
 fun sdk() {

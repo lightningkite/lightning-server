@@ -88,7 +88,7 @@ class QueryParamWebSocketHandlerTest {
     fun header_x_path_has_precedence_over_query_param(): Unit = runBlocking {
         TestServer.test(settings = { }) {
             val ws = TestServer.qp.test(
-                queryParameters = listOf("path" to "/mirror?foo=1"),
+                queryParameters = listOf("path" to "/bad-please-never-use"),
                 headers = HttpHeaders("x-path" to "/other?bar=2")
             )
             val seen = TestServer.lastRequest!!

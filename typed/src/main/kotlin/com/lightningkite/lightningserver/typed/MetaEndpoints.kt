@@ -29,7 +29,7 @@ public class MetaEndpoints(
     private val cache: RuntimeDeferred<Cache>,
 ) : ServerBuilder() {
 
-    public val root: HttpHandler<PathSpec0> = path.get bind HttpHandler {
+    public val root: HttpHandler<PathSpec0> = path.slash.get bind HttpHandler {
         HttpResponse(body = TypedData.html {
             head { title("${generalSettings().projectName} - Meta Information") }
             body {
@@ -322,24 +322,24 @@ public class MetaEndpoints(
                         val request = entry.value
                         val pathAlone = request.path.substringBefore('?')
                         val queryParameters = request.path.substringAfter('?', "").split('&').map { it.substringBefore('=') to it.substringAfter('=', "") }
-                        val match = serverRuntime.server.endpoints.match(serverRuntime.externalSerialization.stringArrayFormat, pathAlone) { it.http[HttpMethod(request.method)] }
-                            ?: return@async entry.key to BulkResponse(
-                                error = LSError(404, detail = "no-match", message = "No matching route found", data = request.method + " " + pathAlone),
-                                durationMs = start.elapsedNow().inWholeMilliseconds
-                            )
-                        val properRequest = originalRequest.copy(
-                            path = RawPath(asString = pathAlone, match = match),
+                        val properRequest = originalRequest.copyWithNewPathType(
+                            path = RawHttpEndpoint<PathSpec>(asString = pathAlone, method = HttpMethod(request.method)),
                             queryParameters = queryParameters,
-                            method = HttpMethod(request.method),
                             body = request.body?.let { TypedData.text(it, MediaType.Application.Json) }
                         )
-                        @Suppress("UNCHECKED_CAST") val handler = match.value as HttpHandler<PathSpec0>
                         try {
-                            entry.key to topLevelReportingContext(match.path.toString()) { handler.handle(properRequest) }.let {
-                                BulkResponse(result = it.body?.text())
+                            entry.key to topLevelReportingContext(properRequest.path.toString()) {
+                                @Suppress("UNCHECKED_CAST")
+                                (properRequest.path.match.value as HttpHandler<PathSpec>).handle(properRequest)
+                            }.let {
+                                BulkResponse(
+                                    durationMs = start.elapsedNow().inWholeMilliseconds,
+                                    result = it.body?.text()
+                                )
                             }
                         } catch (e: Exception) {
                             entry.key to BulkResponse(
+                                durationMs = start.elapsedNow().inWholeMilliseconds,
                                 error = when (e) {
                                     is HttpStatusException -> e.toLSError()
                                     else -> LSError(500, "unknown", "An unknown server error occurred.")
@@ -361,19 +361,7 @@ public class MetaEndpoints(
         openApiJson,
         paths,
         wsTester
+
     )
 
 }
-
-
-internal fun HttpRequest<*>.castPathSpec0(): HttpRequest<PathSpec0> = HttpRequest(
-    path = RawPath(path.string),
-    queryParameters = queryParameters,
-    headers = headers,
-    domain = domain,
-    protocol = protocol,
-    sourceIp = sourceIp,
-    method = method,
-    cache = cache,
-    body = body,
-)

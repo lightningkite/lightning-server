@@ -10,7 +10,7 @@ import kotlinx.serialization.StringFormat
 /**
  * A [PathSpec] with all of its wildcard values fulfilled.
  */
-public class ConcretePath<PATH: PathSpec> internal constructor(
+public class ConcretePath<out PATH: PathSpec> internal constructor(
     public val pathSpec: PATH,
     public val rawPathArguments: List<Any?>,
     public val trailingSegments: TrailingSegments? = null,
@@ -61,7 +61,7 @@ public class ConcretePath<PATH: PathSpec> internal constructor(
     public fun toString(stringArrayFormat: StringArrayFormat): String = path(stringArrayFormat)
 }
 
-public interface HasContextualPath<PATH : PathSpec> {
+public interface HasContextualPath<out PATH : PathSpec> {
     context(server: ServerRuntime) public val pathInContext: ConcretePath<PATH>
 }
 

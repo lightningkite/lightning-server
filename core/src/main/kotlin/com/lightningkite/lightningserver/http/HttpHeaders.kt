@@ -96,7 +96,7 @@ public class HttpHeaders internal constructor (public val normalizedEntries: Map
             sameSite: SameSite? = null,
             extensions: Map<String, String?> = emptyMap(),
         ) {
-            set("Set-Cookie", HttpHeaderValue(
+            set(HttpHeader.SetCookie, HttpHeaderValue(
                 root = "",
                 parameters = buildMap {
                     put("key", key)
@@ -141,7 +141,7 @@ public fun HttpHeaders(entry: Iterable<Pair<String, String>>): HttpHeaders = Htt
 public fun HttpHeaders(vararg entry: Pair<String, String>): HttpHeaders = HttpHeaders(entry.groupBy { it.first.lowercase() }.mapValues { (key, value) -> value.map { HttpHeaderValue.parse(key, it.second) }})
 public inline fun HttpHeaders(setup: HttpHeaders.Builder.() -> Unit): HttpHeaders = HttpHeaders.Builder().apply(setup).build()
 
-public object HttpHeadersSerializer : KSerializer<HttpHeaders> {
+internal object HttpHeadersSerializer : KSerializer<HttpHeaders> {
     private val defer = MapSerializer(String.serializer(), String.serializer())
 
     override val descriptor: SerialDescriptor get() = defer.descriptor

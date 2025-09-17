@@ -5,6 +5,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import java.util.*
 
+public interface AwsLambdaInput
+
 @Serializable
 internal data class APIGatewayV2HTTPEvent(
     val version: String,
@@ -16,7 +18,7 @@ internal data class APIGatewayV2HTTPEvent(
     val isBase64Encoded: Boolean,
     val path: String,
     val multiValueQueryStringParameters: Map<String, List<String>>? = null,
-) {
+): AwsLambdaInput {
     @Serializable
     data class RequestContext(
         val accountId: String,
@@ -60,7 +62,7 @@ internal data class APIGatewayV2WebsocketRequest(
     val requestContext: RequestContext,
     val isBase64Encoded: Boolean,
     val body: String? = null,
-) {
+): AwsLambdaInput {
     @Serializable
     data class RequestContext(
         val routeKey: String,

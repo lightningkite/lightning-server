@@ -32,7 +32,7 @@ public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT
     context(server: ServerRuntime)
     override suspend fun handle(request: HttpRequest<PATH>): HttpResponse {
         @Suppress("UNCHECKED_CAST")
-        val input: INPUT = when (request.method) {
+        val input: INPUT = when (request.path.method) {
             HttpMethod.GET, HttpMethod.HEAD -> request.queryParameters(inputType)
             else ->
                 if (inputType == Unit.serializer()) Unit as INPUT

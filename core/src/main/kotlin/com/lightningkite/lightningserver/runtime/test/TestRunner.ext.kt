@@ -13,7 +13,8 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpec1
 import com.lightningkite.lightningserver.pathing.PathSpec2
 import com.lightningkite.lightningserver.pathing.PathSpec3
-import com.lightningkite.lightningserver.pathing.RawPath
+import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
+import com.lightningkite.lightningserver.pathing.RawWebsocketPath
 import com.lightningkite.lightningserver.runtime.invoke
 import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
@@ -37,7 +38,7 @@ public suspend fun <STORAGE> WebSocketHandler<PathSpec0, STORAGE>.test(
     sourceIp: String = "local",
 ): TestRunner<*>.TestWebSocket<PathSpec0, STORAGE> {
     val request = WebSocketConnectRequest(
-        RawPath(location),
+        RawWebsocketPath(location),
         queryParameters = queryParameters,
         headers = headers,
         domain = domain,
@@ -59,7 +60,7 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A> WebSocketHandler<Pa
     sourceIp: String = "local",
 ): TestRunner<*>.TestWebSocket<PathSpec1<A>, STORAGE> {
     val request = WebSocketConnectRequest(
-        RawPath(location, path1),
+        RawWebsocketPath(location, path1),
         queryParameters = queryParameters,
         headers = headers,
         domain = domain,
@@ -82,7 +83,7 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A, B> WebSocketHandler
     sourceIp: String = "local",
 ): TestRunner<*>.TestWebSocket<PathSpec2<A, B>, STORAGE> {
     val request = WebSocketConnectRequest(
-        RawPath(location, path1, path2),
+        RawWebsocketPath(location, path1, path2),
         queryParameters = queryParameters,
         headers = headers,
         domain = domain,
@@ -106,7 +107,7 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A, B, C> WebSocketHand
     sourceIp: String = "local",
 ): TestRunner<*>.TestWebSocket<PathSpec3<A, B, C>, STORAGE> {
     val request = WebSocketConnectRequest(
-        RawPath(location, path1, path2, path3),
+        RawWebsocketPath(location, path1, path2, path3),
         queryParameters = queryParameters,
         headers = headers,
         domain = domain,
@@ -129,8 +130,7 @@ context(test: TestRunner<*>) public suspend fun HttpHandler<PathSpec0>.test(
 ): HttpResponse {
     return handle(
         HttpRequest(
-            RawPath(location.path, trailingWildcard),
-            method = location.method,
+            RawHttpEndpoint(location.path, location.method, trailingWildcard),
             queryParameters = queryParameters,
             headers = headers,
             domain = domain,
@@ -153,8 +153,7 @@ context(test: TestRunner<*>) public suspend fun <A> HttpHandler<PathSpec1<A>>.te
 ): HttpResponse {
     return handle(
         HttpRequest(
-            RawPath(location.path, path1, trailingWildcard),
-            method = location.method,
+            RawHttpEndpoint(location.path, path1, location.method, trailingWildcard),
             queryParameters = queryParameters,
             headers = headers,
             domain = domain,
@@ -177,8 +176,7 @@ context(test: TestRunner<*>) public suspend fun <A, B> HttpHandler<PathSpec2<A, 
 ): HttpResponse {
     return handle(
         HttpRequest(
-            RawPath(location.path, path1, path2, trailingWildcard),
-            method = location.method,
+            RawHttpEndpoint(location.path, path1, path2, location.method, trailingWildcard),
             queryParameters = queryParameters,
             headers = headers,
             domain = domain,
@@ -202,8 +200,7 @@ context(test: TestRunner<*>) public suspend fun <A, B, C> HttpHandler<PathSpec3<
 ): HttpResponse {
     return handle(
         HttpRequest(
-            RawPath(location.path, path1, path2, path3, trailingWildcard),
-            method = location.method,
+            RawHttpEndpoint(location.path, path1, path2, path3, location.method, trailingWildcard),
             queryParameters = queryParameters,
             headers = headers,
             domain = domain,

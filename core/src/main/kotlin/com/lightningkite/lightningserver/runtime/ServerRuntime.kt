@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.ScheduledTask
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.StartupTask
+import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
@@ -20,6 +21,8 @@ import kotlin.time.Clock
 
 public interface ServerRuntime: SettingContext {
     public val server: ServerDefinition
+    override val publicUrl: String
+        get() = generalSettings().publicUrl
 
     public val externalSerialization: Serialization
     public val internalSerialization: Serialization

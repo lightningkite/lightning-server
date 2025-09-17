@@ -9,15 +9,19 @@ import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.aws.AwsConnections
 import com.lightningkite.services.data.KotlinBytesFormat
+import com.lightningkite.services.get
 import kotlinx.coroutines.future.await
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import software.amazon.awssdk.core.SdkBytes
 import software.amazon.awssdk.http.SdkHttpFullResponse
+import software.amazon.awssdk.services.apigatewaymanagementapi.model.DeleteConnectionRequest
 import software.amazon.awssdk.services.apigatewaymanagementapi.model.GoneException
+import software.amazon.awssdk.services.apigatewaymanagementapi.model.PostToConnectionRequest
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.lambda.model.InvocationType
+import software.amazon.awssdk.services.lambda.model.InvokeRequest
 import java.net.URLDecoder
 import java.util.Base64
 
@@ -25,14 +29,9 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
     val wsUrl: String get() = with(root) { generalSettings.invoke().wsUrl }
     val encoding: KotlinBytesFormat get() = root.internalSerialization.kotlinBytesFormat
 
-    val dynamo: DynamoDbAsyncClient by lazy {
-        DynamoDbAsyncClient.builder().region(root.region)
-//        .overrideConfiguration(AwsConnections.clientOverrideConfiguration)
-            .httpClient(AwsConnections.asyncClient).build()
-    }
     val webSocketDynamo by lazy {
         AwsWebSocketDynamoDb(
-            dynamo, wsUrl.substringAfter("://")
+            root.dynamo, wsUrl.substringAfter("://")
                 .substringBefore('?')
                 .filter { it.isLetterOrDigit() || it == '_' || it == '.' || it == '-' },
             encoding
@@ -44,13 +43,13 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
         val socketId: String,
         val connection: WebSocketConnectRequest<Nothing>,
         val storage: AnonType
-    )
+    ): AwsLambdaInput
 
     @Serializable
     data class WebSocketPublish(
         val topic: String,
         val data: AnonType,
-    )
+    ): AwsLambdaInput
 
     private suspend inline fun <P: PathSpec, T, R> withMid(
         path: P,
@@ -120,10 +119,10 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
 
         override suspend fun send(frame: WebSocketFrame) {
             try {
-                val result = root.apiGatewayManagement.postToConnection {
+                val result = root.apiGatewayWsPostToConnection(PostToConnectionRequest.builder().also {
                     it.connectionId(socketId)
                     it.data(SdkBytes.fromUtf8String(frame.text))
-                }.await()
+                }.build())
                 val r = result.sdkHttpResponse()
                 if (!r.isSuccessful) {
                     root.logger.warn("Socket ${socketId} had a send failure.")
@@ -145,15 +144,18 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
             }
         }
 
-        override suspend fun close(reason: WebSocketClose) = webSocketClose(socketId, reason)
+        override suspend fun close(reason: WebSocketClose) {
+            root.logger.info { "Closing socket $socketId with reason $reason as requested." }
+            webSocketClose(socketId, reason)
+        }
 
     }
 
     private suspend fun webSocketClose(socketId: String, reason: WebSocketClose) {
         try {
-            val result = root.apiGatewayManagement.deleteConnection {
+            val result = root.apiGatewayWsDeleteConnection(DeleteConnectionRequest.builder().also {
                 it.connectionId(socketId)
-            }.await()
+            }.build())
             val r = result.sdkHttpResponse()
             if (!r.isSuccessful) {
                 throw Exception(
@@ -201,6 +203,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         }
                     } catch (e: Exception) {
                         // Suppress, already reported inside *Tracked
+                        root.logger.error(e) { "Closing socket $socketId because subscription message from topic '${match.path.pathSpec}' failed to process." }
                         webSocketClose(socketId, WebSocketClose.INTERNAL_ERROR)
                     }
                 }
@@ -216,7 +219,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
     val rootPath = PathSpec0(listOf(), PathSpec.Afterwards.None)
     suspend fun <T> publish(topic: String, serializer: KSerializer<T>, output: T) {
         try {
-            root.lambdaClient.invoke {
+            root.invokeLambda(InvokeRequest.builder().also {
                 it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
                 it.qualifier(System.getenv("AWS_LAMBDA_FUNCTION_VERSION"))
                 it.invocationType(InvocationType.EVENT)
@@ -232,10 +235,10 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         )
                     )
                 )
-            }.await()
+            }.build())
         } catch (e: Exception) {
             with(root) {
-                exceptionSettings().report(e, "METRICS")
+                logger.error("Publish failed for $topic", e)
             }
         }
     }
@@ -250,6 +253,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                 return APIGatewayV2HTTPResponse(200)
             }
         } catch (e: Exception) {
+            root.logger.error(e) { "Closing socket ${event.socketId} because didConnect failed." }
             webSocketClose(event.socketId, WebSocketClose.INTERNAL_ERROR)
             return APIGatewayV2HTTPResponse(500, body = e.message ?: "")
         }
@@ -278,7 +282,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     else listOf(it)
                 }
                 val lkEvent = WebSocketConnectRequest(
-                    path = RawPath<PathSpec0>(""),
+                    path = RawWebsocketPath<PathSpec0>(""),
                     queryParameters = queryParams,
                     headers = headers,
                     domain = event.requestContext.domainName,
@@ -290,7 +294,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     val storageBytes = encoding.encodeToByteArray(rootWs.storageSerializer, storage)
                     webSocketDynamo.setState(event.requestContext.connectionId, lkEvent, storageBytes)
                     try {
-                        root.lambdaClient.invoke {
+                        root.invokeLambda(InvokeRequest.builder().also {
                             it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
                             it.qualifier(System.getenv("AWS_LAMBDA_FUNCTION_VERSION"))
                             it.invocationType(InvocationType.EVENT)
@@ -308,11 +312,13 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                                     )
                                 )
                             )
-                        }.await()
+                        }.build())
                     } catch (e: Exception) {
-                        with(root) { exceptionSettings().report(e, "AWS WEBSOCKET DIDCONNECT") }
+                        with(root) {
+                            logger.error("Error invoking didConnect", e)
+                        }
                     }
-                    root.logger.info("WebSocket ${event.requestContext.connectionId} connected successfully.")
+                    root.logger.info { "WebSocket ${event.requestContext.connectionId} connected successfully." }
                     APIGatewayV2HTTPResponse(200)
                 } catch (http: HttpStatusException) {
                     APIGatewayV2HTTPResponse(http.status.code, body = http.message)
@@ -374,7 +380,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                                 )
                             }
                         } catch (e: Exception) {
-                            with(root) { exceptionSettings().report(Exception("Failed to send debug info", e), "AWS WEBSOCKET MESSAGE DEBUG") }
+                            root.logger.error("Failed to run debug websocket processing", e)
                         }
                         rootWs.messageFromClientWithMetrics(
                             rootPath,
@@ -384,6 +390,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         APIGatewayV2HTTPResponse(200)
                     }
                 } catch (e: Exception) {
+                    root.logger.error(e) { "Closing socket ${event.requestContext.connectionId} because message from client failed to process (route key '${event.requestContext.routeKey}')." }
                     webSocketClose(event.requestContext.connectionId, WebSocketClose.INTERNAL_ERROR)
                     APIGatewayV2HTTPResponse(500, body = e.message ?: "")
                 }

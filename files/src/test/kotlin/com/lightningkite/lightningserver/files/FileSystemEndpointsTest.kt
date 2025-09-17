@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.files
 
 import com.lightningkite.MediaType
+import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.post
@@ -55,7 +56,7 @@ class FileSystemEndpointsTest {
             val match = contextOf<ServerRuntime>().server.endpoints.match(
                 contextOf<ServerRuntime>().externalSerialization.stringArrayFormat,
                 serialized.substringBefore('?').substringAfter("://").substringAfter("/")
-            )!!
+            ){ it.http[HttpMethod.GET] }!!
             Server.served.fetch.test(
                 trailingWildcard = match.path.trailingSegments,
                 queryParameters = serialized.substringAfter('?').split('&').map { it.substringBefore('=') to it.substringAfter('=', "") },

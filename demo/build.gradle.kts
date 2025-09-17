@@ -45,7 +45,6 @@ dependencies {
     api(libs.serviceAbstractionsEmailTest)
     api(libs.serviceAbstractionsEmailJavasmtp)
     api(libs.serviceAbstractionsEmail)
-    api(libs.serviceAbstractionsDemo)
     api(libs.serviceAbstractionsDatabaseTest)
     ksp(libs.serviceAbstractionsDatabaseProcessor)
     api(libs.serviceAbstractionsDatabaseMongodb)
@@ -91,7 +90,7 @@ tasks.create("serve", JavaExec::class.java) {
     workingDir(project.rootDir)
 }
 
-tasks.create("lambda", Copy::class.java) {
+tasks.create("lambda", Sync::class.java) {
     group = "deploy"
     this.destinationDir = project.buildDir.resolve("dist/lambda")
     val jarTask = tasks.getByName("jar")
@@ -108,7 +107,6 @@ tasks.create("rebuildTerraform", JavaExec::class.java) {
     mainClass.set("com.lightningkite.lightningserver.demo.MainKt")
     args("terraform")
     workingDir(project.rootDir)
-    inputs.files(*file("terraform").walkTopDown().filter { it.name == "project.json" }.toList().toTypedArray())
 }
 tasks.create("sdk", JavaExec::class.java) {
     group = "deploy"

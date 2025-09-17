@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.files
 
 import com.lightningkite.MediaType
+import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.post
@@ -12,8 +13,10 @@ import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.Database
+import com.lightningkite.services.files.KotlinxIoPublicFileSystem
 import com.lightningkite.services.files.PublicFileSystem
 import com.lightningkite.services.files.ServerFile
+import com.lightningkite.services.files.serverFile
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -75,19 +78,22 @@ class UploadEarlyEndpointTest {
     fun testServed(): Unit = runBlocking {
         Server.test(
             settings = {
-                files set PublicFileSystem.Settings("file://build/testfiles/${Uuid.random()}?serveUrl=http://localhost/files")
+                files set PublicFileSystem.Settings("file://build/testfiles/${Uuid.random()}?serveUrl=http://localhost:8080/files")
                 database set Database.Settings()
             }
         ) {
+            println((files() as KotlinxIoPublicFileSystem).serveUrl)
             val file = files().root.then("test.txt")
             file.put(TypedData.text("Hello world!", MediaType.Text.Plain))
-            val serialized = contextOf<ServerRuntime>().externalSerialization.stringArrayFormat.encodeToString(uploadEarly.serializer(), ServerFile(file.url))
+            println(file.url)
+            val serialized = contextOf<ServerRuntime>().externalSerialization.stringArrayFormat.encodeToString(uploadEarly.serializer(), file.serverFile)
+            println(serialized)
             files().parseExternalUrl(serialized)!!
             run {
                 val match = contextOf<ServerRuntime>().server.endpoints.match(
                     contextOf<ServerRuntime>().externalSerialization.stringArrayFormat,
                     serialized.substringBefore('?').substringAfter("://").substringAfter("/")
-                )!!
+                ) { it.http[HttpMethod.GET] } ?: throw Exception("Endpoint for '${serialized.substringBefore('?').substringAfter("://").substringAfter("/")}' not found")
                 Server.served.fetch.test(
                     trailingWildcard = match.path.trailingSegments,
                     queryParameters = serialized.substringAfter('?').split('&')
@@ -100,7 +106,7 @@ class UploadEarlyEndpointTest {
     fun test(): Unit = runBlocking {
         Server.test(
             settings = {
-                files set PublicFileSystem.Settings("file://build/testfiles/${Uuid.random()}?serveUrl=http://localhost/files")
+                files set PublicFileSystem.Settings("file://build/testfiles/${Uuid.random()}?serveUrl=http://localhost:8080/files")
                 database set Database.Settings()
             }
         ) {
@@ -110,7 +116,7 @@ class UploadEarlyEndpointTest {
                 val match = contextOf<ServerRuntime>().server.endpoints.match(
                     contextOf<ServerRuntime>().externalSerialization.stringArrayFormat,
                     prepare.uploadUrl.substringBefore('?').substringAfter("://").substringAfter("/")
-                )!!
+                ) { it.http[HttpMethod.PUT] }!!
                 Server.served.upload.test(
                     trailingWildcard = match.path.trailingSegments,
                     queryParameters = prepare.uploadUrl.substringAfter('?').split('&')
@@ -133,7 +139,7 @@ class UploadEarlyEndpointTest {
                 val match = contextOf<ServerRuntime>().server.endpoints.match(
                     contextOf<ServerRuntime>().externalSerialization.stringArrayFormat,
                     clientSideServerFile.location.substringBefore('?').substringAfter("://").substringAfter("/")
-                )!!
+                ) { it.http[HttpMethod.GET] }!!
                 Server.served.fetch.test(
                     trailingWildcard = match.path.trailingSegments,
                     queryParameters = clientSideServerFile.location.substringAfter('?', "").split('&')

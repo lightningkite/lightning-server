@@ -14,7 +14,7 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
     public val requiredScopes: Runtime<Set<RequiredScope>>
     public fun subscope(subscopes: Iterable<Subscope>): AuthRequirement<SUBJECT>
 
-    public data object None : AuthRequirement<HasId<AnyId>?> {
+    public data object None : AuthRequirement<Nothing?> {
         override val requiredScopes: Runtime.Constant<Set<RequiredScope>> get() = Runtime.Constant(emptySet())
         override fun subscope(subscopes: Iterable<Subscope>): None = this
 

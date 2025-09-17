@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.runtime.test.TestRunner
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.runtime.test.sendWebSocketSubscriptionMessage
 import com.lightningkite.lightningserver.runtime.send
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.lightningserver.websockets.text
@@ -33,6 +34,7 @@ class ModelRestUpdatesWebsocketTest {
         )
         val rest = path.path("model") include ModelRestEndpoints(info)
         val ws = path.path("model").path("updates") include ModelRestUpdatesWebsocket(info)
+        init { registerBasicMediaTypeCoders() }
     }
 
     @Test
@@ -122,7 +124,7 @@ class ModelRestUpdatesWebsocketTest {
             var last: WebSocketFrame? = null
             socket.onMessageSent = { last = it }
 
-            val big = "x".repeat(5000)
+            val big = "x".repeat(50000)
             val changes = CollectionChanges((1..6).map { i -> EntryChange<Sample>(null, Sample(i.toString(), big)) })
             TestServer.ws.generalTopic.send(changes)
 
