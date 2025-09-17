@@ -177,7 +177,7 @@ public object FetcherSdk : SDK.Format {
                 "suspend fun $functionName($argString)" + if (outputType.isUnit()) "" else ": ${outputType.kotlinTypeString()}"
 
             is SDK.Function.Websocket ->
-                "fun $functionName($argString): TypedWebSocket<${inputType.kotlinTypeString()}, ${outputType.kotlinTypeString()}>"
+                "fun $functionName($argString): ClientWebSocket<${inputType.kotlinTypeString()}, ${outputType.kotlinTypeString()}>"
         }
     }
 

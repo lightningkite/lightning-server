@@ -41,7 +41,7 @@ public interface ClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>> {
 
 @LiveVersion(LiveClientModelRestUpdatesWebsocket::class)
 public interface ClientModelRestUpdatesWebsocket<T : HasId<ID>, ID : Comparable<ID>> {
-    public fun updates(): TypedWebSocket<Condition<T>, CollectionUpdates<T, ID>>
+    public fun updates(): ClientWebSocket<Condition<T>, CollectionUpdates<T, ID>>
 }
 
 @LiveVersion(LiveClientModelRestEndpointsAndUpdatesWebsocket::class)

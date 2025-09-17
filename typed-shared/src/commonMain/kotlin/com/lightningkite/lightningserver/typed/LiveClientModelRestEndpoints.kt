@@ -207,7 +207,7 @@ public open class LiveClientModelRestUpdatesWebsocket<T : HasId<ID>, ID : Compar
     public val serializer: KSerializer<T>,
     public val idSerializer: KSerializer<ID>,
 ) : ClientModelRestUpdatesWebsocket<T, ID> {
-    override fun updates(): TypedWebSocket<Condition<T>, CollectionUpdates<T, ID>> =
+    override fun updates(): ClientWebSocket<Condition<T>, CollectionUpdates<T, ID>> =
         fetcher.websocket(subpath, Condition.serializer(serializer), CollectionUpdates.serializer(serializer, idSerializer))
 }
 
