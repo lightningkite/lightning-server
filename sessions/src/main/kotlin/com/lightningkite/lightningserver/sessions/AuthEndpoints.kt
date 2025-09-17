@@ -3,18 +3,24 @@ package com.lightningkite.lightningserver.sessions
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.AnyId
 import com.lightningkite.lightningserver.auth.PrincipalType
+import com.lightningkite.lightningserver.auth.RequiredScope
+import com.lightningkite.lightningserver.auth.auth
+import com.lightningkite.lightningserver.auth.fetch
+import com.lightningkite.lightningserver.auth.get
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.signer
+import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.sessions.proofs.AuthClientEndpoints
+import com.lightningkite.lightningserver.sessions.proofs.AuthRequirements
 import com.lightningkite.lightningserver.sessions.proofs.Proof
 import com.lightningkite.lightningserver.sessions.proofs.ProofOption
 import com.lightningkite.lightningserver.sessions.proofs.extensions.verify
@@ -24,6 +30,7 @@ import com.lightningkite.lightningserver.sessions.token.TokenFormat
 import com.lightningkite.lightningserver.toException
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.ModelRestEndpoints
+import com.lightningkite.lightningserver.typed.auth
 import com.lightningkite.lightningserver.typed.invoke
 import com.lightningkite.lightningserver.typed.sdk.SdkModule
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
@@ -33,6 +40,7 @@ import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlin.math.min
 import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
@@ -45,7 +53,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 ) : SessionManager<SUBJECT, ID>(principal, database, tokenFormat) {
     init {
         sdkSettings.defaultInfo = SdkModule.Info(principal.name + "Auth")
-        sdkSettings.clientInterface = AuthClientEndpoints::class.info(principal.idSerializer)
+        sdkSettings.clientInterface = AuthClientEndpoints::class.info(principal.subjectSerializer, principal.idSerializer)
     }
 
     context(server: ServerRuntime)
@@ -105,6 +113,38 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         )
         else null
     }
+
+    public val authRequirements: ApiHttpHandler<PathSpec0, SUBJECT, Unit, AuthRequirements> =
+        path.path("auth-requirements").get bind ApiHttpHandler(
+            auth = principal.auth(scopes = setOf(RequiredScope("auth:requirements"))),
+            inputType = Unit.serializer(),
+            outputType = AuthRequirements.serializer(),
+            summary = "Authentication Requirements",
+            description = "Returns a required strength and a list of proof options for the user to use in re-authenticating.",
+            errorCases = listOf(),
+            implementation = { _: Unit ->
+                val subject = auth.fetch()
+
+                val methods = serverRuntime.proofMethods.filter { it.established(principal, subject) }
+
+                val maxStrengthPossible = methods
+                    .groupBy { it.info.property ?: it.info.via }
+                    .values
+                    .sumOf { proofs -> proofs.maxOf { it.info.strength } }
+
+                val requiredStrength = min(requiredProofStrengthFor(subject), maxStrengthPossible)
+
+                AuthRequirements(
+                    methods.map { method ->
+                        ProofOption(
+                            method = method.info,
+                            value = method.info.property?.let { principal.getProperty(subject, it) }
+                        )
+                    },
+                    requiredStrength
+                )
+            }
+        )
     
     public val login: ApiHttpHandler<PathSpec0, HasId<AnyId>?, List<Proof>, IdAndAuthMethods<ID>> =
         path.path("login").post bind ApiHttpHandler(

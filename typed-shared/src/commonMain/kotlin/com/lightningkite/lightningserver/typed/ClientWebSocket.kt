@@ -1,10 +1,11 @@
 package com.lightningkite.lightningserver.typed
 
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharedFlow
 
-public interface TypedWebSocket<SEND, RECEIVE> {
-    public val connected: StateFlow<Boolean>
+public interface ClientWebSocket<SEND, RECEIVE> {
+    public val connected: SharedFlow<Boolean>
 
+    public fun connect()
     public fun close(code: Short, reason: String)
     public fun send(data: SEND)
     public fun onOpen(action: () -> Unit)

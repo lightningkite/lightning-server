@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.sessions
 
 import com.lightningkite.lightningserver.BadRequestException
+import com.lightningkite.lightningserver.ForbiddenException
 import com.lightningkite.lightningserver.UnauthorizedException
 import com.lightningkite.lightningserver.auth.AnyId
 import com.lightningkite.lightningserver.auth.AuthRequirement
@@ -8,6 +9,7 @@ import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.GrantedScope
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.RequiredScope
+import com.lightningkite.lightningserver.auth.Subscope
 import com.lightningkite.lightningserver.auth.auth
 import com.lightningkite.lightningserver.auth.authReaders
 import com.lightningkite.lightningserver.auth.fetch
@@ -27,6 +29,8 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.encryption.checkAgainstHash
 import com.lightningkite.lightningserver.encryption.secureHash
+import com.lightningkite.lightningserver.pathing.PathSpec1
+import com.lightningkite.lightningserver.pathing.first
 import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.sessions.token.TokenException
 import com.lightningkite.lightningserver.sessions.token.TokenFormat
@@ -46,8 +50,10 @@ import com.lightningkite.services.database.insertOne
 import com.lightningkite.services.database.modification
 import com.lightningkite.services.database.updateOneById
 import dev.whyoleg.cryptography.random.CryptographyRandom
+import io.ktor.http.path
 import kotlinx.serialization.builtins.serializer
 import kotlin.io.encoding.Base64
+import kotlin.text.get
 import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -57,9 +63,10 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     database: Runtime<Database>,
     public val tokenFormat: Runtime<TokenFormat> = Runtime { PrivateTinyTokenFormat() },
 ) : ServerBuilder(), Authentication.Reader<SUBJECT> {
-    public companion object {
-        public val sessionsScope: RequiredScope = RequiredScope("auth:sessions")
-        public val selfScope: RequiredScope = RequiredScope("auth:self")
+    public object Scopes {
+        public val self: RequiredScope = RequiredScope("auth:self")
+        public val sessions: RequiredScope = RequiredScope("auth:sessions")
+        public val terminate: RequiredScope = sessions.subscope(Subscope("terminate"))
     }
 
     init {
@@ -80,7 +87,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     public val sessionInfo: ModelInfo<SUBJECT, Session<SUBJECT, ID>, Uuid> =
         database.modelInfo(
-            auth = principal.auth(scopes = setOf(sessionsScope)),
+            auth = principal.auth(scopes = setOf(Scopes.sessions)),
             serializer = Session.serializer(principal.subjectSerializer, principal.idSerializer),
             idSerializer = Uuid.serializer(),
             collectionName = principal.name + "Session",
@@ -210,7 +217,6 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     public val tokenSimple: ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, String> =
         path.path("token").path("simple").post bind ApiHttpHandler(
             auth = noAuth,
-//            belongsToInterface = belongsToInterface,
             summary = "Get Token Simple",
             implementation = { refresh: String ->
                 val session = RefreshToken(refresh).session(request)
@@ -223,7 +229,6 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     public val createSubSession: ApiHttpHandler<PathSpec0, SUBJECT, SubSessionRequest, String> =
         path.path("sub-session").post bind ApiHttpHandler(
             auth = sessionInfo.auth.subscope(ModelInfo.Scopes.create),
-//            belongsToInterface = loggedInBelongsToInterface,
             inputType = SubSessionRequest.serializer(),
             outputType = String.serializer(),
             summary = "Create Sub Session",
@@ -250,11 +255,43 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     public val self: ApiHttpHandler<PathSpec0, SUBJECT, Unit, SUBJECT> =
         path.path("self").get bind ApiHttpHandler(
             summary = "Get Self",
-            auth = principal.auth(scopes = setOf(selfScope)),
-//            belongsToInterface = loggedInBelongsToInterface,
+            auth = principal.auth(scopes = setOf(Scopes.self)),
             inputType = Unit.serializer(),
             outputType = principal.subjectSerializer,
             implementation = { _ -> auth.fetch() }
+        )
+
+    public val sessionTerminate: ApiHttpHandler<PathSpec0, SUBJECT, Unit, Unit> =
+        path.path("terminate").post bind ApiHttpHandler(
+            summary = "Terminate Current Session",
+            auth = principal.auth(scopes = setOf(Scopes.terminate)),
+            inputType = Unit.serializer(),
+            outputType = Unit.serializer(),
+            errorCases = listOf(),
+            implementation = { _ ->
+                sessionInfo.collection().updateOneById(
+                    Uuid.parse(auth.sessionId!!),
+                    modification(spath) {
+                        it.terminated assign now()
+                    }
+                )
+            }
+        )
+
+    public val otherSessionTerminate: ApiHttpHandler<PathSpec1<Uuid>, SUBJECT, Unit, Unit> =
+        path.arg<Uuid>("sessionId").path("terminate").post bind ApiHttpHandler(
+            auth = principal.auth(scopes = setOf(Scopes.terminate)),
+            inputType = Unit.serializer(),
+            outputType = Unit.serializer(),
+            summary = "Terminate Session",
+            errorCases = listOf(),
+            implementation = { _ ->
+                if (sessionInfo.collection().get(first)?.subjectId != auth.id) throw ForbiddenException()
+                sessionInfo.collection().updateOneById(
+                    first,
+                    modification(spath) { it.terminated assign now() }
+                )
+            }
         )
 
 //    context(_: ServerRuntime)
