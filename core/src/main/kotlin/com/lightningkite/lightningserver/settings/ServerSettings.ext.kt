@@ -91,13 +91,13 @@ public fun ServerSettings.loadFromFile(
         suggestedFile.writeText(format.encodeToString(serializer, loaded))
         throw IncompleteSettingsException(missingKeys, suggestedFile)
     }
-    this.serializable.include(loaded)
+    this.include(loaded)
 }
 
 context(server: ServerRuntime)
 public fun ServerSettings.preload() {
     val errors = mutableMapOf<ServerSetting<*, *>, Exception>()
-    serializable.keys.forEach { setting ->
+    settings.forEach { setting ->
         try {
             get(setting)
         } catch (e: Exception) {

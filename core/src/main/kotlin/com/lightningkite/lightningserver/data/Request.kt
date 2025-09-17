@@ -4,12 +4,11 @@ import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.pathing.ConcretePath
 import com.lightningkite.lightningserver.pathing.HasContextualPath
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.RawPath
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 
 
-public abstract class Request<PATH: PathSpec>: HasContextualPath<PATH>, Caching {
-    public abstract val path: RawPath<PATH>
+public abstract class Request<out PATH: PathSpec>: HasContextualPath<PATH>, Caching {
+    public abstract val path: HasContextualPath<PATH>
     public abstract val queryParameters: List<Pair<String, String>>
     public abstract val headers: HttpHeaders
     public abstract val domain: String

@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.terraform.awsserverless
 import com.lightningkite.DataSize
 import com.lightningkite.DataSize.Companion.gibibytes
 import com.lightningkite.EmailAddress
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.services.terraform.TerraformAwsVpcInfo
 import com.lightningkite.services.terraform.TerraformEmitterAws
 import com.lightningkite.services.terraform.TerraformEmitterAwsDomain
@@ -13,7 +14,8 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
-public class TerraformAwsServerlessDomainBuilder(
+public class TerraformAwsServerlessDomainBuilder<S: ServerBuilder>(
+    builder: S,
     public val domainZone: String,
     override val domain: String,
     projectPrefix: String,
@@ -32,7 +34,8 @@ public class TerraformAwsServerlessDomainBuilder(
     emergencyCompute: LambdaDurationAlarmThresholds = LambdaDurationAlarmThresholds(threshold = 3.minutes),
     panicInvocations: LambdaInvocationAlarmThresholds = LambdaInvocationAlarmThresholds(threshold = 450),
     panicCompute: LambdaDurationAlarmThresholds = LambdaDurationAlarmThresholds(threshold = 5.minutes),
-): TerraformAwsServerlessBuilder(
+): TerraformAwsServerlessBuilder<S>(
+    builder = builder,
     projectPrefix = projectPrefix,
     deploymentTag = deploymentTag,
     storageBucket = storageBucket,
@@ -52,7 +55,8 @@ public class TerraformAwsServerlessDomainBuilder(
 ), TerraformEmitterAwsDomain {
     override val domainZoneId: String by lazy { domainZoneId(domainZone) }
 }
-public class TerraformAwsServerlessVpcBuilder(
+public class TerraformAwsServerlessVpcBuilder<S: ServerBuilder>(
+    builder: S,
     projectPrefix: String,
     deploymentTag: String,
     storageBucket: String,
@@ -71,7 +75,8 @@ public class TerraformAwsServerlessVpcBuilder(
     emergencyCompute: LambdaDurationAlarmThresholds = LambdaDurationAlarmThresholds(threshold = 3.minutes),
     panicInvocations: LambdaInvocationAlarmThresholds = LambdaInvocationAlarmThresholds(threshold = 450),
     panicCompute: LambdaDurationAlarmThresholds = LambdaDurationAlarmThresholds(threshold = 5.minutes),
-): TerraformAwsServerlessBuilder(
+): TerraformAwsServerlessBuilder<S>(
+    builder = builder,
     projectPrefix = projectPrefix,
     deploymentTag = deploymentTag,
     storageBucket = storageBucket,
@@ -91,7 +96,8 @@ public class TerraformAwsServerlessVpcBuilder(
 ), TerraformEmitterAwsVpc {
     override val applicationVpc: TerraformAwsVpcInfo by lazy { vpc(ipPrefix, availabilityZones) }
 }
-public class TerraformAwsServerlessDomainVpcBuilder(
+public class TerraformAwsServerlessDomainVpcBuilder<S: ServerBuilder>(
+    builder: S,
     public val domainZone: String,
     override val domain: String,
     projectPrefix: String,
@@ -112,7 +118,8 @@ public class TerraformAwsServerlessDomainVpcBuilder(
     emergencyCompute: LambdaDurationAlarmThresholds = LambdaDurationAlarmThresholds(threshold = 3.minutes),
     panicInvocations: LambdaInvocationAlarmThresholds = LambdaInvocationAlarmThresholds(threshold = 450),
     panicCompute: LambdaDurationAlarmThresholds = LambdaDurationAlarmThresholds(threshold = 5.minutes),
-): TerraformAwsServerlessBuilder(
+): TerraformAwsServerlessBuilder<S>(
+    builder = builder,
     projectPrefix = projectPrefix,
     deploymentTag = deploymentTag,
     storageBucket = storageBucket,

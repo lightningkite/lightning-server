@@ -14,7 +14,7 @@ import com.lightningkite.lightningserver.http.intercept
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpecMap
-import com.lightningkite.lightningserver.pathing.RawPath
+import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketConnection
@@ -23,77 +23,20 @@ import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 
 public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpResponse {
-    val match = this.server.endpoints.match(externalSerialization.stringArrayFormat, request.path.string) { it.http[request.method] }
-        ?: run {
-            try {
-                return@handle topLevelReportingContext("exceptionHandler") {
-                    this.server.exceptionHandler.handle(
-                        request.castPathSpec0(),
-                        RouteNotFoundException(request.path)
-                    )
-                }
-            } catch (e: Exception) {
-                try {
-                    return@handle topLevelReportingContext("exceptionHandler") {
-                        this.server.exceptionHandler.handle(
-                            request.castPathSpec0(),
-                            e
-                        )
-                    }
-                } catch (e: Exception) {
-                    return@handle HttpResponse(status = HttpStatus.InternalServerError)
-                }
-            }
-        }
-    val properRequest = HttpRequest(
-        path = RawPath(asString = request.path.string, match = match),
-        queryParameters = request.queryParameters,
-        headers = request.headers,
-        domain = request.domain,
-        protocol = request.protocol,
-        sourceIp = request.sourceIp,
-        method = request.method,
-        cache = request.cache,
-        body = request.body,
-    )
-    val handler = server.httpInterceptors.intercept(match.value)
-    @Suppress("UNCHECKED_CAST")
-    handler as HttpHandler<PathSpec>
     return try {
-        topLevelReportingContext(match.path.toString()) { handler.handle(properRequest) }
+        @Suppress("UNCHECKED_CAST") val rawHandler = request.path.match.value as HttpHandler<PathSpec>
+        val handler = server.httpInterceptors.intercept(rawHandler)
+        topLevelReportingContext(request.path.toString()) { handler.handle(request) }
     } catch (e: Exception) {
         try {
             topLevelReportingContext("exceptionHandler") {
-                this.server.exceptionHandler.handle(request.castPathSpec0(), e)
+                this.server.exceptionHandler.handle(request, e)
             }
         } catch (e: Exception) {
             HttpResponse(status = HttpStatus.InternalServerError)
         }
     }
 }
-
-internal fun HttpRequest<*>.castPathSpec0(): HttpRequest<PathSpec0> = HttpRequest(
-    path = RawPath(path.string),
-    queryParameters = queryParameters,
-    headers = headers,
-    domain = domain,
-    protocol = protocol,
-    sourceIp = sourceIp,
-    method = method,
-    cache = cache,
-    body = body,
-)
-internal fun HttpRequest<*>.castPathSpec0(match: PathSpecMap.Match<ServerPathEndpoints>): HttpRequest<PathSpec0> = HttpRequest(
-    path = RawPath(path.string, match),
-    queryParameters = queryParameters,
-    headers = headers,
-    domain = domain,
-    protocol = protocol,
-    sourceIp = sourceIp,
-    method = method,
-    cache = cache,
-    body = body,
-)
 
 context(serverRuntime: ServerRuntime)
 public suspend fun < Input> Task<Input>.handleWithMetrics(location: PathSpec0, input: Input) {

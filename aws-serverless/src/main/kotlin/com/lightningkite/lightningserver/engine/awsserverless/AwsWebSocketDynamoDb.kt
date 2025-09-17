@@ -4,6 +4,7 @@ package com.lightningkite.lightningserver.engine.awsserverless
 
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.services.data.KotlinBytesFormat
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
@@ -36,11 +37,14 @@ internal class AwsWebSocketDynamoDb(
 ) {
     class StateAndConnectRequest(val state: ByteArray, val connectRequest: WebSocketConnectRequest<*>)
 
-    val socketExpiration = 8.hours
-    val tableSubs = "$baseTableName-subs"
-    val tableSubsReverse = "$baseTableName-subs-reverse"
-    val tableStates = "$baseTableName-state"
+    private val socketExpiration = 8.hours
+    private val tableSubs = "$baseTableName-subs"
+    private val tableSubsReverse = "$baseTableName-subs-reverse"
+    private val tableStates = "$baseTableName-state"
 
+    companion object {
+        internal val logger = KotlinLogging.logger("com.lightningkite.lightningserver.engine.awsserverless.AwsWebSocketDynamoDb")
+    }
     @OptIn(DelicateCoroutinesApi::class)
     val ready = GlobalScope.async(start = CoroutineStart.LAZY) {
         measureTime {

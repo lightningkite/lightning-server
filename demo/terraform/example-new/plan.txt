@@ -1,0 +1,1003 @@
+random_password.secretBasis: Refreshing state... [id=none]
+random_password.database: Refreshing state... [id=none]
+random_password.settings: Refreshing state... [id=none]
+random_password.jwt: Refreshing state... [id=none]
+mongodbatlas_project.database: Refreshing state... [id=632b9896de54ec4226e7b48b]
+aws_iam_role_policy_attachment.files: Refreshing state... [id=demo-example-main-exec-20230105171834795400000002]
+aws_iam_role_policy_attachment.metrics: Refreshing state... [id=demo-example-main-exec-20230814222712223500000001]
+aws_cloudwatch_event_rule.scheduled_task_cleanupUploads: Refreshing state... [id=demo-example_cleanupUploads]
+aws_iam_policy.metrics: Refreshing state... [id=arn:aws:iam::907811386443:policy/demo/example/metrics/demo-example-metrics]
+aws_iam_policy.bucketDynamoAndInvoke: Refreshing state... [id=arn:aws:iam::907811386443:policy/demo/example/bucketDynamoAndInvoke/demo-example-bucketDynamoAndInvoke]
+aws_cloudwatch_event_target.scheduled_task_testmodelrestcleanDumps: Refreshing state... [id=demo-example_testmodelrestcleanDumps-lambda]
+aws_cloudwatch_event_target.scheduled_task_cleanupUploads: Refreshing state... [id=demo-example_cleanupUploads-lambda]
+aws_cloudwatch_event_target.scheduled_task_cleanRedirectToFiles: Refreshing state... [id=demo-example_cleanRedirectToFiles-lambda]
+aws_cloudwatch_event_target.scheduled_task_metafunnelssummarize: Refreshing state... [id=demo-example_metafunnelssummarize-lambda]
+aws_cloudwatch_event_rule.scheduled_task_clearOldMetrics: Refreshing state... [id=demo-example_clearOldMetrics]
+aws_iam_policy.files: Refreshing state... [id=arn:aws:iam::907811386443:policy/demo/example/files/demo-example-files]
+aws_iam_policy.api_gateway_ws: Refreshing state... [id=arn:aws:iam::907811386443:policy/demo/example/api_gateway_ws/demo-example-api_gateway_ws]
+aws_cloudwatch_event_rule.scheduled_task_testmodelrestcleanDumps: Refreshing state... [id=demo-example_testmodelrestcleanDumps]
+aws_iam_role_policy_attachment.api_gateway_ws: Refreshing state... [id=demo-example-main-exec-20230105171834814400000004]
+aws_iam_role_policy_attachment.bucketDynamoAndInvoke: Refreshing state... [id=demo-example-main-exec-20230817210753072400000001]
+aws_cloudwatch_event_rule.scheduled_task_metafunnelssummarize: Refreshing state... [id=demo-example_metafunnelssummarize]
+aws_cloudwatch_event_rule.scheduled_task_cleanRedirectToFiles: Refreshing state... [id=demo-example_cleanRedirectToFiles]
+aws_apigatewayv2_api.ws: Refreshing state... [id=wdmjrw7tpc]
+aws_cloudwatch_event_target.scheduled_task_clearOldMetrics: Refreshing state... [id=demo-example_clearOldMetrics-lambda]
+aws_acm_certificate.ws: Refreshing state... [id=arn:aws:acm:us-west-2:907811386443:certificate/7351bedf-d8bc-4ea7-b391-e8bfd4b4fee2]
+data.aws_caller_identity.current: Reading...
+data.aws_route53_zone.main: Reading...
+aws_ses_domain_identity.email: Refreshing state... [id=example.demo.ivieleague.com]
+data.aws_caller_identity.current: Read complete after 0s [id=907811386443]
+aws_ses_domain_mail_from.email: Refreshing state... [id=example.demo.ivieleague.com]
+aws_cloudwatch_log_group.ws_api: Refreshing state... [id=demo-example-ws-gateway-log]
+data.aws_iam_policy_document.email: Reading...
+data.aws_iam_policy_document.email: Read complete after 0s [id=681910902]
+aws_s3_bucket.lambda_bucket: Refreshing state... [id=demo-example-lambda-bucket20220920193513530200000003]
+aws_s3_bucket.files: Refreshing state... [id=demo-example-files20220920193513533900000004]
+aws_iam_role.main_exec: Refreshing state... [id=demo-example-main-exec]
+aws_acm_certificate.http: Refreshing state... [id=arn:aws:acm:us-west-2:907811386443:certificate/0a9a6bc9-a5bd-45d8-bd9e-882417aaea80]
+aws_apigatewayv2_api.http: Refreshing state... [id=mcm5gvnq54]
+aws_cloudwatch_log_group.main: Refreshing state... [id=demo-example-main-log]
+aws_cloudwatch_event_rule.scheduled_task_testschedule: Refreshing state... [id=demo-example_testschedule]
+aws_iam_user.email: Refreshing state... [id=demo-example-email-user]
+aws_cloudwatch_log_group.http_api: Refreshing state... [id=demo-example-http-gateway-log]
+aws_iam_role.cloudwatch: Refreshing state... [id=demoexample]
+aws_iam_policy.email: Refreshing state... [id=arn:aws:iam::907811386443:policy/demo-example-email-policy]
+aws_ses_domain_dkim.email_dkim: Refreshing state... [id=example.demo.ivieleague.com]
+aws_apigatewayv2_stage.ws: Refreshing state... [id=demo-example-gateway-stage]
+aws_iam_access_key.email: Refreshing state... [id=AKIA5GXOGORFVERUIJRG]
+aws_iam_role_policy_attachment.insights_policy: Refreshing state... [id=demo-example-main-exec-20230322182613602500000001]
+aws_iam_role_policy_attachment.main_policy_vpc: Refreshing state... [id=demo-example-main-exec-20230105174708502100000001]
+aws_iam_role_policy_attachment.main_policy_exec: Refreshing state... [id=demo-example-main-exec-20220920193516928700000007]
+aws_apigatewayv2_stage.http: Refreshing state... [id=demo-example-gateway-stage]
+aws_iam_user_policy_attachment.email: Refreshing state... [id=demo-example-email-user-20230105171834789300000001]
+data.aws_route53_zone.main: Read complete after 0s [id=Z3VAY26IUPC6EM]
+aws_route53_record.http: Refreshing state... [id=Z3VAY26IUPC6EM__972774c830e597d5b4cef1501ba9675f.example.demo.ivieleague.com._CNAME]
+aws_route53_record.email_spf_mail_from: Refreshing state... [id=Z3VAY26IUPC6EM_mail.example.demo.ivieleague.com_TXT]
+aws_route53_record.email_spf_domain: Refreshing state... [id=Z3VAY26IUPC6EM_example.demo.ivieleague.com_TXT]
+aws_route53_record.ws: Refreshing state... [id=Z3VAY26IUPC6EM__57477821a8a7d8607467b8d5e8d788ba.ws.example.demo.ivieleague.com._CNAME]
+aws_route53_record.email_route_53_dmarc_txt: Refreshing state... [id=Z3VAY26IUPC6EM__dmarc.example.demo.ivieleague.com_TXT]
+aws_route53_record.email_mx: Refreshing state... [id=Z3VAY26IUPC6EM_mail.example.demo.ivieleague.com_MX]
+aws_route53_record.email: Refreshing state... [id=Z3VAY26IUPC6EM__amazonses.example.demo.ivieleague.com_TXT]
+aws_route53_record.email_dkim_records[2]: Refreshing state... [id=Z3VAY26IUPC6EM_stjn3pnroawwr7tp3kbmubn2fixpu3w3._domainkey.example.demo.ivieleague.com_CNAME]
+aws_route53_record.email_dkim_records[0]: Refreshing state... [id=Z3VAY26IUPC6EM_wf7nrbfkdtvk3uqrooyqknucjvyhmmpr._domainkey.example.demo.ivieleague.com_CNAME]
+aws_route53_record.email_dkim_records[1]: Refreshing state... [id=Z3VAY26IUPC6EM_bw52az474ig43tpzrzk3tu2gjtmxf4bm._domainkey.example.demo.ivieleague.com_CNAME]
+aws_iam_role_policy.cloudwatch: Refreshing state... [id=demoexample:demoexample_policy]
+aws_api_gateway_account.main: Refreshing state... [id=api-gateway-account]
+aws_s3_bucket_cors_configuration.files: Refreshing state... [id=demo-example-files20220920193513533900000004]
+mongodbatlas_database_user.database: Refreshing state... [id=YXV0aF9kYXRhYmFzZV9uYW1l:YWRtaW4=-cHJvamVjdF9pZA==:NjMyYjk4OTZkZTU0ZWM0MjI2ZTdiNDhi-dXNlcm5hbWU=:ZGVtb2V4YW1wbGVkYXRhYmFzZS1tYWlu]
+mongodbatlas_advanced_cluster.database: Refreshing state... [id=Y2x1c3Rlcl9pZA==:NjdmODIwYWNlMTAwNGQ2ZDBlOWI3YTQw-Y2x1c3Rlcl9uYW1l:ZGVtb2V4YW1wbGVkYXRhYmFzZQ==-cHJvamVjdF9pZA==:NjMyYjk4OTZkZTU0ZWM0MjI2ZTdiNDhi]
+mongodbatlas_project_ip_access_list.database: Refreshing state... [id=ZW50cnk=:MC4wLjAuMC8w-cHJvamVjdF9pZA==:NjMyYjk4OTZkZTU0ZWM0MjI2ZTdiNDhi]
+aws_acm_certificate_validation.http: Refreshing state... [id=2022-09-20 19:35:36.117 +0000 UTC]
+aws_acm_certificate_validation.ws: Refreshing state... [id=2022-09-20 19:35:38.231 +0000 UTC]
+aws_apigatewayv2_domain_name.http: Refreshing state... [id=example.demo.ivieleague.com]
+aws_apigatewayv2_domain_name.ws: Refreshing state... [id=ws.example.demo.ivieleague.com]
+aws_apigatewayv2_api_mapping.http: Refreshing state... [id=wkmxhk]
+aws_route53_record.httpAccess: Refreshing state... [id=Z3VAY26IUPC6EM_example.demo.ivieleague.com_A]
+aws_apigatewayv2_api_mapping.ws: Refreshing state... [id=1gyh3f]
+aws_route53_record.wsAccess: Refreshing state... [id=Z3VAY26IUPC6EM_ws.example.demo.ivieleague.com_A]
+local_sensitive_file.settings_raw: Refreshing state... [id=b478790b87d3d7ae96df89e144c3d1a80b77b6aa]
+null_resource.lambda_jar_source: Refreshing state... [id=1826633605813699479]
+null_resource.settings_reread: Refreshing state... [id=6065069732745083189]
+aws_s3_object.app_storage: Refreshing state... [id=lambda-functions.zip]
+aws_lambda_function.main: Refreshing state... [id=demo-example-main]
+aws_lambda_alias.main: Refreshing state... [id=arn:aws:lambda:us-west-2:907811386443:function:demo-example-main:prod]
+aws_lambda_permission.api_gateway_ws: Refreshing state... [id=terraform-20250605213312612200000002]
+aws_lambda_permission.scheduled_tasks: Refreshing state... [id=terraform-20250605213312612100000001]
+aws_apigatewayv2_integration.ws: Refreshing state... [id=2et9czi]
+aws_lambda_permission.api_gateway_http: Refreshing state... [id=terraform-20250605213312612200000003]
+aws_apigatewayv2_integration.http: Refreshing state... [id=uw42kcm]
+aws_cloudwatch_event_target.scheduled_task_testschedule: Refreshing state... [id=demo-example_testschedule-lambda]
+aws_apigatewayv2_route.ws_connect: Refreshing state... [id=8x50d1r]
+aws_apigatewayv2_route.ws_disconnect: Refreshing state... [id=z5hdj9a]
+aws_apigatewayv2_route.ws_default: Refreshing state... [id=x2v5d1e]
+aws_apigatewayv2_route.http: Refreshing state... [id=gn8j8m4]
+
+Note: Objects have changed outside of Terraform
+
+Terraform detected the following changes made outside of Terraform since the
+last "terraform apply" which may have affected this plan:
+
+  # local_sensitive_file.settings_raw has been deleted
+  - resource "local_sensitive_file" "settings_raw" {
+      - content              = (sensitive value) -> null
+        id                   = "b478790b87d3d7ae96df89e144c3d1a80b77b6aa"
+        # (9 unchanged attributes hidden)
+    }
+
+
+Unless you have made equivalent changes to your configuration, or ignored the
+relevant attributes using ignore_changes, the following plan may include
+actions to undo or respond to these changes.
+
+─────────────────────────────────────────────────────────────────────────────
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  + create
+  ~ update in-place
+  - destroy
+-/+ destroy and then create replacement
+ <= read (data resources)
+
+Terraform will perform the following actions:
+
+  # data.archive_file.lambda will be read during apply
+  # (depends on a resource or a module with changes pending)
+ <= data "archive_file" "lambda" {
+      + id                  = (known after apply)
+      + output_base64sha256 = (known after apply)
+      + output_base64sha512 = (known after apply)
+      + output_md5          = (known after apply)
+      + output_path         = "./build/lambda.jar"
+      + output_sha          = (known after apply)
+      + output_sha256       = (known after apply)
+      + output_sha512       = (known after apply)
+      + output_size         = (known after apply)
+      + source_dir          = "./build/lambda"
+      + type                = "zip"
+    }
+
+  # aws_apigatewayv2_stage.http will be updated in-place
+  ~ resource "aws_apigatewayv2_stage" "http" {
+        id                    = "demo-example-gateway-stage"
+        name                  = "demo-example-gateway-stage"
+        tags                  = {}
+        # (10 unchanged attributes hidden)
+
+      ~ access_log_settings {
+          ~ format          = jsonencode( # whitespace changes
+                {
+                    httpMethod              = "$context.httpMethod"
+                    integrationErrorMessage = "$context.integrationErrorMessage"
+                    protocol                = "$context.protocol"
+                    requestId               = "$context.requestId"
+                    requestTime             = "$context.requestTime"
+                    resourcePath            = "$context.resourcePath"
+                    responseLength          = "$context.responseLength"
+                    routeKey                = "$context.routeKey"
+                    sourceIp                = "$context.identity.sourceIp"
+                    status                  = "$context.status"
+                }
+            )
+            # (1 unchanged attribute hidden)
+        }
+
+        # (1 unchanged block hidden)
+    }
+
+  # aws_apigatewayv2_stage.ws will be updated in-place
+  ~ resource "aws_apigatewayv2_stage" "ws" {
+        id                    = "demo-example-gateway-stage"
+        name                  = "demo-example-gateway-stage"
+        tags                  = {}
+        # (10 unchanged attributes hidden)
+
+      ~ access_log_settings {
+          ~ format          = jsonencode( # whitespace changes
+                {
+                    httpMethod              = "$context.httpMethod"
+                    integrationErrorMessage = "$context.integrationErrorMessage"
+                    protocol                = "$context.protocol"
+                    requestId               = "$context.requestId"
+                    requestTime             = "$context.requestTime"
+                    resourcePath            = "$context.resourcePath"
+                    responseLength          = "$context.responseLength"
+                    routeKey                = "$context.routeKey"
+                    sourceIp                = "$context.identity.sourceIp"
+                    status                  = "$context.status"
+                }
+            )
+            # (1 unchanged attribute hidden)
+        }
+
+        # (1 unchanged block hidden)
+    }
+
+  # aws_cloudwatch_event_rule.scheduled_task_cleanRedirectToFiles will be destroyed
+  # (because aws_cloudwatch_event_rule.scheduled_task_cleanRedirectToFiles is not in configuration)
+  - resource "aws_cloudwatch_event_rule" "scheduled_task_cleanRedirectToFiles" {
+      - arn                 = "arn:aws:events:us-west-2:907811386443:rule/demo-example_cleanRedirectToFiles" -> null
+      - event_bus_name      = "default" -> null
+      - force_destroy       = false -> null
+      - id                  = "demo-example_cleanRedirectToFiles" -> null
+      - is_enabled          = true -> null
+      - name                = "demo-example_cleanRedirectToFiles" -> null
+      - schedule_expression = "rate(1440 minutes)" -> null
+      - state               = "ENABLED" -> null
+      - tags                = {} -> null
+      - tags_all            = {} -> null
+        # (3 unchanged attributes hidden)
+    }
+
+  # aws_cloudwatch_event_rule.scheduled_task_cleanupUploads will be destroyed
+  # (because aws_cloudwatch_event_rule.scheduled_task_cleanupUploads is not in configuration)
+  - resource "aws_cloudwatch_event_rule" "scheduled_task_cleanupUploads" {
+      - arn                 = "arn:aws:events:us-west-2:907811386443:rule/demo-example_cleanupUploads" -> null
+      - event_bus_name      = "default" -> null
+      - force_destroy       = false -> null
+      - id                  = "demo-example_cleanupUploads" -> null
+      - is_enabled          = true -> null
+      - name                = "demo-example_cleanupUploads" -> null
+      - schedule_expression = "rate(1440 minutes)" -> null
+      - state               = "ENABLED" -> null
+      - tags                = {} -> null
+      - tags_all            = {} -> null
+        # (3 unchanged attributes hidden)
+    }
+
+  # aws_cloudwatch_event_rule.scheduled_task_clearOldMetrics will be destroyed
+  # (because aws_cloudwatch_event_rule.scheduled_task_clearOldMetrics is not in configuration)
+  - resource "aws_cloudwatch_event_rule" "scheduled_task_clearOldMetrics" {
+      - arn                 = "arn:aws:events:us-west-2:907811386443:rule/demo-example_clearOldMetrics" -> null
+      - event_bus_name      = "default" -> null
+      - force_destroy       = false -> null
+      - id                  = "demo-example_clearOldMetrics" -> null
+      - is_enabled          = true -> null
+      - name                = "demo-example_clearOldMetrics" -> null
+      - schedule_expression = "rate(60 minutes)" -> null
+      - state               = "ENABLED" -> null
+      - tags                = {} -> null
+      - tags_all            = {} -> null
+        # (3 unchanged attributes hidden)
+    }
+
+  # aws_cloudwatch_event_rule.scheduled_task_metafunnelssummarize will be destroyed
+  # (because aws_cloudwatch_event_rule.scheduled_task_metafunnelssummarize is not in configuration)
+  - resource "aws_cloudwatch_event_rule" "scheduled_task_metafunnelssummarize" {
+      - arn                 = "arn:aws:events:us-west-2:907811386443:rule/demo-example_metafunnelssummarize" -> null
+      - event_bus_name      = "default" -> null
+      - force_destroy       = false -> null
+      - id                  = "demo-example_metafunnelssummarize" -> null
+      - is_enabled          = true -> null
+      - name                = "demo-example_metafunnelssummarize" -> null
+      - schedule_expression = "cron(0 15 * * ? *)" -> null
+      - state               = "ENABLED" -> null
+      - tags                = {} -> null
+      - tags_all            = {} -> null
+        # (3 unchanged attributes hidden)
+    }
+
+  # aws_cloudwatch_event_rule.scheduled_task_testmodelrestcleanDumps will be destroyed
+  # (because aws_cloudwatch_event_rule.scheduled_task_testmodelrestcleanDumps is not in configuration)
+  - resource "aws_cloudwatch_event_rule" "scheduled_task_testmodelrestcleanDumps" {
+      - arn                 = "arn:aws:events:us-west-2:907811386443:rule/demo-example_testmodelrestcleanDumps" -> null
+      - event_bus_name      = "default" -> null
+      - force_destroy       = false -> null
+      - id                  = "demo-example_testmodelrestcleanDumps" -> null
+      - is_enabled          = true -> null
+      - name                = "demo-example_testmodelrestcleanDumps" -> null
+      - schedule_expression = "rate(10 minutes)" -> null
+      - state               = "ENABLED" -> null
+      - tags                = {} -> null
+      - tags_all            = {} -> null
+        # (3 unchanged attributes hidden)
+    }
+
+  # aws_cloudwatch_event_rule.scheduled_task_uploadcleanupUploads will be created
+  + resource "aws_cloudwatch_event_rule" "scheduled_task_uploadcleanupUploads" {
+      + arn                 = (known after apply)
+      + event_bus_name      = "default"
+      + force_destroy       = false
+      + id                  = (known after apply)
+      + name                = "demo-example_uploadcleanupUploads"
+      + name_prefix         = (known after apply)
+      + schedule_expression = "rate(1440 minutes)"
+      + tags_all            = (known after apply)
+    }
+
+  # aws_cloudwatch_event_target.scheduled_task_cleanRedirectToFiles will be destroyed
+  # (because aws_cloudwatch_event_target.scheduled_task_cleanRedirectToFiles is not in configuration)
+  - resource "aws_cloudwatch_event_target" "scheduled_task_cleanRedirectToFiles" {
+      - arn            = "arn:aws:lambda:us-west-2:907811386443:function:demo-example-main:prod" -> null
+      - event_bus_name = "default" -> null
+      - force_destroy  = false -> null
+      - id             = "demo-example_cleanRedirectToFiles-lambda" -> null
+      - input          = jsonencode(
+            {
+              - scheduled = "cleanRedirectToFiles"
+            }
+        ) -> null
+      - rule           = "demo-example_cleanRedirectToFiles" -> null
+      - target_id      = "lambda" -> null
+        # (2 unchanged attributes hidden)
+    }
+
+  # aws_cloudwatch_event_target.scheduled_task_cleanupUploads will be destroyed
+  # (because aws_cloudwatch_event_target.scheduled_task_cleanupUploads is not in configuration)
+  - resource "aws_cloudwatch_event_target" "scheduled_task_cleanupUploads" {
+      - arn            = "arn:aws:lambda:us-west-2:907811386443:function:demo-example-main:prod" -> null
+      - event_bus_name = "default" -> null
+      - force_destroy  = false -> null
+      - id             = "demo-example_cleanupUploads-lambda" -> null
+      - input          = jsonencode(
+            {
+              - scheduled = "cleanupUploads"
+            }
+        ) -> null
+      - rule           = "demo-example_cleanupUploads" -> null
+      - target_id      = "lambda" -> null
+        # (2 unchanged attributes hidden)
+    }
+
+  # aws_cloudwatch_event_target.scheduled_task_clearOldMetrics will be destroyed
+  # (because aws_cloudwatch_event_target.scheduled_task_clearOldMetrics is not in configuration)
+  - resource "aws_cloudwatch_event_target" "scheduled_task_clearOldMetrics" {
+      - arn            = "arn:aws:lambda:us-west-2:907811386443:function:demo-example-main:prod" -> null
+      - event_bus_name = "default" -> null
+      - force_destroy  = false -> null
+      - id             = "demo-example_clearOldMetrics-lambda" -> null
+      - input          = jsonencode(
+            {
+              - scheduled = "clearOldMetrics"
+            }
+        ) -> null
+      - rule           = "demo-example_clearOldMetrics" -> null
+      - target_id      = "lambda" -> null
+        # (2 unchanged attributes hidden)
+    }
+
+  # aws_cloudwatch_event_target.scheduled_task_metafunnelssummarize will be destroyed
+  # (because aws_cloudwatch_event_target.scheduled_task_metafunnelssummarize is not in configuration)
+  - resource "aws_cloudwatch_event_target" "scheduled_task_metafunnelssummarize" {
+      - arn            = "arn:aws:lambda:us-west-2:907811386443:function:demo-example-main:prod" -> null
+      - event_bus_name = "default" -> null
+      - force_destroy  = false -> null
+      - id             = "demo-example_metafunnelssummarize-lambda" -> null
+      - input          = jsonencode(
+            {
+              - scheduled = "/meta/funnels/summarize"
+            }
+        ) -> null
+      - rule           = "demo-example_metafunnelssummarize" -> null
+      - target_id      = "lambda" -> null
+        # (2 unchanged attributes hidden)
+    }
+
+  # aws_cloudwatch_event_target.scheduled_task_testmodelrestcleanDumps will be destroyed
+  # (because aws_cloudwatch_event_target.scheduled_task_testmodelrestcleanDumps is not in configuration)
+  - resource "aws_cloudwatch_event_target" "scheduled_task_testmodelrestcleanDumps" {
+      - arn            = "arn:aws:lambda:us-west-2:907811386443:function:demo-example-main:prod" -> null
+      - event_bus_name = "default" -> null
+      - force_destroy  = false -> null
+      - id             = "demo-example_testmodelrestcleanDumps-lambda" -> null
+      - input          = jsonencode(
+            {
+              - scheduled = "/test-model/rest/cleanDumps"
+            }
+        ) -> null
+      - rule           = "demo-example_testmodelrestcleanDumps" -> null
+      - target_id      = "lambda" -> null
+        # (2 unchanged attributes hidden)
+    }
+
+  # aws_cloudwatch_event_target.scheduled_task_testschedule will be updated in-place
+  ~ resource "aws_cloudwatch_event_target" "scheduled_task_testschedule" {
+        id             = "demo-example_testschedule-lambda"
+      ~ input          = jsonencode(
+          ~ {
+              ~ scheduled = "test-schedule" -> "/test-schedule"
+            }
+        )
+        # (7 unchanged attributes hidden)
+    }
+
+  # aws_cloudwatch_event_target.scheduled_task_uploadcleanupUploads will be created
+  + resource "aws_cloudwatch_event_target" "scheduled_task_uploadcleanupUploads" {
+      + arn            = "arn:aws:lambda:us-west-2:907811386443:function:demo-example-main:prod"
+      + event_bus_name = "default"
+      + force_destroy  = false
+      + id             = (known after apply)
+      + input          = jsonencode(
+            {
+              + scheduled = "/upload/cleanupUploads"
+            }
+        )
+      + rule           = "demo-example_uploadcleanupUploads"
+      + target_id      = "lambda"
+    }
+
+  # aws_cloudwatch_metric_alarm.emergency_compute will be created
+  + resource "aws_cloudwatch_metric_alarm" "emergency_compute" {
+      + actions_enabled                       = true
+      + alarm_actions                         = (known after apply)
+      + alarm_name                            = "demo-example_emergency_compute"
+      + arn                                   = (known after apply)
+      + comparison_operator                   = "GreaterThanOrEqualToThreshold"
+      + datapoints_to_alarm                   = 1
+      + dimensions                            = {
+          + "FunctionName" = "demo-example-main"
+        }
+      + evaluate_low_sample_count_percentiles = (known after apply)
+      + evaluation_periods                    = 1
+      + id                                    = (known after apply)
+      + metric_name                           = "Duration"
+      + namespace                             = "AWS/Lambda"
+      + period                                = 60
+      + statistic                             = "Sum"
+      + tags_all                              = (known after apply)
+      + threshold                             = 180000
+      + treat_missing_data                    = "missing"
+        # (1 unchanged attribute hidden)
+    }
+
+  # aws_cloudwatch_metric_alarm.emergency_invocations will be created
+  + resource "aws_cloudwatch_metric_alarm" "emergency_invocations" {
+      + actions_enabled                       = true
+      + alarm_actions                         = (known after apply)
+      + alarm_name                            = "demo-example_emergency_invocations"
+      + arn                                   = (known after apply)
+      + comparison_operator                   = "GreaterThanOrEqualToThreshold"
+      + datapoints_to_alarm                   = 1
+      + dimensions                            = {
+          + "FunctionName" = "demo-example-main"
+        }
+      + evaluate_low_sample_count_percentiles = (known after apply)
+      + evaluation_periods                    = 1
+      + id                                    = (known after apply)
+      + metric_name                           = "Invocations"
+      + namespace                             = "AWS/Lambda"
+      + period                                = 60
+      + statistic                             = "Sum"
+      + tags_all                              = (known after apply)
+      + threshold                             = 150
+      + treat_missing_data                    = "missing"
+        # (1 unchanged attribute hidden)
+    }
+
+  # aws_cloudwatch_metric_alarm.panic_compute will be created
+  + resource "aws_cloudwatch_metric_alarm" "panic_compute" {
+      + actions_enabled                       = true
+      + alarm_actions                         = (known after apply)
+      + alarm_name                            = "demo-example_panic_compute"
+      + arn                                   = (known after apply)
+      + comparison_operator                   = "GreaterThanOrEqualToThreshold"
+      + datapoints_to_alarm                   = 1
+      + dimensions                            = {
+          + "FunctionName" = "demo-example-main"
+        }
+      + evaluate_low_sample_count_percentiles = (known after apply)
+      + evaluation_periods                    = 1
+      + id                                    = (known after apply)
+      + metric_name                           = "Duration"
+      + namespace                             = "AWS/Lambda"
+      + period                                = 60
+      + statistic                             = "Sum"
+      + tags_all                              = (known after apply)
+      + threshold                             = 300000
+      + treat_missing_data                    = "missing"
+        # (1 unchanged attribute hidden)
+    }
+
+  # aws_cloudwatch_metric_alarm.panic_invocations will be created
+  + resource "aws_cloudwatch_metric_alarm" "panic_invocations" {
+      + actions_enabled                       = true
+      + alarm_actions                         = (known after apply)
+      + alarm_name                            = "demo-example_panic_invocations"
+      + arn                                   = (known after apply)
+      + comparison_operator                   = "GreaterThanOrEqualToThreshold"
+      + datapoints_to_alarm                   = 1
+      + dimensions                            = {
+          + "FunctionName" = "demo-example-main"
+        }
+      + evaluate_low_sample_count_percentiles = (known after apply)
+      + evaluation_periods                    = 1
+      + id                                    = (known after apply)
+      + metric_name                           = "Invocations"
+      + namespace                             = "AWS/Lambda"
+      + period                                = 60
+      + statistic                             = "Sum"
+      + tags_all                              = (known after apply)
+      + threshold                             = 450
+      + treat_missing_data                    = "missing"
+        # (1 unchanged attribute hidden)
+    }
+
+  # aws_iam_policy.api_gateway_ws will be destroyed
+  # (because aws_iam_policy.api_gateway_ws is not in configuration)
+  - resource "aws_iam_policy" "api_gateway_ws" {
+      - arn              = "arn:aws:iam::907811386443:policy/demo/example/api_gateway_ws/demo-example-api_gateway_ws" -> null
+      - attachment_count = 1 -> null
+      - description      = "Access to the demo-example_api_gateway_ws management" -> null
+      - id               = "arn:aws:iam::907811386443:policy/demo/example/api_gateway_ws/demo-example-api_gateway_ws" -> null
+      - name             = "demo-example-api_gateway_ws" -> null
+      - path             = "/demo/example/api_gateway_ws/" -> null
+      - policy           = jsonencode(
+            {
+              - Statement = [
+                  - {
+                      - Action   = [
+                          - "execute-api:ManageConnections",
+                        ]
+                      - Effect   = "Allow"
+                      - Resource = "*"
+                    },
+                ]
+              - Version   = "2012-10-17"
+            }
+        ) -> null
+      - policy_id        = "ANPA5GXOGORFQDMNVF3V2" -> null
+      - tags             = {} -> null
+      - tags_all         = {} -> null
+        # (1 unchanged attribute hidden)
+    }
+
+  # aws_iam_policy.bucketDynamoAndInvoke will be destroyed
+  # (because aws_iam_policy.bucketDynamoAndInvoke is not in configuration)
+  - resource "aws_iam_policy" "bucketDynamoAndInvoke" {
+      - arn              = "arn:aws:iam::907811386443:policy/demo/example/bucketDynamoAndInvoke/demo-example-bucketDynamoAndInvoke" -> null
+      - attachment_count = 1 -> null
+      - description      = "Access to the demo-example bucket, dynamo, and invoke" -> null
+      - id               = "arn:aws:iam::907811386443:policy/demo/example/bucketDynamoAndInvoke/demo-example-bucketDynamoAndInvoke" -> null
+      - name             = "demo-example-bucketDynamoAndInvoke" -> null
+      - path             = "/demo/example/bucketDynamoAndInvoke/" -> null
+      - policy           = jsonencode(
+            {
+              - Statement = [
+                  - {
+                      - Action   = [
+                          - "s3:GetObject",
+                        ]
+                      - Effect   = "Allow"
+                      - Resource = [
+                          - "arn:aws:s3:::demo-example-lambda-bucket20220920193513530200000003",
+                          - "arn:aws:s3:::demo-example-lambda-bucket20220920193513530200000003/*",
+                        ]
+                    },
+                  - {
+                      - Action   = [
+                          - "dynamodb:*",
+                        ]
+                      - Effect   = "Allow"
+                      - Resource = [
+                          - "*",
+                        ]
+                    },
+                  - {
+                      - Action   = [
+                          - "lambda:InvokeFunction",
+                        ]
+                      - Effect   = "Allow"
+                      - Resource = "*"
+                    },
+                ]
+              - Version   = "2012-10-17"
+            }
+        ) -> null
+      - policy_id        = "ANPA5GXOGORF34WG73G7F" -> null
+      - tags             = {} -> null
+      - tags_all         = {} -> null
+        # (1 unchanged attribute hidden)
+    }
+
+  # aws_iam_policy.files will be destroyed
+  # (because aws_iam_policy.files is not in configuration)
+  - resource "aws_iam_policy" "files" {
+      - arn              = "arn:aws:iam::907811386443:policy/demo/example/files/demo-example-files" -> null
+      - attachment_count = 1 -> null
+      - description      = "Access to the demo-example_files bucket" -> null
+      - id               = "arn:aws:iam::907811386443:policy/demo/example/files/demo-example-files" -> null
+      - name             = "demo-example-files" -> null
+      - path             = "/demo/example/files/" -> null
+      - policy           = jsonencode(
+            {
+              - Statement = [
+                  - {
+                      - Action   = [
+                          - "s3:*",
+                        ]
+                      - Effect   = "Allow"
+                      - Resource = [
+                          - "arn:aws:s3:::demo-example-files20220920193513533900000004",
+                          - "arn:aws:s3:::demo-example-files20220920193513533900000004/*",
+                        ]
+                    },
+                ]
+              - Version   = "2012-10-17"
+            }
+        ) -> null
+      - policy_id        = "ANPA5GXOGORF7LGLNEZRG" -> null
+      - tags             = {} -> null
+      - tags_all         = {} -> null
+        # (1 unchanged attribute hidden)
+    }
+
+  # aws_iam_policy.metrics will be destroyed
+  # (because aws_iam_policy.metrics is not in configuration)
+  - resource "aws_iam_policy" "metrics" {
+      - arn              = "arn:aws:iam::907811386443:policy/demo/example/metrics/demo-example-metrics" -> null
+      - attachment_count = 1 -> null
+      - description      = "Access to publish metrics" -> null
+      - id               = "arn:aws:iam::907811386443:policy/demo/example/metrics/demo-example-metrics" -> null
+      - name             = "demo-example-metrics" -> null
+      - path             = "/demo/example/metrics/" -> null
+      - policy           = jsonencode(
+            {
+              - Statement = [
+                  - {
+                      - Action    = [
+                          - "cloudwatch:PutMetricData",
+                        ]
+                      - Condition = {
+                          - StringEquals = {
+                              - "cloudwatch:namespace" = "demo-example"
+                            }
+                        }
+                      - Effect    = "Allow"
+                      - Resource  = [
+                          - "*",
+                        ]
+                    },
+                ]
+              - Version   = "2012-10-17"
+            }
+        ) -> null
+      - policy_id        = "ANPA5GXOGORF3W2R2NJVT" -> null
+      - tags             = {} -> null
+      - tags_all         = {} -> null
+        # (1 unchanged attribute hidden)
+    }
+
+  # aws_iam_policy.servicesAccess will be created
+  + resource "aws_iam_policy" "servicesAccess" {
+      + arn              = (known after apply)
+      + attachment_count = (known after apply)
+      + description      = "Access to the demo-example services"
+      + id               = (known after apply)
+      + name             = "demo-example-servicesAccess"
+      + name_prefix      = (known after apply)
+      + path             = "/demo/example/servicesAccess/"
+      + policy           = jsonencode(
+            {
+              + Statement = [
+                  + {
+                      + Action   = [
+                          + "s3:*",
+                        ]
+                      + Resource = [
+                          + "arn:aws:s3:::demo-example-files20220920193513533900000004",
+                          + "arn:aws:s3:::demo-example-files20220920193513533900000004/*",
+                        ]
+                    },
+                  + {
+                      + Action   = [
+                          + "execute-api:ManageConnections",
+                        ]
+                      + Resource = [
+                          + "*",
+                        ]
+                    },
+                  + {
+                      + Action   = [
+                          + "s3:GetObject",
+                        ]
+                      + Resource = [
+                          + "arn:aws:s3:::demo-example-lambda-bucket20220920193513530200000003",
+                          + "arn:aws:s3:::demo-example-lambda-bucket20220920193513530200000003/*",
+                        ]
+                    },
+                  + {
+                      + Action   = [
+                          + "dynamodb:*",
+                        ]
+                      + Resource = [
+                          + "*",
+                        ]
+                    },
+                  + {
+                      + Action   = [
+                          + "lambda:InvokeFunction",
+                        ]
+                      + Resource = [
+                          + "*",
+                        ]
+                    },
+                ]
+              + Version   = "2012-10-17"
+            }
+        )
+      + policy_id        = (known after apply)
+      + tags_all         = (known after apply)
+    }
+
+  # aws_iam_role_policy_attachment.api_gateway_ws will be destroyed
+  # (because aws_iam_role_policy_attachment.api_gateway_ws is not in configuration)
+  - resource "aws_iam_role_policy_attachment" "api_gateway_ws" {
+      - id         = "demo-example-main-exec-20230105171834814400000004" -> null
+      - policy_arn = "arn:aws:iam::907811386443:policy/demo/example/api_gateway_ws/demo-example-api_gateway_ws" -> null
+      - role       = "demo-example-main-exec" -> null
+    }
+
+  # aws_iam_role_policy_attachment.bucketDynamoAndInvoke will be destroyed
+  # (because aws_iam_role_policy_attachment.bucketDynamoAndInvoke is not in configuration)
+  - resource "aws_iam_role_policy_attachment" "bucketDynamoAndInvoke" {
+      - id         = "demo-example-main-exec-20230817210753072400000001" -> null
+      - policy_arn = "arn:aws:iam::907811386443:policy/demo/example/bucketDynamoAndInvoke/demo-example-bucketDynamoAndInvoke" -> null
+      - role       = "demo-example-main-exec" -> null
+    }
+
+  # aws_iam_role_policy_attachment.files will be destroyed
+  # (because aws_iam_role_policy_attachment.files is not in configuration)
+  - resource "aws_iam_role_policy_attachment" "files" {
+      - id         = "demo-example-main-exec-20230105171834795400000002" -> null
+      - policy_arn = "arn:aws:iam::907811386443:policy/demo/example/files/demo-example-files" -> null
+      - role       = "demo-example-main-exec" -> null
+    }
+
+  # aws_iam_role_policy_attachment.metrics will be destroyed
+  # (because aws_iam_role_policy_attachment.metrics is not in configuration)
+  - resource "aws_iam_role_policy_attachment" "metrics" {
+      - id         = "demo-example-main-exec-20230814222712223500000001" -> null
+      - policy_arn = "arn:aws:iam::907811386443:policy/demo/example/metrics/demo-example-metrics" -> null
+      - role       = "demo-example-main-exec" -> null
+    }
+
+  # aws_iam_role_policy_attachment.servicesAccess will be created
+  + resource "aws_iam_role_policy_attachment" "servicesAccess" {
+      + id         = (known after apply)
+      + policy_arn = (known after apply)
+      + role       = "demo-example-main-exec"
+    }
+
+  # aws_lambda_alias.main will be updated in-place
+  ~ resource "aws_lambda_alias" "main" {
+      ~ function_version = "106" -> (known after apply)
+        id               = "arn:aws:lambda:us-west-2:907811386443:function:demo-example-main:prod"
+        name             = "prod"
+        # (4 unchanged attributes hidden)
+    }
+
+  # aws_lambda_function.main will be updated in-place
+  ~ resource "aws_lambda_function" "main" {
+      ~ handler                        = "com.lightningkite.lightningserverdemo.AwsHandler" -> "com.lightningkite.lightningserver.demo.AwsHandler"
+        id                             = "demo-example-main"
+      ~ last_modified                  = "2025-06-05T21:30:48.000+0000" -> (known after apply)
+      ~ qualified_arn                  = "arn:aws:lambda:us-west-2:907811386443:function:demo-example-main:106" -> (known after apply)
+      ~ qualified_invoke_arn           = "arn:aws:apigateway:us-west-2:lambda:path/2015-03-31/functions/arn:aws:lambda:us-west-2:907811386443:function:demo-example-main:106/invocations" -> (known after apply)
+      ~ source_code_hash               = "u3uB139zD40bJLpTigc22FIJHLfA4k1vwIEUxpse/po=" -> (known after apply)
+        tags                           = {}
+      ~ timeout                        = 45 -> 30
+      ~ version                        = "106" -> (known after apply)
+        # (23 unchanged attributes hidden)
+
+      ~ environment {
+          ~ variables = {
+              - "LIGHTNING_SERVER_SETTINGS_DECRYPTION" = (sensitive value)
+            } -> (known after apply)
+        }
+
+        # (4 unchanged blocks hidden)
+    }
+
+  # aws_lambda_permission.api_gateway_http must be replaced
+-/+ resource "aws_lambda_permission" "api_gateway_http" {
+      ~ function_name       = "arn:aws:lambda:us-west-2:907811386443:function:demo-example-main" -> "arn:aws:lambda:us-west-2:907811386443:function:demo-example-main:prod" # forces replacement
+      ~ id                  = "terraform-20250605213312612200000003" -> (known after apply)
+      - qualifier           = "prod" -> null # forces replacement
+      ~ statement_id        = "terraform-20250605213312612200000003" -> (known after apply)
+      ~ statement_id_prefix = "terraform-" -> (known after apply)
+        # (3 unchanged attributes hidden)
+    }
+
+  # aws_lambda_permission.api_gateway_ws must be replaced
+-/+ resource "aws_lambda_permission" "api_gateway_ws" {
+      ~ function_name       = "arn:aws:lambda:us-west-2:907811386443:function:demo-example-main" -> "arn:aws:lambda:us-west-2:907811386443:function:demo-example-main:prod" # forces replacement
+      ~ id                  = "terraform-20250605213312612200000002" -> (known after apply)
+      - qualifier           = "prod" -> null # forces replacement
+      ~ statement_id        = "terraform-20250605213312612200000002" -> (known after apply)
+      ~ statement_id_prefix = "terraform-" -> (known after apply)
+        # (3 unchanged attributes hidden)
+    }
+
+  # aws_lambda_permission.scheduled_tasks must be replaced
+-/+ resource "aws_lambda_permission" "scheduled_tasks" {
+      ~ function_name       = "arn:aws:lambda:us-west-2:907811386443:function:demo-example-main" -> "arn:aws:lambda:us-west-2:907811386443:function:demo-example-main:prod" # forces replacement
+      ~ id                  = "terraform-20250605213312612100000001" -> (known after apply)
+      - qualifier           = "prod" -> null # forces replacement
+      ~ source_arn          = "arn:aws:events:us-west-2:907811386443:rule/demo-example_*" -> "arn:aws:events:us-west-2:907811386443:rule/demo-example*" # forces replacement
+      ~ statement_id        = "terraform-20250605213312612100000001" -> (known after apply)
+      ~ statement_id_prefix = "terraform-" -> (known after apply)
+        # (2 unchanged attributes hidden)
+    }
+
+  # aws_route53_record.email_dkim_records[0] will be updated in-place
+  ~ resource "aws_route53_record" "email_dkim_records" {
+        id                               = "Z3VAY26IUPC6EM_wf7nrbfkdtvk3uqrooyqknucjvyhmmpr._domainkey.example.demo.ivieleague.com_CNAME"
+        name                             = "wf7nrbfkdtvk3uqrooyqknucjvyhmmpr._domainkey.example.demo.ivieleague.com"
+      ~ records                          = [
+          - "wf7nrbfkdtvk3uqrooyqknucjvyhmmpr.dkim.amazonses.com",
+          + "wf7nrbfkdtvk3uqrooyqknucjvyhmmpr",
+        ]
+      ~ ttl                              = 300 -> 600
+        # (6 unchanged attributes hidden)
+    }
+
+  # aws_route53_record.email_dkim_records[1] will be updated in-place
+  ~ resource "aws_route53_record" "email_dkim_records" {
+        id                               = "Z3VAY26IUPC6EM_bw52az474ig43tpzrzk3tu2gjtmxf4bm._domainkey.example.demo.ivieleague.com_CNAME"
+        name                             = "bw52az474ig43tpzrzk3tu2gjtmxf4bm._domainkey.example.demo.ivieleague.com"
+      ~ records                          = [
+          - "bw52az474ig43tpzrzk3tu2gjtmxf4bm.dkim.amazonses.com",
+          + "bw52az474ig43tpzrzk3tu2gjtmxf4bm",
+        ]
+      ~ ttl                              = 300 -> 600
+        # (6 unchanged attributes hidden)
+    }
+
+  # aws_route53_record.email_dkim_records[2] will be updated in-place
+  ~ resource "aws_route53_record" "email_dkim_records" {
+        id                               = "Z3VAY26IUPC6EM_stjn3pnroawwr7tp3kbmubn2fixpu3w3._domainkey.example.demo.ivieleague.com_CNAME"
+        name                             = "stjn3pnroawwr7tp3kbmubn2fixpu3w3._domainkey.example.demo.ivieleague.com"
+      ~ records                          = [
+          - "stjn3pnroawwr7tp3kbmubn2fixpu3w3.dkim.amazonses.com",
+          + "stjn3pnroawwr7tp3kbmubn2fixpu3w3",
+        ]
+      ~ ttl                              = 300 -> 600
+        # (6 unchanged attributes hidden)
+    }
+
+  # aws_route53_record.email_route_53_dmarc_txt will be updated in-place
+  ~ resource "aws_route53_record" "email_route_53_dmarc_txt" {
+        id                               = "Z3VAY26IUPC6EM__dmarc.example.demo.ivieleague.com_TXT"
+        name                             = "_dmarc.example.demo.ivieleague.com"
+      ~ records                          = [
+          - "v=DMARC1;p=quarantine;pct=75;rua=mailto:joseph@lightningkite.com",
+          + "v=DMARC1;p=quarantine;pct=75;rua=mailto:josephivie@gmail.com",
+        ]
+        # (7 unchanged attributes hidden)
+    }
+
+  # aws_s3_object.app_storage will be updated in-place
+  ~ resource "aws_s3_object" "app_storage" {
+        id                            = "lambda-functions.zip"
+      ~ source_hash                   = "2dfe289263ffea36facbea8bdb8641b4" -> (known after apply)
+        tags                          = {}
+      + version_id                    = (known after apply)
+        # (26 unchanged attributes hidden)
+    }
+
+  # aws_sns_topic.emergency will be created
+  + resource "aws_sns_topic" "emergency" {
+      + arn                         = (known after apply)
+      + beginning_archive_time      = (known after apply)
+      + content_based_deduplication = false
+      + fifo_topic                  = false
+      + id                          = (known after apply)
+      + name                        = "demo-example_emergencies"
+      + name_prefix                 = (known after apply)
+      + owner                       = (known after apply)
+      + policy                      = (known after apply)
+      + signature_version           = (known after apply)
+      + tags_all                    = (known after apply)
+      + tracing_config              = (known after apply)
+    }
+
+  # aws_sns_topic_subscription.emergency_primary will be created
+  + resource "aws_sns_topic_subscription" "emergency_primary" {
+      + arn                             = (known after apply)
+      + confirmation_timeout_in_minutes = 1
+      + confirmation_was_authenticated  = (known after apply)
+      + endpoint                        = "josephivie@gmail.com"
+      + endpoint_auto_confirms          = false
+      + filter_policy_scope             = (known after apply)
+      + id                              = (known after apply)
+      + owner_id                        = (known after apply)
+      + pending_confirmation            = (known after apply)
+      + protocol                        = "email"
+      + raw_message_delivery            = false
+      + topic_arn                       = (known after apply)
+    }
+
+  # local_sensitive_file.settings_raw will be created
+  + resource "local_sensitive_file" "settings_raw" {
+      + content              = (sensitive value)
+      + content_base64sha256 = (known after apply)
+      + content_base64sha512 = (known after apply)
+      + content_md5          = (known after apply)
+      + content_sha1         = (known after apply)
+      + content_sha256       = (known after apply)
+      + content_sha512       = (known after apply)
+      + directory_permission = "0700"
+      + file_permission      = "0700"
+      + filename             = "./build/raw-settings.json"
+      + id                   = (known after apply)
+    }
+
+  # mongodbatlas_advanced_cluster.database will be updated in-place
+  ~ resource "mongodbatlas_advanced_cluster" "database" {
+      ~ backup_enabled                                   = false -> true
+        id                                               = "Y2x1c3Rlcl9pZA==:NjdmODIwYWNlMTAwNGQ2ZDBlOWI3YTQw-Y2x1c3Rlcl9uYW1l:ZGVtb2V4YW1wbGVkYXRhYmFzZQ==-cHJvamVjdF9pZA==:NjMyYjk4OTZkZTU0ZWM0MjI2ZTdiNDhi"
+        name                                             = "demoexampledatabase"
+        # (21 unchanged attributes hidden)
+
+      ~ replication_specs {
+            id           = "67f820ace1004d6d0e9b7a3b"
+          ~ zone_name    = "Zone 1" -> "ZoneName managed by Terraform"
+            # (4 unchanged attributes hidden)
+
+          ~ region_configs {
+              - backing_provider_name = "AWS" -> null
+              ~ provider_name         = "TENANT" -> "AWS"
+                # (2 unchanged attributes hidden)
+
+                # (1 unchanged block hidden)
+            }
+        }
+
+        # (2 unchanged blocks hidden)
+    }
+
+  # mongodbatlas_project.database[0] has moved to mongodbatlas_project.database
+    resource "mongodbatlas_project" "database" {
+        id                                               = "632b9896de54ec4226e7b48b"
+        name                                             = "demoexampledatabase"
+        # (12 unchanged attributes hidden)
+    }
+
+  # null_resource.lambda_jar_source must be replaced
+-/+ resource "null_resource" "lambda_jar_source" {
+      ~ id       = "1826633605813699479" -> (known after apply)
+      ~ triggers = { # forces replacement
+          ~ "always" = "2025-06-05T21:30:32Z" -> (known after apply)
+        }
+    }
+
+  # null_resource.settings_reread must be replaced
+-/+ resource "null_resource" "settings_reread" {
+      ~ id       = "6065069732745083189" -> (known after apply)
+      ~ triggers = { # forces replacement
+          ~ "settingsRawHash" = (sensitive value)
+        }
+    }
+
+  # random_password.jwt will be destroyed
+  # (because random_password.jwt is not in configuration)
+  - resource "random_password" "jwt" {
+      - bcrypt_hash      = (sensitive value) -> null
+      - id               = "none" -> null
+      - length           = 32 -> null
+      - lower            = true -> null
+      - min_lower        = 0 -> null
+      - min_numeric      = 0 -> null
+      - min_special      = 0 -> null
+      - min_upper        = 0 -> null
+      - number           = true -> null
+      - numeric          = true -> null
+      - override_special = "!#$%&*()-_=+[]{}<>:?" -> null
+      - result           = (sensitive value) -> null
+      - special          = true -> null
+      - upper            = true -> null
+    }
+
+  # random_password.settings must be replaced
+-/+ resource "random_password" "settings" {
+      ~ bcrypt_hash      = (sensitive value)
+      ~ id               = "none" -> (known after apply)
+      ~ override_special = "_" -> "-_" # forces replacement
+      ~ result           = (sensitive value)
+        # (10 unchanged attributes hidden)
+    }
+
+Plan: 17 to add, 11 to change, 25 to destroy.
+
+Changes to Outputs:
+  - http     = {
+      - api_id     = "mcm5gvnq54"
+      - arn        = "arn:aws:apigateway:us-west-2::/apis/mcm5gvnq54/stages/demo-example-gateway-stage"
+      - id         = "demo-example-gateway-stage"
+      - invoke_url = "https://mcm5gvnq54.execute-api.us-west-2.amazonaws.com/demo-example-gateway-stage"
+      - name       = "demo-example-gateway-stage"
+    } -> null
+  - http_url = "https://mcm5gvnq54.execute-api.us-west-2.amazonaws.com/demo-example-gateway-stage" -> null
+  - ws       = {
+      - api_id     = "wdmjrw7tpc"
+      - arn        = "arn:aws:apigateway:us-west-2::/apis/wdmjrw7tpc/stages/demo-example-gateway-stage"
+      - id         = "demo-example-gateway-stage"
+      - invoke_url = "wss://wdmjrw7tpc.execute-api.us-west-2.amazonaws.com/demo-example-gateway-stage"
+      - name       = "demo-example-gateway-stage"
+    } -> null
+  - ws_url   = "wss://wdmjrw7tpc.execute-api.us-west-2.amazonaws.com/demo-example-gateway-stage" -> null
+
+─────────────────────────────────────────────────────────────────────────────
+
+Note: You didn't use the -out option to save this plan, so Terraform can't
+guarantee to take exactly these actions if you run "terraform apply" now.

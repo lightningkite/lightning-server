@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.http
 
+import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import kotlin.time.Duration
@@ -10,7 +11,7 @@ public interface ExceptionHttpHandler {
     public val timeout: Duration get() = 30.seconds
 
     context(server: ServerRuntime)
-    public suspend fun handle(request: HttpRequest<PathSpec0>, exception: Exception): HttpResponse
+    public suspend fun handle(request: HttpRequest<PathSpec>, exception: Exception): HttpResponse
 
 }
 

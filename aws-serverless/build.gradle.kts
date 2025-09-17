@@ -16,13 +16,14 @@ dependencies {
         exclude("software.amazon.awssdk:apache-client")
     }
     api(libs.serviceAbstractionsAwsClient) { excludeNetty() }
+    api(libs.serviceAbstractionsCacheDynamodb) { excludeNetty() }
     api(libs.awsS3) { excludeNetty() }
     api(libs.awsLambda) { excludeNetty() }
     api(libs.awsApiGateway) { excludeNetty() }
     api(libs.awsSecretsManager) { excludeNetty() }
     api(libs.lambdaJavaCore) { excludeNetty() }
     api(libs.lambdaJavaEvents) { excludeNetty() }
-    api(libs.lambdaJavaLog4j2) { excludeNetty() }
+//    api(libs.lambdaJavaLog4j2) { excludeNetty() }
     api(libs.dynamodb) { excludeNetty() }
     api(libs.orgCrac)
     implementation(libs.coroutinesReactive)

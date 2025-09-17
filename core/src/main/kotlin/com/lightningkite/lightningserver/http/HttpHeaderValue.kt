@@ -24,6 +24,7 @@ public data class HttpHeaderValue(
 
         public fun parse(header: String, raw: String): HttpHeaderValue =
             if (header.equals(HttpHeader.Cookie, ignoreCase = true)) parseCookies(raw)
+            else if (header.equals(HttpHeader.SetCookie, ignoreCase = true)) parseCookies(raw)
             else parse(raw)
     }
 

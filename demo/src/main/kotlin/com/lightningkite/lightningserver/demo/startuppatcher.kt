@@ -3,7 +3,6 @@ package com.lightningkite.lightningserver.demo
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.demo.Server.bind
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
@@ -24,6 +23,7 @@ import com.lightningkite.services.database.updateOneById
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
+import org.slf4j.LoggerFactory
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant

@@ -4,7 +4,7 @@ import com.lightningkite.lightningserver.AnonType
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.pathing.RawPath
+import com.lightningkite.lightningserver.pathing.RawWebsocketPath
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.*
 import kotlinx.serialization.KSerializer
@@ -100,9 +100,9 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
     override suspend fun willConnect(
         request: WebSocketConnectRequest<PathSpec0>
     ): QueryParamWebSocketHandlerData {
-        val rawPath = request.headers["x-path"]?.root ?: request.queryParameter("path")?.substringBefore('?') ?: "/"
+        val rawPath = request.headers["x-path"]?.root?.substringBefore('?') ?: request.queryParameter("path")?.substringBefore('?') ?: "/"
         val match = serverRuntime.server.endpoints.match(serverRuntime.externalSerialization.stringArrayFormat, rawPath) { it.websocket }
-            ?: throw NotFoundException("No web socket handler found for '$rawPath' - ${request.queryParameter("path")}")
+            ?: throw NotFoundException("No web socket handler found for '$rawPath'")
         val request = run {
             val fixedQueryParameters = request.queryParameters.mapNotNull {
                 if (it.first == "path") {
@@ -112,9 +112,9 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
                     else
                         null
                 } else it
-            }
+            } + (request.headers["x-path"]?.root?.substringAfter('?')?.split('&')?.map { it.substringBefore('=') to it.substringAfter('=', "") } ?: listOf())
             WebSocketConnectRequest<PathSpec>(
-                path = RawPath<PathSpec>(rawPath, match),
+                path = RawWebsocketPath<PathSpec>(rawPath, match),
                 queryParameters = fixedQueryParameters,
                 headers = request.headers,
                 domain = request.domain,

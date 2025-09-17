@@ -3,6 +3,8 @@ package com.lightningkite.lightningserver.terraform.awsserverless
 import com.lightningkite.DataSize
 import com.lightningkite.DataSize.Companion.gibibytes
 import com.lightningkite.EmailAddress
+import com.lightningkite.lightningserver.data.Schedule
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.terraform.BaseTerraformEmitter
 import com.lightningkite.services.terraform.AwsPolicyStatement
@@ -26,7 +28,8 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
-public open class TerraformAwsServerlessBuilder(
+public open class TerraformAwsServerlessBuilder<S: ServerBuilder>(
+    override val builder: S,
     override val projectPrefix: String,
     override val deploymentTag: String,
     public val storageBucket: String,
@@ -43,24 +46,11 @@ public open class TerraformAwsServerlessBuilder(
     public val emergencyCompute: LambdaDurationAlarmThresholds = LambdaDurationAlarmThresholds(threshold = 3.minutes),
     public val panicInvocations: LambdaInvocationAlarmThresholds = LambdaInvocationAlarmThresholds(threshold = 450),
     public val panicCompute: LambdaDurationAlarmThresholds = LambdaDurationAlarmThresholds(threshold = 5.minutes),
-) : BaseTerraformEmitter(), TerraformEmitterAws {
+) : BaseTerraformEmitter<S>(), TerraformEmitterAws {
 
     override val applicationRegion: String get() = region.id()
     override val policyStatements: MutableCollection<AwsPolicyStatement> = ArrayList()
     init {
-        fulfillSetting(generalSettings.name, buildJsonObject {
-            put("projectName", displayName)
-            put(
-                "publicUrl",
-                (this as? TerraformEmitterAwsDomain)?.domain?.let { "https://$it" }
-                    ?: $$"${aws_apigatewayv2_stage.http.invoke_url}")
-            put(
-                "wsUrl",
-                (this as? TerraformEmitterAwsDomain)?.domain?.let { "wss://ws.$it?path=" }
-                    ?: $$"${aws_apigatewayv2_stage.ws.invoke_url}")
-            put("debug", debug)
-            put("emergencyContact", emergencyContact.raw)
-        })
         require(TerraformProviderImport.aws)
         require(TerraformProvider(TerraformProviderImport.aws, null, buildJsonObject { put("region", region.id()) }))
         require(TerraformProvider(TerraformProviderImport.mongodbAtlas, null, JsonObject(emptyMap())))
@@ -68,6 +58,20 @@ public open class TerraformAwsServerlessBuilder(
 
     override fun finalize() {
         val emitter = this@TerraformAwsServerlessBuilder
+
+        fulfillSetting(generalSettings.name, buildJsonObject {
+            put("projectName", displayName)
+            put(
+                "publicUrl",
+                (emitter as? TerraformEmitterAwsDomain)?.domain?.let { "https://$it" }
+                    ?: $$"${aws_apigatewayv2_stage.http.invoke_url}")
+            put(
+                "wsUrl",
+                (emitter as? TerraformEmitterAwsDomain)?.domain?.let { "wss://ws.$it?path=" }
+                    ?: $$"${aws_apigatewayv2_stage.ws.invoke_url}")
+            put("debug", debug)
+            put("emergencyContact", emergencyContact.raw)
+        })
 
         val accessLogFormat = Json.encodeToString(terraformJsonObject {
             "requestId" - $$"$context.requestId"
@@ -119,12 +123,13 @@ public open class TerraformAwsServerlessBuilder(
             }
             "resource.aws_lambda_permission.api_gateway_http" {
                 "action" - "lambda:InvokeFunction"
-                "function_name" - $$"${aws_lambda_alias.main.function_name}:${aws_lambda_alias.main.name}"
+                "function_name" - expression("aws_lambda_alias.main.function_name")
+                "qualifier" - expression("aws_lambda_alias.main.name")
                 "principal" - "apigateway.amazonaws.com"
 
                 "source_arn" - $$"${aws_apigatewayv2_api.http.execution_arn}/*/*"
                 "lifecycle" {
-                    "create_before_destroy" - false
+                    "create_before_destroy" - true
                 }
             }
             (emitter as? TerraformEmitterAwsDomain)?.domain?.let { domainName ->
@@ -221,12 +226,13 @@ public open class TerraformAwsServerlessBuilder(
             }
             "resource.aws_lambda_permission.api_gateway_ws" {
                 "action" - "lambda:InvokeFunction"
-                "function_name" - $$"${aws_lambda_alias.main.function_name}:${aws_lambda_alias.main.name}"
+                "function_name" - expression("aws_lambda_alias.main.function_name")
+                "qualifier" - expression("aws_lambda_alias.main.name")
                 "principal" - "apigateway.amazonaws.com"
 
                 "source_arn" - $$"${aws_apigatewayv2_api.ws.execution_arn}/*/*"
                 "lifecycle" {
-                    "create_before_destroy" - false
+                    "create_before_destroy" - true
                 }
             }
             emitter.policyStatements += AwsPolicyStatement(
@@ -443,17 +449,21 @@ public open class TerraformAwsServerlessBuilder(
                     "*" // TODO: constrain this - how?  circular dependency?!
                 )
             )
+            "locals" {
+                val j = Json { encodeDefaults = true; explicitNulls = false }
+                "servicesAccessPolicy" - buildJsonObject {
+                    put("Version", "2012-10-17")
+                    put(
+                        "Statement",
+                        j.encodeToJsonElement(emitter.policyStatements.toList())
+                    )
+                }
+            }
             "resource.aws_iam_policy.servicesAccess" {
                 "name" - "${emitter.projectPrefix}-servicesAccess"
                 "path" - "/${emitter.projectPrefixPath}/servicesAccess/"
                 "description" - "Access to the ${emitter.projectPrefix} services"
-                "policy" - Json.encodeToString<JsonObject>(buildJsonObject {
-                    put("Version", "2012-10-17")
-                    put(
-                        "Statement",
-                        Json.encodeToJsonElement(emitter.policyStatements.toList())
-                    )
-                })
+                "policy" - expression("jsonencode(local.servicesAccessPolicy)")
             }
             "resource.aws_iam_role_policy_attachment.servicesAccess" {
                 "role" - expression("aws_iam_role.main_exec.name")
@@ -581,11 +591,31 @@ public open class TerraformAwsServerlessBuilder(
             "data.aws_caller_identity.current" {}
             "resource.aws_lambda_permission.scheduled_tasks" {
                 "action" - "lambda:InvokeFunction"
-                "function_name" - $$"${aws_lambda_alias.main.function_name}:${aws_lambda_alias.main.name}"
+                "function_name" - expression("aws_lambda_alias.main.function_name")
+                "qualifier" - expression("aws_lambda_alias.main.name")
                 "principal" - "events.amazonaws.com"
                 "source_arn" - $$"arn:aws:events:$${emitter.applicationRegion}:${data.aws_caller_identity.current.account_id}:rule/$${emitter.projectPrefix}*"
                 "lifecycle" {
-                    "create_before_destroy" - false
+                    "create_before_destroy" - true
+                }
+            }
+        }
+        emit("schedules") {
+            for((path, schedule) in builder.build().schedules) {
+                val name = path.toString().filter { it.isLetterOrDigit() || it == '_' }
+                "resource.aws_cloudwatch_event_rule.scheduled_task_$name" {
+                    "name"                - "${emitter.projectPrefix}_$name"
+                    "schedule_expression" - when(val s = schedule.schedule) {
+                        is Schedule.Daily -> "cron(${s.time.minute} ${s.time.hour} * * ? *)"
+                        is Schedule.Frequency -> "rate(${s.gap.inWholeMinutes} minute${if (s.gap.inWholeMinutes > 1) "s" else ""})"
+                        is Schedule.Cron -> "cron(${s.cron} *)"
+                    }
+                }
+                "resource.aws_cloudwatch_event_target.scheduled_task_$name" {
+                    "rule"      - expression("aws_cloudwatch_event_rule.scheduled_task_$name.name")
+                    "target_id" - "lambda"
+                    "arn"       - expression("aws_lambda_alias.main.arn")
+                    "input"     - "{\"scheduled\": \"$path\"}"
                 }
             }
         }

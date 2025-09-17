@@ -3,7 +3,7 @@ package com.lightningkite.lightningserver
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.pathing.RawPath
+import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import kotlinx.serialization.Serializable
 
 public fun LSError.toException(
@@ -109,7 +109,7 @@ public open class NotFoundException(
 public fun NotFoundException(message: String): NotFoundException = NotFoundException(message = message, detail = "")
 
 public class RouteNotFoundException(
-    public val requestedRoute: RawPath<*>
+    public val requestedRoute: RawHttpEndpoint<*>
 ): NotFoundException(
     detail = "not-found",
     message = "No route matching ${requestedRoute} was found.",

@@ -8,7 +8,7 @@ import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.RawPath
+import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.runtime.handle
 import com.lightningkite.services.data.Data
 import com.lightningkite.services.data.TypedData
@@ -37,8 +37,7 @@ internal class AwsAdapterHttp(val root: AwsAdapter) {
                 ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to URLDecoder.decode(v, Charsets.UTF_8) } }
 
         val request = HttpRequest<PathSpec>(
-            path = RawPath(path),
-            method = method,
+            path = RawHttpEndpoint(path, method),
             queryParameters = queryParams,
             headers = headers,
             body = body,

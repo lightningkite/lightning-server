@@ -14,6 +14,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import software.amazon.awssdk.core.SdkBytes
 import software.amazon.awssdk.services.lambda.model.InvocationType
+import software.amazon.awssdk.services.lambda.model.InvokeRequest
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.Base64
@@ -25,11 +26,11 @@ internal class AwsAdapterTask(val root: AwsAdapter) {
     val format: KotlinBytesFormat get() = root.internalSerialization.kotlinBytesFormat
 
     @Serializable
-    data class TaskInvoke(val taskName: String, val input: AnonType)
+    data class TaskInvoke(val taskName: String, val input: AnonType): AwsLambdaInput
 
     suspend fun <T> launchTask(location: PathSpec0, task: Task<T>, input: T) {
         try {
-            root.lambdaClient.invoke {
+            root.invokeLambda(InvokeRequest.builder().also {
                 it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
                 it.qualifier(System.getenv("AWS_LAMBDA_FUNCTION_VERSION"))
                 it.invocationType(InvocationType.EVENT)
@@ -41,19 +42,16 @@ internal class AwsAdapterTask(val root: AwsAdapter) {
                         )
                     )
                 )
-            }.await().let {
-                it.logResult()
-            }
+            }.build()).logResult()
         } catch (e: Exception) {
             throw Exception("Failed to call ${task}", e)
         }
     }
     suspend fun handleTask(event: TaskInvoke): APIGatewayV2HTTPResponse {
         return coroutineScope {
-            val p = PathSpec0(event.taskName)
+            val p = PathSpec0.fromString(event.taskName)
             val task = root.server.tasks[p]
             if (task == null) {
-                with(root) { exceptionSettings() }.report(AwsTaskInvokeException("Task ${event.taskName} not found"), event.taskName)
                 root.logger.error("Task ${event.taskName} not found")
                 APIGatewayV2HTTPResponse(statusCode = 404, body = "Task ${event.taskName} not found")
             } else try {

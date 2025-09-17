@@ -10,7 +10,8 @@ import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.RawPath
+import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
+import com.lightningkite.lightningserver.pathing.RawWebsocketPath
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.handle
 import com.lightningkite.lightningserver.settings.ServerSettings
@@ -64,29 +65,7 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
         routing {
             route("{...}") {
                 handle {
-                    val request = HttpRequest(
-                        path = RawPath(call.request.path()),
-                        queryParameters = call.request.queryParameters.flattenEntries(),
-                        headers = call.request.headers.adapt(),
-                        domain = call.request.origin.serverHost,
-                        protocol = call.request.origin.scheme,
-                        sourceIp = runConfig.realIpHeader?.let {
-                            call.request.header(it)
-                                ?: run { logger.warn { "Real IP address header for proxy '$it' was missing from the request." }; null }
-                        } ?: call.request.origin.remoteAddress,
-                        method = HttpMethod(call.request.httpMethod.value),
-                        body = run {
-                            // Multipart Support?
-                            val stream = call.receiveStream()
-
-                            TypedData.sink(
-                                call.request.contentType().adapt(),
-                                call.request.contentLength() ?: -1
-                            ) {
-                                it.transferFrom(stream.asSource())
-                            }
-                        },
-                    )
+                    val request = call.adapt()
                     val result: HttpResponse = this@KtorEngine.handle(request)
 
                     for (header in result.headers.normalizedEntries) {
@@ -132,7 +111,7 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
                     else listOf(it)
                 }
                 val request = WebSocketConnectRequest(
-                    path = RawPath(call.request.path()),
+                    path = RawWebsocketPath(call.request.path()),
                     queryParameters = queryParams,
                     headers = call.request.headers.adapt(),
                     domain = call.request.origin.serverHost,
@@ -222,6 +201,7 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
     }
 
     public fun <TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.Configuration> start(factory: ApplicationEngineFactory<TEngine, TConfiguration>) {
+        this.settings.ready()
         runBlocking { runStartupTasks() }
         startSchedules()
         embeddedServer(

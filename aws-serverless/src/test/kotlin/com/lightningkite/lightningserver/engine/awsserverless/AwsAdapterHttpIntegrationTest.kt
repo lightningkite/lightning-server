@@ -4,11 +4,13 @@ import com.amazonaws.services.lambda.runtime.ClientContext
 import com.amazonaws.services.lambda.runtime.CognitoIdentity
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.LambdaLogger
+import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.services.data.TypedData
 import kotlinx.serialization.encodeToString
 import kotlin.test.Test
@@ -25,39 +27,7 @@ class AwsAdapterHttpIntegrationTest {
             val text = req.body?.text() ?: ""
             HttpResponse.plainText("E:$text")
         }
-    }
-
-    // Helper to set environment variables for the current JVM (best-effort; works for typical JDKs)
-    private fun setEnv(key: String, value: String) {
-        try {
-            System.getenv()
-            val env = System.getenv()
-            val cl = env.javaClass
-            val field = cl.getDeclaredField("m")
-            field.isAccessible = true
-            val map = field.get(env) as MutableMap<String, String>
-            map[key] = value
-        } catch (_: Throwable) {
-            // No-op if we can't set; tests may fail early if AWS_REGION missing
-        }
-    }
-
-    private class TestLambdaContext : Context {
-        override fun getAwsRequestId(): String = "req-1"
-        override fun getLogGroupName(): String = "log-group"
-        override fun getLogStreamName(): String =    "log-stream"
-        override fun getFunctionName(): String = "function"
-        override fun getFunctionVersion(): String = "1"
-        override fun getInvokedFunctionArn(): String = "arn:aws:lambda:region:acct:function:function"
-        override fun getIdentity(): CognitoIdentity? = null
-        override fun getClientContext(): ClientContext? = null
-        override fun getRemainingTimeInMillis(): Int = 60_000
-        override fun getMemoryLimitInMB(): Int = 256
-        override fun getLogger(): LambdaLogger = object : LambdaLogger {
-            override fun log(message: String?) { /* ignore */ }
-            @Deprecated("Deprecated in AWS SDK recent versions")
-            override fun log(message: ByteArray?) { /* ignore */ }
-        }
+        init { registerBasicMediaTypeCoders() }
     }
 
     private fun makeHttpEvent(
@@ -103,8 +73,7 @@ class AwsAdapterHttpIntegrationTest {
 
     @Test
     fun http_get_routed_through_adapter() {
-        setEnv("AWS_REGION", "us-east-1")
-        val adapter = AwsAdapter(SampleServer.build())
+        val adapter = TestAwsAdapter(SampleServer.build())
         val event = makeHttpEvent(method = "GET", stage = "prod", pathNoStage = "/hello")
         val json = adapter.internalSerialization.json.encodeToString(event)
         val input = json.byteInputStream()
@@ -114,13 +83,12 @@ class AwsAdapterHttpIntegrationTest {
         val response = adapter.internalSerialization.json.decodeFromString(APIGatewayV2HTTPResponse.serializer(), responseJson)
         assertEquals(200, response.statusCode)
         assertEquals("hi", response.body)
-        assertNotNull(response.headers["content-type"]) // text/plain should be present (lowercased key)
+        assertEquals(MediaType.Text.Plain.toString(), response.headers.entries.find { it.key.equals("content-type", true) }!!.value)
     }
 
     @Test
     fun http_post_with_text_body_round_trips() {
-        setEnv("AWS_REGION", "us-east-1")
-        val adapter = AwsAdapter(SampleServer.build())
+        val adapter = TestAwsAdapter(SampleServer.build())
         val bodyText = "abc"
         val event = makeHttpEvent(
             method = "POST",
@@ -142,8 +110,7 @@ class AwsAdapterHttpIntegrationTest {
 
     @Test
     fun http_unknown_path_returns_404() {
-        setEnv("AWS_REGION", "us-east-1")
-        val adapter = AwsAdapter(SampleServer.build())
+        val adapter = TestAwsAdapter(SampleServer.build())
         val event = makeHttpEvent(method = "GET", stage = "prod", pathNoStage = "/missing")
         val json = adapter.internalSerialization.json.encodeToString(event)
         val input = json.byteInputStream()
@@ -151,6 +118,7 @@ class AwsAdapterHttpIntegrationTest {
         adapter.handleRequest(input, output, TestLambdaContext())
         val responseJson = output.toByteArray().toString(Charsets.UTF_8)
         val response = adapter.internalSerialization.json.decodeFromString(APIGatewayV2HTTPResponse.serializer(), responseJson)
+        println(responseJson)
         assertEquals(404, response.statusCode)
     }
 }

@@ -7,7 +7,6 @@ import com.amazonaws.services.lambda.runtime.RequestStreamHandler
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.include
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
 import com.lightningkite.lightningserver.runtime.location
@@ -15,9 +14,17 @@ import com.lightningkite.lightningserver.settings.SettingsSerializer
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.services.Service
 import com.lightningkite.services.aws.AwsConnections
+import com.lightningkite.services.get
+import io.github.oshai.kotlinlogging.KLogger
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.*
+import kotlinx.coroutines.future.await
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.encodeToStream
 import kotlinx.serialization.json.jsonObject
@@ -25,9 +32,17 @@ import org.crac.Core
 import org.crac.Resource
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import software.amazon.awssdk.identity.spi.internal.DefaultAwsCredentialsIdentity
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.apigatewaymanagementapi.ApiGatewayManagementApiAsyncClient
+import software.amazon.awssdk.services.apigatewaymanagementapi.model.DeleteConnectionRequest
+import software.amazon.awssdk.services.apigatewaymanagementapi.model.DeleteConnectionResponse
+import software.amazon.awssdk.services.apigatewaymanagementapi.model.PostToConnectionRequest
+import software.amazon.awssdk.services.apigatewaymanagementapi.model.PostToConnectionResponse
+import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.lambda.LambdaAsyncClient
+import software.amazon.awssdk.services.lambda.model.InvokeRequest
+import software.amazon.awssdk.services.lambda.model.InvokeResponse
 import software.amazon.awssdk.services.s3.S3Client
 import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient
 import java.io.File
@@ -39,11 +54,11 @@ import kotlin.system.exitProcess
 
 public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(server), RequestStreamHandler, Resource {
 
-    internal val logger: Logger = LoggerFactory.getLogger(this::class.java)
+    internal val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.engine.awsserverless")
     internal var preventLambdaTimeoutReuse: Boolean = false
 
     init {
-        logger.debug("Initializing AwsAdapter...")
+        logger.info { "Initializing AwsAdapter..." }
     }
 
     internal val http = AwsAdapterHttp(this)
@@ -51,8 +66,28 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
     internal val tasks = AwsAdapterTask(this)
     internal val schedules = AwsAdapterSchedule(this)
 
-    internal fun loadSettings() {
-        logger.debug("Loading settings...")
+    init { loadSettings() }
+    protected open fun loadSettings() {
+        fun loadSettings(bytes: ByteArray) {
+            val decryptedBytes = System.getenv("LIGHTNING_SERVER_SETTINGS_DECRYPTION")
+                ?.takeIf { it.isNotBlank() }
+                ?.let { sha256Password ->
+                    OpenSsl.decryptAesCbcPkcs5Sha256(bytes, sha256Password.toByteArray())
+                }
+                ?: bytes
+            println("Raw settings: ${decryptedBytes.toString(Charsets.UTF_8)}")
+            this.settings.include(
+                internalSerialization.json.decodeFromString(
+                    SettingsSerializer(settings.settings.toList()),
+                    decryptedBytes.toString(Charsets.UTF_8)
+                ).also { println("Parsed settings: $it") }
+            )
+            this.settings.ready()
+            runBlocking { runStartupTasks() }
+            Core.getGlobalContext().register(this)
+            println("loadSettings: generalSettings = ${generalSettings()}")
+        }
+        logger.info { "Loading settings..." }
         System.getenv("LIGHTNING_SERVER_SETTINGS_SECRET_ID")?.let { secretId ->
             SecretsManagerClient.create().getSecretValue {
                 it.secretId(secretId)
@@ -73,37 +108,46 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
         }
     }
 
-    internal fun loadSettings(bytes: ByteArray) {
-        val decryptedBytes = System.getenv("LIGHTNING_SERVER_SETTINGS_DECRYPTION")
-            ?.takeIf { it.isNotBlank() }
-            ?.let { sha256Password ->
-                OpenSsl.decryptAesCbcPkcs5Sha256(bytes, sha256Password.toByteArray())
-            }
-            ?: bytes
-        this.settings.serializable.include(
-            internalSerialization.json.decodeFromString(
-                SettingsSerializer(server.settings),
-                decryptedBytes.toString(Charsets.UTF_8)
-            )
-        )
-        runBlocking { runStartupTasks() }
-        Core.getGlobalContext().register(this)
-    }
+    protected open val region: Region by lazy { Region.of(System.getenv("AWS_REGION")) }
 
-    internal val region by lazy { Region.of(System.getenv("AWS_REGION")) }
-    internal val lambdaClient = LambdaAsyncClient.builder()
+    private val lambdaClient = LambdaAsyncClient.builder()
         .region(region)
-        .httpClient(AwsConnections.asyncClient)
-        .overrideConfiguration(AwsConnections.clientOverrideConfiguration)
+        .httpClient(get(AwsConnections).asyncClient)
+        .overrideConfiguration(get(AwsConnections).clientOverrideConfiguration)
         .build()
-    internal val apiGatewayManagement by lazy {
+    public open suspend fun invokeLambda(invokeRequest: InvokeRequest): InvokeResponse {
+        return lambdaClient.invoke(invokeRequest).await()
+    }
+    private val apiGatewayManagement by lazy {
+        println("apiGatewayManagement: generalSettings = ${generalSettings()}")
         ApiGatewayManagementApiAsyncClient.builder()
             .region(region)
-            .httpClient(AwsConnections.asyncClient)
-            .overrideConfiguration(AwsConnections.clientOverrideConfiguration)
-            .endpointOverride(URI.create("https://" + generalSettings().wsUrl.removePrefix("wss://")))
+            .httpClient(get(AwsConnections).asyncClient)
+            .overrideConfiguration(get(AwsConnections).clientOverrideConfiguration)
+            .endpointOverride(URI.create("https://".plus(generalSettings().wsUrl.removePrefix("wss://")).also {
+                logger.info { "Connecting to WebSocket at '$it'" }
+            }))
             .build()
     }
+    public open suspend fun apiGatewayWsPostToConnection(request: PostToConnectionRequest): PostToConnectionResponse {
+        try {
+            return apiGatewayManagement.postToConnection(request).await()
+        } catch(e: Exception) {
+            logger.error { "Failed to send a web socket message" }
+            throw e
+        }
+    }
+    public open suspend fun apiGatewayWsDeleteConnection(request: DeleteConnectionRequest): DeleteConnectionResponse {
+        return apiGatewayManagement.deleteConnection(request).await()
+    }
+    public open val dynamo: DynamoDbAsyncClient by lazy {
+        DynamoDbAsyncClient.builder()
+            .region(region)
+            .httpClient(get(AwsConnections).asyncClient)
+            .overrideConfiguration(get(AwsConnections).clientOverrideConfiguration)
+            .build()
+    }
+
 
     private val backgroundReportingActions = ArrayList<suspend () -> Unit>()
 
@@ -121,11 +165,11 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
     }
 
     override fun beforeCheckpoint(context: org.crac.Context<out Resource>?) {
-        logger.debug("beforeCheckpoint() - Preparing DynamoDB...")
+        logger.info { "beforeCheckpoint() - Preparing DynamoDB..." }
         runBlocking {
             ws.webSocketDynamo.ready.await()
         }
-        logger.debug("beforeCheckpoint() - Preparing all connections...")
+        logger.info { "beforeCheckpoint() - Preparing all connections..." }
         runBlocking {
             settings.allGoals().entries.forEachConcurrent {
                 (it.value as? Service)?.let {
@@ -137,11 +181,11 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
                 }
             }
         }
-        logger.debug("Initialization complete.")
+        logger.info { "Initialization complete." }
     }
 
     override fun afterRestore(context: org.crac.Context<out Resource>?) {
-        logger.debug("afterRestore() - opening all connections")
+        logger.info { "afterRestore() - opening all connections" }
         runBlocking {
             settings.allGoals().entries.forEachConcurrent {
                 (it.value as? Service)?.let {
@@ -151,7 +195,7 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
                 }
             }
         }
-        logger.debug("Connections Complete")
+        logger.info { "Connections Complete" }
     }
 
     override fun handleRequest(input: InputStream, output: OutputStream, context: Context): Unit = runBlocking {
@@ -208,38 +252,22 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
                 }
             }
 
-            @OptIn(DelicateCoroutinesApi::class)
-            val backgroundRegularHealthActionsJob = GlobalScope.launch {
-                println("Running ${backgroundReportingActions.size} backgroundRegularHealthActions...")
-                try {
-                    metricsSettings().flush()
-                } catch (e: Exception) {
-                    exceptionSettings().report(e, "METRICS")
-                }
-            }
             internalSerialization.json.encodeToStream(response, output)
             output.flush()
             output.close()
-            runBlocking {
-                backgroundRegularHealthActionsJob.join()
-            }
         } catch (e: Exception) {
             // Something basic in processing died, we must report it.
-            val ex = Exception("Full lambda failure", e)
-            ex.printStackTrace()
             runBlocking {
-                exceptionSettings().report(e, roughContext)
+                logger.error("Full lambda failure", e)
             }
             if (preventLambdaTimeoutReuse) {
                 println("Killing self to prevent potentially broken reuse.  To disable this, set AwsAdapter.preventLambdaTimeoutReuse to false.")
                 exitProcess(1)
             }
         } catch (e: StackOverflowError) {
-            // StackOverflowError is bad, but not critical.  This lambda could still server other requests.
-            val ex = Exception("Full lambda failure", e)
-            ex.printStackTrace()
+            // StackOverflowError is bad, but not critical.  This lambda could still serve other requests.
             runBlocking {
-                exceptionSettings().report(e, roughContext)
+                logger.error("Full lambda failure", e)
             }
             if (preventLambdaTimeoutReuse) {
                 println("Killing self to prevent potentially broken reuse.  To disable this, set AwsAdapter.preventLambdaTimeoutReuse to false.")
@@ -248,9 +276,8 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
         } catch (e: VirtualMachineError) {
             // If we have a critical error, we need to make sure the process dies so Lambda doesn't attempt to reuse the VM.
             try {
-                e.printStackTrace()
                 runBlocking {
-                    exceptionSettings().report(e, roughContext)
+                    logger.error("Full lambda failure", e)
                 }
             } catch (t: Throwable) { /*squish*/
             }

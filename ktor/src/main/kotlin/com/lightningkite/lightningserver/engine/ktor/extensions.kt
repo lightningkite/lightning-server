@@ -5,7 +5,7 @@ import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.RawPath
+import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
 import com.lightningkite.services.data.TypedData
 import io.ktor.http.*
@@ -32,7 +32,7 @@ internal fun Headers.adapt(): HttpHeaders = HttpHeaders(
 context(server: ServerRuntimeBase)
 internal suspend fun ApplicationCall.adapt(): HttpRequest<PathSpec> {
     return HttpRequest(
-        path = RawPath(request.path()),
+        path = RawHttpEndpoint(request.path(), HttpMethod(request.httpMethod.value)),
         queryParameters = request.queryParameters.flattenEntries(),
         headers = request.headers.adapt(),
         domain = request.origin.serverHost,
@@ -40,7 +40,6 @@ internal suspend fun ApplicationCall.adapt(): HttpRequest<PathSpec> {
         sourceIp = ktorRunConfig().realIpHeader?.let {
             request.header(it) ?: throw Exception("Real IP address header for proxy '$it' was missing from the request.")
         } ?: request.origin.remoteAddress,
-        method = HttpMethod(request.httpMethod.value),
         body = run {
             // MutliPart Support?
             val stream = receiveStream()
