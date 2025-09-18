@@ -15,9 +15,10 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketHandlerInterceptor
+import kotlin.random.Random
 
 public class CorsInterceptor(public val cors: Runtime<CorsSettings>) : HttpInterceptor, WebSocketHandlerInterceptor {
-    override val name: String get() = "CORS"
+    override val name: String = "CORS"
 
     context(runtime: ServerRuntime)
     override suspend fun handle(

@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.pathing
 
+import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -24,7 +25,6 @@ public sealed class PathSpec protected constructor(public val segments: List<Seg
 
     override fun toString(): String = if (segments.isEmpty()) "/" else "/" + segments.joinToString("/") + when (after) {
         Afterwards.None -> ""
-        Afterwards.TrailingSlash -> "/"
         Afterwards.TrailingSegments -> "/{...}"
     }
 
@@ -45,11 +45,6 @@ public sealed class PathSpec protected constructor(public val segments: List<Seg
         None,
 
         /**
-         * A trailing slash after the segments.
-         */
-        TrailingSlash,
-
-        /**
          * An arbitrary number of segments with or without a trailing segment afterwards.
          */
         TrailingSegments;
@@ -57,7 +52,6 @@ public sealed class PathSpec protected constructor(public val segments: List<Seg
         public companion object {
             public fun fromString(string: String): Afterwards = when {
                 string.endsWith("/{...}") -> TrailingSegments
-                string.endsWith("/") -> TrailingSlash
                 else -> None
             }
         }
@@ -88,6 +82,7 @@ public sealed class PathSpec protected constructor(public val segments: List<Seg
         }
 
         public companion object {
+            public val Empty: Constant = Constant("")
             /**
              * String format:
              * constant/{argument}/something/{...}
@@ -152,7 +147,7 @@ public class PathSpec0(segments: List<Segment>, after: Afterwards) : PathSpec(se
     public constructor(vararg constants: String) : this(constants.map { Segment.Constant(it) }, Afterwards.None)
 
     override val wildcards: List<Segment.Wildcard<*>> get() = listOf()
-    public val slash: PathSpec0 get() = PathSpec0(segments, Afterwards.TrailingSlash)
+    public val slash: PathSpec0 get() = PathSpec0(segments + Segment.Empty, Afterwards.None)
     public val any: PathSpec0 get() = PathSpec0(segments, Afterwards.TrailingSegments)
 
     public override fun path(constant: String): PathSpec0 =
@@ -161,7 +156,7 @@ public class PathSpec0(segments: List<Segment>, after: Afterwards) : PathSpec(se
     public override fun <T> arg(wildcard: Segment.Wildcard<T>): PathSpec1<T> =
         PathSpec1(segments + wildcard, after, wildcard)
 
-    public fun concrete(trailingWildcard: ConcretePath.TrailingSegments? = null): ConcretePath<PathSpec0> =
+    public fun concrete(trailingWildcard: PathSegments? = null): ConcretePath<PathSpec0> =
         ConcretePath(this, trailingWildcard)
 
     public inline fun <reified T> arg(name: String): PathSpec1<T> =
@@ -181,7 +176,7 @@ public class PathSpec1<A>(
     public val first: Segment.Wildcard<A>
 ) : PathSpec(segments, after) {
     override val wildcards: List<Segment.Wildcard<*>> = listOf(first)
-    public val slash: PathSpec1<A> get() = PathSpec1(segments, Afterwards.TrailingSlash, first)
+    public val slash: PathSpec1<A> get() = PathSpec1(segments + Segment.Empty, Afterwards.None, first)
     public val any: PathSpec1<A> get() = PathSpec1(segments, Afterwards.TrailingSegments, first)
 
     public override fun path(constant: String): PathSpec1<A> =
@@ -190,7 +185,7 @@ public class PathSpec1<A>(
     public override fun <T> arg(wildcard: Segment.Wildcard<T>): PathSpec2<A, T> =
         PathSpec2<A, T>(segments + wildcard, after, first, wildcard)
 
-    public fun concrete(first: A, trailingWildcard: ConcretePath.TrailingSegments? = null): ConcretePath<PathSpec1<A>> =
+    public fun concrete(first: A, trailingWildcard: PathSegments? = null): ConcretePath<PathSpec1<A>> =
         ConcretePath(this, first, trailingWildcard)
 
     public inline fun <reified T> arg(name: String): PathSpec2<A, T> =
@@ -207,7 +202,7 @@ public class PathSpec2<A, B>(
     public val second: Segment.Wildcard<B>
 ) : PathSpec(segments, after) {
     override val wildcards: List<Segment.Wildcard<*>> = listOf(first, second)
-    public val slash: PathSpec2<A, B> get() = PathSpec2(segments, Afterwards.TrailingSlash, first, second)
+    public val slash: PathSpec2<A, B> get() = PathSpec2(segments + Segment.Empty, Afterwards.None, first, second)
     public val any: PathSpec2<A, B> get() = PathSpec2(segments, Afterwards.TrailingSegments, first, second)
 
     public override fun path(constant: String): PathSpec2<A, B> =
@@ -219,7 +214,7 @@ public class PathSpec2<A, B>(
     public fun concrete(
         first: A,
         second: B,
-        trailingWildcard: ConcretePath.TrailingSegments? = null
+        trailingWildcard: PathSegments? = null
     ): ConcretePath<PathSpec2<A, B>> = ConcretePath(this, first, second, trailingWildcard)
 
     public inline fun <reified T> arg(name: String): PathSpec3<A, B, T> =
@@ -237,7 +232,7 @@ public class PathSpec3<A, B, C>(
     public val third: Segment.Wildcard<C>
 ) : PathSpec(segments, after) {
     override val wildcards: List<Segment.Wildcard<*>> = listOf(first, second, third)
-    public val slash: PathSpec3<A, B, C> get() = PathSpec3(segments, Afterwards.TrailingSlash, first, second, third)
+    public val slash: PathSpec3<A, B, C> get() = PathSpec3(segments + Segment.Empty, Afterwards.None, first, second, third)
     public val any: PathSpec3<A, B, C> get() = PathSpec3(segments, Afterwards.TrailingSegments, first, second, third)
 
     public override fun path(constant: String): PathSpec3<A, B, C> =
@@ -250,7 +245,7 @@ public class PathSpec3<A, B, C>(
         first: A,
         second: B,
         third: C,
-        trailingWildcard: ConcretePath.TrailingSegments? = null
+        trailingWildcard: PathSegments? = null
     ): ConcretePath<PathSpec3<A, B, C>> = ConcretePath(this, first, second, third, trailingWildcard)
 
     public inline fun <reified T> arg(name: String): PathSpecMany =
@@ -265,7 +260,7 @@ public class PathSpecMany(
     after: Afterwards,
     override val wildcards: List<Segment.Wildcard<*>>
 ) : PathSpec(segments, after) {
-    public val slash: PathSpecMany get() = PathSpecMany(segments, Afterwards.TrailingSlash, wildcards)
+    public val slash: PathSpecMany get() = PathSpecMany(segments + Segment.Empty, Afterwards.None, wildcards)
     public val any: PathSpecMany get() = PathSpecMany(segments, Afterwards.TrailingSegments, wildcards)
     public override fun path(constant: String): PathSpecMany =
         PathSpecMany(segments + Segment.Constant(constant), Afterwards.None, wildcards)

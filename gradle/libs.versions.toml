@@ -44,6 +44,7 @@ mcp = "0.7.0"
 memcached = "2.4.8"
 metadataExtractor = "2.19.0"
 mongoDriver = "5.6.0"
+netty = "4.1.114.Final"
 okio = "3.16.0"
 oneTimePass = "2.4.1"
 orgCrac = "0.1.3"
@@ -52,7 +53,7 @@ proguard = "7.7.0"
 scrimage = "4.3.4"
 sentry = "8.21.1"
 serializationLibs = "1.9.0"
-serviceAbstractions = "0.0.1-46"
+serviceAbstractions = "0.0.1-46-local"
 shadow = "8.1.1"
 vanniktechMavenPublish = "0.34.0"
 vertx = "4.5.7"
@@ -130,6 +131,14 @@ memcached = { module = "com.googlecode.xmemcached:xmemcached", version = { ref =
 metadataExtractor = { module = "com.drewnoakes:metadata-extractor", version = { ref = "metadataExtractor" } }
 mongoBson = { module = "org.mongodb:bson", version = { ref = "bson" } }
 mongoDriver = { module = "org.mongodb:mongodb-driver-kotlin-coroutine", version = { ref = "mongoDriver" } }
+nettyBom = { module = "io.netty:netty-bom", version = { ref = "netty" } }
+nettyBuffer = { module = "io.netty:netty-buffer", version = "0.0.0" }
+nettyCodec = { module = "io.netty:netty-codec", version = "0.0.0" }
+nettyCodecHttp = { module = "io.netty:netty-codec-http", version = "0.0.0" }
+nettyHandler = { module = "io.netty:netty-handler", version = "0.0.0" }
+nettyTransport = { module = "io.netty:netty-transport", version = "0.0.0" }
+nettyTransportClassesEpoll = { module = "io.netty:netty-transport-classes-epoll", version = "0.0.0" }
+nettyTransportClassesKqueue = { module = "io.netty:netty-transport-classes-kqueue", version = "0.0.0" }
 okio = { module = "com.squareup.okio:okio", version = { ref = "okio" } }
 oneTimePass = { module = "dev.turingcomplete:kotlin-onetimepassword", version = { ref = "oneTimePass" } }
 orgCrac = { module = "io.github.crac:org-crac", version = { ref = "orgCrac" } }
@@ -145,7 +154,6 @@ serializationProperties = { module = "org.jetbrains.kotlinx:kotlinx-serializatio
 serializationProtobuf = { module = "org.jetbrains.kotlinx:kotlinx-serialization-protobuf", version = { ref = "serializationLibs" } }
 serviceAbstractionsAwsClient = { module = "com.lightningkite.services:aws-client", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsBasis = { module = "com.lightningkite.services:basis", version = { ref = "serviceAbstractions" } }
-serviceAbstractionsOtelJvm = { module = "com.lightningkite.services:otel-jvm", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsCache = { module = "com.lightningkite.services:cache", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsCacheDynamodb = { module = "com.lightningkite.services:cache-dynamodb", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsCacheMemcached = { module = "com.lightningkite.services:cache-memcached", version = { ref = "serviceAbstractions" } }
@@ -173,6 +181,7 @@ serviceAbstractionsMetricsCloudwatch = { module = "com.lightningkite.services:me
 serviceAbstractionsNotifications = { module = "com.lightningkite.services:notifications", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsNotificationsFcm = { module = "com.lightningkite.services:notifications-fcm", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsNotificationsTest = { module = "com.lightningkite.services:notifications-test", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsOtelJvm = { module = "com.lightningkite.services:otel-jvm", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsPubsub = { module = "com.lightningkite.services:pubsub", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsPubsubRedis = { module = "com.lightningkite.services:pubsub-redis", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsPubsubTest = { module = "com.lightningkite.services:pubsub-test", version = { ref = "serviceAbstractions" } }

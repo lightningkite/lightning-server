@@ -38,7 +38,7 @@ public class MetaEndpoints(
                     for (endpoint in endpoints) {
                         li {
                             a(href = endpoint.location.path.toString()) {
-                                +endpoint.location.path.segments.last().toString()
+                                +endpoint.location.path.segments.last { it != PathSpec.Segment.Empty }.toString()
                             }
                         }
                     }
@@ -293,7 +293,7 @@ public class MetaEndpoints(
             }
             </script>
             <div>
-                <label>Path <input id='path' value='${it.queryParameter("path") ?: "/"}'/></label>
+                <label>Path <input id='path' value='${it.queryParameters.get("path") ?: "/"}'/></label>
                 <button type='button' onclick='connectClick()'>Connect</button>
                 <button type='button' onclick='closeClick()'>Close</button>
             </div>
@@ -321,11 +321,10 @@ public class MetaEndpoints(
                     async {
                         val start = TimeSource.Monotonic.markNow()
                         val request = entry.value
-                        val pathAlone = request.path.substringBefore('?')
-                        val queryParameters = request.path.substringAfter('?', "").split('&').map { it.substringBefore('=') to it.substringAfter('=', "") }
+                        val pathAndParams = PathAndParams.parse(request.path)
                         val properRequest = originalRequest.copyWithNewPathType(
-                            path = RawHttpEndpoint<PathSpec>(asString = pathAlone, method = HttpMethod(request.method)),
-                            queryParameters = queryParameters,
+                            path = RawHttpEndpoint<PathSpec>(pathAndParams.pathSegments, method = HttpMethod(request.method)),
+                            queryParameters = pathAndParams.queryParameters,
                             body = request.body?.let { TypedData.text(it, MediaType.Application.Json) }
                         )
                         try {

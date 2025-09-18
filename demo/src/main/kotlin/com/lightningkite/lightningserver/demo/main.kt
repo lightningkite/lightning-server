@@ -7,7 +7,9 @@ import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.definition.telemetrySettings
 import com.lightningkite.lightningserver.engine.awsserverless.AwsLambdaRuntimeSettings
 import com.lightningkite.lightningserver.engine.awsserverless.awsLambdaRuntimeSettings
+import com.lightningkite.lightningserver.engine.jdk.JdkEngine
 import com.lightningkite.lightningserver.engine.ktor.KtorEngine
+import com.lightningkite.lightningserver.engine.netty.NettyEngine
 import com.lightningkite.lightningserver.settings.loadFromFile
 import com.lightningkite.lightningserver.terraform.awsserverless.TerraformAwsServerlessDomainBuilder
 //import com.lightningkite.lightningserver.terraform.awsserverless.TerraformAwsServerlessDomainBuilder
@@ -38,6 +40,24 @@ private fun serve() {
     KtorEngine(built).apply {
         settings.loadFromFile(File("settings.json"), internalSerializersModule)
         start(Netty)
+    }
+}
+private fun serveJdk() {
+    val before = TimeSource.Monotonic.markNow()
+    val built = Server.build()
+    println("Server built in ${before.elapsedNow()}")
+    JdkEngine(built).apply {
+        settings.loadFromFile(File("settings.json"), internalSerializersModule)
+        start()
+    }
+}
+private fun serveNetty() {
+    val before = TimeSource.Monotonic.markNow()
+    val built = Server.build()
+    println("Server built in ${before.elapsedNow()}")
+    NettyEngine(built).apply {
+        settings.loadFromFile(File("settings.json"), internalSerializersModule)
+        start()
     }
 }
 
@@ -76,6 +96,7 @@ fun terraform() {
             secretBasis.generated()
             loggingSettings.direct(LoggingSettings())
             telemetrySettings.direct(OpenTelemetrySettings("print", reportFrequency = null))
+            cors.direct(CorsSettings())
         }
     }.write(File("demo/terraform/example-new").also { it.mkdirs() })
 }
@@ -89,6 +110,6 @@ fun sdk() {
 fun main(vararg args: String) {
     cli(
         arguments = args,
-        available = listOf(::serve, ::terraform, ::sdk),
+        available = listOf(::serve, ::serveJdk, ::serveNetty, ::terraform, ::sdk),
     )
 }

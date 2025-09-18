@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.data.set
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.deprecations.websocket
 import com.lightningkite.lightningserver.http.HttpHeaders
+import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.runtime.test.test
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.builtins.serializer
@@ -62,14 +63,14 @@ class QueryParamWebSocketHandlerTest {
     fun routes_by_query_param_and_fixes_inner_query(): Unit = runBlocking {
         TestServer.test(settings = { }) {
             val ws = TestServer.qp.test(
-                queryParameters = listOf(
+                queryParameters = QueryParameters(listOf(
                     "path" to "/mirror?foo=1",
                     "extra" to "z"
-                )
+                ))
             )
             // Underlying should have received a request to /mirror and extracted foo=1 from the path query
             val seen = TestServer.lastRequest!!
-            assertEquals("/mirror", seen.path.string)
+            assertEquals("/mirror", seen.path.toString())
             val params = seen.queryParameters.toMap()
             // "path" should be stripped; inner foo should be present, and extra preserved
             check("path" !in params)
@@ -88,12 +89,12 @@ class QueryParamWebSocketHandlerTest {
     fun header_x_path_has_precedence_over_query_param(): Unit = runBlocking {
         TestServer.test(settings = { }) {
             val ws = TestServer.qp.test(
-                queryParameters = listOf("path" to "/bad-please-never-use"),
+                queryParameters = QueryParameters(listOf("path" to "/bad-please-never-use")),
                 headers = HttpHeaders("x-path" to "/other?bar=2")
             )
             val seen = TestServer.lastRequest!!
             // Routed to /other per x-path header
-            assertEquals("/other", seen.path.string)
+            assertEquals("/other", seen.path.toString())
             val params = seen.queryParameters.toMap()
             // Ensure header-provided query param made it through
             assertEquals("2", params["bar"])
@@ -111,7 +112,7 @@ class QueryParamWebSocketHandlerTest {
         TestServer.test(settings = { }) {
             assertFailsWith<NotFoundException> {
                 // No handler bound at /missing
-                TestServer.qp.test(queryParameters = listOf("path" to "/missing"))
+                TestServer.qp.test(queryParameters = QueryParameters(listOf("path" to "/missing")))
             }
         }
     }
@@ -119,7 +120,7 @@ class QueryParamWebSocketHandlerTest {
     @Test
     fun cache_update_is_persisted_back_to_outer_state(): Unit = runBlocking {
         TestServer.test(settings = { }) {
-            val ws = TestServer.qp.test(queryParameters = listOf("path" to "/mirror"))
+            val ws = TestServer.qp.test(queryParameters = QueryParameters(listOf("path" to "/mirror")))
             // Trigger cache write in underlying handler
             ws.send(WebSocketFrame.Text("cache"))
             // After the message finishes, finalize() should have propagated the updated request back

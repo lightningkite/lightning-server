@@ -30,7 +30,7 @@ internal fun List<HttpInterceptor>.compileAndInstrument(): HttpInterceptor = whe
     else -> {
         val outermost = this[0]
         val start = HttpInterceptor { request, cont -> outermost.handleInstrumented(request, cont) }
-        drop(0).fold(start) { earlierInterceptors, interceptor ->
+        drop(1).fold(start) { earlierInterceptors, interceptor ->
             HttpInterceptor { request, cont -> earlierInterceptors.handle(request) { interceptor.handleInstrumented(it, cont) } }
         }
     }

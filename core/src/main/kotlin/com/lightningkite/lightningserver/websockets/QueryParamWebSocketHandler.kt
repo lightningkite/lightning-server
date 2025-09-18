@@ -2,6 +2,8 @@ package com.lightningkite.lightningserver.websockets
 
 import com.lightningkite.lightningserver.AnonType
 import com.lightningkite.lightningserver.NotFoundException
+import com.lightningkite.lightningserver.http.PathSegments
+import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.RawWebsocketPath
@@ -100,11 +102,11 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
     override suspend fun willConnect(
         request: WebSocketConnectRequest<PathSpec0>
     ): QueryParamWebSocketHandlerData {
-        val rawPath = request.headers["x-path"]?.root?.substringBefore('?') ?: request.queryParameter("path")?.substringBefore('?') ?: "/"
+        val rawPath = request.headers["x-path"]?.root?.substringBefore('?') ?: request.queryParameters["path"]?.substringBefore('?') ?: "/"
         val match = serverRuntime.server.endpoints.match(serverRuntime.externalSerialization.stringArrayFormat, rawPath) { it.websocket }
             ?: throw NotFoundException("No web socket handler found for '$rawPath'")
         val request = run {
-            val fixedQueryParameters = request.queryParameters.mapNotNull {
+            val fixedQueryParameters = QueryParameters(request.queryParameters.mapNotNull {
                 if (it.first == "path") {
                     if (it.second.contains('?'))
                         it.second.substringAfter('?').substringBefore('=') to it.second.substringAfter('?')
@@ -112,9 +114,9 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
                     else
                         null
                 } else it
-            } + (request.headers["x-path"]?.root?.substringAfter('?')?.split('&')?.map { it.substringBefore('=') to it.substringAfter('=', "") } ?: listOf())
+            } + (request.headers["x-path"]?.root?.substringAfter('?')?.let { QueryParameters.parse(it).entries } ?: listOf()))
             WebSocketConnectRequest<PathSpec>(
-                path = RawWebsocketPath<PathSpec>(rawPath, match),
+                path = RawWebsocketPath<PathSpec>(PathSegments.parse(rawPath), match),
                 queryParameters = fixedQueryParameters,
                 headers = request.headers,
                 domain = request.domain,
@@ -151,7 +153,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
         val innerRequest = connection.currentState.request
         val match = with(connection) { innerRequest.path.match }
         val otherHandler = match.value
-            ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${innerRequest.path.string}'")
+            ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${innerRequest.path}'")
         @Suppress("UNCHECKED_CAST")
         otherHandler as WebSocketHandler<PathSpec, Any?>
         connection.withWrapped(otherHandler) { otherHandler.didConnectWithMetrics(match.pathSpec, it) }
@@ -164,7 +166,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
         val innerRequest = connection.currentState.request
         val match = with(connection) { innerRequest.path.match }
         val otherHandler = match.value
-            ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${innerRequest.path.string}'")
+            ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${innerRequest.path}'")
         @Suppress("UNCHECKED_CAST")
         otherHandler as WebSocketHandler<PathSpec, Any?>
         connection.withWrapped(otherHandler) { otherHandler.messageFromClientWithMetrics(match.pathSpec, it, frame) }
@@ -177,7 +179,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
         val innerRequest = connection.currentState.request
         val match = with(connection) { innerRequest.path.match }
         val otherHandler = match.value
-            ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${innerRequest.path.string}'")
+            ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${innerRequest.path}'")
         @Suppress("UNCHECKED_CAST")
         otherHandler as WebSocketHandler<PathSpec, Any?>
         connection.withWrapped(otherHandler) { otherHandler.messageFromSubscriptionWithMetrics(match.pathSpec, it, topic) }
@@ -190,7 +192,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
         val innerRequest = connection.currentState.request
         val match = with(connection) { innerRequest.path.match }
         val otherHandler = match.value
-            ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${innerRequest.path.string}'")
+            ?: throw com.lightningkite.lightningserver.NotFoundException("No web socket handler found for '${innerRequest.path}'")
         @Suppress("UNCHECKED_CAST")
         otherHandler as WebSocketHandler<PathSpec, Any?>
         connection.withWrapped(otherHandler) { otherHandler.disconnectWithMetrics(match.pathSpec, it, reason) }

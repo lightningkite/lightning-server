@@ -70,8 +70,8 @@ public interface ApiWebsocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
         return willConnectTyped(WebSocketConnectRequestAccess(request, request.auth(auth))).let { ApiWebsocketStorage(
             request.headers.accept.firstOrNull()
                 ?: request.headers.contentType
-                ?: request.queryParameter("Accept")?.let { MediaType(it) }
-                ?: request.queryParameter("Content-Type")?.let { MediaType(it) }
+                ?: request.queryParameters.get("Accept")?.let { MediaType(it) }
+                ?: request.queryParameters.get("Content-Type")?.let { MediaType(it) }
                 ?: MediaType.Application.Json
             , it) }
     }

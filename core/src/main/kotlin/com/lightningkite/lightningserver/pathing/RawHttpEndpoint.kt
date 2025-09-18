@@ -3,12 +3,15 @@ package com.lightningkite.lightningserver.pathing
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.RouteNotFoundException
 import com.lightningkite.lightningserver.http.HttpHandler
+import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 
 @Serializable
-public data class RawHttpEndpoint<out PATH: PathSpec>(val asString: String, val method: HttpMethod): HasContextualPath<PATH> {
+public data class RawHttpEndpoint<out PATH: PathSpec>(val pathSegments: PathSegments, val method: HttpMethod): HasContextualPath<PATH> {
+    public constructor(asString: String, method: HttpMethod): this(PathSegments.parse(asString), method)
+
     @Suppress("UNCHECKED_CAST")
     context(server: ServerRuntime)
     override val pathInContext: ConcretePath<PATH> get() = match.path as ConcretePath<PATH>
@@ -18,38 +21,38 @@ public data class RawHttpEndpoint<out PATH: PathSpec>(val asString: String, val 
     context(server: ServerRuntime)
     public val match: PathSpecMap.Match<HttpHandler<*>> get() {
         if (this.matchIfPresent == null) {
-            this.matchIfPresent = server.server.endpoints.match(server.externalSerialization.stringArrayFormat, asString) { it.http[method] }
+            this.matchIfPresent = server.server.endpoints.match(server.externalSerialization.stringArrayFormat, pathSegments) { it.http[method] }
         }
         return this.matchIfPresent ?: throw RouteNotFoundException(this)
     }
 
     public constructor(
-        asString: String,
+        pathSegments: PathSegments,
         method: HttpMethod,
         match: PathSpecMap.Match<HttpHandler<*>>
-    ) : this(asString, method) {
+    ) : this(pathSegments, method) {
         this.matchIfPresent = match
     }
 
-    override fun equals(other: Any?): Boolean = other is RawHttpEndpoint<*> && other.asString == asString
-    override fun hashCode(): Int = asString.hashCode() + 1
-    override fun toString(): String = "$method $asString"
+    override fun equals(other: Any?): Boolean = other is RawHttpEndpoint<*> && other.pathSegments == pathSegments
+    override fun hashCode(): Int = pathSegments.hashCode() + 1
+    override fun toString(): String = "$method /$pathSegments"
 }
 
 context(server: ServerRuntime)
-public fun <PATH : PathSpec> RawHttpEndpoint(path: ConcretePath<PATH>, method: HttpMethod): RawHttpEndpoint<PATH> = RawHttpEndpoint(path.path(server.internalSerialization.stringArrayFormat), method = method)
+public fun <PATH : PathSpec> RawHttpEndpoint(path: ConcretePath<PATH>, method: HttpMethod): RawHttpEndpoint<PATH> = RawHttpEndpoint(path.pathSegments(server.internalSerialization.stringArrayFormat), method = method)
 
 context(serverRuntime: ServerRuntime)
-public fun RawHttpEndpoint(spec: PathSpec0, method: HttpMethod, trailingSegments: ConcretePath.TrailingSegments? = null): RawHttpEndpoint<PathSpec0> = RawHttpEndpoint(ConcretePath(spec, trailingSegments), method)
+public fun RawHttpEndpoint(spec: PathSpec0, method: HttpMethod, trailingSegments: PathSegments? = null): RawHttpEndpoint<PathSpec0> = RawHttpEndpoint(ConcretePath(spec, trailingSegments), method)
 
 context(serverRuntime: ServerRuntime)
-public fun <A> RawHttpEndpoint(spec: PathSpec1<A>, path1: A, method: HttpMethod, trailingSegments: ConcretePath.TrailingSegments? = null): RawHttpEndpoint<PathSpec1<A>> =
+public fun <A> RawHttpEndpoint(spec: PathSpec1<A>, path1: A, method: HttpMethod, trailingSegments: PathSegments? = null): RawHttpEndpoint<PathSpec1<A>> =
     RawHttpEndpoint(ConcretePath(spec, path1, trailingSegments), method)
 
 context(serverRuntime: ServerRuntime)
-public fun <A, B> RawHttpEndpoint(spec: PathSpec2<A, B>, path1: A, path2: B, method: HttpMethod, trailingSegments: ConcretePath.TrailingSegments? = null): RawHttpEndpoint<PathSpec2<A, B>> =
+public fun <A, B> RawHttpEndpoint(spec: PathSpec2<A, B>, path1: A, path2: B, method: HttpMethod, trailingSegments: PathSegments? = null): RawHttpEndpoint<PathSpec2<A, B>> =
     RawHttpEndpoint(ConcretePath(spec, path1, path2, trailingSegments), method)
 
 context(serverRuntime: ServerRuntime)
-public fun <A, B, C> RawHttpEndpoint(spec: PathSpec3<A, B, C>, path1: A, path2: B, path3: C, method: HttpMethod, trailingSegments: ConcretePath.TrailingSegments? = null): RawHttpEndpoint<PathSpec3<A, B, C>> =
+public fun <A, B, C> RawHttpEndpoint(spec: PathSpec3<A, B, C>, path1: A, path2: B, path3: C, method: HttpMethod, trailingSegments: PathSegments? = null): RawHttpEndpoint<PathSpec3<A, B, C>> =
     RawHttpEndpoint(ConcretePath(spec, path1, path2, path3, trailingSegments), method)

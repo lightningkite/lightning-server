@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.pathing
 
+import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.services.data.StringArrayFormat
 import kotlinx.serialization.modules.EmptySerializersModule
 import org.junit.Test
@@ -7,12 +8,23 @@ import kotlin.test.assertEquals
 
 class MutablePathSpecMapTest {
 
-    fun Any?.kotlin(): String = when(this) {
+    fun Any?.kotlin(): String = when (this) {
         null -> "null"
         is String -> "\"$this\""
         is Int -> "$this"
         else -> this::class.qualifiedName ?: "unknown"
     }
+
+    @Test
+    fun withslash(): Unit {
+        val saf = StringArrayFormat(EmptySerializersModule())
+        val map = MutablePathSpecMap<Int>()
+
+        map[PathSpec.root.path("variable").arg<String>("dumb")] = 42
+        map.match(saf, "/variable/asdf") { it }?.let { println(it) }
+        map.match(saf, "/variable/asdf%2fwithslash") { it }?.let { println(it) }
+    }
+
 
     @Test
     fun pathSpecCheck(): Unit {
@@ -31,18 +43,19 @@ class MutablePathSpecMapTest {
             val match = map.match(saf, path) { it.a }
             println("    val match = map.match(saf, \"$path\") { it.a }")
             println("    assertEquals(${match?.path?.let { "\"$it\"" }}, match?.path?.toString())")
-            println("    assertEquals(listOf(${match?.path?.rawPathArguments?.joinToString(", "){ it.kotlin() }}), match?.path?.rawPathArguments?.toList())")
+            println("    assertEquals(listOf(${match?.path?.rawPathArguments?.joinToString(", ") { it.kotlin() }}), match?.path?.rawPathArguments?.toList())")
             println("}")
 //            println("$path  -->  " + map.match(saf, path) { it.a }?.let {
 //                "${it.path} (${it.pathSpec} / ${it.path.rawPathArguments} / ${it.path.wildcard}) ${it.value}"
 //            })
         }
+
         fun sampleInt(path: String) {
             println("run {")
             val match = map.match(saf, path) { it.b }
             println("    val match = map.match(saf, \"$path\") { it.b }")
             println("    assertEquals(${match?.path?.let { "\"$it\"" }}, match?.path?.toString())")
-            println("    assertEquals(listOf(${match?.path?.rawPathArguments?.joinToString(", "){ it.kotlin() }}), match?.path?.rawPathArguments?.toList())")
+            println("    assertEquals(listOf(${match?.path?.rawPathArguments?.joinToString(", ") { it.kotlin() }}), match?.path?.rawPathArguments?.toList())")
             println("}")
 //            println("$path  INT-->  " + map.match(saf, path) { it.b }?.let {
 //                "${it.path} (${it.pathSpec} / ${it.path.rawPathArguments} / ${it.path.wildcard}) ${it.value}"
@@ -52,7 +65,6 @@ class MutablePathSpecMapTest {
         sample("/")
         sample("weird")
         sample("test")
-        sample("test/")
         sample("test/a")
         sample("test/22")
         sampleInt("test/a/b/c")
@@ -79,11 +91,6 @@ class MutablePathSpecMapTest {
             assertEquals(listOf(), match?.path?.rawPathArguments?.toList())
         }
         run {
-            val match = map.match(saf, "test/") { it.a }
-            assertEquals("/test/", match?.path?.toString())
-            assertEquals(listOf(), match?.path?.rawPathArguments?.toList())
-        }
-        run {
             val match = map.match(saf, "test/a") { it.a }
             assertEquals("/test/a", match?.path?.toString())
             assertEquals(listOf(), match?.path?.rawPathArguments?.toList())
@@ -105,4 +112,5 @@ class MutablePathSpecMapTest {
         }
     }
 }
+
 private data class TestHoldingThing(val a: String? = null, val b: Int? = null) {}

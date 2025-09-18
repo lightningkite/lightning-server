@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.http.HttpHeaders
+import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.pathing.ConcretePath
 import com.lightningkite.lightningserver.pathing.HasContextualPath
 import com.lightningkite.lightningserver.pathing.PathSpec
@@ -39,7 +40,7 @@ public data class WebSocketSubscriptionMessage<PATH: PathSpec, T>(
 @Serializable
 public data class WebSocketConnectRequest<PATH: PathSpec>(
     override val path: RawWebsocketPath<PATH>,
-    override val queryParameters: List<Pair<String, String>> = listOf(),
+    override val queryParameters: QueryParameters = QueryParameters.EMPTY,
     override val headers: HttpHeaders = HttpHeaders.EMPTY,
     override val domain: String = "",
     override val protocol: String = "",

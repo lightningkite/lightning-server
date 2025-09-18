@@ -187,6 +187,13 @@
             },
             "database": "mongodb+srv://demo-exampledatabase-main:${random_password.database.result}@${replace(mongodbatlas_advanced_cluster.database.connection_strings[0].standard_srv, \"mongodb+srv://\", \"\")}/default?retryWrites=true&w=majority",
             "cache": "dynamodb://us-west-2/demo_example",
+            "cors": {
+                "limitToDomains": [],
+                "limitToHeaders": [],
+                "limitToMethods": [],
+                "exposedHeaders": [],
+                "allowCredentials": false
+            },
             "secretBasis": "${random_password.secretBasis.result}",
             "sms": "console",
             "files": "s3://${aws_s3_bucket.files.bucket}.s3-${aws_s3_bucket.files.region}.amazonaws.com/?signedUrlDuration=1d",

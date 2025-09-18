@@ -11,6 +11,7 @@ import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpStatus
+import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.http.handleInstrumented
 import com.lightningkite.lightningserver.pathMoved
 import com.lightningkite.lightningserver.pathing.PathSpec
@@ -54,7 +55,7 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
                         ).associateWith { method ->
                             serverRuntime.server.endpoints.match(
                                 serverRuntime.externalSerialization.stringArrayFormat,
-                                request.path.asString
+                                request.path.pathSegments
                             ) { it.http[method] }
                         }
                         val existingMethods = perEndpoint.entries.filter { it.value != null }.mapTo(HashSet()) { it.key }
@@ -80,12 +81,12 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
                     }
                     else -> {
                         // Let's see if they just got their ending slash wrong.
-                        val altSlashEndpoint = req.path.copy(asString = req.path.asString.let {
-                            if(it.endsWith('/')) it.substringBeforeLast('/') else "$it/"
-                        })
+                        val altSlashEndpoint = req.path.copy(pathSegments = req.path.pathSegments.segments.let {
+                            if(it.lastOrNull() == "") it.dropLast(1) else it + ""
+                        }.let(::PathSegments))
                         try {
                             altSlashEndpoint.match
-                            HttpResponse.pathMoved(to = altSlashEndpoint.asString)
+                            HttpResponse.pathMoved(to = "/" + altSlashEndpoint.pathSegments.toString())
                         } catch(_: RouteNotFoundException) {
                             throw notFound
                         }

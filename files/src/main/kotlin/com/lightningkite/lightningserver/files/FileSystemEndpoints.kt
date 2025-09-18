@@ -28,7 +28,7 @@ public class FileSystemEndpoints(
     public val rootFile: FileObject get() = files().root
 
     context(runtime: ServerRuntime)
-    private fun Request<*>.filePath(): String = path.trailingSegments?.toString()?.removePrefix("/")?.plus("?")?.plus(queryParametersAsString) ?: throw BadRequestException("No file to look up")
+    private fun Request<*>.filePath(): String = path.trailingSegments?.toString()?.removePrefix("/")?.plus("?")?.plus(queryParameters.toString()) ?: throw BadRequestException("No file to look up")
 
     public val fetchHead: HttpHandler<PathSpec0> = path.any.head bind HttpHandler {
         val filePath = it.filePath()

@@ -4,6 +4,7 @@ import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
@@ -96,8 +97,7 @@ class UploadEarlyEndpointTest {
                 ) { it.http[HttpMethod.GET] } ?: throw Exception("Endpoint for '${serialized.substringBefore('?').substringAfter("://").substringAfter("/")}' not found")
                 Server.served.fetch.test(
                     trailingWildcard = match.path.trailingSegments,
-                    queryParameters = serialized.substringAfter('?').split('&')
-                        .map { it.substringBefore('=') to it.substringAfter('=', "") },
+                    queryParameters = serialized.substringAfter('?').let { QueryParameters.parse(it) },
                 )
             }
         }
@@ -119,8 +119,7 @@ class UploadEarlyEndpointTest {
                 ) { it.http[HttpMethod.PUT] }!!
                 Server.served.upload.test(
                     trailingWildcard = match.path.trailingSegments,
-                    queryParameters = prepare.uploadUrl.substringAfter('?').split('&')
-                        .map { it.substringBefore('=') to it.substringAfter('=', "") },
+                    queryParameters = prepare.uploadUrl.substringAfter('?').let { QueryParameters.parse(it) },
                     body = TypedData.text("Hello world!", MediaType.Text.Plain)
                 )
             }
@@ -142,8 +141,7 @@ class UploadEarlyEndpointTest {
                 ) { it.http[HttpMethod.GET] }!!
                 Server.served.fetch.test(
                     trailingWildcard = match.path.trailingSegments,
-                    queryParameters = clientSideServerFile.location.substringAfter('?', "").split('&')
-                        .map { it.substringBefore('=') to it.substringAfter('=', "") },
+                    queryParameters = clientSideServerFile.location.substringAfter('?').let { QueryParameters.parse(it) },
                 )
             }
         }

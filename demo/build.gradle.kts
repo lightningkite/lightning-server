@@ -18,6 +18,8 @@ dependencies {
     api(project(":ktor"))
     api(project(":typed"))
     api(project(":aws-serverless"))
+    api(project(":jdk-server"))
+    api(project(":netty"))
     api(project(":sessions"))
     api(project(":sessions-email"))
 //    api(project(":sessions-oauth"))
@@ -87,6 +89,21 @@ tasks.create("serve", JavaExec::class.java) {
     classpath(sourceSets.main.get().runtimeClasspath)
     mainClass.set("com.lightningkite.lightningserver.demo.MainKt")
     args("serve")
+    workingDir(project.rootDir)
+}
+
+tasks.create("serveJdk", JavaExec::class.java) {
+    group = "application"
+    classpath(sourceSets.main.get().runtimeClasspath)
+    mainClass.set("com.lightningkite.lightningserver.demo.MainKt")
+    args("serveJdk")
+    workingDir(project.rootDir)
+}
+tasks.create("serveNetty", JavaExec::class.java) {
+    group = "application"
+    classpath(sourceSets.main.get().runtimeClasspath)
+    mainClass.set("com.lightningkite.lightningserver.demo.MainKt")
+    args("serveNetty")
     workingDir(project.rootDir)
 }
 

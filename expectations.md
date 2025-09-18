@@ -15,3 +15,25 @@
 
 
 Accept-Language support?
+
+# Expectations for Deployment
+
+- AWS Lambda
+  - In code
+    - Define which services to use
+    - Define other constants
+  - On Running
+    - Generate Terraform
+    - Prompt for secret insertion if secrets aren't present
+    - Execute Terraform init with retrieved secrets
+    - Execute Terraform apply with retrieved secrets
+- SSH to Existing Machine
+  - In code
+    - Define serialized settings
+  - On Running
+    - SCP's the executable to the machine
+    - (if needed) Get needed JDK
+    - (if needed) Establish Supervisor config
+    - (if needed) Establish NGINX/Angie config
+    - (if needed) Establish settings file path
+    - Supervisor restart

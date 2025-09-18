@@ -61,16 +61,16 @@
 //public fun <PATH : PathSpec> RawPath(path: ConcretePath<PATH>): RawPath<PATH> = RawPath(path.path(server.internalSerialization.stringArrayFormat))
 //
 //context(serverRuntime: ServerRuntime)
-//public fun RawPath(spec: PathSpec0, trailingSegments: ConcretePath.TrailingSegments? = null): RawPath<PathSpec0> = RawPath(ConcretePath(spec, trailingSegments))
+//public fun RawPath(spec: PathSpec0, trailingSegments: PathSegments? = null): RawPath<PathSpec0> = RawPath(ConcretePath(spec, trailingSegments))
 //
 //context(serverRuntime: ServerRuntime)
-//public fun <A> RawPath(spec: PathSpec1<A>, path1: A, trailingSegments: ConcretePath.TrailingSegments? = null): RawPath<PathSpec1<A>> =
+//public fun <A> RawPath(spec: PathSpec1<A>, path1: A, trailingSegments: PathSegments? = null): RawPath<PathSpec1<A>> =
 //    RawPath(ConcretePath(spec, path1, trailingSegments))
 //
 //context(serverRuntime: ServerRuntime)
-//public fun <A, B> RawPath(spec: PathSpec2<A, B>, path1: A, path2: B, trailingSegments: ConcretePath.TrailingSegments? = null): RawPath<PathSpec2<A, B>> =
+//public fun <A, B> RawPath(spec: PathSpec2<A, B>, path1: A, path2: B, trailingSegments: PathSegments? = null): RawPath<PathSpec2<A, B>> =
 //    RawPath(ConcretePath(spec, path1, path2, trailingSegments))
 //
 //context(serverRuntime: ServerRuntime)
-//public fun <A, B, C> RawPath(spec: PathSpec3<A, B, C>, path1: A, path2: B, path3: C, trailingSegments: ConcretePath.TrailingSegments? = null): RawPath<PathSpec3<A, B, C>> =
+//public fun <A, B, C> RawPath(spec: PathSpec3<A, B, C>, path1: A, path2: B, path3: C, trailingSegments: PathSegments? = null): RawPath<PathSpec3<A, B, C>> =
 //    RawPath(ConcretePath(spec, path1, path2, path3, trailingSegments))

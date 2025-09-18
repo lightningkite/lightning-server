@@ -64,7 +64,7 @@ class ImplementationHelpersHandleTest {
                 val resp = serverRuntime.handle(
                     HttpRequest<PathSpec>(
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
-                        queryParameters = listOf(),
+                        queryParameters = QueryParameters.EMPTY,
                         headers = HttpHeaders.EMPTY,
                         domain = "example.com",
                         protocol = "https",
@@ -97,7 +97,7 @@ class ImplementationHelpersHandleTest {
                 val resp = serverRuntime.handle(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.HEAD),
-                        queryParameters = listOf(),
+                        queryParameters = QueryParameters.EMPTY,
                         headers = HttpHeaders.EMPTY,
                         domain = "example.com",
                         protocol = "https",
@@ -130,7 +130,7 @@ class ImplementationHelpersHandleTest {
                 val resp = serverRuntime.handle(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.OPTIONS),
-                        queryParameters = listOf(),
+                        queryParameters = QueryParameters.EMPTY,
                         headers = HttpHeaders.EMPTY,
                         domain = "example.com",
                         protocol = "https",
@@ -167,7 +167,7 @@ class ImplementationHelpersHandleTest {
                 val resp = serverRuntime.handle(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/slash", method = HttpMethod.GET),
-                        queryParameters = listOf(),
+                        queryParameters = QueryParameters.EMPTY,
                         headers = HttpHeaders.EMPTY,
                         domain = "example.com",
                         protocol = "https",
@@ -201,7 +201,7 @@ class ImplementationHelpersHandleTest {
                 val resp = serverRuntime.handle(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
-                        queryParameters = listOf(),
+                        queryParameters = QueryParameters.EMPTY,
                         headers = HttpHeaders {
                             set(HttpHeader.AcceptEncoding, "gzip")
                         },

@@ -8,6 +8,8 @@ import com.lightningkite.lightningserver.engine.local.LocalEngine
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
+import com.lightningkite.lightningserver.http.PathSegments
+import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
@@ -99,15 +101,9 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
                 }
             }
             webSocket("{...}") {
-                var queryParams = call.request.queryParameters.flattenEntries()
-                // TODO: Remove this fugly hack and deal with websocket auth better
-                queryParams = queryParams.flatMap {
-                    if (it.first == "path") listOf(it) + it.second.substringAfter('?').split('&')
-                        .map { part -> part.substringBefore('=') to part.substringAfter('=') }
-                    else listOf(it)
-                }
+                val queryParams = call.request.queryParameters.flattenEntries().let(::QueryParameters).pathHack()
                 val request = WebSocketConnectRequest(
-                    path = RawWebsocketPath(call.request.path()),
+                    path = RawWebsocketPath(PathSegments.parse(call.request.path())),
                     queryParameters = queryParams,
                     headers = call.request.headers.adapt(),
                     domain = call.request.origin.serverHost,
@@ -118,11 +114,11 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
                     } ?: call.request.origin.remoteAddress,
                 )
 
-                val match = server.endpoints.match(externalSerialization.stringArrayFormat, request.path.string) { it.websocket } ?: run {
+                val match = server.endpoints.match(externalSerialization.stringArrayFormat, request.path.pathSegments) { it.websocket } ?: run {
                     this@webSocket.close(
                         CloseReason(
                             CloseReason.Codes.CANNOT_ACCEPT,
-                            "No matching path found for ${request.path.string}"
+                            "No matching path found for ${request.path}"
                         )
                     )
                     return@webSocket

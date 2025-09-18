@@ -19,6 +19,7 @@ import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.cache.*
 import com.lightningkite.services.cache.dynamodb.*
 import com.lightningkite.services.cache.memcached.*
+import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.*
 import com.lightningkite.services.database.mongodb.*
 import com.lightningkite.services.email.*
@@ -49,11 +50,7 @@ object Server : ServerBuilder() {
     val cache = setting("cache", Cache.Settings())
     val cors = setting("cors", CorsSettings())
 
-    val corsInterceptor = CorsInterceptor(cors)
-    init {
-        http.interceptors += corsInterceptor
-        websockets.interceptors += corsInterceptor
-    }
+    val corsInterceptor = CorsInterceptor(cors).also { install(it) }
 
     init {
         JavaSmtpEmailService
@@ -115,6 +112,10 @@ object Server : ServerBuilder() {
         HttpResponse.plainText("Hello ${it.auth(UserAuth.auth() or noAuth)?.fetch()}")
     }
 
+    val slashEscaping = path.path("variable").arg<String>("stupidid").get bind HttpHandler { request ->
+        HttpResponse.plainText("The variable is '${request.path.pathInContext.rawPathArguments[0]}'")
+    }
+
     val socket = path.path("socket") bind WebSocketHandler(
         willConnect = { Uuid.random().toString() },
         didConnect = { /*send("Connected $currentState")*/ },
@@ -126,6 +127,22 @@ object Server : ServerBuilder() {
         },
         disconnect = { println("Disconnect $currentState") }
     )
+
+    val mockWorkGet = path.path("mock-work").get bind HttpHandler {
+        repeat(5) {
+            // Mocking DB requests
+            delay(10)
+        }
+        HttpResponse.plainText("ok")
+    }
+    val mockWorkPost = path.path("mock-work").post bind HttpHandler {
+        val bytes = it.body?.data?.bytes()
+        repeat(5) {
+            // Mocking DB requests
+            delay(10)
+        }
+        HttpResponse(body = bytes?.let { bytes -> TypedData.bytes(bytes, it.body!!.mediaType) })
+    }
 
     val task = path.path("Sample Task") bind Task { it: Int ->
         val id = Uuid.random()
