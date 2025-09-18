@@ -40,7 +40,7 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
             var result = try {
                 @Suppress("UNCHECKED_CAST")
                 (req.path.match.value as HttpHandler<PathSpec>).handleWithMetrics(req as HttpRequest<PathSpec>)
-            } catch(notFound: RouteNotFoundException) {
+            } catch (notFound: RouteNotFoundException) {
                 when (req.path.method) {
                     HttpMethod.OPTIONS -> {
                         // Let's return the available methods.
@@ -59,15 +59,16 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
                             ) { it.http[method] }
                         }
                         val existingMethods = perEndpoint.entries.filter { it.value != null }.mapTo(HashSet()) { it.key }
-                        if(existingMethods.contains(HttpMethod.GET)) existingMethods += HttpMethod.HEAD
+                        if (existingMethods.contains(HttpMethod.GET)) existingMethods += HttpMethod.HEAD
                         existingMethods += HttpMethod.OPTIONS
                         HttpResponse(
-                            status = if(existingMethods.isEmpty()) HttpStatus.NotFound else HttpStatus.NoContent,
+                            status = if (existingMethods.isEmpty()) HttpStatus.NotFound else HttpStatus.NoContent,
                             headers = HttpHeaders {
                                 set(HttpHeader.AccessControlAllowMethods, existingMethods.joinToString(","))
                             }
                         )
                     }
+
                     HttpMethod.HEAD -> {
                         // OK, we'll do a get and remove the body.
                         val getRequest = req.copyWithNewPathType(path = req.path.copy(method = HttpMethod.GET))
@@ -76,18 +77,19 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
                         val getResult = (getRequest.path.match.value as HttpHandler<PathSpec>).handleWithMetrics(getRequest)
                         getResult.copy(
                             body = null,
-                            status = if(getResult.status.success) HttpStatus.NoContent else getResult.status,
+                            status = if (getResult.status.success) HttpStatus.NoContent else getResult.status,
                         )
                     }
+
                     else -> {
                         // Let's see if they just got their ending slash wrong.
                         val altSlashEndpoint = req.path.copy(pathSegments = req.path.pathSegments.segments.let {
-                            if(it.lastOrNull() == "") it.dropLast(1) else it + ""
+                            if (it.lastOrNull() == "") it.dropLast(1) else it + ""
                         }.let(::PathSegments))
                         try {
                             altSlashEndpoint.match
                             HttpResponse.pathMoved(to = "/" + altSlashEndpoint.pathSegments.toString())
-                        } catch(_: RouteNotFoundException) {
+                        } catch (_: RouteNotFoundException) {
                             throw notFound
                         }
                     }
@@ -95,13 +97,13 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
             }
             // Compression
             run {
-                for(option in request.headers.getMany(HttpHeader.AcceptEncoding).map { it.root }) {
-                    when(option) {
+                for (option in request.headers.getMany(HttpHeader.AcceptEncoding).map { it.root }) {
+                    when (option) {
                         "gzip" -> {
                             result = result.copy(
                                 headers = result.headers + HttpHeaders(HttpHeader.ContentEncoding to "gzip"),
                                 body = result.body?.copy(
-                                    data = when(val data = result.body.data) {
+                                    data = when (val data = result.body.data) {
                                         is Data.Sink -> Data.Sink(
                                             emit = {
                                                 GZIPOutputStream(it.asOutputStream()).asSink().buffered().use {
@@ -146,7 +148,6 @@ context(serverRuntime: ServerRuntime) private suspend inline fun <PATH : PathSpe
 }
 
 
-
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.willConnectWithMetrics(location: PATH, serverRuntime: ServerRuntime, request: WebSocketConnectRequest<PATH>): STORAGE {
     return with(serverRuntime) {
         instrument("WEBSOCKET.WILLCONNECT $location") {
@@ -154,23 +155,28 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.wi
         }
     }
 }
-public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.didConnectWithMetrics(location: PATH, connection: WebSocketConnection<PATH, STORAGE>, ) {
+
+public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.didConnectWithMetrics(location: PATH, connection: WebSocketConnection<PATH, STORAGE>) {
     return with(connection) {
         instrument("WEBSOCKET.DIDCONNECT $location") {
-
             didConnect()
         }
     }
 }
+
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.messageFromClientWithMetrics(location: PATH, connection: WebSocketConnection<PATH, STORAGE>, frame: WebSocketFrame) {
     return with(connection) {
         instrument("WEBSOCKET.MESSAGE $location") {
-
             messageFromClient(frame)
         }
     }
 }
-public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.messageFromSubscriptionWithMetrics(location: PATH, connection: WebSocketConnection<PATH, STORAGE>, topic: WebSocketSubscriptionMessage<*, *>) {
+
+public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.messageFromSubscriptionWithMetrics(
+    location: PATH,
+    connection: WebSocketConnection<PATH, STORAGE>,
+    topic: WebSocketSubscriptionMessage<*, *>
+) {
     return with(connection) {
         instrument("WEBSOCKET.SUBSCRIPTION $location") {
 
@@ -178,10 +184,10 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
         }
     }
 }
+
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.disconnectWithMetrics(location: PATH, connection: WebSocketConnection<PATH, STORAGE>, reason: WebSocketClose) {
     return with(connection) {
         instrument("WEBSOCKET.DISCONNECT $location") {
-
             disconnect(reason)
         }
     }
@@ -190,14 +196,14 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
 context(serverRuntime: ServerRuntime)
 public suspend fun <T> Task<T>.executeWithMetrics(location: PathSpec0, input: T) {
     return instrument("TASK $location") {
-
         with(serverRuntime) {
             this@executeWithMetrics.executeInline(input)
         }
     }
 }
+
 context(serverRuntime: ServerRuntime)
-public suspend fun ScheduledTask.executeWithMetrics(location: PathSpec0, ) {
+public suspend fun ScheduledTask.executeWithMetrics(location: PathSpec0) {
     return instrument("SCHEDULE $location") {
 
         with(serverRuntime) {
@@ -209,7 +215,6 @@ public suspend fun ScheduledTask.executeWithMetrics(location: PathSpec0, ) {
 context(serverRuntime: ServerRuntime)
 public suspend fun StartupTask.executeWithMetrics(location: PathSpec0) {
     return instrument("STARTUP $location") {
-
         execute()
     }
 }
@@ -217,10 +222,10 @@ public suspend fun StartupTask.executeWithMetrics(location: PathSpec0) {
 context(runtime: ServerRuntime)
 public suspend inline fun <T> instrument(name: String, crossinline action: suspend (Span?) -> T): T {
     val tel = runtime.openTelemetry?.get("com.lightningkite.lightningserver")
-    return if(tel != null) tel.spanBuilder(name).use {
+    return if (tel != null) tel.spanBuilder(name).use {
         try {
             action(it)
-        } catch(t: Throwable) {
+        } catch (t: Throwable) {
             tel.error("Context $name failed", t)
             throw t
         }
