@@ -58,7 +58,8 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
     internal val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.engine.awsserverless")
     internal var preventLambdaTimeoutReuse: Boolean = false
 
-    override val settings: ServerSettings = ServerSettings(super.settings.settings.plus(awsLambdaRuntimeSettings).toSet())
+//    override val settings: ServerSettings = ServerSettings(super.settings.settings.plus(awsLambdaRuntimeSettings).toSet())
+    override val settings: ServerSettings = ServerSettings(super.settings.settings.toSet())
 
     init {
         logger.info { "Initializing AwsAdapter..." }
@@ -81,7 +82,7 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
             println("Raw settings: ${decryptedBytes.toString(Charsets.UTF_8)}")
             this.settings.include(
                 internalSerialization.json.decodeFromString(
-                    SettingsSerializer(settings.settings.toList()),
+                    SettingsSerializer(settings.settings.toList(), internalSerialization.json),
                     decryptedBytes.toString(Charsets.UTF_8)
                 ).also { println("Parsed settings: $it") }
             )

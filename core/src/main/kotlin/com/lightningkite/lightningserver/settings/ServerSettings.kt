@@ -4,7 +4,10 @@ import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.builder.MapRegistry
 import com.lightningkite.lightningserver.definition.builder.getOrRegister
 import com.lightningkite.lightningserver.definition.builder.include
+import com.lightningkite.lightningserver.definition.loggingSettings
+import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.services.otel.applyToLogback
 
 public class ServerSettings(public val settings: Set<ServerSetting<*, *>>) {
     public var ready: Boolean = false
@@ -35,10 +38,31 @@ public class ServerSettings(public val settings: Set<ServerSetting<*, *>>) {
     public fun readyUsingDefaults() {
         ready = true
     }
+
+    context(server: ServerRuntime)
     public fun ready() {
         val missing = settings.minus(serializable.keys + goal.keys)
         if(missing.isNotEmpty()) throw IllegalStateException("Settings ${missing.joinToString { it.name }} are missing.")
         ready = true
+
+        val errors = mutableMapOf<ServerSetting<*, *>, Exception>()
+
+        if(loggingSettings in settings)
+            get(loggingSettings).applyToLogback()
+        settings.forEach { setting ->
+            try {
+                get(setting)
+            } catch (e: Exception) {
+                errors[setting] = e
+            }
+        }
+        if (errors.isNotEmpty()) {
+            errors.forEach { (setting, error) ->
+                server.logger.error { "Invalid value for ${setting.name}" }
+                server.logger.error { error.stackTraceToString() }
+            }
+            throw Error("Failed to preload all settings")
+        }
     }
 
     @Suppress("UNCHECKED_CAST")

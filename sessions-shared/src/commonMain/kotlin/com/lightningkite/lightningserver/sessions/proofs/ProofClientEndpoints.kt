@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
-import com.lightningkite.lightningserver.sessions.EstablishOtp
+import com.lightningkite.lightningserver.sessions.EstablishTotp
 import com.lightningkite.lightningserver.sessions.EstablishPassword
 import com.lightningkite.lightningserver.typed.LiveVersion
 
@@ -33,7 +33,7 @@ public sealed interface ProofClientEndpoints {
         public suspend fun proveOTP(input: IdentificationAndPassword): Proof
 
         // required auth
-        public suspend fun establishOneTimePassword(input: EstablishOtp): String
+        public suspend fun establishOneTimePassword(input: EstablishTotp): String
         public suspend fun confirmOneTimePassword(input: String)
     }
 

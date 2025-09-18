@@ -5,14 +5,6 @@ import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.http.HttpHandler
-import com.lightningkite.lightningserver.http.HttpHeader
-import com.lightningkite.lightningserver.http.HttpHeaders
-import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.HttpStatus
-import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.http.head
-import com.lightningkite.lightningserver.http.put
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.trailingSegments
@@ -22,13 +14,15 @@ import com.lightningkite.services.files.KotlinxIoPublicFileSystem
 import com.lightningkite.services.files.PublicFileSystem
 
 public class FileSystemEndpoints(
-    public val files: Runtime<PublicFileSystem>
-): ServerBuilder() {
+    public val files: Runtime<PublicFileSystem>,
+) : ServerBuilder() {
     context(runtime: ServerRuntime)
     public val rootFile: FileObject get() = files().root
 
     context(runtime: ServerRuntime)
-    private fun Request<*>.filePath(): String = path.trailingSegments?.toString()?.removePrefix("/")?.plus("?")?.plus(queryParameters.toString()) ?: throw BadRequestException("No file to look up")
+    private fun Request<*>.filePath(): String =
+        path.trailingSegments?.toString()?.removePrefix("/")?.plus("?")?.plus(queryParameters.toString())
+            ?: throw BadRequestException("No file to look up")
 
     public val fetchHead: HttpHandler<PathSpec0> = path.any.head bind HttpHandler {
         val filePath = it.filePath()
@@ -36,7 +30,8 @@ public class FileSystemEndpoints(
         // If you ever see a NPE, logic itself has broken and the universe will cease to exist shortly.
         // ... or your file system implementation is broken and doesn't recognize its own root URL.
         val head = try {
-            files().parseExternalUrl(files().rootUrls[0] + filePath)!!.head() ?: throw NotFoundException("No file $filePath found")
+            files().parseExternalUrl(files().rootUrls[0] + filePath)!!.head()
+                ?: throw NotFoundException("No file $filePath found")
         } catch (e: Exception) {
             throw BadRequestException("Invalid file URL")
         }
@@ -73,15 +68,14 @@ public class FileSystemEndpoints(
 
     public val upload: HttpHandler<PathSpec0> = path.any.put bind HttpHandler {
         val kotlinx = files() as? KotlinxIoPublicFileSystem
-        if (kotlinx != null) {
-            try {
-                kotlinx.parseUploadUrl(files().rootUrls[0] + it.filePath())!!.put(it.body!!)
-            } catch (e: Exception) {
-                throw BadRequestException("Invalid file Upload URL")
-            }
-        } else {
-            throw BadRequestException("You can't upload files to this reflection of the real file system.")
+            ?: throw BadRequestException("You can't upload files to this reflection of the real file system.")
+
+        try {
+            kotlinx.parseUploadUrl(files().rootUrls[0] + it.filePath())!!.put(it.body!!)
+        } catch (e: Exception) {
+            throw BadRequestException("Invalid file Upload URL")
         }
+
         HttpResponse(status = HttpStatus.NoContent)
     }
 }

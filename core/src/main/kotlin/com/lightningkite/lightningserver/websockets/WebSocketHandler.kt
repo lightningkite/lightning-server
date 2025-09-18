@@ -36,17 +36,17 @@ public inline fun <PATH: PathSpec, reified STORAGE> WebSocketHandler(
 ): WebSocketHandler<PATH, STORAGE> =
     object : WebSocketHandler<PATH, STORAGE> {
         override val storageSerializer: KSerializer<STORAGE> = storageSerializer
-        override suspend context(serverRuntime: ServerRuntime) fun willConnect(request: WebSocketConnectRequest<PATH>): STORAGE = willConnect(contextOf(), request)
+        override suspend context(serverRuntime: ServerRuntime) fun willConnect(request: WebSocketConnectRequest<PATH>): STORAGE = willConnect(contextOf<ServerRuntime>(), request)
         override suspend context(connection: WebSocketConnection<PATH, STORAGE>) fun didConnect() {
-            didConnect(contextOf(), )
+            didConnect(contextOf<WebSocketConnection<PATH, STORAGE>>(), )
         }
         override suspend context(connection: WebSocketConnection<PATH, STORAGE>) fun messageFromClient(frame: WebSocketFrame) {
-            messageFromClient(contextOf(), frame)
+            messageFromClient(contextOf<WebSocketConnection<PATH, STORAGE>>(), frame)
         }
         private val subHandler = TopicHandlersBuilder<PATH, STORAGE>().apply(topicHandlers).build()
-        override suspend context(connection: WebSocketConnection<PATH, STORAGE>) fun messageFromSubscription(topic: WebSocketSubscriptionMessage<*, *>) = subHandler(contextOf(), topic)
+        override suspend context(connection: WebSocketConnection<PATH, STORAGE>) fun messageFromSubscription(topic: WebSocketSubscriptionMessage<*, *>) = subHandler(contextOf<WebSocketConnection<PATH, STORAGE>>(), topic)
         override suspend context(connection: WebSocketConnection<PATH, STORAGE>) fun disconnect(reason: WebSocketClose) {
-            disconnect(contextOf(), reason)
+            disconnect(contextOf<WebSocketConnection<PATH, STORAGE>>(), reason)
         }
     }
 

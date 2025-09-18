@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
 import com.lightningkite.lightningserver.HttpMethod
-import com.lightningkite.lightningserver.sessions.EstablishOtp
+import com.lightningkite.lightningserver.sessions.EstablishTotp
 import com.lightningkite.lightningserver.sessions.EstablishPassword
 import com.lightningkite.lightningserver.typed.Fetcher
 import kotlinx.serialization.builtins.ListSerializer
@@ -62,10 +62,10 @@ public object LiveProofClientEndpoints {
             outSerializer = Proof.serializer()
         )
 
-        override suspend fun establishOneTimePassword(input: EstablishOtp): String = fetcher(
+        override suspend fun establishOneTimePassword(input: EstablishTotp): String = fetcher(
             url = "$subpath/establish",
             method = HttpMethod.POST,
-            inSerializer = EstablishOtp.serializer(),
+            inSerializer = EstablishTotp.serializer(),
             body = input,
             outSerializer = String.serializer()
         )

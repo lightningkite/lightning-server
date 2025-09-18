@@ -99,7 +99,7 @@ public inline fun <PATH: PathSpec, reified STORAGE, USER: HasId<*>?, reified INP
 
         private val subHandler = ApiTopicHandlersBuilder<PATH, STORAGE, USER, INPUT, OUTPUT>().apply(topicHandlersType).build()
         public context(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>)
-        override suspend fun messageFromSubscriptionTyped(topic: WebSocketSubscriptionMessage<*, *>): Unit = subHandler(contextOf(), topic)
+        override suspend fun messageFromSubscriptionTyped(topic: WebSocketSubscriptionMessage<*, *>): Unit = subHandler(contextOf<Connection<PATH, STORAGE, USER, INPUT, OUTPUT>>(), topic)
 
         public context(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>)
         override suspend fun disconnectTyped(reason: WebSocketClose): Unit = disconnectType(connection, reason)

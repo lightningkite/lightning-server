@@ -1,12 +1,10 @@
 package com.lightningkite.lightningserver.demo
 
 import com.lightningkite.kotlinercli.cli
-import com.lightningkite.lightningserver.definition.CorsSettings
+import com.lightningkite.lightningserver.cors.CorsSettings
 import com.lightningkite.lightningserver.definition.loggingSettings
 import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.definition.telemetrySettings
-import com.lightningkite.lightningserver.engine.awsserverless.AwsLambdaRuntimeSettings
-import com.lightningkite.lightningserver.engine.awsserverless.awsLambdaRuntimeSettings
 import com.lightningkite.lightningserver.engine.jdk.JdkEngine
 import com.lightningkite.lightningserver.engine.ktor.KtorEngine
 import com.lightningkite.lightningserver.engine.netty.NettyEngine
@@ -82,12 +80,12 @@ fun terraform() {
 //        purchaseDomain = true,
     ).apply {
         settings {
-            awsLambdaRuntimeSettings.direct(AwsLambdaRuntimeSettings(CorsSettings(
-                limitToDomains = null,
-                limitToHeaders = null,
-                limitToMethods = null,
-                allowCredentials = true
-            )))
+//            awsLambdaRuntimeSettings.direct(AwsLambdaRuntimeSettings(CorsSettings(
+//                limitToDomains = null,
+//                limitToHeaders = null,
+//                limitToMethods = null,
+//                allowCredentials = true
+//            )))
             database.mongodbAtlasFree(orgId = "6323a65c43d66b56a2ea5aea", zoneName = "Zone 1")
             email.awsSesSmtp(emergencyContact)
             sms.direct(SMS.Settings())

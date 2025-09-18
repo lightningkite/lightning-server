@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.engine.vertx
 
-import com.lightningkite.lightningserver.definition.CorsSettings
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.engine.local.LocalEngine
@@ -28,7 +27,6 @@ public data class VertxRuntimeSettings(
     val host: String = "0.0.0.0",
     val port: Int = 8080,
     val realIpHeader: String? = null,
-    val cors: CorsSettings? = null,
 )
 
 internal val vertxRunConfig: ServerSetting.Direct<VertxRuntimeSettings> = ServerSetting(

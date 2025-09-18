@@ -29,8 +29,7 @@ public fun ServerSettings.loadFromFile(
     file: File,
     module: SerializersModule,
 ) {
-    val serializer = SettingsSerializer(settings.sortedBy { it.name })
-    val format = if (file.name.contains(".properties")) {
+    val format: StringFormat = if (file.name.contains(".properties")) {
         object : StringFormat {
             val properties = Properties(module)
             override val serializersModule: SerializersModule = EmptySerializersModule()
@@ -61,6 +60,8 @@ public fun ServerSettings.loadFromFile(
         encodeDefaults = true
         serializersModule = module
     }
+
+    val serializer = SettingsSerializer(settings.sortedBy { it.name }, format)
 
     if (!file.exists()) {
         file.writeText(format.encodeToString(serializer, settings.associateWith { it.default }))
@@ -93,24 +94,3 @@ public fun ServerSettings.loadFromFile(
     }
     this.include(loaded)
 }
-
-context(server: ServerRuntime)
-public fun ServerSettings.preload() {
-    val errors = mutableMapOf<ServerSetting<*, *>, Exception>()
-    settings.forEach { setting ->
-        try {
-            get(setting)
-        } catch (e: Exception) {
-            errors[setting] = e
-        }
-    }
-    if (errors.isNotEmpty()) {
-        errors.forEach { (setting, error) ->
-            server.logger.error { "Invalid value for ${setting.name}" }
-            server.logger.error { error.stackTraceToString() }
-        }
-        throw Error("Failed to preload all settings")
-    }
-
-}
-

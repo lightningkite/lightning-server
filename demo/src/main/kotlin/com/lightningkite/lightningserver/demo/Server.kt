@@ -6,6 +6,7 @@ import com.lightningkite.DataSize.Companion.bytes
 import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.cors.CorsInterceptor
+import com.lightningkite.lightningserver.cors.CorsSettings
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.deprecations.startupOnce
@@ -59,8 +60,8 @@ object Server : ServerBuilder() {
         MongoDatabase
         MemcachedCache
         S3PublicFileSystem
-        startupOnce("adminUser", database) {
-            database().collection<User>().insertOne(
+        StartupOnce("adminUser", database) {
+            database().table<User>().insertOne(
                 User(
                     email = "joseph+admin@lightningkite.com",
                     isSuperUser = true
@@ -229,7 +230,7 @@ object Server : ServerBuilder() {
     }
 
     val databaseCheck = path.path("database-check").get bind HttpHandler {
-        HttpResponse.plainText(database().collection<User>()::class.qualifiedName ?: "???")
+        HttpResponse.plainText(database().table<User>()::class.qualifiedName ?: "???")
     }
 
     val testSchedule = path.path("test-schedule") bind ScheduledTask(frequency = 5.minutes) {

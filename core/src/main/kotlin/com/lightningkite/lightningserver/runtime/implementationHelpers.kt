@@ -12,7 +12,6 @@ import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.PathSegments
-import com.lightningkite.lightningserver.http.handleInstrumented
 import com.lightningkite.lightningserver.pathMoved
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
@@ -43,39 +42,13 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
                 (req.path.match.value as HttpHandler<PathSpec>).handleWithMetrics(req as HttpRequest<PathSpec>)
             } catch (notFound: RouteNotFoundException) {
                 when (req.path.method) {
-                    HttpMethod.OPTIONS -> {
-                        // Let's return the available methods.
-                        val perEndpoint = listOf(
-                            HttpMethod.GET,
-                            HttpMethod.POST,
-                            HttpMethod.PUT,
-                            HttpMethod.PATCH,
-                            HttpMethod.DELETE,
-                            HttpMethod.OPTIONS,
-                            HttpMethod.HEAD,
-                        ).associateWith { method ->
-                            serverRuntime.server.endpoints.match(
-                                serverRuntime.externalSerialization.stringArrayFormat,
-                                request.path.pathSegments
-                            ) { it.http[method] }
-                        }
-                        val existingMethods = perEndpoint.entries.filter { it.value != null }.mapTo(HashSet()) { it.key }
-                        if (existingMethods.contains(HttpMethod.GET)) existingMethods += HttpMethod.HEAD
-                        existingMethods += HttpMethod.OPTIONS
-                        HttpResponse(
-                            status = if (existingMethods.isEmpty()) HttpStatus.NotFound else HttpStatus.NoContent,
-                            headers = HttpHeaders {
-                                set(HttpHeader.AccessControlAllowMethods, existingMethods.joinToString(","))
-                            }
-                        )
-                    }
-
                     HttpMethod.HEAD -> {
                         // OK, we'll do a get and remove the body.
                         val getRequest = req.copyWithNewPathType(path = req.path.copy(method = HttpMethod.GET))
 
                         @Suppress("UNCHECKED_CAST")
-                        val getResult = (getRequest.path.match.value as HttpHandler<PathSpec>).handleWithMetrics(getRequest)
+                        val getResult =
+                            (getRequest.path.match.value as HttpHandler<PathSpec>).handleWithMetrics(getRequest)
                         getResult.copy(
                             body = null,
                             status = if (getResult.status.success) HttpStatus.NoContent else getResult.status,
@@ -84,7 +57,7 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
 
                     else -> {
                         println("Not found: ${req.path.pathSegments.segments.map { "'$it'" }}, looking for slashes")
-                        if(request.path.pathSegments.isNotEmpty()) {
+                        if (request.path.pathSegments.isNotEmpty()) {
                             // Let's see if they just got their ending slash wrong.
                             val altSlashEndpoint = req.path.copy(pathSegments = req.path.pathSegments.segments.let {
                                 if (it.lastOrNull() == "") it.dropLast(1) else it + ""
@@ -143,7 +116,9 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
     }
 }
 
-context(serverRuntime: ServerRuntime) private suspend inline fun <PATH : PathSpec> HttpHandler<PATH>.handleWithMetrics(request: HttpRequest<PATH>): HttpResponse {
+context(serverRuntime: ServerRuntime) private suspend inline fun <PATH : PathSpec> HttpHandler<PATH>.handleWithMetrics(
+    request: HttpRequest<PATH>,
+): HttpResponse {
     return instrument(location.toString()) {
         this@handleWithMetrics.handle(
             request
@@ -152,7 +127,11 @@ context(serverRuntime: ServerRuntime) private suspend inline fun <PATH : PathSpe
 }
 
 
-public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.willConnectWithMetrics(location: PATH, serverRuntime: ServerRuntime, request: WebSocketConnectRequest<PATH>): STORAGE {
+public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.willConnectWithMetrics(
+    location: PATH,
+    serverRuntime: ServerRuntime,
+    request: WebSocketConnectRequest<PATH>,
+): STORAGE {
     return with(serverRuntime) {
         instrument("WEBSOCKET.WILLCONNECT $location") {
             willConnect(request)
@@ -160,7 +139,10 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.wi
     }
 }
 
-public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.didConnectWithMetrics(location: PATH, connection: WebSocketConnection<PATH, STORAGE>) {
+public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.didConnectWithMetrics(
+    location: PATH,
+    connection: WebSocketConnection<PATH, STORAGE>,
+) {
     return with(connection) {
         instrument("WEBSOCKET.DIDCONNECT $location") {
             didConnect()
@@ -168,7 +150,11 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
     }
 }
 
-public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.messageFromClientWithMetrics(location: PATH, connection: WebSocketConnection<PATH, STORAGE>, frame: WebSocketFrame) {
+public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.messageFromClientWithMetrics(
+    location: PATH,
+    connection: WebSocketConnection<PATH, STORAGE>,
+    frame: WebSocketFrame,
+) {
     return with(connection) {
         instrument("WEBSOCKET.MESSAGE $location") {
             messageFromClient(frame)
@@ -179,7 +165,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.messageFromSubscriptionWithMetrics(
     location: PATH,
     connection: WebSocketConnection<PATH, STORAGE>,
-    topic: WebSocketSubscriptionMessage<*, *>
+    topic: WebSocketSubscriptionMessage<*, *>,
 ) {
     return with(connection) {
         instrument("WEBSOCKET.SUBSCRIPTION $location") {
@@ -189,7 +175,11 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
     }
 }
 
-public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.disconnectWithMetrics(location: PATH, connection: WebSocketConnection<PATH, STORAGE>, reason: WebSocketClose) {
+public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.disconnectWithMetrics(
+    location: PATH,
+    connection: WebSocketConnection<PATH, STORAGE>,
+    reason: WebSocketClose,
+) {
     return with(connection) {
         instrument("WEBSOCKET.DISCONNECT $location") {
             disconnect(reason)

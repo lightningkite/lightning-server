@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.settings
 
 import com.lightningkite.lightningserver.definition.ServerSetting
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.StringFormat
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
@@ -12,7 +13,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import java.io.File
 
-public class SettingsSerializer(private val keys: List<ServerSetting<*, *>>) :
+public class SettingsSerializer(private val keys: List<ServerSetting<*, *>>, private val chainFormat: StringFormat) :
     KSerializer<Map<ServerSetting<*, *>, Any?>> {
     override val descriptor: SerialDescriptor =
         buildClassSerialDescriptor("com.lightningkite.lightningserver.settings.Settings${keys.hashCode()}") {
@@ -26,7 +27,7 @@ public class SettingsSerializer(private val keys: List<ServerSetting<*, *>>) :
 
     override fun serialize(
         encoder: Encoder,
-        value: Map<ServerSetting<*, *>, Any?>
+        value: Map<ServerSetting<*, *>, Any?>,
     ) {
         encoder.beginStructure(descriptor).apply {
             for (key in keys) {
@@ -36,7 +37,7 @@ public class SettingsSerializer(private val keys: List<ServerSetting<*, *>>) :
                         descriptor,
                         descriptor.getElementIndex(key.name),
                         key.serializer as KSerializer<Any?>,
-                        value[key]!!
+                        value[key]
                     )
                 }
             }
@@ -55,13 +56,15 @@ public class SettingsSerializer(private val keys: List<ServerSetting<*, *>>) :
                 if (index == keys.size) {
                     val f = File(decodeStringElement(descriptor, index).replace("~", System.getProperty("user.home")))
                     when (f.extension) {
-                        "json" -> Json.parseToJsonElement(f.readText())
-                            .let { it as JsonObject }
-                            .entries.forEach { entry ->
-                                val setting = keys.find { it.name == entry.key } ?: return@forEach
-                                lowPriorityMap[setting] =
-                                    Json.decodeFromJsonElement(setting.serializer, entry.value)
-                            }
+                        "json" -> (chainFormat as Json).let { json ->
+                            json.parseToJsonElement(f.readText())
+                                .let { it as JsonObject }
+                                .entries.forEach { entry ->
+                                    val setting = keys.find { it.name == entry.key } ?: return@forEach
+                                    lowPriorityMap[setting] =
+                                        json.decodeFromJsonElement(setting.serializer, entry.value)
+                                }
+                        }
                     }
                 } else {
                     val setting = keys[index]

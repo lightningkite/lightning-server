@@ -184,7 +184,7 @@ public object FetcherSdk : SDK.Format {
     context(_: ServerRuntime)
     private fun AuthRequirement<*>.docString(): String = when (this) {
         is AuthRequirement.Options -> options.joinToString(" *or* ") { it.docString() }
-        is AuthRequirement.AuthSetting -> setting()?.let { "$this (${it.docString()})" } ?: toString()
+        is AuthRequirement.AuthSetting -> setting()?.let { "$this (${it.docString()})" } ?: this.toString()
         else -> this.toString()
     }
 }

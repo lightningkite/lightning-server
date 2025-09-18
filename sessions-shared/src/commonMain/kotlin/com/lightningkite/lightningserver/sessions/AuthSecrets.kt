@@ -71,6 +71,6 @@ public data class EstablishPassword(
 )
 
 @Serializable
-public data class EstablishOtp(
+public data class EstablishTotp(
     val label: String? = null
 )

@@ -1,7 +1,6 @@
 package com.lightningkite.lightningserver.engine.ktor
 
 import com.lightningkite.lightningserver.HttpStatusException
-import com.lightningkite.lightningserver.definition.CorsSettings
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.engine.local.LocalEngine

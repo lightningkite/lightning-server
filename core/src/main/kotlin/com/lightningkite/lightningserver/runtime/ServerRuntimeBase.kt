@@ -29,7 +29,6 @@ public abstract class ServerRuntimeBase(override val server: ServerDefinition): 
     override val sharedResources: SharedResources = SharedResources()
     override val projectName: String by lazy { generalSettings().projectName }
     override val openTelemetry: OpenTelemetry? by lazy {
-        loggingSettings().applyToLogback()
         telemetrySettings()
     }
 //    override val secretBasis: ByteArray by lazy { com.lightningkite.lightningserver.definition.secretBasis().bytes }

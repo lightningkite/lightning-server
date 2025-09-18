@@ -7,7 +7,6 @@ import com.lightningkite.lightningserver.data.Schedule
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
-import com.lightningkite.lightningserver.engine.awsserverless.awsLambdaRuntimeSettings
 import com.lightningkite.lightningserver.terraform.BaseTerraformEmitter
 import com.lightningkite.services.Setting
 import com.lightningkite.services.terraform.AwsPolicyStatement
@@ -51,7 +50,8 @@ public open class TerraformAwsServerlessBuilder<S: ServerBuilder>(
     public val panicCompute: LambdaDurationAlarmThresholds = LambdaDurationAlarmThresholds(threshold = 5.minutes),
 ) : BaseTerraformEmitter<S>(), TerraformEmitterAws {
 
-    override val additionalSettings: Set<ServerSetting<*, *>> = setOf(awsLambdaRuntimeSettings)
+//    override val additionalSettings: Set<ServerSetting<*, *>> = setOf(awsLambdaRuntimeSettings)
+    override val additionalSettings: Set<ServerSetting<*, *>> = setOf()
 
     override val applicationRegion: String get() = region.id()
     override val policyStatements: MutableCollection<AwsPolicyStatement> = ArrayList()
