@@ -4,6 +4,8 @@ import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.http.HttpRequest
+import com.lightningkite.lightningserver.http.PathSegments
+import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
@@ -32,8 +34,8 @@ internal fun Headers.adapt(): HttpHeaders = HttpHeaders(
 context(server: ServerRuntimeBase)
 internal suspend fun ApplicationCall.adapt(): HttpRequest<PathSpec> {
     return HttpRequest(
-        path = RawHttpEndpoint(request.path(), HttpMethod(request.httpMethod.value)),
-        queryParameters = request.queryParameters.flattenEntries(),
+        path = RawHttpEndpoint(PathSegments.parse(request.path()), HttpMethod(request.httpMethod.value)),
+        queryParameters = QueryParameters(request.queryParameters.flattenEntries()),
         headers = request.headers.adapt(),
         domain = request.origin.serverHost,
         protocol = request.origin.scheme,

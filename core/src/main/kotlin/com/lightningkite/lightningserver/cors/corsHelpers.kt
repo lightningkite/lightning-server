@@ -1,4 +1,4 @@
-package com.lightningkite.lightningserver.runtime
+package com.lightningkite.lightningserver.cors
 
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.definition.CorsSettings
@@ -25,6 +25,7 @@ internal fun originMatches(allowed: List<String>, origin: String): Boolean {
                             (allowedTrimmed.startsWith('*') && originTrimmed.endsWith(allowedTrimmed.removePrefix("*"))))
         }
 }
+// TODO: include Access-Control-Max-Age for extra performance?
 
 @InternalLightningServerApi
 public fun CorsSettings?.generateCorsHeaders(incomingHeaders: HttpHeaders): Map<String, List<HttpHeaderValue>> {

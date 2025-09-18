@@ -6,6 +6,8 @@ import com.lightningkite.lightningserver.data.get
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders
+import com.lightningkite.lightningserver.http.PathSegments
+import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.RawWebsocketPath
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -25,8 +27,8 @@ import kotlin.test.Test
 class WebSocketConnectRequestTest {
     @Test fun serialization(): Unit = runBlocking {
         val r = WebSocketConnectRequest<PathSpec0>(
-            path = RawWebsocketPath("a/b/c"),
-            queryParameters = listOf("a" to "b", "c" to "d"),
+            path = RawWebsocketPath(PathSegments.parse("a/b/c")),
+            queryParameters = QueryParameters(listOf("a" to "b", "c" to "d")),
             headers = HttpHeaders {
                 setCookie("test", "asdf")
                 set(HttpHeader.Location, "https://www.google.com")

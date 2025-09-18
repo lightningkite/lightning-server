@@ -4,6 +4,7 @@ import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
@@ -59,7 +60,7 @@ class FileSystemEndpointsTest {
             ){ it.http[HttpMethod.GET] }!!
             Server.served.fetch.test(
                 trailingWildcard = match.path.trailingSegments,
-                queryParameters = serialized.substringAfter('?').split('&').map { it.substringBefore('=') to it.substringAfter('=', "") },
+                queryParameters = QueryParameters.parse(serialized.substringAfter('?')),
             )
         }
     }

@@ -4,9 +4,12 @@ import com.lightningkite.DataSize
 import com.lightningkite.DataSize.Companion.gibibytes
 import com.lightningkite.EmailAddress
 import com.lightningkite.lightningserver.data.Schedule
+import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
+import com.lightningkite.lightningserver.engine.awsserverless.awsLambdaRuntimeSettings
 import com.lightningkite.lightningserver.terraform.BaseTerraformEmitter
+import com.lightningkite.services.Setting
 import com.lightningkite.services.terraform.AwsPolicyStatement
 import com.lightningkite.services.terraform.TerraformEmitterAws
 import com.lightningkite.services.terraform.TerraformEmitterAwsDomain
@@ -47,6 +50,8 @@ public open class TerraformAwsServerlessBuilder<S: ServerBuilder>(
     public val panicInvocations: LambdaInvocationAlarmThresholds = LambdaInvocationAlarmThresholds(threshold = 450),
     public val panicCompute: LambdaDurationAlarmThresholds = LambdaDurationAlarmThresholds(threshold = 5.minutes),
 ) : BaseTerraformEmitter<S>(), TerraformEmitterAws {
+
+    override val additionalSettings: Set<ServerSetting<*, *>> = setOf(awsLambdaRuntimeSettings)
 
     override val applicationRegion: String get() = region.id()
     override val policyStatements: MutableCollection<AwsPolicyStatement> = ArrayList()

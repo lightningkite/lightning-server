@@ -2,6 +2,7 @@
 
 package com.lightningkite.lightningserver.pathing
 
+import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.data.StringArrayFormat
 import kotlinx.serialization.KSerializer
@@ -13,7 +14,7 @@ import kotlinx.serialization.StringFormat
 public class ConcretePath<out PATH: PathSpec> internal constructor(
     public val pathSpec: PATH,
     public val rawPathArguments: List<Any?>,
-    public val trailingSegments: TrailingSegments? = null,
+    public val trailingSegments: PathSegments? = null,
 ) {
     public val segments: List<Segment> by lazy {
         var index = 0
@@ -24,14 +25,7 @@ public class ConcretePath<out PATH: PathSpec> internal constructor(
             }
         } + (trailingSegments?.segments?.map(Segment::Constant) ?: emptyList())
     }
-
-    public val hasTrailingSlash: Boolean get() =
-        trailingSegments?.trailingSlash ?: (pathSpec.after == PathSpec.Afterwards.TrailingSlash)
-
-    public data class TrailingSegments(val segments: List<String>, val trailingSlash: Boolean) {
-        override fun toString(): String = segments.joinToString("/", postfix = if (trailingSlash) "/" else "")
-    }
-
+    
     public sealed interface Segment {
         public fun toString(format: StringFormat): String
 
@@ -50,13 +44,13 @@ public class ConcretePath<out PATH: PathSpec> internal constructor(
     }
 
     override fun toString(): String =
-        segments.joinToString(prefix = "/", separator = "/", postfix = if (hasTrailingSlash) "/" else "")
+        segments.joinToString(prefix = "/", separator = "/")
 
-    public fun pathSegments(stringArrayFormat: StringArrayFormat): List<String> =
-        segments.map { it.toString(stringArrayFormat) }
+    public fun pathSegments(stringArrayFormat: StringArrayFormat): PathSegments =
+        PathSegments(segments.map { it.toString(stringArrayFormat) })
 
     public fun path(stringArrayFormat: StringArrayFormat): String =
-        segments.joinToString(prefix = "/", separator = "/", postfix = if (hasTrailingSlash) "/" else "") { it.toString(stringArrayFormat) }
+        segments.joinToString(prefix = "/", separator = "/") { it.toString(stringArrayFormat) }
 
     public fun toString(stringArrayFormat: StringArrayFormat): String = path(stringArrayFormat)
 }
@@ -69,16 +63,16 @@ public interface HasConcretePath<PATH : PathSpec> {
     public val path: ConcretePath<PATH>
 }
 
-public fun ConcretePath(path: PathSpec0, trailingWildcard: ConcretePath.TrailingSegments? = null): ConcretePath<PathSpec0> =
+public fun ConcretePath(path: PathSpec0, trailingWildcard: PathSegments? = null): ConcretePath<PathSpec0> =
     ConcretePath(path, emptyList(), trailingWildcard?.takeIf { path.after == PathSpec.Afterwards.TrailingSegments })
-public fun <A> ConcretePath(path: PathSpec1<A>, first: A, trailingWildcard: ConcretePath.TrailingSegments? = null): ConcretePath<PathSpec1<A>> =
+public fun <A> ConcretePath(path: PathSpec1<A>, first: A, trailingWildcard: PathSegments? = null): ConcretePath<PathSpec1<A>> =
     ConcretePath(path, listOf(first), trailingWildcard?.takeIf { path.after == PathSpec.Afterwards.TrailingSegments })
-public fun <A, B> ConcretePath(path: PathSpec2<A, B>, first: A, second: B, trailingWildcard: ConcretePath.TrailingSegments? = null): ConcretePath<PathSpec2<A, B>> =
+public fun <A, B> ConcretePath(path: PathSpec2<A, B>, first: A, second: B, trailingWildcard: PathSegments? = null): ConcretePath<PathSpec2<A, B>> =
     ConcretePath(path, listOf(first, second), trailingWildcard?.takeIf { path.after == PathSpec.Afterwards.TrailingSegments })
-public fun <A, B, C> ConcretePath(path: PathSpec3<A, B, C>, first: A, second: B, third: C, trailingWildcard: ConcretePath.TrailingSegments? = null): ConcretePath<PathSpec3<A, B, C>> =
+public fun <A, B, C> ConcretePath(path: PathSpec3<A, B, C>, first: A, second: B, third: C, trailingWildcard: PathSegments? = null): ConcretePath<PathSpec3<A, B, C>> =
     ConcretePath(path, listOf(first, second, third), trailingWildcard?.takeIf { path.after == PathSpec.Afterwards.TrailingSegments })
 
-public fun HasConcretePath<*>.pathSegments(stringArrayFormat: StringArrayFormat): List<String> = path.pathSegments(stringArrayFormat)
+public fun HasConcretePath<*>.pathSegments(stringArrayFormat: StringArrayFormat): PathSegments = path.pathSegments(stringArrayFormat)
 public fun HasConcretePath<*>.path(stringArrayFormat: StringArrayFormat): String = path.path(stringArrayFormat)
 
 @get:JvmName("first1")
@@ -101,7 +95,7 @@ public inline val <A, B, C> ConcretePath<PathSpec3<A, B, C>>.third: C get() = ra
 
 
 
-public val HasConcretePath<*>.trailingSegments: ConcretePath.TrailingSegments? get() = path.trailingSegments
+public val HasConcretePath<*>.trailingSegments: PathSegments? get() = path.trailingSegments
 
 @get:JvmName("first1")
 public val <A> HasConcretePath<PathSpec1<A>>.first: A get() = path.first
@@ -123,7 +117,7 @@ public val <A, B, C> HasConcretePath<PathSpec3<A, B, C>>.third: C get() = path.t
 
 
 context(serverRuntime: ServerRuntime)
-public val HasContextualPath<*>.trailingSegments: ConcretePath.TrailingSegments? get() = pathInContext.trailingSegments
+public val HasContextualPath<*>.trailingSegments: PathSegments? get() = pathInContext.trailingSegments
 
 @get:JvmName("first1")
 context(serverRuntime: ServerRuntime)
@@ -150,6 +144,6 @@ context(serverRuntime: ServerRuntime)
 public val <A, B, C> HasContextualPath<PathSpec3<A, B, C>>.third: C get() = pathInContext.third
 
 context(serverRuntime: ServerRuntime)
-public fun HasContextualPath<*>.pathSegments(stringArrayFormat: StringArrayFormat): List<String> = pathInContext.pathSegments(stringArrayFormat)
+public fun HasContextualPath<*>.pathSegments(stringArrayFormat: StringArrayFormat): PathSegments = pathInContext.pathSegments(stringArrayFormat)
 context(serverRuntime: ServerRuntime)
 public fun HasContextualPath<*>.path(stringArrayFormat: StringArrayFormat): String = pathInContext.path(stringArrayFormat)

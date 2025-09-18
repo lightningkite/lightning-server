@@ -3,6 +3,8 @@ package com.lightningkite.lightningserver.engine.awsserverless
 import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.HttpHeaders
+import com.lightningkite.lightningserver.http.PathSegments
+import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.*
@@ -189,7 +191,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     return@forSubscribers
                 }
                 val p = match.path
-                val h = root.server.websocketInterceptors.fold(match.value) { a, b -> b(a) }
+                val h = root.server.compiledWebsocketInterceptors(match.value)
                 @Suppress("UNCHECKED_CAST")
                 h as WebSocketHandler<PathSpec, Any?>
                 // TODO: could retrieve more states at once?
@@ -282,8 +284,8 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     else listOf(it)
                 }
                 val lkEvent = WebSocketConnectRequest(
-                    path = RawWebsocketPath<PathSpec0>(""),
-                    queryParameters = queryParams,
+                    path = RawWebsocketPath<PathSpec0>(PathSegments.EMPTY),
+                    queryParameters = QueryParameters(queryParams),
                     headers = headers,
                     domain = event.requestContext.domainName,
                     protocol = "https",
@@ -368,7 +370,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         AnonType(state.state),
                     ) { mid ->
                         try {
-                            if (with(root) { generalSettings() }.debug && state.connectRequest.queryParameter("debug")
+                            if (with(root) { generalSettings() }.debug && state.connectRequest.queryParameters["debug"]
                                     ?.toBoolean() == true
                             ) {
                                 mid.send(

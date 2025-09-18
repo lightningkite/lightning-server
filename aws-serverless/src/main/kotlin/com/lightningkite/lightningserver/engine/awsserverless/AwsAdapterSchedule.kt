@@ -1,8 +1,7 @@
 package com.lightningkite.lightningserver.engine.awsserverless
 
-import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.runtime.handleWithMetrics
+import com.lightningkite.lightningserver.runtime.executeWithMetrics
 import kotlinx.serialization.Serializable
 
 internal class AwsAdapterSchedule(val root: AwsAdapter) {
@@ -19,7 +18,7 @@ internal class AwsAdapterSchedule(val root: AwsAdapter) {
                 )
         try {
             with(root) {
-                schedule.handleWithMetrics(p)
+                schedule.executeWithMetrics(p)
             }
             return APIGatewayV2HTTPResponse(statusCode = 200)
         } catch (e: Exception) {

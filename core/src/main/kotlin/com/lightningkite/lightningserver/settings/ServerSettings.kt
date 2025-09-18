@@ -32,7 +32,12 @@ public class ServerSettings(public val settings: Set<ServerSetting<*, *>>) {
         serializable.include(map)
     }
 
+    public fun readyUsingDefaults() {
+        ready = true
+    }
     public fun ready() {
+        val missing = settings.minus(serializable.keys + goal.keys)
+        if(missing.isNotEmpty()) throw IllegalStateException("Settings ${missing.joinToString { it.name }} are missing.")
         ready = true
     }
 

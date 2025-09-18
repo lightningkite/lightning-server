@@ -46,10 +46,8 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
     public override val serverVersion:String =  "Unknown"
 
     override val settings: ServerSettings = ServerSettings(
-        server.settings.plus(
+        super.settings.settings.plus(
             listOf(
-                generalSettings,
-                secretBasis,
                 enginePubSub,
                 engineCache,
             )

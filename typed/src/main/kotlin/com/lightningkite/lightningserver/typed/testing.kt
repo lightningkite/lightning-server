@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
+import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpec1
 import com.lightningkite.lightningserver.pathing.PathSpec2
@@ -22,7 +23,7 @@ import com.lightningkite.services.database.HasId
 //
 //context(test: TestRunner<*>)
 //public suspend fun <STORAGE> WebSocketHandler<PathSpec0, STORAGE>.test(
-//    queryParameters: List<Pair<String, String>> = listOf(),
+//    queryParameters: QueryParameters = listOf(),
 //    headers: HttpHeaders = HttpHeaders.EMPTY,
 //    domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
 //    protocol: String = generalSettings().publicUrl.substringBefore("://"),
@@ -43,7 +44,7 @@ import com.lightningkite.services.database.HasId
 //}
 //context(test: TestRunner<*>) public suspend fun <STORAGE, A> WebSocketHandler<PathSpec1<A>, STORAGE>.test(
 //    path1: A,
-//    queryParameters: List<Pair<String, String>> = listOf(),
+//    queryParameters: QueryParameters = listOf(),
 //    headers: HttpHeaders = HttpHeaders.EMPTY,
 //    domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
 //    protocol: String = generalSettings().publicUrl.substringBefore("://"),
@@ -65,7 +66,7 @@ import com.lightningkite.services.database.HasId
 //context(test: TestRunner<*>) public suspend fun <STORAGE, A, B> WebSocketHandler<PathSpec2<A, B>, STORAGE>.test(
 //    path1: A,
 //    path2: B,
-//    queryParameters: List<Pair<String, String>> = listOf(),
+//    queryParameters: QueryParameters = listOf(),
 //    headers: HttpHeaders = HttpHeaders.EMPTY,
 //    domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
 //    protocol: String = generalSettings().publicUrl.substringBefore("://"),
@@ -88,7 +89,7 @@ import com.lightningkite.services.database.HasId
 //    path1: A,
 //    path2: B,
 //    path3: C,
-//    queryParameters: List<Pair<String, String>> = listOf(),
+//    queryParameters: QueryParameters = listOf(),
 //    headers: HttpHeaders = HttpHeaders.EMPTY,
 //    domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
 //    protocol: String = generalSettings().publicUrl.substringBefore("://"),
@@ -115,7 +116,7 @@ context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT> 
         access = HttpAccess(
             HttpRequest(
                 RawHttpEndpoint(location.path, method = location.method),
-                queryParameters = listOf(),
+                queryParameters = QueryParameters.EMPTY,
                 headers = HttpHeaders(),
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
@@ -137,7 +138,7 @@ context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT, 
         access = HttpAccess(
             HttpRequest(
                 RawHttpEndpoint(location.path, path1, method = location.method),
-                queryParameters = listOf(),
+                queryParameters = QueryParameters.EMPTY,
                 headers = HttpHeaders(),
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
@@ -159,7 +160,7 @@ context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT, 
         access = HttpAccess(
             HttpRequest(
                 RawHttpEndpoint(location.path, path1, path2, method = location.method),
-                queryParameters = listOf(),
+                queryParameters = QueryParameters.EMPTY,
                 headers = HttpHeaders(),
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
@@ -182,7 +183,7 @@ context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT, 
         access = HttpAccess(
             HttpRequest(
                 RawHttpEndpoint(location.path, path1, path2, path3, method = location.method),
-                queryParameters = listOf(),
+                queryParameters = QueryParameters.EMPTY,
                 headers = HttpHeaders(),
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
@@ -204,7 +205,7 @@ context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT> 
         access = HttpAccess(
             HttpRequest(
                 RawHttpEndpoint(location.path, method = location.method),
-                queryParameters = listOf(),
+                queryParameters = QueryParameters.EMPTY,
                 headers = HttpHeaders(),
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
@@ -227,7 +228,7 @@ context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT, 
         access = HttpAccess(
             HttpRequest(
                 RawHttpEndpoint(location.path, path1, method = location.method),
-                queryParameters = listOf(),
+                queryParameters = QueryParameters.EMPTY,
                 headers = HttpHeaders(),
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
@@ -250,7 +251,7 @@ context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT, 
         access = HttpAccess(
             HttpRequest(
                 RawHttpEndpoint(location.path, path1, path2, method = location.method),
-                queryParameters = listOf(),
+                queryParameters = QueryParameters.EMPTY,
                 headers = HttpHeaders(),
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
@@ -274,7 +275,7 @@ context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT, 
         access = HttpAccess(
             HttpRequest(
                 RawHttpEndpoint(location.path, path1, path2, path3, method = location.method),
-                queryParameters = listOf(),
+                queryParameters = QueryParameters.EMPTY,
                 headers = HttpHeaders(),
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),

@@ -7,6 +7,8 @@ import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
+import com.lightningkite.lightningserver.http.PathSegments
+import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.runtime.handle
@@ -21,7 +23,7 @@ import java.util.Base64
 internal class AwsAdapterHttp(val root: AwsAdapter) {
     suspend fun handleHttp(event: APIGatewayV2HTTPEvent, setRoughContext: (String) -> Unit): APIGatewayV2HTTPResponse {
         val method = HttpMethod(event.httpMethod)
-        val path = event.path.removePrefix("/" + event.requestContext.stage)
+        val path = PathSegments.parse(event.path.removePrefix("/" + event.requestContext.stage))
         val headers = HttpHeaders(event.multiValueHeaders.entries.flatMap { it.value.map { v -> it.key to v } })
         val body = event.body?.let { raw ->
             if (event.isBase64Encoded)
@@ -38,7 +40,7 @@ internal class AwsAdapterHttp(val root: AwsAdapter) {
 
         val request = HttpRequest<PathSpec>(
             path = RawHttpEndpoint(path, method),
-            queryParameters = queryParams,
+            queryParameters = QueryParameters(queryParams),
             headers = headers,
             body = body,
             domain = event.requestContext.domainName,

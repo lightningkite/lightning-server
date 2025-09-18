@@ -12,7 +12,7 @@ import kotlinx.serialization.Transient
 @Serializable
 public data class HttpRequest<PATH: PathSpec>(
     override val path: RawHttpEndpoint<PATH>,
-    override val queryParameters: List<Pair<String, String>>,
+    override val queryParameters: QueryParameters,
     override val headers: HttpHeaders,
     override val domain: String,
     override val protocol: String,
@@ -22,7 +22,7 @@ public data class HttpRequest<PATH: PathSpec>(
 ) : Request<PATH>() {
     public fun <PATH2: PathSpec> copyWithNewPathType(
         path: RawHttpEndpoint<PATH2> ,
-        queryParameters: List<Pair<String, String>> = this.queryParameters,
+        queryParameters: QueryParameters = this.queryParameters,
         headers: HttpHeaders = this.headers,
         domain: String = this.domain,
         protocol: String = this.protocol,

@@ -69,6 +69,8 @@ public data class GeneralServerSettings(
     val debug: Boolean = false,
     val emergencyContact: String? = null,
 ) {
+    public val publicUrlDomain: String get() = publicUrl.substringAfter("://").substringBefore("/")
+    public val wsUrlDomain: String get() = wsUrl.substringAfter("://").substringBefore("/")
     public fun absolutePathAdjustment(string: String): String {
         return if (string.startsWith("/")) {
             val inbetween = publicUrl.substringAfter("://").substringAfter("/", "")

@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
 import com.lightningkite.lightningserver.runtime.location
+import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.settings.SettingsSerializer
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.services.Service
@@ -56,6 +57,8 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
 
     internal val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.engine.awsserverless")
     internal var preventLambdaTimeoutReuse: Boolean = false
+
+    override val settings: ServerSettings = ServerSettings(super.settings.settings.plus(awsLambdaRuntimeSettings).toSet())
 
     init {
         logger.info { "Initializing AwsAdapter..." }

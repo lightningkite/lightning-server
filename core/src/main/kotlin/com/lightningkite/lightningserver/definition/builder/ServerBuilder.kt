@@ -14,6 +14,7 @@ import com.lightningkite.lightningserver.serialization.MediaTypeEncoder
 import com.lightningkite.lightningserver.serialization.MediaTypeEncoderRegistry
 import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
+import com.lightningkite.lightningserver.websockets.WebSocketHandlerInterceptor
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
 import com.lightningkite.lightningserver.websockets.WebSocketsBuilder
 import com.lightningkite.services.Setting
@@ -91,6 +92,19 @@ public abstract class ServerBuilder : Extendable {
 
     private val imports: ListRegistry<Locationed<PathSpec0, ServerDefinition>> = ListRegistry()
     private val modules: ListRegistry<Locationed<PathSpec0, ServerBuilder>> = ListRegistry()
+
+    @LightningServerDsl
+    @JvmName("installHttpInterceptor")
+    public fun <T: HttpInterceptor> install(interceptor: T): T = interceptor.also { http.interceptors.add(it) }
+    @LightningServerDsl
+    @JvmName("installWebSocketHandlerInterceptor")
+    public fun <T: WebSocketHandlerInterceptor> install(interceptor: T): T = interceptor.also { websockets.interceptors.add(it) }
+    @LightningServerDsl
+    @JvmName("installRequestInterceptor")
+    public fun <T> install(interceptor: T): T where T: HttpInterceptor, T: WebSocketHandlerInterceptor = interceptor.also {
+        http.interceptors.add(it)
+        websockets.interceptors.add(it)
+    }
 
     @LightningServerDsl
     public infix fun <PATH : PathSpec, HANDLER : HttpHandler<PATH>> HttpEndpoint<PATH>.bind(handler: HANDLER): HANDLER {
@@ -269,8 +283,8 @@ public abstract class ServerBuilder : Extendable {
         thisLayer = ServerDefinition.Module(
             internalSerializersModule = internalSerialization,
             externalSerializersModule = externalSerialization,
-            httpInterceptors = http.interceptors.interceptors.toSealedList(),
-            websocketInterceptors = websockets.interceptors.interceptors.toSealedList(),
+            httpInterceptors = http.interceptors.toSealedList(),
+            websocketInterceptors = websockets.interceptors.toSealedList(),
             endpoints = MutablePathSpecMap<ServerPathEndpoints>().apply {
                 for (path in http.handlers.keys + websockets.handlers.keys) {
                     put(path, ServerPathEndpoints(

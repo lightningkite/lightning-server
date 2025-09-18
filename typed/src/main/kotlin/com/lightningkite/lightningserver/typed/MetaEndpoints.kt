@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.*
+import com.lightningkite.DataSize.Companion.bytes
 import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
@@ -9,6 +10,7 @@ import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.*
+import com.lightningkite.lightningserver.runtime.instrument
 import com.lightningkite.lightningserver.typed.jsonschema.*
 import com.lightningkite.lightningserver.typed.kschema.*
 import com.lightningkite.services.*
@@ -37,7 +39,7 @@ public class MetaEndpoints(
                     for (endpoint in endpoints) {
                         li {
                             a(href = endpoint.location.path.toString()) {
-                                +endpoint.location.path.segments.last().toString()
+                                +endpoint.location.path.segments.last { it != PathSpec.Segment.Empty }.toString()
                             }
                         }
                     }
@@ -62,15 +64,15 @@ public class MetaEndpoints(
 
     private fun Long.roundMemoryForSecurity() = this.div(100_000).times(100_000)  // Round to the nearest megabyte
     private fun memory(): ServerHealth.Memory {
-        val max = Runtime.getRuntime().maxMemory().roundMemoryForSecurity()
-        val total = Runtime.getRuntime().totalMemory().roundMemoryForSecurity()
-        val free = Runtime.getRuntime().freeMemory().roundMemoryForSecurity()
+        val max = Runtime.getRuntime().maxMemory().roundMemoryForSecurity().bytes
+        val total = Runtime.getRuntime().totalMemory().roundMemoryForSecurity().bytes
+        val free = Runtime.getRuntime().freeMemory().roundMemoryForSecurity().bytes
         return ServerHealth.Memory(
             max = max,
             total = total,
             free = free,
             systemAllocated = total - free,
-            usage = ((total - free).toDouble() / max.toDouble()).toFloat()
+            usage = ((total - free).bytes.toDouble() / max.bytes.toDouble()).toFloat()
         )
     }
 
@@ -292,7 +294,7 @@ public class MetaEndpoints(
             }
             </script>
             <div>
-                <label>Path <input id='path' value='${it.queryParameter("path") ?: "/"}'/></label>
+                <label>Path <input id='path' value='${it.queryParameters.get("path") ?: "/"}'/></label>
                 <button type='button' onclick='connectClick()'>Connect</button>
                 <button type='button' onclick='closeClick()'>Close</button>
             </div>
@@ -320,17 +322,16 @@ public class MetaEndpoints(
                     async {
                         val start = TimeSource.Monotonic.markNow()
                         val request = entry.value
-                        val pathAlone = request.path.substringBefore('?')
-                        val queryParameters = request.path.substringAfter('?', "").split('&').map { it.substringBefore('=') to it.substringAfter('=', "") }
+                        val pathAndParams = PathAndParams.parse(request.path)
                         val properRequest = originalRequest.copyWithNewPathType(
-                            path = RawHttpEndpoint<PathSpec>(asString = pathAlone, method = HttpMethod(request.method)),
-                            queryParameters = queryParameters,
+                            path = RawHttpEndpoint<PathSpec>(pathAndParams.pathSegments, method = HttpMethod(request.method)),
+                            queryParameters = pathAndParams.queryParameters,
                             body = request.body?.let { TypedData.text(it, MediaType.Application.Json) }
                         )
                         try {
-                            entry.key to topLevelReportingContext(properRequest.path.toString()) {
-                                @Suppress("UNCHECKED_CAST")
-                                (properRequest.path.match.value as HttpHandler<PathSpec>).handle(properRequest)
+                            entry.key to instrument(properRequest.path.toString()) {
+                                (@Suppress("UNCHECKED_CAST")
+                                (properRequest.path.match.value as HttpHandler<PathSpec>).handle(properRequest))
                             }.let {
                                 BulkResponse(
                                     durationMs = start.elapsedNow().inWholeMilliseconds,
