@@ -1,15 +1,12 @@
 package com.lightningkite.lightningserver.runtime.test
 
-import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.generalSettings
-import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.http.QueryParameters
-import com.lightningkite.lightningserver.pathing.ConcretePath
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpec1
@@ -17,7 +14,6 @@ import com.lightningkite.lightningserver.pathing.PathSpec2
 import com.lightningkite.lightningserver.pathing.PathSpec3
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.pathing.RawWebsocketPath
-import com.lightningkite.lightningserver.runtime.invoke
 import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketHandler

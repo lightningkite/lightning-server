@@ -37,6 +37,7 @@ class MutablePathSpecMapTest {
         map[PathSpec.root.path("test")] = TestHoldingThing(a = "test")
         map[PathSpec.root.path("test").path("a")] = TestHoldingThing(a = "test-a")
         map[PathSpec.root.path("test").arg<Int>("id")] = TestHoldingThing(a = "test-x")
+        val sealed = map.toSealedPathSpecMap()
 
         fun sample(path: String) {
             println("run {")
@@ -45,9 +46,11 @@ class MutablePathSpecMapTest {
             println("    assertEquals(${match?.path?.let { "\"$it\"" }}, match?.path?.toString())")
             println("    assertEquals(listOf(${match?.path?.rawPathArguments?.joinToString(", ") { it.kotlin() }}), match?.path?.rawPathArguments?.toList())")
             println("}")
-//            println("$path  -->  " + map.match(saf, path) { it.a }?.let {
-//                "${it.path} (${it.pathSpec} / ${it.path.rawPathArguments} / ${it.path.wildcard}) ${it.value}"
-//            })
+            println("run {")
+            println("    val match = sealed.match(saf, \"$path\") { it.a }")
+            println("    assertEquals(${match?.path?.let { "\"$it\"" }}, match?.path?.toString())")
+            println("    assertEquals(listOf(${match?.path?.rawPathArguments?.joinToString(", ") { it.kotlin() }}), match?.path?.rawPathArguments?.toList())")
+            println("}")
         }
 
         fun sampleInt(path: String) {
@@ -57,9 +60,11 @@ class MutablePathSpecMapTest {
             println("    assertEquals(${match?.path?.let { "\"$it\"" }}, match?.path?.toString())")
             println("    assertEquals(listOf(${match?.path?.rawPathArguments?.joinToString(", ") { it.kotlin() }}), match?.path?.rawPathArguments?.toList())")
             println("}")
-//            println("$path  INT-->  " + map.match(saf, path) { it.b }?.let {
-//                "${it.path} (${it.pathSpec} / ${it.path.rawPathArguments} / ${it.path.wildcard}) ${it.value}"
-//            })
+            println("run {")
+            println("    val match = sealed.match(saf, \"$path\") { it.b }")
+            println("    assertEquals(${match?.path?.let { "\"$it\"" }}, match?.path?.toString())")
+            println("    assertEquals(listOf(${match?.path?.rawPathArguments?.joinToString(", ") { it.kotlin() }}), match?.path?.rawPathArguments?.toList())")
+            println("}")
         }
         sample("")
         sample("/")
@@ -76,7 +81,17 @@ class MutablePathSpecMapTest {
             assertEquals(listOf(), match?.path?.rawPathArguments?.toList())
         }
         run {
+            val match = sealed.match(saf, "") { it.a }
+            assertEquals("/", match?.path?.toString())
+            assertEquals(listOf(), match?.path?.rawPathArguments?.toList())
+        }
+        run {
             val match = map.match(saf, "/") { it.a }
+            assertEquals("/", match?.path?.toString())
+            assertEquals(listOf(), match?.path?.rawPathArguments?.toList())
+        }
+        run {
+            val match = sealed.match(saf, "/") { it.a }
             assertEquals("/", match?.path?.toString())
             assertEquals(listOf(), match?.path?.rawPathArguments?.toList())
         }
@@ -86,7 +101,17 @@ class MutablePathSpecMapTest {
             assertEquals(listOf(), match?.path?.rawPathArguments?.toList())
         }
         run {
+            val match = sealed.match(saf, "weird") { it.a }
+            assertEquals("/weird", match?.path?.toString())
+            assertEquals(listOf(), match?.path?.rawPathArguments?.toList())
+        }
+        run {
             val match = map.match(saf, "test") { it.a }
+            assertEquals("/test", match?.path?.toString())
+            assertEquals(listOf(), match?.path?.rawPathArguments?.toList())
+        }
+        run {
+            val match = sealed.match(saf, "test") { it.a }
             assertEquals("/test", match?.path?.toString())
             assertEquals(listOf(), match?.path?.rawPathArguments?.toList())
         }
@@ -96,7 +121,17 @@ class MutablePathSpecMapTest {
             assertEquals(listOf(), match?.path?.rawPathArguments?.toList())
         }
         run {
+            val match = sealed.match(saf, "test/a") { it.a }
+            assertEquals("/test/a", match?.path?.toString())
+            assertEquals(listOf(), match?.path?.rawPathArguments?.toList())
+        }
+        run {
             val match = map.match(saf, "test/22") { it.a }
+            assertEquals("/test/{id=22}", match?.path?.toString())
+            assertEquals(listOf(22), match?.path?.rawPathArguments?.toList())
+        }
+        run {
+            val match = sealed.match(saf, "test/22") { it.a }
             assertEquals("/test/{id=22}", match?.path?.toString())
             assertEquals(listOf(22), match?.path?.rawPathArguments?.toList())
         }
@@ -106,7 +141,17 @@ class MutablePathSpecMapTest {
             assertEquals(listOf(), match?.path?.rawPathArguments?.toList())
         }
         run {
+            val match = sealed.match(saf, "test/a/b/c") { it.b }
+            assertEquals("/test/a/b/c", match?.path?.toString())
+            assertEquals(listOf(), match?.path?.rawPathArguments?.toList())
+        }
+        run {
             val match = map.match(saf, "test/22/asdf") { it.a }
+            assertEquals("/test/22/asdf", match?.path?.toString())
+            assertEquals(listOf(), match?.path?.rawPathArguments?.toList())
+        }
+        run {
+            val match = sealed.match(saf, "test/22/asdf") { it.a }
             assertEquals("/test/22/asdf", match?.path?.toString())
             assertEquals(listOf(), match?.path?.rawPathArguments?.toList())
         }

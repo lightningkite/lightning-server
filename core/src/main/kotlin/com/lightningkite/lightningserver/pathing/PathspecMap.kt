@@ -16,7 +16,7 @@ public interface PathSpecMap<out V> : Map<PathSpec, V> {
     public fun asSequence(): Sequence<Locationed<PathSpec, V>>
 
     public class Match<out V>(
-        override val path: ConcretePath<PathSpec>,
+        override val path: ResolvedPath<PathSpec>,
         public val value: V
     ) : HasConcretePath<PathSpec> {
         public constructor(
@@ -25,7 +25,7 @@ public interface PathSpecMap<out V> : Map<PathSpec, V> {
             wildcard: PathSegments?,
             value: V
         ) : this(
-            ConcretePath(pathSpec, rawPathArguments, trailingSegments = wildcard),
+            ResolvedPath(pathSpec, rawPathArguments, trailingSegments = wildcard),
             value
         )
 
@@ -169,7 +169,7 @@ public class MutablePathSpecMap<V>() : PathSpecMap<V> {
         pathParts: PathSegments,
         getter: (V) -> T?
     ): PathSpecMap.Match<T>? {
-        if (pathParts.segments.isEmpty())
+        if (pathParts.segments.isEmpty() || pathParts.singleOrNull() == "")
             return (root.path ?: root.thenConstant[""]?.path ?: root.chainedWildcard)?.let {
                 val value = root[it.after]?.let(getter) ?: return@let null
                 PathSpecMap.Match<T>(
@@ -333,7 +333,7 @@ public class ImmutablePathSpecMap<V>(start: MutablePathSpecMap<V>) : PathSpecMap
         pathParts: PathSegments,
         getter: (V) -> T?
     ): PathSpecMap.Match<T>? {
-        if (pathParts.segments.isEmpty())
+        if (pathParts.segments.isEmpty() || pathParts.singleOrNull() == "")
             return (root.path ?: root.thenConstant[""]?.path ?: root.chainedWildcard)?.let {
                 val value = root[it.after]?.let(getter) ?: return@let null
                 PathSpecMap.Match<T>(
@@ -374,10 +374,11 @@ public class ImmutablePathSpecMap<V>(start: MutablePathSpecMap<V>) : PathSpecMap
                     PathSpecMap.Match<T>(
                         pathSpec = spec,
                         rawPathArguments = wildcards.zip(spec.wildcards) { v, s ->
-                            format.decodeFromString(
-                                s.serializer,
-                                v
-                            )
+                            try {
+                                format.decodeFromString(s.serializer, v)
+                            } catch(e: SerializationException) {
+                                throw BadRequestException("${s.name} in '$spec' is formatted incorrectly", cause = e)
+                            }
                         },
                         wildcard = PathSegments(pathParts.drop(spec.segments.size)),
                         value = value,
@@ -390,10 +391,11 @@ public class ImmutablePathSpecMap<V>(start: MutablePathSpecMap<V>) : PathSpecMap
                 PathSpecMap.Match<T>(
                     pathSpec = spec,
                     rawPathArguments = wildcards.zip(spec.wildcards) { v, s ->
-                        format.decodeFromString(
-                            s.serializer,
-                            v
-                        )
+                        try {
+                            format.decodeFromString(s.serializer, v)
+                        } catch(e: SerializationException) {
+                            throw BadRequestException("${s.name} in '$spec' is formatted incorrectly", cause = e)
+                        }
                     },
                     wildcard = null,
                     value = value,
@@ -408,10 +410,11 @@ public class ImmutablePathSpecMap<V>(start: MutablePathSpecMap<V>) : PathSpecMap
                         PathSpecMap.Match<T>(
                             pathSpec = spec,
                             rawPathArguments = wildcards.zip(spec.wildcards) { v, s ->
-                                format.decodeFromString(
-                                    s.serializer,
-                                    v
-                                )
+                                try {
+                                    format.decodeFromString(s.serializer, v)
+                                } catch(e: SerializationException) {
+                                    throw BadRequestException("${s.name} in '$spec' is formatted incorrectly", cause = e)
+                                }
                             },
                             wildcard = PathSegments(pathParts.drop(spec.segments.size)),
                             value = value,

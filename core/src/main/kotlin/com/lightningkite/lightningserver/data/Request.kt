@@ -2,7 +2,7 @@ package com.lightningkite.lightningserver.data
 
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.QueryParameters
-import com.lightningkite.lightningserver.pathing.ConcretePath
+import com.lightningkite.lightningserver.pathing.ResolvedPath
 import com.lightningkite.lightningserver.pathing.HasContextualPath
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -17,7 +17,7 @@ public abstract class Request<out PATH: PathSpec>: HasContextualPath<PATH>, Cach
     public abstract val sourceIp: String
 
     context(serverRuntime: ServerRuntime)
-    override val pathInContext: ConcretePath<PATH>
+    override val pathInContext: ResolvedPath<PATH>
         get() = path.pathInContext
 }
 

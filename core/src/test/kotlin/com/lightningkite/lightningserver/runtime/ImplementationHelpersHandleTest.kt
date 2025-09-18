@@ -26,6 +26,11 @@ class ImplementationHelpersHandleTest {
     // Minimal test server definition
     object TestServer : ServerBuilder() {
         // Simple GET /ping returns "pong"
+        val root = path.get bind HttpHandler<PathSpec0> {
+            HttpResponse.plainText("root")
+        }
+
+        // Simple GET /ping returns "pong"
         val getPing = path.path("ping").get bind HttpHandler<PathSpec0> {
             HttpResponse.plainText("pong")
         }
@@ -178,6 +183,71 @@ class ImplementationHelpersHandleTest {
                 assertEquals(HttpStatus.TemporaryRedirect, resp.status)
                 val location = resp.headers[HttpHeader.Location]?.root
                 assertEquals("/slash/", location)
+            }
+        }
+    }
+
+    @Test
+    fun trailing_slash_redirects_root() {
+        TestServer.test(
+            settings = {
+                loggingSettings.set(
+                    LoggingSettings(
+                        LoggingSettings.ContextSettings(
+                            filePattern = null,
+                            toConsole = true,
+                            level = Level.DEBUG
+                        )
+                    )
+                )
+            }
+        ) {
+            runBlocking {
+                val resp = serverRuntime.handle(
+                    HttpRequest(
+                        path = RawHttpEndpoint(asString = "/", method = HttpMethod.GET),
+                        queryParameters = QueryParameters.EMPTY,
+                        headers = HttpHeaders.EMPTY,
+                        domain = "example.com",
+                        protocol = "https",
+                        sourceIp = "local",
+                    )
+                )
+                // Expect a redirect with Location header pointing to alternate form
+                println(resp)
+                assertNotEquals(HttpStatus.TemporaryRedirect, resp.status)
+            }
+        }
+    }
+    @Test
+    fun trailing_slash_redirects_root2() {
+        TestServer.test(
+            settings = {
+                loggingSettings.set(
+                    LoggingSettings(
+                        LoggingSettings.ContextSettings(
+                            filePattern = null,
+                            toConsole = true,
+                            level = Level.DEBUG
+                        )
+                    )
+                )
+            }
+        ) {
+            runBlocking {
+                val resp = serverRuntime.handle(
+                    HttpRequest(
+                        path = RawHttpEndpoint(asString = "", method = HttpMethod.GET),
+                        queryParameters = QueryParameters.EMPTY,
+                        headers = HttpHeaders.EMPTY,
+                        domain = "example.com",
+                        protocol = "https",
+                        sourceIp = "local",
+                    )
+                )
+                // Expect a redirect with Location header pointing to alternate form
+                println(resp)
+                assertNotEquals(HttpStatus.TemporaryRedirect, resp.status)
             }
         }
     }

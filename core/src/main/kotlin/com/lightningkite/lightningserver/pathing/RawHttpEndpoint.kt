@@ -14,7 +14,7 @@ public data class RawHttpEndpoint<out PATH: PathSpec>(val pathSegments: PathSegm
 
     @Suppress("UNCHECKED_CAST")
     context(server: ServerRuntime)
-    override val pathInContext: ConcretePath<PATH> get() = match.path as ConcretePath<PATH>
+    override val pathInContext: ResolvedPath<PATH> get() = match.path as ResolvedPath<PATH>
 
     @Transient private var matchIfPresent: PathSpecMap.Match<HttpHandler<*>>? = null
 
@@ -40,7 +40,7 @@ public data class RawHttpEndpoint<out PATH: PathSpec>(val pathSegments: PathSegm
 }
 
 context(server: ServerRuntime)
-public fun <PATH : PathSpec> RawHttpEndpoint(path: ConcretePath<PATH>, method: HttpMethod): RawHttpEndpoint<PATH> = RawHttpEndpoint(path.pathSegments(server.internalSerialization.stringArrayFormat), method = method)
+public fun <PATH : PathSpec> RawHttpEndpoint(path: ResolvedPath<PATH>, method: HttpMethod): RawHttpEndpoint<PATH> = RawHttpEndpoint(path.pathSegments(server.internalSerialization.stringArrayFormat), method = method)
 
 context(serverRuntime: ServerRuntime)
 public fun RawHttpEndpoint(spec: PathSpec0, method: HttpMethod, trailingSegments: PathSegments? = null): RawHttpEndpoint<PathSpec0> = RawHttpEndpoint(ConcretePath(spec, trailingSegments), method)

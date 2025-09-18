@@ -16,6 +16,7 @@ import com.lightningkite.lightningserver.http.handleInstrumented
 import com.lightningkite.lightningserver.pathMoved
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.telemetry.use
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
@@ -82,16 +83,19 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
                     }
 
                     else -> {
-                        // Let's see if they just got their ending slash wrong.
-                        val altSlashEndpoint = req.path.copy(pathSegments = req.path.pathSegments.segments.let {
-                            if (it.lastOrNull() == "") it.dropLast(1) else it + ""
-                        }.let(::PathSegments))
-                        try {
-                            altSlashEndpoint.match
-                            HttpResponse.pathMoved(to = "/" + altSlashEndpoint.pathSegments.toString())
-                        } catch (_: RouteNotFoundException) {
-                            throw notFound
-                        }
+                        println("Not found: ${req.path.pathSegments.segments.map { "'$it'" }}, looking for slashes")
+                        if(request.path.pathSegments.isNotEmpty()) {
+                            // Let's see if they just got their ending slash wrong.
+                            val altSlashEndpoint = req.path.copy(pathSegments = req.path.pathSegments.segments.let {
+                                if (it.lastOrNull() == "") it.dropLast(1) else it + ""
+                            }.let(::PathSegments))
+                            try {
+                                altSlashEndpoint.match
+                                HttpResponse.pathMoved(to = "/" + altSlashEndpoint.pathSegments.toString())
+                            } catch (_: RouteNotFoundException) {
+                                throw notFound
+                            }
+                        } else throw notFound
                     }
                 }
             }

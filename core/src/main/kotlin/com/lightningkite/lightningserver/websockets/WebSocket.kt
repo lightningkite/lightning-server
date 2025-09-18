@@ -5,7 +5,7 @@ import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.QueryParameters
-import com.lightningkite.lightningserver.pathing.ConcretePath
+import com.lightningkite.lightningserver.pathing.ResolvedPath
 import com.lightningkite.lightningserver.pathing.HasContextualPath
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawWebsocketPath
@@ -24,7 +24,7 @@ public data class WebSocketSubscriptionRequest<PATH: PathSpec, T>(
     val rawPathArguments: List<Any?>,
 ): HasContextualPath<PATH> {
     context(server: ServerRuntime)
-    override val pathInContext: ConcretePath<PATH> get() = ConcretePath(topic.location, rawPathArguments)
+    override val pathInContext: ResolvedPath<PATH> get() = ResolvedPath(topic.location, rawPathArguments)
 }
 
 public data class WebSocketSubscriptionMessage<PATH: PathSpec, T>(
@@ -33,7 +33,7 @@ public data class WebSocketSubscriptionMessage<PATH: PathSpec, T>(
     val value: T
 ): HasContextualPath<PATH> {
     context(server: ServerRuntime)
-    override val pathInContext: ConcretePath<PATH> get() = ConcretePath(topic.location, rawPathArguments)
+    override val pathInContext: ResolvedPath<PATH> get() = ResolvedPath(topic.location, rawPathArguments)
 }
 
 

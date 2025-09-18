@@ -11,12 +11,12 @@ import kotlinx.serialization.StringFormat
 /**
  * A [PathSpec] with all of its wildcard values fulfilled.
  */
-public class ConcretePath<out PATH: PathSpec> internal constructor(
+public class ResolvedPath<out PATH: PathSpec> internal constructor(
     public val pathSpec: PATH,
     public val rawPathArguments: List<Any?>,
     public val trailingSegments: PathSegments? = null,
 ) {
-    public val segments: List<Segment> by lazy {
+    private val segments: List<Segment> by lazy {
         var index = 0
         pathSpec.segments.map {
             when (it) {
@@ -25,17 +25,17 @@ public class ConcretePath<out PATH: PathSpec> internal constructor(
             }
         } + (trailingSegments?.segments?.map(Segment::Constant) ?: emptyList())
     }
-    
-    public sealed interface Segment {
-        public fun toString(format: StringFormat): String
 
-        public data class Constant(val value: String) : Segment {
+    private sealed interface Segment {
+        fun toString(format: StringFormat): String
+
+        data class Constant(val value: String) : Segment {
             public constructor(segment: PathSpec.Segment.Constant) : this(segment.value)
 
             override fun toString(): String = value
             override fun toString(format: StringFormat): String = value
         }
-        public data class WildcardWithValue<T>(val name: String, val serializer: KSerializer<T>, val value: T) : Segment {
+        data class WildcardWithValue<T>(val name: String, val serializer: KSerializer<T>, val value: T) : Segment {
             public constructor(segment: PathSpec.Segment.Wildcard<T>, value: T) : this(segment.name, segment.serializer, value)
 
             override fun toString(): String = "{$name=$value}"
@@ -56,42 +56,42 @@ public class ConcretePath<out PATH: PathSpec> internal constructor(
 }
 
 public interface HasContextualPath<out PATH : PathSpec> {
-    context(server: ServerRuntime) public val pathInContext: ConcretePath<PATH>
+    context(server: ServerRuntime) public val pathInContext: ResolvedPath<PATH>
 }
 
 public interface HasConcretePath<PATH : PathSpec> {
-    public val path: ConcretePath<PATH>
+    public val path: ResolvedPath<PATH>
 }
 
-public fun ConcretePath(path: PathSpec0, trailingWildcard: PathSegments? = null): ConcretePath<PathSpec0> =
-    ConcretePath(path, emptyList(), trailingWildcard?.takeIf { path.after == PathSpec.Afterwards.TrailingSegments })
-public fun <A> ConcretePath(path: PathSpec1<A>, first: A, trailingWildcard: PathSegments? = null): ConcretePath<PathSpec1<A>> =
-    ConcretePath(path, listOf(first), trailingWildcard?.takeIf { path.after == PathSpec.Afterwards.TrailingSegments })
-public fun <A, B> ConcretePath(path: PathSpec2<A, B>, first: A, second: B, trailingWildcard: PathSegments? = null): ConcretePath<PathSpec2<A, B>> =
-    ConcretePath(path, listOf(first, second), trailingWildcard?.takeIf { path.after == PathSpec.Afterwards.TrailingSegments })
-public fun <A, B, C> ConcretePath(path: PathSpec3<A, B, C>, first: A, second: B, third: C, trailingWildcard: PathSegments? = null): ConcretePath<PathSpec3<A, B, C>> =
-    ConcretePath(path, listOf(first, second, third), trailingWildcard?.takeIf { path.after == PathSpec.Afterwards.TrailingSegments })
+public fun ConcretePath(path: PathSpec0, trailingWildcard: PathSegments? = null): ResolvedPath<PathSpec0> =
+    ResolvedPath(path, emptyList(), trailingWildcard?.takeIf { path.after == PathSpec.Afterwards.TrailingSegments })
+public fun <A> ConcretePath(path: PathSpec1<A>, first: A, trailingWildcard: PathSegments? = null): ResolvedPath<PathSpec1<A>> =
+    ResolvedPath(path, listOf(first), trailingWildcard?.takeIf { path.after == PathSpec.Afterwards.TrailingSegments })
+public fun <A, B> ConcretePath(path: PathSpec2<A, B>, first: A, second: B, trailingWildcard: PathSegments? = null): ResolvedPath<PathSpec2<A, B>> =
+    ResolvedPath(path, listOf(first, second), trailingWildcard?.takeIf { path.after == PathSpec.Afterwards.TrailingSegments })
+public fun <A, B, C> ConcretePath(path: PathSpec3<A, B, C>, first: A, second: B, third: C, trailingWildcard: PathSegments? = null): ResolvedPath<PathSpec3<A, B, C>> =
+    ResolvedPath(path, listOf(first, second, third), trailingWildcard?.takeIf { path.after == PathSpec.Afterwards.TrailingSegments })
 
 public fun HasConcretePath<*>.pathSegments(stringArrayFormat: StringArrayFormat): PathSegments = path.pathSegments(stringArrayFormat)
 public fun HasConcretePath<*>.path(stringArrayFormat: StringArrayFormat): String = path.path(stringArrayFormat)
 
 @get:JvmName("first1")
-public val <A> ConcretePath<PathSpec1<A>>.first: A get() = rawPathArguments[0] as A
+public val <A> ResolvedPath<PathSpec1<A>>.first: A get() = rawPathArguments[0] as A
 
 @get:JvmName("first2")
-public val <A, B> ConcretePath<PathSpec2<A, B>>.first: A get() = rawPathArguments[0] as A
+public val <A, B> ResolvedPath<PathSpec2<A, B>>.first: A get() = rawPathArguments[0] as A
 
 @get:JvmName("second2")
-public inline val <A, B> ConcretePath<PathSpec2<A, B>>.second: B get() = rawPathArguments[1] as B
+public inline val <A, B> ResolvedPath<PathSpec2<A, B>>.second: B get() = rawPathArguments[1] as B
 
 @get:JvmName("first3")
-public inline val <A, B, C> ConcretePath<PathSpec3<A, B, C>>.first: A get() = rawPathArguments[0] as A
+public inline val <A, B, C> ResolvedPath<PathSpec3<A, B, C>>.first: A get() = rawPathArguments[0] as A
 
 @get:JvmName("second3")
-public inline val <A, B, C> ConcretePath<PathSpec3<A, B, C>>.second: B get() = rawPathArguments[1] as B
+public inline val <A, B, C> ResolvedPath<PathSpec3<A, B, C>>.second: B get() = rawPathArguments[1] as B
 
 @get:JvmName("third3")
-public inline val <A, B, C> ConcretePath<PathSpec3<A, B, C>>.third: C get() = rawPathArguments[1] as C
+public inline val <A, B, C> ResolvedPath<PathSpec3<A, B, C>>.third: C get() = rawPathArguments[1] as C
 
 
 

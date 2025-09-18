@@ -31,7 +31,7 @@ public class RawWebsocketPath<PATH: PathSpec>(public val pathSegments: PathSegme
 
     @Suppress("UNCHECKED_CAST")
     context(server: ServerRuntime)
-    override val pathInContext: ConcretePath<PATH> get() = match.path as ConcretePath<PATH>
+    override val pathInContext: ResolvedPath<PATH> get() = match.path as ResolvedPath<PATH>
 
     private var matchIfPresent: PathSpecMap.Match<*>? = null
 
@@ -56,7 +56,7 @@ public class RawWebsocketPath<PATH: PathSpec>(public val pathSegments: PathSegme
 }
 
 context(server: ServerRuntime)
-public fun <PATH : PathSpec> RawWebsocketPath(path: ConcretePath<PATH>): RawWebsocketPath<PATH> = RawWebsocketPath(path.pathSegments(server.internalSerialization.stringArrayFormat))
+public fun <PATH : PathSpec> RawWebsocketPath(path: ResolvedPath<PATH>): RawWebsocketPath<PATH> = RawWebsocketPath(path.pathSegments(server.internalSerialization.stringArrayFormat))
 
 context(serverRuntime: ServerRuntime)
 public fun RawWebsocketPath(spec: PathSpec0, trailingSegments: PathSegments? = null): RawWebsocketPath<PathSpec0> = RawWebsocketPath(ConcretePath(spec, trailingSegments))
