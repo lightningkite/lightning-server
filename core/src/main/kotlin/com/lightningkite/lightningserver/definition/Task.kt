@@ -12,25 +12,28 @@ public interface Task<Input> {
     public val timeout: Duration get() = 30.seconds
 
     context(server: ServerRuntime)
-    public suspend fun execute(input: Input)
+    public suspend fun executeInline(input: Input)
 }
 
 public inline fun <reified INPUT> Task(
     timeout: Duration = 5.minutes,
-    noinline handler: suspend context(ServerRuntime) (INPUT) -> Unit
+    noinline handler: suspend context(ServerRuntime) Task<INPUT>.(INPUT) -> Unit
 ): Task<INPUT> = Task(serializerOrContextual<INPUT>(), timeout, handler)
 
 public fun <INPUT> Task(
     input: KSerializer<INPUT>,
     timeout: Duration = 5.minutes,
-    handler: suspend context(ServerRuntime) (INPUT) -> Unit
+    handler: suspend context(ServerRuntime) Task<INPUT>.(INPUT) -> Unit
 ): Task<INPUT> =
     object : Task<INPUT> {
         override val timeout: Duration = timeout
         override val serializer: KSerializer<INPUT> = input
 
         context(server: ServerRuntime)
-        override suspend fun execute(input: INPUT) {
-            return handler(server, input)
+        override suspend fun executeInline(input: INPUT) {
+            return handler(server, this, input)
         }
     }
+
+context(server: ServerRuntime)
+public suspend fun <INPUT> Task<INPUT>.launch(input: INPUT): Unit = with(server) { invoke(input) }
