@@ -108,7 +108,7 @@ public class TimeBasedOTPProofEndpoints(
             errorCases = listOf(),
             examples = listOf(),
             implementation = { input: EstablishOtp ->
-                modelInfo.collection().updateMany(condition {
+                modelInfo.table().updateMany(condition {
                     it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName)
                 }, modification {
                     it.disabledAt assign now()
@@ -122,7 +122,7 @@ public class TimeBasedOTPProofEndpoints(
                     issuer = generalSettings().projectName,
                     config = config,
                 )
-                modelInfo.collection().insertOne(secret)
+                modelInfo.table().insertOne(secret)
                 secret.url
             }
         )
@@ -163,14 +163,14 @@ public class TimeBasedOTPProofEndpoints(
                     val subjectId = handler.fetchUserIdString(input.property, input.value)
                         ?: throw BadRequestException("User ID and code do not match")
 
-                    val active = modelInfo.collection().find(condition {
+                    val active = modelInfo.table().find(condition {
                         it.subjectId.eq(subjectId) and it.subjectType.eq(subject) and active
                     }).toList()
 
                     val matching = active.find { it.generator.isValid(input.password, now.toJavaInstant()) }
                         ?: throw BadRequestException("User ID and code do not match")
 
-                    modelInfo.collection().updateOneById(matching._id, modification {
+                    modelInfo.table().updateOneById(matching._id, modification {
                         it.lastUsedAt assign now
                     })
 
@@ -194,7 +194,7 @@ public class TimeBasedOTPProofEndpoints(
             errorCases = listOf(),
             examples = listOf(),
             implementation = { code: String ->
-                val active = modelInfo.collection().find(condition {
+                val active = modelInfo.table().find(condition {
                     it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) and it.disabledAt.eq(null)
                 }).toList()
 
@@ -219,7 +219,7 @@ public class TimeBasedOTPProofEndpoints(
         subject: SUBJECT,
     ): Boolean {
         @Suppress("UNCHECKED_CAST")
-        return modelInfo.collection().count(condition {
+        return modelInfo.table().count(condition {
             it.subjectId.eq(principal.idString(subject._id)) and
                     it.subjectType.eq(principal.name) and
                     active and

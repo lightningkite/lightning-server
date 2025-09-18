@@ -4,9 +4,7 @@ import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.GeneralServerSettings
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
-import com.lightningkite.lightningserver.runtime.test.TestRunner
 import com.lightningkite.lightningserver.runtime.test.test
-import com.lightningkite.lightningserver.runtime.test.sendWebSocketSubscriptionMessage
 import com.lightningkite.lightningserver.runtime.send
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
@@ -17,8 +15,6 @@ import com.lightningkite.services.database.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.decodeFromJsonElement
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -64,7 +60,7 @@ class ModelRestUpdatesWebsocketTest {
 
             // Now simulate a change via the model info's change listener by inserting a model
             val inserted = Sample("1", "A")
-            TestServer.info.collection().insert(listOf(inserted))
+            TestServer.info.table().insert(listOf(inserted))
 
             val afterInsert = last as WebSocketFrame.Text
             val updates = json.decodeFromString(CollectionUpdates.serializer(Sample.serializer(), String.serializer()), afterInsert.text)

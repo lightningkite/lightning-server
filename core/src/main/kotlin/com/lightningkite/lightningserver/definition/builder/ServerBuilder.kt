@@ -72,7 +72,7 @@ public abstract class ServerBuilder : Extendable {
     public open val internalSerialization: Runtime<SerializersModule> get() = Runtime.Constant(EmptySerializersModule())
     public open val externalSerialization: Runtime<SerializersModule> get() = Runtime.Constant(EmptySerializersModule())
 
-    protected val path: PathSpec0 get() = PathSpec.root // just for convenience
+    public val path: PathSpec0 get() = PathSpec.root // just for convenience
 
     private val settings: ListRegistry<ServerSetting<*, *>> = ListRegistry()
 

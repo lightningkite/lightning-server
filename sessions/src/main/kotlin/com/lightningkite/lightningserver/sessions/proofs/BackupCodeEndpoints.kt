@@ -91,7 +91,7 @@ public class BackupCodeEndpoints(
             errorCases = listOf(),
             examples = listOf(),
             implementation = { _: Unit ->
-                modelInfo.collection().deleteManyIgnoringOld(
+                modelInfo.table().deleteManyIgnoringOld(
                     condition { it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) }
                 )
 
@@ -106,7 +106,7 @@ public class BackupCodeEndpoints(
                     code
                 }
 
-                modelInfo.collection().insert(newCodes.map {
+                modelInfo.table().insert(newCodes.map {
                     BackupCodeSecret(
                         code = it.lowercase(),
                         subjectId = auth.rawId,
@@ -129,7 +129,7 @@ public class BackupCodeEndpoints(
             examples = listOf(),
             implementation = { _: Unit ->
 
-                modelInfo.collection().deleteManyIgnoringOld(
+                modelInfo.table().deleteManyIgnoringOld(
                     condition { it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) }
                 )
 
@@ -147,7 +147,7 @@ public class BackupCodeEndpoints(
             errorCases = listOf(),
             examples = listOf(),
             implementation = { _: Unit ->
-                modelInfo.collection().findOne(
+                modelInfo.table().findOne(
                     condition { it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) }
                 ) != null
             }
@@ -190,7 +190,7 @@ public class BackupCodeEndpoints(
                     val subjectId = handler.fetchUserIdString(input.property, input.value)
                         ?: throw BadRequestException("Invalid Backup Code")
 
-                    val secrets = modelInfo.collection().find(condition {
+                    val secrets = modelInfo.table().find(condition {
                         it.subjectId.eq(subjectId) and
                                 it.subjectType.eq(subject)
                     })
@@ -200,7 +200,7 @@ public class BackupCodeEndpoints(
                     val match = secrets.find { normalizedCode == it.code }
                         ?: throw BadRequestException("Invalid Backup Code")
 
-                    modelInfo.collection().deleteOneById(match._id)
+                    modelInfo.table().deleteOneById(match._id)
 
                     proofSigner.await().makeProof(
                         info = info.copy(strength = 10),
@@ -216,7 +216,7 @@ public class BackupCodeEndpoints(
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> established(
         principal: PrincipalType<SUBJECT, ID>,
         subject: SUBJECT,
-    ): Boolean = modelInfo.collection()
+    ): Boolean = modelInfo.table()
         .findOne(condition {
             it.subjectId.eq(principal.idString(subject._id)) and
                     it.subjectType.eq(principal.name)

@@ -143,7 +143,7 @@ public class WebAuthNProofEndpoints(
         principal: PrincipalType<SUBJECT, ID>,
         subject: SUBJECT,
     ): Boolean {
-        return modelInfo.collection().findOne(condition {
+        return modelInfo.table().findOne(condition {
             Condition.And(
                 it.subjectId eq principal.idString(subject._id),
                 it.subjectType eq principal.name,
@@ -154,7 +154,7 @@ public class WebAuthNProofEndpoints(
 
     context(server: ServerRuntime)
     private suspend fun userCredentials(subjectId: String, subjectType: String): List<WebAuthN.ExistingCredential> =
-        modelInfo.collection()
+        modelInfo.table()
             .find(condition {
                 it.subjectId.eq(subjectId) and
                         it.subjectType.eq(subjectType) and
@@ -275,7 +275,7 @@ public class WebAuthNProofEndpoints(
                     throw BadRequestException("Failed to verify Authenticator")
                 }
 
-                modelInfo.collection().insertOne(
+                modelInfo.table().insertOne(
                     WebAuthNCredential(
                         _id = credentials.id,
                         displayName = displayName,
@@ -400,7 +400,7 @@ public class WebAuthNProofEndpoints(
                 if (fromCache.challenge != WebAuthN.base64Decoder.decode(clientData.challenge).decodeToString())
                     throw BadRequestException("No Challenge available")
 
-                val publicKeyCredential: WebAuthNCredential = modelInfo.collection()
+                val publicKeyCredential: WebAuthNCredential = modelInfo.table()
                     .find(condition { it._id.eq(credentials.id) and active })
                     .firstOrNull()
                     ?: throw ForbiddenException("Invalid Credential ID")
@@ -441,7 +441,7 @@ public class WebAuthNProofEndpoints(
                     throw BadRequestException("Failed to verify Authenticator")
                 }
 
-                modelInfo.collection().updateOneById(
+                modelInfo.table().updateOneById(
                     publicKeyCredential._id,
                     modification {
                         it.lastUsedAt assign now()

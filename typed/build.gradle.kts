@@ -18,6 +18,10 @@ dependencies {
     api(libs.serviceAbstractionsHttpClient)
     api(libs.kotlinReflect)
     testImplementation(libs.kotlinTestJunit)
+
+    configurations.filter { it.name.startsWith("ksp") }.forEach {
+        add(it.name, libs.serviceAbstractionsDatabaseProcessor)
+    }
 }
 
 ksp {

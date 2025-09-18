@@ -57,7 +57,9 @@ public value class GrantedScope(public val asString: String) {
 
 @JvmInline
 @Serializable
-public value class Subscope(public val asString: String)
+public value class Subscope(public val asString: String) {
+    public operator fun plus(other: Subscope): Subscope = Subscope("$asString:${other.asString}")
+}
 
 public fun Set<RequiredScope>.subscope(subscopes: Iterable<Subscope>): Set<RequiredScope> =
     flatMapTo(HashSet()) { required ->

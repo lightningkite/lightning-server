@@ -50,10 +50,8 @@ import com.lightningkite.services.database.insertOne
 import com.lightningkite.services.database.modification
 import com.lightningkite.services.database.updateOneById
 import dev.whyoleg.cryptography.random.CryptographyRandom
-import io.ktor.http.path
 import kotlinx.serialization.builtins.serializer
 import kotlin.io.encoding.Base64
-import kotlin.text.get
 import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -90,7 +88,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             auth = principal.auth(scopes = setOf(Scopes.sessions)),
             serializer = Session.serializer(principal.subjectSerializer, principal.idSerializer),
             idSerializer = Uuid.serializer(),
-            collectionName = principal.name + "Session",
+            tableName = principal.name + "Session",
             permissions = {
                 val auth = this.authOrNull
                 val canUse: Condition<Session<SUBJECT, ID>> = when {
@@ -158,7 +156,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             lastUsed = now(),
 //            oauthClient = oauthClient,  TODO: OAuth
             derivedFrom = derivedFrom,
-        ).also { sessionInfo.collection().insertOne(it) }.let {
+        ).also { sessionInfo.table().insertOne(it) }.let {
             it to RefreshToken(principal.name, it._id, secret)
         }
     }
@@ -182,7 +180,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             if (generalSettings().debug) println("Auth failed because type != handler.name")
             return null
         }
-        val session = sessionInfo.collection().get(_id) ?: run {
+        val session = sessionInfo.table().get(_id) ?: run {
             if (generalSettings().debug) println("No such session")
             throw UnauthorizedException("No such session")
         }
@@ -202,7 +200,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             if (generalSettings().debug) println("Auth failed because session.terminated != null")
             throw UnauthorizedException("Session has been terminated.")
         }
-        sessionInfo.collection().updateOneById(_id, modification(spath) {
+        sessionInfo.table().updateOneById(_id, modification(spath) {
             it.lastUsed assign now()
             it.userAgents addAll setOf(request?.headers?.get(HttpHeader.UserAgent)?.root ?: "")
             it.ips addAll setOf(request?.sourceIp ?: "test")
@@ -235,7 +233,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             description = "Creates a session with more limited authorization",
             implementation = { request: SubSessionRequest ->
                 val sessionUuid = this.auth.sessionId?.let(Uuid::parse) ?: throw UnauthorizedException()
-                val session = sessionInfo.collection().get(sessionUuid)
+                val session = sessionInfo.table().get(sessionUuid)
                     ?: throw UnauthorizedException()
 
                 newSession(
@@ -269,7 +267,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             outputType = Unit.serializer(),
             errorCases = listOf(),
             implementation = { _ ->
-                sessionInfo.collection().updateOneById(
+                sessionInfo.table().updateOneById(
                     Uuid.parse(auth.sessionId!!),
                     modification(spath) {
                         it.terminated assign now()
@@ -286,8 +284,8 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             summary = "Terminate Session",
             errorCases = listOf(),
             implementation = { _ ->
-                if (sessionInfo.collection().get(first)?.subjectId != auth.id) throw ForbiddenException()
-                sessionInfo.collection().updateOneById(
+                if (sessionInfo.table().get(first)?.subjectId != auth.id) throw ForbiddenException()
+                sessionInfo.table().updateOneById(
                     first,
                     modification(spath) { it.terminated assign now() }
                 )

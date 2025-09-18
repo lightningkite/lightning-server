@@ -2,7 +2,9 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.AuthRequirement
+import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.definition.Locationed
+import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -56,6 +58,11 @@ public suspend operator fun <PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT> Api
     return handle(newAccess, input)
 }
 
-context(server: ServerRuntime, access: HttpAccess<PATH, out USER>)
-public suspend operator fun <PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT> Locationed<*, ApiHttpHandler<PATH, USER, INPUT, OUTPUT>>.invoke(input: INPUT): OUTPUT =
-    item.invoke(input)
+/**
+ * Calls the handler using auth taken from the provided [request]. Access is created by [Request.access].
+ * */
+context(server: ServerRuntime)
+public suspend fun <PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.handle(
+    request: HttpRequest<PATH>,
+    input: INPUT
+): OUTPUT = handle(request.access(auth), input)

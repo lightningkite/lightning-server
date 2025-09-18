@@ -1,8 +1,6 @@
 package com.lightningkite.lightningserver.runtime
 
-import com.lightningkite.lightningserver.RouteNotFoundException
 import com.lightningkite.lightningserver.definition.ScheduledTask
-import com.lightningkite.lightningserver.definition.ServerPathEndpoints
 import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.http.HttpEndpoint
@@ -13,8 +11,6 @@ import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.intercept
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.pathing.PathSpecMap
-import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketConnection
@@ -41,7 +37,7 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
 context(serverRuntime: ServerRuntime)
 public suspend fun < Input> Task<Input>.handleWithMetrics(location: PathSpec0, input: Input) {
     return topLevelReportingContext("TASK $location") {
-        this.execute(input)
+        this.executeInline(input)
     }
 }
 
@@ -107,7 +103,7 @@ context(serverRuntime: ServerRuntime)
 public suspend fun <T> Task<T>.executeWithMetrics(location: PathSpec0, input: T) {
     return topLevelReportingContext("TASK $location") {
         with(serverRuntime) {
-            execute(input)
+            executeInline(input)
         }
     }
 }

@@ -7,13 +7,51 @@ import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.services.database.HasId
 import kotlin.time.Duration
 
+/**
+ * A requirement for [Authentication].
+ *
+ * [AuthRequirement] may impose any criteria for [Authentication], but it is important to note
+ * that an [AuthRequirement] with a nullable [SUBJECT] type indicates that it will accept `null`.
+ * Conversely, a non-nullable [SUBJECT] indicates it will not accept `null`. If you implement this
+ * interface you ***must*** follow this convention.
+ *
+ * [AuthRequirement] is deeply connected with scopes. See [RequiredScope] for more details.
+ *
+ * To create an [AuthRequirement] for a specific [PrincipalType], use the [PrincipalType.auth] factory
+ * function. To specify that there are multiple requirement options, using the [AuthRequirement.or]
+ * infix function.
+ *
+ * example
+ * ```kotlin
+ * class User(override val _id: Uuid): HasId<Uuid>
+ *
+ * object Principal : PrincipalType<User, Uuid> {
+ *    // Principal impl...
+ * }
+ *
+ * // Require Authentication<User>() with root access
+ * val r1 = Principal.auth()
+ *
+ * // Require Authentication<User>() with no scope requirements
+ * val r2 = Principal.auth(scopes = emptySet())
+ *
+ * // Creating an AuthRequirement<User?>, might be a user, might not.
+ * val maybeUser = Principal.auth() or AuthRequirement.None
+ * ```
+ * */
 public interface AuthRequirement<out SUBJECT : HasId<*>?> {
+    /**
+     * Returns true if [auth] satisfies this [AuthRequirement].
+     * */
     context(server: ServerRuntime)
     public suspend fun accepts(auth: Authentication<*>?): Boolean
 
     public val requiredScopes: Runtime<Set<RequiredScope>>
     public fun subscope(subscopes: Iterable<Subscope>): AuthRequirement<SUBJECT>
 
+    /**
+     * No requirements, will accept any authentication or `null`
+     * */
     public data object None : AuthRequirement<Nothing?> {
         override val requiredScopes: Runtime.Constant<Set<RequiredScope>> get() = Runtime.Constant(emptySet())
         override fun subscope(subscopes: Iterable<Subscope>): None = this
@@ -26,9 +64,15 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
         override fun toString(): String = "Not Authenticated"
     }
 
+    /**
+     * A requirement that is set by the server, and is only determined at runtime.
+     *
+     * This is useful for creating generic endpoints where you want to check for specific
+     * privileges that are specific to each project.
+     * */
     public abstract class AuthSetting(
         public val default: AuthRequirement<*>? = null
-    ) : AuthRequirement<HasId<AnyId>>, MutableExtensions.Key<AuthRequirement<*>> {
+    ) : AuthRequirement<HasId<AnyId>>, MutableExtensions.Key<AuthRequirement<HasId<*>>> {
         context(server: ServerRuntime)
         public fun setting(): AuthRequirement<*>? = server.server.extensions[this]
 

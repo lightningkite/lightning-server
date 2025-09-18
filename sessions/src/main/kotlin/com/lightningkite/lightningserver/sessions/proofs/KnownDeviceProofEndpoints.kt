@@ -114,7 +114,7 @@ public class KnownDeviceProofEndpoints(
             deviceInfo = deviceInfo,
             establishedAt = now()
         )
-        modelInfo.collection().insertOne(secret)
+        modelInfo.table().insertOne(secret)
         return KnownDeviceSecretAndExpiration("$secretId/$secretValue", exp)
     }
 
@@ -162,13 +162,13 @@ public class KnownDeviceProofEndpoints(
                 cache().constrainAttemptRate(
                     cacheKey = "known-devices-count-${id}"
                 ) {
-                    val active = modelInfo.collection().get(id)
+                    val active = modelInfo.table().get(id)
                         ?: throw BadRequestException("No such known device")
 
                     if (!secret.checkAgainstHash(active.hash))
                         throw BadRequestException("User ID and code do not match")
 
-                    modelInfo.collection().updateOneById(id, modification {
+                    modelInfo.table().updateOneById(id, modification {
                         it.lastUsedAt assign now
                     })
 

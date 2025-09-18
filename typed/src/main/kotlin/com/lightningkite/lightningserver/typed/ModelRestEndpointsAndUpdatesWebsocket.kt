@@ -18,7 +18,7 @@ public class ModelRestEndpointsAndUpdatesWebsocket<USER : HasId<*>?, T : HasId<I
         sdkSettings.clientInterface = ClientModelRestEndpointsAndUpdatesWebsocket::class.info(endpoints.info.serializer, endpoints.info.idSerializer)
 
         sdkSettings.defaultInfo = SdkModule.Info(
-            interfaceName = endpoints.info.collectionName.pascalCase() + "RestEndpointsAndUpdatesWebsocket",
+            interfaceName = endpoints.info.tableName.pascalCase() + "RestEndpointsAndUpdatesWebsocket",
             valueName = "rest"
         )
     }

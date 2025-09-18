@@ -55,7 +55,7 @@ public class FunnelEndpoints(
             description = "Gets the current status of the funnels",
             errorCases = listOf(),
             implementation = { _: Unit ->
-                summaryInfo.collection().find(condition { it.date.eq(first) }).toCollection(HashSet())
+                summaryInfo.table().find(condition { it.date.eq(first) }).toCollection(HashSet())
             }
         )
 
@@ -75,7 +75,7 @@ public class FunnelEndpoints(
         }
 
         val data = HashMap<String, Data>()
-        info.collection().find(condition { it.started.gt(start) and it.started.lt(end) })
+        info.table().find(condition { it.started.gt(start) and it.started.lt(end) })
             .collect {
                 val d = data.getOrPut(it.funnel) { Data() }
                 d.expectedErrorRate = it.expectedErrorRate
@@ -94,8 +94,8 @@ public class FunnelEndpoints(
                 }
                 d.count++
             }
-        summaryInfo.collection().deleteMany(condition { it.date.eq(targetDate) })
-        summaryInfo.collection().insertMany(data.entries.map {
+        summaryInfo.table().deleteMany(condition { it.date.eq(targetDate) })
+        summaryInfo.table().insertMany(data.entries.map {
             val errorRate = it.value.error / it.value.count.toFloat()
             FunnelSummary(
                 funnel = it.key,
@@ -136,7 +136,7 @@ public class FunnelEndpoints(
             auth = read or noAuth,
             summary = "Start Funnel Instance"
         ) { input: FunnelStart ->
-            info.collection().insertOne(
+            info.table().insertOne(
                 FunnelInstance(
                     funnel = input.funnel,
                     userAgent = input.userAgent,
@@ -153,7 +153,7 @@ public class FunnelEndpoints(
             auth = noAuth,
             summary = "Error Funnel Instance"
         ) { input: String ->
-            info.collection().updateOneById(first, modification {
+            info.table().updateOneById(first, modification {
                 it.errors += input
             })
             Unit
@@ -165,7 +165,7 @@ public class FunnelEndpoints(
             auth = noAuth,
             summary = "Set Step Funnel Instance"
         ) { step: Int ->
-            info.collection().updateOneById(first, modification {
+            info.table().updateOneById(first, modification {
                 it.step.coerceAtLeast(step)
             })
             Unit
@@ -176,7 +176,7 @@ public class FunnelEndpoints(
             auth = noAuth,
             summary = "Success Funnel Instance"
         ) { _: Unit ->
-            info.collection().updateOneById(first, modification {
+            info.table().updateOneById(first, modification {
                 it.success assign now()
             })
             Unit

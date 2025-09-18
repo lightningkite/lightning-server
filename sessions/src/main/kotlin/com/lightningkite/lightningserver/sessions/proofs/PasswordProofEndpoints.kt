@@ -114,7 +114,7 @@ public class PasswordProofEndpoints(
             hint = password.hint,
             establishedAt = now
         )
-        modelInfo.collection().updateMany(
+        modelInfo.table().updateMany(
             condition {
                 Condition.And(
                     it.subjectId eq secret.subjectId,
@@ -124,7 +124,7 @@ public class PasswordProofEndpoints(
             },
             modification { it.disabledAt assign now }
         )
-        modelInfo.collection().insertOne(secret)
+        modelInfo.table().insertOne(secret)
     }
 
     public val establish: ApiHttpHandler<PathSpec0, HasId<AnyId>, EstablishPassword, Unit> =
@@ -179,14 +179,14 @@ public class PasswordProofEndpoints(
                     val subjectId = handler.fetchUserIdString(input.property, input.value)
                         ?: throw BadRequestException("User ID and code do not match")
 
-                    val active = modelInfo.collection().find(condition {
+                    val active = modelInfo.table().find(condition {
                         it.subjectId.eq(subjectId) and it.subjectType.eq(subject) and active
                     }).toList()
 
                     val matching = active.find { input.password.checkAgainstHash(it.hash) }
                         ?: throw BadRequestException("User ID and code do not match")
 
-                    modelInfo.collection().updateOneById(matching._id, modification {
+                    modelInfo.table().updateOneById(matching._id, modification {
                         it.lastUsedAt assign now
                     })
 
@@ -206,7 +206,7 @@ public class PasswordProofEndpoints(
         subject: SUBJECT,
     ): Boolean {
         @Suppress("UNCHECKED_CAST")
-        return modelInfo.collection().count(condition {
+        return modelInfo.table().count(condition {
             Condition.And(
                 it.subjectId eq principal.idString(subject._id),
                 it.subjectType eq principal.name,

@@ -2,10 +2,8 @@ package com.lightningkite.lightningserver.runtime.test
 
 import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.definition.*
-import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
@@ -18,12 +16,7 @@ import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.launch
-import java.net.NetworkInterface
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ConcurrentLinkedDeque
 import kotlin.time.Clock
 
 public class TestRunner<SERVER: ServerBuilder>(
@@ -62,7 +55,7 @@ public class TestRunner<SERVER: ServerBuilder>(
     }
 
     override suspend fun <T> Task<T>.invoke(input: T) {
-        this.execute(input)
+        this.executeInline(input)
     }
 
     public inner class TestWebSocket<PATH: PathSpec, STORAGE>(

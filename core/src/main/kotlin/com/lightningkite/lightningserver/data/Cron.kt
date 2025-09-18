@@ -16,23 +16,15 @@ public data class CronPattern(
     val months: LongBits,
 ) {
     public constructor(
-        minutes: Iterable<Int>? = null,
-        hours: Iterable<Int>? = null,
-        daysOfMonth: Iterable<Int>? = null,
-        daysOfWeek: Iterable<DayOfWeek>? = null,
-        months: Iterable<Month>? = null,
+        minutes: Iterable<Int> = everyMinute,
+        hours: Iterable<Int> = everyHour,
+        days: CronDays = CronDays.All,
+        months: Iterable<Month> = everyMonth,
     ) : this(
-        minutes = minutes?.let(::LongBits) ?: totalminutes,
-        hours = hours?.let(::LongBits) ?: totalhours,
-        days = daysOfMonth?.let {
-            if (daysOfWeek != null) throw IllegalArgumentException("You can't provide both daysOfMonth and daysOfWeek.")
-            CronDays.DaysOfMonth(it.map {
-                CronDayOfMonth.Day(it)
-            }.toSet())
-        }
-            ?: daysOfWeek?.let { CronDays.DaysOfWeek(it.map { CronDayOfWeek(it) }.toSet()) }
-            ?: CronDays.All,
-        months = months?.map { it: Month -> it.number }?.let(::LongBits) ?: totalmonths,
+        minutes = LongBits(minutes),
+        hours = LongBits(hours),
+        days = days,
+        months = months.map { it.number }.let(::LongBits),
     ) {
         if (this.minutes.long == 0L) throw IllegalArgumentException("No valid minutes provided")
         if (this.hours.long == 0L) throw IllegalArgumentException("No valid hours provided")
@@ -44,15 +36,19 @@ public data class CronPattern(
     }
 
     public companion object {
-        private val totalminutes = LongBits(0..<60)
-        private val totalhours = LongBits(0..<24)
-        private val totalmonths = LongBits(1..12)
+        public val everyMinute: Iterable<Int> = (0..<60)
+        public val everyHour: Iterable<Int> = (0..<24)
+        public val everyMonth: Iterable<Month> = Month.entries
+
+        private val allMinutes = LongBits(everyMinute)
+        private val allHours = LongBits(everyHour)
+        private val allMonths = LongBits(everyMonth.map { it.number })
     }
 
     override fun toString(): String = buildString {
-        append(minutes.takeUnless { it == totalminutes }?.toString() ?: "*")
+        append(minutes.takeUnless { it == allMinutes }?.toString() ?: "*")
         append(' ')
-        append(hours.takeUnless { it == totalhours }?.toString() ?: "*")
+        append(hours.takeUnless { it == allHours }?.toString() ?: "*")
         append(' ')
         when (days) {
             CronDays.All -> append("*")
@@ -60,13 +56,27 @@ public data class CronPattern(
             is CronDays.DaysOfWeek -> append("?")
         }
         append(' ')
-        append(months.takeUnless { it == totalmonths }?.toString() ?: "*")
+        append(months.takeUnless { it == allMonths }?.toString() ?: "*")
         append(' ')
         when (days) {
             CronDays.All -> append("?")
             is CronDays.DaysOfMonth -> append("?")
             is CronDays.DaysOfWeek -> append(days.days.joinToString(","))
         }
+    }
+}
+
+public sealed interface CronDays {
+    public data object All : CronDays
+
+    public data class DaysOfMonth(val days: Set<CronDayOfMonth>) : CronDays {
+        public constructor(days: Iterable<Int>) : this(days.map(CronDayOfMonth::Day).toSet())
+        public constructor(vararg days: Int) : this(days.map(CronDayOfMonth::Day).toSet())
+    }
+
+    public data class DaysOfWeek(val days: Set<CronDayOfWeek>) : CronDays {
+        public constructor(days: Iterable<DayOfWeek>) : this(days.map(::CronDayOfWeek).toSet())
+        public constructor(vararg days: DayOfWeek) : this(days.map(::CronDayOfWeek).toSet())
     }
 }
 
@@ -104,18 +114,11 @@ public data class CronDayOfWeek(
     }
 }
 
-public sealed class CronDays {
-    public data object All : CronDays()
-    public data class DaysOfMonth(val days: Set<CronDayOfMonth>) : CronDays()
-    public data class DaysOfWeek(val days: Set<CronDayOfWeek>) : CronDays()
-}
-
 public operator fun LocalDateTime.plus(pattern: CronPattern): LocalDateTime {
     return LocalDateTime(year, month, day, hour, minute).makeValid(pattern)
 }
 
 private fun LocalDateTime.makeValid(pattern: CronPattern): LocalDateTime {
-
     var year = this.year
     var month = this.month
     var dayOfMonth = day

@@ -31,7 +31,6 @@ import com.lightningkite.services.database.SerializableProperty
 import com.lightningkite.services.database.simplify
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlin.reflect.typeOf
 
 
 // Condition<T>, CollectionUpdates<T, ID>
@@ -53,7 +52,7 @@ public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
     init {
         sdkSettings.clientInterface = ClientModelRestUpdatesWebsocket::class.info(info.serializer, info.idSerializer)
         sdkSettings.defaultInfo = SdkModule.Info(
-            interfaceName = info.collectionName.pascalCase() + "RestUpdatesWebsocket",
+            interfaceName = info.tableName.pascalCase() + "RestUpdatesWebsocket",
             valueName = "websocket"
         )
     }
@@ -72,7 +71,7 @@ public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
             @Suppress("UNCHECKED_CAST")
             return ModelRestUpdatesWebsocketData(
                 user = access.authOrNull as? Authentication<Nothing>,
-                mask = info.collection(access).mask()
+                mask = info.table(access).mask()
             )
         }
 
@@ -82,7 +81,7 @@ public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
 
         context(connection: ApiWebsocketHandler.Connection<PathSpec0, ModelRestUpdatesWebsocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>>)
         override suspend fun messageFromClientTyped(frame: Condition<T>) {
-            val p = info.collection(Access(connection.request, connection.auth()))
+            val p = info.table(Access(connection.request, connection.auth()))
             val c = p.fullCondition(frame).simplify()
             val oldTopics: Set<WebSocketSubscriptionRequest<out PathSpec, *>> = connection.currentState.topics.mapTo(HashSet()) {
                 connection.server.webSocketTopics.match(connection.internalSerialization.stringArrayFormat, it)

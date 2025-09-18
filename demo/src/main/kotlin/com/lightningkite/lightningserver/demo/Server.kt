@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.*
+import com.lightningkite.lightningserver.deprecations.startupOnce
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.runtime.*
@@ -28,12 +29,10 @@ import com.lightningkite.services.http.*
 import com.lightningkite.services.sms.*
 import io.ktor.client.request.*
 import io.ktor.server.plugins.NotFoundException
-import io.ktor.websocket.Serializer
 import kotlinx.coroutines.*
 import kotlinx.html.*
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.*
-import kotlinx.serialization.modules.SerializersModule
 import kotlin.random.*
 import kotlin.time.*
 import kotlin.time.Duration.Companion.minutes
@@ -63,18 +62,22 @@ object Server : ServerBuilder() {
         }
     }
 
+    val admins = path.path("setup-admins") bind StartupOnce(database) {
+
+    }
+
     object UserAuth: PrincipalType<User, Uuid> {
         override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
         override val subjectSerializer: KSerializer<User> = User.Companion.serializer()
         override val name: String get() = User.serializer().descriptor.serialName.substringAfterLast('.')
 
         context(server: ServerRuntime)
-        override suspend fun fetch(id: Uuid): User = userInfo.collection().get(id) ?: throw NotFoundException()
+        override suspend fun fetch(id: Uuid): User = userInfo.table().get(id) ?: throw NotFoundException()
 
         context(server: ServerRuntime)
         override suspend fun fetchByProperty(property: String, value: String): User? {
             return when(property) {
-                "email" -> return userInfo.collection().findOne(condition { it.email eq value })
+                "email" -> return userInfo.table().findOne(condition { it.email eq value })
                 else -> super.fetchByProperty(property, value)
             }
         }

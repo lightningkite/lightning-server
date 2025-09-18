@@ -2,7 +2,9 @@ package com.lightningkite.lightningserver.deprecations
 
 import com.lightningkite.lightningserver.data.Schedule
 import com.lightningkite.lightningserver.definition.ScheduledTask
+import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.definition.launch
 import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.delete
 import com.lightningkite.lightningserver.http.get
@@ -15,6 +17,9 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.serialization.KSerializer
 import kotlin.time.Duration
 
 
@@ -82,7 +87,43 @@ public fun ServerBuilder.schedule(name: String, schedule: Schedule, action: susp
 @Deprecated(
     "Use the standard syntax",
     ReplaceWith("path.path(name) bind ScheduledTask(frequency = frequency, handler = action)"),
-    DeprecationLevel.ERROR
 )
-public fun ServerBuilder.schedule(name: String, frequency: Duration, action: suspend ServerRuntime.() -> Unit): ScheduledTask = TODO()
+public fun ServerBuilder.schedule(name: String, frequency: Duration, action: suspend context(ServerRuntime) () -> Unit): ScheduledTask =
+    path.path(name) bind ScheduledTask(frequency = frequency, handler = action)
 
+@Deprecated(
+    "Use the standard syntax",
+    ReplaceWith("path.path(name) bind ScheduledTask(timeOfDay, timezone, handler = action)")
+)
+public fun ServerBuilder.schedule(name: String, timeOfDay: LocalTime, timezone: TimeZone, action: suspend context(ServerRuntime) () -> Unit): ScheduledTask =
+    path.path(name) bind ScheduledTask(timeOfDay, timezone, handler = action)
+
+@Deprecated("Use PathSpec instead", ReplaceWith("PathSpec"))
+public typealias ServerPath = PathSpec
+
+@Deprecated("Use ServerBuilder instead. Also, make your endpoints an object if possible.", ReplaceWith("ServerBuilder()", "com.lightningkite.lightningserver.definition.builder"))
+public abstract class ServerPathGroup(path: PathSpec) : ServerBuilder()
+
+@Deprecated("Use \"launch\" directly", ReplaceWith("launch"))
+context(_: ServerRuntime)
+public suspend fun <Input> Task<Input>.restart(input: Input): Unit = launch(input)
+
+@Deprecated(
+    "Use the standard syntax.",
+    ReplaceWith("path.path(name) bind Task(serializer, handler = action)")
+)
+context(builder: ServerBuilder)
+public fun <Input> task(name: String, serializer: KSerializer<Input>, action: suspend context(ServerRuntime) Task<Input>.(Input) -> Unit): Task<Input> =
+    with(builder) {
+        path.path(name) bind Task(serializer, handler = action)
+    }
+
+@Deprecated(
+    "Use the standard syntax.",
+    ReplaceWith("path.path(name) bind Task(handler = action)")
+)
+context(builder: ServerBuilder)
+public inline fun <reified Input> task(name: String, noinline action: suspend context(ServerRuntime) Task<Input>.(Input) -> Unit): Task<Input> =
+    with(builder) {
+        path.path(name) bind Task(handler = action)
+    }

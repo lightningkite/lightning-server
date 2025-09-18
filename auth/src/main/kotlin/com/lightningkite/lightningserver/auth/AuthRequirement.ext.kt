@@ -10,6 +10,14 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 
+/**
+ * Asserts that the given [Authentication] will be accepted by this [AuthRequirement].
+ * If the authentication is not accepted, a [ForbiddenException] will be thrown.
+ *
+ * This assertion allows the authentication to be type-casted to the requirement's [SUBJECT] type.
+ * An [AuthRequirement] with a nullable `SUBJECT?` type indicates that it will accept `null`, in which
+ * case `null` will be returned if provided.
+ * */
 @Suppress("UNCHECKED_CAST")
 context(server: ServerRuntime)
 public suspend fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.assert(
@@ -69,16 +77,16 @@ public val AuthRequirement.Companion.isDeveloper: AuthAny
     get() = AuthRequirement.IsDeveloper
 
 context(builder: ServerBuilder)
-public var AuthRequirement.Companion.isSuperUser: AuthRequirement<*>
+public var AuthRequirement.Companion.isSuperUser: AuthRequirement<HasId<*>>
     get() = AuthRequirement.IsSuperUser
     set(value) { builder.extensions[AuthRequirement.IsSuperUser] = value }
 
 context(builder: ServerBuilder)
-public var AuthRequirement.Companion.isAdmin: AuthRequirement<*>
+public var AuthRequirement.Companion.isAdmin: AuthRequirement<HasId<*>>
     get() = AuthRequirement.IsAdmin
     set(value) { builder.extensions[AuthRequirement.IsAdmin] = value }
 
 context(builder: ServerBuilder)
-public var AuthRequirement.Companion.isDeveloper: AuthRequirement<*>
+public var AuthRequirement.Companion.isDeveloper: AuthRequirement<HasId<*>>
     get() = AuthRequirement.IsDeveloper
     set(value) { builder.extensions[AuthRequirement.IsDeveloper] = value }
