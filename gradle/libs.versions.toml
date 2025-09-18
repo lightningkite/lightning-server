@@ -161,6 +161,7 @@ serviceAbstractionsCacheRedis = { module = "com.lightningkite.services:cache-red
 serviceAbstractionsCacheTest = { module = "com.lightningkite.services:cache-test", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsData = { module = "com.lightningkite.services:data", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsDatabase = { module = "com.lightningkite.services:database", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsDatabaseShared = { module = "com.lightningkite.services:database-shared", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsDatabaseJsonfile = { module = "com.lightningkite.services:database-jsonfile", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsDatabaseMongodb = { module = "com.lightningkite.services:database-mongodb", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsDatabasePostgres = { module = "com.lightningkite.services:database-postgres", version = { ref = "serviceAbstractions" } }
