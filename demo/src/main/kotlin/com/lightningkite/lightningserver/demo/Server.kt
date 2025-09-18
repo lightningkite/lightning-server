@@ -11,6 +11,7 @@ import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.deprecations.startupOnce
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.pathing.first
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.sessions.*
@@ -120,13 +121,28 @@ object Server : ServerBuilder() {
         HttpResponse.plainText("The variable is '${request.path.pathInContext.rawPathArguments[0]}'")
     }
 
+    val topic = path.path("socket-topic").topic(String.serializer())
+    val socketSideMessage = path.path("socket").arg<String>("tosend").get bind HttpHandler {
+        topic.send(it.first)
+        HttpResponse.plainText("Sent!")
+    }
     val socket = path.path("socket") bind WebSocketHandler(
         willConnect = { Uuid.random().toString() },
-        didConnect = { /*send("Connected $currentState")*/ },
+        didConnect = {
+            println("didConnect $currentState")
+            subscribe(topic)
+        },
         messageFromClient = {
+            println("messageFromClient $currentState $it")
             send(it.text)
             if (it.content == "die") {
                 throw Exception("You asked me to die!")
+            }
+        },
+        topicHandlers = {
+            topic bind {
+                println("topicHandlers $currentState $it")
+                send(it.value)
             }
         },
         disconnect = { println("Disconnect $currentState") }

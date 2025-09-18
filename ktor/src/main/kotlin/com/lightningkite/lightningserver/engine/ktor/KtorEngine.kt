@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.engine.local.LocalEngine
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
+import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.logger
@@ -171,21 +172,11 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
                     closingMid.let { mid ->
                         context(mid) { socketHandler.disconnect(WebSocketClose.NORMAL) }
                     }
-                } catch (e: HttpStatusException) {
-                    closingMid?.let { mid ->
-                        with(mid) {
-                            socketHandler.disconnect(
-                                when (e.status.code / 100) {
-                                    1, 2, 3 -> WebSocketClose.NORMAL
-                                    4 -> WebSocketClose.CLOSED_ABNORMALLY
-                                    else -> WebSocketClose.INTERNAL_ERROR
-                                }
-                            )
-                        }
-                    }
                 } catch (e: Throwable) {
                     closingMid?.let { mid ->
-                        context(mid) { socketHandler.disconnect(WebSocketClose.INTERNAL_ERROR) }
+                        with(mid) {
+                            socketHandler.disconnect(((e as? HttpStatusException)?.status ?: HttpStatus.InternalServerError).bestWebsocketCloseCode)
+                        }
                     }
                 }
             }

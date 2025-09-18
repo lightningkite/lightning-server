@@ -1,8 +1,10 @@
 package com.lightningkite.lightningserver.websockets
 
 import com.lightningkite.lightningserver.AnonType
+import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.MultiplexMessage
 import com.lightningkite.lightningserver.NotFoundException
+import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.pathing.PathSpec
@@ -227,7 +229,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                 @Suppress("UNCHECKED_CAST")
                 otherHandler as WebSocketHandler<PathSpec, Any?>
                 connection.withWrapped(otherHandler, channel) {
-                    otherHandler.disconnectWithMetrics(match.pathSpec, it, WebSocketClose.CLOSED_ABNORMALLY)
+                    otherHandler.disconnectWithMetrics(match.pathSpec, it, ((e as? HttpStatusException)?.status ?: HttpStatus.InternalServerError).bestWebsocketCloseCode)
                 }
             }
             connection.queueStateUpdate { it.copy(map = it.map - channel) }

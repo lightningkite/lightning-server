@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.engine.local.LocalEngine
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
+import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.PathAndParams
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
@@ -230,7 +231,7 @@ public class NettyEngine(
                         try {
                             handler.messageFromClientWithMetrics(pathspec, mid, m)
                         } catch(e: Exception) {
-                            mid.close(WebSocketClose.CLOSED_ABNORMALLY)
+                            mid.close(((e as? HttpStatusException)?.status ?: HttpStatus.InternalServerError).bestWebsocketCloseCode)
                         }
                     }
                 }
@@ -245,7 +246,7 @@ public class NettyEngine(
                         try {
                             handler.messageFromClientWithMetrics(pathspec, mid, m)
                         } catch(e: Exception) {
-                            mid.close(WebSocketClose.CLOSED_ABNORMALLY)
+                            mid.close(((e as? HttpStatusException)?.status ?: HttpStatus.InternalServerError).bestWebsocketCloseCode)
                         }
                     }
                 }
@@ -259,7 +260,7 @@ public class NettyEngine(
                             try {
                                 handler.disconnectWithMetrics(pathspec, mid, WebSocketClose.NORMAL)
                             } catch(e: Exception) {
-                                mid.close(WebSocketClose.CLOSED_ABNORMALLY)
+                                mid.close(((e as? HttpStatusException)?.status ?: HttpStatus.InternalServerError).bestWebsocketCloseCode)
                             }
                         }
                     }
@@ -382,7 +383,7 @@ public class NettyEngine(
                     context(mid) {
                         scope.launch {
                             logger.error { "Disconnected because channel is inactive " }
-                            handler.disconnect(WebSocketClose.CLOSED_ABNORMALLY)
+                            handler.disconnect(WebSocketClose.GOING_AWAY)
                         }
                     }
                 } catch (_: Throwable) {
