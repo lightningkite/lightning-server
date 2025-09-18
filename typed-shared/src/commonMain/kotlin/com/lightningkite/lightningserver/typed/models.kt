@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.typed
 
+import com.lightningkite.DataSize
 import kotlinx.serialization.Serializable
 import com.lightningkite.services.HealthStatus
 import com.lightningkite.services.data.Description
@@ -85,10 +86,10 @@ public data class ServerHealth(
 
     @Serializable
     public data class Memory(
-        val max: Long,
-        val total: Long,
-        val free: Long,
-        val systemAllocated: Long,
+        val max: DataSize,
+        val total: DataSize,
+        val free: DataSize,
+        val systemAllocated: DataSize,
         val usage: Float,
     ) {
         public val status: HealthStatus

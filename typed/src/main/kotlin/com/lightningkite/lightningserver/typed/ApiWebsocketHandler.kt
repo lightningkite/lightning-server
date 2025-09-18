@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.MediaType
+import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.Authentication
@@ -21,6 +22,7 @@ import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 
 public interface ApiWebsocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?, INPUT, OUTPUT>
     : WebSocketHandler<PATH, ApiWebsocketStorage<STORAGE>>, SDK.Documentable
@@ -83,7 +85,11 @@ public interface ApiWebsocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
 
     override context(connection: WebSocketConnection<PATH, ApiWebsocketStorage<STORAGE>>)
     suspend fun messageFromClient(frame: WebSocketFrame) {
-        val parsed = connection.currentState.mediaType.decoder!!(frame, inputType)
+        val parsed = try {
+            connection.currentState.mediaType.decoder!!(frame, inputType)
+        } catch(e: SerializationException) {
+            throw BadRequestException(e.message ?: "Could not parse", cause = e)
+        }
         with(ConnectionWrapper<PATH, STORAGE, USER, INPUT, OUTPUT>(connection, outputType, auth)) { messageFromClientTyped(parsed) }
     }
 

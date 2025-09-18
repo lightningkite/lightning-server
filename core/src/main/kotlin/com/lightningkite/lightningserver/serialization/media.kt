@@ -70,7 +70,11 @@ context(serverRuntime: ServerRuntime)
 public suspend fun <T> TypedData.parse(serializer: DeserializationStrategy<T>): T {
     val format = mediaType.decoder
         ?: throw BadRequestException("No media type decoder found supporting $mediaType")
-    return format(this, serializer)
+    return try {
+        format(this, serializer)
+    } catch(e: SerializationException) {
+        throw BadRequestException(e.message ?: "Unknown formatting error", cause = e.cause)
+    }
 }
 
 context(serverRuntime: ServerRuntime) public suspend inline fun <reified T> T.toTypedData(accepts: List<MediaType>): TypedData

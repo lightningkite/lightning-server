@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.*
+import com.lightningkite.DataSize.Companion.bytes
 import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
@@ -63,15 +64,15 @@ public class MetaEndpoints(
 
     private fun Long.roundMemoryForSecurity() = this.div(100_000).times(100_000)  // Round to the nearest megabyte
     private fun memory(): ServerHealth.Memory {
-        val max = Runtime.getRuntime().maxMemory().roundMemoryForSecurity()
-        val total = Runtime.getRuntime().totalMemory().roundMemoryForSecurity()
-        val free = Runtime.getRuntime().freeMemory().roundMemoryForSecurity()
+        val max = Runtime.getRuntime().maxMemory().roundMemoryForSecurity().bytes
+        val total = Runtime.getRuntime().totalMemory().roundMemoryForSecurity().bytes
+        val free = Runtime.getRuntime().freeMemory().roundMemoryForSecurity().bytes
         return ServerHealth.Memory(
             max = max,
             total = total,
             free = free,
             systemAllocated = total - free,
-            usage = ((total - free).toDouble() / max.toDouble()).toFloat()
+            usage = ((total - free).bytes.toDouble() / max.bytes.toDouble()).toFloat()
         )
     }
 

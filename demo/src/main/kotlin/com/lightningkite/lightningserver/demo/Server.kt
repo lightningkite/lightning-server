@@ -2,6 +2,7 @@
 
 package com.lightningkite.lightningserver.demo
 
+import com.lightningkite.DataSize.Companion.bytes
 import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.cors.CorsInterceptor
@@ -142,6 +143,21 @@ object Server : ServerBuilder() {
             delay(10)
         }
         HttpResponse(body = bytes?.let { bytes -> TypedData.bytes(bytes, it.body!!.mediaType) })
+    }
+
+    val mem = path.path("mem").get bind HttpHandler {
+        repeat(5) { System.gc() }
+        val max = java.lang.Runtime.getRuntime().maxMemory().bytes
+        val total = java.lang.Runtime.getRuntime().totalMemory().bytes
+        val free = java.lang.Runtime.getRuntime().freeMemory().bytes
+        val memory = ServerHealth.Memory(
+            max = max,
+            total = total,
+            free = free,
+            systemAllocated = total - free,
+            usage = ((total - free).bytes.toDouble() / max.bytes.toDouble()).toFloat()
+        )
+        HttpResponse.plainText("Memory usage: ${memory}")
     }
 
     val task = path.path("Sample Task") bind Task { it: Int ->

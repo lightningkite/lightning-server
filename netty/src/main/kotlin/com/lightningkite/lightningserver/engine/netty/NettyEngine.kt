@@ -62,6 +62,9 @@ import java.net.InetSocketAddress
 import java.net.URI
 import java.nio.charset.StandardCharsets
 import kotlin.time.Clock
+import io.netty.handler.codec.http.HttpServerExpectContinueHandler
+import io.netty.handler.timeout.IdleStateHandler
+import io.netty.handler.timeout.IdleStateEvent
 import io.netty.handler.codec.http.HttpHeaders as NettyHttpHeaders
 import com.lightningkite.lightningserver.http.HttpHeaders as LsHttpHeaders
 import com.lightningkite.lightningserver.websockets.WebSocketFrame as LkWebSocketFrame
@@ -82,17 +85,15 @@ public class NettyEngine(
 
     override val settings: ServerSettings = ServerSettings(super.settings.settings.plus(nettyRunConfig).toSet())
 
-    private var bossGroup: EventLoopGroup? = null
-    private var workerGroup: EventLoopGroup? = null
+    private lateinit var bossGroup: EventLoopGroup
+    private lateinit var workerGroup: EventLoopGroup
 
     private val supervisorJob = SupervisorJob()
-    override val scope: CoroutineScope = CoroutineScope(Dispatchers.Default + supervisorJob)
+    override lateinit var scope: CoroutineScope
 
     public fun start() {
         // Prepare configuration and lifecycle
         this.settings.ready()
-        runBlocking { runStartupTasks() }
-        startSchedules()
 
         val cfg = nettyRunConfig()
 
@@ -101,30 +102,35 @@ public class NettyEngine(
         val boss: EventLoopGroup
         val worker: EventLoopGroup
         val channelClass: Class<out ServerChannel>
+        val workerThreads = cfg.workerThreads ?: 0
         when {
             useEpoll -> {
                 boss = EpollEventLoopGroup(1)
-                worker = EpollEventLoopGroup()
+                worker = EpollEventLoopGroup(workerThreads)
                 channelClass = EpollServerSocketChannel::class.java
             }
             useKQueue -> {
                 boss = KQueueEventLoopGroup(1)
-                worker = KQueueEventLoopGroup()
+                worker = KQueueEventLoopGroup(workerThreads)
                 channelClass = KQueueServerSocketChannel::class.java
             }
             else -> {
                 boss = NioEventLoopGroup(1)
-                worker = NioEventLoopGroup()
+                worker = NioEventLoopGroup(workerThreads)
                 channelClass = NioServerSocketChannel::class.java
             }
         }
         bossGroup = boss
         workerGroup = worker
+        scope = CoroutineScope(worker.asCoroutineDispatcher() + supervisorJob)
+
+        runBlocking { runStartupTasks() }
+        startSchedules()
 
         val b = ServerBootstrap()
         b.group(boss, worker)
             .channel(channelClass)
-            .option(ChannelOption.SO_BACKLOG, 1024)
+            .option(ChannelOption.SO_BACKLOG, cfg.backlog)
             .option(ChannelOption.SO_REUSEADDR, true)
             .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
             .childOption(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
@@ -133,14 +139,20 @@ public class NettyEngine(
             .childOption(ChannelOption.WRITE_BUFFER_WATER_MARK, WriteBufferWaterMark(32 * 1024, 64 * 1024))
             .childHandler(object : ChannelInitializer<SocketChannel>() {
                 override fun initChannel(ch: SocketChannel) {
+                    ch.config().isAutoRead = cfg.autoRead
                     val p = ch.pipeline()
                     p.addLast(HttpServerCodec())
-                    p.addLast(HttpObjectAggregator(16 * 1024 * 1024))
+                    p.addLast(HttpServerExpectContinueHandler())
+                    p.addLast(HttpObjectAggregator(cfg.maxAggregatedContentLengthBytes))
                     p.addLast(ChunkedWriteHandler())
-                    p.addLast(WebSocketServerCompressionHandler())
+                    if (cfg.websocketCompression) p.addLast(WebSocketServerCompressionHandler())
+                    p.addLast(IdleStateHandler(0, 0, 120))
                     p.addLast(NettyServerHandler(cfg))
                 }
             })
+
+        if (cfg.recvBufBytes != null) b.childOption(ChannelOption.SO_RCVBUF, cfg.recvBufBytes)
+        if (cfg.sendBufBytes != null) b.childOption(ChannelOption.SO_SNDBUF, cfg.sendBufBytes)
 
         val ch = b.bind(cfg.host, cfg.port).sync().channel()
         logger.info { "NettyEngine started on http://${cfg.host}:${cfg.port}" }
@@ -164,12 +176,12 @@ public class NettyEngine(
                     val connection = msg.headers()[CONNECTION]?.lowercase() ?: ""
                     val upgrade = msg.headers()[UPGRADE]?.lowercase() ?: ""
                     if (connection.contains("upgrade") && upgrade == "websocket") {  // Is it a websocket?
-                        scope.launch {
+                        scope.launch(ctx.executor().asCoroutineDispatcher()) {
                             handleWebSocketStartup(ctx, msg)
                         }
                     } else {
                         val request = msg.toLightningHttpRequest(ctx, cfg)
-                        scope.launch {
+                        scope.launch(ctx.executor().asCoroutineDispatcher()) {
                             try {
                                 try {
                                     val result: HttpResponse = this@NettyEngine.handle(request)
@@ -214,7 +226,7 @@ public class NettyEngine(
                     val handler = ctx.channel().attr(HANDLER_KEY).get() ?: return
                     val pathspec = ctx.channel().attr(PATHSPEC_KEY).get() ?: return
                     val m = LkWebSocketFrame(msg.text())
-                    scope.launch {
+                    scope.launch(ctx.executor().asCoroutineDispatcher()) {
                         try {
                             handler.messageFromClientWithMetrics(pathspec, mid, m)
                         } catch(e: Exception) {
@@ -229,7 +241,7 @@ public class NettyEngine(
                     val pathspec = ctx.channel().attr(PATHSPEC_KEY).get() ?: return
                     val bytes = ByteBufUtil.getBytes(msg.content())
                     val m = LkWebSocketFrame(bytes)
-                    scope.launch {
+                    scope.launch(ctx.executor().asCoroutineDispatcher()) {
                         try {
                             handler.messageFromClientWithMetrics(pathspec, mid, m)
                         } catch(e: Exception) {
@@ -243,7 +255,7 @@ public class NettyEngine(
                     val handler = ctx.channel().attr(HANDLER_KEY).get()
                     val pathspec = ctx.channel().attr(PATHSPEC_KEY).get()
                     if (mid != null && handler != null && pathspec != null) {
-                        scope.launch {
+                        scope.launch(ctx.executor().asCoroutineDispatcher()) {
                             try {
                                 handler.disconnectWithMetrics(pathspec, mid, WebSocketClose.NORMAL)
                             } catch(e: Exception) {
@@ -353,6 +365,14 @@ public class NettyEngine(
             }
         }
 
+
+        override fun userEventTriggered(ctx: ChannelHandlerContext, evt: Any) {
+            if (evt is IdleStateEvent) {
+                ctx.close()
+            } else {
+                super.userEventTriggered(ctx, evt)
+            }
+        }
 
         override fun channelInactive(ctx: ChannelHandlerContext) {
             val mid = ctx.channel().attr(MID_KEY).get()
