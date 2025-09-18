@@ -4,12 +4,11 @@ import com.lightningkite.lightningserver.definition.CorsSettings
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.HttpMethod
-import com.lightningkite.lightningserver.runtime.generatePreflightCorsHeaders
+import com.lightningkite.lightningserver.cors.generatePreflightCorsHeaders
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlin.text.get
 
 class TestGeneratePreflightCorsHeaders {
 

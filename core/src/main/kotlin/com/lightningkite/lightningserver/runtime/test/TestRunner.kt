@@ -26,7 +26,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedDeque
 import kotlin.time.Clock
 
-public class TestRunner<SERVER: ServerBuilder>(
+public class TestRunner<SERVER: ServerBuilder> @Deprecated("Please use SERVER.test() instead.") constructor (
     public val serverBuilder: SERVER,
     private val clockGet: () -> Clock = { Clock.System }
 ) : ServerRuntimeBase(serverBuilder.build()) {
@@ -40,15 +40,6 @@ public class TestRunner<SERVER: ServerBuilder>(
 
     override val clock: Clock
         get() = clockGet()
-
-    public constructor(
-        server: SERVER,
-        clockGet: () -> Clock = { Clock.System },
-        settings: context(ServerSettings) SERVER.() -> Unit,
-    ): this(server, clockGet) {
-        context(this.settings) { settings(server) }
-        this.settings.ready()
-    }
 
     private val settingsCache = HashMap<ServerSetting<*, *>, Any?>()
 
@@ -157,10 +148,10 @@ public inline fun <SERVER: ServerBuilder> SERVER.test(
     settings: context(ServerSettings) SERVER.() -> Unit,
     action: context(TestRunner<SERVER>) SERVER.()->Unit
 ) {
-    val runner = TestRunner(this)
+    @Suppress("DEPRECATION") val runner = TestRunner(this)
     with(runner) {
         context(this.settings) { settings(this@test) }
-        this.settings.ready()
+        this.settings.readyUsingDefaults()
     }
     action(runner, this)
 }

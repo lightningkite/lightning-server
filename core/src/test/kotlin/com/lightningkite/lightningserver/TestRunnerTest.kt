@@ -85,10 +85,6 @@ class TestRunnerTest {
         )
     }
 
-    val test = TestRunner(TestServer, settings = {
-        generalSettings set GeneralServerSettings()
-    })
-
     @Test
     fun test() {
         TestServer.test(

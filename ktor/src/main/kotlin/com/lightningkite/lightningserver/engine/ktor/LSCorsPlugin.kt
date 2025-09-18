@@ -2,8 +2,8 @@ package com.lightningkite.lightningserver.engine.ktor
 
 import com.lightningkite.lightningserver.definition.CorsSettings
 import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
-import com.lightningkite.lightningserver.runtime.generateCorsHeaders
-import com.lightningkite.lightningserver.runtime.generatePreflightCorsHeaders
+import com.lightningkite.lightningserver.cors.generateCorsHeaders
+import com.lightningkite.lightningserver.cors.generatePreflightCorsHeaders
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*

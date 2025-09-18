@@ -12,7 +12,6 @@ import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.originMatches
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketHandlerInterceptor
@@ -25,8 +24,9 @@ public class CorsInterceptor(public val cors: Runtime<CorsSettings>) : HttpInter
         request: HttpRequest<*>,
         cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse
     ): HttpResponse {
-        val origin = request.headers[HttpHeader.Origin]?.root ?: generalSettings().publicUrl
+        val origin = request.headers[HttpHeader.Origin]?.root ?: generalSettings().publicUrlDomain
         val matchingOrigin = cors().limitToDomains
+            ?.plus(generalSettings().publicUrlDomain)
             ?.let { allowed ->
                 if (originMatches(
                         allowed,
@@ -66,7 +66,7 @@ public class CorsInterceptor(public val cors: Runtime<CorsSettings>) : HttpInter
         return object: WebSocketHandler<PATH, T> by handler {
             context(serverRuntime: ServerRuntime)
             override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
-                val origin = request.headers[HttpHeader.Origin]?.root ?: generalSettings().publicUrl
+                val origin = request.headers[HttpHeader.Origin]?.root ?: generalSettings().publicUrl.substringAfter("://").substringBefore("/")
                 val matchingOrigin = cors().limitToDomains
                     ?.let { allowed ->
                         if (originMatches(

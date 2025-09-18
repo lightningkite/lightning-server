@@ -1,4 +1,4 @@
-package com.lightningkite.lightningserver.runtime
+package com.lightningkite.lightningserver.cors
 
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.definition.CorsSettings

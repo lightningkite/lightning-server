@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.runtime.cors
 
-import com.lightningkite.lightningserver.runtime.originMatches
+import com.lightningkite.lightningserver.cors.originMatches
 import junit.framework.TestCase.assertFalse
 import org.junit.Test
 import kotlin.test.assertTrue

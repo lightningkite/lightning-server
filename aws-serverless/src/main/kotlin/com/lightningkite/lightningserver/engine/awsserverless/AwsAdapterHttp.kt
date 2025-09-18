@@ -5,12 +5,10 @@ import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaderValue
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.HttpMethod
-import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
-import com.lightningkite.lightningserver.runtime.addCorsHeaders
 import com.lightningkite.lightningserver.runtime.handle
 import com.lightningkite.services.data.Data
 import com.lightningkite.services.data.TypedData

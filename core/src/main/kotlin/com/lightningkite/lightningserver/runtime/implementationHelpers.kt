@@ -24,6 +24,7 @@ import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.services.data.Data
 import com.lightningkite.services.otel.get
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.opentelemetry.api.trace.Span
 import kotlinx.io.asInputStream
 import kotlinx.io.asOutputStream
@@ -56,7 +57,9 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
                                 request.path.asString
                             ) { it.http[method] }
                         }
-                        val existingMethods = perEndpoint.entries.filter { it.value != null }.map { it.key }
+                        val existingMethods = perEndpoint.entries.filter { it.value != null }.mapTo(HashSet()) { it.key }
+                        if(existingMethods.contains(HttpMethod.GET)) existingMethods += HttpMethod.HEAD
+                        existingMethods += HttpMethod.OPTIONS
                         HttpResponse(
                             status = if(existingMethods.isEmpty()) HttpStatus.NotFound else HttpStatus.NoContent,
                             headers = HttpHeaders {
@@ -119,6 +122,8 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
         }
     } catch (e: Exception) {
         try {
+            KotlinLogging.logger("com.lightningkite.lightningserver")
+                .error(e) { "Exception in HTTP" }
             instrument("exceptionHandler") {
                 server.exceptionHandler.handle(
                     request,
