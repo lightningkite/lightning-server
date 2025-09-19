@@ -15,7 +15,7 @@ import kotlin.collections.iterator
 import kotlin.time.Duration
 
 
-@Serializable(SerializableCacheSerializer::class)
+@Serializable(SerializableCache.Serializer::class)
 public class SerializableCache private constructor(
     private val serialized: HashMap<String, ByteArray>
 ) {
@@ -66,7 +66,7 @@ public class SerializableCache private constructor(
     private fun <T> cache(key: Key<T>, value: T) {
         val expiring = Expiring(
             value,
-            expiresAt = key.expireAfter?.let { server.clock.now() + it }
+            expireAfter = key.expireAfter
         )
 
         serialized[key.id] = server.internalSerialization.kotlinBytesFormat.encodeToByteArray(Expiring.serializer(key.serializer), expiring)
@@ -112,10 +112,21 @@ public class SerializableCache private constructor(
         serialized.clear()
         updated = false
     }
+
+    private object Serializer : KSerializer<SerializableCache> {
+        private val defer = MapSerializer(String.serializer(), ByteArraySerializer())
+
+        override val descriptor: SerialDescriptor
+            get() = SerialDescriptor("com.lightningkite.lightningserver.SerializableCache", defer.descriptor)
+
+        override fun serialize(encoder: Encoder, value: SerializableCache) { defer.serialize(encoder, value.bytes) }
+        override fun deserialize(decoder: Decoder): SerializableCache = SerializableCache(decoder.decodeSerializableValue(defer))
+    }
 }
 
 context(server: ServerRuntime)
 public inline fun <T> SerializableCache.getOrPut(key: Key<T>, default: () -> T): T = get(key) ?: default().also { set(key, it) }
+
 
 public interface Caching {
     public val cache: SerializableCache
@@ -129,14 +140,3 @@ public operator fun <T> Caching.get(key: Key<T>): T? = cache[key]
 
 context(server: ServerRuntime)
 public suspend fun <INPUT, T> Caching.get(key: CalculatingKey<INPUT, T>, input: INPUT): T = cache.get(key, input)
-
-
-public object SerializableCacheSerializer : KSerializer<SerializableCache> {
-    private val defer = MapSerializer(String.serializer(), ByteArraySerializer())
-
-    override val descriptor: SerialDescriptor
-        get() = SerialDescriptor("com.lightningkite.lightningserver.SerializableCache", defer.descriptor)
-
-    override fun serialize(encoder: Encoder, value: SerializableCache) { defer.serialize(encoder, value.bytes) }
-    override fun deserialize(decoder: Decoder): SerializableCache = SerializableCache(decoder.decodeSerializableValue(defer))
-}

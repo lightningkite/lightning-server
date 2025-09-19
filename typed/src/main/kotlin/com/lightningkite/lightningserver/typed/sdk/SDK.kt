@@ -211,8 +211,14 @@ public object SDK { // namespace object
     }
 
     public fun ServerBuilder.writeSdk(format: Format, folder: KFile, packageName: String) {
-        context(Runtime(this)) {
-            format.write(build(), folder, packageName)
+        with(Runtime(this)) {
+            settings.readyUsingDefaults()
+            writeSdk(format, folder, packageName)
         }
+    }
+
+    context(runtime: ServerRuntime)
+    public fun ServerBuilder.writeSdk(format: Format, folder: KFile, packageName: String) {
+        format.write(build(), folder, packageName)
     }
 }

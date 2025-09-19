@@ -1,7 +1,6 @@
 package com.lightningkite.lightningserver.data
 
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.now
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -16,4 +15,4 @@ public data class Expiring<T>(
 }
 
 context(server: ServerRuntime)
-public fun <T> Expiring(value: T, expireAfter: Duration?): Expiring<T> = Expiring(value, expireAfter?.let { now() + it })
+public fun <T> Expiring(value: T, expireAfter: Duration?): Expiring<T> = Expiring(value, expireAfter?.let { server.clock.now() + it })

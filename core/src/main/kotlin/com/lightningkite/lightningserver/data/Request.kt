@@ -7,7 +7,6 @@ import com.lightningkite.lightningserver.pathing.HasContextualPath
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 
-
 public abstract class Request<out PATH: PathSpec>: HasContextualPath<PATH>, Caching {
     public abstract val path: HasContextualPath<PATH>
     public abstract val queryParameters: QueryParameters

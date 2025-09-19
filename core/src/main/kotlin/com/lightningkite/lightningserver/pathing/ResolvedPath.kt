@@ -59,7 +59,7 @@ public interface HasContextualPath<out PATH : PathSpec> {
     context(server: ServerRuntime) public val pathInContext: ResolvedPath<PATH>
 }
 
-public interface HasConcretePath<PATH : PathSpec> {
+public interface HasResolvedPath<PATH : PathSpec> {
     public val path: ResolvedPath<PATH>
 }
 
@@ -72,8 +72,8 @@ public fun <A, B> ConcretePath(path: PathSpec2<A, B>, first: A, second: B, trail
 public fun <A, B, C> ConcretePath(path: PathSpec3<A, B, C>, first: A, second: B, third: C, trailingWildcard: PathSegments? = null): ResolvedPath<PathSpec3<A, B, C>> =
     ResolvedPath(path, listOf(first, second, third), trailingWildcard?.takeIf { path.after == PathSpec.Afterwards.TrailingSegments })
 
-public fun HasConcretePath<*>.pathSegments(stringArrayFormat: StringArrayFormat): PathSegments = path.pathSegments(stringArrayFormat)
-public fun HasConcretePath<*>.path(stringArrayFormat: StringArrayFormat): String = path.path(stringArrayFormat)
+public fun HasResolvedPath<*>.pathSegments(stringArrayFormat: StringArrayFormat): PathSegments = path.pathSegments(stringArrayFormat)
+public fun HasResolvedPath<*>.path(stringArrayFormat: StringArrayFormat): String = path.path(stringArrayFormat)
 
 @get:JvmName("first1")
 public val <A> ResolvedPath<PathSpec1<A>>.first: A get() = rawPathArguments[0] as A
@@ -95,25 +95,25 @@ public inline val <A, B, C> ResolvedPath<PathSpec3<A, B, C>>.third: C get() = ra
 
 
 
-public val HasConcretePath<*>.trailingSegments: PathSegments? get() = path.trailingSegments
+public val HasResolvedPath<*>.trailingSegments: PathSegments? get() = path.trailingSegments
 
 @get:JvmName("first1")
-public val <A> HasConcretePath<PathSpec1<A>>.first: A get() = path.first
+public val <A> HasResolvedPath<PathSpec1<A>>.first: A get() = path.first
 
 @get:JvmName("first2")
-public val <A, B> HasConcretePath<PathSpec2<A, B>>.first: A get() = path.first
+public val <A, B> HasResolvedPath<PathSpec2<A, B>>.first: A get() = path.first
 
 @get:JvmName("second2")
-public val <A, B> HasConcretePath<PathSpec2<A, B>>.second: B get() = path.second
+public val <A, B> HasResolvedPath<PathSpec2<A, B>>.second: B get() = path.second
 
 @get:JvmName("first3")
-public val <A, B, C> HasConcretePath<PathSpec3<A, B, C>>.first: A get() = path.first
+public val <A, B, C> HasResolvedPath<PathSpec3<A, B, C>>.first: A get() = path.first
 
 @get:JvmName("second3")
-public val <A, B, C> HasConcretePath<PathSpec3<A, B, C>>.second: B get() = path.second
+public val <A, B, C> HasResolvedPath<PathSpec3<A, B, C>>.second: B get() = path.second
 
 @get:JvmName("third3")
-public val <A, B, C> HasConcretePath<PathSpec3<A, B, C>>.third: C get() = path.third
+public val <A, B, C> HasResolvedPath<PathSpec3<A, B, C>>.third: C get() = path.third
 
 
 context(serverRuntime: ServerRuntime)

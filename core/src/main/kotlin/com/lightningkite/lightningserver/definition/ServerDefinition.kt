@@ -135,7 +135,7 @@ public data class ServerDefinition(
         }.associate { it }
     }
     @Suppress("UNCHECKED_CAST")
-    public fun <P: PathSpec> location(handler: HttpHandler<P>): HttpEndpoint<P> = reverseLookupHttpHandler[handler] as HttpEndpoint<P>
+    public fun <P: PathSpec> location(handler: HttpHandler<P>): HttpEndpoint<P>? = reverseLookupHttpHandler[handler]?.let { it as HttpEndpoint<P> }
 
     private val reverseLookupWebSocketHandler: Map<WebSocketHandler<*, *>, PathSpec> by lazy {
         endpoints.entries.mapNotNull {
@@ -143,26 +143,26 @@ public data class ServerDefinition(
         }.associate { it }
     }
     @Suppress("UNCHECKED_CAST")
-    public fun <P: PathSpec> location(handler: WebSocketHandler<P, *>): P = reverseLookupWebSocketHandler[handler] as P
+    public fun <P: PathSpec> location(handler: WebSocketHandler<P, *>): P? = reverseLookupWebSocketHandler[handler]?.let { it as P }
 
     private val reverseLookupWebSocketTopic: Map<WebSocketTopic<*, *>, PathSpec> by lazy {
         webSocketTopics.entries.associate { it.value to it.key }
     }
     @Suppress("UNCHECKED_CAST")
-    public fun <P: PathSpec> location(handler: WebSocketTopic<P, *>): P = reverseLookupWebSocketTopic[handler] as P
+    public fun <P: PathSpec> location(handler: WebSocketTopic<P, *>): P? = reverseLookupWebSocketTopic[handler]?.let { it as P }
 
     private val reverseLookupTask: Map<Task<*>, PathSpec0> by lazy {
         tasks.entries.associate { it.value to it.key }
     }
-    public fun location(handler: Task<*>): PathSpec0 = reverseLookupTask[handler]!!
+    public fun location(handler: Task<*>): PathSpec0? = reverseLookupTask[handler]
 
     private val reverseLookupStartupTask: Map<StartupTask, PathSpec0> by lazy {
         startupTasks.entries.associate { it.value to it.key }
     }
-    public fun location(handler: StartupTask): PathSpec0 = reverseLookupStartupTask[handler]!!
+    public fun location(handler: StartupTask): PathSpec0? = reverseLookupStartupTask[handler]
 
     private val reverseLookupScheduledTask: Map<ScheduledTask, PathSpec0> by lazy {
         schedules.entries.associate { it.value to it.key }
     }
-    public fun location(handler: ScheduledTask): PathSpec0 = reverseLookupScheduledTask[handler]!!
+    public fun location(handler: ScheduledTask): PathSpec0? = reverseLookupScheduledTask[handler]
 }

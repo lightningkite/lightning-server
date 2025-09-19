@@ -18,7 +18,7 @@ public interface PathSpecMap<out V> : Map<PathSpec, V> {
     public class Match<out V>(
         override val path: ResolvedPath<PathSpec>,
         public val value: V
-    ) : HasConcretePath<PathSpec> {
+    ) : HasResolvedPath<PathSpec> {
         public constructor(
             pathSpec: PathSpec,
             rawPathArguments: List<Any?>,

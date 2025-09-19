@@ -70,8 +70,8 @@ import kotlinx.serialization.modules.SerializersModule
  * ```
  * */
 public abstract class ServerBuilder : Extendable {
-    public open val internalSerialization: Runtime<SerializersModule> get() = Runtime.Constant(EmptySerializersModule())
-    public open val externalSerialization: Runtime<SerializersModule> get() = Runtime.Constant(EmptySerializersModule())
+    protected open val internalSerialization: Runtime<SerializersModule> get() = Runtime.Constant(EmptySerializersModule())
+    protected open val externalSerialization: Runtime<SerializersModule> get() = Runtime.Constant(EmptySerializersModule())
 
     public val path: PathSpec0 get() = PathSpec.root // just for convenience
 

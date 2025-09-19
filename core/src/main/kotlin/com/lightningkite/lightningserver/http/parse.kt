@@ -8,9 +8,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import java.net.URLDecoder
 import java.net.URLEncoder
-import java.util.function.IntFunction
 
-@Serializable(PathAndParams.MySerializer::class)
+@Serializable(PathAndParams.Serializer::class)
 public data class PathAndParams(
     val pathSegments: PathSegments,
     val queryParameters: QueryParameters
@@ -28,14 +27,14 @@ public data class PathAndParams(
         }
     }
 
-    internal class MySerializer: kotlinx.serialization.KSerializer<PathAndParams> {
+    private object Serializer: kotlinx.serialization.KSerializer<PathAndParams> {
         override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.lightningserver.http.PathAndParams", PrimitiveKind.STRING)
         override fun deserialize(decoder: Decoder): PathAndParams = parse(decoder.decodeString())
         override fun serialize(encoder: Encoder, value: PathAndParams) = encoder.encodeString(value.toString())
     }
 }
 
-@Serializable(PathSegments.MySerializer::class)
+@Serializable(PathSegments.Serializer::class)
 @JvmInline
 public value class PathSegments(public val segments: List<String>): List<String> by segments {
     override fun toString(): String = segments.joinToString("/") {
@@ -44,19 +43,20 @@ public value class PathSegments(public val segments: List<String>): List<String>
             Charsets.UTF_8
         )
     }
+
     public companion object {
-        public val EMPTY: PathSegments = PathSegments(listOf())
+        public val EMPTY: PathSegments = PathSegments(emptyList())
         public fun parse(path: String): PathSegments = PathSegments(path.removePrefix("/").split("/").map { URLDecoder.decode(it, Charsets.UTF_8) })
     }
 
-    internal class MySerializer: kotlinx.serialization.KSerializer<PathSegments> {
+    private object Serializer: kotlinx.serialization.KSerializer<PathSegments> {
         override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.lightningserver.http.PathSegments", PrimitiveKind.STRING)
         override fun deserialize(decoder: Decoder): PathSegments = parse(decoder.decodeString())
         override fun serialize(encoder: Encoder, value: PathSegments) = encoder.encodeString(value.toString())
     }
 }
 
-@Serializable(QueryParameters.MySerializer::class)
+@Serializable(QueryParameters.Serializer::class)
 @JvmInline
 public value class QueryParameters(public val entries: List<Pair<String, String>>): List<Pair<String, String>> by entries {
 
@@ -78,7 +78,7 @@ public value class QueryParameters(public val entries: List<Pair<String, String>
     }
 
     public companion object {
-        public val EMPTY: QueryParameters = QueryParameters(listOf())
+        public val EMPTY: QueryParameters = QueryParameters(emptyList())
         public fun parse(path: String): QueryParameters {
             return QueryParameters(
                 path.split('&').map { it.split('=', limit = 2) }.map {
@@ -91,7 +91,7 @@ public value class QueryParameters(public val entries: List<Pair<String, String>
         }
     }
 
-    internal class MySerializer: kotlinx.serialization.KSerializer<QueryParameters> {
+    private object Serializer: kotlinx.serialization.KSerializer<QueryParameters> {
         override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.lightningserver.http.QueryParameters", PrimitiveKind.STRING)
         override fun deserialize(decoder: Decoder): QueryParameters = parse(decoder.decodeString())
         override fun serialize(encoder: Encoder, value: QueryParameters) = encoder.encodeString(value.toString())

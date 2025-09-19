@@ -4,11 +4,8 @@ import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.files.ServerFile
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.UseContextualSerialization
-import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
-
 
 @GenerateDataClassPaths
 @Serializable
