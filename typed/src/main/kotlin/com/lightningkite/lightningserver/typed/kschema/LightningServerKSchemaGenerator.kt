@@ -62,14 +62,15 @@ val lightningServerKSchema: LightningServerKSchema get() {
             node.layer.endpoints.flatMap { (interfaceInfo, pathSpecMap) ->
                 val interfaceType = interfaceInfo?.virtualTypeReference(registry)
 
-                pathSpecMap.asSequence().flatMap { (path, endpoints) ->
-                    val routes = path.wildcards.associate { it.name to it.serializer.virtualTypeReference(registry) }
+                pathSpecMap.asSequence().flatMap { (relativePath, endpoints) ->
+                    val routes = relativePath.wildcards.associate { it.name to it.serializer.virtualTypeReference(registry) }
+                    val path = node.absolutePath.toString() + relativePath.toString()
 
                     val http = endpoints.http.map { (method, endpoint) ->
                         LightningServerKSchemaEndpoint(
                             docGroup = docGroup,
                             method = method.toString(),
-                            path = path.toString(),
+                            path = path,
                             scopes = endpoint.auth.requiredScopes(),
                             routes = routes,
                             input = endpoint.inputType.virtualTypeReference(registry),
@@ -84,7 +85,7 @@ val lightningServerKSchema: LightningServerKSchema get() {
                         LightningServerKSchemaEndpoint(
                             docGroup = docGroup,
                             method = HttpMethod.WEBSOCKET.toString(),
-                            path = path.toString(),
+                            path = path,
                             scopes = it.auth.requiredScopes(),
                             routes = routes,
                             input = it.inputType.virtualTypeReference(registry),

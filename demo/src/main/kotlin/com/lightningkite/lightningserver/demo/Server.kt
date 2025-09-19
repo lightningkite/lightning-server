@@ -25,6 +25,7 @@ import com.lightningkite.services.cache.dynamodb.*
 import com.lightningkite.services.cache.memcached.*
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.*
+import com.lightningkite.services.database.jsonfile.JsonFileDatabase
 import com.lightningkite.services.database.mongodb.*
 import com.lightningkite.services.email.*
 import com.lightningkite.services.email.javasmtp.JavaSmtpEmailService
@@ -56,6 +57,7 @@ object Server : ServerBuilder() {
 
     init {
         JavaSmtpEmailService
+        JsonFileDatabase
         DynamoDbCache
         MongoDatabase
         MemcachedCache
@@ -71,7 +73,7 @@ object Server : ServerBuilder() {
     }
 
     val admins = path.path("setup-admins") bind StartupOnce(database) {
-
+        userInfo.table().insertOne(User(email = "joseph+root@lightningkite.com", isSuperUser = true))
     }
 
     object UserAuth: PrincipalType<User, Uuid> {
@@ -85,7 +87,7 @@ object Server : ServerBuilder() {
         context(server: ServerRuntime)
         override suspend fun fetchByProperty(property: String, value: String): User? {
             return when(property) {
-                "email" -> return userInfo.table().findOne(condition { it.email eq value })
+                "email" -> return userInfo.table().findOne(condition { it.email eq value }) ?: userInfo.table().insertOne(User(email = value))
                 else -> super.fetchByProperty(property, value)
             }
         }
@@ -112,7 +114,7 @@ object Server : ServerBuilder() {
         val rest = path.path("rest") module ModelRestEndpoints(userInfo)
     }
     val uploadEarly = path.path("upload") module UploadEarlyEndpoint(files, database, Runtime.Constant(listOf()))
-    val testModel = path.path("test-model") module TestModelEndpoints()
+    val testModel = path.path("test-model") module TestModelEndpoints
 
     val root = path.get bind HttpHandler {
         HttpResponse.plainText("Hello ${it.auth(UserAuth.auth() or noAuth)?.fetch()}")

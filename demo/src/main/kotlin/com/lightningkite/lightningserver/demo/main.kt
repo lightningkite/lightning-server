@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.engine.jdk.JdkEngine
 import com.lightningkite.lightningserver.engine.ktor.KtorEngine
 import com.lightningkite.lightningserver.engine.netty.NettyEngine
 import com.lightningkite.lightningserver.settings.loadFromFile
+import com.lightningkite.lightningserver.terraform.awsserverless.TerraformAwsServerlessBuilder
 import com.lightningkite.lightningserver.terraform.awsserverless.TerraformAwsServerlessDomainBuilder
 //import com.lightningkite.lightningserver.terraform.awsserverless.TerraformAwsServerlessDomainBuilder
 import com.lightningkite.lightningserver.terraform.generated
@@ -40,6 +41,7 @@ private fun serve() {
         start(Netty)
     }
 }
+
 private fun serveJdk() {
     val before = TimeSource.Monotonic.markNow()
     val built = Server.build()
@@ -49,6 +51,7 @@ private fun serveJdk() {
         start()
     }
 }
+
 private fun serveNetty() {
     val before = TimeSource.Monotonic.markNow()
     val built = Server.build()
@@ -63,21 +66,23 @@ fun terraform() {
     Server
     TerraformAwsServerlessDomainBuilder(
         builder = Server,
-        handlerFullyQualifiedName = "com.lightningkite.lightningserver.demo.AwsHandler",
-
-        storageBucket = "ivieleague-deployment-states",
-        storageBucketPathOverride = "demo/example",
-        projectPrefix = "demo-example",
-        deploymentTag = "demo-example",
-
-        displayName = "Demo Example",
-        debug = true,
-        emergencyContact = "josephivie@gmail.com".toEmailAddress(),
-
-        region = Region.US_WEST_2,
         domain = "example.demo.ivieleague.com",
         domainZone = "ivieleague.com",
+        config = TerraformAwsServerlessBuilder.Config(
+            handlerFullyQualifiedName = "com.lightningkite.lightningserver.demo.AwsHandler",
+
+            storageBucket = "ivieleague-deployment-states",
+            storageBucketPathOverride = "demo/example",
+            projectPrefix = "demo-example",
+            deploymentTag = "demo-example",
+
+            displayName = "Demo Example",
+            debug = true,
+            emergencyContact = "josephivie@gmail.com".toEmailAddress(),
+
+            region = Region.US_WEST_2,
 //        purchaseDomain = true,
+        )
     ).apply {
         settings {
 //            awsLambdaRuntimeSettings.direct(AwsLambdaRuntimeSettings(CorsSettings(
@@ -87,7 +92,7 @@ fun terraform() {
 //                allowCredentials = true
 //            )))
             database.mongodbAtlasFree(orgId = "6323a65c43d66b56a2ea5aea", zoneName = "Zone 1")
-            email.awsSesSmtp(emergencyContact)
+            email.awsSesSmtp(config.emergencyContact)
             sms.direct(SMS.Settings())
             files.awsS3Bucket(signedUrlDuration = 1.days)
             cache.awsDynamoDb()
