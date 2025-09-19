@@ -79,7 +79,7 @@ public class MetaEndpoints(
     public val docs: ApiDocs = path.path("docs") include ApiDocs(packageName)
 
     public val health: ApiHttpHandler<PathSpec0, HasId<AnyId>?, Unit, ServerHealth> =
-        path.path("health").get bind ApiHttpHandler(
+        path.path("health").get bind explicitApiHttpHandler(
             auth = noAuth,
             inputType = Unit.serializer(),
             outputType = ServerHealth.serializer(),

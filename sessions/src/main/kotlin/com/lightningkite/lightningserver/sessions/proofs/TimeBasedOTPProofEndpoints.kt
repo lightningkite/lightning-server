@@ -99,7 +99,7 @@ public class TimeBasedOTPProofEndpoints(
     public val rest: ModelRestEndpoints<HasId<AnyId>, TotpSecret, Uuid> = path.path("secrets") include ModelRestEndpoints(modelInfo)
 
     public val establish: ApiHttpHandler<PathSpec0, HasId<AnyId>, EstablishTotp, String> =
-        path.path("establish").post bind ApiHttpHandler(
+        path.path("establish").post bind explicitApiHttpHandler(
             summary = "Establish Time Based One Time Password",
             inputType = EstablishTotp.serializer(),
             outputType = String.serializer(),
@@ -185,7 +185,7 @@ public class TimeBasedOTPProofEndpoints(
         )
 
     public val confirm: ApiHttpHandler<PathSpec0, HasId<AnyId>, String, Unit> =
-        path.path("existing").post bind ApiHttpHandler(
+        path.path("existing").post bind explicitApiHttpHandler(
             summary = "Confirm Time Based One Time Password",
             inputType = String.serializer(),
             outputType = Unit.serializer(),

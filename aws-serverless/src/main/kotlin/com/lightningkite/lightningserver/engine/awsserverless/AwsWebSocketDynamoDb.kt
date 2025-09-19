@@ -5,13 +5,10 @@ package com.lightningkite.lightningserver.engine.awsserverless
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.services.data.KotlinBytesFormat
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.async
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.reactive.asFlow
-import kotlinx.coroutines.reactive.collect
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.builtins.NothingSerializer
 import software.amazon.awssdk.core.SdkBytes
@@ -45,61 +42,66 @@ internal class AwsWebSocketDynamoDb(
     companion object {
         internal val logger = KotlinLogging.logger("com.lightningkite.lightningserver.engine.awsserverless.AwsWebSocketDynamoDb")
     }
-    @OptIn(DelicateCoroutinesApi::class)
-    val ready = GlobalScope.async(start = CoroutineStart.LAZY) {
-        measureTime {
-            client.requireTable(
-                createTableRequest = {
-                    it.tableName(tableSubs)
-                    it.billingMode(BillingMode.PAY_PER_REQUEST)
-                    it.keySchema(
-                        { it.attributeName("topic").keyType(KeyType.HASH) },
-                        { it.attributeName("socketId").keyType(KeyType.RANGE) })
-                    it.attributeDefinitions(
-                        { it.attributeName("topic").attributeType(ScalarAttributeType.S) },
-                        { it.attributeName("socketId").attributeType(ScalarAttributeType.S) },
-//                    { it.attributeName("path").attributeType(ScalarAttributeType.S) },
-//                    { it.attributeName("expire").attributeType(ScalarAttributeType.N) },
-                    )
-                    it.globalSecondaryIndexes(
-                        {
-                            it.keySchema(
-                                { it.attributeName("socketId").keyType(KeyType.HASH) },
-                                { it.attributeName("topic").keyType(KeyType.RANGE) })
-                            it.projection {
-                                it.projectionType(ProjectionType.INCLUDE).nonKeyAttributes("path", "expire")
+
+    private val initMutex = Mutex()
+    @Volatile private var initialized = false
+
+    internal suspend fun ensureTables() {
+        if (initialized) return
+        initMutex.withLock {
+            if (initialized) return
+            measureTime {
+                client.requireTable(
+                    createTableRequest = {
+                        it.tableName(tableSubs)
+                        it.billingMode(BillingMode.PAY_PER_REQUEST)
+                        it.keySchema(
+                            { it.attributeName("topic").keyType(KeyType.HASH) },
+                            { it.attributeName("socketId").keyType(KeyType.RANGE) })
+                        it.attributeDefinitions(
+                            { it.attributeName("topic").attributeType(ScalarAttributeType.S) },
+                            { it.attributeName("socketId").attributeType(ScalarAttributeType.S) },
+                        )
+                        it.globalSecondaryIndexes(
+                            {
+                                it.keySchema(
+                                    { it.attributeName("socketId").keyType(KeyType.HASH) },
+                                    { it.attributeName("topic").keyType(KeyType.RANGE) })
+                                it.projection {
+                                    it.projectionType(ProjectionType.INCLUDE).nonKeyAttributes("path", "expire")
+                                }
+                                it.indexName(tableSubsReverse)
                             }
-                            it.indexName(tableSubsReverse)
+                        )
+                    },
+                    timeToLive = {
+                        it.tableName(tableSubs)
+                        it.timeToLiveSpecification {
+                            it.attributeName("expire")
+                            it.enabled(true)
                         }
-                    )
-                },
-                timeToLive = {
-                    it.tableName(tableSubs)
-                    it.timeToLiveSpecification {
-                        it.attributeName("expire")
-                        it.enabled(true)
                     }
-                }
-            )
-            client.requireTable(
-                createTableRequest = {
-                    it.tableName(tableStates)
-                    it.billingMode(BillingMode.PAY_PER_REQUEST)
-                    it.keySchema({ it.attributeName("socketId").keyType(KeyType.HASH) })
-                    it.attributeDefinitions(
-                        { it.attributeName("socketId").attributeType(ScalarAttributeType.S) },
-                    )
-                },
-                timeToLive = {
-                    it.tableName(tableStates)
-                    it.timeToLiveSpecification {
-                        it.attributeName("expire")
-                        it.enabled(true)
+                )
+                client.requireTable(
+                    createTableRequest = {
+                        it.tableName(tableStates)
+                        it.billingMode(BillingMode.PAY_PER_REQUEST)
+                        it.keySchema({ it.attributeName("socketId").keyType(KeyType.HASH) })
+                        it.attributeDefinitions(
+                            { it.attributeName("socketId").attributeType(ScalarAttributeType.S) },
+                        )
+                    },
+                    timeToLive = {
+                        it.tableName(tableStates)
+                        it.timeToLiveSpecification {
+                            it.attributeName("expire")
+                            it.enabled(true)
+                        }
                     }
-                }
-            )
-        }.also { println("AwsWebSocketDynamoDb.ready took $it") }
-        Unit
+                )
+            }.also { logger.debug { "AwsWebSocketDynamoDb.ensureTables took $it" } }
+            initialized = true
+        }
     }
 
     suspend fun subscribers(topic: String): Map<String, Set<String>> {
@@ -109,7 +111,7 @@ internal class AwsWebSocketDynamoDb(
     }
 
     suspend fun forSubscribers(topic: String, perSubscriber: suspend (path: String, ids: Collection<String>) -> Unit) {
-        ready.await()
+        ensureTables()
         measureTime {
             client.queryPaginator {
                 it.tableName(tableSubs)
@@ -126,11 +128,11 @@ internal class AwsWebSocketDynamoDb(
                     perSubscriber(key, value)
                 }
             }
-        }.also { println("AwsWebSocketDynamoDb.forSubscribers took $it") }
+        }.also { logger.debug { "AwsWebSocketDynamoDb.forSubscribers took $it" } }
     }
 
     suspend fun subscribe(path: String, topic: String, socketId: String) {
-        ready.await()
+        ensureTables()
         measureTime {
             client.putItem {
                 it.tableName(tableSubs)
@@ -139,15 +141,15 @@ internal class AwsWebSocketDynamoDb(
                         "topic" to AttributeValue.fromS(topic),
                         "socketId" to AttributeValue.fromS(socketId),
                         "path" to AttributeValue.fromS(path),
-                        "expires" to AttributeValue.fromN(Clock.System.now().plus(socketExpiration).epochSeconds.toString())
+                        "expire" to AttributeValue.fromN(Clock.System.now().plus(socketExpiration).epochSeconds.toString())
                     )
                 )
             }.await()
-        }.also { println("AwsWebSocketDynamoDb.subscribe took $it") }
+        }.also { logger.debug { "AwsWebSocketDynamoDb.subscribe took $it" } }
     }
 
     suspend fun unsubscribe(topic: String, socketId: String) {
-        ready.await()
+        ensureTables()
         measureTime {
             client.deleteItem {
                 it.tableName(tableSubs)
@@ -158,11 +160,11 @@ internal class AwsWebSocketDynamoDb(
                     )
                 )
             }.await()
-        }.also { println("AwsWebSocketDynamoDb.unsubscribe took $it") }
+        }.also { logger.debug { "AwsWebSocketDynamoDb.unsubscribe took $it" } }
     }
 
     suspend fun clean(socketId: String) {
-        ready.await()
+        ensureTables()
         measureTime {
             client.queryPaginator {
                 it.tableName(tableSubs)
@@ -171,11 +173,25 @@ internal class AwsWebSocketDynamoDb(
                 it.keyConditionExpression("socketId = :socketId")
                 it.projectionExpression("topic, socketId")
                 it.limit(100)
-            }.collect {
-                for (item in it.items()) {
-                    client.deleteItem {
-                        it.tableName(tableSubs)
-                        it.key(item)
+            }.asFlow().collect { page ->
+                val keys = page.items().map { item ->
+                    item.filter { (k, _) -> k == "topic" || k == "socketId" }
+                }
+                keys.chunked(25).forEach { batch ->
+                    client.batchWriteItem {
+                        it.requestItems(
+                            mapOf(
+                                tableSubs to batch.map { k ->
+                                    software.amazon.awssdk.services.dynamodb.model.WriteRequest.builder()
+                                        .deleteRequest(
+                                            software.amazon.awssdk.services.dynamodb.model.DeleteRequest.builder()
+                                                .key(k)
+                                                .build()
+                                        )
+                                        .build()
+                                }
+                            )
+                        )
                     }.await()
                 }
             }
@@ -183,15 +199,15 @@ internal class AwsWebSocketDynamoDb(
                 it.tableName(tableStates)
                 it.key(mapOf("socketId" to AttributeValue.fromS(socketId)))
             }.await()
-        }.also { println("AwsWebSocketDynamoDb.clean took $it") }
+        }.also { logger.debug { "AwsWebSocketDynamoDb.clean took $it" } }
     }
 
     suspend fun debugStates(): Map<String, StateAndConnectRequest> {
-        ready.await()
+        ensureTables()
         val out = HashMap<String, StateAndConnectRequest>()
         client.scanPaginator {
             it.tableName(tableStates)
-            it.attributesToGet("socketId", "state", "request")
+            it.projectionExpression("socketId, state, request")
         }.asFlow().collect {
             it.items()?.forEach {
                 out[it["socketId"]!!.s()] = StateAndConnectRequest(
@@ -204,28 +220,28 @@ internal class AwsWebSocketDynamoDb(
     }
 
     suspend fun state(id: String): StateAndConnectRequest? {
-        ready.await()
+        ensureTables()
         val result: StateAndConnectRequest?
         measureTime {
             result = client.getItem {
                 it.tableName(tableStates)
                 it.key(mapOf("socketId" to AttributeValue.fromS(id)))
-                it.attributesToGet("state", "request")
+                it.projectionExpression("state, request")
             }.await().item()?.let {
                 StateAndConnectRequest(
                     it["state"]!!.b().asByteArray(),
                     encoding.decodeFromByteArray(WebSocketConnectRequest.serializer(NothingSerializer()), it.get("request")!!.b().asByteArray()),
                 )
             }
-        }.also { println("AwsWebSocketDynamoDb.state($id) took $it") }
+        }.also { logger.debug { "AwsWebSocketDynamoDb.state($id) took $it" } }
         return result
     }
 
     suspend fun statesAlone(ids: Iterable<String>): Map<String, ByteArray> {
-        ready.await()
+        ensureTables()
         val out = HashMap<String, ByteArray>()
         measureTime {
-            val getState = KeysAndAttributes.builder().attributesToGet("socketId", "state")
+            val getState = KeysAndAttributes.builder().projectionExpression("socketId, state")
                 .keys(ids.map { mapOf("socketId" to AttributeValue.fromS(it)) }).build()
             client.batchGetItemPaginator {
                 it.requestItems(mapOf(tableStates to getState))
@@ -234,15 +250,15 @@ internal class AwsWebSocketDynamoDb(
                     out[it["socketId"]!!.s()] = it["state"]!!.b().asByteArray()
                 }
             }
-        }.also { println("AwsWebSocketDynamoDb.statesAlone(${ids.joinToString()}) took $it") }
+        }.also { logger.debug { "AwsWebSocketDynamoDb.statesAlone(${ids.joinToString()}) took $it" } }
         return out
     }
 
     suspend fun states(ids: Iterable<String>): Map<String, StateAndConnectRequest> {
-        ready.await()
+        ensureTables()
         val out = HashMap<String, StateAndConnectRequest>()
         measureTime {
-            val getState = KeysAndAttributes.builder().attributesToGet("socketId", "state", "request")
+            val getState = KeysAndAttributes.builder().projectionExpression("socketId, state, request")
                 .keys(ids.map { mapOf("socketId" to AttributeValue.fromS(it)) }).build()
             client.batchGetItemPaginator {
                 it.requestItems(mapOf(tableStates to getState))
@@ -254,12 +270,12 @@ internal class AwsWebSocketDynamoDb(
                     )
                 }
             }
-        }.also { println("AwsWebSocketDynamoDb.states(${ids.joinToString()}) took $it") }
+        }.also { logger.debug { "AwsWebSocketDynamoDb.states(${ids.joinToString()}) took $it" } }
         return out
     }
 
     suspend fun setState(socketId: String, request: WebSocketConnectRequest<*>, toState: ByteArray) {
-        ready.await()
+        ensureTables()
         measureTime {
             client.putItem {
                 it.tableName(tableStates)
@@ -276,32 +292,32 @@ internal class AwsWebSocketDynamoDb(
                                 )
                             )
                         ),
-                        "expires" to AttributeValue.fromN(Clock.System.now().plus(socketExpiration).epochSeconds.toString())
+                        "expire" to AttributeValue.fromN(Clock.System.now().plus(socketExpiration).epochSeconds.toString())
                     )
                 )
             }.await()
-        }.also { println("AwsWebSocketDynamoDb.setState($socketId) took $it") }
+        }.also { logger.debug { "AwsWebSocketDynamoDb.setState($socketId) took $it" } }
     }
 
     suspend fun updateState(socketId: String, fromState: ByteArray, toState: ByteArray): Boolean {
-        ready.await()
+        ensureTables()
         return try {
             measureTime {
                 client.updateItem {
                     it.tableName(tableStates)
                     it.key(mapOf("socketId" to AttributeValue.fromS(socketId)))
-                    it.expressionAttributeNames(mapOf("#state" to "state", "#expires" to "expires"))
+                    it.expressionAttributeNames(mapOf("#state" to "state", "#expire" to "expire"))
                     it.expressionAttributeValues(
                         mapOf(
                             ":fromState" to AttributeValue.fromB(SdkBytes.fromByteArray(fromState)),
                             ":state" to AttributeValue.fromB(SdkBytes.fromByteArray(toState)),
-                            ":expires" to AttributeValue.fromN(Clock.System.now().plus(socketExpiration).epochSeconds.toString()),
+                            ":expire" to AttributeValue.fromN(Clock.System.now().plus(socketExpiration).epochSeconds.toString()),
                         )
                     )
                     it.conditionExpression("#state = :fromState")
-                    it.updateExpression("SET #state = :state, #expires = :expires")
+                    it.updateExpression("SET #state = :state, #expire = :expire")
                 }.await()
-            }.also { println("AwsWebSocketDynamoDb.updateState($socketId) took $it") }
+            }.also { logger.debug { "AwsWebSocketDynamoDb.updateState($socketId) took $it" } }
             true
         } catch (_: ConditionalCheckFailedException) {
             false

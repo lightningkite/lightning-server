@@ -3,7 +3,6 @@ package com.lightningkite.lightningserver.typed
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.data.Request
-import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.pathing.PathSpec
@@ -13,7 +12,7 @@ import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.serializerOrContextual
 import kotlinx.serialization.KSerializer
 
-public fun <PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT> ApiHttpHandler(
+public fun <PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT> explicitApiHttpHandler(
     summary: String,
     description: String = "",
     functionName: String = summary.functionCase(),
@@ -50,7 +49,7 @@ public inline fun <PATH: PathSpec, USER: HasId<*>?, reified INPUT, reified OUTPU
     examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = emptyList(),
     noinline implementation: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT
 ): ApiHttpHandler<PATH, USER, INPUT, OUTPUT> =
-    ApiHttpHandler(summary, description, functionName, serializerOrContextual<INPUT>(), serializerOrContextual<OUTPUT>(), auth, successCode, errorCases, examples, implementation)
+    explicitApiHttpHandler(summary, description, functionName, serializerOrContextual<INPUT>(), serializerOrContextual<OUTPUT>(), auth, successCode, errorCases, examples, implementation)
 
 context(server: ServerRuntime, access: HttpAccess<PATH, out USER>)
 public suspend operator fun <PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.invoke(input: INPUT): OUTPUT {
