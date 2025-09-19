@@ -89,6 +89,9 @@ public class NettyEngine(
     private lateinit var bossGroup: EventLoopGroup
     private lateinit var workerGroup: EventLoopGroup
 
+    @Volatile
+    public var boundAddress: InetSocketAddress? = null
+
     private val supervisorJob = SupervisorJob()
     override lateinit var scope: CoroutineScope
 
@@ -156,7 +159,9 @@ public class NettyEngine(
         if (cfg.sendBufBytes != null) b.childOption(ChannelOption.SO_SNDBUF, cfg.sendBufBytes)
 
         val ch = b.bind(cfg.host, cfg.port).sync().channel()
-        logger.info { "NettyEngine started on http://${cfg.host}:${cfg.port}" }
+        val local = ch.localAddress() as? java.net.InetSocketAddress
+        this@NettyEngine.boundAddress = local
+        logger.info { "NettyEngine started on http://${cfg.host}:${local?.port ?: cfg.port}" }
         ch.closeFuture().addListener { _ ->
             shutdown()
         }

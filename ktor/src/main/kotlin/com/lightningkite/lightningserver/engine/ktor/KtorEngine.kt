@@ -55,7 +55,7 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
 
     override val settings: ServerSettings = ServerSettings(super.settings.settings.plus(ktorRunConfig).toSet())
 
-    private fun Application.adapt() {
+    internal fun Application.adapt() {
         install(WebSockets)
 
         val runConfig = ktorRunConfig()

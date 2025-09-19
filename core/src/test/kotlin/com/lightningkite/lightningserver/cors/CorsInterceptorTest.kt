@@ -2,7 +2,6 @@ package com.lightningkite.lightningserver.cors
 
 import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.HttpMethod
-import com.lightningkite.lightningserver.definition.CorsSettings
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpHeader

@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.runtime
 
+import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.RouteNotFoundException
 import com.lightningkite.lightningserver.definition.ScheduledTask
@@ -56,7 +57,9 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
                     }
 
                     else -> {
-                        println("Not found: ${req.path.pathSegments.segments.map { "'$it'" }}, looking for slashes")
+                        KotlinLogging.logger("com.lightningkite.lightningserver").debug {
+                            "Not found: ${req.path.pathSegments.segments.map { "'$it'" }}, looking for slashes"
+                        }
                         if (request.path.pathSegments.isNotEmpty()) {
                             // Let's see if they just got their ending slash wrong.
                             val altSlashEndpoint = req.path.copy(pathSegments = req.path.pathSegments.segments.let {
@@ -72,28 +75,70 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
                     }
                 }
             }
-            // Compression
+            // Compression (size- and type-aware defaults, gzip only)
             run {
-                for (option in request.headers.getMany(HttpHeader.AcceptEncoding).map { it.root }) {
-                    when (option) {
-                        "gzip" -> {
-                            result = result.copy(
-                                headers = result.headers + HttpHeaders(HttpHeader.ContentEncoding to "gzip"),
-                                body = result.body?.copy(
-                                    data = when (val data = result.body.data) {
-                                        is Data.Sink -> Data.Sink(
-                                            emit = {
-                                                GZIPOutputStream(it.asOutputStream()).asSink().buffered().use {
-                                                    data.emit(it)
-                                                }
-                                            }
-                                        )
-//                                        is Data.Source -> {}
-                                        else -> data.bytes().gzip().let(Data::Bytes)
-                                    }
-                                )
-                            )
-                            break
+                // Preconditions: response/body present and eligible
+                val bodyHolder = result.body ?: return@run
+                if (result.status == HttpStatus.NoContent || result.status == HttpStatus.NotModified || result.status == HttpStatus.PartialContent) return@run
+                if (result.headers[HttpHeader.ContentEncoding] != null) return@run
+                if (request.headers[HttpHeader.Range] != null) return@run
+                if (result.headers[HttpHeader.ContentRange] != null) return@run
+
+                // Accept-Encoding negotiation (gzip only for now)
+                val accepts = request.headers.getMany(HttpHeader.AcceptEncoding).map { it.root.lowercase().substringBefore(';').trim() }
+                if (!accepts.contains("gzip")) return@run
+
+                // Content-Type denylist (skip already-compressed types)
+                val contentTypeRoot = result.headers[HttpHeader.ContentType]?.root?.let {
+                    try { MediaType(it) } catch(e: Exception) { null }
+                }
+                when(contentTypeRoot?.type) {
+                    "image", "audio", "video" -> return@run
+                    "application" -> when(contentTypeRoot.subtype) {
+                        "zip", "gzip", "x-gzip", "x-7z-compressed", "x-bzip2", "x-tar", "pdf" -> return@run
+                    }
+                    "font" -> when(contentTypeRoot.subtype) {
+                        "woff", "woff2" -> return@run
+                    }
+                }
+
+                // Defaults
+                val minSizeForCompression = 1024 // 1 KiB
+                val tryCompressAndFallbackMax = 64 * 1024 // 64 KiB
+
+                when (val data = bodyHolder.data) {
+                    is Data.Sink -> {
+                        // Stream-first path: wrap outgoing stream in GZIPOutputStream (single layer)
+                        val newBody = bodyHolder.copy(data = Data.Sink { outSink ->
+                            GZIPOutputStream(outSink.asOutputStream()).use { gz ->
+                                gz.asSink().buffered().use { buf ->
+                                    data.emit(buf)
+                                }
+                            }
+                        })
+                        val newHeaders = result.headers.copy {
+                            set(HttpHeader.ContentEncoding, "gzip")
+                            set(HttpHeader.Vary, HttpHeader.AcceptEncoding)
+                        }
+                        result = result.copy(headers = newHeaders, body = newBody)
+                    }
+                    else -> {
+                        val original = data.bytes()
+                        if (original.size < minSizeForCompression) return@run
+
+                        // Try-compress-and-fallback for moderate sizes
+                        val compressed: ByteArray? = if (original.size <= tryCompressAndFallbackMax) {
+                            val gz = original.gzip()
+                            if (gz.size < original.size) gz else null
+                        } else null
+
+                        val finalBytes = compressed ?: if (original.size > tryCompressAndFallbackMax) original.gzip() else null
+                        if (finalBytes != null) {
+                            val newHeaders = result.headers.copy {
+                                set(HttpHeader.ContentEncoding, "gzip")
+                                set(HttpHeader.Vary, HttpHeader.AcceptEncoding)
+                            }
+                            result = result.copy(headers = newHeaders, body = bodyHolder.copy(data = Data.Bytes(finalBytes)))
                         }
                     }
                 }
@@ -119,10 +164,17 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
 context(serverRuntime: ServerRuntime) private suspend inline fun <PATH : PathSpec> HttpHandler<PATH>.handleWithMetrics(
     request: HttpRequest<PATH>,
 ): HttpResponse {
-    return instrument(location.toString()) {
-        this@handleWithMetrics.handle(
-            request
-        )
+    return instrument(location.toString()) { span ->
+        // Add useful HTTP attributes to the current span
+        span?.setAttribute("http.method", request.path.method.toString())
+        span?.setAttribute("http.route", location.toString())
+        span?.setAttribute("http.target", "/" + request.path.pathSegments.toString())
+        span?.setAttribute("http.scheme", request.protocol)
+        span?.setAttribute("http.host", request.domain)
+        span?.setAttribute("net.peer.ip", request.sourceIp)
+        val response = this@handleWithMetrics.handle(request)
+        span?.setAttribute("http.status_code", response.status.code.toLong())
+        response
     }
 }
 
@@ -133,7 +185,10 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.wi
     request: WebSocketConnectRequest<PATH>,
 ): STORAGE {
     return with(serverRuntime) {
-        instrument("WEBSOCKET.WILLCONNECT $location") {
+        instrument("WEBSOCKET.WILLCONNECT $location") { span ->
+            span?.setAttribute("ws.event", "willConnect")
+            span?.setAttribute("ws.route", location.toString())
+            span?.setAttribute("net.peer.ip", request.sourceIp)
             willConnect(request)
         }
     }
@@ -144,7 +199,10 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
     connection: WebSocketConnection<PATH, STORAGE>,
 ) {
     return with(connection) {
-        instrument("WEBSOCKET.DIDCONNECT $location") {
+        instrument("WEBSOCKET.DIDCONNECT $location") { span ->
+            span?.setAttribute("ws.event", "didConnect")
+            span?.setAttribute("ws.route", location.toString())
+            span?.setAttribute("net.peer.ip", request.sourceIp)
             didConnect()
         }
     }
@@ -156,7 +214,18 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
     frame: WebSocketFrame,
 ) {
     return with(connection) {
-        instrument("WEBSOCKET.MESSAGE $location") {
+        instrument("WEBSOCKET.MESSAGE $location") { span ->
+            span?.setAttribute("ws.event", "messageFromClient")
+            span?.setAttribute("ws.route", location.toString())
+            span?.setAttribute("net.peer.ip", request.sourceIp)
+            span?.setAttribute("ws.frame.type", when(frame){
+                is WebSocketFrame.Text -> "text"
+                is WebSocketFrame.Binary -> "binary"
+            })
+            span?.setAttribute("ws.frame.size", when(frame){
+                is WebSocketFrame.Text -> frame.content.length.toLong()
+                is WebSocketFrame.Binary -> frame.content.size.toLong()
+            })
             messageFromClient(frame)
         }
     }
@@ -168,8 +237,11 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
     topic: WebSocketSubscriptionMessage<*, *>,
 ) {
     return with(connection) {
-        instrument("WEBSOCKET.SUBSCRIPTION $location") {
-
+        instrument("WEBSOCKET.SUBSCRIPTION $location") { span ->
+            span?.setAttribute("ws.event", "messageFromSubscription")
+            span?.setAttribute("ws.route", location.toString())
+            span?.setAttribute("net.peer.ip", request.sourceIp)
+            span?.setAttribute("ws.subscription.topic", topic.topic.location.toString())
             messageFromSubscription(topic)
         }
     }
@@ -181,7 +253,12 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
     reason: WebSocketClose,
 ) {
     return with(connection) {
-        instrument("WEBSOCKET.DISCONNECT $location") {
+        instrument("WEBSOCKET.DISCONNECT $location") { span ->
+            span?.setAttribute("ws.event", "disconnect")
+            span?.setAttribute("ws.route", location.toString())
+            span?.setAttribute("net.peer.ip", request.sourceIp)
+            span?.setAttribute("ws.disconnect.code", reason.code.toLong())
+            span?.setAttribute("ws.disconnect.reason", reason.name)
             disconnect(reason)
         }
     }
@@ -189,7 +266,9 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
 
 context(serverRuntime: ServerRuntime)
 public suspend fun <T> Task<T>.executeWithMetrics(location: PathSpec0, input: T) {
-    return instrument("TASK $location") {
+    return instrument("TASK $location") { span ->
+        span?.setAttribute("task.type", "TASK")
+        span?.setAttribute("task.route", location.toString())
         with(serverRuntime) {
             this@executeWithMetrics.executeInline(input)
         }
@@ -198,8 +277,9 @@ public suspend fun <T> Task<T>.executeWithMetrics(location: PathSpec0, input: T)
 
 context(serverRuntime: ServerRuntime)
 public suspend fun ScheduledTask.executeWithMetrics(location: PathSpec0) {
-    return instrument("SCHEDULE $location") {
-
+    return instrument("SCHEDULE $location") { span ->
+        span?.setAttribute("task.type", "SCHEDULE")
+        span?.setAttribute("task.route", location.toString())
         with(serverRuntime) {
             this@executeWithMetrics.execute()
         }
@@ -208,7 +288,9 @@ public suspend fun ScheduledTask.executeWithMetrics(location: PathSpec0) {
 
 context(serverRuntime: ServerRuntime)
 public suspend fun StartupTask.executeWithMetrics(location: PathSpec0) {
-    return instrument("STARTUP $location") {
+    return instrument("STARTUP $location") { span ->
+        span?.setAttribute("task.type", "STARTUP")
+        span?.setAttribute("task.route", location.toString())
         execute()
     }
 }

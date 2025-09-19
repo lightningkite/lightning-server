@@ -27,6 +27,8 @@ dependencies {
     // For native transports (compile-time APIs); actual native libs load if present on the platform
     implementation(libs.nettyTransportClassesEpoll)
     implementation(libs.nettyTransportClassesKqueue)
+
+    testImplementation("com.squareup.okhttp3:okhttp:4.12.0")
 }
 
 ksp {

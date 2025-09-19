@@ -45,7 +45,10 @@ public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT
 
         return HttpResponse(
             body = if (result == Unit) null else result.toTypedData(request.headers.accept, outputType),
-            status = successCode
+            status = successCode,
+            headers = HttpHeaders {
+                set(HttpHeader.Vary, HttpHeader.Accept)
+            }
         )
     }
 

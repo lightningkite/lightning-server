@@ -53,7 +53,7 @@ proguard = "7.7.0"
 scrimage = "4.3.4"
 sentry = "8.21.1"
 serializationLibs = "1.9.0"
-serviceAbstractions = "0.0.1-48"
+serviceAbstractions = "0.0.1-47"
 shadow = "8.1.1"
 vanniktechMavenPublish = "0.34.0"
 vertx = "4.5.7"
@@ -161,11 +161,11 @@ serviceAbstractionsCacheRedis = { module = "com.lightningkite.services:cache-red
 serviceAbstractionsCacheTest = { module = "com.lightningkite.services:cache-test", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsData = { module = "com.lightningkite.services:data", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsDatabase = { module = "com.lightningkite.services:database", version = { ref = "serviceAbstractions" } }
-serviceAbstractionsDatabaseShared = { module = "com.lightningkite.services:database-shared", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsDatabaseJsonfile = { module = "com.lightningkite.services:database-jsonfile", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsDatabaseMongodb = { module = "com.lightningkite.services:database-mongodb", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsDatabasePostgres = { module = "com.lightningkite.services:database-postgres", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsDatabaseProcessor = { module = "com.lightningkite.services:database-processor", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsDatabaseShared = { module = "com.lightningkite.services:database-shared", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsDatabaseTest = { module = "com.lightningkite.services:database-test", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsDemo = { module = "com.lightningkite.services:demo", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsEmail = { module = "com.lightningkite.services:email", version = { ref = "serviceAbstractions" } }

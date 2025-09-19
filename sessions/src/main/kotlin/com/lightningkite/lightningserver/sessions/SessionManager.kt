@@ -55,6 +55,7 @@ import kotlin.io.encoding.Base64
 import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
+import io.opentelemetry.api.trace.Span
 
 public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     public val principal: PrincipalType<SUBJECT, ID>,
@@ -125,7 +126,20 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 ?: return null
 
         try {
-            return tokenFormat().read(principal, token) ?: RefreshToken(token).session(request)?.toAuth()
+            return tokenFormat().read(principal, token)
+                ?.also { auth ->
+                    val span = Span.current()
+                    auth.sessionId?.let { span.setAttribute("session.id", it) }
+                    span.setAttribute("user.id", auth.id.toString())
+                    span.setAttribute("authorization.method", "access token")
+                }
+                ?: RefreshToken(token).session(request)?.toAuth()
+                    ?.also { auth ->
+                        val span = Span.current()
+                        auth.sessionId?.let { span.setAttribute("session.id", it) }
+                        span.setAttribute("user.id", auth.id.toString())
+                        span.setAttribute("authorization.method", "refresh token")
+                    }
         } catch (e: TokenException) {
             throw UnauthorizedException(e.message ?: "JWT issue")
         }

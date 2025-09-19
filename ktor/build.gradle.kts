@@ -25,6 +25,10 @@ dependencies {
     api(libs.ktorCallLogging)
 //    api(libs.ktorCors)
     api(libs.ktorJson)
+
+    // Test dependencies
+    testImplementation(libs.kotlinTest)
+    testImplementation(libs.ktorTestHost)
 }
 
 ksp {
