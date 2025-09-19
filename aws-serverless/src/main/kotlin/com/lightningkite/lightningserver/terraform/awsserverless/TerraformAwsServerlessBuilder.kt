@@ -32,32 +32,40 @@ import kotlin.time.Duration.Companion.seconds
 
 public open class TerraformAwsServerlessBuilder<S: ServerBuilder>(
     override val builder: S,
-    override val projectPrefix: String,
-    override val deploymentTag: String,
-    public val storageBucket: String,
-    public val storageBucketPathOverride: String? = null,
-    public val region: Region,
-    public val handlerFullyQualifiedName: String,
-    public val displayName: String,
-    public val debug: Boolean,
-    public val emergencyContact: EmailAddress,
-    public val snapStart: Boolean = true,
-    public val timeout: Duration = 30.seconds,
-    public val memory: DataSize = 1.gibibytes,
-    public val emergencyInvocations: LambdaInvocationAlarmThresholds = LambdaInvocationAlarmThresholds(threshold = 150),
-    public val emergencyCompute: LambdaDurationAlarmThresholds = LambdaDurationAlarmThresholds(threshold = 3.minutes),
-    public val panicInvocations: LambdaInvocationAlarmThresholds = LambdaInvocationAlarmThresholds(threshold = 450),
-    public val panicCompute: LambdaDurationAlarmThresholds = LambdaDurationAlarmThresholds(threshold = 5.minutes),
+    public val config: Config,
 ) : BaseTerraformEmitter<S>(), TerraformEmitterAws {
+    override val deploymentTag: String
+        get() = config.deploymentTag
+    override val projectPrefix: String
+        get() = config.projectPrefix
+
+    public data class Config(
+        val projectPrefix: String,
+        val deploymentTag: String,
+        val storageBucket: String,
+        val storageBucketPathOverride: String? = null,
+        val region: Region,
+        val handlerFullyQualifiedName: String,
+        val displayName: String,
+        val debug: Boolean,
+        val emergencyContact: EmailAddress,
+        val snapStart: Boolean = true,
+        val timeout: Duration = 30.seconds,
+        val memory: DataSize = 1.gibibytes,
+        val emergencyInvocations: LambdaInvocationAlarmThresholds = LambdaInvocationAlarmThresholds(threshold = 150),
+        val emergencyCompute: LambdaDurationAlarmThresholds = LambdaDurationAlarmThresholds(threshold = 3.minutes),
+        val panicInvocations: LambdaInvocationAlarmThresholds = LambdaInvocationAlarmThresholds(threshold = 450),
+        val panicCompute: LambdaDurationAlarmThresholds = LambdaDurationAlarmThresholds(threshold = 5.minutes),
+    )
 
 //    override val additionalSettings: Set<ServerSetting<*, *>> = setOf(awsLambdaRuntimeSettings)
     override val additionalSettings: Set<ServerSetting<*, *>> = setOf()
 
-    override val applicationRegion: String get() = region.id()
+    override val applicationRegion: String get() = config.region.id()
     override val policyStatements: MutableCollection<AwsPolicyStatement> = ArrayList()
     init {
         require(TerraformProviderImport.aws)
-        require(TerraformProvider(TerraformProviderImport.aws, null, buildJsonObject { put("region", region.id()) }))
+        require(TerraformProvider(TerraformProviderImport.aws, null, buildJsonObject { put("region", config.region.id()) }))
         require(TerraformProvider(TerraformProviderImport.mongodbAtlas, null, JsonObject(emptyMap())))
     }
 
@@ -65,7 +73,7 @@ public open class TerraformAwsServerlessBuilder<S: ServerBuilder>(
         val emitter = this@TerraformAwsServerlessBuilder
 
         fulfillSetting(generalSettings.name, buildJsonObject {
-            put("projectName", displayName)
+            put("projectName", config.displayName)
             put(
                 "publicUrl",
                 (emitter as? TerraformEmitterAwsDomain)?.domain?.let { "https://$it" }
@@ -74,8 +82,8 @@ public open class TerraformAwsServerlessBuilder<S: ServerBuilder>(
                 "wsUrl",
                 (emitter as? TerraformEmitterAwsDomain)?.domain?.let { "wss://ws.$it?path=" }
                     ?: $$"${aws_apigatewayv2_stage.ws.invoke_url}")
-            put("debug", debug)
-            put("emergencyContact", emergencyContact.raw)
+            put("debug", config.debug)
+            put("emergencyContact", config.emergencyContact.raw)
         })
 
         val accessLogFormat = Json.encodeToString(terraformJsonObject {
@@ -298,15 +306,15 @@ public open class TerraformAwsServerlessBuilder<S: ServerBuilder>(
             "resource.aws_sns_topic_subscription.emergency_primary" {
                 "topic_arn" - expression("aws_sns_topic.emergency.arn")
                 "protocol" - "email"
-                "endpoint" - emergencyContact.raw
+                "endpoint" - config.emergencyContact.raw
             }
             "resource.aws_cloudwatch_metric_alarm.emergency_invocations" {
                 "alarm_name" - "${namePrefix}_emergency_invocations"
                 "comparison_operator" - "GreaterThanOrEqualToThreshold"
-                "evaluation_periods" - emergencyInvocations.evaluationPeriods
-                "datapoints_to_alarm" - emergencyInvocations.dataPointsToAlarm
-                "period" - emergencyInvocations.period.inWholeSeconds
-                "threshold" - emergencyInvocations.threshold
+                "evaluation_periods" - config.emergencyInvocations.evaluationPeriods
+                "datapoints_to_alarm" - config.emergencyInvocations.dataPointsToAlarm
+                "period" - config.emergencyInvocations.period.inWholeSeconds
+                "threshold" - config.emergencyInvocations.threshold
                 "metric_name" - "Invocations"
                 "namespace" - "AWS/Lambda"
                 "statistic" - "Sum"
@@ -320,11 +328,11 @@ public open class TerraformAwsServerlessBuilder<S: ServerBuilder>(
             "resource.aws_cloudwatch_metric_alarm.emergency_compute" {
                 "alarm_name" - "${namePrefix}_emergency_compute"
                 "comparison_operator" - "GreaterThanOrEqualToThreshold"
-                "evaluation_periods" - emergencyCompute.evaluationPeriods
-                "datapoints_to_alarm" - emergencyCompute.dataPointsToAlarm
-                "period" - emergencyCompute.period.inWholeSeconds
-                "statistic" - emergencyCompute.statistic.name
-                "threshold" - emergencyCompute.threshold.inWholeMilliseconds
+                "evaluation_periods" - config.emergencyCompute.evaluationPeriods
+                "datapoints_to_alarm" - config.emergencyCompute.dataPointsToAlarm
+                "period" - config.emergencyCompute.period.inWholeSeconds
+                "statistic" - config.emergencyCompute.statistic.name
+                "threshold" - config.emergencyCompute.threshold.inWholeMilliseconds
                 "metric_name" - "Duration"
                 "namespace" - "AWS/Lambda"
                 "alarm_description" - ""
@@ -337,10 +345,10 @@ public open class TerraformAwsServerlessBuilder<S: ServerBuilder>(
             "resource.aws_cloudwatch_metric_alarm.panic_invocations" {
                 "alarm_name" - "${namePrefix}_panic_invocations"
                 "comparison_operator" - "GreaterThanOrEqualToThreshold"
-                "evaluation_periods" - panicInvocations.evaluationPeriods
-                "datapoints_to_alarm" - panicInvocations.dataPointsToAlarm
-                "period" - panicInvocations.period.inWholeSeconds
-                "threshold" - panicInvocations.threshold
+                "evaluation_periods" - config.panicInvocations.evaluationPeriods
+                "datapoints_to_alarm" - config.panicInvocations.dataPointsToAlarm
+                "period" - config.panicInvocations.period.inWholeSeconds
+                "threshold" - config.panicInvocations.threshold
                 "metric_name" - "Invocations"
                 "namespace" - "AWS/Lambda"
                 "statistic" - "Sum"
@@ -354,11 +362,11 @@ public open class TerraformAwsServerlessBuilder<S: ServerBuilder>(
             "resource.aws_cloudwatch_metric_alarm.panic_compute" {
                 "alarm_name" - "${namePrefix}_panic_compute"
                 "comparison_operator" - "GreaterThanOrEqualToThreshold"
-                "evaluation_periods" - panicCompute.evaluationPeriods
-                "datapoints_to_alarm" - panicCompute.dataPointsToAlarm
-                "period" - panicCompute.period.inWholeSeconds
-                "statistic" - panicCompute.statistic.name
-                "threshold" - panicCompute.threshold.inWholeMilliseconds
+                "evaluation_periods" - config.panicCompute.evaluationPeriods
+                "datapoints_to_alarm" - config.panicCompute.dataPointsToAlarm
+                "period" - config.panicCompute.period.inWholeSeconds
+                "statistic" - config.panicCompute.statistic.name
+                "threshold" - config.panicCompute.threshold.inWholeMilliseconds
                 "metric_name" - "Duration"
                 "namespace" - "AWS/Lambda"
                 "alarm_description" - ""
@@ -497,15 +505,15 @@ public open class TerraformAwsServerlessBuilder<S: ServerBuilder>(
             }
             "resource.aws_lambda_function.main" {
                 "function_name" - "${emitter.projectPrefix}-main"
-                "publish" - snapStart
+                "publish" - config.snapStart
                 "s3_bucket" - expression("aws_s3_bucket.lambda_bucket.id")
                 "s3_key" - expression("aws_s3_object.app_storage.key")
 
                 "runtime" - "java17"
-                "handler" - handlerFullyQualifiedName
+                "handler" - config.handlerFullyQualifiedName
 
-                "memory_size" - memory.inWholeMebibytes
-                "timeout" - timeout.inWholeSeconds
+                "memory_size" - config.memory.inWholeMebibytes
+                "timeout" - config.timeout.inWholeSeconds
 
                 "source_code_hash" - expression("data.archive_file.lambda.output_base64sha256")
 
@@ -527,7 +535,7 @@ public open class TerraformAwsServerlessBuilder<S: ServerBuilder>(
                 "name" - "prod"
                 "description" - "The current production version of the lambda."
                 "function_name" - expression("aws_lambda_function.main.arn")
-                "function_version" - (if (snapStart) expression("aws_lambda_function.main.version") else "\$LATEST")
+                "function_version" - (if (config.snapStart) expression("aws_lambda_function.main.version") else "\$LATEST")
             }
             "resource.aws_cloudwatch_log_group.main" {
                 "name" - "${emitter.projectPrefix}-main-log"
@@ -634,8 +642,8 @@ public open class TerraformAwsServerlessBuilder<S: ServerBuilder>(
                 }
                 "required_version" - "~> 1.0"
                 "backend.s3" {
-                    "bucket" - storageBucket
-                    "key" - storageBucketPathOverride ?: projectPrefix
+                    "bucket" - config.storageBucket
+                    "key" - config.storageBucketPathOverride ?: projectPrefix
                     "region" - applicationRegion
                 }
             }

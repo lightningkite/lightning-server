@@ -35,9 +35,10 @@ import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.sessions.token.TokenException
 import com.lightningkite.lightningserver.sessions.token.TokenFormat
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
+import com.lightningkite.lightningserver.typed.explicitApiHttpHandler
 import com.lightningkite.lightningserver.typed.ModelInfo
 import com.lightningkite.lightningserver.typed.auth
-import com.lightningkite.lightningserver.typed.modelInfo
+import com.lightningkite.lightningserver.typed.explicitModelInfo
 import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
@@ -85,7 +86,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     private val spath = Session.path(principal.subjectSerializer, principal.idSerializer)
 
     public val sessionInfo: ModelInfo<SUBJECT, Session<SUBJECT, ID>, Uuid> =
-        database.modelInfo(
+        database.explicitModelInfo(
             auth = principal.auth(scopes = setOf(Scopes.sessions)),
             serializer = Session.serializer(principal.subjectSerializer, principal.idSerializer),
             idSerializer = Uuid.serializer(),
@@ -183,6 +184,15 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     )
 
     context(server: ServerRuntime)
+    private suspend fun terminateSessionById(id: Uuid, requireOwnershipOf: ID?) {
+        if (requireOwnershipOf != null) {
+            val owner = sessionInfo.table().get(id)?.subjectId ?: throw ForbiddenException()
+            if (owner != requireOwnershipOf) throw ForbiddenException()
+        }
+        sessionInfo.table().updateOneById(id, modification(spath) { it.terminated assign now() })
+    }
+
+    context(server: ServerRuntime)
     private suspend fun RefreshToken.session(request: Request<*>?): Session<SUBJECT, ID>? {
         if (!valid) {
             if (generalSettings().debug) println("Auth failed because !valid")
@@ -202,11 +212,11 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         }
         if ((session.expires ?: Instant.DISTANT_FUTURE) < now()) {
             if (generalSettings().debug) println("Auth failed because (session.expires ?: Instant.DISTANT_FUTURE) < now()")
-            throw UnauthorizedException("Session has expired.")
+            throw UnauthorizedException("Session has expired (hard).")
         }
         if ((session.stale ?: Instant.DISTANT_FUTURE) < now()) {
             if (generalSettings().debug) println("Auth failed because (session.stale ?: Instant.DISTANT_FUTURE) < now()")
-            throw UnauthorizedException("Session has expired.")
+            throw UnauthorizedException("Session has expired (stale).")
         }
         if (session.terminated != null) {
             if (generalSettings().debug) println("Auth failed because session.terminated != null")
@@ -237,7 +247,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         )
 
     public val createSubSession: ApiHttpHandler<PathSpec0, SUBJECT, SubSessionRequest, String> =
-        path.path("sub-session").post bind ApiHttpHandler(
+        path.path("sub-session").post bind explicitApiHttpHandler(
             auth = sessionInfo.auth.subscope(ModelInfo.Scopes.create),
             inputType = SubSessionRequest.serializer(),
             outputType = String.serializer(),
@@ -263,7 +273,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         )
 
     public val self: ApiHttpHandler<PathSpec0, SUBJECT, Unit, SUBJECT> =
-        path.path("self").get bind ApiHttpHandler(
+        path.path("self").get bind explicitApiHttpHandler(
             summary = "Get Self",
             auth = principal.auth(scopes = setOf(Scopes.self)),
             inputType = Unit.serializer(),
@@ -272,35 +282,26 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         )
 
     public val sessionTerminate: ApiHttpHandler<PathSpec0, SUBJECT, Unit, Unit> =
-        path.path("terminate").post bind ApiHttpHandler(
+        path.path("terminate").post bind explicitApiHttpHandler(
             summary = "Terminate Current Session",
             auth = principal.auth(scopes = setOf(Scopes.terminate)),
             inputType = Unit.serializer(),
             outputType = Unit.serializer(),
             errorCases = listOf(),
             implementation = { _ ->
-                sessionInfo.table().updateOneById(
-                    Uuid.parse(auth.sessionId!!),
-                    modification(spath) {
-                        it.terminated assign now()
-                    }
-                )
+                terminateSessionById(Uuid.parse(auth.sessionId!!), null)
             }
         )
 
     public val otherSessionTerminate: ApiHttpHandler<PathSpec1<Uuid>, SUBJECT, Unit, Unit> =
-        path.arg<Uuid>("sessionId").path("terminate").post bind ApiHttpHandler(
+        path.arg<Uuid>("sessionId").path("terminate").post bind explicitApiHttpHandler(
             auth = principal.auth(scopes = setOf(Scopes.terminate)),
             inputType = Unit.serializer(),
             outputType = Unit.serializer(),
             summary = "Terminate Session",
             errorCases = listOf(),
             implementation = { _ ->
-                if (sessionInfo.table().get(first)?.subjectId != auth.id) throw ForbiddenException()
-                sessionInfo.table().updateOneById(
-                    first,
-                    modification(spath) { it.terminated assign now() }
-                )
+                terminateSessionById(first, auth.id)
             }
         )
 

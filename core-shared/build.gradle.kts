@@ -57,7 +57,7 @@ kotlin {
         }
         val commonTest by getting {
             dependencies {
-                implementation(kotlin("test"))
+                implementation(libs.kotlinTest)
             }
             kotlin {
                 srcDir(file("build/generated/ksp/common/commonTest/kotlin"))

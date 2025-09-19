@@ -6,7 +6,6 @@ import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.RequiredScope
 import com.lightningkite.lightningserver.auth.auth
 import com.lightningkite.lightningserver.auth.fetch
-import com.lightningkite.lightningserver.auth.get
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
@@ -25,10 +24,12 @@ import com.lightningkite.lightningserver.sessions.proofs.Proof
 import com.lightningkite.lightningserver.sessions.proofs.ProofOption
 import com.lightningkite.lightningserver.sessions.proofs.extensions.verify
 import com.lightningkite.lightningserver.sessions.proofs.proofMethods
+import com.lightningkite.lightningserver.sessions.proofs.ProofMethod
 import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.sessions.token.TokenFormat
 import com.lightningkite.lightningserver.toException
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
+import com.lightningkite.lightningserver.typed.explicitApiHttpHandler
 import com.lightningkite.lightningserver.typed.ModelRestEndpoints
 import com.lightningkite.lightningserver.typed.auth
 import com.lightningkite.lightningserver.typed.invoke
@@ -58,6 +59,12 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     context(server: ServerRuntime)
     public abstract suspend fun requiredProofStrengthFor(subject: SUBJECT): Int
+
+    private fun maxStrengthPossible(methods: Collection<ProofMethod>): Int =
+        methods
+            .groupBy { it.info.property ?: it.info.via }
+            .values
+            .sumOf { group -> group.maxOf { it.info.strength } }
 
     private val errorNoSingleUser = LSError(
         404,
@@ -115,7 +122,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     }
 
     public val authRequirements: ApiHttpHandler<PathSpec0, SUBJECT, Unit, AuthRequirements> =
-        path.path("auth-requirements").get bind ApiHttpHandler(
+        path.path("auth-requirements").get bind explicitApiHttpHandler(
             auth = principal.auth(scopes = setOf(RequiredScope("auth:requirements"))),
             inputType = Unit.serializer(),
             outputType = AuthRequirements.serializer(),
@@ -127,12 +134,9 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
                 val methods = serverRuntime.proofMethods.filter { it.established(principal, subject) }
 
-                val maxStrengthPossible = methods
-                    .groupBy { it.info.property ?: it.info.via }
-                    .values
-                    .sumOf { proofs -> proofs.maxOf { it.info.strength } }
+                val maxPossible = maxStrengthPossible(methods)
 
-                val requiredStrength = min(requiredProofStrengthFor(subject), maxStrengthPossible)
+                val requiredStrength = min(requiredProofStrengthFor(subject), maxPossible)
 
                 AuthRequirements(
                     methods.map { method ->
@@ -147,7 +151,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         )
     
     public val login: ApiHttpHandler<PathSpec0, HasId<AnyId>?, List<Proof>, IdAndAuthMethods<ID>> =
-        path.path("login").post bind ApiHttpHandler(
+        path.path("login").post bind explicitApiHttpHandler(
             auth = noAuth,
             inputType = ListSerializer(Proof.serializer()),
             outputType = IdAndAuthMethods.serializer(principal.idSerializer),
@@ -161,7 +165,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         )
 
     public val login2: ApiHttpHandler<PathSpec0, HasId<AnyId>?, LogInRequest, IdAndAuthMethods<ID>> =
-        path.path("login2").post bind ApiHttpHandler(
+        path.path("login2").post bind explicitApiHttpHandler(
             auth = noAuth,
             inputType = LogInRequest.serializer(),
             outputType = IdAndAuthMethods.serializer(principal.idSerializer),
@@ -182,7 +186,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         )
 
     public val proofsCheck: ApiHttpHandler<PathSpec0, HasId<AnyId>?, List<Proof>, ProofsCheckResult<ID>> =
-        path.path("proofs-check").post bind ApiHttpHandler(
+        path.path("proofs-check").post bind explicitApiHttpHandler(
             auth = noAuth,
             inputType = ListSerializer(Proof.serializer()),
             outputType = ProofsCheckResult.serializer(principal.idSerializer),
@@ -232,12 +236,9 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                     .values
                     .sumOf { proofs -> proofs.maxOf { it.strength } }
 
-                val maxStrengthPossible = methods.values
-                    .groupBy { it.info.property ?: it.info.via }
-                    .values
-                    .sumOf { proofs -> proofs.maxOf { it.info.strength } }
+                val maxPossible = maxStrengthPossible(methods.values)
 
-                val requiredStrength = min(requiredProofStrengthFor(subject), maxStrengthPossible)
+                val requiredStrength = min(requiredProofStrengthFor(subject), maxPossible)
 
                 ProofsCheckResult(
                     readyToLogIn = strength >= requiredStrength,

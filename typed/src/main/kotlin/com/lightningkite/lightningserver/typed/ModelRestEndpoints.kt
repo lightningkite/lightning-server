@@ -42,7 +42,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
     private val bulkPath = path.path("bulk")
 
     public val permissions: ApiHttpHandler<PathSpec0, USER, Unit, ModelPermissions<T>> =
-        path.path("_permissions_").get bind ApiHttpHandler(
+        path.path("_permissions_").get bind explicitApiHttpHandler(
             summary = "Permissions",
             description = "Returns the user's permissions for this collection.",
             inputType = Unit.serializer(),
@@ -57,7 +57,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
 
     public val list: ApiHttpHandler<PathSpec0, USER, Query<T>, List<T>> =
-        path.get bind ApiHttpHandler(
+        path.get bind explicitApiHttpHandler(
             summary = "List",
             description = "Gets a list of ${info.tableName}s.",
             inputType = Query.serializer(info.serializer),
@@ -74,7 +74,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
 
     public val query: ApiHttpHandler<PathSpec0, USER, Query<T>, List<T>> =
-        path.path("query").post bind ApiHttpHandler(
+        path.path("query").post bind explicitApiHttpHandler(
             summary = "Query",
             description = "Gets a list of ${info.tableName}s that match the given query.",
             inputType = Query.serializer(info.serializer),
@@ -91,7 +91,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
 
     public val queryPartial: ApiHttpHandler<PathSpec0, USER, QueryPartial<T>, List<Partial<T>>> =
-        path.path("query-partial").post bind ApiHttpHandler(
+        path.path("query-partial").post bind explicitApiHttpHandler(
             summary = "QueryPartial",
             description = "Gets parts of ${info.tableName}s that match the given query.",
             inputType = QueryPartial.serializer(info.serializer),
@@ -108,7 +108,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
 
     public val detail: ApiHttpHandler<PathSpec1<ID>, USER, Unit, T> =
-        detailPath.get bind ApiHttpHandler(
+        detailPath.get bind explicitApiHttpHandler(
             summary = "Detail",
             description = "Gets the ${info.tableName} for the provided id.",
             inputType = Unit.serializer(),
@@ -130,7 +130,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
 
     public val insertBulk: ApiHttpHandler<PathSpec0, USER, List<T>, List<T>> =
-        bulkPath.post bind ApiHttpHandler(
+        bulkPath.post bind explicitApiHttpHandler(
             summary = "Insert Bulk",
             description = "Creates multiple ${info.tableName}s at the same time.",
             inputType = ListSerializer(info.serializer),
@@ -153,7 +153,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
 
     public val insert: ApiHttpHandler<PathSpec0, USER, T, T> =
-        path.post bind ApiHttpHandler(
+        path.post bind explicitApiHttpHandler(
             summary = "Insert",
             description = "Creates a new ${info.tableName}",
             inputType = info.serializer,
@@ -177,7 +177,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
 
     public val upsert: ApiHttpHandler<PathSpec1<ID>, USER, T, T> =
-        detailPath.post bind ApiHttpHandler(
+        detailPath.post bind explicitApiHttpHandler(
             summary = "Upsert",
             description = "Creates or updates a ${info.tableName}",
             inputType = info.serializer,
@@ -203,7 +203,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
 
     public val bulkReplace: ApiHttpHandler<PathSpec0, USER, List<T>, List<T>> =
-        bulkPath.put bind ApiHttpHandler(
+        bulkPath.put bind explicitApiHttpHandler(
             summary = "Bulk Replace",
             description = "Modifies many ${info.tableName}s at the same time by ID.",
             inputType = ListSerializer(info.serializer),
@@ -227,7 +227,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
 
     public val replace: ApiHttpHandler<PathSpec1<ID>, USER, T, T> =
-        detailPath.put bind ApiHttpHandler(
+        detailPath.put bind explicitApiHttpHandler(
             summary = "Replace",
             description = "Replaces a single ${info.tableName} by ID.",
             inputType = info.serializer,
@@ -253,7 +253,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
 
     public val bulkModify: ApiHttpHandler<PathSpec0, USER, MassModification<T>, Int> =
-        bulkPath.patch bind ApiHttpHandler(
+        bulkPath.patch bind explicitApiHttpHandler(
             summary = "Bulk Modify",
             description = "Modifies many ${info.tableName}s at the same time. Returns the number of changed items.",
             inputType = MassModification.serializer(info.serializer),
@@ -277,7 +277,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
 
     public val modifyWithDiff: ApiHttpHandler<PathSpec1<ID>, USER, Modification<T>, EntryChange<T>> =
-        detailPath.path("delta").patch bind ApiHttpHandler(
+        detailPath.path("delta").patch bind explicitApiHttpHandler(
             summary = "Modify with Diff",
             description = "Modifies a ${info.tableName} by ID, returning both the previous value and new value.",
             inputType = Modification.serializer(info.serializer),
@@ -309,7 +309,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
 
     public val modify: ApiHttpHandler<PathSpec1<ID>, USER, Modification<T>, T> =
-        detailPath.patch bind ApiHttpHandler(
+        detailPath.patch bind explicitApiHttpHandler(
             summary = "Modify",
             description = "Modifies a ${info.tableName} by ID, returning the new value.",
             inputType = Modification.serializer(info.serializer),
@@ -342,7 +342,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
 
     public val modifySimple: ApiHttpHandler<PathSpec1<ID>, USER, Partial<T>, T> =
-        detailPath.path("simplified").patch bind ApiHttpHandler(
+        detailPath.path("simplified").patch bind explicitApiHttpHandler(
             summary = "Simplified Modify",
             description = "Modifies a ${info.tableName} by ID, returning the new value.",
             inputType = PartialSerializer(info.serializer),
@@ -375,7 +375,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
 
     public val bulkDelete: ApiHttpHandler<PathSpec0, USER, Condition<T>, Int> =
-        path.path("bulk-delete").post bind ApiHttpHandler(
+        path.path("bulk-delete").post bind explicitApiHttpHandler(
             summary = "Bulk Delete",
             description = "Deletes all matching ${info.tableName}s, returning the number of deleted items.",
             inputType = Condition.serializer(info.serializer),
@@ -390,7 +390,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
 
     public val deleteItem: ApiHttpHandler<PathSpec1<ID>, USER, Unit, Unit> =
-        detailPath.delete bind ApiHttpHandler(
+        detailPath.delete bind explicitApiHttpHandler(
             summary = "Delete",
             description = "Deletes a ${info.tableName} by id.",
             inputType = Unit.serializer(),
@@ -414,7 +414,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         )
 
     public val count: ApiHttpHandler<PathSpec0, USER, Condition<T>, Int> =
-        path.path("count").post bind ApiHttpHandler(
+        path.path("count").post bind explicitApiHttpHandler(
             summary = "Count",
             description = "Gets the total number of ${info.tableName}s matching the given condition.",
             inputType = Condition.serializer(info.serializer),
@@ -429,7 +429,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
 
     public val groupCount: ApiHttpHandler<PathSpec0, USER, GroupCountQuery<T>, Map<String, Int>> =
-        path.path("group-count").post bind ApiHttpHandler(
+        path.path("group-count").post bind explicitApiHttpHandler(
             summary = "Group Count",
             description = "Gets the total number of ${info.tableName}s matching the given condition divided by group.",
             inputType = GroupCountQuery.serializer(info.serializer),
@@ -447,7 +447,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
 
     public val aggregate: ApiHttpHandler<PathSpec0, USER, AggregateQuery<T>, Double?> =
-        path.path("aggregate").post bind ApiHttpHandler(
+        path.path("aggregate").post bind explicitApiHttpHandler(
             summary = "Aggregate",
             description = "Aggregates a property of ${info.tableName}s matching the given condition.",
             inputType = AggregateQuery.serializer(info.serializer),
@@ -468,7 +468,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
 
     public val groupAggregate: ApiHttpHandler<PathSpec0, USER, GroupAggregateQuery<T>, Map<String, Double?>> =
-        path.path("group-aggregate").post bind ApiHttpHandler(
+        path.path("group-aggregate").post bind explicitApiHttpHandler(
             summary = "Group Aggregate",
             description = "Aggregates a property of ${info.tableName}s matching the given condition divided by group.",
             inputType = GroupAggregateQuery.serializer(info.serializer),
@@ -491,7 +491,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
 
     public val groupCount2: ApiHttpHandler<PathSpec0, USER, GroupCountQuery<T>, Map<String, Int>> =
-        path.path("group-count-2").post bind ApiHttpHandler(
+        path.path("group-count-2").post bind explicitApiHttpHandler(
             summary = "Group Count 2",
             description = "Gets the total number of ${info.tableName}s matching the given condition divided by group.",
             inputType = GroupCountQuery.serializer(info.serializer),
@@ -511,7 +511,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
 
 
     public val groupAggregate2: ApiHttpHandler<PathSpec0, USER, GroupAggregateQuery<T>, Map<String, Double?>> =
-        path.path("group-aggregate-2").post bind ApiHttpHandler(
+        path.path("group-aggregate-2").post bind explicitApiHttpHandler(
             summary = "Group Aggregate 2",
             description = "Aggregates a property of ${info.tableName}s matching the given condition divided by group.",
             inputType = GroupAggregateQuery.serializer(info.serializer),

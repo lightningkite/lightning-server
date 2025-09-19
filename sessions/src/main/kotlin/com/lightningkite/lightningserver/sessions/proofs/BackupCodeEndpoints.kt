@@ -20,6 +20,7 @@ import com.lightningkite.lightningserver.auth.idString
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
+import com.lightningkite.lightningserver.typed.explicitApiHttpHandler
 import com.lightningkite.lightningserver.typed.ModelInfo
 import com.lightningkite.lightningserver.typed.auth
 import com.lightningkite.lightningserver.typed.modelInfo
@@ -82,7 +83,7 @@ public class BackupCodeEndpoints(
         )
 
     public val resetCodes: ApiHttpHandler<PathSpec0, HasId<AnyId>, Unit, List<String>> =
-        path.path("reset-codes").post bind ApiHttpHandler(
+        path.path("reset-codes").post bind explicitApiHttpHandler(
             summary = "Reset Codes",
             inputType = Unit.serializer(),
             outputType = ListSerializer(String.serializer()),
@@ -119,7 +120,7 @@ public class BackupCodeEndpoints(
         )
 
     public val clearCodes: ApiHttpHandler<PathSpec0, HasId<AnyId>, Unit, Unit> =
-        path.path("clear-codes").post bind ApiHttpHandler(
+        path.path("clear-codes").post bind explicitApiHttpHandler(
             summary = "Clear Codes",
             inputType = Unit.serializer(),
             outputType = Unit.serializer(),
@@ -138,7 +139,7 @@ public class BackupCodeEndpoints(
         )
 
     public val established: ApiHttpHandler<PathSpec0, HasId<AnyId>, Unit, Boolean> =
-        path.path("established").get bind ApiHttpHandler(
+        path.path("established").get bind explicitApiHttpHandler(
             summary = "Established",
             inputType = Unit.serializer(),
             outputType = Boolean.serializer(),

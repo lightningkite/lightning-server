@@ -34,8 +34,9 @@ public data class RawHttpEndpoint<out PATH: PathSpec>(val pathSegments: PathSegm
         this.matchIfPresent = match
     }
 
-    override fun equals(other: Any?): Boolean = other is RawHttpEndpoint<*> && other.pathSegments == pathSegments
-    override fun hashCode(): Int = pathSegments.hashCode() + 1
+    override fun equals(other: Any?): Boolean =
+        other is RawHttpEndpoint<*> && other.pathSegments == pathSegments && other.method == method
+    override fun hashCode(): Int = 31 * pathSegments.hashCode() + method.hashCode()
     override fun toString(): String = "$method /$pathSegments"
 }
 

@@ -6,38 +6,25 @@ import com.lightningkite.lightningserver.RouteNotFoundException
 import com.lightningkite.lightningserver.definition.ScheduledTask
 import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.definition.Task
-import com.lightningkite.lightningserver.http.HttpHandler
-import com.lightningkite.lightningserver.http.HttpHeader
-import com.lightningkite.lightningserver.http.HttpHeaders
-import com.lightningkite.lightningserver.http.HttpRequest
-import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.HttpStatus
-import com.lightningkite.lightningserver.http.PathSegments
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathMoved
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.telemetry.use
-import com.lightningkite.lightningserver.websockets.WebSocketClose
-import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
-import com.lightningkite.lightningserver.websockets.WebSocketConnection
-import com.lightningkite.lightningserver.websockets.WebSocketFrame
-import com.lightningkite.lightningserver.websockets.WebSocketHandler
-import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
+import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.Data
 import com.lightningkite.services.otel.get
-import io.github.oshai.kotlinlogging.KotlinLogging
 import io.opentelemetry.api.trace.Span
-import kotlinx.io.asInputStream
 import kotlinx.io.asOutputStream
 import kotlinx.io.asSink
 import kotlinx.io.buffered
-import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 
 public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpResponse {
     return try {
         server.compiledHttpInterceptors.handle(request) { req ->
+            this.logger.info { "${request.path} accessed by ${request.sourceIp}" }
             var result = try {
                 @Suppress("UNCHECKED_CAST")
                 (req.path.match.value as HttpHandler<PathSpec>).handleWithMetrics(req as HttpRequest<PathSpec>)
@@ -57,7 +44,7 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
                     }
 
                     else -> {
-                        KotlinLogging.logger("com.lightningkite.lightningserver").debug {
+                        this.logger.debug {
                             "Not found: ${req.path.pathSegments.segments.map { "'$it'" }}, looking for slashes"
                         }
                         if (request.path.pathSegments.isNotEmpty()) {
@@ -85,19 +72,25 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
                 if (result.headers[HttpHeader.ContentRange] != null) return@run
 
                 // Accept-Encoding negotiation (gzip only for now)
-                val accepts = request.headers.getMany(HttpHeader.AcceptEncoding).map { it.root.lowercase().substringBefore(';').trim() }
+                val accepts = request.headers.getMany(HttpHeader.AcceptEncoding)
+                    .map { it.root.lowercase().substringBefore(';').trim() }
                 if (!accepts.contains("gzip")) return@run
 
                 // Content-Type denylist (skip already-compressed types)
                 val contentTypeRoot = result.headers[HttpHeader.ContentType]?.root?.let {
-                    try { MediaType(it) } catch(e: Exception) { null }
+                    try {
+                        MediaType(it)
+                    } catch (e: Exception) {
+                        null
+                    }
                 }
-                when(contentTypeRoot?.type) {
+                when (contentTypeRoot?.type) {
                     "image", "audio", "video" -> return@run
-                    "application" -> when(contentTypeRoot.subtype) {
+                    "application" -> when (contentTypeRoot.subtype) {
                         "zip", "gzip", "x-gzip", "x-7z-compressed", "x-bzip2", "x-tar", "pdf" -> return@run
                     }
-                    "font" -> when(contentTypeRoot.subtype) {
+
+                    "font" -> when (contentTypeRoot.subtype) {
                         "woff", "woff2" -> return@run
                     }
                 }
@@ -122,6 +115,7 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
                         }
                         result = result.copy(headers = newHeaders, body = newBody)
                     }
+
                     else -> {
                         val original = data.bytes()
                         if (original.size < minSizeForCompression) return@run
@@ -132,13 +126,15 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
                             if (gz.size < original.size) gz else null
                         } else null
 
-                        val finalBytes = compressed ?: if (original.size > tryCompressAndFallbackMax) original.gzip() else null
+                        val finalBytes =
+                            compressed ?: if (original.size > tryCompressAndFallbackMax) original.gzip() else null
                         if (finalBytes != null) {
                             val newHeaders = result.headers.copy {
                                 set(HttpHeader.ContentEncoding, "gzip")
                                 set(HttpHeader.Vary, HttpHeader.AcceptEncoding)
                             }
-                            result = result.copy(headers = newHeaders, body = bodyHolder.copy(data = Data.Bytes(finalBytes)))
+                            result =
+                                result.copy(headers = newHeaders, body = bodyHolder.copy(data = Data.Bytes(finalBytes)))
                         }
                     }
                 }
@@ -147,8 +143,7 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
         }
     } catch (e: Exception) {
         try {
-            KotlinLogging.logger("com.lightningkite.lightningserver")
-                .error(e) { "Exception in HTTP" }
+            this.logger.error(e) { "Exception in HTTP" }
             instrument("exceptionHandler") {
                 server.exceptionHandler.handle(
                     request,
@@ -218,14 +213,18 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
             span?.setAttribute("ws.event", "messageFromClient")
             span?.setAttribute("ws.route", location.toString())
             span?.setAttribute("net.peer.ip", request.sourceIp)
-            span?.setAttribute("ws.frame.type", when(frame){
-                is WebSocketFrame.Text -> "text"
-                is WebSocketFrame.Binary -> "binary"
-            })
-            span?.setAttribute("ws.frame.size", when(frame){
-                is WebSocketFrame.Text -> frame.content.length.toLong()
-                is WebSocketFrame.Binary -> frame.content.size.toLong()
-            })
+            span?.setAttribute(
+                "ws.frame.type", when (frame) {
+                    is WebSocketFrame.Text -> "text"
+                    is WebSocketFrame.Binary -> "binary"
+                }
+            )
+            span?.setAttribute(
+                "ws.frame.size", when (frame) {
+                    is WebSocketFrame.Text -> frame.content.length.toLong()
+                    is WebSocketFrame.Binary -> frame.content.size.toLong()
+                }
+            )
             messageFromClient(frame)
         }
     }

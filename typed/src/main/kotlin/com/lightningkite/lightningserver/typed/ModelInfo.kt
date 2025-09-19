@@ -7,14 +7,10 @@ import com.lightningkite.lightningserver.auth.subscope
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.CollectionChanges
-import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.Database
-import com.lightningkite.services.database.EntryChange
 import com.lightningkite.services.database.Table
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.ModelPermissions
-import com.lightningkite.services.database.Modification
-import com.lightningkite.services.database.SortPart
 import com.lightningkite.services.database.default
 import com.lightningkite.services.database.serializerOrContextual
 import com.lightningkite.services.database.withPermissions
@@ -92,7 +88,7 @@ public inline fun <reified USER : HasId<*>?, reified T : HasId<ID>, reified ID :
 }
 
 
-public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> Runtime<Database>.modelInfo(
+public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> Runtime<Database>.explicitModelInfo(
     auth: AuthRequirement<USER>,
     serializer: KSerializer<T>,
     idSerializer: KSerializer<ID>,
@@ -111,7 +107,7 @@ public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> Runtime<Databa
     override val auth: AuthRequirement<USER> = subscope?.let { auth.subscope(it) } ?: auth
 
     context(server: ServerRuntime)
-    override fun baseTable(): Table<T> = this@modelInfo().table(serializer, tableName)
+    override fun baseTable(): Table<T> = this@explicitModelInfo().table(serializer, tableName)
 
     override val tableName: String
         get() = tableName

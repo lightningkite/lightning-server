@@ -16,13 +16,13 @@ import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec1
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
+import com.lightningkite.lightningserver.typed.explicitApiHttpHandler
 import com.lightningkite.lightningserver.typed.ModelRestEndpoints
 import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebsocket.Companion.plus
 import com.lightningkite.lightningserver.typed.ModelRestUpdatesWebsocket
 import com.lightningkite.lightningserver.typed.modelInfo
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.withSdkInfo
-import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.ModelPermissions
@@ -30,7 +30,6 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.Uuid
 
 @Serializable
@@ -54,7 +53,7 @@ object Server : ServerBuilder() {
 
     val database = setting("database", Database.Settings())
 
-    val root = path.get bind ApiHttpHandler(
+    val root = path.get bind explicitApiHttpHandler(
         summary = "Index",
         auth = noAuth,
         inputType = Unit.serializer(),
@@ -62,7 +61,7 @@ object Server : ServerBuilder() {
         implementation = { _: Unit -> 0 }
     )
 
-    val action = path.post bind ApiHttpHandler(
+    val action = path.post bind explicitApiHttpHandler(
         functionName = "Improper SDK Function Name",
         summary = "Action",
         description = "Does something really really cool...",
@@ -91,7 +90,7 @@ data class TestInput(
     val name: String
 )
 
-private val testEndpoint = ApiHttpHandler<PathSpec1<String>, HasId<AnyId>?, TestInput, String>(
+private val testEndpoint = explicitApiHttpHandler<PathSpec1<String>, HasId<AnyId>?, TestInput, String>(
     summary = "Test Endpoint",
     functionName = "testSdkEndpoint",
     description = "This is a test endpoint for the sdk",

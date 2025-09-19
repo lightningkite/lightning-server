@@ -128,7 +128,7 @@ public class PasswordProofEndpoints(
     }
 
     public val establish: ApiHttpHandler<PathSpec0, HasId<AnyId>, EstablishPassword, Unit> =
-        path.path("establish").post bind ApiHttpHandler(
+        path.path("establish").post bind explicitApiHttpHandler(
             summary = "Establish Password",
             inputType = EstablishPassword.serializer(),
             outputType = Unit.serializer(),

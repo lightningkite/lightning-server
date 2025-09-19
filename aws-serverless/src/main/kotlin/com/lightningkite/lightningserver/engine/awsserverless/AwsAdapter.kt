@@ -171,7 +171,7 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
     override fun beforeCheckpoint(context: org.crac.Context<out Resource>?) {
         logger.info { "beforeCheckpoint() - Preparing DynamoDB..." }
         runBlocking {
-            ws.webSocketDynamo.ready.await()
+            ws.webSocketDynamo.ensureTables()
         }
         logger.info { "beforeCheckpoint() - Preparing all connections..." }
         runBlocking {

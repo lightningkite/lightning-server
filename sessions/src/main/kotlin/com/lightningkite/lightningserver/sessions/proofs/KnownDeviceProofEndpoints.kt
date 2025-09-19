@@ -119,7 +119,7 @@ public class KnownDeviceProofEndpoints(
     }
 
     public val options: ApiHttpHandler<PathSpec0, HasId<AnyId>?, Unit, KnownDeviceOptions> =
-        path.path("options").get bind ApiHttpHandler(
+        path.path("options").get bind explicitApiHttpHandler(
             summary = "Known Device Options",
             inputType = Unit.serializer(),
             outputType = KnownDeviceOptions.serializer(),
@@ -183,7 +183,7 @@ public class KnownDeviceProofEndpoints(
         )
 
     public val establish: ApiHttpHandler<PathSpec0, HasId<AnyId>, Unit, String> =
-        path.path("establish").post bind ApiHttpHandler(
+        path.path("establish").post bind explicitApiHttpHandler(
             summary = "Establish Known Device",
             inputType = Unit.serializer(),
             outputType = String.serializer(),
@@ -205,7 +205,7 @@ public class KnownDeviceProofEndpoints(
         )
 
     public val establish2: ApiHttpHandler<PathSpec0, HasId<AnyId>, Unit, KnownDeviceSecretAndExpiration> =
-        path.path("establish2").post bind ApiHttpHandler(
+        path.path("establish2").post bind explicitApiHttpHandler(
             summary = "Establish Known Device V2",
             inputType = Unit.serializer(),
             outputType = KnownDeviceSecretAndExpiration.serializer(),

@@ -8,7 +8,7 @@ import com.lightningkite.lightningserver.typed.ModelRestUpdatesWebsocket
 import com.lightningkite.lightningserver.typed.modelInfo
 import com.lightningkite.services.database.ModelPermissions
 
-class TestModelEndpoints: ServerBuilder() {
+object TestModelEndpoints: ServerBuilder() {
     val info = Server.database.modelInfo(
         auth = noAuth,
         permissions = { ModelPermissions.allowAll<TestModel>() },
