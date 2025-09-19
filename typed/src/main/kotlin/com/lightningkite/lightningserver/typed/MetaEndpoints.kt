@@ -17,11 +17,19 @@ import com.lightningkite.services.*
 import com.lightningkite.services.cache.*
 import com.lightningkite.services.data.*
 import com.lightningkite.services.database.*
+import com.lightningkite.services.http.client
+import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.*
 import kotlinx.html.*
+import kotlinx.html.html
 import kotlinx.serialization.builtins.*
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.lang.Runtime
 import java.lang.management.*
+import kotlin.text.contains
+import kotlin.text.set
 import kotlin.time.TimeSource
 
 
@@ -126,6 +134,41 @@ public class MetaEndpoints(
                 )
             )
         }
+
+    context(runtime: ServerRuntime)
+    private suspend fun openAdmin2(): HttpResponse {
+        val inject = buildJsonObject {
+            put("url", generalSettings().publicUrl)
+        }
+        val page = client.get("https://ls5admin.cs.lightningkite.com").bodyAsText()
+            .let { original ->
+                (original.substringBeforeLast("</body>") + """
+                    <script type="application/json" id="injectedBackendInformation">${inject}</script>
+                    </body>
+                """.trimIndent() + original.substringAfterLast("</body>"))
+            }
+            .let { original ->
+                (original.substringBeforeLast("<head>") + """
+                    <head>
+                    <base href="${admin2.location.path.concrete().toString(runtime.externalSerialization.stringArrayFormat)}">
+                """.trimIndent() + original.substringAfterLast("<head>"))
+            }
+        return HttpResponse.html(content = page, headers = HttpHeaders {
+            set(
+                "Content-Security-Policy",
+                "script-src 'unsafe-eval' ${generalSettings().publicUrl}/ https://ls5admin.cs.lightningkite.com/"
+            )
+        })
+    }
+    public val admin2: HttpHandler<PathSpec0> = path.path("admin2").slash.get bind HttpHandler {
+        openAdmin2()
+    }
+    public val admin2Resources: HttpHandler<PathSpec0> = path.path("admin2").any.get bind HttpHandler {
+        if (it.trailingSegments?.any { it.contains(".") } == true)
+            HttpResponse.pathMovedOld("https://ls5admin.cs.lightningkite.com/${it.trailingSegments}")
+        else
+            openAdmin2()
+    }
 
     public val openApi: HttpHandler<PathSpec0> =
         path.path("openapi").get bind HttpHandler {
@@ -355,6 +398,7 @@ public class MetaEndpoints(
 
     private val endpoints: List<HttpHandler<PathSpec0>> = listOf(
         docs.index,
+        admin2,
         isOnline,
         health,
         kschema,
