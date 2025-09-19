@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.engine.netty
 
+import com.lightningkite.DataSize.Companion.bytes
+import com.lightningkite.DataSize.Companion.kibibytes
 import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.HttpStatusException
@@ -10,7 +12,6 @@ import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.PathAndParams
-import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.pathing.RawWebsocketPath
@@ -122,23 +123,36 @@ public class NettyEngine(
         runBlocking { runStartupTasks() }
         startSchedules()
 
+        val maxContentLength = cfg.maxAggregatedContentLength.bytes.coerceIn(0, Int.MAX_VALUE.toLong()).toInt()
+        if (cfg.maxAggregatedContentLength.bytes > Int.MAX_VALUE.toLong())
+            logger.warn {
+                "maxAggregatedContentLength: ${
+                    cfg.maxAggregatedContentLength.gibibytes.times(100).toInt().div(100.0)
+                } GiB is greater than the max supported size of ${
+                    Int.MAX_VALUE.bytes.gibibytes.times(100).toInt().div(100.0)
+                } GiB. Using max value instead."
+            }
+
         val b = ServerBootstrap()
         b.group(boss, worker)
             .channel(channelClass)
-            .option(ChannelOption.SO_BACKLOG, cfg.backlog)
+            .option(ChannelOption.SO_BACKLOG, cfg.backlog.bytes.toInt())
             .option(ChannelOption.SO_REUSEADDR, true)
             .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
             .childOption(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
             .childOption(ChannelOption.TCP_NODELAY, true)
             .childOption(ChannelOption.SO_KEEPALIVE, true)
-            .childOption(ChannelOption.WRITE_BUFFER_WATER_MARK, WriteBufferWaterMark(32 * 1024, 64 * 1024))
+            .childOption(
+                ChannelOption.WRITE_BUFFER_WATER_MARK,
+                WriteBufferWaterMark(32.kibibytes.bytes.toInt(), 64.kibibytes.bytes.toInt())
+            )
             .childHandler(object : ChannelInitializer<SocketChannel>() {
                 override fun initChannel(ch: SocketChannel) {
                     ch.config().isAutoRead = cfg.autoRead
                     val p = ch.pipeline()
                     p.addLast(HttpServerCodec())
                     p.addLast(HttpServerExpectContinueHandler())
-                    p.addLast(HttpObjectAggregator(cfg.maxAggregatedContentLengthBytes))
+                    p.addLast(HttpObjectAggregator(maxContentLength))
                     p.addLast(ChunkedWriteHandler())
                     if (cfg.websocketCompression) p.addLast(WebSocketServerCompressionHandler())
                     p.addLast(IdleStateHandler(0, 0, 120))
@@ -146,22 +160,23 @@ public class NettyEngine(
                 }
             })
 
-        if (cfg.recvBufBytes != null) b.childOption(ChannelOption.SO_RCVBUF, cfg.recvBufBytes)
-        if (cfg.sendBufBytes != null) b.childOption(ChannelOption.SO_SNDBUF, cfg.sendBufBytes)
+        if (cfg.recvBufBytes != null) b.childOption(ChannelOption.SO_RCVBUF, cfg.recvBufBytes.bytes.toInt())
+        if (cfg.sendBufBytes != null) b.childOption(ChannelOption.SO_SNDBUF, cfg.sendBufBytes.bytes.toInt())
 
         val ch = b.bind(cfg.host, cfg.port).sync().channel()
-        val local = ch.localAddress() as? java.net.InetSocketAddress
+        val local = ch.localAddress() as? InetSocketAddress
         this@NettyEngine.boundAddress = local
         logger.info { "NettyEngine started on http://${cfg.host}:${local?.port ?: cfg.port}" }
         ch.closeFuture().addListener { _ ->
             shutdown()
-        }
+        }.sync()
+
     }
 
     public fun shutdown() {
         try {
-            workerGroup?.shutdownGracefully()
-            bossGroup?.shutdownGracefully()
+            workerGroup.shutdownGracefully()
+            bossGroup.shutdownGracefully()
         } catch (_: Throwable) {
         }
     }
@@ -185,7 +200,7 @@ public class NettyEngine(
                                     val nettyRes = result.toNettyResponse(msg.protocolVersion())
                                     val keepAlive = HttpUtil.isKeepAlive(msg)
                                     if (keepAlive) {
-                                        nettyRes.headers()[HttpHeaderNames.CONNECTION] = HttpHeaderValues.KEEP_ALIVE
+                                        nettyRes.headers()[CONNECTION] = HttpHeaderValues.KEEP_ALIVE
                                         ctx.writeAndFlush(nettyRes)
                                     } else {
                                         ctx.writeAndFlush(nettyRes).addListener(ChannelFutureListener.CLOSE)
@@ -202,11 +217,11 @@ public class NettyEngine(
                                         HttpResponseStatus.INTERNAL_SERVER_ERROR,
                                         Unpooled.wrappedBuffer(body.toByteArray())
                                     )
-                                    res.headers()[HttpHeaderNames.CONTENT_TYPE] = "text/plain; charset=utf-8"
-                                    res.headers()[HttpHeaderNames.CONTENT_LENGTH] = body.toByteArray().size.toString()
+                                    res.headers()[CONTENT_TYPE] = "text/plain; charset=utf-8"
+                                    res.headers()[CONTENT_LENGTH] = body.toByteArray().size.toString()
                                     val keepAlive = HttpUtil.isKeepAlive(msg)
                                     if (keepAlive) {
-                                        res.headers()[HttpHeaderNames.CONNECTION] = HttpHeaderValues.KEEP_ALIVE
+                                        res.headers()[CONNECTION] = HttpHeaderValues.KEEP_ALIVE
                                         ctx.writeAndFlush(res)
                                     } else {
                                         ctx.writeAndFlush(res).addListener(ChannelFutureListener.CLOSE)
@@ -282,8 +297,14 @@ public class NettyEngine(
         }
 
         private suspend fun handleWebSocketStartup(ctx: ChannelHandlerContext, req: FullHttpRequest) {
-            val wsRequest = req.toLightningWebSocketConnectRequest(ctx, cfg)
-
+            val wsRequest = try {
+                req.toLightningWebSocketConnectRequest(ctx, cfg)
+            } catch (e: Throwable) {
+                logger.error(e) { "" }
+                val res = DefaultFullHttpResponse(req.protocolVersion(), HttpResponseStatus.INTERNAL_SERVER_ERROR)
+                ctx.writeAndFlush(res).addListener(ChannelFutureListener.CLOSE)
+                return
+            }
             val match = this@NettyEngine.server.endpoints.match(
                 this@NettyEngine.externalSerialization.stringArrayFormat,
                 wsRequest.path.pathSegments
@@ -411,7 +432,6 @@ public class NettyEngine(
             val fullUri = PathAndParams.parse(this.uri())
             val headers = (this.headers() as NettyHttpHeaders).toLightningHeaders()
             val contentTypeHeader = headers.contentType
-            val contentLength = headers.contentLength ?: -1L
 
             val body = if (this.content().isReadable) {
                 val bytes = ByteArray(this.content().readableBytes())
@@ -422,11 +442,11 @@ public class NettyEngine(
                 )
             } else null
 
-            val hostHeader = this.headers()[HttpHeaderNames.HOST] ?: ""
+            val hostHeader = this.headers()[HOST] ?: ""
             val domain = hostHeader.substringBefore(":")
             val sourceIp = cfg.realIpHeader?.let { h ->
                 this.headers()[h] ?: run {
-                    NettyEngine.logger.warn { "Real IP address header for proxy '$h' was missing from the request." }
+                    logger.warn { "Real IP address header for proxy '$h' was missing from the request." }
                     null
                 }
             } ?: ((ctx.channel().remoteAddress() as? InetSocketAddress)?.address?.hostAddress ?: "")
@@ -448,11 +468,11 @@ public class NettyEngine(
         ): WebSocketConnectRequest<PathSpec> {
             val fullUri = PathAndParams.parse(this.uri())
             val headers = (this.headers() as NettyHttpHeaders).toLightningHeaders()
-            val hostHeader = this.headers()[HttpHeaderNames.HOST] ?: ""
+            val hostHeader = this.headers()[HOST] ?: ""
             val domain = hostHeader.substringBefore(":")
             val sourceIp = cfg.realIpHeader?.let { h ->
                 this.headers()[h] ?: run {
-                    NettyEngine.logger.warn { "Real IP address header for proxy '$h' was missing from the request." }
+                    logger.warn { "Real IP address header for proxy '$h' was missing from the request." }
                     null
                 }
             } ?: ((ctx.channel().remoteAddress() as? InetSocketAddress)?.address?.hostAddress ?: "")
@@ -495,10 +515,10 @@ public class NettyEngine(
                 }
             }
             this.body?.mediaType?.let { mt ->
-                res.headers()[HttpHeaderNames.CONTENT_TYPE] = mt.toString()
+                res.headers()[CONTENT_TYPE] = mt.toString()
             }
             if (contentBuf !== Unpooled.EMPTY_BUFFER) {
-                res.headers()[HttpHeaderNames.CONTENT_LENGTH] = contentBuf.readableBytes().toString()
+                res.headers()[CONTENT_LENGTH] = contentBuf.readableBytes().toString()
             }
             return res
         }

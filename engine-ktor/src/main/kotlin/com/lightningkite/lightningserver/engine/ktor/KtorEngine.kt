@@ -4,22 +4,18 @@ import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.engine.local.LocalEngine
-import com.lightningkite.lightningserver.HttpMethod
-import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.pathing.RawWebsocketPath
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.handle
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.Data
-import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.pubsub.PubSubChannel
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -32,7 +28,6 @@ import io.ktor.server.websocket.*
 import io.ktor.util.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.*
-import kotlinx.io.asSource
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlin.time.Clock
@@ -114,7 +109,10 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
                     } ?: call.request.origin.remoteAddress,
                 )
 
-                val match = server.endpoints.match(externalSerialization.stringArrayFormat, request.path.pathSegments) { it.websocket } ?: run {
+                val match = server.endpoints.match(
+                    externalSerialization.stringArrayFormat,
+                    request.path.pathSegments
+                ) { it.websocket } ?: run {
                     this@webSocket.close(
                         CloseReason(
                             CloseReason.Codes.CANNOT_ACCEPT,
@@ -174,7 +172,10 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
                 } catch (e: Throwable) {
                     closingMid?.let { mid ->
                         with(mid) {
-                            socketHandler.disconnect(((e as? HttpStatusException)?.status ?: HttpStatus.InternalServerError).bestWebsocketCloseCode)
+                            socketHandler.disconnect(
+                                ((e as? HttpStatusException)?.status
+                                    ?: HttpStatus.InternalServerError).bestWebsocketCloseCode
+                            )
                         }
                     }
                 }

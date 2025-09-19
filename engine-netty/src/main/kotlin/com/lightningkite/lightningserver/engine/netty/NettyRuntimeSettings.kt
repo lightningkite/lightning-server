@@ -1,5 +1,8 @@
 package com.lightningkite.lightningserver.engine.netty
 
+import com.lightningkite.DataSize
+import com.lightningkite.DataSize.Companion.bytes
+import com.lightningkite.DataSize.Companion.mebibytes
 import com.lightningkite.lightningserver.definition.ServerSetting
 import kotlinx.serialization.Serializable
 
@@ -9,11 +12,11 @@ public data class NettyRuntimeSettings(
     val port: Int = 8080,
     val realIpHeader: String? = null,
     val workerThreads: Int? = null,
-    val maxAggregatedContentLengthBytes: Int = 16 * 1024 * 1024,
+    val maxAggregatedContentLength: DataSize = 16.mebibytes,
     val websocketCompression: Boolean = false,
-    val backlog: Int = 4096,
-    val recvBufBytes: Int? = null,
-    val sendBufBytes: Int? = null,
+    val backlog: DataSize = 4096.bytes,
+    val recvBufBytes: DataSize? = null,
+    val sendBufBytes: DataSize? = null,
     val autoRead: Boolean = true,
 )
 

@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.http.QueryParameters
+import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
@@ -40,7 +41,8 @@ internal suspend fun ApplicationCall.adapt(): HttpRequest<PathSpec> {
         domain = request.origin.serverHost,
         protocol = request.origin.scheme,
         sourceIp = ktorRunConfig().realIpHeader?.let {
-            request.header(it) ?: throw Exception("Real IP address header for proxy '$it' was missing from the request.")
+            request.header(it)
+                ?: run { server.logger.warn { "Real IP address header for proxy '$it' was missing from the request." }; null }
         } ?: request.origin.remoteAddress,
         body = run {
             // MutliPart Support?
