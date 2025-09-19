@@ -15,11 +15,11 @@ group = "com.lightningkite.lightningserver"
 
 dependencies {
     api(project(":core"))
-    api(project(":ktor"))
+    api(project(":engine-ktor"))
     api(project(":typed"))
-    api(project(":aws-serverless"))
+    api(project(":engine-aws-serverless"))
     api(project(":jdk-server"))
-    api(project(":netty"))
+    api(project(":engine-netty"))
     api(project(":sessions"))
     api(project(":sessions-email"))
 //    api(project(":sessions-oauth"))
