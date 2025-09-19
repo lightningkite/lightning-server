@@ -1,6 +1,8 @@
 package com.lightningkite.lightningserver.definition
 
 import com.lightningkite.MediaType
+import com.lightningkite.buildSealedList
+import com.lightningkite.buildSealedMap
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
@@ -20,11 +22,11 @@ import kotlinx.serialization.modules.plus
  * The immutable, runtime representation of a server's structure and resources.
  *
  * [ServerDefinition] is produced by building a [ServerBuilder] and contains all endpoints, tasks, schedules, settings,
- * and other server resources, organized in a modular fashion. It is used by the server engine to route requests,
+ * and other server resources, organized in a tree structure. It is used by the server engine to route requests,
  * execute tasks, and provide runtime lookups for handlers and resources.
  *
- * The server is composed of a root [Module] (thisLayer) and any number of submodules (modules), each of which may
- * contain their own endpoints, tasks, schedules, settings, and other resources.
+ * The server is composed in a tree structure with a root [Module] (`thisLayer`) and any number of submodules (`modules`),
+ * each of which may contain their own endpoints, tasks, schedules, settings, other resources, and nested submodules.
  */
 public data class ServerDefinition(
     val thisLayer: Module,
@@ -80,22 +82,22 @@ public data class ServerDefinition(
 
         val flattenedModules = modules.mapItems { it.flatten() }
 
-        fun <T> flattenList(registry: (Module) -> List<T>): List<T> = buildList {
+        fun <T> flattenList(registry: (Module) -> List<T>): List<T> = buildSealedList {
             addAll(registry(thisLayer))
             for ((modPath, module) in flattenedModules) {
                 addAll(registry(module))
             }
         }
 
-        fun <T> flattenMap(registry: (Module) -> Map<PathSpec0, T>): Map<PathSpec0, T> = buildMap {
+        fun <T> flattenMap(registry: (Module) -> Map<PathSpec0, T>): Map<PathSpec0, T> = buildSealedMap {
             putAll(registry(thisLayer))
             for ((modPath, module) in flattenedModules) {
                 putAll(registry(module).mapKeys { (path, _) -> modPath + path })
             }
         }
 
-        fun <T> flattenPathSpec(registry: (Module) -> PathSpecMap<T>): PathSpecMap<T> = MutablePathSpecMap<T>().apply {
-            putAll(com.lightningkite.lightningserver.pathing.PathSpec.root, registry(thisLayer))
+        fun <T> flattenPathSpec(registry: (Module) -> PathSpecMap<T>): PathSpecMap<T> = buildPathSpecMap {
+            putAll(registry(thisLayer))
             for ((modPath, module) in flattenedModules) {
                 putAll(modPath, registry(module))
             }

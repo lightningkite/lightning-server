@@ -12,12 +12,15 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpecMap
 import com.lightningkite.lightningserver.pathing.plus
+import com.lightningkite.lightningserver.pathing.toSealedPathSpecMap
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.ApiWebsocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.services.data.KFile
+import com.lightningkite.toSealedList
+import com.lightningkite.toSealedMap
 import kotlinx.serialization.KSerializer
 import kotlin.collections.component1
 import kotlin.collections.component2
@@ -46,6 +49,11 @@ public object SDK { // namespace object
     ) {
         public data class Layer(
             val info: SdkModule.Info,
+            /**
+             * The endpoints for this layer, grouped by their client interface.
+             *
+             * The location of the interface is the location of the module with that interface.
+             * The associated endpoints already include this location prefixed in the `PathSpecMap`*/
             val endpoints: Map<Locationed<PathSpec0, InterfaceInfo>?, PathSpecMap<ServerApiEndpoints>>
         )
 
@@ -70,6 +78,7 @@ public object SDK { // namespace object
     }
 
     public sealed interface Function : Documentable {
+        /**The relative path of the function to its containing module*/
         public val path: PathSpec
         public val fromInterface: InterfaceInfo?
         public val arguments: List<Argument>
@@ -149,9 +158,9 @@ public object SDK { // namespace object
             fun build(): Data = Data(
                 Data.Layer(
                     info,
-                    endpoints.toMap()
+                    endpoints.mapValues { it.value.toSealedPathSpecMap() }.toSealedMap()
                 ),
-                modules.mapItems { it.build() }
+                modules.mapItems { it.build() }.toSealedList()
             )
         }
 
