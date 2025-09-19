@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.typed.kschema
 
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.definition.generalSettings
+import com.lightningkite.lightningserver.pathing.plus
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.ApiWebsocketHandler
@@ -60,11 +61,11 @@ val lightningServerKSchema: LightningServerKSchema get() {
             val docGroup = node.docGroup
 
             node.layer.endpoints.flatMap { (interfaceInfo, pathSpecMap) ->
-                val interfaceType = interfaceInfo?.virtualTypeReference(registry)
+                val interfaceType = interfaceInfo?.item?.virtualTypeReference(registry)
 
                 pathSpecMap.asSequence().flatMap { (relativePath, endpoints) ->
                     val routes = relativePath.wildcards.associate { it.name to it.serializer.virtualTypeReference(registry) }
-                    val path = node.absolutePath.toString() + relativePath.toString()
+                    val path = (node.absolutePath + relativePath).toString()
 
                     val http = endpoints.http.map { (method, endpoint) ->
                         LightningServerKSchemaEndpoint(
@@ -107,9 +108,9 @@ val lightningServerKSchema: LightningServerKSchema get() {
                 if (interfaceInfo == null) return@mapNotNull null
 
                 LightningServerKSchemaInterface(
-                    interfaceInfo.virtualTypeReference(registry),
+                    interfaceInfo.item.virtualTypeReference(registry),
                     docGroup = docGroup,
-                    path = node.absolutePath.toString()
+                    path = (node.absolutePath + interfaceInfo.location).toString()
                 )
             }
         }.toList(),

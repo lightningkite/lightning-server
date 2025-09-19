@@ -46,7 +46,7 @@ public object SDK { // namespace object
     ) {
         public data class Layer(
             val info: SdkModule.Info,
-            val endpoints: Map<InterfaceInfo?, PathSpecMap<ServerApiEndpoints>>
+            val endpoints: Map<Locationed<PathSpec0, InterfaceInfo>?, PathSpecMap<ServerApiEndpoints>>
         )
 
         public data class Node(
@@ -107,7 +107,7 @@ public object SDK { // namespace object
         val info: SdkModule.Info,
         /**The relative path of the module to its parent module*/
         val path: PathSpec0,
-        val extendsInterfaces: List<InterfaceInfo>,
+        val extendsInterfaces: List<Locationed<PathSpec0, InterfaceInfo>>,
         val functions: List<Function>,
         val children: List<Module>
     ) {
@@ -117,12 +117,12 @@ public object SDK { // namespace object
 
     public fun ServerDefinition.sdk(root: SdkModule.Info = SdkModule.Info("Api")): Data {
         class Builder(val info: SdkModule.Info) {
-            val endpoints = HashMap<InterfaceInfo?, MutablePathSpecMap<ServerApiEndpoints>>()
+            val endpoints = HashMap<Locationed<PathSpec0, InterfaceInfo>?, MutablePathSpecMap<ServerApiEndpoints>>()
             val modules = ArrayList<Locationed<PathSpec0, Builder>>()
 
             fun append(relativePath: PathSpec0, module: ServerDefinition) {
                 endpoints
-                    .getOrPut(module.thisLayer.extensions[InterfaceInfo], ::MutablePathSpecMap)
+                    .getOrPut(module.thisLayer.extensions[InterfaceInfo]?.let { Locationed(relativePath, it) }, ::MutablePathSpecMap)
                     .apply {
                         module.thisLayer.endpoints.asSequence().forEach { entry ->
                             val api = ServerApiEndpoints(entry.value)
@@ -163,9 +163,9 @@ public object SDK { // namespace object
     }
 
 
-    private fun List<InterfaceInfo>.filterSupertypes(): List<InterfaceInfo> {
-        val supertypes = flatMap { it.type.supertypes }.mapNotNull { it.classifier as? KClass<*> }
-        return filter { it.type !in supertypes }
+    private fun List<Locationed<PathSpec0, InterfaceInfo>>.filterSupertypes(): List<Locationed<PathSpec0, InterfaceInfo>> {
+        val supertypes = flatMap { it.item.type.supertypes }.mapNotNull { it.classifier as? KClass<*> }
+        return filter { it.item.type !in supertypes }
     }
 
     private fun Data.processToModules(path: PathSpec0): Module = Module(
@@ -178,7 +178,7 @@ public object SDK { // namespace object
                     Function.Websocket(
                         handler = it,
                         path = path,
-                        fromInterface = inter,
+                        fromInterface = inter?.item,
                     )
                 }
 
@@ -186,7 +186,7 @@ public object SDK { // namespace object
                     Function.Endpoint(
                         handler = api,
                         endpoint = HttpEndpoint(path, method),
-                        fromInterface = inter,
+                        fromInterface = inter?.item,
                     )
                 }
 

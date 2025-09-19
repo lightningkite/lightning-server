@@ -40,7 +40,7 @@ public object FetcherSdk : SDK.Format {
         vararg imports: String
     ) {
         fun SDK.Module.imports(): List<String> =
-            extendsInterfaces.flatMap { it.imports } + children.flatMap { it.imports() }
+            extendsInterfaces.flatMap { it.item.imports } + children.flatMap { it.imports() }
 
         (imports.toList() + imports())
             .distinct()
@@ -55,12 +55,12 @@ public object FetcherSdk : SDK.Format {
 
         fun SDK.Module.writeInterface(depth: Int) {
 
-            val singleInterface = extendsInterfaces.singleOrNull()?.takeIf { declaredFunctions.isEmpty() && depth > 0 }
+            val singleInterface = extendsInterfaces.singleOrNull()?.item?.takeIf { declaredFunctions.isEmpty() && depth > 0 }
 
             appendLine()
 
             if (singleInterface == null) {
-                appendDepth(depth, "interface ${info.interfaceName}" + (if (extendsInterfaces.isEmpty()) "" else " : ${extendsInterfaces.joinToString { it.kotlinString() }}") + " {")
+                appendDepth(depth, "interface ${info.interfaceName}" + (if (extendsInterfaces.isEmpty()) "" else " : ${extendsInterfaces.joinToString { it.item.kotlinString() }}") + " {")
 
                 for (function in declaredFunctions) {
                     val docs = buildList {
@@ -131,7 +131,7 @@ public object FetcherSdk : SDK.Format {
 
             if (singleInterface == null) {
                 val extendsInterfaces = listOf((chain + this).joinToString(".") { it.info.interfaceName }) + extendsInterfaces.map { inter ->
-                    "${inter.kotlinString()} by ${inter.liveString(pathPrefix)}"
+                    "${inter.item.kotlinString()} by ${inter.item.liveString(pathPrefix + inter.location)}"
                 }
 
                 if (depth == 0) appendLine("class Live${info.interfaceName}(val fetcher: Fetcher) : ${extendsInterfaces.joinToString()} {")
@@ -164,7 +164,7 @@ public object FetcherSdk : SDK.Format {
                 appendDepth(depth, "}")
             }
 
-            if (depth > 0) appendDepth(depth, "override val ${info.valueName} = ${singleInterface?.liveString(pathPrefix) ?: "Live${info.interfaceName}()"}")
+            if (depth > 0) appendDepth(depth, "override val ${info.valueName} = ${singleInterface?.item?.liveString(pathPrefix) ?: "Live${info.interfaceName}()"}")
         }
 
         module.writeLive(emptyList())
