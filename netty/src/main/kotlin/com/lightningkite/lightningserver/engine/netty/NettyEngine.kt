@@ -4,7 +4,6 @@ import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.NotFoundException
-import com.lightningkite.lightningserver.RouteNotFoundException
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.engine.local.LocalEngine
 import com.lightningkite.lightningserver.http.HttpRequest
@@ -15,13 +14,7 @@ import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.pathing.RawWebsocketPath
-import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.didConnectWithMetrics
-import com.lightningkite.lightningserver.runtime.disconnectWithMetrics
-import com.lightningkite.lightningserver.runtime.handle
-import com.lightningkite.lightningserver.runtime.location
-import com.lightningkite.lightningserver.runtime.messageFromClientWithMetrics
-import com.lightningkite.lightningserver.runtime.willConnectWithMetrics
+import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.Data
@@ -29,32 +22,26 @@ import com.lightningkite.services.data.TypedData
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.netty.bootstrap.ServerBootstrap
 import io.netty.buffer.ByteBufUtil
+import io.netty.buffer.PooledByteBufAllocator
 import io.netty.buffer.Unpooled
 import io.netty.channel.*
-import io.netty.channel.nio.NioEventLoopGroup
-import io.netty.channel.socket.SocketChannel
-import io.netty.channel.socket.nio.NioServerSocketChannel
-import io.netty.channel.socket.ServerSocketChannel
-import io.netty.handler.codec.http.*
-import io.netty.handler.codec.http.HttpHeaderNames
-import io.netty.handler.codec.http.HttpHeaderNames.CONNECTION
-import io.netty.handler.codec.http.HttpHeaderNames.HOST
-import io.netty.handler.codec.http.HttpHeaderNames.UPGRADE
-import io.netty.handler.codec.http.HttpHeaderValues
-import io.netty.handler.codec.http.HttpUtil
-import io.netty.handler.codec.http.websocketx.*
-import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler
-import io.netty.handler.stream.ChunkedWriteHandler
-import io.netty.util.AttributeKey
-import io.netty.buffer.PooledByteBufAllocator
-import io.netty.channel.WriteBufferWaterMark
-import io.netty.channel.ChannelOption
 import io.netty.channel.epoll.Epoll
 import io.netty.channel.epoll.EpollEventLoopGroup
 import io.netty.channel.epoll.EpollServerSocketChannel
 import io.netty.channel.kqueue.KQueue
 import io.netty.channel.kqueue.KQueueEventLoopGroup
 import io.netty.channel.kqueue.KQueueServerSocketChannel
+import io.netty.channel.nio.NioEventLoopGroup
+import io.netty.channel.socket.SocketChannel
+import io.netty.channel.socket.nio.NioServerSocketChannel
+import io.netty.handler.codec.http.*
+import io.netty.handler.codec.http.HttpHeaderNames.*
+import io.netty.handler.codec.http.websocketx.*
+import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler
+import io.netty.handler.stream.ChunkedWriteHandler
+import io.netty.handler.timeout.IdleStateEvent
+import io.netty.handler.timeout.IdleStateHandler
+import io.netty.util.AttributeKey
 import kotlinx.coroutines.*
 import kotlinx.io.asSink
 import kotlinx.io.buffered
@@ -63,25 +50,18 @@ import java.net.InetSocketAddress
 import java.net.URI
 import java.nio.charset.StandardCharsets
 import kotlin.time.Clock
-import io.netty.handler.codec.http.HttpServerExpectContinueHandler
-import io.netty.handler.timeout.IdleStateHandler
-import io.netty.handler.timeout.IdleStateEvent
-import io.netty.handler.codec.http.HttpHeaders as NettyHttpHeaders
 import com.lightningkite.lightningserver.http.HttpHeaders as LsHttpHeaders
 import com.lightningkite.lightningserver.websockets.WebSocketFrame as LkWebSocketFrame
+import io.netty.handler.codec.http.HttpHeaders as NettyHttpHeaders
 
 
 public class NettyEngine(
     server: ServerDefinition,
-    override val clock: Clock = Clock.System
+    override val clock: Clock = Clock.System,
 ) : LocalEngine(server) {
 
     public companion object {
         internal val logger = KotlinLogging.logger("com.lightningkite.lightningserver.engine.netty.NettyEngine")
-        private val HANDSHAKER_KEY: AttributeKey<WebSocketServerHandshaker> = AttributeKey.valueOf("HANDSHAKER")
-        private val MID_KEY: AttributeKey<WebSocketConnection<PathSpec, Any?>> = AttributeKey.valueOf("MID")
-        private val PATHSPEC_KEY: AttributeKey<PathSpec> = AttributeKey.valueOf("PATHSPEC")
-        private val HANDLER_KEY: AttributeKey<WebSocketHandler<PathSpec, Any?>> = AttributeKey.valueOf("SOCKET_HANDLER")
     }
 
     override val settings: ServerSettings = ServerSettings(super.settings.settings.plus(nettyRunConfig).toSet())
@@ -94,6 +74,11 @@ public class NettyEngine(
 
     private val supervisorJob = SupervisorJob()
     override lateinit var scope: CoroutineScope
+
+    private lateinit var HANDSHAKER_KEY: AttributeKey<WebSocketServerHandshaker>
+    private lateinit var MID_KEY: AttributeKey<WebSocketConnection<PathSpec, Any?>>
+    private lateinit var PATHSPEC_KEY: AttributeKey<PathSpec>
+    private lateinit var HANDLER_KEY: AttributeKey<WebSocketHandler<PathSpec, Any?>>
 
     public fun start() {
         // Prepare configuration and lifecycle
@@ -113,11 +98,13 @@ public class NettyEngine(
                 worker = EpollEventLoopGroup(workerThreads)
                 channelClass = EpollServerSocketChannel::class.java
             }
+
             useKQueue -> {
                 boss = KQueueEventLoopGroup(1)
                 worker = KQueueEventLoopGroup(workerThreads)
                 channelClass = KQueueServerSocketChannel::class.java
             }
+
             else -> {
                 boss = NioEventLoopGroup(1)
                 worker = NioEventLoopGroup(workerThreads)
@@ -127,6 +114,10 @@ public class NettyEngine(
         bossGroup = boss
         workerGroup = worker
         scope = CoroutineScope(worker.asCoroutineDispatcher() + supervisorJob)
+        HANDSHAKER_KEY = AttributeKey.valueOf("HANDSHAKER")
+        MID_KEY = AttributeKey.valueOf("MID")
+        PATHSPEC_KEY = AttributeKey.valueOf("PATHSPEC")
+        HANDLER_KEY = AttributeKey.valueOf("SOCKET_HANDLER")
 
         runBlocking { runStartupTasks() }
         startSchedules()
@@ -235,8 +226,11 @@ public class NettyEngine(
                     scope.launch(ctx.executor().asCoroutineDispatcher()) {
                         try {
                             handler.messageFromClientWithMetrics(pathspec, mid, m)
-                        } catch(e: Exception) {
-                            mid.close(((e as? HttpStatusException)?.status ?: HttpStatus.InternalServerError).bestWebsocketCloseCode)
+                        } catch (e: Exception) {
+                            mid.close(
+                                ((e as? HttpStatusException)?.status
+                                    ?: HttpStatus.InternalServerError).bestWebsocketCloseCode
+                            )
                         }
                     }
                 }
@@ -250,8 +244,11 @@ public class NettyEngine(
                     scope.launch(ctx.executor().asCoroutineDispatcher()) {
                         try {
                             handler.messageFromClientWithMetrics(pathspec, mid, m)
-                        } catch(e: Exception) {
-                            mid.close(((e as? HttpStatusException)?.status ?: HttpStatus.InternalServerError).bestWebsocketCloseCode)
+                        } catch (e: Exception) {
+                            mid.close(
+                                ((e as? HttpStatusException)?.status
+                                    ?: HttpStatus.InternalServerError).bestWebsocketCloseCode
+                            )
                         }
                     }
                 }
@@ -264,8 +261,11 @@ public class NettyEngine(
                         scope.launch(ctx.executor().asCoroutineDispatcher()) {
                             try {
                                 handler.disconnectWithMetrics(pathspec, mid, WebSocketClose.NORMAL)
-                            } catch(e: Exception) {
-                                mid.close(((e as? HttpStatusException)?.status ?: HttpStatus.InternalServerError).bestWebsocketCloseCode)
+                            } catch (e: Exception) {
+                                mid.close(
+                                    ((e as? HttpStatusException)?.status
+                                        ?: HttpStatus.InternalServerError).bestWebsocketCloseCode
+                                )
                             }
                         }
                     }
@@ -406,7 +406,7 @@ public class NettyEngine(
 
         private fun FullHttpRequest.toLightningHttpRequest(
             ctx: ChannelHandlerContext,
-            cfg: NettyRuntimeSettings
+            cfg: NettyRuntimeSettings,
         ): HttpRequest<PathSpec> {
             val fullUri = PathAndParams.parse(this.uri())
             val headers = (this.headers() as NettyHttpHeaders).toLightningHeaders()
@@ -444,7 +444,7 @@ public class NettyEngine(
 
         private fun FullHttpRequest.toLightningWebSocketConnectRequest(
             ctx: ChannelHandlerContext,
-            cfg: NettyRuntimeSettings
+            cfg: NettyRuntimeSettings,
         ): WebSocketConnectRequest<PathSpec> {
             val fullUri = PathAndParams.parse(this.uri())
             val headers = (this.headers() as NettyHttpHeaders).toLightningHeaders()
