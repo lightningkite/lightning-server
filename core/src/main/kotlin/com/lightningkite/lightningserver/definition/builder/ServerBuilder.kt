@@ -1,11 +1,13 @@
 package com.lightningkite.lightningserver.definition.builder
 
+import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.LightningServerDsl
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.http.*
-import com.lightningkite.lightningserver.pathing.MutablePathSpecMap
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.pathing.PathSpecRegistry
+import com.lightningkite.lightningserver.pathing.buildPathSpecMap
 import com.lightningkite.lightningserver.pathing.toSealedPathSpecMap
 import com.lightningkite.lightningserver.serialization.MediaTypeCoder
 import com.lightningkite.lightningserver.serialization.MediaTypeDecoder
@@ -16,7 +18,6 @@ import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketHandlerInterceptor
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
-import com.lightningkite.lightningserver.websockets.WebSocketsBuilder
 import com.lightningkite.services.Setting
 import com.lightningkite.services.SettingContext
 import com.lightningkite.toSealedList
@@ -70,15 +71,20 @@ import kotlinx.serialization.modules.SerializersModule
  * ```
  * */
 public abstract class ServerBuilder : Extendable {
-    public open val internalSerialization: Runtime<SerializersModule> get() = Runtime.Constant(EmptySerializersModule())
-    public open val externalSerialization: Runtime<SerializersModule> get() = Runtime.Constant(EmptySerializersModule())
+    protected open val internalSerialization: Runtime<SerializersModule> get() = Runtime.Constant(EmptySerializersModule())
+    protected open val externalSerialization: Runtime<SerializersModule> get() = Runtime.Constant(EmptySerializersModule())
 
     public val path: PathSpec0 get() = PathSpec.root // just for convenience
 
     private val settings: ListRegistry<ServerSetting<*, *>> = ListRegistry()
 
-    private val http: HttpBuilder = HttpBuilder()
-    private val websockets: WebSocketsBuilder = WebSocketsBuilder()
+    private val httpInterceptors: ListRegistry<HttpInterceptor> = ListRegistry()
+    private val httpHandlers: PathSpecRegistry<MapRegistry<HttpMethod, HttpHandler<*>>> = PathSpecRegistry()
+
+    private val websocketInterceptors: ListRegistry<WebSocketHandlerInterceptor> = ListRegistry()
+    private val websocketHandlers: PathSpecRegistry<WebSocketHandler<*, *>> = PathSpecRegistry()
+    private val websocketTopics: PathSpecRegistry<WebSocketTopic<*, *>> = PathSpecRegistry()
+
     private var exceptionHandler: ExceptionHttpHandler = DefaultExceptionHttpHandler
 
     private val startupTasks: MapRegistry<PathSpec0, StartupTask> = MapRegistry()
@@ -95,26 +101,26 @@ public abstract class ServerBuilder : Extendable {
 
     @LightningServerDsl
     @JvmName("installHttpInterceptor")
-    public fun <T: HttpInterceptor> install(interceptor: T): T = interceptor.also { http.interceptors.add(it) }
+    public fun <T: HttpInterceptor> install(interceptor: T): T = interceptor.also { httpInterceptors.register(it) }
     @LightningServerDsl
     @JvmName("installWebSocketHandlerInterceptor")
-    public fun <T: WebSocketHandlerInterceptor> install(interceptor: T): T = interceptor.also { websockets.interceptors.add(it) }
+    public fun <T: WebSocketHandlerInterceptor> install(interceptor: T): T = interceptor.also { websocketInterceptors.register(it) }
     @LightningServerDsl
     @JvmName("installRequestInterceptor")
     public fun <T> install(interceptor: T): T where T: HttpInterceptor, T: WebSocketHandlerInterceptor = interceptor.also {
-        http.interceptors.add(it)
-        websockets.interceptors.add(it)
+        httpInterceptors.register(it)
+        websocketInterceptors.register(it)
     }
 
     @LightningServerDsl
     public infix fun <PATH : PathSpec, HANDLER : HttpHandler<PATH>> HttpEndpoint<PATH>.bind(handler: HANDLER): HANDLER {
-        http.register(this, handler)
+        httpHandlers.getOrRegister(this.path, ::MapRegistry).register(this.method, handler)
         return handler
     }
 
     @LightningServerDsl
     public infix fun <PATH : PathSpec, STORAGE, T : WebSocketHandler<PATH, STORAGE>> PATH.bind(handler: T): T {
-        websockets.register(this, handler)
+        websocketHandlers.register(this, handler)
         return handler
     }
 
@@ -139,7 +145,7 @@ public abstract class ServerBuilder : Extendable {
     @LightningServerDsl
     public fun <PATH : PathSpec, T> PATH.topic(type: KSerializer<T>): WebSocketTopic<PATH, T> {
         val topic = WebSocketTopic<PATH, T>(type)
-        websockets.topics.register(this, topic)
+        websocketTopics.register(this, topic)
         return topic
     }
 
@@ -283,19 +289,19 @@ public abstract class ServerBuilder : Extendable {
         thisLayer = ServerDefinition.Module(
             internalSerializersModule = internalSerialization,
             externalSerializersModule = externalSerialization,
-            httpInterceptors = http.interceptors.toSealedList(),
-            websocketInterceptors = websockets.interceptors.toSealedList(),
-            endpoints = MutablePathSpecMap<ServerPathEndpoints>().apply {
-                for (path in http.handlers.keys + websockets.handlers.keys) {
+            httpInterceptors = httpInterceptors.toSealedList(),
+            websocketInterceptors = websocketInterceptors.toSealedList(),
+            endpoints = buildPathSpecMap {
+                for (path in httpHandlers.keys + websocketHandlers.keys) {
                     put(path, ServerPathEndpoints(
-                        http = http.handlers[path] ?: emptyMap(),
-                        websocket = websockets.handlers[path]
+                        http = httpHandlers[path] ?: emptyMap(),
+                        websocket = websocketHandlers[path]
                     ))
                 }
-            }.toSealedPathSpecMap(),
+            },
             schedules = schedules.toSealedMap(),
             tasks = tasks.toSealedMap(),
-            webSocketTopics = websockets.topics.registered.toSealedPathSpecMap(),
+            webSocketTopics = websocketTopics.toSealedPathSpecMap(),
             settings = settings.toSealedList(),
             extensions = extensions.toSealedExtensions(),
             exceptionHandler = exceptionHandler,

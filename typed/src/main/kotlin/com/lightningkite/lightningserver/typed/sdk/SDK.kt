@@ -12,12 +12,15 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpecMap
 import com.lightningkite.lightningserver.pathing.plus
+import com.lightningkite.lightningserver.pathing.toSealedPathSpecMap
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.ApiWebsocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.services.data.KFile
+import com.lightningkite.toSealedList
+import com.lightningkite.toSealedMap
 import kotlinx.serialization.KSerializer
 import kotlin.collections.component1
 import kotlin.collections.component2
@@ -46,7 +49,12 @@ public object SDK { // namespace object
     ) {
         public data class Layer(
             val info: SdkModule.Info,
-            val endpoints: Map<InterfaceInfo?, PathSpecMap<ServerApiEndpoints>>
+            /**
+             * The endpoints for this layer, grouped by their client interface.
+             *
+             * The location of the interface is the location of the module with that interface.
+             * The associated endpoints already include this location prefixed in the `PathSpecMap`*/
+            val endpoints: Map<Locationed<PathSpec0, InterfaceInfo>?, PathSpecMap<ServerApiEndpoints>>
         )
 
         public data class Node(
@@ -70,6 +78,7 @@ public object SDK { // namespace object
     }
 
     public sealed interface Function : Documentable {
+        /**The relative path of the function to its containing module*/
         public val path: PathSpec
         public val fromInterface: InterfaceInfo?
         public val arguments: List<Argument>
@@ -107,7 +116,7 @@ public object SDK { // namespace object
         val info: SdkModule.Info,
         /**The relative path of the module to its parent module*/
         val path: PathSpec0,
-        val extendsInterfaces: List<InterfaceInfo>,
+        val extendsInterfaces: List<Locationed<PathSpec0, InterfaceInfo>>,
         val functions: List<Function>,
         val children: List<Module>
     ) {
@@ -117,12 +126,12 @@ public object SDK { // namespace object
 
     public fun ServerDefinition.sdk(root: SdkModule.Info = SdkModule.Info("Api")): Data {
         class Builder(val info: SdkModule.Info) {
-            val endpoints = HashMap<InterfaceInfo?, MutablePathSpecMap<ServerApiEndpoints>>()
+            val endpoints = HashMap<Locationed<PathSpec0, InterfaceInfo>?, MutablePathSpecMap<ServerApiEndpoints>>()
             val modules = ArrayList<Locationed<PathSpec0, Builder>>()
 
             fun append(relativePath: PathSpec0, module: ServerDefinition) {
                 endpoints
-                    .getOrPut(module.thisLayer.extensions[InterfaceInfo], ::MutablePathSpecMap)
+                    .getOrPut(module.thisLayer.extensions[InterfaceInfo]?.let { Locationed(relativePath, it) }, ::MutablePathSpecMap)
                     .apply {
                         module.thisLayer.endpoints.asSequence().forEach { entry ->
                             val api = ServerApiEndpoints(entry.value)
@@ -149,9 +158,9 @@ public object SDK { // namespace object
             fun build(): Data = Data(
                 Data.Layer(
                     info,
-                    endpoints.toMap()
+                    endpoints.mapValues { it.value.toSealedPathSpecMap() }.toSealedMap()
                 ),
-                modules.mapItems { it.build() }
+                modules.mapItems { it.build() }.toSealedList()
             )
         }
 
@@ -163,9 +172,9 @@ public object SDK { // namespace object
     }
 
 
-    private fun List<InterfaceInfo>.filterSupertypes(): List<InterfaceInfo> {
-        val supertypes = flatMap { it.type.supertypes }.mapNotNull { it.classifier as? KClass<*> }
-        return filter { it.type !in supertypes }
+    private fun List<Locationed<PathSpec0, InterfaceInfo>>.filterSupertypes(): List<Locationed<PathSpec0, InterfaceInfo>> {
+        val supertypes = flatMap { it.item.type.supertypes }.mapNotNull { it.classifier as? KClass<*> }
+        return filter { it.item.type !in supertypes }
     }
 
     private fun Data.processToModules(path: PathSpec0): Module = Module(
@@ -178,7 +187,7 @@ public object SDK { // namespace object
                     Function.Websocket(
                         handler = it,
                         path = path,
-                        fromInterface = inter,
+                        fromInterface = inter?.item,
                     )
                 }
 
@@ -186,7 +195,7 @@ public object SDK { // namespace object
                     Function.Endpoint(
                         handler = api,
                         endpoint = HttpEndpoint(path, method),
-                        fromInterface = inter,
+                        fromInterface = inter?.item,
                     )
                 }
 
@@ -211,8 +220,14 @@ public object SDK { // namespace object
     }
 
     public fun ServerBuilder.writeSdk(format: Format, folder: KFile, packageName: String) {
-        context(Runtime(this)) {
-            format.write(build(), folder, packageName)
+        with(Runtime(this)) {
+            settings.readyUsingDefaults()
+            writeSdk(format, folder, packageName)
         }
+    }
+
+    context(runtime: ServerRuntime)
+    public fun ServerBuilder.writeSdk(format: Format, folder: KFile, packageName: String) {
+        format.write(build(), folder, packageName)
     }
 }

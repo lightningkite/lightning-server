@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.typed.sdk
 
 import com.lightningkite.lightningserver.definition.mapItems
 import com.lightningkite.lightningserver.pathing.MutablePathSpecMap
+import com.lightningkite.lightningserver.pathing.buildPathSpecMap
 
 internal val SDK.Data.Node.docGroup: String?
     get() = (ancestors + layer).drop(1).takeUnless { it.isEmpty() }?.joinToString(".") { it.info.interfaceName }
@@ -9,7 +10,7 @@ internal val SDK.Data.Node.docGroup: String?
 public fun SDK.Data.filterSafeEndpoints(): SDK.Data = copy(
     layer = layer.copy(
         endpoints = layer.endpoints.mapValues { (_, endpoints) ->
-            MutablePathSpecMap<ServerApiEndpoints>().apply {
+            buildPathSpecMap {
                 for ((path, endpoints) in endpoints.asSequence()) {
                     put(path, endpoints.filterSafeEndpoints())
                 }

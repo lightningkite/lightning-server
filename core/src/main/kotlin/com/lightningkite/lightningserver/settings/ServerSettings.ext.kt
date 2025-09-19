@@ -1,9 +1,7 @@
 package com.lightningkite.lightningserver.settings
 
 import com.lightningkite.lightningserver.definition.ServerSetting
-import com.lightningkite.lightningserver.definition.builder.include
-import com.lightningkite.lightningserver.logger
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.services.data.KFile
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerializationStrategy
@@ -12,7 +10,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.properties.Properties
-import java.io.File
 
 context(builder: ServerSettings)
 public infix fun <SERIALIZABLE> ServerSetting<SERIALIZABLE, *>.set(value: SERIALIZABLE) {
@@ -26,7 +23,7 @@ public infix fun <RESULT> ServerSetting<*, RESULT>.setStatic(value: RESULT) {
 
 @OptIn(ExperimentalSerializationApi::class)
 public fun ServerSettings.loadFromFile(
-    file: File,
+    file: KFile,
     module: SerializersModule,
 ) {
     val format: StringFormat = if (file.name.contains(".properties")) {
@@ -68,13 +65,14 @@ public fun ServerSettings.loadFromFile(
         throw MissingSettingFile(file)
     }
 
-    val bytes = file.readBytes()
+    val bytes = file.readByteArray()
     val decryptedBytes = System.getenv("LIGHTNING_SERVER_SETTINGS_DECRYPTION")
         ?.takeIf { it.isNotBlank() }
         ?.let { sha256Password ->
             OpenSsl.decryptAesCbcPkcs5Sha256(bytes, sha256Password.toByteArray())
         }
         ?: bytes
+
     val text = decryptedBytes.decodeToString()
     val loaded: MutableMap<ServerSetting<*, *>, Any?> = format.decodeFromString(serializer, text).toMutableMap()
     val missingKeys = HashSet<ServerSetting<*, *>>()
@@ -88,7 +86,8 @@ public fun ServerSettings.loadFromFile(
     }
     if (missingKeys.isNotEmpty()) {
         val suggestedFile =
-            file.resolveSibling(file.nameWithoutExtension.replace(".enc", "") + ".suggested." + file.extension)
+            file.resolve("./" + file.nameWithoutExtension.replace(".enc", "") + ".suggested." + file.extension)
+
         suggestedFile.writeText(format.encodeToString(serializer, loaded))
         throw IncompleteSettingsException(missingKeys, suggestedFile)
     }

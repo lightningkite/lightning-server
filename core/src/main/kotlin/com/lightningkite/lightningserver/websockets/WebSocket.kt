@@ -16,8 +16,7 @@ import kotlinx.serialization.Serializable
 
 public class WebSocketTopic<PATH: PathSpec, T> internal constructor(
     public val type: KSerializer<T>
-) {
-}
+)
 
 public data class WebSocketSubscriptionRequest<PATH: PathSpec, T>(
     val topic: WebSocketTopic<PATH, T>,

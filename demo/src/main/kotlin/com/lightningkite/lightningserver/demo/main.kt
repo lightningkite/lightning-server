@@ -37,7 +37,7 @@ private fun serve() {
     val built = Server.build()
     println("Server built in ${before.elapsedNow()}")
     KtorEngine(built).apply {
-        settings.loadFromFile(File("settings.json"), internalSerializersModule)
+        settings.loadFromFile(KFile("settings.json"), internalSerializersModule)
         start(Netty)
     }
 }
@@ -47,7 +47,7 @@ private fun serveJdk() {
     val built = Server.build()
     println("Server built in ${before.elapsedNow()}")
     JdkEngine(built).apply {
-        settings.loadFromFile(File("settings.json"), internalSerializersModule)
+        settings.loadFromFile(KFile("settings.json"), internalSerializersModule)
         start()
     }
 }
@@ -57,7 +57,7 @@ private fun serveNetty() {
     val built = Server.build()
     println("Server built in ${before.elapsedNow()}")
     NettyEngine(built).apply {
-        settings.loadFromFile(File("settings.json"), internalSerializersModule)
+        settings.loadFromFile(KFile("settings.json"), internalSerializersModule)
         start()
     }
 }

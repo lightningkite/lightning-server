@@ -9,6 +9,7 @@ public value class LongBits(public val long: Long) : Iterable<Int> {
     )
 
     public operator fun plus(other: LongBits): LongBits = LongBits(long or other.long)
+
     public fun lowestIncluding(index: Int): Int {
         var result = index
         var current = long ushr index
@@ -36,7 +37,6 @@ public value class LongBits(public val long: Long) : Iterable<Int> {
                     if (num % 2L == 1L) {
                         num = num shr 1
                         return index++
-
                     }
                     num = num shr 1
                     index++
@@ -47,6 +47,7 @@ public value class LongBits(public val long: Long) : Iterable<Int> {
     }
 
     public operator fun contains(index: Int): Boolean = (long and (1L shl index)) > 0L
+
     override fun toString(): String = buildString {
         var wasOn = false
         var start = -1
