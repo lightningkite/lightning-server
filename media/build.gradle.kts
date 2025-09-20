@@ -15,6 +15,8 @@ dependencies {
     api(libs.scrimage)
     api(libs.scrimageWebP)
     api(libs.scrimageFormats)
+    testImplementation(libs.kotlinTest)
+    testImplementation(libs.kotlinTestJunit)
 }
 
 ksp {

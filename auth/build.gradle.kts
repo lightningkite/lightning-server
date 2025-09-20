@@ -14,6 +14,8 @@ dependencies {
     api(project(":core"))
     api(libs.serviceAbstractionsDatabase)
     api(libs.kotlinReflect)
+    testImplementation(libs.kotlinTest)
+    testImplementation(libs.kotlinTestJunit)
 }
 
 ksp {

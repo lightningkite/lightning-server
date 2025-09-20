@@ -29,6 +29,8 @@ dependencies {
     implementation(libs.coroutinesReactive)
     implementation(libs.coroutinesJdk)
     api(libs.kotlinReflect)
+    testImplementation(libs.kotlinTest)
+    testImplementation(libs.kotlinTestJunit)
 }
 
 ksp {

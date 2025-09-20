@@ -32,7 +32,7 @@ private fun InterfaceInfo.virtualTypeReference(registry: SerializationRegistry):
 public context(runtime: ServerRuntime)
 val lightningServerKSchema: LightningServerKSchema get() {
     val registry = SerializationRegistry(runtime.externalSerialization.serializersModule).also {
-        it.registerShared()
+        it.registerLightningKiteCommonSerializers()
     }
 
     runtime.server.endpoints.forEach { (path, endpoints) ->

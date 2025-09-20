@@ -7,7 +7,7 @@ import kotlinx.serialization.builtins.serializer
 import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalSerializationApi::class)
-internal fun SerializationRegistry.registerShared() {
+public fun SerializationRegistry.registerLightningKiteCommonSerializers() {
     register(com.lightningkite.GeoCoordinate.serializer())
     register(com.lightningkite.TrimmedString.serializer())
     register(com.lightningkite.CaselessString.serializer())

@@ -23,6 +23,8 @@ dependencies {
     implementation(libs.bouncyCastleBcpkix)
 
     implementation(libs.webauthn4jCore)
+    testImplementation(libs.kotlinTest)
+    testImplementation(libs.kotlinTestJunit)
 
     ksp(libs.serviceAbstractionsDatabaseProcessor)
 }

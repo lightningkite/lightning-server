@@ -25,6 +25,7 @@ dependencies {
     api(libs.kotlinxCryptoCore)
     api(libs.kotlinxCryptoOptimal)
 
+    testImplementation(libs.kotlinTest)
     testImplementation(libs.kotlinTestJunit)
 }
 

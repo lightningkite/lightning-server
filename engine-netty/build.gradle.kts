@@ -28,6 +28,8 @@ dependencies {
     implementation(libs.nettyTransportClassesEpoll)
     implementation(libs.nettyTransportClassesKqueue)
 
+    testImplementation(libs.kotlinTest)
+    testImplementation(libs.kotlinTestJunit)
     testImplementation("com.squareup.okhttp3:okhttp:4.12.0")
 }
 

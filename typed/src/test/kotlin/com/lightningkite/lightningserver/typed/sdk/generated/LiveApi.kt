@@ -7,10 +7,10 @@ import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.ListSerializer
 
 class LiveApi(val fetcher: Fetcher) : Api {
-	override suspend fun improperSDKFunctionName(): kotlin.Int =
-		fetcher("", HttpMethod.POST, kotlin.Unit.serializer(), kotlin.Unit, kotlin.Int.serializer())
 	override suspend fun index(): kotlin.Int =
 		fetcher("", HttpMethod.GET, kotlin.Unit.serializer(), kotlin.Unit, kotlin.Int.serializer())
+	override suspend fun improperSDKFunctionName(): kotlin.Int =
+		fetcher("", HttpMethod.POST, kotlin.Unit.serializer(), kotlin.Unit, kotlin.Int.serializer())
 	override suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int =
 		fetcher("inline/action/${fetcher.url(id, kotlin.uuid.Uuid.serializer())}/${fetcher.url(category, kotlin.uuid.Uuid.serializer())}", HttpMethod.POST, kotlin.Unit.serializer(), kotlin.Unit, kotlin.Int.serializer())
 

@@ -18,7 +18,7 @@ dependencies {
     api(project(":engine-ktor"))
     api(project(":typed"))
     api(project(":engine-aws-serverless"))
-    api(project(":jdk-server"))
+    api(project(":engine-jdk-server"))
     api(project(":engine-netty"))
     api(project(":sessions"))
     api(project(":sessions-email"))
@@ -65,6 +65,7 @@ dependencies {
     implementation(libs.kotlinerCli)
     implementation(libs.ktorCallLogging)
     implementation(project(":sessions"))
+    testImplementation(libs.kotlinTest)
     testImplementation(libs.kotlinTestJunit)
 }
 

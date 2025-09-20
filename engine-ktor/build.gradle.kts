@@ -28,6 +28,7 @@ dependencies {
 
     // Test dependencies
     testImplementation(libs.kotlinTest)
+    testImplementation(libs.kotlinTestJunit)
     testImplementation(libs.ktorTestHost)
 }
 

@@ -72,7 +72,7 @@ kotlin {
             }
         }
         val jvmTest by getting {
-            dependsOn(commonTest)
+
         }
     }
 }

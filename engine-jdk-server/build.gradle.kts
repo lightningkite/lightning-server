@@ -16,6 +16,8 @@ dependencies {
     api(libs.serviceAbstractionsCache)
     api(libs.serviceAbstractionsPubsub)
     api(libs.kotlinReflect)
+    testImplementation(libs.kotlinTest)
+    testImplementation(libs.kotlinTestJunit)
 }
 
 ksp {

@@ -61,7 +61,7 @@ public fun ServerSettings.loadFromFile(
     val serializer = SettingsSerializer(settings.sortedBy { it.name }, format)
 
     if (!file.exists()) {
-        file.writeText(format.encodeToString(serializer, settings.associateWith { it.default }))
+        file.writeString(format.encodeToString(serializer, settings.associateWith { it.default }))
         throw MissingSettingFile(file)
     }
 
@@ -86,9 +86,9 @@ public fun ServerSettings.loadFromFile(
     }
     if (missingKeys.isNotEmpty()) {
         val suggestedFile =
-            file.resolve("./" + file.nameWithoutExtension.replace(".enc", "") + ".suggested." + file.extension)
+            file.parent!!.resolve(file.nameWithoutExtension.replace(".enc", "") + ".suggested." + file.extension)
 
-        suggestedFile.writeText(format.encodeToString(serializer, loaded))
+        suggestedFile.writeString(format.encodeToString(serializer, loaded))
         throw IncompleteSettingsException(missingKeys, suggestedFile)
     }
     this.include(loaded)

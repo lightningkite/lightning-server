@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.settings
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
+import com.lightningkite.services.data.workingDirectory
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.EmptySerializersModule
 import java.io.File
@@ -13,7 +14,7 @@ class SettingsLoaderFileTest {
     @Serializable
     data class Complex(val string: String, val number: Int)
 
-    val testRoot = File("build/test-run")
+    val testRoot = workingDirectory.then("build", "test-run")
 
     object Server: ServerBuilder() {
         val webUrl = setting("webUrl", "http://localhost:8080")
@@ -30,7 +31,7 @@ class SettingsLoaderFileTest {
         testRoot.deleteRecursively()
         testRoot.mkdirs()
         val file = testRoot.resolve("test.properties").also {
-            it.writeText(
+            it.writeString(
                 """
                 general.port=8941
                 secretBasis=1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
@@ -52,7 +53,7 @@ class SettingsLoaderFileTest {
         testRoot.deleteRecursively()
         testRoot.mkdirs()
         val file = testRoot.resolve("test.json").also {
-            it.writeText(
+            it.writeString(
                 """
                 {
                     general: {},
@@ -77,8 +78,8 @@ class SettingsLoaderFileTest {
     fun testPropertiesClean() {
         testRoot.deleteRecursively()
         testRoot.mkdirs()
-        val file = testRoot.resolve("test.properties").also {
-            it.writeText("")
+        val file = testRoot.then("test.properties").also {
+            it.writeString("")
         }
         try {
             ServerSettings(allSettings)
@@ -86,8 +87,8 @@ class SettingsLoaderFileTest {
                 .allSerializable()
                 .forEach { println("${it.key.name}: ${it.value}") }
         } catch(e: IncompleteSettingsException) {
-            println("---SUGGESTED---\n${e.suggestedFile.readText()}\n")
-            e.suggestedFile.copyRecursively(file, overwrite = true)
+            println("---SUGGESTED---\n${e.suggestedFile.readString()}\n")
+            e.suggestedFile.copyTo(file, overwrite = true)
         }
         ServerSettings(allSettings)
             .apply { loadFromFile(file, EmptySerializersModule()) }
@@ -98,8 +99,8 @@ class SettingsLoaderFileTest {
     fun testJsonClean() {
         testRoot.deleteRecursively()
         testRoot.mkdirs()
-        val file = testRoot.resolve("test.json").also {
-            it.writeText("{}")
+        val file = testRoot.then("test.json").also {
+            it.writeString("{}")
         }
         try {
             ServerSettings(allSettings)
@@ -107,8 +108,8 @@ class SettingsLoaderFileTest {
                 .allSerializable()
                 .forEach { println("${it.key.name}: ${it.value}") }
         } catch(e: IncompleteSettingsException) {
-            println("---SUGGESTED---\n${e.suggestedFile.readText()}\n")
-            e.suggestedFile.copyRecursively(file, overwrite = true)
+            println("---SUGGESTED---\n${e.suggestedFile.readString()}\n")
+            e.suggestedFile.copyTo(file, overwrite = true)
         }
         ServerSettings(allSettings)
             .apply { loadFromFile(file, EmptySerializersModule()) }

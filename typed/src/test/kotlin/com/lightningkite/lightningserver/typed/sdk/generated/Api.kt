@@ -4,6 +4,12 @@ package com.lightningkite.lightningserver.typed.sdk
 
 interface Api {
 	/**
+	 * Index
+	 * 
+	 * **Auth Requirements:** Not Authenticated
+	 * */
+	suspend fun index(): kotlin.Int
+	/**
 	 * Action
 	 * 
 	 * Does something really really cool...
@@ -11,12 +17,6 @@ interface Api {
 	 * **Auth Requirements:** User *or* Not Authenticated
 	 * */
 	suspend fun improperSDKFunctionName(): kotlin.Int
-	/**
-	 * Index
-	 * 
-	 * **Auth Requirements:** Not Authenticated
-	 * */
-	suspend fun index(): kotlin.Int
 	/**
 	 * Inlined Endpoint
 	 * 
