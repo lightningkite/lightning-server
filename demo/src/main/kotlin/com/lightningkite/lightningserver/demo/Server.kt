@@ -53,7 +53,7 @@ object Server : ServerBuilder() {
     val cache = setting("cache", Cache.Settings())
     val cors = setting("cors", CorsSettings())
 
-    val corsInterceptor = CorsInterceptor(cors).also { install(it) }
+    val corsInterceptor = install(CorsInterceptor(cors))
 
     init {
         JavaSmtpEmailService
@@ -62,7 +62,7 @@ object Server : ServerBuilder() {
         MongoDatabase
         MemcachedCache
         S3PublicFileSystem
-        StartupOnce("adminUser", database) {
+        path.path("adminUser") bind StartupOnce(database) {
             database().table<User>().insertOne(
                 User(
                     email = "joseph+admin@lightningkite.com",
@@ -121,7 +121,7 @@ object Server : ServerBuilder() {
     }
 
     val slashEscaping = path.path("variable").arg<String>("stupidid").get bind HttpHandler { request ->
-        HttpResponse.plainText("The variable is '${request.path.pathInContext.rawPathArguments[0]}'")
+        HttpResponse.plainText("The variable is '${request.path.first}'")
     }
 
     val topic = path.path("socket-topic").topic(String.serializer())

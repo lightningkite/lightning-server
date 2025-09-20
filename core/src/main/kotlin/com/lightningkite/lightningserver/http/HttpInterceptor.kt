@@ -5,12 +5,13 @@ import com.lightningkite.lightningserver.runtime.instrument
 
 public fun interface HttpInterceptor {
     public val name: String get() = this::class.simpleName ?: "anonymous"
+
     context(runtime: ServerRuntime)
-    public suspend fun handle(request: HttpRequest<*>, cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse): HttpResponse
+    public suspend fun intercept(request: HttpRequest<*>, cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse): HttpResponse
 
     public object None : HttpInterceptor {
         context(runtime: ServerRuntime)
-        override suspend fun handle(
+        override suspend fun intercept(
             request: HttpRequest<*>,
             cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse
         ): HttpResponse {
@@ -19,19 +20,26 @@ public fun interface HttpInterceptor {
     }
 }
 
-context(server: ServerRuntime) public suspend inline fun HttpInterceptor.handleInstrumented(request: HttpRequest<*>, noinline action: suspend ServerRuntime.(HttpRequest<*>) -> HttpResponse): HttpResponse {
+context(server: ServerRuntime)
+public suspend inline fun HttpInterceptor.interceptInstrumented(request: HttpRequest<*>, noinline action: suspend ServerRuntime.(HttpRequest<*>) -> HttpResponse): HttpResponse {
     return instrument(name) {
-        handle(request, action)
+        intercept(request, action)
     }
 }
 
-internal fun List<HttpInterceptor>.compileAndInstrument(): HttpInterceptor = when(size) {
+internal fun List<HttpInterceptor>.compileAndInstrument(): HttpInterceptor = when (size) {
     0 -> HttpInterceptor.None
-    else -> {
-        val outermost = this[0]
-        val start = HttpInterceptor { request, cont -> outermost.handleInstrumented(request, cont) }
-        drop(1).fold(start) { earlierInterceptors, interceptor ->
-            HttpInterceptor { request, cont -> earlierInterceptors.handle(request) { interceptor.handleInstrumented(it, cont) } }
+    1 -> HttpInterceptor { request, cont -> first().interceptInstrumented(request, cont) }
+    else -> reduceIndexed { idx, acc, interceptor ->
+        when {
+            acc === HttpInterceptor.None -> interceptor
+            interceptor === HttpInterceptor.None -> acc
+
+            else -> HttpInterceptor { request, cont ->
+                // idx is of the current interceptor in the list, so will start at 1
+                if (idx == 1) acc.interceptInstrumented(request) { interceptor.interceptInstrumented(it, cont) }
+                else acc.intercept(request) { interceptor.interceptInstrumented(it, cont) }
+            }
         }
     }
 }

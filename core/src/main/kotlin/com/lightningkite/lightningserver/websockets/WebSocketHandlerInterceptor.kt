@@ -7,46 +7,12 @@ import kotlinx.serialization.KSerializer
 
 public interface WebSocketHandlerInterceptor {
     public val name: String get() = this::class.simpleName ?: "anonymous"
-    public operator fun <PATH : PathSpec, T> invoke(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T>
+
+    public fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T>
 
     public object None : WebSocketHandlerInterceptor {
-        override fun <PATH: PathSpec, T> invoke(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> = handler
+        override fun <PATH: PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> = handler
     }
-//
-//    public class Builder(
-//        interceptors: List<WebSocketHandlerInterceptor> = emptyList()
-//    ) {
-//        private data class Combine(
-//            val first: WebSocketHandlerInterceptor,
-//            val second: WebSocketHandlerInterceptor
-//        ) : WebSocketHandlerInterceptor {
-//            override fun <PATH : PathSpec, T> invoke(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> = second(first(handler))
-//        }
-//
-//        private fun WebSocketHandlerInterceptor.then(other: WebSocketHandlerInterceptor) = when {
-//            this === None -> other
-//            other === None -> this
-//            else -> Combine(this, other)
-//        }
-//
-//        private val _interceptors = ArrayList(interceptors)
-//        public val interceptors: List<WebSocketHandlerInterceptor> get() = _interceptors
-//
-//        /**
-//         * Adds the provided [interceptor] to the end of the interception list.
-//         * */
-//        public fun register(interceptor: WebSocketHandlerInterceptor) {
-//            _interceptors.add(interceptor)
-//        }
-//
-//        /**
-//         * Adds the provided [interceptor] to the end of the interception list.
-//         * */
-//        public operator fun plusAssign(interceptor: WebSocketHandlerInterceptor) { register(interceptor) }
-//
-//        public fun build(): WebSocketHandlerInterceptor =
-//            interceptors.reduceOrNull { acc, interceptor -> acc.then(interceptor) } ?: None
-//    }
 }
 
 
@@ -101,16 +67,16 @@ internal fun List<WebSocketHandlerInterceptor>.compileAndInstrument(): WebSocket
             object: WebSocketHandlerInterceptor {
                 override val name: String
                     get() = one.name
-                override fun <PATH : PathSpec, T> invoke(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> {
-                    return one.invoke(handler).instrumented(one.name)
+                override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> {
+                    return one.intercept(handler).instrumented(one.name)
                 }
             }
         }
         else -> {
-            reversed().reduceOrNull { laterInterceptors, interceptor ->
+            reduceRightOrNull { laterInterceptors, interceptor ->
                 object: WebSocketHandlerInterceptor {
-                    override fun <PATH : PathSpec, T> invoke(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> {
-                        return laterInterceptors(interceptor(handler).instrumented(interceptor.name))
+                    override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> {
+                        return laterInterceptors.intercept(interceptor.intercept(handler).instrumented(interceptor.name))
                     }
                 }
             } ?: WebSocketHandlerInterceptor.None

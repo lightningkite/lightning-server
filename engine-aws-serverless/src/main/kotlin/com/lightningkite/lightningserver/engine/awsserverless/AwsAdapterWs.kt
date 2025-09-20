@@ -191,7 +191,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     return@forSubscribers
                 }
                 val p = match.path
-                val h = root.server.compiledWebsocketInterceptors(match.value)
+                val h = root.server.compiledWebsocketInterceptors.intercept(match.value)
                 @Suppress("UNCHECKED_CAST")
                 h as WebSocketHandler<PathSpec, Any?>
                 // TODO: could retrieve more states at once?

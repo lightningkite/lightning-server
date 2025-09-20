@@ -121,7 +121,7 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
                     )
                     return@webSocket
                 }
-                val socketHandler = server.compiledWebsocketInterceptors(match.value)
+                val socketHandler = server.compiledWebsocketInterceptors.intercept(match.value)
 
                 @Suppress("UNCHECKED_CAST")
                 socketHandler as WebSocketHandler<PathSpec, Any?>
