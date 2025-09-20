@@ -77,7 +77,7 @@ public class WebAuthNProofEndpoints(
             it.disabledAt.eq(null) and (it.expiresAt.eq(null) or it.expiresAt.notNull.gt(now()))
         }
 
-    public val modelInfo: ModelInfo<HasId<AnyId>, WebAuthNCredential, String> = database.modelInfo(
+    public val modelInfo: ModelInfo<HasId<*>, WebAuthNCredential, String> = database.modelInfo(
         auth = proofMethodAuth or AuthRequirement.IsAdmin,
         permissions = {
             val admin = condition<WebAuthNCredential>(AuthRequirement.IsAdmin.accepts(authOrNull))
@@ -110,7 +110,7 @@ public class WebAuthNProofEndpoints(
         }
     )
 
-    public val rest: ModelRestEndpoints<HasId<AnyId>, WebAuthNCredential, String> = path.path("credentials") include ModelRestEndpoints(modelInfo)
+    public val rest: ModelRestEndpoints<HasId<*>, WebAuthNCredential, String> = path.path("credentials") include ModelRestEndpoints(modelInfo)
 
 
     private fun challengeCacheKey(key: String): String =
@@ -169,7 +169,7 @@ public class WebAuthNProofEndpoints(
             .toList()
 
     @OptIn(ExperimentalEncodingApi::class)
-    public val registerStart: ApiHttpHandler<PathSpec0, HasId<AnyId>, WebAuthN.GeneralPreference, WebAuthN.Registration.RegistrationResponse> =
+    public val registerStart: ApiHttpHandler<PathSpec0, HasId<*>, WebAuthN.GeneralPreference, WebAuthN.Registration.RegistrationResponse> =
         path.path("register-start").post bind ApiHttpHandler(
             auth = proofMethodAuth,
             summary = "Issue WebAuthN creation challenge",
@@ -219,7 +219,7 @@ public class WebAuthNProofEndpoints(
         )
 
     @OptIn(ExperimentalEncodingApi::class)
-    public val registerFinish: ApiHttpHandler<PathSpec0, HasId<AnyId>, WebAuthN.Registration.RegisterRequest, Unit> =
+    public val registerFinish: ApiHttpHandler<PathSpec0, HasId<*>, WebAuthN.Registration.RegisterRequest, Unit> =
         path.path("register-finish").post bind ApiHttpHandler(
             auth = proofMethodAuth,
             summary = "Establish WebAuthN Credential",
@@ -305,7 +305,7 @@ public class WebAuthNProofEndpoints(
     // keys. If they do, then we must return the subjects existing credential IDs. If a user hits this endpoint WITH
     // authentication, then they are re-authenticating, and we will return the existing credential ids regardless of
     // identity provided.
-    public val start: ApiHttpHandler<PathSpec0, HasId<AnyId>?, Identification, WebAuthN.Authentication.StartResponse> =
+    public val start: ApiHttpHandler<PathSpec0, HasId<*>?, Identification, WebAuthN.Authentication.StartResponse> =
         path.path("start").post bind ApiHttpHandler(
             auth = anyAuth or noAuth,
             summary = "Begin WebAuthN challenge",
@@ -378,7 +378,7 @@ public class WebAuthNProofEndpoints(
 
 
     @OptIn(ExperimentalEncodingApi::class)
-    public val prove: ApiHttpHandler<PathSpec0, HasId<AnyId>?, WebAuthN.Authentication.ProveRequest, Proof> =
+    public val prove: ApiHttpHandler<PathSpec0, HasId<*>?, WebAuthN.Authentication.ProveRequest, Proof> =
         path.path("prove").post bind ApiHttpHandler(
             auth = noAuth,
             summary = "Prove WebAuthN ownership",

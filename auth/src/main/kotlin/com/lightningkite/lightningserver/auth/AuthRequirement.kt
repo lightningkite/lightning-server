@@ -52,15 +52,26 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
     /**
      * No requirements, will accept any authentication or `null`
      * */
-    public data object None : AuthRequirement<Nothing?> {
+    public data object None : AuthRequirement<HasId<*>?> {
         override val requiredScopes: Runtime.Constant<Set<RequiredScope>> get() = Runtime.Constant(emptySet())
         override fun subscope(subscopes: Iterable<Subscope>): None = this
 
         context(server: ServerRuntime)
         override suspend fun accepts(auth: Authentication<*>?): Boolean = true
 
-        @Suppress("UNCHECKED_CAST")
-        public fun <SUBJECT : HasId<*>> typed(): AuthRequirement<SUBJECT?> = this as AuthRequirement<SUBJECT?>
+        override fun toString(): String = "No Requirements"
+    }
+
+    /**
+     * Only accepts no authentication, e.g. `auth == null`
+     * */
+    public data object NotAuthenticated : AuthRequirement<Nothing?> {
+        override val requiredScopes: Runtime.Constant<Set<RequiredScope>> get() = Runtime.Constant(emptySet())
+        override fun subscope(subscopes: Iterable<Subscope>): NotAuthenticated = this
+
+        context(server: ServerRuntime)
+        override suspend fun accepts(auth: Authentication<*>?): Boolean = auth == null
+
         override fun toString(): String = "Not Authenticated"
     }
 
@@ -72,7 +83,7 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
      * */
     public abstract class AuthSetting(
         public val default: AuthRequirement<*>? = null
-    ) : AuthRequirement<HasId<AnyId>>, MutableExtensions.Key<AuthRequirement<HasId<*>>> {
+    ) : AuthRequirement<HasId<*>>, MutableExtensions.Key<AuthRequirement<HasId<*>>> {
         context(server: ServerRuntime)
         public fun setting(): AuthRequirement<*>? = server.server.extensions[this]
 
@@ -86,7 +97,7 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
         public data class Scoped(
             val wraps: AuthSetting,
             val subscopes: Iterable<Subscope>
-        ) : AuthRequirement<HasId<AnyId>> {
+        ) : AuthRequirement<HasId<*>> {
             override val requiredScopes: Runtime<Set<RequiredScope>> =
                 Runtime { wraps.setting()?.requiredScopes()?.subscope(subscopes) ?: emptySet() }
 
@@ -107,7 +118,7 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
         val scopes: Set<RequiredScope> = setOf(RequiredScope.root),
         val maxAge: Duration? = null,
         val requirement: (suspend context(ServerRuntime) (Authentication<*>) -> Boolean)? = null
-    ) : AuthRequirement<HasId<AnyId>> {
+    ) : AuthRequirement<HasId<*>> {
         override val requiredScopes: Runtime.Constant<Set<RequiredScope>>
             get() = Runtime.Constant(scopes)
 

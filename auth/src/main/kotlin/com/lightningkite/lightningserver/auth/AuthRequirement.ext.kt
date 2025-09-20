@@ -28,14 +28,12 @@ public suspend fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.assert(
 
 public fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.subscope(subscope: Subscope): AuthRequirement<SUBJECT> = subscope(listOf(subscope))
 
-public typealias AnyId = Comparable<Any?>
-public typealias NoAuth = AuthRequirement<HasId<AnyId>?>
-public typealias AuthAny = AuthRequirement<HasId<AnyId>>
 
-public val noAuth: AuthRequirement.None = AuthRequirement.None
-public val anyAuth: AuthAny = AuthRequirement.Authenticated()
+public val noAuth: AuthRequirement.None get() = AuthRequirement.None
 
-public val recentRootAuth: AuthAny =
+public val anyAuth: AuthRequirement.Authenticated = AuthRequirement.Authenticated()
+
+public val recentRootAuth: AuthRequirement.Authenticated =
     AuthRequirement.Authenticated(
         scopes = setOf(RequiredScope.root), // root access
         maxAge = 10.minutes
@@ -60,20 +58,12 @@ public infix fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.or(
     other: AuthRequirement<SUBJECT>
 ): AuthRequirement<SUBJECT> = Options(options() + other.options())
 
-public infix fun <SUBJECT : HasId<*>> AuthRequirement<SUBJECT>.or(
-    other: AuthRequirement.None
-): AuthRequirement<SUBJECT?> = Options(options() + other.typed())
 
-public infix fun <SUBJECT : HasId<*>> AuthRequirement.None.or(
-    other: AuthRequirement<SUBJECT>
-): AuthRequirement<SUBJECT?> = Options(other.options() + this.typed())
-
-
-public val AuthRequirement.Companion.isSuperUser: AuthAny
+public val AuthRequirement.Companion.isSuperUser: AuthRequirement<HasId<*>>
     get() = AuthRequirement.IsSuperUser
-public val AuthRequirement.Companion.isAdmin: AuthAny
+public val AuthRequirement.Companion.isAdmin: AuthRequirement<HasId<*>>
     get() = AuthRequirement.IsAdmin
-public val AuthRequirement.Companion.isDeveloper: AuthAny
+public val AuthRequirement.Companion.isDeveloper: AuthRequirement<HasId<*>>
     get() = AuthRequirement.IsDeveloper
 
 context(builder: ServerBuilder)

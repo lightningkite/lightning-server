@@ -82,7 +82,7 @@ public class BackupCodeEndpoints(
             permissions = { ModelPermissions<BackupCodeSecret>() }
         )
 
-    public val resetCodes: ApiHttpHandler<PathSpec0, HasId<AnyId>, Unit, List<String>> =
+    public val resetCodes: ApiHttpHandler<PathSpec0, HasId<*>, Unit, List<String>> =
         path.path("reset-codes").post bind explicitApiHttpHandler(
             summary = "Reset Codes",
             inputType = Unit.serializer(),
@@ -119,7 +119,7 @@ public class BackupCodeEndpoints(
             }
         )
 
-    public val clearCodes: ApiHttpHandler<PathSpec0, HasId<AnyId>, Unit, Unit> =
+    public val clearCodes: ApiHttpHandler<PathSpec0, HasId<*>, Unit, Unit> =
         path.path("clear-codes").post bind explicitApiHttpHandler(
             summary = "Clear Codes",
             inputType = Unit.serializer(),
@@ -138,7 +138,7 @@ public class BackupCodeEndpoints(
             }
         )
 
-    public val established: ApiHttpHandler<PathSpec0, HasId<AnyId>, Unit, Boolean> =
+    public val established: ApiHttpHandler<PathSpec0, HasId<*>, Unit, Boolean> =
         path.path("established").get bind explicitApiHttpHandler(
             summary = "Established",
             inputType = Unit.serializer(),
@@ -154,7 +154,7 @@ public class BackupCodeEndpoints(
             }
         )
 
-    public override val prove: ApiHttpHandler<PathSpec0, HasId<AnyId>?, IdentificationAndPassword, Proof> =
+    public override val prove: ApiHttpHandler<PathSpec0, HasId<*>?, IdentificationAndPassword, Proof> =
         path.path("prove").post bind ApiHttpHandler(
             auth = noAuth,
             summary = "Prove With Backup Code",

@@ -86,7 +86,7 @@ public class MetaEndpoints(
 
     public val docs: ApiDocs = path.path("docs") include ApiDocs(packageName)
 
-    public val health: ApiHttpHandler<PathSpec0, HasId<AnyId>?, Unit, ServerHealth> =
+    public val health: ApiHttpHandler<PathSpec0, HasId<*>?, Unit, ServerHealth> =
         path.path("health").get bind explicitApiHttpHandler(
             auth = noAuth,
             inputType = Unit.serializer(),
@@ -354,7 +354,7 @@ public class MetaEndpoints(
             )
         }
 
-    public val bulk: ApiHttpHandler<PathSpec0, HasId<AnyId>?, Map<String, BulkRequest>, Map<String, BulkResponse>> = path.path("bulk").post bind ApiHttpHandler(
+    public val bulk: ApiHttpHandler<PathSpec0, HasId<*>?, Map<String, BulkRequest>, Map<String, BulkResponse>> = path.path("bulk").post bind ApiHttpHandler(
         summary = "Bulk Request",
         description = "Performs multiple requests at once, returning the results in the same order.",
         auth = noAuth,

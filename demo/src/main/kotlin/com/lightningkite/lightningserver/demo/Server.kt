@@ -93,8 +93,8 @@ object Server : ServerBuilder() {
 
     }
 
-    val userInfo = database.modelInfo<User?, User, Uuid>(
-        auth = UserAuth.auth() or noAuth,
+    val userInfo = database.modelInfo(
+        auth = UserAuth.auth() or AuthRequirement.NotAuthenticated,
         permissions = {
             val user = authOrNull?.fetch()
             val everyone: Condition<User> = Condition.Always

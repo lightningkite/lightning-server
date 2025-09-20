@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.typed.sdk
 
-import com.lightningkite.lightningserver.auth.AnyId
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.RequiredScope
@@ -90,7 +89,7 @@ data class TestInput(
     val name: String
 )
 
-private val testEndpoint = explicitApiHttpHandler<PathSpec1<String>, HasId<AnyId>?, TestInput, String>(
+private val testEndpoint = explicitApiHttpHandler<PathSpec1<String>, HasId<*>?, TestInput, String>(
     summary = "Test Endpoint",
     functionName = "testSdkEndpoint",
     description = "This is a test endpoint for the sdk",

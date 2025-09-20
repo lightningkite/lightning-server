@@ -3,7 +3,6 @@ package com.lightningkite.lightningserver.sessions
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.ForbiddenException
 import com.lightningkite.lightningserver.UnauthorizedException
-import com.lightningkite.lightningserver.auth.AnyId
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.GrantedScope
@@ -234,7 +233,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         return session
     }
 
-    public val tokenSimple: ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, String> =
+    public val tokenSimple: ApiHttpHandler<PathSpec0, HasId<*>?, String, String> =
         path.path("token").path("simple").post bind ApiHttpHandler(
             auth = noAuth,
             summary = "Get Token Simple",
