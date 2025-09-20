@@ -1,14 +1,11 @@
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.lightningserver.LightningServerDsl
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.StartupTask
-import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.location
+import com.lightningkite.lightningserver.runtime.locationOrNull
 import com.lightningkite.lightningserver.runtime.now
-import com.lightningkite.lightningserver.typed.started
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
@@ -85,7 +82,7 @@ public suspend fun doOnce(
  * Creates a [StartupTask] that calls [doOnce] with its bound path as its key.
  * */
 @Suppress("FunctionName")
-public fun StartupOnce(
+public fun startupOnce(
     database: Runtime<Database>,
     dependencies: List<StartupTask> = emptyList(),
     timeout: Duration = 60.seconds,
@@ -94,30 +91,11 @@ public fun StartupOnce(
     var task: StartupTask? = null
     task = StartupTask(dependencies, timeout) {
         doOnce(
-            key = task?.location?.toString() ?: throw IllegalStateException("StartupOnce not bound to path"),
+            key = task?.locationOrNull?.toString() ?: throw IllegalStateException("StartupOnce not bound to path"),
             database = database,
             timeout = timeout,
             action = action
         )
     }
     return task
-}
-
-/**
- * Creates a [StartupTask] that calls [doOnce] with the provided key.
- * */
-@Suppress("FunctionName")
-public fun StartupOnce(
-    key: String,
-    database: Runtime<Database>,
-    dependencies: List<StartupTask> = emptyList(),
-    timeout: Duration = 60.seconds,
-    action: suspend context(ServerRuntime) () -> Unit
-): StartupTask = StartupTask(dependencies, timeout) {
-    doOnce(
-        key = key,
-        database = database,
-        timeout = timeout,
-        action = action
-    )
 }

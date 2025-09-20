@@ -9,7 +9,6 @@ import com.lightningkite.lightningserver.cors.CorsInterceptor
 import com.lightningkite.lightningserver.cors.CorsSettings
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.*
-import com.lightningkite.lightningserver.deprecations.startupOnce
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.first
@@ -62,7 +61,7 @@ object Server : ServerBuilder() {
         MongoDatabase
         MemcachedCache
         S3PublicFileSystem
-        path.path("adminUser") bind StartupOnce(database) {
+        path.path("adminUser") bind startupOnce(database) {
             database().table<User>().insertOne(
                 User(
                     email = "joseph+admin@lightningkite.com",
@@ -72,7 +71,7 @@ object Server : ServerBuilder() {
         }
     }
 
-    val admins = path.path("setup-admins") bind StartupOnce(database) {
+    val admins = path.path("setup-admins") bind startupOnce(database) {
         userInfo.table().insertOne(User(email = "joseph+root@lightningkite.com", isSuperUser = true))
     }
 
