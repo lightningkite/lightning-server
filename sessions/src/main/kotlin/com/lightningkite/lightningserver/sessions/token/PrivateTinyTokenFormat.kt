@@ -8,7 +8,6 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.services.database.HasId
 import dev.whyoleg.cryptography.operations.Cipher
-import java.lang.Exception
 import javax.crypto.AEADBadTagException
 import kotlin.io.encoding.Base64
 import kotlin.time.Duration
@@ -20,28 +19,28 @@ public class PrivateTinyTokenFormat(
 ): TokenFormat {
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> create(
-        handler: PrincipalType<SUBJECT, ID>,
+        principal: PrincipalType<SUBJECT, ID>,
         auth: Authentication<SUBJECT>
     ): String =
-        handler.name + '/' + cipher.await().encrypt(
+        principal.name + '/' + cipher.await().encrypt(
             server.internalSerialization.kotlinBytesFormat.encodeToByteArray(
-                Authentication.serializer(handler.subjectSerializer),
+                Authentication.serializer(principal.subjectSerializer),
                 auth.copy(expiration = now().plus(expiration))
             )
         ).let(Base64.UrlSafe::encode)
 
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> read(
-        handler: PrincipalType<SUBJECT, ID>,
+        principal: PrincipalType<SUBJECT, ID>,
         value: String
     ): Authentication<SUBJECT>? {
-        if (!value.startsWith(handler.name + '/')) return null
+        if (!value.startsWith(principal.name + '/')) return null
         try {
             val decoded = Base64.UrlSafe.decode(value.substringAfter('/'))
             val decrypted = cipher.await().decrypt(decoded)
 
             val auth = server.internalSerialization.kotlinBytesFormat.decodeFromByteArray(
-                Authentication.serializer(handler.subjectSerializer),
+                Authentication.serializer(principal.subjectSerializer),
                 decrypted
             )
             if (auth.expiration != null && now() > auth.expiration!!) throw TokenException("Token has expired")

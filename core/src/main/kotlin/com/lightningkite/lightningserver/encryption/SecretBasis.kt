@@ -21,7 +21,7 @@ import kotlin.io.encoding.Base64
  * A secure basis for cryptographic operations.
  * This class provides a foundation for cryptographic operations like signing and encryption.
  */
-@Serializable(SecretBasisSerializer::class)
+@Serializable(SecretBasis.Serializer::class)
 public data class SecretBasis(public val string: String) {
     public companion object {
         public const val BITS: Int = 512
@@ -139,11 +139,13 @@ public data class SecretBasis(public val string: String) {
         variant: String,
         size: BinarySize? = null
     ): K = decoder.decodeFromByteArrayBlocking(format, deriveBlocking(variant, size))
-}
 
-public object SecretBasisSerializer : KSerializer<SecretBasis> {
-    override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("com.lightningkite.lightningserver.encryption.SecretBasis", PrimitiveKind.STRING)
-    override fun deserialize(decoder: Decoder): SecretBasis = SecretBasis(decoder.decodeString())
-    override fun serialize(encoder: Encoder, value: SecretBasis) { encoder.encodeString(value.string) }
+
+
+    private object Serializer : KSerializer<SecretBasis> {
+        override val descriptor: SerialDescriptor =
+            PrimitiveSerialDescriptor("com.lightningkite.lightningserver.encryption.SecretBasis", PrimitiveKind.STRING)
+        override fun deserialize(decoder: Decoder): SecretBasis = SecretBasis(decoder.decodeString())
+        override fun serialize(encoder: Encoder, value: SecretBasis) { encoder.encodeString(value.string) }
+    }
 }
