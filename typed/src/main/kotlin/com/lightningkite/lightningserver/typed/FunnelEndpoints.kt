@@ -16,6 +16,8 @@ import com.lightningkite.lightningserver.pathing.PathSpec1
 import com.lightningkite.lightningserver.pathing.first
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
+import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.withSdkInfo
+import com.lightningkite.lightningserver.typed.sdk.module
 import com.lightningkite.services.HealthStatus
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toCollection
@@ -36,7 +38,7 @@ public class FunnelEndpoints(
     )
 
     public val summaryRest: ModelRestEndpoints<HasId<*>, FunnelSummary, Uuid> =
-        path.path("summary").path("rest") include ModelRestEndpoints(summaryInfo)
+        path.path("summary").path("rest") module ModelRestEndpoints(summaryInfo).withSdkInfo(valueName = "summaries")
 
     public val info: ModelInfo<HasId<*>, FunnelInstance, Uuid> = database.modelInfo(
         auth = read,
@@ -44,7 +46,7 @@ public class FunnelEndpoints(
     )
 
     public val rest: ModelRestEndpoints<HasId<*>, FunnelInstance, Uuid> =
-        path.path("instance").path("rest") include ModelRestEndpoints(info)
+        path.path("instance").path("rest") module ModelRestEndpoints(info).withSdkInfo(valueName = "instances")
 
 
     public val summaries: ApiHttpHandler<PathSpec1<LocalDate>, HasId<*>?, Unit, java.util.HashSet<FunnelSummary>> =

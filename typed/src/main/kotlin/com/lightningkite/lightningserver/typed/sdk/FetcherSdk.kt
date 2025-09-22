@@ -12,6 +12,7 @@ import com.lightningkite.lightningserver.typed.sdk.SDK.processToModules
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
 import com.lightningkite.services.data.KFile
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.nullable
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
@@ -55,12 +56,14 @@ public object FetcherSdk : SDK.Format {
 
         fun SDK.Module.writeInterface(depth: Int) {
 
-            val singleInterface = extendsInterfaces.singleOrNull()?.item?.takeIf { declaredFunctions.isEmpty() && depth > 0 }
+            val singleInterface = extendsInterfaces.singleOrNull()?.item?.takeIf { declaredFunctions.isEmpty() && children.isEmpty() && depth > 0 }
 
             appendLine()
 
             if (singleInterface == null) {
                 appendDepth(depth, "interface ${info.interfaceName}" + (if (extendsInterfaces.isEmpty()) "" else " : ${extendsInterfaces.joinToString { it.item.kotlinString() }}") + " {")
+
+                if (depth == 0) appendDepth(1, "fun withHeaderCalculator(calculator: suspend () -> List<Pair<String, String>>): ${info.interfaceName}")
 
                 for (function in declaredFunctions) {
                     val docs = buildList {
@@ -99,6 +102,7 @@ public object FetcherSdk : SDK.Format {
             "kotlinx.serialization.builtins.serializer",
             "kotlinx.serialization.builtins.MapSerializer",
             "kotlinx.serialization.builtins.ListSerializer",
+            "kotlinx.serialization.builtins.nullable"
         )
 
         fun PathSpec.toCodeString() = segments.joinToString("/", prefix = "\"", postfix = "\"") {
@@ -134,7 +138,12 @@ public object FetcherSdk : SDK.Format {
                     "${inter.item.kotlinString()} by ${inter.item.liveString(pathPrefix + inter.location)}"
                 }
 
-                if (depth == 0) appendLine("class Live${info.interfaceName}(val fetcher: Fetcher) : ${extendsInterfaces.joinToString()} {")
+                if (depth == 0) {
+                    appendLine("class Live${info.interfaceName}(val fetcher: Fetcher) : ${extendsInterfaces.joinToString()} {")
+
+                    appendDepth(1, "override fun withHeaderCalculator(calculator: suspend () -> List<Pair<String, String>>): Live${info.interfaceName} = ")
+                    appendDepth(2, "Live${info.interfaceName}(fetcher.withHeaderCalculator(calculator))")
+                }
                 else appendDepth(depth, "inner class Live${info.interfaceName} : ${extendsInterfaces.joinToString()} {")
 
                 for (function in declaredFunctions) {
