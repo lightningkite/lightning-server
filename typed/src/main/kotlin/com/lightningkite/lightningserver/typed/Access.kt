@@ -24,7 +24,7 @@ import java.security.Principal
  * Represents the authentication access from a [Request]. This is a convenience wrapper to
  * provide both the authentication and request the authentication came from.
  *
- * To create an [Access] instance use the [Request.access] factory function.
+ * To create an [Access] instance use the [Request.access] method.
  * */
 public class Access<REQ : Request<PATH>, PATH : PathSpec, SUBJECT : HasId<*>?> internal constructor(
     public val request: REQ,

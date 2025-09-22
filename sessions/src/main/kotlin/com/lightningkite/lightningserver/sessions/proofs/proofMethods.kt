@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
-import com.lightningkite.lightningserver.auth.AnyId
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.RequiredScope
@@ -40,20 +39,20 @@ public interface ProofMethod {
 }
 
 public interface DirectProofMethod : ProofMethod {
-    public val prove: ApiHttpHandler<PathSpec0, HasId<AnyId>?, IdentificationAndPassword, Proof>
+    public val prove: ApiHttpHandler<PathSpec0, HasId<*>?, IdentificationAndPassword, Proof>
 }
 
 public interface StringProofMethod : ProofMethod {
-    public val prove: ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, Proof>
+    public val prove: ApiHttpHandler<PathSpec0, HasId<*>?, String, Proof>
 }
 
 public interface StartedProofMethod : ProofMethod {
-    public val start: ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, String>
-    public val prove: ApiHttpHandler<PathSpec0, HasId<AnyId>?, FinishProof, Proof>
+    public val start: ApiHttpHandler<PathSpec0, HasId<*>?, String, String>
+    public val prove: ApiHttpHandler<PathSpec0, HasId<*>?, FinishProof, Proof>
 }
 
 public interface ExternalProofMethod : ProofMethod {
-    public val start: ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, String>
+    public val start: ApiHttpHandler<PathSpec0, HasId<*>?, String, String>
     public val indirectLink: PathSpec
 }
 

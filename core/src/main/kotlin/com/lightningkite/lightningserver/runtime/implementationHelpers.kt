@@ -23,7 +23,7 @@ import java.util.zip.GZIPOutputStream
 
 public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpResponse {
     return try {
-        server.compiledHttpInterceptors.handle(request) { req ->
+        server.compiledHttpInterceptors.intercept(request) { req ->
             this.logger.info { "${request.path} accessed by ${request.sourceIp}" }
             var result = try {
                 @Suppress("UNCHECKED_CAST")

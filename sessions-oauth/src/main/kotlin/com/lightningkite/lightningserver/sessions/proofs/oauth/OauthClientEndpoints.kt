@@ -43,7 +43,7 @@ public class OauthClientEndpoints(
     )
 
     public val rest: ModelRestEndpoints<out HasId<out Comparable<*>>?, out Comparable<*>, OauthClient, String> = ModelRestEndpoints(modelInfo)
-    public val createSecret: Locationed<HttpEndpoint<PathSpec1<String>>, ApiHttpHandler<PathSpec1<String>, HasId<AnyId>, AnyId, Unit, String?>> =
+    public val createSecret: Locationed<HttpEndpoint<PathSpec1<String>>, ApiHttpHandler<PathSpec1<String>, HasId<*>, AnyId, Unit, String?>> =
         path.arg<String>("_id").path("create-secret").post bind ApiHttpHandler(
         authOptions = maintainPermissions,
         summary = "Create Secret",

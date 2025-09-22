@@ -1,10 +1,9 @@
 package com.lightningkite.lightningserver.sessions
 
 import com.lightningkite.lightningserver.LSError
-import com.lightningkite.lightningserver.auth.AnyId
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.RequiredScope
-import com.lightningkite.lightningserver.auth.auth
+import com.lightningkite.lightningserver.auth.require
 import com.lightningkite.lightningserver.auth.fetch
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.Runtime
@@ -123,7 +122,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     public val authRequirements: ApiHttpHandler<PathSpec0, SUBJECT, Unit, AuthRequirements> =
         path.path("auth-requirements").get bind explicitApiHttpHandler(
-            auth = principal.auth(scopes = setOf(RequiredScope("auth:requirements"))),
+            auth = principal.require(scopes = setOf(RequiredScope("auth:requirements"))),
             inputType = Unit.serializer(),
             outputType = AuthRequirements.serializer(),
             summary = "Authentication Requirements",
@@ -150,7 +149,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             }
         )
     
-    public val login: ApiHttpHandler<PathSpec0, HasId<AnyId>?, List<Proof>, IdAndAuthMethods<ID>> =
+    public val login: ApiHttpHandler<PathSpec0, HasId<*>?, List<Proof>, IdAndAuthMethods<ID>> =
         path.path("login").post bind explicitApiHttpHandler(
             auth = noAuth,
             inputType = ListSerializer(Proof.serializer()),
@@ -164,7 +163,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             }
         )
 
-    public val login2: ApiHttpHandler<PathSpec0, HasId<AnyId>?, LogInRequest, IdAndAuthMethods<ID>> =
+    public val login2: ApiHttpHandler<PathSpec0, HasId<*>?, LogInRequest, IdAndAuthMethods<ID>> =
         path.path("login2").post bind explicitApiHttpHandler(
             auth = noAuth,
             inputType = LogInRequest.serializer(),
@@ -185,7 +184,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             }
         )
 
-    public val proofsCheck: ApiHttpHandler<PathSpec0, HasId<AnyId>?, List<Proof>, ProofsCheckResult<ID>> =
+    public val proofsCheck: ApiHttpHandler<PathSpec0, HasId<*>?, List<Proof>, ProofsCheckResult<ID>> =
         path.path("proofs-check").post bind explicitApiHttpHandler(
             auth = noAuth,
             inputType = ListSerializer(Proof.serializer()),

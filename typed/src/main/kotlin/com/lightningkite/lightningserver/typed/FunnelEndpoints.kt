@@ -2,7 +2,6 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.ZonedDateTime
 import com.lightningkite.atZone
-import com.lightningkite.lightningserver.auth.AnyId
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.auth.or
@@ -148,7 +147,7 @@ public class FunnelEndpoints(
             )!!._id
         }
 
-    public val error: ApiHttpHandler<PathSpec1<Uuid>, HasId<AnyId>?, String, Unit> =
+    public val error: ApiHttpHandler<PathSpec1<Uuid>, HasId<*>?, String, Unit> =
         path.path("error").arg<Uuid>("id").post bind ApiHttpHandler(
             auth = noAuth,
             summary = "Error Funnel Instance"
@@ -160,7 +159,7 @@ public class FunnelEndpoints(
         }
 
 
-    public val step: ApiHttpHandler<PathSpec1<Uuid>, HasId<AnyId>?, Int, Unit> =
+    public val step: ApiHttpHandler<PathSpec1<Uuid>, HasId<*>?, Int, Unit> =
         path.path("step").arg<Uuid>("id").post bind ApiHttpHandler(
             auth = noAuth,
             summary = "Set Step Funnel Instance"
@@ -171,7 +170,7 @@ public class FunnelEndpoints(
             Unit
         }
 
-    public val success: ApiHttpHandler<PathSpec1<Uuid>, HasId<AnyId>?, Unit, Unit> =
+    public val success: ApiHttpHandler<PathSpec1<Uuid>, HasId<*>?, Unit, Unit> =
         path.path("success").arg<Uuid>("id").post bind ApiHttpHandler(
             auth = noAuth,
             summary = "Success Funnel Instance"

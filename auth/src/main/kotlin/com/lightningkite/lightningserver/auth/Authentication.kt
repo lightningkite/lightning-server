@@ -152,10 +152,10 @@ public class Authentication<SUBJECT : HasId<*>> private constructor(
                 input.headers[HttpHeader.XMasquerade]?.root?.let { masquerade ->
                     val principal = masquerade.substringBefore('/')
 
-                    val handler = server.server.principalTypes[principal] as? PrincipalType<HasId<AnyId>, AnyId>
+                    val handler = server.server.principalTypes[principal] as? PrincipalType<HasId<*>, *>
                         ?: throw BadRequestException("Principal type $principal is unrecognized for masquerade")
 
-                    val mask = Authentication<HasId<AnyId>>(
+                    val mask = Authentication<HasId<*>>(
                         principal,
                         rawId = masquerade.substringAfter('/'),
                         sessionId = null,
@@ -207,6 +207,7 @@ context(server: ServerRuntime)
 public val <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication<SUBJECT>.id: ID
     get() = untypedId as ID
 
+@Suppress("UNCHECKED_CAST")
 context(server: ServerRuntime)
-public suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication<SUBJECT>.fetch(): SUBJECT =
-    cache.getOrPut(subjectCacheKey) { principalType.fetch(id) }
+public suspend fun <SUBJECT : HasId<*>> Authentication<SUBJECT>.fetch(): SUBJECT =
+    cache.getOrPut(subjectCacheKey) { (untypedPrincipal as PrincipalType<SUBJECT, Comparable<*>>).fetch(untypedId) }

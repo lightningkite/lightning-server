@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.auth
 
+import com.lightningkite.lightningserver.DelicateLightningServerApi
 import com.lightningkite.lightningserver.definition.MutableExtensions
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -12,16 +13,14 @@ import kotlin.time.Duration
  *
  * [AuthRequirement] may impose any criteria for [Authentication], but it is important to note
  * that an [AuthRequirement] with a nullable [SUBJECT] type indicates that it will accept `null`.
- * Conversely, a non-nullable [SUBJECT] indicates it will not accept `null`. If you implement this
- * interface you ***must*** follow this convention.
+ * Conversely, a non-nullable [SUBJECT] indicates it will not accept `null`.
  *
  * [AuthRequirement] is deeply connected with scopes. See [RequiredScope] for more details.
  *
- * To create an [AuthRequirement] for a specific [PrincipalType], use the [PrincipalType.auth] factory
- * function. To specify that there are multiple requirement options, using the [AuthRequirement.or]
- * infix function.
+ * To create an [AuthRequirement] for a specific [PrincipalType], use the [PrincipalType.require] method.
+ * To specify that there are multiple requirement options, using the [AuthRequirement.or] infix function.
  *
- * example
+ * Example:
  * ```kotlin
  * class User(override val _id: Uuid): HasId<Uuid>
  *
@@ -30,15 +29,25 @@ import kotlin.time.Duration
  * }
  *
  * // Require Authentication<User>() with root access
- * val r1 = Principal.auth()
+ * val r1 = Principal.require()
  *
  * // Require Authentication<User>() with no scope requirements
- * val r2 = Principal.auth(scopes = emptySet())
+ * val r2 = Principal.require(scopes = emptySet())
  *
  * // Creating an AuthRequirement<User?>, might be a user, might not.
- * val maybeUser = Principal.auth() or AuthRequirement.None
+ * val maybeUser = Principal.require() or AuthRequirement.NotAuthenticated
  * ```
+ *
+ * ## Rules for Inheritance
+ *
+ * [AuthRequirement] requires certain conventions to be met to be inherited correctly.
+ *
+ * The [SUBJECT] type provided for the [AuthRequirement] implementation should match the `SUBJECT`
+ * type for any accepted [Authentication]. If your [AuthRequirement] will accept `null`
+ * its `SUBJECT` type must be nullable. If these typing rules aren't followed casting exceptions
+ * can occur when calling [AuthRequirement.assert].
  * */
+@SubclassOptInRequired(DelicateLightningServerApi::class)
 public interface AuthRequirement<out SUBJECT : HasId<*>?> {
     /**
      * Returns true if [auth] satisfies this [AuthRequirement].
@@ -52,15 +61,26 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
     /**
      * No requirements, will accept any authentication or `null`
      * */
-    public data object None : AuthRequirement<Nothing?> {
+    public data object None : AuthRequirement<HasId<*>?> {
         override val requiredScopes: Runtime.Constant<Set<RequiredScope>> get() = Runtime.Constant(emptySet())
         override fun subscope(subscopes: Iterable<Subscope>): None = this
 
         context(server: ServerRuntime)
         override suspend fun accepts(auth: Authentication<*>?): Boolean = true
 
-        @Suppress("UNCHECKED_CAST")
-        public fun <SUBJECT : HasId<*>> typed(): AuthRequirement<SUBJECT?> = this as AuthRequirement<SUBJECT?>
+        override fun toString(): String = "No Requirements"
+    }
+
+    /**
+     * Only accepts no authentication, e.g. `auth == null`
+     * */
+    public data object NotAuthenticated : AuthRequirement<Nothing?> {
+        override val requiredScopes: Runtime.Constant<Set<RequiredScope>> get() = Runtime.Constant(emptySet())
+        override fun subscope(subscopes: Iterable<Subscope>): NotAuthenticated = this
+
+        context(server: ServerRuntime)
+        override suspend fun accepts(auth: Authentication<*>?): Boolean = auth == null
+
         override fun toString(): String = "Not Authenticated"
     }
 
@@ -72,7 +92,7 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
      * */
     public abstract class AuthSetting(
         public val default: AuthRequirement<*>? = null
-    ) : AuthRequirement<HasId<AnyId>>, MutableExtensions.Key<AuthRequirement<HasId<*>>> {
+    ) : AuthRequirement<HasId<*>>, MutableExtensions.Key<AuthRequirement<HasId<*>>> {
         context(server: ServerRuntime)
         public fun setting(): AuthRequirement<*>? = server.server.extensions[this]
 
@@ -86,7 +106,7 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
         public data class Scoped(
             val wraps: AuthSetting,
             val subscopes: Iterable<Subscope>
-        ) : AuthRequirement<HasId<AnyId>> {
+        ) : AuthRequirement<HasId<*>> {
             override val requiredScopes: Runtime<Set<RequiredScope>> =
                 Runtime { wraps.setting()?.requiredScopes()?.subscope(subscopes) ?: emptySet() }
 
@@ -107,7 +127,7 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
         val scopes: Set<RequiredScope> = setOf(RequiredScope.root),
         val maxAge: Duration? = null,
         val requirement: (suspend context(ServerRuntime) (Authentication<*>) -> Boolean)? = null
-    ) : AuthRequirement<HasId<AnyId>> {
+    ) : AuthRequirement<HasId<*>> {
         override val requiredScopes: Runtime.Constant<Set<RequiredScope>>
             get() = Runtime.Constant(scopes)
 
@@ -179,6 +199,3 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
 
     public companion object;
 }
-
-public fun <T : HasId<*>?> AuthRequirement<T>.options(): Set<AuthRequirement<T>> =
-    if (this is AuthRequirement.Options) options else setOf(this)

@@ -61,7 +61,7 @@ public class KnownDeviceProofEndpoints(
         it.disabledAt.eq(null) and ((it.expiresAt.eq(null) or it.expiresAt.notNull.gte(now())))
     }
 
-    public val modelInfo: ModelInfo<HasId<AnyId>, KnownDeviceSecret, Uuid> = database.modelInfo(
+    public val modelInfo: ModelInfo<HasId<*>, KnownDeviceSecret, Uuid> = database.modelInfo(
         auth = proofMethodAuth or AuthRequirement.IsAdmin,
         signals = {
             it.interceptCreate {
@@ -94,7 +94,7 @@ public class KnownDeviceProofEndpoints(
         }
     )
 
-    public val rest: ModelRestEndpoints<HasId<AnyId>, KnownDeviceSecret, Uuid> = path.path("secrets") include ModelRestEndpoints(modelInfo)
+    public val rest: ModelRestEndpoints<HasId<*>, KnownDeviceSecret, Uuid> = path.path("secrets") include ModelRestEndpoints(modelInfo)
 
     context(_: ServerRuntime)
     public suspend fun <SUBJECT : HasId<ID>, ID: Comparable<ID>> establish(
@@ -118,7 +118,18 @@ public class KnownDeviceProofEndpoints(
         return KnownDeviceSecretAndExpiration("$secretId/$secretValue", exp)
     }
 
-    public val options: ApiHttpHandler<PathSpec0, HasId<AnyId>?, Unit, KnownDeviceOptions> =
+    @Suppress("UNCHECKED_CAST")
+    context(_: ServerRuntime)
+    private suspend fun <SUBJECT : HasId<*>> establish(
+        auth: Authentication<SUBJECT>,
+        deviceInfo: String
+    ) = establish(
+        auth.untypedPrincipal as PrincipalType<HasId<Comparable<Any?>>, Comparable<Any?>>,
+        auth.untypedId as Comparable<Any?>,
+        deviceInfo
+    )
+
+    public val options: ApiHttpHandler<PathSpec0, HasId<*>?, Unit, KnownDeviceOptions> =
         path.path("options").get bind explicitApiHttpHandler(
             summary = "Known Device Options",
             inputType = Unit.serializer(),
@@ -135,7 +146,7 @@ public class KnownDeviceProofEndpoints(
             }
         )
 
-    public override val prove: ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, Proof> =
+    public override val prove: ApiHttpHandler<PathSpec0, HasId<*>?, String, Proof> =
         path.path("prove").post bind ApiHttpHandler(
             auth = noAuth,
             summary = "Prove Known Device",
@@ -182,7 +193,7 @@ public class KnownDeviceProofEndpoints(
             }
         )
 
-    public val establish: ApiHttpHandler<PathSpec0, HasId<AnyId>, Unit, String> =
+    public val establish: ApiHttpHandler<PathSpec0, HasId<*>, Unit, String> =
         path.path("establish").post bind explicitApiHttpHandler(
             summary = "Establish Known Device",
             inputType = Unit.serializer(),
@@ -193,8 +204,7 @@ public class KnownDeviceProofEndpoints(
             examples = listOf(),
             implementation = { _: Unit ->
                 establish(
-                    auth.principalType,
-                    auth.id,
+                    auth,
                     run {
                         val agent = request.headers[HttpHeader.UserAgent]
                         val ip = request.sourceIp
@@ -204,7 +214,7 @@ public class KnownDeviceProofEndpoints(
             }
         )
 
-    public val establish2: ApiHttpHandler<PathSpec0, HasId<AnyId>, Unit, KnownDeviceSecretAndExpiration> =
+    public val establish2: ApiHttpHandler<PathSpec0, HasId<*>, Unit, KnownDeviceSecretAndExpiration> =
         path.path("establish2").post bind explicitApiHttpHandler(
             summary = "Establish Known Device V2",
             inputType = Unit.serializer(),
@@ -215,8 +225,7 @@ public class KnownDeviceProofEndpoints(
             examples = listOf(),
             implementation = { _: Unit ->
                 establish(
-                    auth.principalType,
-                    auth.id,
+                    auth,
                     run {
                         val agent = request.headers[HttpHeader.UserAgent]
                         val ip = request.sourceIp

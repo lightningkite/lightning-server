@@ -1,11 +1,10 @@
 package com.lightningkite.lightningserver.typed.sdk
 
-import com.lightningkite.lightningserver.auth.AnyId
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.RequiredScope
 import com.lightningkite.lightningserver.auth.anyAuth
-import com.lightningkite.lightningserver.auth.auth
+import com.lightningkite.lightningserver.auth.require
 import com.lightningkite.lightningserver.auth.fetch
 import com.lightningkite.lightningserver.auth.isSuperUser
 import com.lightningkite.lightningserver.auth.noAuth
@@ -48,7 +47,7 @@ data class User(
 
 object Server : ServerBuilder() {
     init {
-        AuthRequirement.isSuperUser = User.auth { it.fetch().isSuperUser }
+        AuthRequirement.isSuperUser = User.require { it.fetch().isSuperUser }
     }
 
     val database = setting("database", Database.Settings())
@@ -65,7 +64,7 @@ object Server : ServerBuilder() {
         functionName = "Improper SDK Function Name",
         summary = "Action",
         description = "Does something really really cool...",
-        auth = User.auth(scopes = emptySet()) or noAuth,
+        auth = User.require(scopes = emptySet()) or noAuth,
         inputType = Unit.serializer(),
         outputType = Int.serializer(),
         implementation = { _: Unit ->
@@ -90,7 +89,7 @@ data class TestInput(
     val name: String
 )
 
-private val testEndpoint = explicitApiHttpHandler<PathSpec1<String>, HasId<AnyId>?, TestInput, String>(
+private val testEndpoint = explicitApiHttpHandler<PathSpec1<String>, HasId<*>?, TestInput, String>(
     summary = "Test Endpoint",
     functionName = "testSdkEndpoint",
     description = "This is a test endpoint for the sdk",
@@ -172,7 +171,7 @@ val preDefinedModule = object : ServerBuilder() {
     val endpoints = path.path("foo").post bind ApiHttpHandler(
         summary = "Pre-Defined Endpoint",
         description = "This is an endpoint included through a pre-build definition",
-        auth = User.auth(RequiredScope("pre:defined")) or User.auth(RequiredScope("foo")) or AuthRequirement.IsSuperUser,
+        auth = User.require(RequiredScope("pre:defined")) or User.require(RequiredScope("foo")) or AuthRequirement.IsSuperUser,
         implementation = { input: Int -> input * 2 }
     )
 }.build()

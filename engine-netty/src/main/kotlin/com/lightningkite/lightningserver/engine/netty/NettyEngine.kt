@@ -319,7 +319,7 @@ public class NettyEngine(
 
             @Suppress("UNCHECKED_CAST")
             val socketHandler =
-                this@NettyEngine.server.compiledWebsocketInterceptors(match.value) as WebSocketHandler<PathSpec, Any?>
+                this@NettyEngine.server.compiledWebsocketInterceptors.intercept(match.value) as WebSocketHandler<PathSpec, Any?>
 
             val startingState = try {
                 socketHandler.willConnectWithMetrics(match.pathSpec, this@NettyEngine, wsRequest)
