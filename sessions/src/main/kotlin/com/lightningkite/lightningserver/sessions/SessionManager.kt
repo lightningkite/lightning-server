@@ -9,7 +9,7 @@ import com.lightningkite.lightningserver.auth.GrantedScope
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.RequiredScope
 import com.lightningkite.lightningserver.auth.Subscope
-import com.lightningkite.lightningserver.auth.auth
+import com.lightningkite.lightningserver.auth.require
 import com.lightningkite.lightningserver.auth.authReaders
 import com.lightningkite.lightningserver.auth.fetch
 import com.lightningkite.lightningserver.auth.id
@@ -86,7 +86,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     public val sessionInfo: ModelInfo<SUBJECT, Session<SUBJECT, ID>, Uuid> =
         database.explicitModelInfo(
-            auth = principal.auth(scopes = setOf(Scopes.sessions)),
+            auth = principal.require(scopes = setOf(Scopes.sessions)),
             serializer = Session.serializer(principal.subjectSerializer, principal.idSerializer),
             idSerializer = Uuid.serializer(),
             tableName = principal.name + "Session",
@@ -274,7 +274,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     public val self: ApiHttpHandler<PathSpec0, SUBJECT, Unit, SUBJECT> =
         path.path("self").get bind explicitApiHttpHandler(
             summary = "Get Self",
-            auth = principal.auth(scopes = setOf(Scopes.self)),
+            auth = principal.require(scopes = setOf(Scopes.self)),
             inputType = Unit.serializer(),
             outputType = principal.subjectSerializer,
             implementation = { _ -> auth.fetch() }
@@ -283,7 +283,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     public val sessionTerminate: ApiHttpHandler<PathSpec0, SUBJECT, Unit, Unit> =
         path.path("terminate").post bind explicitApiHttpHandler(
             summary = "Terminate Current Session",
-            auth = principal.auth(scopes = setOf(Scopes.terminate)),
+            auth = principal.require(scopes = setOf(Scopes.terminate)),
             inputType = Unit.serializer(),
             outputType = Unit.serializer(),
             errorCases = listOf(),
@@ -294,7 +294,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     public val otherSessionTerminate: ApiHttpHandler<PathSpec1<Uuid>, SUBJECT, Unit, Unit> =
         path.arg<Uuid>("sessionId").path("terminate").post bind explicitApiHttpHandler(
-            auth = principal.auth(scopes = setOf(Scopes.terminate)),
+            auth = principal.require(scopes = setOf(Scopes.terminate)),
             inputType = Unit.serializer(),
             outputType = Unit.serializer(),
             summary = "Terminate Session",

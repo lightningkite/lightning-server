@@ -61,17 +61,9 @@ object Server : ServerBuilder() {
         MongoDatabase
         MemcachedCache
         S3PublicFileSystem
-        path.path("adminUser") bind startupOnce(database) {
-            database().table<User>().insertOne(
-                User(
-                    email = "joseph+admin@lightningkite.com",
-                    isSuperUser = true
-                )
-            )
-        }
     }
 
-    val admins = path.path("setup-admins") bind startupOnce(database) {
+    val setupAdmins = path.path("setup-admins") bind startupOnce(database) {
         userInfo.table().insertOne(User(email = "joseph+root@lightningkite.com", isSuperUser = true))
     }
 
@@ -90,11 +82,10 @@ object Server : ServerBuilder() {
                 else -> super.fetchByProperty(property, value)
             }
         }
-
     }
 
-    val userInfo = database.modelInfo(
-        auth = UserAuth.auth() or AuthRequirement.NotAuthenticated,
+    val userInfo: ModelInfo<User?, User, Uuid> = database.modelInfo(
+        auth = UserAuth.require() or AuthRequirement.NotAuthenticated,
         permissions = {
             val user = authOrNull?.fetch()
             val everyone: Condition<User> = Condition.Always
@@ -109,6 +100,7 @@ object Server : ServerBuilder() {
             )
         }
     )
+
     val user = path.path("user") include object : ServerBuilder() {
         val rest = path.path("rest") module ModelRestEndpoints(userInfo)
     }
@@ -116,7 +108,7 @@ object Server : ServerBuilder() {
     val testModel = path.path("test-model") module TestModelEndpoints
 
     val root = path.get bind HttpHandler {
-        HttpResponse.plainText("Hello ${it.auth(UserAuth.auth() or noAuth)?.fetch()}")
+        HttpResponse.plainText("Hello ${it.auth(UserAuth.require() or noAuth)?.fetch()}")
     }
 
     val slashEscaping = path.path("variable").arg<String>("stupidid").get bind HttpHandler { request ->
@@ -199,13 +191,13 @@ object Server : ServerBuilder() {
     }
 
     val testPrimitive = path.path("test-primitive").get bind ApiHttpHandler(
-        auth = UserAuth.auth(),
+        auth = UserAuth.require(),
         summary = "Get Test Primitive",
         errorCases = listOf(),
         implementation = { input: Unit -> "42 is great" }
     )
     val testObject = path.path("test-object").get bind ApiHttpHandler(
-        auth = UserAuth.auth(),
+        auth = UserAuth.require(),
         summary = "Get Test Object",
         errorCases = listOf(),
         examples = listOf(ApiHttpHandler.Example(input = Unit, output = TestModel())),
@@ -311,7 +303,7 @@ object Server : ServerBuilder() {
         // Not reading the body.  Is that it?
 //        HttpResponse.plainText("OK")
 //        HttpResponse.json(testModel.info.collection().all().toList())
-        val auth = it.auth(UserAuth.auth())
+        val auth = it.auth(UserAuth.require())
         HttpResponse.plainText(auth.id.toString())
     }
 

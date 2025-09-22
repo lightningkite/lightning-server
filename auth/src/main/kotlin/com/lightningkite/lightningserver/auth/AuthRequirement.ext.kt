@@ -31,7 +31,7 @@ public fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.subscope(subscope: Sub
 
 public val noAuth: AuthRequirement.None get() = AuthRequirement.None
 
-public val anyAuth: AuthRequirement.Authenticated = AuthRequirement.Authenticated()
+public val anyAuth: AuthRequirement.Authenticated = AuthRequirement.Authenticated(scopes = emptySet())
 
 public val recentRootAuth: AuthRequirement.Authenticated =
     AuthRequirement.Authenticated(
@@ -39,24 +39,29 @@ public val recentRootAuth: AuthRequirement.Authenticated =
         maxAge = 10.minutes
     )
 
-public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.auth(
-    scopes: Set<RequiredScope> = setOf(RequiredScope.root),
+public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.require(
+    scopes: Set<RequiredScope>,
     maxAge: Duration? = null,
     requirement: (suspend context(ServerRuntime) (Authentication<SUBJECT>) -> Boolean)? = null
 ): AuthRequirement<SUBJECT> =
     AuthRequirement.AuthenticatedAs(this, scopes, maxAge, requirement)
 
-public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.auth(
-    scope: RequiredScope,
+public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.require(
+    scope: RequiredScope = RequiredScope.root,
     maxAge: Duration? = null,
     requirement: (suspend context(ServerRuntime) (Authentication<SUBJECT>) -> Boolean)? = null
 ): AuthRequirement<SUBJECT> =
     AuthRequirement.AuthenticatedAs(this, setOf(scope), maxAge, requirement)
 
 
+public fun <T : HasId<*>?> AuthRequirement<T>.options(): Set<AuthRequirement<T>> =
+    if (this is Options) options else setOf(this)
+
 public infix fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.or(
     other: AuthRequirement<SUBJECT>
-): AuthRequirement<SUBJECT> = Options(options() + other.options())
+): AuthRequirement<SUBJECT> =
+    if (this === AuthRequirement.None || other === AuthRequirement.None) AuthRequirement.None
+    else Options(options() + other.options())
 
 
 public val AuthRequirement.Companion.isSuperUser: AuthRequirement<HasId<*>>
