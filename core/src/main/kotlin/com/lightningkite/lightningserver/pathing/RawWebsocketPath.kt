@@ -59,16 +59,16 @@ context(server: ServerRuntime)
 public fun <PATH : PathSpec> RawWebsocketPath(path: ResolvedPath<PATH>): RawWebsocketPath<PATH> = RawWebsocketPath(path.pathSegments(server.internalSerialization.stringArrayFormat))
 
 context(serverRuntime: ServerRuntime)
-public fun RawWebsocketPath(spec: PathSpec0, trailingSegments: PathSegments? = null): RawWebsocketPath<PathSpec0> = RawWebsocketPath(ConcretePath(spec, trailingSegments))
+public fun RawWebsocketPath(spec: PathSpec0, trailingSegments: PathSegments? = null): RawWebsocketPath<PathSpec0> = RawWebsocketPath(ResolvedPath(spec, trailingSegments))
 
 context(serverRuntime: ServerRuntime)
 public fun <A> RawWebsocketPath(spec: PathSpec1<A>, path1: A, trailingSegments: PathSegments? = null): RawWebsocketPath<PathSpec1<A>> =
-    RawWebsocketPath(ConcretePath(spec, path1, trailingSegments))
+    RawWebsocketPath(ResolvedPath(spec, path1, trailingSegments))
 
 context(serverRuntime: ServerRuntime)
 public fun <A, B> RawWebsocketPath(spec: PathSpec2<A, B>, path1: A, path2: B, trailingSegments: PathSegments? = null): RawWebsocketPath<PathSpec2<A, B>> =
-    RawWebsocketPath(ConcretePath(spec, path1, path2, trailingSegments))
+    RawWebsocketPath(ResolvedPath(spec, path1, path2, trailingSegments))
 
 context(serverRuntime: ServerRuntime)
 public fun <A, B, C> RawWebsocketPath(spec: PathSpec3<A, B, C>, path1: A, path2: B, path3: C, trailingSegments: PathSegments? = null): RawWebsocketPath<PathSpec3<A, B, C>> =
-    RawWebsocketPath(ConcretePath(spec, path1, path2, path3, trailingSegments))
+    RawWebsocketPath(ResolvedPath(spec, path1, path2, path3, trailingSegments))

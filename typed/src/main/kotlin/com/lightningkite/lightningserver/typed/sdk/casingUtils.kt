@@ -22,4 +22,5 @@ public fun String.screamingSnakeCase(): String = caseAlter { "_$it" }.uppercase(
 public fun String.camelCase(): String = caseAlter { it.capitalize() }.decapitalize()
 public fun String.pascalCase(): String = caseAlter { it.capitalize() }.capitalize()
 
-public fun String.functionCase(): String = filter { it.isLetterOrDigit() }.dropWhile { it.isDigit() }.camelCase()
+public fun String.functionCase(): String =
+    filter { it.isLetterOrDigit() || it.isWhitespace() || it in setOf('-', '_') }.dropWhile { it.isDigit() }.camelCase()
