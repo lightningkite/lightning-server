@@ -3,7 +3,11 @@ package com.lightningkite.lightningserver.definition
 import com.lightningkite.MediaType
 import com.lightningkite.buildSealedList
 import com.lightningkite.buildSealedMap
+import com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationError
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.definition.builder.buildListRegistry
+import com.lightningkite.lightningserver.definition.builder.buildMapRegistry
+import com.lightningkite.lightningserver.definition.builder.include
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.serialization.MediaTypeDecoder
@@ -89,17 +93,10 @@ public data class ServerDefinition(
             }
         }
 
-        fun <T> flattenMap(registry: (Module) -> Map<PathSpec0, T>): Map<PathSpec0, T> = buildSealedMap {
-            putAll(registry(thisLayer))
+        fun <T> flattenMap(registry: (Module) -> Map<PathSpec0, T>): Map<PathSpec0, T> = buildMapRegistry {
+            include(registry(thisLayer))
             for ((modPath, module) in flattenedModules) {
-                putAll(registry(module).mapKeys { (path, _) -> modPath + path })
-            }
-        }
-
-        fun <T> flattenPathSpec(registry: (Module) -> PathSpecMap<T>): PathSpecMap<T> = buildPathSpecMap {
-            putAll(registry(thisLayer))
-            for ((modPath, module) in flattenedModules) {
-                putAll(modPath, registry(module))
+                include(registry(module).mapKeys { (path, _) -> modPath + path })
             }
         }
 
@@ -108,10 +105,32 @@ public data class ServerDefinition(
             externalSerializersModule = Runtime.Cached { flattenedModules.map { it.item }.fold(thisLayer.externalSerializersModule()) { acc, module -> acc + module.externalSerializersModule() } },
             httpInterceptors = flattenList { it.httpInterceptors },
             websocketInterceptors = flattenList { it.websocketInterceptors },
-            endpoints = flattenPathSpec { it.endpoints },
+            endpoints = buildPathSpecMap { // We want to be able to override existing entries here, but we'll have to check for duplicate registration manually.
+                putAll(thisLayer.endpoints)
+                for ((modPath, map) in flattenedModules.mapItems { it.endpoints })
+                    for ((relPath, endpoints) in map) {
+                        val path = modPath + relPath
+                        get(path)
+                            ?.let { previous ->
+                                val intersection = endpoints.http.keys.intersect(previous.http.keys)
+                                if (intersection.isNotEmpty()) throw DuplicateRegistrationError("Endpoints ${intersection.map { HttpEndpoint(path, it) }} already have registered handlers", previous.http, endpoints.http)
+                                if (previous.websocket != null && endpoints.websocket != null) throw DuplicateRegistrationError("Path $path already has a registered websocket", previous.websocket, endpoints.websocket)
+                                put(path, ServerPathEndpoints(
+                                    previous.http + endpoints.http,
+                                    previous.websocket ?: endpoints.websocket
+                                ))
+                            }
+                            ?: put(path, endpoints)
+                    }
+            },
             schedules = flattenMap { it.schedules },
             tasks = flattenMap { it.tasks },
-            webSocketTopics = flattenPathSpec { it.webSocketTopics },
+            webSocketTopics = buildPathSpecRegistry {
+                include(thisLayer.webSocketTopics)
+                for ((modPath, module) in flattenedModules)
+                    for ((relPath, topic) in module.webSocketTopics)
+                        register(modPath + relPath, topic)
+            },
             settings = (thisLayer.settings + flattenedModules.flatMap { it.item.settings }).distinctBy { it.name },
             extensions = thisLayer.extensions.toMutableExtensions().apply {
                 flattenedModules.forEach { include(it.item.extensions, it.location) }
