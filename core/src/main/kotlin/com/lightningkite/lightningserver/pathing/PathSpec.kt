@@ -241,7 +241,7 @@ public class PathSpec3<A, B, C>(
     public override fun <T> arg(wildcard: Segment.Wildcard<T>): PathSpecMany =
         PathSpecMany(segments + wildcard, after, wildcards + wildcard)
 
-    public fun concrete(
+    public fun resolved(
         first: A,
         second: B,
         third: C,
@@ -262,6 +262,7 @@ public class PathSpecMany(
 ) : PathSpec(segments, after) {
     public val slash: PathSpecMany get() = PathSpecMany(segments + Segment.Empty, Afterwards.None, wildcards)
     public val any: PathSpecMany get() = PathSpecMany(segments, Afterwards.TrailingSegments, wildcards)
+
     public override fun path(constant: String): PathSpecMany =
         PathSpecMany(segments + Segment.Constant(constant), Afterwards.None, wildcards)
 
