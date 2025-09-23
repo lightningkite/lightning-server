@@ -156,8 +156,8 @@ public class PathSpec0(segments: List<Segment>, after: Afterwards) : PathSpec(se
     public override fun <T> arg(wildcard: Segment.Wildcard<T>): PathSpec1<T> =
         PathSpec1(segments + wildcard, after, wildcard)
 
-    public fun concrete(trailingWildcard: PathSegments? = null): ResolvedPath<PathSpec0> =
-        ConcretePath(this, trailingWildcard)
+    public fun resolved(trailingWildcard: PathSegments? = null): ResolvedPath<PathSpec0> =
+        ResolvedPath(this, trailingWildcard)
 
     public inline fun <reified T> arg(name: String): PathSpec1<T> =
         arg(Segment.Wildcard(name, serializerOrContextual<T>()))
@@ -185,8 +185,8 @@ public class PathSpec1<A>(
     public override fun <T> arg(wildcard: Segment.Wildcard<T>): PathSpec2<A, T> =
         PathSpec2<A, T>(segments + wildcard, after, first, wildcard)
 
-    public fun concrete(first: A, trailingWildcard: PathSegments? = null): ResolvedPath<PathSpec1<A>> =
-        ConcretePath(this, first, trailingWildcard)
+    public fun resolved(first: A, trailingWildcard: PathSegments? = null): ResolvedPath<PathSpec1<A>> =
+        ResolvedPath(this, first, trailingWildcard)
 
     public inline fun <reified T> arg(name: String): PathSpec2<A, T> =
         arg(Segment.Wildcard(name, serializerOrContextual<T>()))
@@ -211,11 +211,11 @@ public class PathSpec2<A, B>(
     public override fun <T> arg(wildcard: Segment.Wildcard<T>): PathSpec3<A, B, T> =
         PathSpec3<A, B, T>(segments + wildcard, after, first, second, wildcard)
 
-    public fun concrete(
+    public fun resolved(
         first: A,
         second: B,
         trailingWildcard: PathSegments? = null
-    ): ResolvedPath<PathSpec2<A, B>> = ConcretePath(this, first, second, trailingWildcard)
+    ): ResolvedPath<PathSpec2<A, B>> = ResolvedPath(this, first, second, trailingWildcard)
 
     public inline fun <reified T> arg(name: String): PathSpec3<A, B, T> =
         arg(Segment.Wildcard(name, serializerOrContextual<T>()))
@@ -241,12 +241,12 @@ public class PathSpec3<A, B, C>(
     public override fun <T> arg(wildcard: Segment.Wildcard<T>): PathSpecMany =
         PathSpecMany(segments + wildcard, after, wildcards + wildcard)
 
-    public fun concrete(
+    public fun resolved(
         first: A,
         second: B,
         third: C,
         trailingWildcard: PathSegments? = null
-    ): ResolvedPath<PathSpec3<A, B, C>> = ConcretePath(this, first, second, third, trailingWildcard)
+    ): ResolvedPath<PathSpec3<A, B, C>> = ResolvedPath(this, first, second, third, trailingWildcard)
 
     public inline fun <reified T> arg(name: String): PathSpecMany =
         arg(Segment.Wildcard(name, serializerOrContextual<T>()))
@@ -262,6 +262,7 @@ public class PathSpecMany(
 ) : PathSpec(segments, after) {
     public val slash: PathSpecMany get() = PathSpecMany(segments + Segment.Empty, Afterwards.None, wildcards)
     public val any: PathSpecMany get() = PathSpecMany(segments, Afterwards.TrailingSegments, wildcards)
+
     public override fun path(constant: String): PathSpecMany =
         PathSpecMany(segments + Segment.Constant(constant), Afterwards.None, wildcards)
 

@@ -62,7 +62,7 @@ public class PasswordProofEndpoints(
             it.disabledAt.eq(null) and ((it.expiresAt.eq(null) or it.expiresAt.notNull.gt(now())))
         }
 
-    public val modelInfo: ModelInfo<HasId<AnyId>, PasswordSecret, Uuid> =
+    public val modelInfo: ModelInfo<HasId<*>, PasswordSecret, Uuid> =
         database.modelInfo(
             auth = proofMethodAuth or AuthRequirement.IsAdmin,
             signals = { col ->
@@ -97,7 +97,7 @@ public class PasswordProofEndpoints(
             }
         )
 
-    public val rest: ModelRestEndpoints<HasId<AnyId>, PasswordSecret, Uuid> =
+    public val rest: ModelRestEndpoints<HasId<*>, PasswordSecret, Uuid> =
         path.path("secrets") include ModelRestEndpoints(modelInfo)
 
     context(_: ServerRuntime)
@@ -127,7 +127,7 @@ public class PasswordProofEndpoints(
         modelInfo.table().insertOne(secret)
     }
 
-    public val establish: ApiHttpHandler<PathSpec0, HasId<AnyId>, EstablishPassword, Unit> =
+    public val establish: ApiHttpHandler<PathSpec0, HasId<*>, EstablishPassword, Unit> =
         path.path("establish").post bind explicitApiHttpHandler(
             summary = "Establish Password",
             inputType = EstablishPassword.serializer(),
@@ -136,16 +136,17 @@ public class PasswordProofEndpoints(
             auth = proofMethodAuth,
             errorCases = emptyList(),
             implementation = { value: EstablishPassword ->
+                @Suppress("UNCHECKED_CAST")
                 establish(
-                    auth.principalType,
-                    auth.id,
+                    auth.untypedPrincipal as PrincipalType<HasId<Comparable<Any?>>, Comparable<Any?>>,
+                    auth.untypedId as Comparable<Any?>,
                     value
                 )
                 Unit
             }
         )
 
-    public override val prove: ApiHttpHandler<PathSpec0, HasId<AnyId>?, IdentificationAndPassword, Proof> =
+    public override val prove: ApiHttpHandler<PathSpec0, HasId<*>?, IdentificationAndPassword, Proof> =
         path.path("prove").post bind ApiHttpHandler(
             auth = noAuth,
             summary = "Prove password ownership",

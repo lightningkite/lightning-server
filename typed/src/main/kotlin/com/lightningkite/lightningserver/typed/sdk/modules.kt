@@ -23,8 +23,10 @@ public data class SdkModule<S>(
     public companion object {
         public var SdkSettings.defaultInfo: Info? by Default
 
+        private fun String.removeLast(string: String) = if (this != string) removeSuffix(string) else this
+
         public fun <S : ServerBuilder> S.withSdkInfo(
-            interfaceName: String = sdkSettings.defaultInfo?.interfaceName ?: this::class.simpleName?.let { it.pascalCase() + "Api" } ?: throw IllegalArgumentException("Cannot infer name for anonymous object"),
+            interfaceName: String = sdkSettings.defaultInfo?.interfaceName ?: this::class.simpleName?.let { it.removeLast("Endpoints").removeLast("Module").pascalCase() + "Api" } ?: throw IllegalArgumentException("Cannot infer name for anonymous object"),
             valueName: String = sdkSettings.defaultInfo?.valueName ?: interfaceName.camelCase().removeSuffix("Api")
         ) : SdkModule<S> =
             SdkModule(this, interfaceName, valueName)

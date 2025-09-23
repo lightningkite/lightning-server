@@ -8,21 +8,6 @@ import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
-
-@GenerateDataClassPaths
-@Serializable
-public data class UploadForNextRequest(
-    override val _id: Uuid = Uuid.random(),
-    val file: ServerFile,
-    val expires: Instant
-) : HasId<Uuid>
-
-@Serializable
-public data class UploadInformation(
-    val uploadUrl: String,
-    val futureCallToken: String
-)
-
 @Serializable
 @GenerateDataClassPaths
 public data class ServerFileWithMetadata(

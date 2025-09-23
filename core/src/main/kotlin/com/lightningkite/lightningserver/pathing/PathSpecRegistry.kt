@@ -19,3 +19,5 @@ internal class PathSpecRegistryImpl<V>(
 
 public fun <V> PathSpecRegistry(): PathSpecRegistry<V> = PathSpecRegistryImpl()
 
+public fun <V> buildPathSpecRegistry(setup: PathSpecRegistry<V>.() -> Unit): PathSpecMap<V> = PathSpecRegistry<V>().apply(setup).toSealedPathSpecMap()
+

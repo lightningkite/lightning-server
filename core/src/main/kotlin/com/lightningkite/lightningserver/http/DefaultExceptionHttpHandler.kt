@@ -27,7 +27,7 @@ internal object DefaultExceptionHttpHandler : ExceptionHttpHandler {
                 message = "An unknown error occurred"
             )
         }
-        val lsError = if(generalSettings().debug) lsErrorWithoutTrace.copy(stackTrace = exception.stackTraceToString())
+        val lsError = if (generalSettings().debug) lsErrorWithoutTrace.copy(stackTrace = exception.stackTraceToString())
         else lsErrorWithoutTrace
         return HttpResponse(
             status = HttpStatus(lsError.http),

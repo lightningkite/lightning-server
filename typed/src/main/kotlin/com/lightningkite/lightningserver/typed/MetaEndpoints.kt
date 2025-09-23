@@ -22,14 +22,12 @@ import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.*
 import kotlinx.html.*
-import kotlinx.html.html
 import kotlinx.serialization.builtins.*
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.lang.Runtime
 import java.lang.management.*
 import kotlin.text.contains
-import kotlin.text.set
 import kotlin.time.TimeSource
 
 
@@ -86,7 +84,7 @@ public class MetaEndpoints(
 
     public val docs: ApiDocs = path.path("docs") include ApiDocs(packageName)
 
-    public val health: ApiHttpHandler<PathSpec0, HasId<AnyId>?, Unit, ServerHealth> =
+    public val health: ApiHttpHandler<PathSpec0, HasId<*>?, Unit, ServerHealth> =
         path.path("health").get bind explicitApiHttpHandler(
             auth = noAuth,
             inputType = Unit.serializer(),
@@ -150,7 +148,7 @@ public class MetaEndpoints(
             .let { original ->
                 (original.substringBeforeLast("<head>") + """
                     <head>
-                    <base href="${admin2.location.path.concrete().toString(runtime.externalSerialization.stringArrayFormat)}">
+                    <base href="${admin2.location.path.resolved().toString(runtime.externalSerialization.stringArrayFormat)}">
                 """.trimIndent() + original.substringAfterLast("<head>"))
             }
         return HttpResponse.html(content = page, headers = HttpHeaders {
@@ -354,7 +352,7 @@ public class MetaEndpoints(
             )
         }
 
-    public val bulk: ApiHttpHandler<PathSpec0, HasId<AnyId>?, Map<String, BulkRequest>, Map<String, BulkResponse>> = path.path("bulk").post bind ApiHttpHandler(
+    public val bulk: ApiHttpHandler<PathSpec0, HasId<*>?, Map<String, BulkRequest>, Map<String, BulkResponse>> = path.path("bulk").post bind ApiHttpHandler(
         summary = "Bulk Request",
         description = "Performs multiple requests at once, returning the results in the same order.",
         auth = noAuth,

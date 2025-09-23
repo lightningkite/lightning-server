@@ -7,7 +7,7 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.AuthAccess
 import com.lightningkite.lightningserver.typed.ModelInfo
-import com.lightningkite.lightningserver.typed.StartupOnce
+import com.lightningkite.lightningserver.typed.startupOnce
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.Table
@@ -22,7 +22,7 @@ public fun startupOnce(
     database: Runtime<Database>,
     action: suspend context(ServerRuntime) () -> Unit
 ): Unit = with(builder) {
-    path.path(key) bind StartupOnce(database, action = action)
+    path.path(key) bind startupOnce(database, action = action)
 }
 
 @Deprecated("Use fetch instead", ReplaceWith("fetch"))

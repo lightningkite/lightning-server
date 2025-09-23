@@ -28,52 +28,47 @@ public suspend fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.assert(
 
 public fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.subscope(subscope: Subscope): AuthRequirement<SUBJECT> = subscope(listOf(subscope))
 
-public typealias AnyId = Comparable<Any?>
-public typealias NoAuth = AuthRequirement<HasId<AnyId>?>
-public typealias AuthAny = AuthRequirement<HasId<AnyId>>
 
-public val noAuth: AuthRequirement.None = AuthRequirement.None
-public val anyAuth: AuthAny = AuthRequirement.Authenticated()
+public val noAuth: AuthRequirement.None get() = AuthRequirement.None
 
-public val recentRootAuth: AuthAny =
+public val anyAuth: AuthRequirement.Authenticated = AuthRequirement.Authenticated(scopes = emptySet())
+
+public val recentRootAuth: AuthRequirement.Authenticated =
     AuthRequirement.Authenticated(
         scopes = setOf(RequiredScope.root), // root access
         maxAge = 10.minutes
     )
 
-public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.auth(
-    scopes: Set<RequiredScope> = setOf(RequiredScope.root),
+public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.require(
+    scopes: Set<RequiredScope>,
     maxAge: Duration? = null,
     requirement: (suspend context(ServerRuntime) (Authentication<SUBJECT>) -> Boolean)? = null
 ): AuthRequirement<SUBJECT> =
     AuthRequirement.AuthenticatedAs(this, scopes, maxAge, requirement)
 
-public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.auth(
-    scope: RequiredScope,
+public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.require(
+    scope: RequiredScope = RequiredScope.root,
     maxAge: Duration? = null,
     requirement: (suspend context(ServerRuntime) (Authentication<SUBJECT>) -> Boolean)? = null
 ): AuthRequirement<SUBJECT> =
     AuthRequirement.AuthenticatedAs(this, setOf(scope), maxAge, requirement)
 
 
+public fun <T : HasId<*>?> AuthRequirement<T>.options(): Set<AuthRequirement<T>> =
+    if (this is Options) options else setOf(this)
+
 public infix fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.or(
     other: AuthRequirement<SUBJECT>
-): AuthRequirement<SUBJECT> = Options(options() + other.options())
-
-public infix fun <SUBJECT : HasId<*>> AuthRequirement<SUBJECT>.or(
-    other: AuthRequirement.None
-): AuthRequirement<SUBJECT?> = Options(options() + other.typed())
-
-public infix fun <SUBJECT : HasId<*>> AuthRequirement.None.or(
-    other: AuthRequirement<SUBJECT>
-): AuthRequirement<SUBJECT?> = Options(other.options() + this.typed())
+): AuthRequirement<SUBJECT> =
+    if (this === AuthRequirement.None || other === AuthRequirement.None) AuthRequirement.None
+    else Options(options() + other.options())
 
 
-public val AuthRequirement.Companion.isSuperUser: AuthAny
+public val AuthRequirement.Companion.isSuperUser: AuthRequirement<HasId<*>>
     get() = AuthRequirement.IsSuperUser
-public val AuthRequirement.Companion.isAdmin: AuthAny
+public val AuthRequirement.Companion.isAdmin: AuthRequirement<HasId<*>>
     get() = AuthRequirement.IsAdmin
-public val AuthRequirement.Companion.isDeveloper: AuthAny
+public val AuthRequirement.Companion.isDeveloper: AuthRequirement<HasId<*>>
     get() = AuthRequirement.IsDeveloper
 
 context(builder: ServerBuilder)

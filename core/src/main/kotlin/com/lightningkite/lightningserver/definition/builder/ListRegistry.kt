@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.definition.builder
 
+import com.lightningkite.toSealedList
+
 /**
  * A [List] that can have items added to it, but not removed.
  * */
@@ -19,3 +21,5 @@ public fun <V> ListRegistry<V>.include(values: List<V>) {
 
 public fun <V> ListRegistry(): ListRegistry<V> = BasicListRegistry()
 public fun <V> ListRegistry(items: List<V>): ListRegistry<V> = BasicListRegistry(ArrayList(items))
+
+public fun <V> buildListRegistry(setup: ListRegistry<V>.() -> Unit): List<V> = ListRegistry<V>().apply(setup).toSealedList()

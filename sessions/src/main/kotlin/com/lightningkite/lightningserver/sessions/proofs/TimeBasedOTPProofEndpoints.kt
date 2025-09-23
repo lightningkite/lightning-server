@@ -67,7 +67,7 @@ public class TimeBasedOTPProofEndpoints(
             it.disabledAt.eq(null) and (it.expiresAt.eq(null) or it.expiresAt.notNull.gte(now()))
         }
 
-    public val modelInfo: ModelInfo<HasId<AnyId>, TotpSecret, Uuid> = database.modelInfo(
+    public val modelInfo: ModelInfo<HasId<*>, TotpSecret, Uuid> = database.modelInfo(
         auth = proofMethodAuth or AuthRequirement.IsAdmin,
         permissions = {
             val admin = condition<TotpSecret>(AuthRequirement.IsAdmin.accepts(authOrNull))
@@ -96,9 +96,9 @@ public class TimeBasedOTPProofEndpoints(
         }
     )
 
-    public val rest: ModelRestEndpoints<HasId<AnyId>, TotpSecret, Uuid> = path.path("secrets") include ModelRestEndpoints(modelInfo)
+    public val rest: ModelRestEndpoints<HasId<*>, TotpSecret, Uuid> = path.path("secrets") include ModelRestEndpoints(modelInfo)
 
-    public val establish: ApiHttpHandler<PathSpec0, HasId<AnyId>, EstablishTotp, String> =
+    public val establish: ApiHttpHandler<PathSpec0, HasId<*>, EstablishTotp, String> =
         path.path("establish").post bind explicitApiHttpHandler(
             summary = "Establish Time Based One Time Password",
             inputType = EstablishTotp.serializer(),
@@ -127,7 +127,7 @@ public class TimeBasedOTPProofEndpoints(
             }
         )
 
-    override val prove: ApiHttpHandler<PathSpec0, HasId<AnyId>?, IdentificationAndPassword, Proof> =
+    override val prove: ApiHttpHandler<PathSpec0, HasId<*>?, IdentificationAndPassword, Proof> =
         path.path("prove").post bind ApiHttpHandler(
             auth = noAuth,
             summary = "Prove TOTP",
@@ -184,7 +184,7 @@ public class TimeBasedOTPProofEndpoints(
             }
         )
 
-    public val confirm: ApiHttpHandler<PathSpec0, HasId<AnyId>, String, Unit> =
+    public val confirm: ApiHttpHandler<PathSpec0, HasId<*>, String, Unit> =
         path.path("existing").post bind explicitApiHttpHandler(
             summary = "Confirm Time Based One Time Password",
             inputType = String.serializer(),

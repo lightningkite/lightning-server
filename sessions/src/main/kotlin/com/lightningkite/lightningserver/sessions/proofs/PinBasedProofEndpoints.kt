@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
-import com.lightningkite.lightningserver.auth.AnyId
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
@@ -42,7 +41,7 @@ public abstract class PinBasedProofEndpoints(
         strength = strength
     )
 
-    public override val start: ApiHttpHandler<PathSpec0, HasId<AnyId>?, String, String> =
+    public override val start: ApiHttpHandler<PathSpec0, HasId<*>?, String, String> =
         path.path("start").post bind ApiHttpHandler(
             auth = noAuth,
             summary = "Begin $name Ownership Proof",
@@ -72,7 +71,7 @@ public abstract class PinBasedProofEndpoints(
         )
     }
 
-    override val prove: ApiHttpHandler<PathSpec0, HasId<AnyId>?, FinishProof, Proof> =
+    override val prove: ApiHttpHandler<PathSpec0, HasId<*>?, FinishProof, Proof> =
         path.path("prove").post bind ApiHttpHandler(
             auth = noAuth,
             summary = "Prove ${info.property} ownership",

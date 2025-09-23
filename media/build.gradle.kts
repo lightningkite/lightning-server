@@ -39,5 +39,5 @@ kotlin {
 }
 
 lkLibrary("lightningkite", "lightning-server") {
-    description.set("A Vert.x engine implementation for Lightning Server.")
+    description.set("A set of image processing tools for LightningServer.")
 }

@@ -23,12 +23,12 @@ public class PublicTinyTokenFormat(
 
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> create(
-        handler: PrincipalType<SUBJECT, ID>,
+        principal: PrincipalType<SUBJECT, ID>,
         auth: Authentication<SUBJECT>
     ): String =
-        "tt/${handler.name}/" + server.internalSerialization.kotlinBytesFormat
+        "tt/${principal.name}/" + server.internalSerialization.kotlinBytesFormat
             .encodeToByteArray(
-                Authentication.serializer(handler.subjectSerializer),
+                Authentication.serializer(principal.subjectSerializer),
                 auth.copy(expiration = now().plus(expiration))
             )
             .let { hasher.await().sign(it) + it }
@@ -36,10 +36,10 @@ public class PublicTinyTokenFormat(
 
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> read(
-        handler: PrincipalType<SUBJECT, ID>,
+        principal: PrincipalType<SUBJECT, ID>,
         value: String
     ): Authentication<SUBJECT>? {
-        val prefix = "tt/${handler.name}/"
+        val prefix = "tt/${principal.name}/"
         if (!value.startsWith(prefix)) return null
 
         val decoded = Base64.UrlSafe.decode(value.drop(prefix.length))
@@ -50,7 +50,7 @@ public class PublicTinyTokenFormat(
         if (!hasher.await().verify(data, signature)) throw TokenException("Incorrect signature")
 
         val auth = server.internalSerialization.kotlinBytesFormat.decodeFromByteArray(
-            Authentication.serializer(handler.subjectSerializer),
+            Authentication.serializer(principal.subjectSerializer),
             data
         )
         if (auth.expiration != null && now() > auth.expiration!!) throw TokenException("Token has expired")

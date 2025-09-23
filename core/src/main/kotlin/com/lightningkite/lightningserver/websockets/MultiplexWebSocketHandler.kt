@@ -131,8 +131,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
         )
 
     context(connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>)
-    override suspend fun didConnect(
-    ): Unit = Unit
+    override suspend fun didConnect(): Unit = Unit
 
     context(connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>,)
     override suspend fun messageFromClient(

@@ -3,7 +3,7 @@ package com.lightningkite.lightningserver.typed.sdk
 import kotlinx.io.Sink
 import kotlinx.io.writeString
 
-internal fun Sink.useAsAppendable(action: Appendable.() -> Unit) {
+public fun Sink.useAsAppendable(action: Appendable.() -> Unit) {
     this.use { sink ->
         val appendable = object : Appendable {
             override fun append(c: Char): Appendable {

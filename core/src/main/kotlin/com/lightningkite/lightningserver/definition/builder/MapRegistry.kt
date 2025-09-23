@@ -43,3 +43,5 @@ private class BasicMapRegistry<L, V>(
 }
 
 public fun <L, V> MapRegistry(): MapRegistry<L, V> = BasicMapRegistry()
+
+public fun <L, V> buildMapRegistry(setup: MapRegistry<L, V>.() -> Unit): Map<L, V> = MapRegistry<L, V>().apply(setup).toSealedMap()

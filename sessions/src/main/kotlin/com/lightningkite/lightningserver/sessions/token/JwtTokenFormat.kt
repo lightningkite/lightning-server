@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.generalSettings
+import com.lightningkite.lightningserver.definition.map
 import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.signer
@@ -25,22 +26,20 @@ import kotlin.time.Instant
 public class JwtTokenFormat(
     public val hasher: RuntimeDeferred<Signer> = secretBasis.signer("jwt"),
     public val expiration: Duration = 5.minutes,
-    public val issuerOverride: String? = null,
-    public val audienceOverride: String? = null,
-): TokenFormat {
-    public val issuer: Runtime<String> = Runtime { issuerOverride ?: generalSettings().publicUrl }
-    public val audience: Runtime<String> = Runtime { audienceOverride ?: generalSettings().publicUrl }
+    public val issuer: Runtime<String> = generalSettings.map { it.publicUrl },
+    public val audience: Runtime<String> = generalSettings.map { it.publicUrl }
+) : TokenFormat {
 
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> create(
-        handler: PrincipalType<SUBJECT, ID>,
+        principal: PrincipalType<SUBJECT, ID>,
         auth: Authentication<SUBJECT>
     ): String =
         hasher.await().signJwt(
             JwtClaims(
                 iss = issuer(),
                 sid = auth.sessionId,
-                sub = "${handler.name}|${server.internalSerialization.json.encodeToString(handler.idSerializer, auth.id)}",
+                sub = "${principal.name}|${server.internalSerialization.json.encodeToString(principal.idSerializer, auth.id)}",
                 aud = audience(),
                 exp = now().plus(expiration).epochSeconds,
                 iat = auth.issuedAt.epochSeconds,
@@ -53,18 +52,18 @@ public class JwtTokenFormat(
 
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> read(
-        handler: PrincipalType<SUBJECT, ID>,
+        principal: PrincipalType<SUBJECT, ID>,
         value: String
     ): Authentication<SUBJECT>? {
-        val prefix = "${handler.name}|"
+        val prefix = "${principal.name}|"
         val claims = hasher.await().verifyJwt(value, audience()) ?: return null
 
         val rawSub = claims.sub!!
-        val sub = if(rawSub.startsWith(prefix)) rawSub.removePrefix(prefix) else return null
+        val sub = if (rawSub.startsWith(prefix)) rawSub.removePrefix(prefix) else return null
 
         return Authentication(
-            principalType = handler,
-            id = server.internalSerialization.json.decodeFromString(handler.idSerializer, sub),
+            principalType = principal,
+            id = server.internalSerialization.json.decodeFromString(principal.idSerializer, sub),
             sessionId = claims.sid,
             issuedAt = Instant.fromEpochSeconds(claims.iat),
             expiration = Instant.fromEpochSeconds(claims.exp),
