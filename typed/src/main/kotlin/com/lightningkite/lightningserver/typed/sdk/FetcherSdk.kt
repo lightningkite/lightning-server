@@ -21,8 +21,10 @@ public object FetcherSdk : SDK.Format {
     override fun write(data: ServerDefinition, folder: KFile, packageName: String) {
         val processed = data.sdk().processToModules().ensureUniqueNames()
 
-        folder.then("Api.kt").overwrite { writeInterface(processed, packageName) }
-        folder.then("LiveApi.kt").overwrite { writeLive(processed, packageName) }
+        val rootName = processed.info.interfaceName
+
+        folder.then("$rootName.kt").overwrite { writeInterface(processed, packageName) }
+        folder.then("Live$rootName.kt").overwrite { writeLive(processed, packageName) }
     }
 
     private fun KFile.overwrite(action: Appendable.() -> Unit) {
@@ -173,7 +175,7 @@ public object FetcherSdk : SDK.Format {
                 appendDepth(depth, "}")
             }
 
-            if (depth > 0) appendDepth(depth, "override val ${info.valueName} = ${singleInterface?.item?.liveString(pathPrefix) ?: "Live${info.interfaceName}()"}")
+            if (depth > 0) appendDepth(depth, "override val ${info.valueName} = ${singleInterface?.item?.liveString(pathPrefix + singleInterface.location) ?: "Live${info.interfaceName}()"}")
         }
 
         module.writeLive(emptyList())

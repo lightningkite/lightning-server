@@ -49,7 +49,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 api(libs.kotlinXDatetime)
-                api(libs.serviceAbstractionsDatabase)
+                api(libs.serviceAbstractionsDatabaseShared)
             }
             kotlin {
                 srcDir(file("build/generated/ksp/common/commonMain/kotlin"))

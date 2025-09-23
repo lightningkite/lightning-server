@@ -64,8 +64,10 @@ public value class QueryParameters(public val entries: List<Pair<String, String>
 
     // TODO: Remove this fugly hack and deal with websocket auth better
     public fun pathHack(): QueryParameters = QueryParameters(entries.flatMap {
-        if (it.first == "path") listOf(it) + parse(it.second)
-        else listOf(it)
+        if (it.first == "path" && it.second.contains('?'))
+            listOf(it) + parse(it.second.substringAfter('?')).entries
+        else
+            listOf(it)
     })
 
     override fun toString(): String = entries.joinToString("&") {

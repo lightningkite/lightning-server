@@ -12,7 +12,6 @@ import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketHandlerInterceptor
 
-
 internal fun originMatches(allowed: List<String>, origin: String): Boolean {
     val originSchema = origin.substringBefore("://")
     val originTrimmed = origin.substringAfter("://")
@@ -26,7 +25,6 @@ internal fun originMatches(allowed: List<String>, origin: String): Boolean {
                             (allowedTrimmed.startsWith('*') && originTrimmed.endsWith(allowedTrimmed.removePrefix("*"))))
         }
 }
-
 
 /**
  * CorsInterceptor which will apply cors headers to responses as necessary.
@@ -97,9 +95,8 @@ public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpIn
                 if (request.path.method == HttpMethod.OPTIONS) {
                     set(
                         HttpHeader.AccessControlAllowHeaders,
-                        config.limitToHeaders?.joinToString()
-                            ?: request.headers[HttpHeader.AccessControlRequestHeaders]?.root
-                            ?: "",
+                        config.limitToHeaders?.joinToString(",")
+                            ?: request.headers.getMany(HttpHeader.AccessControlRequestHeaders).joinToString(",") { it.root }
                     )
                     config.cacheLength?.let {
                         set(HttpHeader.AccessControlMaxAge, it.toString())

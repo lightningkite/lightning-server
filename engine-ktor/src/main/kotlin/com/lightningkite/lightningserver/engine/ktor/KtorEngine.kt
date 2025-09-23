@@ -98,7 +98,7 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
             webSocket("{...}") {
                 val queryParams = call.request.queryParameters.flattenEntries().let(::QueryParameters).pathHack()
                 val request = WebSocketConnectRequest(
-                    path = RawWebsocketPath(PathSegments.parse(call.request.path())),
+                    path = RawWebsocketPath(PathSegments.parse(queryParams["path"] ?: call.request.path())),
                     queryParameters = queryParams,
                     headers = call.request.headers.adapt(),
                     domain = call.request.origin.serverHost,

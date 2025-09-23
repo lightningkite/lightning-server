@@ -17,7 +17,6 @@ import kotlin.math.roundToInt
 public data class MediaPreviewOptions(
     /**The maximum size allowed for both width and height*/
     val sizeInPixels: Int? = null,
-    /***/
     val forceRatio: Double? = null,
     val type: MediaType? = null,
     val quality: Double? = null,
@@ -69,7 +68,7 @@ public fun ImmutableImage.apply(
     val type = options.type ?: originalType
 
     type.let {
-        when(it) {
+        when (it) {
             MediaType.Image.PNG -> processing.output(PngWriter(), destinationFile)
             MediaType.Image.JPEG -> processing.output(JpegWriter(options.quality?.times(100)?.roundToInt() ?: 95, false), destinationFile)
             MediaType.Image.WebP -> processing.output(WebpWriter(), destinationFile)
