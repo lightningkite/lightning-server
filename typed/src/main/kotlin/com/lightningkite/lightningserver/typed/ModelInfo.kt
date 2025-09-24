@@ -139,4 +139,4 @@ public suspend fun <USER : HasId<*>, T : HasId<ID>, ID : Comparable<ID>> ModelIn
 
 @JvmName("authTableNullable")
 context(_: ServerRuntime)
-public suspend fun <USER : HasId<*>, T : HasId<ID>, ID : Comparable<ID>> ModelInfo<USER?, T, ID>.table(auth: Authentication<USER>?): Table<T> = table(AuthAccess(auth))
+public suspend fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ModelInfo<USER, T, ID>.table(auth: Authentication<USER & Any>?): Table<T> = table(AuthAccess(auth))
