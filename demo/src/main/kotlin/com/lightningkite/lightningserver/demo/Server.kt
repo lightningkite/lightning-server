@@ -7,11 +7,16 @@ import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.cors.CorsInterceptor
 import com.lightningkite.lightningserver.cors.CorsSettings
+import com.lightningkite.lightningserver.data.alter
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.pathing.PathSpec1
 import com.lightningkite.lightningserver.pathing.first
+import com.lightningkite.lightningserver.pathing.second
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.sessions.*
@@ -278,6 +283,28 @@ object Server : ServerBuilder() {
             println("Allocated ${permanentMemory.size} times")
         }
         HttpResponse.plainText("This should not be reachable.")
+    }
+
+    val arged = path.path("arged").arg<String>("name").arg<Int>("arg2").get bind ApiHttpHandler(
+        auth = UserAuth.require(),
+        summary = "Arged",
+        implementation = { input: Unit ->
+
+        }
+    )
+
+    val arged2 = path.path("arged2").arg<String>("name").arg<Int>("arg2").get bind ApiHttpHandler(
+        auth = UserAuth.require(),
+        summary = "Arged",
+        implementation = { input: Unit ->
+            arged(input)
+        }
+    )
+
+    val indirect = path.path("indirect").arg<String>("id").arg<Int>("arg2").post bind HttpHandler { request ->
+        arged(request, request.first, request.second, Unit)
+
+        HttpResponse()
     }
 
     val sample = path.path("page").get bind HttpHandler {
