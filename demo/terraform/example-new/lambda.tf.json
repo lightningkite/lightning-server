@@ -169,15 +169,6 @@
     },
     "locals": {
         "settings_raw": {
-            "awsLambdaRuntimeSettings": {
-                "cors": {
-                    "limitToDomains": null,
-                    "limitToHeaders": null,
-                    "limitToMethods": null,
-                    "exposedHeaders": [],
-                    "allowCredentials": true
-                }
-            },
             "general": {
                 "projectName": "Demo Example",
                 "publicUrl": "https://example.demo.ivieleague.com",
@@ -192,7 +183,9 @@
                 "limitToHeaders": [],
                 "limitToMethods": [],
                 "exposedHeaders": [],
-                "allowCredentials": false
+                "allowCredentials": false,
+                "cacheLength": null,
+                "forbidOnMatchFail": true
             },
             "secretBasis": "${random_password.secretBasis.result}",
             "sms": "console",
@@ -213,22 +206,13 @@
                 "traceReportFrequency": null,
                 "logReportFrequency": null
             },
+            "someSecret": "${var.someSecret}",
             "email": "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587?fromEmail=noreply@example.demo.ivieleague.com"
         },
         "is_windows": "${substr(pathexpand(\"~\"), 0, 1) == \"/\" ? false : true}",
         "servicesAccessPolicy": {
             "Version": "2012-10-17",
             "Statement": [
-                {
-                    "Action": [
-                        "s3:*"
-                    ],
-                    "Effect": "Allow",
-                    "Resource": [
-                        "${aws_s3_bucket.files.arn}",
-                        "${aws_s3_bucket.files.arn}/*"
-                    ]
-                },
                 {
                     "Action": [
                         "execute-api:ManageConnections"

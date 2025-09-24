@@ -47,8 +47,8 @@ public fun <T, R> RuntimeDeferred<T>.mapSuspending(transform: suspend context(Se
 
 public interface ServerSetting<SETTING, RESULT> : Runtime<RESULT>, TerraformNeed<SETTING> {
     override val name: String
-    public val serializer: KSerializer<SETTING>
-    public val default: SETTING
+    override val serializer: KSerializer<SETTING>
+    override val default: SETTING
     public val optional: Boolean get() = false
 
     context(settings: SettingContext)
@@ -70,6 +70,7 @@ private data class BasicServerSetting<SETTING, RESULT>(
     override val name: String,
     override val default: SETTING,
     override val serializer: KSerializer<SETTING>,
+    override val instructions: String = "No instructions",
     override val optional: Boolean,
     private val getter: SettingContext.(SETTING) -> RESULT
 ) : ServerSetting<SETTING, RESULT> {
@@ -88,23 +89,26 @@ public fun <SETTING, RESULT> ServerSetting(
     name: String,
     default: SETTING,
     serializer: KSerializer<SETTING>,
+    instructions: String = "No instructions",
     optional: Boolean = false,
     getter: SettingContext.(SETTING) -> RESULT
 ) : ServerSetting<SETTING, RESULT> =
-    BasicServerSetting(name, default, serializer, optional, getter)
+    BasicServerSetting(name, default, serializer, instructions, optional, getter)
 
 public fun <SETTING : Setting<RESULT>, RESULT> ServerSetting(
     name: String,
     default: SETTING,
     serializer: KSerializer<SETTING>,
+    instructions: String = "No instructions",
     optional: Boolean = false
 ): ServerSetting<SETTING, RESULT> =
-    ServerSetting(name, default, serializer, optional) { it.invoke(name, this) }
+    ServerSetting(name, default, serializer, instructions, optional) { it.invoke(name, this) }
 
 private data class BasicDirectServerSetting<SETTING>(
     override val name: String,
     override val default: SETTING,
     override val serializer: KSerializer<SETTING>,
+    override val instructions: String = "No instructions",
     override val optional: Boolean,
 ) : ServerSetting.Direct<SETTING> {
     private var cached: NullWrapper<SETTING>? = null
@@ -118,8 +122,9 @@ public fun <SETTING> ServerSetting(
     name: String,
     default: SETTING,
     serializer: KSerializer<SETTING>,
+    instructions: String = "No instructions",
     optional: Boolean = false
 ) : ServerSetting.Direct<SETTING> =
-    BasicDirectServerSetting(name, default, serializer, optional)
+    BasicDirectServerSetting(name, default, serializer, instructions, optional)
 
 

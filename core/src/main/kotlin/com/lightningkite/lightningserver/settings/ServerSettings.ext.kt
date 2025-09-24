@@ -10,6 +10,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.properties.Properties
+import kotlin.io.path.Path
 
 context(builder: ServerSettings)
 public infix fun <SERIALIZABLE> ServerSetting<SERIALIZABLE, *>.set(value: SERIALIZABLE) {
@@ -85,9 +86,7 @@ public fun ServerSettings.loadFromFile(
         }
     }
     if (missingKeys.isNotEmpty()) {
-        val suggestedFile =
-            file.parent!!.resolve(file.nameWithoutExtension.replace(".enc", "") + ".suggested." + file.extension)
-
+        val suggestedFile = file.withAlteredExtension { "suggested.$it" }
         suggestedFile.writeString(format.encodeToString(serializer, loaded))
         throw IncompleteSettingsException(missingKeys, suggestedFile)
     }

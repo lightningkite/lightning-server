@@ -56,6 +56,7 @@ object Server : ServerBuilder() {
     val files = setting("files", PublicFileSystem.Settings())
     val cache = setting("cache", Cache.Settings())
     val cors = setting("cors", CorsSettings())
+    val newSecret = setting("someSecret", "???", instructions = "This can be whatever you dream, you madman.")
 
     val corsInterceptor = install(CorsInterceptor(cors))
 
