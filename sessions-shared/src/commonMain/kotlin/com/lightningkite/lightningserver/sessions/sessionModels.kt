@@ -57,7 +57,10 @@ public data class IdAndAuthMethods<ID>(
     val options: List<ProofOption> = listOf(),
     val strengthRequired: Int = 1,
     val refreshToken: String? = null,
-)
+){
+    @Deprecated("Use refreshToken instead. This will be removed at a later date.", replaceWith = ReplaceWith("refreshToken"))
+    val session: String? = refreshToken
+}
 
 @Serializable
 public data class ProofsCheckResult<ID>(
