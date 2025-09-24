@@ -31,8 +31,9 @@ private fun InterfaceInfo.virtualTypeReference(registry: SerializationRegistry):
 
 public context(runtime: ServerRuntime)
 val lightningServerKSchema: LightningServerKSchema get() {
-    val registry = SerializationRegistry(runtime.externalSerialization.serializersModule).also {
-        it.registerLightningKiteCommonSerializers()
+    val registry = SerializationRegistry(runtime.externalSerialization.serializersModule).apply {
+//        register(ServerFile.serializer())
+        register(com.lightningkite.lightningserver.LSError.serializer())
     }
 
     runtime.server.endpoints.forEach { (path, endpoints) ->

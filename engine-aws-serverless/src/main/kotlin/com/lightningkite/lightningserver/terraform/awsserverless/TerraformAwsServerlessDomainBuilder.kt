@@ -14,41 +14,37 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
-public class TerraformAwsServerlessDomainBuilder<S: ServerBuilder>(
+public abstract class TerraformAwsServerlessDomainBuilder<S: ServerBuilder>(
     builder: S,
-    config: Config,
-    public val domainZone: String,
-    override val domain: String,
 ): TerraformAwsServerlessBuilder<S>(
     builder = builder,
-    config = config,
 ), TerraformEmitterAwsDomain {
+
+    public abstract val domainZone: String
+    public abstract override val domain: String
     override val domainZoneId: String by lazy { domainZoneId(domainZone) }
 }
-public class TerraformAwsServerlessVpcBuilder<S: ServerBuilder>(
+public abstract class TerraformAwsServerlessVpcBuilder<S: ServerBuilder>(
     builder: S,
-    config: Config,
-    public val ipPrefix: String = "10.0",
-    public val availabilityZones: List<String> = listOf("${config.region.id()}a", "${config.region.id()}b", "${config.region.id()}c"),
 ): TerraformAwsServerlessBuilder<S>(
     builder = builder,
-    config = config,
 ), TerraformEmitterAwsVpc {
+    public open val ipPrefix: String get() = "10.0"
+    public open val availabilityZones: List<String> get() = listOf("${region.id()}a", "${region.id()}b", "${region.id()}c")
     override val applicationVpc: TerraformAwsVpcInfo by lazy { vpc(ipPrefix, availabilityZones) }
 }
-public class TerraformAwsServerlessDomainVpcBuilder<S: ServerBuilder>(
+public abstract class TerraformAwsServerlessDomainVpcBuilder<S: ServerBuilder>(
     builder: S,
-    config: Config,
-    public val domainZone: String,
-    override val domain: String,
-    public val ipPrefix: String = "10.0",
-    public val availabilityZones: List<String> = listOf("${config.region.id()}a", "${config.region.id()}b", "${config.region.id()}c"),
 ): TerraformAwsServerlessBuilder<S>(
     builder = builder,
-    config = config,
 ), TerraformEmitterAwsVpc, TerraformEmitterAwsDomain {
-    override val applicationVpc: TerraformAwsVpcInfo by lazy { vpc(ipPrefix, availabilityZones) }
+    public abstract val domainZone: String
+    public abstract override val domain: String
     override val domainZoneId: String by lazy { domainZoneId(domainZone) }
+
+    public open val ipPrefix: String get() = "10.0"
+    public open val availabilityZones: List<String> get() = listOf("${region.id()}a", "${region.id()}b", "${region.id()}c")
+    override val applicationVpc: TerraformAwsVpcInfo by lazy { vpc(ipPrefix, availabilityZones) }
 }
 
 

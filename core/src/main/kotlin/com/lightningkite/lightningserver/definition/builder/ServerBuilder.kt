@@ -160,6 +160,7 @@ public abstract class ServerBuilder : Extendable {
         name: String,
         default: Setting,
         serializer: KSerializer<Setting>,
+        instructions: String = "No instructions",
         optional: Boolean = false,
         getter: SettingContext.(Setting) -> Result,
     ): ServerSetting<Setting, Result> =
@@ -168,6 +169,7 @@ public abstract class ServerBuilder : Extendable {
                 name,
                 default,
                 serializer,
+                instructions,
                 optional,
             ) { value -> getter(this, value) }
         )
@@ -177,6 +179,7 @@ public abstract class ServerBuilder : Extendable {
         name: String,
         default: SETTING,
         serializer: KSerializer<SETTING>,
+        instructions: String = "No instructions",
         optional: Boolean = false,
     ): ServerSetting<SETTING, RESULT> =
         setting(
@@ -184,6 +187,7 @@ public abstract class ServerBuilder : Extendable {
                 name,
                 default,
                 serializer,
+                instructions,
                 optional,
             )
         )
@@ -192,6 +196,7 @@ public abstract class ServerBuilder : Extendable {
     public inline fun <reified SETTING : Setting<RESULT>, RESULT> setting(
         name: String,
         default: SETTING,
+        instructions: String = "No instructions",
         optional: Boolean = false,
     ): ServerSetting<SETTING, RESULT> =
         setting(
@@ -199,6 +204,7 @@ public abstract class ServerBuilder : Extendable {
                 name,
                 default,
                 serializerOrContextual<SETTING>(),
+                instructions,
                 optional,
             )
         )
@@ -208,12 +214,14 @@ public abstract class ServerBuilder : Extendable {
         name: String,
         default: Result,
         serializer: KSerializer<Result>,
+        instructions: String = "No instructions",
         optional: Boolean = false,
     ): ServerSetting.Direct<Result> {
         val setting = ServerSetting(
             name,
             default,
             serializer,
+            instructions,
             optional,
         )
         settings.register(setting)
@@ -224,6 +232,7 @@ public abstract class ServerBuilder : Extendable {
     public inline fun <reified Setting, Result> setting(
         name: String,
         default: Setting,
+        instructions: String = "No instructions",
         optional: Boolean = false,
         crossinline getter: SettingContext.(Setting) -> Result,
     ): ServerSetting<Setting, Result> =
@@ -232,6 +241,7 @@ public abstract class ServerBuilder : Extendable {
                 name,
                 default,
                 serializerOrContextual<Setting>(),
+                instructions,
                 optional,
             ) { value -> getter(this, value) }
         )
@@ -240,12 +250,14 @@ public abstract class ServerBuilder : Extendable {
     public inline fun <reified Result> setting(
         name: String,
         default: Result,
+        instructions: String = "No instructions",
         optional: Boolean = false,
     ): ServerSetting.Direct<Result> =
         setting(
             name,
             default,
             serializerOrContextual<Result>(),
+            instructions,
             optional,
         )
 

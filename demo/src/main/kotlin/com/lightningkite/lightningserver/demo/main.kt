@@ -1,35 +1,41 @@
 package com.lightningkite.lightningserver.demo
 
-import com.lightningkite.kotlinercli.cli
-import com.lightningkite.lightningserver.cors.CorsSettings
-import com.lightningkite.lightningserver.definition.loggingSettings
-import com.lightningkite.lightningserver.definition.secretBasis
-import com.lightningkite.lightningserver.definition.telemetrySettings
-import com.lightningkite.lightningserver.engine.jdk.JdkEngine
-import com.lightningkite.lightningserver.engine.ktor.KtorEngine
-import com.lightningkite.lightningserver.engine.netty.NettyEngine
-import com.lightningkite.lightningserver.settings.loadFromFile
-import com.lightningkite.lightningserver.terraform.awsserverless.TerraformAwsServerlessBuilder
-import com.lightningkite.lightningserver.terraform.awsserverless.TerraformAwsServerlessDomainBuilder
-//import com.lightningkite.lightningserver.terraform.awsserverless.TerraformAwsServerlessDomainBuilder
-import com.lightningkite.lightningserver.terraform.generated
-import com.lightningkite.lightningserver.typed.sdk.FetcherSdk
+import com.lightningkite.*
+import com.lightningkite.kotlinercli.*
+import com.lightningkite.lightningserver.cors.*
+import com.lightningkite.lightningserver.definition.*
+import com.lightningkite.lightningserver.engine.awsserverless.*
+import com.lightningkite.lightningserver.engine.jdk.*
+import com.lightningkite.lightningserver.engine.ktor.*
+import com.lightningkite.lightningserver.engine.netty.*
+import com.lightningkite.lightningserver.settings.*
+import com.lightningkite.lightningserver.terraform.*
+import com.lightningkite.lightningserver.terraform.awsserverless.*
+import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SDK.writeSdk
-import com.lightningkite.services.LoggingSettings
-import com.lightningkite.services.cache.dynamodb.awsDynamoDb
-import com.lightningkite.services.data.KFile
-import com.lightningkite.services.database.mongodb.mongodbAtlasFree
-import com.lightningkite.services.email.javasmtp.awsSesSmtp
-import com.lightningkite.services.files.s3.awsS3Bucket
-import com.lightningkite.services.otel.OpenTelemetrySettings
-import com.lightningkite.services.sms.SMS
-import com.lightningkite.services.terraform.direct
-import com.lightningkite.toEmailAddress
+import com.lightningkite.services.*
+import com.lightningkite.services.cache.dynamodb.*
+import com.lightningkite.services.data.*
+import com.lightningkite.services.database.mongodb.*
+import com.lightningkite.services.email.javasmtp.*
+import com.lightningkite.services.files.s3.*
+import com.lightningkite.services.otel.*
+import com.lightningkite.services.sms.*
+import com.lightningkite.services.terraform.*
 import io.ktor.server.netty.*
-import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.regions.*
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.lang.ProcessBuilder
+import javax.swing.BoxLayout
+import javax.swing.JButton
+import javax.swing.JFrame
+import javax.swing.JLabel
+import javax.swing.JOptionPane
+import javax.swing.JPasswordField
+import kotlin.reflect.*
+import kotlin.time.*
 import kotlin.time.Duration.Companion.days
-import kotlin.time.TimeSource
 
 
 private fun serve() {
@@ -62,46 +68,42 @@ private fun serveNetty() {
     }
 }
 
-fun terraform() {
-    Server
-    TerraformAwsServerlessDomainBuilder(
-        builder = Server,
-        domain = "example.demo.ivieleague.com",
-        domainZone = "ivieleague.com",
-        config = TerraformAwsServerlessBuilder.Config(
-            handlerFullyQualifiedName = "com.lightningkite.lightningserver.demo.AwsHandler",
+object DemoEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
+    override val domain = "example.demo.ivieleague.com"
+    override val domainZone = "ivieleague.com"
+    override val terraformRoot: File = File("demo/terraform/example-new")
 
-            storageBucket = "ivieleague-deployment-states",
-            storageBucketPathOverride = "demo/example",
-            projectPrefix = "demo-example",
-            deploymentTag = "demo-example",
+    override val handler: KClass<out AwsAdapter> = AwsHandler::class
 
-            displayName = "Demo Example",
-            debug = true,
-            emergencyContact = "josephivie@gmail.com".toEmailAddress(),
+    override val storageBucket = "ivieleague-deployment-states"
+    override val storageBucketPath = "demo/example"
+    override val displayName = "Demo Example"
+    override val debug = true
+    override val emergencyContact = "josephivie@gmail.com".toEmailAddress()
 
-            region = Region.US_WEST_2,
-//        purchaseDomain = true,
-        )
-    ).apply {
-        settings {
-//            awsLambdaRuntimeSettings.direct(AwsLambdaRuntimeSettings(CorsSettings(
-//                limitToDomains = null,
-//                limitToHeaders = null,
-//                limitToMethods = null,
-//                allowCredentials = true
-//            )))
-            database.mongodbAtlasFree(orgId = "6323a65c43d66b56a2ea5aea", zoneName = "Zone 1")
-            email.awsSesSmtp(config.emergencyContact)
-            sms.direct(SMS.Settings())
-            files.awsS3Bucket(signedUrlDuration = 1.days)
-            cache.awsDynamoDb()
-            secretBasis.generated()
-            loggingSettings.direct(LoggingSettings())
-            telemetrySettings.direct(OpenTelemetrySettings("print", reportFrequency = null))
-            cors.direct(CorsSettings())
-        }
-    }.write(File("demo/terraform/example-new").also { it.mkdirs() })
+    override val region = Region.US_WEST_2!!
+    override fun Server.settings() {
+        database.mongodbAtlasFree(orgId = "6323a65c43d66b56a2ea5aea", zoneName = "Zone 1")
+        email.awsSesSmtp("josephivie@gmail.com".toEmailAddress())
+        sms.direct(SMS.Settings())
+        files.awsS3Bucket(signedUrlDuration = 1.days)
+        cache.awsDynamoDb()
+        secretBasis.generated()
+        loggingSettings.direct(LoggingSettings())
+        telemetrySettings.direct(OpenTelemetrySettings("print", reportFrequency = null))
+        cors.direct(CorsSettings())
+        newSecret.byVariable()
+    }
+}
+
+object DemoEnvDeploy {
+    @JvmStatic
+    fun main(vararg args: String) = DemoEnv.deploy()
+}
+
+object DemoEnvEdit {
+    @JvmStatic
+    fun main(vararg args: String) = DemoEnv.editVars()
 }
 
 fun sdk() {
@@ -113,6 +115,6 @@ fun sdk() {
 fun main(vararg args: String) {
     cli(
         arguments = args,
-        available = listOf(::serve, ::serveJdk, ::serveNetty, ::terraform, ::sdk),
+        available = listOf(::serve, ::serveJdk, ::serveNetty, ::sdk),
     )
 }

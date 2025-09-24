@@ -18,7 +18,7 @@
                 "insufficient_data_actions": [],
                 "metric_name": "Invocations",
                 "evaluation_periods": 1,
-                "alarm_description": "",
+                "alarm_description": "Panic Invocations",
                 "comparison_operator": "GreaterThanOrEqualToThreshold",
                 "namespace": "AWS/Lambda",
                 "dimensions": {
@@ -37,7 +37,7 @@
                 "insufficient_data_actions": [],
                 "metric_name": "Duration",
                 "evaluation_periods": 1,
-                "alarm_description": "",
+                "alarm_description": "Emergency Compute",
                 "comparison_operator": "GreaterThanOrEqualToThreshold",
                 "namespace": "AWS/Lambda",
                 "dimensions": {
@@ -56,7 +56,7 @@
                 "insufficient_data_actions": [],
                 "metric_name": "Duration",
                 "evaluation_periods": 1,
-                "alarm_description": "",
+                "alarm_description": "Panic Compute",
                 "comparison_operator": "GreaterThanOrEqualToThreshold",
                 "namespace": "AWS/Lambda",
                 "dimensions": {
@@ -75,7 +75,7 @@
                 "insufficient_data_actions": [],
                 "metric_name": "Invocations",
                 "evaluation_periods": 1,
-                "alarm_description": "",
+                "alarm_description": "Emergency Invocations",
                 "comparison_operator": "GreaterThanOrEqualToThreshold",
                 "namespace": "AWS/Lambda",
                 "dimensions": {

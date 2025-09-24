@@ -11,6 +11,7 @@ import com.lightningkite.lightningserver.typed.sdk.functionCase
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.serializerOrContextual
 import kotlinx.serialization.KSerializer
+import kotlin.experimental.ExperimentalTypeInference
 
 public fun <PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT> explicitApiHttpHandler(
     summary: String,

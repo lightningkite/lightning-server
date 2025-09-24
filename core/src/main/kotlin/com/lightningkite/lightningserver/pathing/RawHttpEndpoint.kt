@@ -23,7 +23,12 @@ public data class RawHttpEndpoint<out PATH: PathSpec>(val pathSegments: PathSegm
         if (this.matchIfPresent == null) {
             this.matchIfPresent = server.server.endpoints.match(server.externalSerialization.stringArrayFormat, pathSegments) { it.http[method] }
         }
-        return this.matchIfPresent ?: throw RouteNotFoundException(this)
+        return this.matchIfPresent ?: throw RouteNotFoundException(this).also {
+            println("Registered:")
+            server.server.endpoints.entries.forEach {
+                println("  ${it.key}: ${it.value.http.entries.joinToString(", ") { "${it.key} -> ${it.value}" }}")
+            }
+        }
     }
 
     public constructor(

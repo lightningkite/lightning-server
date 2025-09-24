@@ -365,7 +365,7 @@ public class MetaEndpoints(
                         val request = entry.value
                         val pathAndParams = PathAndParams.parse(request.path)
                         val properRequest = originalRequest.copyWithNewPathType(
-                            path = RawHttpEndpoint<PathSpec>(pathAndParams.pathSegments, method = HttpMethod(request.method)),
+                            path = RawHttpEndpoint(pathAndParams.pathSegments, method = HttpMethod(request.method)),
                             queryParameters = pathAndParams.queryParameters,
                             body = request.body?.let { TypedData.text(it, MediaType.Application.Json) }
                         )
