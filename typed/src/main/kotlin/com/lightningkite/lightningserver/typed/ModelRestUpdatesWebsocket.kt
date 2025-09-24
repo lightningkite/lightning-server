@@ -81,11 +81,11 @@ public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
 
         context(connection: ApiWebsocketHandler.Connection<PathSpec0, ModelRestUpdatesWebsocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>>)
         override suspend fun messageFromClientTyped(frame: Condition<T>) {
-            val p = info.table(Access(connection.request, connection.auth()))
+            val p = info.table(AuthAccess(connection.auth()))
             val c = p.fullCondition(frame).simplify()
             val oldTopics: Set<WebSocketSubscriptionRequest<out PathSpec, *>> = connection.currentState.topics.mapTo(HashSet()) {
                 connection.server.webSocketTopics.match(connection.internalSerialization.stringArrayFormat, it)
-                    ?.let { WebSocketSubscriptionRequest(it.value!!, it.path.rawPathArguments) }
+                    ?.let { match -> WebSocketSubscriptionRequest(match.value, match.path.rawPathArguments) }
                     ?: throw IllegalArgumentException(
                         "WebSocket topic $it does not exist.  " +
                                 "Topics must be registered with the server before they can be used."

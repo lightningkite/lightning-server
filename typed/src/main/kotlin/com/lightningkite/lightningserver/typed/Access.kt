@@ -59,7 +59,8 @@ private class AccessWithoutRequest<SUBJECT : HasId<*>?>(
     override val request: Nothing? get() = null
 }
 
-public fun <SUBJECT : HasId<*>> AuthAccess(auth: Authentication<SUBJECT>?): AuthAccess<SUBJECT?> = AccessWithoutRequest(auth)
+@JvmName("AuthAccessNullable")
+public fun <SUBJECT : HasId<*>?> AuthAccess(auth: Authentication<SUBJECT & Any>?): AuthAccess<SUBJECT> = AccessWithoutRequest(auth)
 public fun <SUBJECT : HasId<*>> AuthAccess(auth: Authentication<SUBJECT>): AuthAccess<SUBJECT> = AccessWithoutRequest(auth)
 
 
