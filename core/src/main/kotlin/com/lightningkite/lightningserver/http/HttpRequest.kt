@@ -1,9 +1,8 @@
 package com.lightningkite.lightningserver.http
 
-import com.lightningkite.lightningserver.HttpMethod
+import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.services.data.TypedData
 import kotlinx.serialization.Serializable
@@ -21,7 +20,7 @@ public data class HttpRequest<PATH: PathSpec>(
     @Transient public val body: TypedData? = null,
 ) : Request<PATH>() {
     public fun <PATH2: PathSpec> copyWithNewPathType(
-        path: RawHttpEndpoint<PATH2> ,
+        path: RawHttpEndpoint<PATH2>,
         queryParameters: QueryParameters = this.queryParameters,
         headers: HttpHeaders = this.headers,
         domain: String = this.domain,

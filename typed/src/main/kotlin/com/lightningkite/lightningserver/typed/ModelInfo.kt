@@ -133,3 +133,10 @@ public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> Runtime<Databa
     context(server: ServerRuntime)
     override fun table(): Table<T> = systemAccess(log(null, collectionWithSignals()))
 }
+
+context(_: ServerRuntime)
+public suspend fun <USER : HasId<*>, T : HasId<ID>, ID : Comparable<ID>> ModelInfo<USER, T, ID>.table(auth: Authentication<USER>): Table<T> = table(AuthAccess(auth))
+
+@JvmName("authTableNullable")
+context(_: ServerRuntime)
+public suspend fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ModelInfo<USER, T, ID>.table(auth: Authentication<USER & Any>?): Table<T> = table(AuthAccess(auth))

@@ -29,6 +29,6 @@ public operator fun <PATH : PathSpec> PATH.plus(other: PathSpec0): PATH =
     } as PATH
 
 public operator fun <A, B> PathSpec1<A>.plus(other: PathSpec1<B>): PathSpec2<A, B> = PathSpec2(this.segments + other.segments, other.after, this.first, other.first)
-public operator fun <A, B, C> PathSpec1<A>.plus(other: PathSpec2<B, C>): PathSpec3<A, B, C> = PathSpec3(this.segments + other.segments, other.after, this.first, other.first, other.second)
 
+public operator fun <A, B, C> PathSpec1<A>.plus(other: PathSpec2<B, C>): PathSpec3<A, B, C> = PathSpec3(this.segments + other.segments, other.after, this.first, other.first, other.second)
 public operator fun <A, B, C> PathSpec2<A, B>.plus(other: PathSpec1<C>): PathSpec3<A, B, C> = PathSpec3(this.segments + other.segments, other.after, this.first, this.second, other.first)

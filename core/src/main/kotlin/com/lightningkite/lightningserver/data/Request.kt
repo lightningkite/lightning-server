@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.pathing.ResolvedPath
 import com.lightningkite.lightningserver.pathing.HasContextualPath
 import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 
 public abstract class Request<out PATH: PathSpec>: HasContextualPath<PATH>, Caching {
@@ -18,20 +19,6 @@ public abstract class Request<out PATH: PathSpec>: HasContextualPath<PATH>, Cach
     context(serverRuntime: ServerRuntime)
     override val pathInContext: ResolvedPath<PATH>
         get() = path.pathInContext
-
-    public class Test<PATH : PathSpec>(private val testPath: ResolvedPath<PATH>) : Request<PATH>() {
-        override val path: HasContextualPath<PATH> = object : HasContextualPath<PATH> {
-            context(_: ServerRuntime)
-            override val pathInContext: ResolvedPath<PATH> get() = testPath
-        }
-
-        override val sourceIp: String = "TEST"
-        override val protocol: String = "HTTP"
-        override val domain: String = "TEST"
-        override val headers: HttpHeaders = HttpHeaders.EMPTY
-        override val queryParameters: QueryParameters = QueryParameters.EMPTY
-        override val cache: SerializableCache = SerializableCache()
-    }
 }
 
 context(server: ServerRuntime)
