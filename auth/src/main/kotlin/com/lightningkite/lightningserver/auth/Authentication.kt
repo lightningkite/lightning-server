@@ -106,6 +106,7 @@ public class Authentication<SUBJECT : HasId<*>> private constructor(
                 override val id: String = "${principalName}-subject-cache"
                 override val serializer: KSerializer<SUBJECT> = untypedPrincipal.subjectSerializer
                 override val expireAfter: Duration? = untypedPrincipal.subjectCacheExpiration
+                override val localOnly: Boolean = true
             }.also { _subjectCacheKey = it }
 
     context(server: ServerRuntime)
