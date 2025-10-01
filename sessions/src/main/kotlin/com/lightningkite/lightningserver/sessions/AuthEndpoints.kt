@@ -42,6 +42,7 @@ import com.lightningkite.services.database.HasId
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlin.math.min
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
 
@@ -58,6 +59,8 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     context(server: ServerRuntime)
     public abstract suspend fun requiredProofStrengthFor(subject: SUBJECT): Int
+
+    public open val proofExpiration: Duration = 1.hours
 
     private fun maxStrengthPossible(methods: Collection<ProofMethod>): Int =
         methods
@@ -110,7 +113,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             subjectId = result.id,
             label = request.label,
             expires = run {
-                val a = result.expires
+                val a = result.maxExpiration
                 val b = request.expires
                 if (a != null && b != null) minOf(a, b) else a ?: b
             },
@@ -196,16 +199,16 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             implementation = { proofs: List<Proof> ->
                 proofs.forEach {
                     if (!proofSigner.await().verify(it)) throw errorInvalidProof.toException(data = it.via)
-                    if (now() > it.at + 1.hours) throw errorExpiredProof.toException(data = it.via)
+                    if (now() > it.at + proofExpiration) throw errorExpiredProof.toException(data = it.via)
                 }
                 val used = proofs.map { it.via }.toSet()
-                val users = proofs.mapNotNull { principal.fetchByProperty(it.property, it.value) }.distinctBy { it._id }
+                val subjects = proofs.mapNotNull { principal.fetchByProperty(it.property, it.value) }.distinctBy { it._id }
 
-                val subject = users.singleOrNull() ?: run {
+                val subject = subjects.singleOrNull() ?: run {
                     val properties = proofs.map { it.property }.toSet()
                     throw errorNoSingleUser.toException(
                         message = listOfNotNull(
-                            if (users.isEmpty()) "No user was" else "Multiple users were",
+                            if (subjects.isEmpty()) "No user was" else "Multiple users were",
                             "found with the",
                             if (properties.size > 1) "properties" else null,
                             proofs
@@ -241,7 +244,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
                 ProofsCheckResult(
                     readyToLogIn = strength >= requiredStrength,
-                    expires = sessionExpiration(subject),
+                    maxExpiration = sessionExpiration(subject),
                     id = subject._id,
                     options = proofMethods
                         .filter { it.info.via !in used }

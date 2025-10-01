@@ -18,6 +18,10 @@ public data class ServerFileWithMetadata(
     val height: Int? = null,
     val previews: List<ServerFileWithMetadataPreview> = listOf()
 ) {
+    // Backwards compatibility, must serialize so cannot be a getter.
+    @Deprecated("Use mediaType instead. This will be removed at a later date.")
+    val mimeType:String? = mediaType?.toString()
+
     public fun previews(
         supportedTypes: Set<MediaType>,
         preferredMinimumWidth: Int? = null,
@@ -48,4 +52,8 @@ public data class ServerFileWithMetadataPreview(
     val size: Long,
     val width: Int? = null,
     val height: Int? = null
-)
+){
+    // Backwards compatibility, must serialize so cannot be a getter.
+    @Deprecated("Use mediaType instead. This will be removed at a later date.")
+    val mimeType:String = mediaType.toString()
+}

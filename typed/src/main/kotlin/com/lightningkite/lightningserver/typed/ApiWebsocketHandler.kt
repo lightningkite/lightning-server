@@ -70,10 +70,10 @@ public interface ApiWebsocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
     override context(serverRuntime: ServerRuntime)
     suspend fun willConnect(request: WebSocketConnectRequest<PATH>): ApiWebsocketStorage<STORAGE> {
         return willConnectTyped(WebSocketConnectRequestAccess(request, request.auth(auth))).let { ApiWebsocketStorage(
-            request.headers.accept.firstOrNull()
-                ?: request.headers.contentType
-                ?: request.queryParameters.get("Accept")?.let { MediaType(it) }
-                ?: request.queryParameters.get("Content-Type")?.let { MediaType(it) }
+            request.headers.accept.firstOrNull()?.takeUnless { it.type == "*" }
+                ?: request.headers.contentType?.takeUnless { it.type == "*" }
+                ?: request.queryParameters.get("Accept")?.let { MediaType(it) }?.takeUnless { it.type == "*" }
+                ?: request.queryParameters.get("Content-Type")?.let { MediaType(it) }?.takeUnless { it.type == "*" }
                 ?: MediaType.Application.Json
             , it) }
     }

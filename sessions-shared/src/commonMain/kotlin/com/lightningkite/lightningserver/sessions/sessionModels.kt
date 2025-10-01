@@ -58,6 +58,8 @@ public data class IdAndAuthMethods<ID>(
     val strengthRequired: Int = 1,
     val refreshToken: String? = null,
 ){
+
+    // Backwards compatibility, must serialize so cannot be a getter.
     @Deprecated("Use refreshToken instead. This will be removed at a later date.", replaceWith = ReplaceWith("refreshToken"))
     val session: String? = refreshToken
 }
@@ -68,5 +70,5 @@ public data class ProofsCheckResult<ID>(
     val options: List<ProofOption> = listOf(),
     val strengthRequired: Int = 1,
     val readyToLogIn: Boolean,
-    val expires: Instant?,
+    val maxExpiration: Instant?,
 )
