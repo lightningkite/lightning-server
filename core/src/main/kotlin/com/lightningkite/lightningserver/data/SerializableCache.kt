@@ -11,13 +11,12 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlin.collections.iterator
 import kotlin.time.Duration
 
 
 @Serializable(SerializableCache.Serializer::class)
 public class SerializableCache private constructor(
-    private val serialized: HashMap<String, ByteArray>
+    private val serialized: HashMap<String, ByteArray>,
 ) {
     internal constructor(serialized: Map<String, ByteArray>) : this(HashMap(serialized))
 
@@ -27,6 +26,7 @@ public class SerializableCache private constructor(
         public val id: String
         public val serializer: KSerializer<T>
         public val expireAfter: Duration? get() = null
+        public val localOnly: Boolean get() = false
     }
 
     public interface CalculatingKey<INPUT, T> : Key<T> {
@@ -57,7 +57,12 @@ public class SerializableCache private constructor(
         }
 
         serialized[key.id]
-            ?.let { server.internalSerialization.kotlinBytesFormat.decodeFromByteArray(Expiring.serializer(key.serializer), it) }
+            ?.let {
+                server.internalSerialization.kotlinBytesFormat.decodeFromByteArray(
+                    Expiring.serializer(key.serializer),
+                    it
+                )
+            }
             ?.let {
                 if (it.expired) {
                     serialized.remove(key.id)
@@ -78,7 +83,9 @@ public class SerializableCache private constructor(
             expireAfter = key.expireAfter
         )
 
-        serialized[key.id] = server.internalSerialization.kotlinBytesFormat.encodeToByteArray(Expiring.serializer(key.serializer), expiring)
+        if (!key.localOnly)
+            serialized[key.id] = server.internalSerialization.kotlinBytesFormat
+                .encodeToByteArray(Expiring.serializer(key.serializer), expiring)
         cache[key.id] = KeyAndResult(key, expiring)
         updated = true
     }
@@ -107,6 +114,7 @@ public class SerializableCache private constructor(
         }
         return true
     }
+
     override fun hashCode(): Int = bytes.hashCode()
 
     override fun toString(): String = cache
@@ -128,13 +136,18 @@ public class SerializableCache private constructor(
         override val descriptor: SerialDescriptor
             get() = SerialDescriptor("com.lightningkite.lightningserver.SerializableCache", defer.descriptor)
 
-        override fun serialize(encoder: Encoder, value: SerializableCache) { defer.serialize(encoder, value.bytes) }
-        override fun deserialize(decoder: Decoder): SerializableCache = SerializableCache(decoder.decodeSerializableValue(defer))
+        override fun serialize(encoder: Encoder, value: SerializableCache) {
+            defer.serialize(encoder, value.bytes)
+        }
+
+        override fun deserialize(decoder: Decoder): SerializableCache =
+            SerializableCache(decoder.decodeSerializableValue(defer))
     }
 }
 
 context(server: ServerRuntime)
-public inline fun <T> SerializableCache.getOrPut(key: Key<T>, default: () -> T): T = get(key) ?: default().also { set(key, it) }
+public inline fun <T> SerializableCache.getOrPut(key: Key<T>, default: () -> T): T =
+    get(key) ?: default().also { set(key, it) }
 
 
 public interface Caching {
