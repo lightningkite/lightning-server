@@ -40,7 +40,8 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
 )
 
 @Serializable
-public class Authentication<SUBJECT : HasId<*>> private constructor(
+@ConsistentCopyVisibility
+public data class Authentication<SUBJECT : HasId<*>> private constructor(
     public val principalName: String,
     public val rawId: String,
     public val sessionId: String?,

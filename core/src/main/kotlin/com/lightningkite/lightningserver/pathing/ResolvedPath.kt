@@ -11,7 +11,8 @@ import kotlinx.serialization.StringFormat
 /**
  * A [PathSpec] with all of its wildcard values fulfilled.
  */
-public class ResolvedPath<out PATH: PathSpec> internal constructor(
+@ConsistentCopyVisibility
+public data class ResolvedPath<out PATH: PathSpec> internal constructor(
     public val pathSpec: PATH,
     public val rawPathArguments: List<Any?>,
     public val trailingSegments: PathSegments? = null,
@@ -91,7 +92,7 @@ public inline val <A, B, C> ResolvedPath<PathSpec3<A, B, C>>.first: A get() = ra
 public inline val <A, B, C> ResolvedPath<PathSpec3<A, B, C>>.second: B get() = rawPathArguments[1] as B
 
 @get:JvmName("third3")
-public inline val <A, B, C> ResolvedPath<PathSpec3<A, B, C>>.third: C get() = rawPathArguments[1] as C
+public inline val <A, B, C> ResolvedPath<PathSpec3<A, B, C>>.third: C get() = rawPathArguments[2] as C
 
 
 

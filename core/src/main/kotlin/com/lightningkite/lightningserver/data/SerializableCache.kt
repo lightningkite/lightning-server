@@ -86,6 +86,7 @@ public class SerializableCache private constructor(
         if (!key.localOnly)
             serialized[key.id] = server.internalSerialization.kotlinBytesFormat
                 .encodeToByteArray(Expiring.serializer(key.serializer), expiring)
+
         cache[key.id] = KeyAndResult(key, expiring)
         updated = true
     }

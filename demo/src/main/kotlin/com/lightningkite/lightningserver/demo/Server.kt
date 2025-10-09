@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.cors.CorsSettings
 import com.lightningkite.lightningserver.data.alter
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.*
+import com.lightningkite.lightningserver.deprecations.path1
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
@@ -22,6 +23,7 @@ import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCod
 import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.sessions.proofs.*
 import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.lightningserver.typed.path
 import com.lightningkite.lightningserver.typed.sdk.module
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.cache.*
@@ -235,6 +237,16 @@ object Server : ServerBuilder() {
     val testSchedule = path.path("test-schedule") bind ScheduledTask(frequency = 5.minutes) {
         println("Hello schedule!")
     }
+
+    val testPathed = path.path("a").arg<String>("b").arg<Int>("c").post bind ApiHttpHandler(
+        summary = "Test Pathing",
+        auth = UserAuth.require(),
+        implementation = { _: Unit ->
+            println("A = ${path.first}")
+            println("B = ${path.second}")
+            println("Hello ${auth.fetch()}")
+        }
+    )
 
     val hasInternet = path.path("has-internet").get bind HttpHandler {
         println("Checking for internet...")
