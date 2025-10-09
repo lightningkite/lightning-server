@@ -8,10 +8,10 @@ import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.engine.local.LocalEngine
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.HttpStatus
-import com.lightningkite.lightningserver.http.PathAndParams
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.pathing.RawWebsocketPath
@@ -44,8 +44,6 @@ import io.netty.handler.timeout.IdleStateEvent
 import io.netty.handler.timeout.IdleStateHandler
 import io.netty.util.AttributeKey
 import kotlinx.coroutines.*
-import kotlinx.io.asSink
-import kotlinx.io.buffered
 import kotlinx.serialization.KSerializer
 import java.net.InetSocketAddress
 import java.net.URI
@@ -487,27 +485,16 @@ public class NettyEngine(
             )
         }
 
-        private fun HttpResponse.toNettyResponse(version: HttpVersion): DefaultFullHttpResponse {
-            val status = HttpResponseStatus.valueOf(this.status.code)
-
+        private fun HttpResponse.toNettyResponse(version: HttpVersion): FullHttpResponse {
             val contentBuf = when (val b = this.body?.data) {
                 null -> Unpooled.EMPTY_BUFFER
                 is Data.Bytes -> Unpooled.wrappedBuffer(b.data)
-                is Data.Text -> Unpooled.wrappedBuffer(b.data.toByteArray(StandardCharsets.UTF_8))
-                is Data.Sink -> {
-                    val baos = java.io.ByteArrayOutputStream()
-                    b.emit(baos.asSink().buffered())
-                    Unpooled.wrappedBuffer(baos.toByteArray())
-                }
-
-                is Data.Source -> {
-                    val baos = java.io.ByteArrayOutputStream()
-                    b.source.transferTo(baos.asSink().buffered())
-                    Unpooled.wrappedBuffer(baos.toByteArray())
-                }
+                is Data.Text -> Unpooled.wrappedBuffer(b.bytes())
+                is Data.Sink -> Unpooled.wrappedBuffer(b.bytes())
+                is Data.Source -> Unpooled.wrappedBuffer(b.bytes())
             }
 
-            val res = DefaultFullHttpResponse(version, status, contentBuf)
+            val res = DefaultFullHttpResponse(version, HttpResponseStatus.valueOf(this.status.code), contentBuf)
 
             for ((key, values) in this.headers.normalizedEntries) {
                 for (value in values) {
@@ -520,18 +507,16 @@ public class NettyEngine(
             if (contentBuf !== Unpooled.EMPTY_BUFFER) {
                 res.headers()[CONTENT_LENGTH] = contentBuf.readableBytes().toString()
             }
+
             return res
         }
 
-        private fun NettyHttpHeaders.toLightningHeaders(): LsHttpHeaders = LsHttpHeaders(
-            buildList {
-                for (e in this@toLightningHeaders.entries()) {
-                    val key = e.key.toString()
-                    val raw = e.value ?: continue
-                    raw.split(',').map { it.trim() }.forEach { add(key to it) }
-                }
-            }
-        )
+        private fun NettyHttpHeaders.toLightningHeaders(): LsHttpHeaders =
+            HttpHeaders(this@toLightningHeaders.entries().flatMap { (key, raw) ->
+                raw.split(',')
+                    .map { key to it.trim() }
+            })
+
     }
 
     private abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
