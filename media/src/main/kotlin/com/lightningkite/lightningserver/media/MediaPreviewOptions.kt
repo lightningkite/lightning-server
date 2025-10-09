@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.media
 import com.lightningkite.MediaType
 import com.sksamuel.scrimage.ImmutableImage
 import com.sksamuel.scrimage.metadata.Orientation
+import com.sksamuel.scrimage.nio.BmpWriter
 import com.sksamuel.scrimage.nio.GifWriter
 import com.sksamuel.scrimage.nio.JpegWriter
 import com.sksamuel.scrimage.nio.PngWriter
@@ -10,7 +11,6 @@ import com.sksamuel.scrimage.nio.TiffWriter
 import com.sksamuel.scrimage.webp.WebpWriter
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.File
-import kotlin.invoke
 import kotlin.jvm.optionals.getOrNull
 import kotlin.math.roundToInt
 
@@ -46,7 +46,10 @@ public fun ImmutableImage.apply(
     options: MediaPreviewOptions,
     originalType: MediaType,
 ): FileMediaInfo? {
-    val canSkip = (options.sizeInPixels == null || options.sizeInPixels > width || options.sizeInPixels > height) &&
+    val needsScaling = options.sizeInPixels != null && (options.sizeInPixels < width || options.sizeInPixels < height)
+    val needsRatio = options.forceRatio != null && width.toDouble() / height != options.forceRatio
+    val canSkip = !needsScaling &&
+            !needsRatio &&
             (options.type == null || originalType == options.type) &&
             ((options.type ?: originalType) != MediaType.Image.JPEG || this.metadata.orientation?.getOrNull().let { it == Orientation.Zero || it == null })
 
@@ -56,13 +59,16 @@ public fun ImmutableImage.apply(
     var processing = basis
     val destinationFile = options.destination ?: File.createTempFile("resized", originalType.extension)
 
-    options.sizeInPixels?.let { size ->
-        val scaleFactor = kotlin.math.max(size / basis.width.toDouble(), size / basis.height.toDouble()).coerceAtMost(1.0)
-        processing = processing.scale(scaleFactor)
-    }
+    if (needsRatio)
+        processing = processing.resizeToRatio(options.forceRatio)
 
-    options.forceRatio?.let {
-        processing = processing.resizeToRatio(it)
+    if (needsScaling && (!needsRatio || options.sizeInPixels < processing.width || options.sizeInPixels < processing.height)) {
+        val scaleFactor =
+            kotlin.math.max(
+                options.sizeInPixels / basis.width.toDouble(),
+                options.sizeInPixels / basis.height.toDouble()
+            ).coerceAtMost(1.0)
+        processing = processing.scale(scaleFactor)
     }
 
     val type = options.type ?: originalType
@@ -70,11 +76,15 @@ public fun ImmutableImage.apply(
     type.let {
         when (it) {
             MediaType.Image.PNG -> processing.output(PngWriter(), destinationFile)
-            MediaType.Image.JPEG -> processing.output(JpegWriter(options.quality?.times(100)?.roundToInt() ?: 95, false), destinationFile)
+            MediaType.Image.JPEG -> processing.output(
+                JpegWriter(options.quality?.times(100)?.roundToInt() ?: 95, false),
+                destinationFile
+            )
+
             MediaType.Image.WebP -> processing.output(WebpWriter(), destinationFile)
             MediaType.Image.Tiff -> processing.output(TiffWriter(), destinationFile)
             MediaType.Image.GIF -> processing.output(GifWriter(false), destinationFile)
-//            MediaType.Image.BMP -> processing.output(BmpWriter(), destinationFile)
+            MediaType.Image.BMP -> processing.output(BmpWriter(), destinationFile)
 //                    MediaType.Image.APNG -> processing.output(???, out)
 //                    MediaType.Image.AVIF -> processing.output(???, out)
             else -> {

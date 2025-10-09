@@ -13,4 +13,4 @@ public val ServerFile.fileObject: FileObject get() {
     return ext.fileSystems.firstNotNullOfOrNull { it.parseInternalUrl(location) } ?: throw IllegalStateException("No file systems available to parse $location")
 }
 
-public val FileObject.nameWithoutExtension: String get() = name.substringAfterLast('.')
+public val FileObject.nameWithoutExtension: String get() = name.substringBeforeLast('.')

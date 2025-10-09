@@ -9,54 +9,37 @@ import com.lightningkite.lightningserver.runtime.invoke
 import com.lightningkite.lightningserver.runtime.locationOrNull
 import com.lightningkite.lightningserver.typed.ModelInfo
 import com.lightningkite.services.data.TypedData
-import com.lightningkite.services.database.DataClassPath
-import com.lightningkite.services.database.DataClassPathSelf
-import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.Modification
-import com.lightningkite.services.database.Table
-import com.lightningkite.services.database.and
-import com.lightningkite.services.database.interceptChange
-import com.lightningkite.services.database.interceptCreate
-import com.lightningkite.services.database.map
-import com.lightningkite.services.database.updateOneById
-import com.lightningkite.services.database.valueSetForDataClassPath
+import com.lightningkite.services.database.*
 import com.lightningkite.services.files.serverFile
 import com.sksamuel.scrimage.ImmutableImage
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
+import kotlinx.io.asInputStream
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 context(runtime: ServerRuntime)
-public suspend fun ServerFileWithMetadata.process(options: Collection<MediaPreviewOptions>): ServerFileWithMetadata = withContext(Dispatchers.IO) {
-    if (options.isEmpty()) return@withContext this@process
-    if (previews.isNotEmpty()) return@withContext this@process
+public suspend fun ServerFileWithMetadata.process(options: Collection<MediaPreviewOptions>): ServerFileWithMetadata =
+    withContext(Dispatchers.IO) {
+        if (options.isEmpty()) return@withContext this@process
+        if (previews.isNotEmpty()) return@withContext this@process
 
-    val originalFile = original
-    val originalFileObject = originalFile.fileObject
+        val originalFile = original
+        val originalFileObject = originalFile.fileObject
 
-    var out = this@process
-    val toClean = ArrayList<File>()
-
-    try {
-        // Download the original file
-        val tempFile = File.createTempFile("original", originalFile.location.substringAfterLast('.'))
-        toClean += tempFile
+        var out = this@process
 
         val content = originalFileObject.get() ?: return@withContext out
 
-        content.write(tempFile.toKFile().sink())
-
         out = out.copy(
             size = content.data.size,
-            mediaType = content.mediaType,
+            mimeType = content.mediaType,
         )
 
         if (content.mediaType.type != "image") return@withContext out
 
-        val basis = ImmutableImage.loader().fromFile(tempFile)
+        val basis = ImmutableImage.loader().fromStream(content.data.source().asInputStream())
 
         out = out.copy(
             width = basis.width,
@@ -65,14 +48,15 @@ public suspend fun ServerFileWithMetadata.process(options: Collection<MediaPrevi
 
         for (option in options) {
             val result = basis.apply(option, content.mediaType) ?: continue
-            val fileObject = originalFileObject.parent!!.then(originalFileObject.nameWithoutExtension + "-${option}." + result.mimeType.extension)
+            val fileObject =
+                originalFileObject.parent!!.then(originalFileObject.nameWithoutExtension + "-${option}." + result.mimeType.extension)
 
             fileObject.put(TypedData.source(result.file.toKFile().source(), result.mimeType))
 
             out = out.copy(
                 previews = out.previews + ServerFileWithMetadataPreview(
                     file = fileObject.serverFile,
-                    mediaType = result.mimeType,
+                    mimeType = result.mimeType,
                     size = result.size,
                     width = result.width,
                     height = result.height,
@@ -81,17 +65,13 @@ public suspend fun ServerFileWithMetadata.process(options: Collection<MediaPrevi
         }
 
         out
-    } finally {
-        // Clean up temporary files
-        toClean.forEach { it.delete() }
     }
-}
 
 public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> processImagesInBackground(
     info: ModelInfo<USER, T, ID>,
     vararg options: MediaPreviewOptions,
     timeout: Duration = 5.minutes,
-    makePath: (DataClassPath<T, T>) -> DataClassPath<T, ServerFileWithMetadata?>
+    makePath: (DataClassPath<T, T>) -> DataClassPath<T, ServerFileWithMetadata?>,
 ): Task<T> {
     val path = makePath(DataClassPathSelf(info.serializer))
 
@@ -100,9 +80,11 @@ public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> processImagesI
         withContext(Dispatchers.IO) {
             info.table().updateOneById(
                 model._id,
-                path.mapModification(Modification.Assign(
-                    new.process(options.toList())
-                ))
+                path.mapModification(
+                    Modification.Assign(
+                        new.process(options.toList())
+                    )
+                )
             )
         }
     }
@@ -127,7 +109,7 @@ public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> processImagesI
 context(_: ServerRuntime)
 public fun <T : Any> Table<T>.interceptImagesForProcessing(
     vararg options: MediaPreviewOptions,
-    makePath: (DataClassPath<T, T>) -> DataClassPath<T, ServerFileWithMetadata?>
+    makePath: (DataClassPath<T, T>) -> DataClassPath<T, ServerFileWithMetadata?>,
 ): Table<T> {
     val path = makePath(DataClassPathSelf(serializer))
     return this
@@ -140,12 +122,16 @@ public fun <T : Any> Table<T>.interceptImagesForProcessing(
         .interceptChange {
             val new = it.valueSetForDataClassPath(path) ?: return@interceptChange it
 
-            Modification.Chain(listOf(
-                it,
-                path.mapModification(Modification.Assign(
-                    new.process(options.toList())
-                ))
-            ))
+            Modification.Chain(
+                listOf(
+                    it,
+                    path.mapModification(
+                        Modification.Assign(
+                            new.process(options.toList())
+                        )
+                    )
+                )
+            )
         }
 }
 
@@ -153,6 +139,9 @@ public fun <T : Any> Table<T>.interceptImagesForProcessing(
 context(_: ServerRuntime)
 public fun <T : Any> Table<T>.interceptImagesForProcessingNotNull(
     vararg options: MediaPreviewOptions,
-    makePath: (DataClassPath<T, T>) -> DataClassPath<T, ServerFileWithMetadata>
+    makePath: (DataClassPath<T, T>) -> DataClassPath<T, ServerFileWithMetadata>,
 ): Table<T> =
-    interceptImagesForProcessing(*options, makePath = makePath as (DataClassPath<T, T>) -> DataClassPath<T, ServerFileWithMetadata?>)
+    interceptImagesForProcessing(
+        *options,
+        makePath = makePath as (DataClassPath<T, T>) -> DataClassPath<T, ServerFileWithMetadata?>
+    )

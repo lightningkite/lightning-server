@@ -12,15 +12,12 @@ import kotlin.uuid.Uuid
 @GenerateDataClassPaths
 public data class ServerFileWithMetadata(
     val original: ServerFile,
-    val mediaType: MediaType? = null,
+    val mimeType: MediaType? = null,
     val size: Long? = null,
     val width: Int? = null,
     val height: Int? = null,
     val previews: List<ServerFileWithMetadataPreview> = listOf()
 ) {
-    // Backwards compatibility, must serialize so cannot be a getter.
-    @Deprecated("Use mediaType instead. This will be removed at a later date.")
-    val mimeType:String? = mediaType?.toString()
 
     public fun previews(
         supportedTypes: Set<MediaType>,
@@ -28,7 +25,7 @@ public data class ServerFileWithMetadata(
         preferredMinimumHeight: Int? = null,
     ): Sequence<ServerFileWithMetadataPreview> = previews
         .asSequence()
-        .filter { it.mediaType in supportedTypes }
+        .filter { it.mimeType in supportedTypes }
         .sortedBy {
             val diffWidth = preferredMinimumWidth?.let { d ->
                 it.width?.let { a ->
@@ -48,12 +45,8 @@ public data class ServerFileWithMetadata(
 @GenerateDataClassPaths
 public data class ServerFileWithMetadataPreview(
     val file: ServerFile,
-    val mediaType: MediaType,
+    val mimeType:MediaType,
     val size: Long,
     val width: Int? = null,
     val height: Int? = null
-){
-    // Backwards compatibility, must serialize so cannot be a getter.
-    @Deprecated("Use mediaType instead. This will be removed at a later date.")
-    val mimeType:String = mediaType.toString()
-}
+)
