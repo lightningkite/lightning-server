@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.runtime
 
-import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.RouteNotFoundException
 import com.lightningkite.lightningserver.definition.ScheduledTask
@@ -14,6 +13,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.telemetry.use
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.Data
+import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.otel.get
 import io.opentelemetry.api.trace.Span
 import kotlinx.io.asOutputStream
@@ -62,84 +62,63 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
                     }
                 }
             }
-            // Compression (size- and type-aware defaults, gzip only)
-            run {
-                // Preconditions: response/body present and eligible
-                val bodyHolder = result.body ?: return@run
-                if (result.status == HttpStatus.NoContent || result.status == HttpStatus.NotModified || result.status == HttpStatus.PartialContent) return@run
-                if (result.headers[HttpHeader.ContentEncoding] != null) return@run
-                if (request.headers[HttpHeader.Range] != null) return@run
-                if (result.headers[HttpHeader.ContentRange] != null) return@run
+            if (result.body == null || request.headers[HttpHeader.AcceptEncoding] == null) return@intercept result
 
-                // Accept-Encoding negotiation (gzip only for now)
-                val accepts = request.headers.getMany(HttpHeader.AcceptEncoding)
-                    .map { it.root.lowercase().substringBefore(';').trim() }
-                if (!accepts.contains("gzip")) return@run
+            val acceptedEncodings = request.headers.getMany(HttpHeader.AcceptEncoding)
+            if (acceptedEncodings.isEmpty()) return@intercept result
 
-                // Content-Type denylist (skip already-compressed types)
-                val contentTypeRoot = result.headers[HttpHeader.ContentType]?.root?.let {
-                    try {
-                        MediaType(it)
-                    } catch (e: Exception) {
-                        null
-                    }
-                }
-                when (contentTypeRoot?.type) {
-                    "image", "audio", "video" -> return@run
-                    "application" -> when (contentTypeRoot.subtype) {
-                        "zip", "gzip", "x-gzip", "x-7z-compressed", "x-bzip2", "x-tar", "pdf" -> return@run
-                    }
+            val accepts = acceptedEncodings
+                .map { it.root.lowercase().substringBefore(';').trim() }
 
-                    "font" -> when (contentTypeRoot.subtype) {
-                        "woff", "woff2" -> return@run
-                    }
+            // Accept-Encoding negotiation (gzip only for now)
+            if (!accepts.contains("gzip")) return@intercept result
+
+            // Content-Type denylist (skip already-compressed types)
+            if (result.body.mediaType.type in setOf("image", "audio", "video") ||
+                (result.body.mediaType.type == "application" &&
+                        result.body.mediaType.subtype in
+                        setOf("zip", "gzip", "x-gzip", "x-7z-compressed", "x-bzip2", "x-tar", "pdf")
+                        ) ||
+                (result.body.mediaType.type == "font" && result.body.mediaType.subtype in setOf("woff", "woff2"))
+            ) return@intercept result
+
+            // Lower compress limit. Either not worth the effort, or likely will inflate a little.
+            if (result.body.data.size != -1L && result.body.data.size < 256 /*256 bytes*/) return@intercept result
+
+            val (newData, compressed) = when (val data = result.body.data) {
+                is Data.Sink -> {
+                    Data.Sink { outSink ->
+                        data.write(GZIPOutputStream(outSink.asOutputStream()).asSink().buffered())
+                    } to true
                 }
 
-                // Defaults
-                val minSizeForCompression = 1024 // 1 KiB
-                val tryCompressAndFallbackMax = 64 * 1024 // 64 KiB
-
-                when (val data = bodyHolder.data) {
-                    is Data.Sink -> {
-                        // Stream-first path: wrap outgoing stream in GZIPOutputStream (single layer)
-                        val newBody = bodyHolder.copy(data = Data.Sink { outSink ->
-                            GZIPOutputStream(outSink.asOutputStream()).use { gz ->
-                                gz.asSink().buffered().use { buf ->
-                                    data.emit(buf)
-                                }
-                            }
-                        })
-                        val newHeaders = result.headers.copy {
-                            set(HttpHeader.ContentEncoding, "gzip")
-                            set(HttpHeader.Vary, HttpHeader.AcceptEncoding)
+                is Data.Source -> {
+                    Data.Sink { outSink ->
+                        GZIPOutputStream(outSink.asOutputStream()).asSink().buffered().use { gzOut ->
+                            data.write(gzOut)
                         }
-                        result = result.copy(headers = newHeaders, body = newBody)
-                    }
+                    } to true
+                }
 
-                    else -> {
-                        val original = data.bytes()
-                        if (original.size < minSizeForCompression) return@run
-
-                        // Try-compress-and-fallback for moderate sizes
-                        val compressed: ByteArray? = if (original.size <= tryCompressAndFallbackMax) {
-                            val gz = original.gzip()
-                            if (gz.size < original.size) gz else null
-                        } else null
-
-                        val finalBytes =
-                            compressed ?: if (original.size > tryCompressAndFallbackMax) original.gzip() else null
-                        if (finalBytes != null) {
-                            val newHeaders = result.headers.copy {
-                                set(HttpHeader.ContentEncoding, "gzip")
-                                set(HttpHeader.Vary, HttpHeader.AcceptEncoding)
-                            }
-                            result =
-                                result.copy(headers = newHeaders, body = bodyHolder.copy(data = Data.Bytes(finalBytes)))
-                        }
-                    }
+                else -> {
+                    // 1024 Grey area. It likely will compress fine, but if not send the original
+                    if (data.size <= 1024 /*1 kibibyte*/) {
+                        val og = data.bytes()
+                        val gz = og.gzip()
+                        if (gz.size < data.size)
+                            Data.Bytes(gz) to true
+                        else
+                            Data.Bytes(og) to false
+                    } else
+                        Data.Bytes(data.bytes().gzip()) to true
                 }
             }
-            result
+            result.copy(
+                headers = if (compressed) result.headers.copy {
+                    set(HttpHeader.ContentEncoding, "gzip")
+                } else result.headers,
+                body = TypedData(newData, result.body.mediaType)
+            )
         }
     } catch (e: Exception) {
         try {

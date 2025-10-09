@@ -87,7 +87,7 @@ public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpIn
         }
 
         return baseResponse.copy(
-            headers = baseResponse.headers + HttpHeaders {
+            headers = baseResponse.headers.copy {
                 set(HttpHeader.AccessControlAllowOrigin, origin)
 
                 if (config.allowCredentials) set(HttpHeader.AccessControlAllowCredentials, "true")
