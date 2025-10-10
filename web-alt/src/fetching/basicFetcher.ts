@@ -22,7 +22,13 @@ export function createBasicFetcher(
       body,
       { method, headers: await additionalHeaders() },
       responseInterceptors
-    ).then((x) => x.json() as Promise<T>);
+    ).then((x) => {
+      try {
+        return x.json()
+      } catch (e) {
+        return undefined
+      }
+    });
   };
 }
 
