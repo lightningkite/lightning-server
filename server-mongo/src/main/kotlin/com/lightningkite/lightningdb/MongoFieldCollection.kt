@@ -546,18 +546,18 @@ class MongoFieldCollection<Model : Any>(
                     }
                 }
             }
-            serializer.descriptor.indexes().forEach {
-                if (it.type == GeoCoordinateGeoJsonSerializer.descriptor.serialName) {
+            serializer.descriptor.indexes().forEach { index: NeededIndex ->
+                if (index.type == GeoCoordinateGeoJsonSerializer.descriptor.serialName) {
                     requireCompletion += launch {
-                        val nameOrDefault = it.name ?: it.fields[0].plus("_geo")
+                        val nameOrDefault = index.name ?: index.fields[0].plus("_geo")
                         try {
-                            createIndex(Indexes.geo2dsphere(it.fields), IndexOptions().name(nameOrDefault))
+                            createIndex(Indexes.geo2dsphere(index.fields), IndexOptions().name(nameOrDefault))
                         } catch (e: MongoCommandException) {
                             // Reform index if it already exists but with some difference in options
                             if (e.errorCode == 85) {
                                 try {
                                     dropIndex(nameOrDefault)
-                                    createIndex(Indexes.geo2dsphere(it.fields), IndexOptions().name(nameOrDefault))
+                                    createIndex(Indexes.geo2dsphere(index.fields), IndexOptions().name(nameOrDefault))
                                 } catch (e2: MongoCommandException) {
                                     Exception(
                                         "Creating geo index failed on ${this@prepare.namespace.fullName}",
@@ -573,10 +573,10 @@ class MongoFieldCollection<Model : Any>(
                             }
                         }
                     }
-                } else if (it.unique) {
+                } else if (index.unique) {
                     requireCompletion += launch {
-                        val keys = Sorts.ascending(it.fields)
-                        val options = IndexOptions().unique(true).name(it.name)
+                        val keys = Sorts.orderBy(index.fields.map { if(it.startsWith('-')) Sorts.descending(it) else Sorts.ascending(it) })
+                        val options = IndexOptions().unique(true).name(index.name)
                         try {
                             createIndex(keys, options)
                         } catch (e: MongoCommandException) {
@@ -602,8 +602,8 @@ class MongoFieldCollection<Model : Any>(
                     }
                 } else {
                     launch {
-                        val keys = Sorts.ascending(it.fields)
-                        val options = IndexOptions().unique(false).background(true).name(it.name)
+                        val keys = Sorts.orderBy(index.fields.map { field -> if(field.startsWith('-')) Sorts.descending(field.drop(1)) else Sorts.ascending(field) })
+                        val options = IndexOptions().unique(false).background(true).name(index.name)
                         try {
                             createIndex(keys, options)
                         } catch (e: MongoCommandException) {
@@ -626,7 +626,7 @@ class MongoFieldCollection<Model : Any>(
                     }
                 }
             }
-            requireCompletion.forEach { it.join() }
+            requireCompletion.joinAll()
         }
         preparedAlready = true
     }
