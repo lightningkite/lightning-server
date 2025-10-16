@@ -7,23 +7,19 @@ import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.cors.CorsInterceptor
 import com.lightningkite.lightningserver.cors.CorsSettings
-import com.lightningkite.lightningserver.data.alter
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.deprecations.path1
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.http.*
-import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.pathing.PathSpec1
-import com.lightningkite.lightningserver.pathing.first
-import com.lightningkite.lightningserver.pathing.second
+import com.lightningkite.lightningserver.pathing.arg1
+import com.lightningkite.lightningserver.pathing.arg2
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.sessions.proofs.*
 import com.lightningkite.lightningserver.typed.*
-import com.lightningkite.lightningserver.typed.path
+import com.lightningkite.lightningserver.typed.route
 import com.lightningkite.lightningserver.typed.sdk.module
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.cache.*
@@ -93,7 +89,7 @@ object Server : ServerBuilder() {
     }
 
     val userInfo: ModelInfo<User?, User, Uuid> = database.modelInfo(
-        auth = UserAuth.require() or AuthRequirement.NotAuthenticated,
+        auth = UserAuth.require() or AuthRequirement.None,
         permissions = {
             val user = authOrNull?.fetch()
             val everyone: Condition<User> = Condition.Always
@@ -242,8 +238,10 @@ object Server : ServerBuilder() {
         summary = "Test Pathing",
         auth = UserAuth.require(),
         implementation = { _: Unit ->
-            println("A = ${path.first}")
-            println("B = ${path.second}")
+            println("A = $path1")
+            println("A = ${route.arg1}")
+
+            println("B = ${route.arg2}")
             println("Hello ${auth.fetch()}")
         }
     )

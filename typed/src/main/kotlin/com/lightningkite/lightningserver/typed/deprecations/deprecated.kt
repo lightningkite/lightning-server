@@ -5,18 +5,17 @@ import com.lightningkite.lightningserver.auth.fetch
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec1
 import com.lightningkite.lightningserver.pathing.PathSpec2
 import com.lightningkite.lightningserver.pathing.PathSpec3
-import com.lightningkite.lightningserver.pathing.first
-import com.lightningkite.lightningserver.pathing.second
-import com.lightningkite.lightningserver.pathing.third
+import com.lightningkite.lightningserver.pathing.arg1
+import com.lightningkite.lightningserver.pathing.arg2
+import com.lightningkite.lightningserver.pathing.arg3
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.Access
 import com.lightningkite.lightningserver.typed.AuthAccess
 import com.lightningkite.lightningserver.typed.ModelInfo
-import com.lightningkite.lightningserver.typed.path
+import com.lightningkite.lightningserver.typed.route
 import com.lightningkite.lightningserver.typed.startupOnce
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
@@ -58,26 +57,26 @@ public suspend fun <SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> Mod
 public val <SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ModelInfo<SUBJECT, T, ID>.collectionName: String get() = tableName
 
 
-@Deprecated("Use path.first instead", ReplaceWith("path.first", "com.lightningkite.lightningserver.typed.path", "com.lightningkite.lightningserver.pathing.first"))
+@Deprecated("Use route.arg1 instead", ReplaceWith("route.arg1", "com.lightningkite.lightningserver.typed.route", "com.lightningkite.lightningserver.pathing.arg1"))
 context(runtime: ServerRuntime)
-public val <REQ : Request<PathSpec1<A>>, A> Access<REQ, PathSpec1<A>, *>.path1: A get() = path.first
+public val <REQ : Request<PathSpec1<A>>, A> Access<REQ, PathSpec1<A>, *>.path1: A get() = route.arg1
 
-@Deprecated("Use path.first instead", ReplaceWith("path.first", "com.lightningkite.lightningserver.typed.path", "com.lightningkite.lightningserver.pathing.first"))
+@Deprecated("Use route.arg1 instead", ReplaceWith("route.arg1", "com.lightningkite.lightningserver.typed.route", "com.lightningkite.lightningserver.pathing.arg1"))
 context(runtime: ServerRuntime)
-public val <REQ : Request<PathSpec2<A, B>>, A, B> Access<REQ, PathSpec2<A, B>, *>.path1: A get() = path.first
+public val <REQ : Request<PathSpec2<A, B>>, A, B> Access<REQ, PathSpec2<A, B>, *>.path1: A get() = route.arg1
 
-@Deprecated("Use path.second instead", ReplaceWith("path.second", "com.lightningkite.lightningserver.typed.path", "com.lightningkite.lightningserver.pathing.second"))
+@Deprecated("Use route.arg2 instead", ReplaceWith("route.arg2", "com.lightningkite.lightningserver.typed.route", "com.lightningkite.lightningserver.pathing.arg2"))
 context(runtime: ServerRuntime)
-public val <REQ : Request<PathSpec2<A, B>>, A, B> Access<REQ, PathSpec2<A, B>, *>.path2: B get() = path.second
+public val <REQ : Request<PathSpec2<A, B>>, A, B> Access<REQ, PathSpec2<A, B>, *>.path2: B get() = route.arg2
 
-@Deprecated("Use path.first instead", ReplaceWith("path.first", "com.lightningkite.lightningserver.typed.path", "com.lightningkite.lightningserver.pathing.first"))
+@Deprecated("Use route.arg1 instead", ReplaceWith("route.arg1", "com.lightningkite.lightningserver.typed.route", "com.lightningkite.lightningserver.pathing.arg1"))
 context(runtime: ServerRuntime)
-public val <REQ : Request<PathSpec3<A, B, C>>, A, B, C> Access<REQ, PathSpec3<A, B, C>, *>.path1: A get() = path.first
+public val <REQ : Request<PathSpec3<A, B, C>>, A, B, C> Access<REQ, PathSpec3<A, B, C>, *>.path1: A get() = route.arg1
 
-@Deprecated("Use path.second instead", ReplaceWith("path.second", "com.lightningkite.lightningserver.typed.path", "com.lightningkite.lightningserver.pathing.second"))
+@Deprecated("Use route.arg2 instead", ReplaceWith("route.arg2", "com.lightningkite.lightningserver.typed.route", "com.lightningkite.lightningserver.pathing.arg2"))
 context(runtime: ServerRuntime)
-public val <REQ : Request<PathSpec3<A, B, C>>, A, B, C> Access<REQ, PathSpec3<A, B, C>, *>.path2: B get() = path.second
+public val <REQ : Request<PathSpec3<A, B, C>>, A, B, C> Access<REQ, PathSpec3<A, B, C>, *>.path2: B get() = route.arg2
 
-@Deprecated("Use path.third instead", ReplaceWith("path.second", "com.lightningkite.lightningserver.typed.path", "com.lightningkite.lightningserver.pathing.third"))
+@Deprecated("Use route.arg3 instead", ReplaceWith("route.second", "com.lightningkite.lightningserver.typed.route", "com.lightningkite.lightningserver.pathing.arg3"))
 context(runtime: ServerRuntime)
-public val <REQ : Request<PathSpec3<A, B, C>>, A, B, C> Access<REQ, PathSpec3<A, B, C>, *>.path3: C get() = path.third
+public val <REQ : Request<PathSpec3<A, B, C>>, A, B, C> Access<REQ, PathSpec3<A, B, C>, *>.path3: C get() = route.arg3

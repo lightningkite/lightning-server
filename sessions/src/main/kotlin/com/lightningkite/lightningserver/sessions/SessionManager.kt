@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.auth.GrantedScope
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.RequiredScope
 import com.lightningkite.lightningserver.auth.Subscope
+import com.lightningkite.lightningserver.auth.accepts
 import com.lightningkite.lightningserver.auth.require
 import com.lightningkite.lightningserver.auth.authReaders
 import com.lightningkite.lightningserver.auth.fetch
@@ -29,7 +30,7 @@ import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.encryption.checkAgainstHash
 import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.pathing.PathSpec1
-import com.lightningkite.lightningserver.pathing.first
+import com.lightningkite.lightningserver.pathing.arg1
 import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.sessions.token.TokenException
 import com.lightningkite.lightningserver.sessions.token.TokenFormat
@@ -38,6 +39,7 @@ import com.lightningkite.lightningserver.typed.explicitApiHttpHandler
 import com.lightningkite.lightningserver.typed.ModelInfo
 import com.lightningkite.lightningserver.typed.auth
 import com.lightningkite.lightningserver.typed.explicitModelInfo
+import com.lightningkite.lightningserver.typed.route
 import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
@@ -300,7 +302,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             summary = "Terminate Session",
             errorCases = listOf(),
             implementation = { _ ->
-                terminateSessionById(first, auth.id)
+                terminateSessionById(route.arg1, auth.id)
             }
         )
 

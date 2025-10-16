@@ -6,11 +6,11 @@ import com.lightningkite.lightningserver.auth.assert
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.data.get
 import com.lightningkite.lightningserver.http.HttpRequest
-import com.lightningkite.lightningserver.pathing.HasContextualPath
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.ForbiddenException
+import com.lightningkite.lightningserver.auth.accepts
 import com.lightningkite.lightningserver.pathing.ResolvedPath
 import com.lightningkite.services.database.HasId
 
@@ -35,13 +35,14 @@ public typealias AuthAccess<SUBJECT> = Access<*, *, SUBJECT>
  * Retrieves the [ResolvedPath] of this [Request]
  * */
 context(runtime: ServerRuntime)
-public val <REQ : Request<PATH>, PATH : PathSpec> Access<REQ, PATH, *>.path: ResolvedPath<PATH> get() = request.pathInContext
+public val <REQ : Request<PATH>, PATH : PathSpec> Access<REQ, PATH, *>.route: ResolvedPath<PATH> get() = request.pathInContext
 
 public val <SUBJECT : HasId<*>> Access<*, *, SUBJECT>.auth: Authentication<SUBJECT> get() = authOrNull!! // safe because the type is non-null (by convention)
 
 
 /**
- * Creates a new [Access] for this request by asserting the provided [AuthRequirement].
+ * Creates a new [Access] for this request by retrieving this request's [Authentication]
+ * and then asserting the provided [AuthRequirement].
  *
  * This method calls [AuthRequirement.assert] to retrieve the authentication.
  *
@@ -53,7 +54,10 @@ context(server: ServerRuntime)
 public suspend fun <REQUEST : Request<PATH>, PATH : PathSpec, SUBJECT : HasId<*>?> REQUEST.access(
     requirement: AuthRequirement<SUBJECT>
 ): Access<REQUEST, PATH, SUBJECT> =
-    Access(this, requirement.assert(get(Authentication.CacheKey)))
+    Access(
+        request = this,
+        authOrNull = requirement.assert(this[Authentication.CacheKey])
+    )
 
 @JvmName("AuthAccessNullable")
 public fun <SUBJECT : HasId<*>?> AuthAccess(auth: Authentication<SUBJECT & Any>?): AuthAccess<SUBJECT> = Access<Nothing?, Nothing, SUBJECT>(null, auth)

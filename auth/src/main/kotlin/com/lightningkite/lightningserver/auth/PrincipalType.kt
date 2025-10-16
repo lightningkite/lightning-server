@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.auth
 
+import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.definition.MapRegistryExtension
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationError
@@ -10,7 +11,6 @@ import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.serializerOrContextual
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.encoding.CompositeDecoder
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 public interface PrincipalType<SUBJECT : HasId<ID>, ID : Comparable<ID>> {
@@ -19,10 +19,16 @@ public interface PrincipalType<SUBJECT : HasId<ID>, ID : Comparable<ID>> {
 
     public val name: String get() = subjectSerializer.descriptor.serialName.substringAfterLast('.')
 
-    public val subjectCacheExpiration: Duration? get() = 5.minutes
-
     context(server: ServerRuntime)
     public suspend fun fetch(id: ID): SUBJECT
+
+    public val subjectCacheKey: SerializableCache.Key<SUBJECT>
+        get() = SerializableCache.Key(
+            "$name-subject",
+            subjectSerializer,
+            expireAfter = 5.minutes,
+            localOnly = true
+        )
 
     public fun hasProperty(property: String): Boolean =
         subjectSerializer.descriptor.getElementIndex(property) != CompositeDecoder.UNKNOWN_NAME
@@ -31,7 +37,6 @@ public interface PrincipalType<SUBJECT : HasId<ID>, ID : Comparable<ID>> {
     public fun getProperty(principal: SUBJECT, property: String): String? =
         if (property == "$name/_id") idString(principal._id)
         else server.internalSerialization.formDataFormat.encodeToMap(subjectSerializer, principal)[property]
-
 
     context(server: ServerRuntime)
     public suspend fun fetchByProperty(property: String, value: String): SUBJECT? {

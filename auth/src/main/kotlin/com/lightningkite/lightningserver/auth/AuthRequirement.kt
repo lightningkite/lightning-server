@@ -49,11 +49,14 @@ import kotlin.time.Duration
  * */
 @SubclassOptInRequired(DelicateLightningServerApi::class)
 public interface AuthRequirement<out SUBJECT : HasId<*>?> {
-    /**
-     * Returns true if [auth] satisfies this [AuthRequirement].
-     * */
-    context(server: ServerRuntime)
-    public suspend fun accepts(auth: Authentication<*>?): Boolean
+    public sealed interface Result<out SUBJECT : HasId<*>?> {
+        public data class Failed(val reason: String) : Result<Nothing>
+
+        public data class Success<out SUBJECT : HasId<*>?>(val auth: Authentication<SUBJECT & Any>?) : Result<SUBJECT>
+    }
+
+    context(runtime: ServerRuntime)
+    public suspend fun check(auth: Authentication<*>?): Result<SUBJECT>
 
     public val requiredScopes: Runtime<Set<RequiredScope>>
     public fun subscope(subscopes: Iterable<Subscope>): AuthRequirement<SUBJECT>
@@ -61,27 +64,14 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
     /**
      * No requirements, will accept any authentication or `null`
      * */
-    public data object None : AuthRequirement<HasId<*>?> {
+    public data object None : AuthRequirement<Nothing?> {
         override val requiredScopes: Runtime.Constant<Set<RequiredScope>> get() = Runtime.Constant(emptySet())
         override fun subscope(subscopes: Iterable<Subscope>): None = this
 
-        context(server: ServerRuntime)
-        override suspend fun accepts(auth: Authentication<*>?): Boolean = true
+        context(runtime: ServerRuntime)
+        override suspend fun check(auth: Authentication<*>?): Result<Nothing?> = Result.Success(null)
 
         override fun toString(): String = "No Requirements"
-    }
-
-    /**
-     * Only accepts no authentication, e.g. `auth == null`
-     * */
-    public data object NotAuthenticated : AuthRequirement<Nothing?> {
-        override val requiredScopes: Runtime.Constant<Set<RequiredScope>> get() = Runtime.Constant(emptySet())
-        override fun subscope(subscopes: Iterable<Subscope>): NotAuthenticated = this
-
-        context(server: ServerRuntime)
-        override suspend fun accepts(auth: Authentication<*>?): Boolean = auth == null
-
-        override fun toString(): String = "Not Authenticated"
     }
 
     /**
@@ -91,17 +81,17 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
      * privileges that are specific to each project.
      * */
     public abstract class AuthSetting(
-        public val default: AuthRequirement<*>? = null
+        public val default: AuthRequirement<HasId<*>>? = null
     ) : AuthRequirement<HasId<*>>, MutableExtensions.Key<AuthRequirement<HasId<*>>> {
         context(server: ServerRuntime)
-        public fun setting(): AuthRequirement<*>? = server.server.extensions[this]
+        public fun setting(): AuthRequirement<HasId<*>>? = server.server.extensions[this]
 
         override val requiredScopes: Runtime<Set<RequiredScope>> = Runtime { setting()?.requiredScopes() ?: emptySet() }
         override fun subscope(subscopes: Iterable<Subscope>): Scoped = Scoped(this, subscopes)
 
-        context(server: ServerRuntime)
-        override suspend fun accepts(auth: Authentication<*>?): Boolean =
-            setting()?.accepts(auth) ?: default?.accepts(auth) ?: false
+        context(runtime: ServerRuntime)
+        override suspend fun check(auth: Authentication<*>?): Result<HasId<*>> =
+            setting()?.check(auth) ?: default?.check(auth) ?: Result.Failed("AuthSetting $this has no set value or default")
 
         public data class Scoped(
             val wraps: AuthSetting,
@@ -113,9 +103,9 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
             override fun subscope(subscopes: Iterable<Subscope>): Scoped =
                 copy(subscopes = this.subscopes + subscopes)
 
-            context(server: ServerRuntime)
-            override suspend fun accepts(auth: Authentication<*>?): Boolean =
-                wraps.setting()?.subscope(subscopes)?.accepts(auth) ?: wraps.accepts(auth)
+            context(runtime: ServerRuntime)
+            override suspend fun check(auth: Authentication<*>?): Result<HasId<*>> =
+                wraps.setting()?.subscope(subscopes)?.check(auth) ?: wraps.check(auth)
         }
     }
 
@@ -135,11 +125,12 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
             copy(scopes = scopes.subscope(subscopes))
 
         context(server: ServerRuntime)
-        override suspend fun accepts(auth: Authentication<*>?): Boolean {
-            if (auth == null) return false
-            if (!auth.meetsRequirements(scopes)) return false
-            if (maxAge != null && now() - auth.issuedAt > maxAge) return false
-            return requirement?.invoke(server, auth) ?: true
+        override suspend fun check(auth: Authentication<*>?): Result<HasId<*>> {
+            if (auth == null) return Result.Failed("Auth required")
+            if (!auth.meetsRequirements(scopes)) return Result.Failed("Auth does not have required scopes $scopes")
+            if (maxAge != null && now() - auth.issuedAt > maxAge) return Result.Failed("Auth is older than max age $maxAge")
+            if (requirement?.invoke(server, auth) == false) return Result.Failed("Auth does not meet additional requirement")
+            return Result.Success(auth)
         }
 
         override fun toString(): String = listOfNotNull(
@@ -163,13 +154,18 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
             copy(scopes = scopes.subscope(subscopes))
 
         context(server: ServerRuntime)
-        override suspend fun accepts(auth: Authentication<*>?): Boolean {
-            if (auth == null) return false
-            if (principalType != auth.untypedPrincipal) return false
-            if (!auth.meetsRequirements(scopes)) return false
-            if (maxAge != null && now() - auth.issuedAt > maxAge) return false
+        override suspend fun check(auth: Authentication<*>?): Result<SUBJECT> {
+            if (auth == null) return Result.Failed("Auth required")
+            if (principalType != auth.untypedPrincipal) return Result.Failed("Auth is not of type ${principalType.name}")
+            if (!auth.meetsRequirements(scopes)) return Result.Failed("Auth does not have required scopes $scopes")
+            if (maxAge != null && now() - auth.issuedAt > maxAge) return Result.Failed("Auth is older than max age $maxAge")
+
             @Suppress("UNCHECKED_CAST") // typecheck done when principal type was checked
-            return requirement?.invoke(server, auth as Authentication<SUBJECT>) ?: true
+            auth as Authentication<SUBJECT>
+
+            if (requirement?.invoke(server, auth) == false) return Result.Failed("Auth does not meet additional requirement")
+
+            return Result.Success(auth)
         }
 
         override fun toString(): String = listOfNotNull(
@@ -192,7 +188,16 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
             Options(options.map { it.subscope(subscopes) }.toSet())
 
         context(server: ServerRuntime)
-        override suspend fun accepts(auth: Authentication<*>?): Boolean = options.any { it.accepts(auth) }
+        override suspend fun check(auth: Authentication<*>?): Result<SUBJECT> = options
+            .map {
+                when (val r = it.check(auth)) {
+                    is Result.Failed -> r
+                    is Result.Success<*> -> return r
+                }
+            }
+            .let { failures ->
+                Result.Failed(failures.joinToString { it.reason })
+            }
 
         override fun toString(): String = "AuthOptions(${options.joinToString()})"
     }

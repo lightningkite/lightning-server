@@ -9,22 +9,31 @@ import kotlin.collections.plus
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
+context(server: ServerRuntime)
+public suspend fun AuthRequirement<*>.accepts(auth: Authentication<*>?): Boolean =
+    when (check(auth)) {
+        is AuthRequirement.Result.Failed -> false
+        is AuthRequirement.Result.Success<*> -> true
+    }
 
 /**
  * Asserts that the given [Authentication] will be accepted by this [AuthRequirement].
  * If the authentication is not accepted, a [ForbiddenException] will be thrown.
- *
- * This assertion allows the authentication to be type-casted to the requirement's [SUBJECT] type.
- * An [AuthRequirement] with a nullable `SUBJECT?` type indicates that it will accept `null`, in which
- * case `null` will be returned if provided.
  * */
-@Suppress("UNCHECKED_CAST")
 context(server: ServerRuntime)
 public suspend fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.assert(
     auth: Authentication<*>?
 ): Authentication<SUBJECT & Any>? =
-    if (accepts(auth)) auth?.let { it as Authentication<SUBJECT & Any> }
-    else throw ForbiddenException("You do not meet the authorization criteria.")
+    when (val r = check(auth)) {
+        is AuthRequirement.Result.Failed -> throw ForbiddenException(
+            """
+                You do not meet the authorization criteria
+                Requirement: ${this.naturalLanguage()}
+                Failed On: ${r.reason}
+            """.trimIndent()
+        )
+        is AuthRequirement.Result.Success<SUBJECT> -> r.auth
+    }
 
 public fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.subscope(subscope: Subscope): AuthRequirement<SUBJECT> = subscope(listOf(subscope))
 
@@ -39,6 +48,10 @@ public val recentRootAuth: AuthRequirement.Authenticated =
         maxAge = 10.minutes
     )
 
+/**
+ * Creates an [AuthRequirement] that requires authentication of this [SUBJECT] type,
+ * along with the other specified requirements.
+ * */
 public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.require(
     scopes: Set<RequiredScope>,
     maxAge: Duration? = null,
@@ -46,6 +59,10 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>
 ): AuthRequirement<SUBJECT> =
     AuthRequirement.AuthenticatedAs(this, scopes, maxAge, requirement)
 
+/**
+ * Creates an [AuthRequirement] that requires authentication of this [SUBJECT] type,
+ * along with the other specified requirements.
+ * */
 public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.require(
     scope: RequiredScope = RequiredScope.root,
     maxAge: Duration? = null,
@@ -85,3 +102,12 @@ context(builder: ServerBuilder)
 public var AuthRequirement.Companion.isDeveloper: AuthRequirement<HasId<*>>
     get() = AuthRequirement.IsDeveloper
     set(value) { builder.extensions[AuthRequirement.IsDeveloper] = value }
+
+
+
+context(_: ServerRuntime)
+public fun AuthRequirement<*>.naturalLanguage(): String = when (this) {
+    is AuthRequirement.Options -> options.joinToString(" *or* ") { it.naturalLanguage() }
+    is AuthRequirement.AuthSetting -> setting()?.let { "$this (${it.naturalLanguage()})" } ?: this.toString()
+    else -> this.toString()
+}

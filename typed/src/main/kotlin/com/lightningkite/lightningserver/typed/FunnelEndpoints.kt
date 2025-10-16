@@ -13,7 +13,7 @@ import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpec1
-import com.lightningkite.lightningserver.pathing.first
+import com.lightningkite.lightningserver.pathing.arg1
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.withSdkInfo
@@ -56,7 +56,7 @@ public class FunnelEndpoints(
             description = "Gets the current status of the funnels",
             errorCases = listOf(),
             implementation = { _: Unit ->
-                summaryInfo.table().find(condition { it.date.eq(first) }).toCollection(HashSet())
+                summaryInfo.table().find(condition { it.date.eq(arg1) }).toCollection(HashSet())
             }
         )
 
@@ -154,7 +154,7 @@ public class FunnelEndpoints(
             auth = noAuth,
             summary = "Error Funnel Instance"
         ) { input: String ->
-            info.table().updateOneById(first, modification {
+            info.table().updateOneById(arg1, modification {
                 it.errors += input
             })
             Unit
@@ -166,7 +166,7 @@ public class FunnelEndpoints(
             auth = noAuth,
             summary = "Set Step Funnel Instance"
         ) { step: Int ->
-            info.table().updateOneById(first, modification {
+            info.table().updateOneById(arg1, modification {
                 it.step.coerceAtLeast(step)
             })
             Unit
@@ -177,7 +177,7 @@ public class FunnelEndpoints(
             auth = noAuth,
             summary = "Success Funnel Instance"
         ) { _: Unit ->
-            info.table().updateOneById(first, modification {
+            info.table().updateOneById(arg1, modification {
                 it.success assign now()
             })
             Unit

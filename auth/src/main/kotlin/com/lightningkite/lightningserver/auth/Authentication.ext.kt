@@ -8,6 +8,8 @@ import com.lightningkite.lightningserver.definition.getValue
 import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.HttpMethod
+import com.lightningkite.lightningserver.definition.ListRegistryExtension
+import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.HasId
@@ -21,7 +23,11 @@ public suspend operator fun <SUBJECT : HasId<ID>, ID : Comparable<ID>, T> Authen
     key: AuthCacheKey<SUBJECT, T>
 ): T = cache.get(key, this)
 
-public val ServerBuilder.authReaders: ListRegistry<Authentication.Reader<*>> by Authentication.Reader
+
+private object AuthReaders : ListRegistryExtension<Authentication.Reader<*>>
+
+public val ServerBuilder.authReaders: ListRegistry<Authentication.Reader<*>> by AuthReaders
+public val ServerDefinition.authReaders: List<Authentication.Reader<*>> by AuthReaders
 
 
 context(server: ServerRuntime)
