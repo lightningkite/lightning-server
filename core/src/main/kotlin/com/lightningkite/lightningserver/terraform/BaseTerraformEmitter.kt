@@ -71,6 +71,7 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
             finalize()
             finalized = true
         }
+        terraformRoot.mkdirs()
         val prettyJson = Json { prettyPrint = true }
         terraformRoot.listFiles()?.filter { it.name.endsWith(".tf.json") }?.forEach { it.delete() }
         for ((name, content) in files.entries) {

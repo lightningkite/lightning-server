@@ -90,7 +90,7 @@ object DemoEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
         cache.awsDynamoDb()
         secretBasis.generated()
         loggingSettings.direct(LoggingSettings())
-        telemetrySettings.direct(OpenTelemetrySettings("print", reportFrequency = null))
+        telemetrySettings.direct(OpenTelemetrySettings("console", reportFrequency = null))
         cors.direct(CorsSettings())
         newSecret.byVariable()
     }

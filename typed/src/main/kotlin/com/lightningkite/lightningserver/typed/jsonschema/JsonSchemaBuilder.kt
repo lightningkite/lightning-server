@@ -124,13 +124,13 @@ public data class JsonSchemaTypeLink(
     val rel: String,
 )
 
-internal fun Json.schemaDefinitions(types: Iterable<KSerializer<*>>): Map<String, JsonSchemaType> {
+public fun Json.schemaDefinitions(types: Iterable<KSerializer<*>>): Map<String, JsonSchemaType> {
     val b = JsonSchemaBuilder(this)
     for (it in types) b.get(it)
     return b.definitions
 }
 
-internal fun Json.schema(type: KSerializer<*>): JsonSchemaDefinition {
+public fun Json.schema(type: KSerializer<*>): JsonSchemaDefinition {
     val b = JsonSchemaBuilder(this)
     b.get(type)
     return JsonSchemaDefinition(

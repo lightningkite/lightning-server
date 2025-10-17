@@ -19,7 +19,7 @@ public fun KSerializer<*>.kotlinTypeString(): String {
         StructureKind.MAP -> "Map<String, ${this.mapValueElement()!!.kotlinTypeString()}>"
 
         StructureKind.LIST -> "List<${this.listElement()!!.kotlinTypeString()}>"
-        SerialKind.CONTEXTUAL -> descriptor.capturedKClass!!.qualifiedName!!
+        SerialKind.CONTEXTUAL -> descriptor.capturedKClass?.qualifiedName ?: descriptor.serialName.substringBefore('/')
         else -> {
             descriptor.serialName.substringBefore('/').substringBefore('<') +
                     (typeParametersSerializersOrNull()
@@ -33,15 +33,6 @@ public fun KSerializer<*>.kotlinTypeString(): String {
 @OptIn(ExperimentalSerializationApi::class)
 context(server: ServerRuntime)
 public fun KSerializer<*>.kotlinSerializer(): String {
-    fun KSerializer<*>.uncontextualize(): KSerializer<*> {
-        return if (this.descriptor.kind == SerialKind.CONTEXTUAL) {
-            val kClass = descriptor.capturedKClass ?: throw IllegalStateException("No captured KClass found for $descriptor")
-            server.internalSerialization.serializersModule.getContextual(kClass)
-                ?: server.externalSerialization.serializersModule.getContextual(kClass)
-                ?: throw IllegalStateException("No contextual serializer found for ${descriptor.capturedKClass!!.qualifiedName}")
-        } else this
-    }
-
     nullElement()?.let { return it.kotlinSerializer() + ".nullable" }
 
     return when (this.descriptor.kind) {
@@ -52,7 +43,7 @@ public fun KSerializer<*>.kotlinSerializer(): String {
         StructureKind.LIST -> "ListSerializer(${this.listElement()!!.kotlinSerializer()})"
 
         SerialKind.CONTEXTUAL -> "ContextualSerializer(${kotlinTypeString()}::class, null, arrayOf(${
-            this.uncontextualize().typeParametersSerializersOrNull()?.joinToString(", ") { it.kotlinSerializer() } ?: ""
+            this.typeParametersSerializersOrNull()?.joinToString(", ") { it.kotlinSerializer() } ?: ""
         }))"
 
         else -> {
