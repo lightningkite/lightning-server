@@ -74,7 +74,7 @@ public object FetcherSdk : SDK.Format {
                         if (function.summary.isNotBlank()) line(function.summary)
                         if (function.description.isNotBlank()) line(function.description)
 
-                        add("**Auth Requirements:** ${function.auth.naturalLanguage().replace("[", "[[").replace("]", "]]")}")
+                        add("**Auth Requirements:** ${function.auth.naturalLanguage(true).replace("[", "[[").replace("]", "]]")}")
                     }
 
                     appendDepth(depth + 1, "/**")

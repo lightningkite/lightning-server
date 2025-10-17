@@ -12,8 +12,8 @@ import kotlin.time.Duration.Companion.minutes
 context(server: ServerRuntime)
 public suspend fun AuthRequirement<*>.accepts(auth: Authentication<*>?): Boolean =
     when (check(auth)) {
-        is AuthRequirement.Result.Failed -> false
-        is AuthRequirement.Result.Success<*> -> true
+        is AuthRequirement.Result.Rejected -> false
+        is AuthRequirement.Result.Accepted -> true
     }
 
 /**
@@ -25,14 +25,14 @@ public suspend fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.assert(
     auth: Authentication<*>?
 ): Authentication<SUBJECT & Any>? =
     when (val r = check(auth)) {
-        is AuthRequirement.Result.Failed -> throw ForbiddenException(
+        is AuthRequirement.Result.Rejected -> throw ForbiddenException(
             """
                 You do not meet the authorization criteria
                 Requirement: ${this.naturalLanguage()}
                 Failed On: ${r.reason}
             """.trimIndent()
         )
-        is AuthRequirement.Result.Success<SUBJECT> -> r.auth
+        is AuthRequirement.Result.Accepted<SUBJECT> -> r.auth
     }
 
 public fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.subscope(subscope: Subscope): AuthRequirement<SUBJECT> = subscope(listOf(subscope))
@@ -106,8 +106,8 @@ public var AuthRequirement.Companion.isDeveloper: AuthRequirement<HasId<*>>
 
 
 context(_: ServerRuntime)
-public fun AuthRequirement<*>.naturalLanguage(): String = when (this) {
-    is AuthRequirement.Options -> options.joinToString(" *or* ") { it.naturalLanguage() }
-    is AuthRequirement.AuthSetting -> setting()?.let { "$this (${it.naturalLanguage()})" } ?: this.toString()
+public fun AuthRequirement<*>.naturalLanguage(markdown: Boolean = false): String = when (this) {
+    is AuthRequirement.Options -> options.joinToString(if (markdown) " *or* " else " or ") { it.naturalLanguage(markdown) }
+    is AuthRequirement.AuthSetting -> setting()?.let { "$this (${it.naturalLanguage(markdown)})" } ?: this.toString()
     else -> this.toString()
 }

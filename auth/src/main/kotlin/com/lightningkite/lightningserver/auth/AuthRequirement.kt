@@ -49,10 +49,12 @@ import kotlin.time.Duration
  * */
 @SubclassOptInRequired(DelicateLightningServerApi::class)
 public interface AuthRequirement<out SUBJECT : HasId<*>?> {
-    public sealed interface Result<out SUBJECT : HasId<*>?> {
-        public data class Failed(val reason: String) : Result<Nothing>
 
-        public data class Success<out SUBJECT : HasId<*>?>(val auth: Authentication<SUBJECT & Any>?) : Result<SUBJECT>
+    public sealed interface Result<out SUBJECT : HasId<*>?> {
+
+        public data class Rejected(val reason: String) : Result<Nothing>
+
+        public data class Accepted<out SUBJECT : HasId<*>?>(val auth: Authentication<SUBJECT & Any>?) : Result<SUBJECT>
     }
 
     context(runtime: ServerRuntime)
@@ -69,7 +71,7 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
         override fun subscope(subscopes: Iterable<Subscope>): None = this
 
         context(runtime: ServerRuntime)
-        override suspend fun check(auth: Authentication<*>?): Result<Nothing?> = Result.Success(null)
+        override suspend fun check(auth: Authentication<*>?): Result<Nothing?> = Result.Accepted(null)
 
         override fun toString(): String = "No Requirements"
     }
@@ -91,7 +93,7 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
 
         context(runtime: ServerRuntime)
         override suspend fun check(auth: Authentication<*>?): Result<HasId<*>> =
-            setting()?.check(auth) ?: default?.check(auth) ?: Result.Failed("AuthSetting $this has no set value or default")
+            setting()?.check(auth) ?: default?.check(auth) ?: Result.Rejected("AuthSetting $this has no set value or default")
 
         public data class Scoped(
             val wraps: AuthSetting,
@@ -126,16 +128,20 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
 
         context(server: ServerRuntime)
         override suspend fun check(auth: Authentication<*>?): Result<HasId<*>> {
-            if (auth == null) return Result.Failed("Auth required")
-            if (!auth.meetsRequirements(scopes)) return Result.Failed("Auth does not have required scopes $scopes")
-            if (maxAge != null && now() - auth.issuedAt > maxAge) return Result.Failed("Auth is older than max age $maxAge")
-            if (requirement?.invoke(server, auth) == false) return Result.Failed("Auth does not meet additional requirement")
-            return Result.Success(auth)
+            if (auth == null) return Result.Rejected("Auth required")
+            if (!auth.meetsRequirements(scopes)) return Result.Rejected("Auth does not have required scopes $scopes")
+            if (maxAge != null && now() - auth.issuedAt > maxAge) return Result.Rejected("Auth is older than max age $maxAge")
+            if (requirement?.invoke(server, auth) == false) return Result.Rejected("Auth does not meet additional requirement")
+            return Result.Accepted(auth)
         }
 
         override fun toString(): String = listOfNotNull(
             "Authenticated",
-            scopes.takeIf { it.isNotEmpty() }?.let { if (it.size > 1) "scopes $it" else "scope ${it.first()}" },
+            scopes.takeIf { it.isNotEmpty() }?.let {
+                if (it.size > 1) "scopes $it"
+                else if (it.first() == RequiredScope.root) "root access"
+                else "scope ${it.first()}"
+            },
             maxAge?.let { "max age of $it" },
             requirement?.let { "an additional requirement" }
         ).joinToString(" and ").replaceFirst("and", "with")
@@ -155,22 +161,26 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
 
         context(server: ServerRuntime)
         override suspend fun check(auth: Authentication<*>?): Result<SUBJECT> {
-            if (auth == null) return Result.Failed("Auth required")
-            if (principalType != auth.untypedPrincipal) return Result.Failed("Auth is not of type ${principalType.name}")
-            if (!auth.meetsRequirements(scopes)) return Result.Failed("Auth does not have required scopes $scopes")
-            if (maxAge != null && now() - auth.issuedAt > maxAge) return Result.Failed("Auth is older than max age $maxAge")
+            if (auth == null) return Result.Rejected("Auth required")
+            if (principalType != auth.untypedPrincipal) return Result.Rejected("Auth is not of type ${principalType.name}")
+            if (!auth.meetsRequirements(scopes)) return Result.Rejected("Auth does not have required scopes $scopes")
+            if (maxAge != null && now() - auth.issuedAt > maxAge) return Result.Rejected("Auth is older than max age $maxAge")
 
             @Suppress("UNCHECKED_CAST") // typecheck done when principal type was checked
             auth as Authentication<SUBJECT>
 
-            if (requirement?.invoke(server, auth) == false) return Result.Failed("Auth does not meet additional requirement")
+            if (requirement?.invoke(server, auth) == false) return Result.Rejected("Auth does not meet additional requirement")
 
-            return Result.Success(auth)
+            return Result.Accepted(auth)
         }
 
         override fun toString(): String = listOfNotNull(
             principalType.name,
-            scopes.takeIf { it.isNotEmpty() }?.let { if (it.size > 1) "scopes $it" else "scope ${it.first()}" },
+            scopes.takeIf { it.isNotEmpty() }?.let {
+                if (it.size > 1) "scopes $it"
+                else if (it.first() == RequiredScope.root) "root access"
+                else "scope ${it.first()}"
+            },
             maxAge?.let { "max age of $it" },
             requirement?.let { "an additional requirement" }
         ).joinToString(" and ").replaceFirst("and", "with")
@@ -191,15 +201,15 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
         override suspend fun check(auth: Authentication<*>?): Result<SUBJECT> = options
             .map {
                 when (val r = it.check(auth)) {
-                    is Result.Failed -> r
-                    is Result.Success<*> -> return r
+                    is Result.Rejected -> r
+                    is Result.Accepted -> return r
                 }
             }
             .let { failures ->
-                Result.Failed(failures.joinToString { it.reason })
+                Result.Rejected(failures.joinToString { it.reason })
             }
 
-        override fun toString(): String = "AuthOptions(${options.joinToString()})"
+        override fun toString(): String = options.joinToString(" or ")
     }
 
     public companion object;
