@@ -58,25 +58,31 @@ public val <SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ModelInfo<S
 
 
 @Deprecated("Use route.arg1 instead", ReplaceWith("route.arg1", "com.lightningkite.lightningserver.typed.route", "com.lightningkite.lightningserver.pathing.arg1"))
+@get:JvmName("path1_1")
 context(runtime: ServerRuntime)
 public val <REQ : Request<PathSpec1<A>>, A> Access<REQ, PathSpec1<A>, *>.path1: A get() = route.arg1
 
 @Deprecated("Use route.arg1 instead", ReplaceWith("route.arg1", "com.lightningkite.lightningserver.typed.route", "com.lightningkite.lightningserver.pathing.arg1"))
+@get:JvmName("path1_2")
 context(runtime: ServerRuntime)
 public val <REQ : Request<PathSpec2<A, B>>, A, B> Access<REQ, PathSpec2<A, B>, *>.path1: A get() = route.arg1
 
 @Deprecated("Use route.arg2 instead", ReplaceWith("route.arg2", "com.lightningkite.lightningserver.typed.route", "com.lightningkite.lightningserver.pathing.arg2"))
+@get:JvmName("path2_2")
 context(runtime: ServerRuntime)
 public val <REQ : Request<PathSpec2<A, B>>, A, B> Access<REQ, PathSpec2<A, B>, *>.path2: B get() = route.arg2
 
 @Deprecated("Use route.arg1 instead", ReplaceWith("route.arg1", "com.lightningkite.lightningserver.typed.route", "com.lightningkite.lightningserver.pathing.arg1"))
+@get:JvmName("path1_3")
 context(runtime: ServerRuntime)
 public val <REQ : Request<PathSpec3<A, B, C>>, A, B, C> Access<REQ, PathSpec3<A, B, C>, *>.path1: A get() = route.arg1
 
 @Deprecated("Use route.arg2 instead", ReplaceWith("route.arg2", "com.lightningkite.lightningserver.typed.route", "com.lightningkite.lightningserver.pathing.arg2"))
+@get:JvmName("path2_3")
 context(runtime: ServerRuntime)
 public val <REQ : Request<PathSpec3<A, B, C>>, A, B, C> Access<REQ, PathSpec3<A, B, C>, *>.path2: B get() = route.arg2
 
 @Deprecated("Use route.arg3 instead", ReplaceWith("route.second", "com.lightningkite.lightningserver.typed.route", "com.lightningkite.lightningserver.pathing.arg3"))
+@get:JvmName("path3_3")
 context(runtime: ServerRuntime)
 public val <REQ : Request<PathSpec3<A, B, C>>, A, B, C> Access<REQ, PathSpec3<A, B, C>, *>.path3: C get() = route.arg3

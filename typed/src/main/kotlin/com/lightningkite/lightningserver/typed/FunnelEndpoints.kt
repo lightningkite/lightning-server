@@ -56,7 +56,7 @@ public class FunnelEndpoints(
             description = "Gets the current status of the funnels",
             errorCases = listOf(),
             implementation = { _: Unit ->
-                summaryInfo.table().find(condition { it.date.eq(arg1) }).toCollection(HashSet())
+                summaryInfo.table().find(condition { it.date.eq(route.arg1) }).toCollection(HashSet())
             }
         )
 
@@ -154,7 +154,7 @@ public class FunnelEndpoints(
             auth = noAuth,
             summary = "Error Funnel Instance"
         ) { input: String ->
-            info.table().updateOneById(arg1, modification {
+            info.table().updateOneById(route.arg1, modification {
                 it.errors += input
             })
             Unit
@@ -166,7 +166,7 @@ public class FunnelEndpoints(
             auth = noAuth,
             summary = "Set Step Funnel Instance"
         ) { step: Int ->
-            info.table().updateOneById(arg1, modification {
+            info.table().updateOneById(route.arg1, modification {
                 it.step.coerceAtLeast(step)
             })
             Unit
@@ -177,7 +177,7 @@ public class FunnelEndpoints(
             auth = noAuth,
             summary = "Success Funnel Instance"
         ) { _: Unit ->
-            info.table().updateOneById(arg1, modification {
+            info.table().updateOneById(route.arg1, modification {
                 it.success assign now()
             })
             Unit

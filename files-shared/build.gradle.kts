@@ -51,6 +51,7 @@ kotlin {
                 api(project(":typed-shared"))
                 api(libs.kotlinXDatetime)
                 api(libs.serviceAbstractionsFilesClient)
+                api(libs.serviceAbstractionsDatabaseShared)
             }
             kotlin {
                 srcDir(file("build/generated/ksp/common/commonMain/kotlin"))

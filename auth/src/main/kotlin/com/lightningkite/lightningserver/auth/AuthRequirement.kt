@@ -37,15 +37,6 @@ import kotlin.time.Duration
  * // Creating an AuthRequirement<User?>, might be a user, might not.
  * val maybeUser = Principal.require() or AuthRequirement.NotAuthenticated
  * ```
- *
- * ## Rules for Inheritance
- *
- * [AuthRequirement] requires certain conventions to be met to be inherited correctly.
- *
- * The [SUBJECT] type provided for the [AuthRequirement] implementation should match the `SUBJECT`
- * type for any accepted [Authentication]. If your [AuthRequirement] will accept `null`
- * its `SUBJECT` type must be nullable. If these typing rules aren't followed casting exceptions
- * can occur when calling [AuthRequirement.assert].
  * */
 @SubclassOptInRequired(DelicateLightningServerApi::class)
 public interface AuthRequirement<out SUBJECT : HasId<*>?> {

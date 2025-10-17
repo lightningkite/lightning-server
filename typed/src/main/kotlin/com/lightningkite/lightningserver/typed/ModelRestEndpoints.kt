@@ -124,7 +124,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             ),
             examples = emptyList(),
             implementation = { _: Unit ->
-                info.table(this).get(arg1) ?: throw NotFoundException()
+                info.table(this).get(route.arg1) ?: throw NotFoundException()
             }
         )
 
@@ -188,7 +188,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             implementation = { value: T ->
                 try {
                     info.table(this)
-                        .upsertOneById(arg1, value)
+                        .upsertOneById(route.arg1, value)
                         .new
                         ?: throw NotFoundException()
                 } catch (e: UniqueViolationException) {
@@ -238,7 +238,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             implementation = { value: T ->
                 try {
                     info.table(this)
-                        .replaceOneById(arg1, value)
+                        .replaceOneById(route.arg1, value)
                         .new
                         ?: throw NotFoundException()
                 } catch (e: UniqueViolationException) {
@@ -295,7 +295,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             implementation = { input: Modification<T> ->
                 try {
                     info.table(this)
-                        .updateOneById(arg1, input)
+                        .updateOneById(route.arg1, input)
                         .also { if (it.old == null && it.new == null) throw NotFoundException() }
                 } catch (e: UniqueViolationException) {
                     throw BadRequestException(
@@ -327,7 +327,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             implementation = { input: Modification<T> ->
                 try {
                     info.table(this)
-                        .updateOneById(arg1, input)
+                        .updateOneById(route.arg1, input)
                         .also { if (it.old == null && it.new == null) throw NotFoundException() }
                         .new!!
                 } catch (e: UniqueViolationException) {
@@ -360,7 +360,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             implementation = { input: Partial<T> ->
                 try {
                     info.table(this)
-                        .updateOneById(arg1, input.toModification(info.serializer))
+                        .updateOneById(route.arg1, input.toModification(info.serializer))
                         .also { if (it.old == null && it.new == null) throw NotFoundException() }
                         .new!!
                 } catch (e: UniqueViolationException) {
@@ -406,7 +406,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             ),
             examples = emptyList(),
             implementation = { _: Unit ->
-                if (!info.table(this).deleteOneById(arg1)) {
+                if (!info.table(this).deleteOneById(route.arg1)) {
                     throw NotFoundException()
                 }
                 Unit

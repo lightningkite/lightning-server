@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.HttpHandler
+import com.lightningkite.lightningserver.pathing.arg1
 import com.lightningkite.lightningserver.runtime.send
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.set
@@ -29,7 +30,7 @@ class TestRunnerTest {
             HttpResponse.plainText("Hello world!")
         }
         val testEndpointWithArg = path.path("test").arg<String>("arg1").get bind HttpHandler {
-            HttpResponse.plainText("Hello, ${it.first}!")
+            HttpResponse.plainText("Hello, ${it.arg1}!")
         }
         val testWebsocketTopic = path.path("broadcast").topic(String.serializer())
 
