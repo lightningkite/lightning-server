@@ -47,14 +47,18 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
     public abstract val region: Region
     public abstract val displayName: String
     public override val deploymentTag: String get() = displayName
-    public override val projectPrefix: String get() = displayName.lowercase().replace(" ", "-").filter { it.isLetterOrDigit() || it == '-' }
+    public override val projectPrefix: String
+        get() = displayName.lowercase().replace(" ", "-").filter { it.isLetterOrDigit() || it == '-' }
     public open val storageBucketPath: String get() = projectPrefix
     override val terraformRoot: File get() = File("terraform/$projectPrefix")
     override val secretsSource: SecretSource by lazy {
         val fetcher = PasswordFetcher()
         ManySecretSources(
             EnvironmentSecretSource,
-            EncryptedFileSecretSource(storageBucket.substringAfterLast('/') + "_" + projectPrefix, passwordFetcher = fetcher),
+            EncryptedFileSecretSource(
+                storageBucket.substringAfterLast('/') + "_" + projectPrefix,
+                passwordFetcher = fetcher
+            ),
             EncryptedFileSecretSource(storageBucket.substringAfterLast('/'), passwordFetcher = fetcher),
         )
     }
@@ -62,25 +66,28 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
     public abstract val handler: KClass<out AwsAdapter>
     public abstract val debug: Boolean
     public abstract val emergencyContact: EmailAddress
-    
+
     public open val snapStart: Boolean get() = true
     public open val timeout: Duration get() = 30.seconds
     public open val memory: DataSize get() = 1.gibibytes
-    
-    public open val invocationAlarms: Map<String, LambdaInvocationAlarmThresholds> get() = mapOf(
-        "emergency" to LambdaInvocationAlarmThresholds(threshold = 150),
-        "panic" to LambdaInvocationAlarmThresholds(threshold = 450),
-    )
-    public open val computeAlarms: Map<String, LambdaDurationAlarmThresholds> get() = mapOf(
-        "emergency" to LambdaDurationAlarmThresholds(threshold = 3.minutes),
-        "panic" to LambdaDurationAlarmThresholds(threshold = 5.minutes),
-    )
+
+    public open val invocationAlarms: Map<String, LambdaInvocationAlarmThresholds>
+        get() = mapOf(
+            "emergency" to LambdaInvocationAlarmThresholds(threshold = 150),
+            "panic" to LambdaInvocationAlarmThresholds(threshold = 450),
+        )
+    public open val computeAlarms: Map<String, LambdaDurationAlarmThresholds>
+        get() = mapOf(
+            "emergency" to LambdaDurationAlarmThresholds(threshold = 3.minutes),
+            "panic" to LambdaDurationAlarmThresholds(threshold = 5.minutes),
+        )
 
     override val additionalSettings: Set<ServerSetting<*, *>> = setOf()
     override val applicationRegion: String get() = region.id()
     override val policyStatements: MutableCollection<AwsPolicyStatement> = ArrayList()
 
     override fun finalize() {
+        super.finalize()
         require(TerraformProviderImport.aws)
         require(
             TerraformProvider(
@@ -651,6 +658,5 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 include(terraformProviders)
             }
         }
-        super.finalize()
     }
 }
