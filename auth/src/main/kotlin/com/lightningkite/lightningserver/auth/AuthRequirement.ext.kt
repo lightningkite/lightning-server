@@ -77,8 +77,7 @@ public fun <T : HasId<*>?> AuthRequirement<T>.options(): Set<AuthRequirement<T>>
 public infix fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.or(
     other: AuthRequirement<SUBJECT>
 ): AuthRequirement<SUBJECT> =
-    if (this === AuthRequirement.None || other === AuthRequirement.None) AuthRequirement.None
-    else Options(options() + other.options())
+    Options(options() + other.options())
 
 
 public val AuthRequirement.Companion.isSuperUser: AuthRequirement<HasId<*>>

@@ -199,6 +199,7 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
 
         context(server: ServerRuntime)
         override suspend fun check(auth: Authentication<*>?): Result<SUBJECT> = options
+            .sortedBy { it === None } // None should always be last resort
             .map {
                 when (val r = it.check(auth)) {
                     is Result.Rejected -> r
