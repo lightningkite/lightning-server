@@ -50,6 +50,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
     public override val projectPrefix: String
         get() = displayName.lowercase().replace(" ", "-").filter { it.isLetterOrDigit() || it == '-' }
     public open val storageBucketPath: String get() = projectPrefix
+    public open val storageEncryptionEnabled: Boolean get() = true
     override val terraformRoot: File get() = File("terraform/$projectPrefix")
     override val secretsSource: SecretSource by lazy {
         val fetcher = PasswordFetcher()
@@ -651,7 +652,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                     "bucket" - storageBucket
                     "key" - storageBucketPath
                     "region" - applicationRegion
-                    "encrypt" - true
+                    "encrypt" - storageEncryptionEnabled
                 }
             }
             if (terraformProviders.isNotEmpty()) {
