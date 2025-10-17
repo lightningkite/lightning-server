@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.files
 
 
 interface Api {
+	fun withHeaderCalculator(calculator: suspend () -> List<Pair<String, String>>): Api
 
 	interface UploadEarlyEndpointApi {
 		/**
@@ -10,17 +11,17 @@ interface Api {
 		 * 
 		 * Upload a file to make a request later.  Times out in around 10 minutes.
 		 * 
-		 * **Auth Requirements:** Not Authenticated
+		 * **Auth Requirements:** No Requirements
 		 * */
-		suspend fun uploadFileforRequest(): com.lightningkite.lightningserver.files.UploadInformation
+		suspend fun uploadFileForRequest(): com.lightningkite.lightningserver.files.UploadInformation
 		/**
 		 * Verify uploaded file
 		 * 
 		 * Checks out a file and moves it out of jail if it's safe.  Makes for significantly faster subsequent requests.
 		 * 
-		 * **Auth Requirements:** Not Authenticated
+		 * **Auth Requirements:** No Requirements
 		 * */
-		suspend fun verifyuploadedfile(input: kotlin.String): kotlin.String
+		suspend fun verifyUploadedFile(input: kotlin.String): kotlin.String
 	}
 	val uploadEarlyEndpoint: UploadEarlyEndpointApi
 

@@ -5,8 +5,11 @@ import com.lightningkite.lightningserver.typed.Fetcher
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.nullable
 
 class LiveApi(val fetcher: Fetcher) : Api {
+	override fun withHeaderCalculator(calculator: suspend () -> List<Pair<String, String>>): LiveApi = 
+		LiveApi(fetcher.withHeaderCalculator(calculator))
 	override suspend fun index(): kotlin.Int =
 		fetcher("", HttpMethod.GET, kotlin.Unit.serializer(), kotlin.Unit, kotlin.Int.serializer())
 	override suspend fun improperSDKFunctionName(): kotlin.Int =
