@@ -19,6 +19,22 @@ import com.lightningkite.services.database.serializerOrContextual
 import kotlinx.serialization.KSerializer
 import kotlin.experimental.ExperimentalTypeInference
 
+private data class ApiHttpHandlerData<PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT>(
+    override val summary: String,
+    override val description: String = "",
+    override val functionName: String = summary.functionCase(),
+    override val inputType: KSerializer<INPUT>,
+    override val outputType: KSerializer<OUTPUT>,
+    override val auth: AuthRequirement<USER>,
+    override val successCode: HttpStatus = HttpStatus.OK,
+    override val errorCases: List<LSError> = emptyList(),
+    override val examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = emptyList(),
+    val implementation: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT
+) : ApiHttpHandler<PATH, USER, INPUT, OUTPUT> {
+    context(server: ServerRuntime)
+    override suspend fun handle(access: HttpAccess<PATH, USER>, input: INPUT): OUTPUT = access.implementation(input)
+}
+
 public fun <PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT> explicitApiHttpHandler(
     summary: String,
     description: String = "",
@@ -31,20 +47,7 @@ public fun <PATH: PathSpec, USER: HasId<*>?, INPUT, OUTPUT> explicitApiHttpHandl
     examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = emptyList(),
     implementation: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT
 ): ApiHttpHandler<PATH, USER, INPUT, OUTPUT> =
-    object : ApiHttpHandler<PATH, USER, INPUT, OUTPUT> {
-        override val summary: String = summary
-        override val description: String = description
-        override val functionName: String = functionName
-        override val inputType: KSerializer<INPUT> = inputType
-        override val outputType: KSerializer<OUTPUT> = outputType
-        override val auth: AuthRequirement<USER> = auth
-        override val successCode: HttpStatus = successCode
-        override val errorCases: List<LSError> = errorCases
-        override val examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = examples
-
-        context(server: ServerRuntime)
-        override suspend fun handle(access: HttpAccess<PATH, USER>, input: INPUT): OUTPUT = access.implementation(input)
-    }
+    ApiHttpHandlerData(summary, description, functionName, inputType, outputType, auth, successCode, errorCases, examples, implementation)
 
 public inline fun <PATH: PathSpec, USER: HasId<*>?, reified INPUT, reified OUTPUT> ApiHttpHandler(
     summary: String,

@@ -86,6 +86,7 @@ public class SerializableCache private constructor(
         if (!key.localOnly)
             serialized[key.id] = server.internalSerialization.kotlinBytesFormat
                 .encodeToByteArray(Expiring.serializer(key.serializer), expiring)
+
         cache[key.id] = KeyAndResult(key, expiring)
         updated = true
     }
@@ -128,6 +129,22 @@ public class SerializableCache private constructor(
         cache.clear()
         serialized.clear()
         updated = false
+    }
+
+    public companion object {
+        private data class KeyData<T>(
+            override val id: String,
+            override val serializer: KSerializer<T>,
+            override val expireAfter: Duration? = null,
+            override val localOnly: Boolean = false,
+        ) : Key<T>
+
+        public fun <T> Key(
+            id: String,
+            serializer: KSerializer<T>,
+            expireAfter: Duration? = null,
+            localOnly: Boolean = false,
+        ): Key<T> = KeyData(id, serializer, expireAfter, localOnly)
     }
 
     private object Serializer : KSerializer<SerializableCache> {

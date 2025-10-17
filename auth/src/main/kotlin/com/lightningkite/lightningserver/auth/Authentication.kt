@@ -14,7 +14,6 @@ import com.lightningkite.services.database.HasId
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.NothingSerializer
 import kotlinx.serialization.builtins.nullable
-import kotlin.time.Duration
 import kotlin.time.Instant
 
 context(server: ServerRuntime)
@@ -40,7 +39,8 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
 )
 
 @Serializable
-public class Authentication<SUBJECT : HasId<*>> private constructor(
+@ConsistentCopyVisibility
+public data class Authentication<SUBJECT : HasId<*>> private constructor(
     public val principalName: String,
     public val rawId: String,
     public val sessionId: String?,
@@ -96,19 +96,6 @@ public class Authentication<SUBJECT : HasId<*>> private constructor(
             ?: server.internalSerialization.stringArrayFormat.decodeFromString(untypedPrincipal.idSerializer, rawId)
                 .also { cachedId = it }
 
-    @Transient
-    private var _subjectCacheKey: SerializableCache.Key<SUBJECT>? = null
-
-    context(server: ServerRuntime)
-    internal val subjectCacheKey
-        get() = _subjectCacheKey
-            ?: object : SerializableCache.Key<SUBJECT> {
-                override val id: String = "${principalName}-subject-cache"
-                override val serializer: KSerializer<SUBJECT> = untypedPrincipal.subjectSerializer
-                override val expireAfter: Duration? = untypedPrincipal.subjectCacheExpiration
-                override val localOnly: Boolean = true
-            }.also { _subjectCacheKey = it }
-
     context(server: ServerRuntime)
     public suspend fun precache(keys: Iterable<AuthCacheKey<SUBJECT, *>>) {
         for (key in keys) cache.get(key, this)
@@ -147,7 +134,7 @@ public class Authentication<SUBJECT : HasId<*>> private constructor(
 
         context(server: ServerRuntime)
         override suspend fun calculate(input: Request<*>): Authentication<*>? {
-            for (reader in server.server.extensions[Reader] ?: emptyList()) {
+            for (reader in server.server.authReaders.sortedByDescending { it.priority }) {
                 val auth = reader.read(input) ?: continue
 
                 input.headers[HttpHeader.XMasquerade]?.root?.let { masquerade ->
@@ -191,10 +178,10 @@ public class Authentication<SUBJECT : HasId<*>> private constructor(
     // related types
 
     public fun interface Reader<SUBJECT : HasId<*>> {
+        public val priority: Double get() = 0.0
+
         context(server: ServerRuntime)
         public suspend fun read(request: Request<*>): Authentication<SUBJECT>?
-
-        public companion object : ListRegistryExtension<Reader<*>>
     }
 }
 
@@ -211,4 +198,4 @@ public val <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication<SUBJECT>.id
 @Suppress("UNCHECKED_CAST")
 context(server: ServerRuntime)
 public suspend fun <SUBJECT : HasId<*>> Authentication<SUBJECT>.fetch(): SUBJECT =
-    cache.getOrPut(subjectCacheKey) { (untypedPrincipal as PrincipalType<SUBJECT, Comparable<*>>).fetch(untypedId) }
+    cache.getOrPut(untypedPrincipal.subjectCacheKey) { (untypedPrincipal as PrincipalType<SUBJECT, Comparable<*>>).fetch(untypedId) }

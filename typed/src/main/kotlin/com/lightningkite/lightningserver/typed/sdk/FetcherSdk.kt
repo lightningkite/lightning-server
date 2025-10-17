@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.typed.sdk
 
 import com.lightningkite.lightningserver.auth.AuthRequirement
+import com.lightningkite.lightningserver.auth.naturalLanguage
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.pathing.PathSpec
@@ -73,7 +74,7 @@ public object FetcherSdk : SDK.Format {
                         if (function.summary.isNotBlank()) line(function.summary)
                         if (function.description.isNotBlank()) line(function.description)
 
-                        add("**Auth Requirements:** ${function.auth.docString().replace("[", "[[").replace("]", "]]")}")
+                        add("**Auth Requirements:** ${function.auth.naturalLanguage(true).replace("[", "[[").replace("]", "]]")}")
                     }
 
                     appendDepth(depth + 1, "/**")
@@ -190,12 +191,5 @@ public object FetcherSdk : SDK.Format {
             is SDK.Function.Websocket ->
                 "fun $functionName($argString): ClientWebSocket<${inputType.kotlinTypeString()}, ${outputType.kotlinTypeString()}>"
         }
-    }
-
-    context(_: ServerRuntime)
-    private fun AuthRequirement<*>.docString(): String = when (this) {
-        is AuthRequirement.Options -> options.joinToString(" *or* ") { it.docString() }
-        is AuthRequirement.AuthSetting -> setting()?.let { "$this (${it.docString()})" } ?: this.toString()
-        else -> this.toString()
     }
 }
