@@ -335,6 +335,7 @@ private fun SerialDescriptor.nullElement(): SerialDescriptor? {
     } catch(e: Exception) { return null }
 }
 
+@OptIn(SealedSerializationApi::class)
 internal class SerialDescriptorForNullable(
     internal val original: SerialDescriptor,
 ) : SerialDescriptor by original {
