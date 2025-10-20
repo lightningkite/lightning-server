@@ -79,17 +79,15 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
                     OpenSsl.decryptAesCbcPkcs5Sha256(bytes, sha256Password.toByteArray())
                 }
                 ?: bytes
-            println("Raw settings: ${decryptedBytes.toString(Charsets.UTF_8)}")
             this.settings.include(
                 internalSerialization.json.decodeFromString(
                     SettingsSerializer(settings.settings.toList(), internalSerialization.json),
                     decryptedBytes.toString(Charsets.UTF_8)
-                ).also { println("Parsed settings: $it") }
+                )
             )
             this.settings.ready()
             runBlocking { runStartupTasks() }
             Core.getGlobalContext().register(this)
-            println("loadSettings: generalSettings = ${generalSettings()}")
         }
         logger.info { "Loading settings..." }
         System.getenv("LIGHTNING_SERVER_SETTINGS_SECRET_ID")?.let { secretId ->
