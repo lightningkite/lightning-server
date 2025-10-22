@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.AnonType
 import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.executeWithMetrics
+import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.services.data.KotlinBytesFormat
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.Serializable

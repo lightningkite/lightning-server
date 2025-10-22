@@ -152,9 +152,11 @@ public fun SecretSource.runGuiEditor(variables: List<TerraformNeed<*>>) {
 public fun SecretSource.runTerminalEditor(variables: List<TerraformNeed<*>>) {
     if(this !is InteractiveSecretSource) return
     while(true) {
-        val sel = readSelection("What variable do you want to set?", variables + null, { it?.name ?: "Quit" })
-        if(sel == null) break
-        prompt(sel)
+        val sel = readSelection("What variable do you want to work with?", variables + null, { it?.name ?: "Quit" })
+        if (sel == null) break
+        val read = readSelection("Do you want to read or write this variable?", listOf(true, false), { if(it) "Read" else "Write" })
+        if (read) println("The current value is '${getOrNull(sel)}'.")
+        else prompt(sel)
     }
 }
 

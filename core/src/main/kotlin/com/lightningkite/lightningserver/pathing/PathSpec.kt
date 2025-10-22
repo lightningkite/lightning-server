@@ -85,12 +85,11 @@ public sealed class PathSpec protected constructor(public val segments: List<Seg
             public val Empty: Constant = Constant("")
             /**
              * String format:
-             * constant/{argument}/something/{...}
+             * /constant/{argument}/something/{...}
              * All arguments will be of type [String].
              */
             public fun fromString(string: String): List<Segment> {
-                return string.split('/')
-                    .filter { it.isNotBlank() }
+                return string.removePrefix("/").split('/')
                     .filter { it != "{...}" }
                     .map {
                         if (it.startsWith("{"))
@@ -163,7 +162,7 @@ public class PathSpec0(segments: List<Segment>, after: Afterwards) : PathSpec(se
         arg(Segment.Wildcard(name, serializerOrContextual<T>()))
 
     public companion object {
-        public fun fromString(string: String): PathSpec0 = PathSpec0(string.split('/').map { Segment.Constant(it) }, Afterwards.fromString(string))
+        public fun fromString(string: String): PathSpec0 = PathSpec0(string.removePrefix("/").split('/').map { Segment.Constant(it) }, Afterwards.fromString(string))
     }
 }
 
