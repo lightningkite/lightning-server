@@ -72,15 +72,12 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
     public open val timeout: Duration get() = 30.seconds
     public open val memory: DataSize get() = 1.gibibytes
 
-    public open val invocationAlarms: Map<String, LambdaInvocationAlarmThresholds>
+    public open val alarms: Map<String, LambdaAlarm>
         get() = mapOf(
-            "emergency" to LambdaInvocationAlarmThresholds(threshold = 150),
-            "panic" to LambdaInvocationAlarmThresholds(threshold = 450),
-        )
-    public open val computeAlarms: Map<String, LambdaDurationAlarmThresholds>
-        get() = mapOf(
-            "emergency" to LambdaDurationAlarmThresholds(threshold = 3.minutes),
-            "panic" to LambdaDurationAlarmThresholds(threshold = 5.minutes),
+            "emergency_invocations" to LambdaInvocationAlarm(threshold = 150, description = "Emergency Invocations"),
+            "emergency_compute" to LambdaDurationAlarm(threshold = 3.minutes, description = "Emergency Computation"),
+            "panic_invocations" to LambdaInvocationAlarm(threshold = 450, description = "Panic Invocations"),
+            "panic_compute" to LambdaDurationAlarm(threshold = 5.minutes, description = "Panic Computation"),
         )
 
     override val additionalSettings: Set<ServerSetting<*, *>> = setOf()
@@ -223,14 +220,14 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
         }
         emit("ws") {
             "resource.aws_apigatewayv2_api.ws" {
-                "name" - "demo-example-gateway"
+                "name" - "${emitter.projectPrefix}-gateway"
                 "protocol_type" - "WEBSOCKET"
                 "route_selection_expression" - "constant"
             }
             "resource.aws_apigatewayv2_stage.ws" {
                 "api_id" - expression("aws_apigatewayv2_api.ws.id")
 
-                "name" - "demo-example-gateway-stage"
+                "name" - "${emitter.projectPrefix}-gateway-stage"
                 "auto_deploy" - true
 
                 "access_log_settings" {
@@ -247,7 +244,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 "integration_method" - "POST"
             }
             "resource.aws_cloudwatch_log_group.ws_api" {
-                "name" - "demo-example-ws-gateway-log"
+                "name" - "${emitter.projectPrefix}-ws-gateway-log"
 
                 "retention_in_days" - 30
             }
@@ -336,46 +333,26 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
         }
         emit("lambdaAlarms") {
             val functionName = expression("aws_lambda_function.main.function_name")
-            val namePrefix = emitter.projectPrefix
             "resource.aws_sns_topic.emergency" {
-                "name" - "${namePrefix}_emergencies"
+                "name" - "${emitter.projectPrefix}_emergencies"
             }
             "resource.aws_sns_topic_subscription.emergency_primary" {
                 "topic_arn" - expression("aws_sns_topic.emergency.arn")
                 "protocol" - "email"
                 "endpoint" - emergencyContact.raw
             }
-            invocationAlarms.entries.forEach { (key, value) ->
-                "resource.aws_cloudwatch_metric_alarm.${key}_invocations" {
-                    "alarm_name" - "${namePrefix}_${key}_invocations"
-                    "comparison_operator" - "GreaterThanOrEqualToThreshold"
-                    "evaluation_periods" - value.evaluationPeriods
-                    "datapoints_to_alarm" - value.dataPointsToAlarm
-                    "period" - value.period.inWholeSeconds
-                    "threshold" - value.threshold
-                    "metric_name" - "Invocations"
-                    "namespace" - "AWS/Lambda"
-                    "statistic" - "Sum"
-                    "alarm_description" - "${key.replaceFirstChar { if (it.isLowerCase()) it.titlecase(getDefault()) else it.toString() }} Invocations"
-                    "insufficient_data_actions" - listOf<JsonObject>()
-                    "dimensions" {
-                        "FunctionName" - functionName
-                    }
-                    "alarm_actions" - listOf(expression("aws_sns_topic.emergency.arn"))
-                }
-            }
-            computeAlarms.entries.forEach { (key, value) ->
-                "resource.aws_cloudwatch_metric_alarm.${key}_compute" {
-                    "alarm_name" - "${namePrefix}_${key}_compute"
+            alarms.entries.forEach { (key, value) ->
+                "resource.aws_cloudwatch_metric_alarm.${key}" {
+                    "alarm_name" - "${emitter.projectPrefix}_${key}"
                     "comparison_operator" - "GreaterThanOrEqualToThreshold"
                     "evaluation_periods" - value.evaluationPeriods
                     "datapoints_to_alarm" - value.dataPointsToAlarm
                     "period" - value.period.inWholeSeconds
                     "statistic" - value.statistic.name
-                    "threshold" - value.threshold.inWholeMilliseconds
-                    "metric_name" - "Duration"
+                    "threshold" - value.threshold
+                    "metric_name" - value.metric.name
                     "namespace" - "AWS/Lambda"
-                    "alarm_description" - "${key.replaceFirstChar { if (it.isLowerCase()) it.titlecase(getDefault()) else it.toString() }} Compute"
+                    "alarm_description" - value.description
                     "insufficient_data_actions" - listOf<JsonObject>()
                     "dimensions" {
                         "FunctionName" - functionName

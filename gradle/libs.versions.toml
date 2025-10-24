@@ -68,6 +68,7 @@ awsCloudWatch = { module = "software.amazon.awssdk:cloudwatch", version = { ref 
 awsCrtClient = { module = "software.amazon.awssdk:aws-crt-client", version = { ref = "awsVersion" } }
 awsLambda = { module = "software.amazon.awssdk:lambda", version = { ref = "awsVersion" } }
 awsRds = { module = "software.amazon.awssdk:rds", version = { ref = "awsVersion" } }
+awsSecrets = { module = "software.amazon.awssdk:secretsmanager", version = { ref = "awsVersion" } }
 awsS3 = { module = "software.amazon.awssdk:s3", version = { ref = "awsVersion" } }
 awsSecretsManager = { module = "software.amazon.awssdk:secretsmanager", version = { ref = "awsVersion" } }
 awsSes = { module = "software.amazon.awssdk:ses", version = { ref = "awsVersion" } }

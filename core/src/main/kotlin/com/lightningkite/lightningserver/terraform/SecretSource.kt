@@ -256,11 +256,10 @@ public class ManySecretSources(
 }
 
 private fun <T> KSerializer<T>.parse(string: String): T = try {
-    if (this.descriptor.kind is PrimitiveKind) StringArrayFormat(EmptySerializersModule()).decodeFromString(
-        this,
-        string
-    )
-    else Json.decodeFromString(this, string)
+    if (this.descriptor.kind is PrimitiveKind)
+        StringArrayFormat(EmptySerializersModule()).decodeFromString(this, string)
+    else
+        Json.decodeFromString(this, string)
 } catch(e: SerializationException) {
     throw IllegalArgumentException("Does not fit format.  Expecting a ${this.descriptor.serialName}")
 }
@@ -410,7 +409,7 @@ public class EncryptedFileSecretSource(
     override fun <T> set(need: TerraformNeed<T>, value: T) {
         getMap()[need.name] = json.encodeToString(need.serializer, value)
         file.writeBytes(
-            encryptionKey!!.cipher().encryptBlocking(Json.encodeToString(map).toByteArray(Charsets.UTF_8))
+            encryptionKey!!.cipher().encryptBlocking(json.encodeToString(map).toByteArray(Charsets.UTF_8))
         )
     }
 }
