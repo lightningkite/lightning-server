@@ -10,8 +10,8 @@ At the top of your server object, define a new setting by using the following sy
 
 ```kotlin
 // Server.kt
-object Server : ServerPathGroup(ServerPath.root) {
-    val settingName = setting(name = "settingName", default = "defaultValue")
+object Server : ServerBuilder() {
+    val settingName = setting("settingName", "defaultValue")
     //...
 }
 ```
@@ -22,9 +22,9 @@ We can then access the value of the setting by accessing the value and adding `(
 
 ```kotlin
 // Server.kt
-object Server : ServerPathGroup(ServerPath.root) {
+object Server : ServerBuilder() {
     //...
-    val seeSampleSetting = path("print-setting").get.handler {
+    val seeSampleSetting = path.path("print-setting").get bind HttpHandler {
         HttpResponse.plainText(settingName())
     }
 }

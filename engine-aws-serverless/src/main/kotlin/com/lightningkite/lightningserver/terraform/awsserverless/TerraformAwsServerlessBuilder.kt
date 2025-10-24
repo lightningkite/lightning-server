@@ -31,6 +31,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.lambda.model.Architecture
 import java.io.File
 import java.util.Locale
 import java.util.Locale.getDefault
@@ -68,6 +69,8 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
     public abstract val debug: Boolean
     public abstract val emergencyContact: EmailAddress
 
+    public val architecture: Architecture get() = Architecture.X86_64
+
     public open val snapStart: Boolean get() = true
     public open val timeout: Duration get() = 30.seconds
     public open val memory: DataSize get() = 1.gibibytes
@@ -86,6 +89,13 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
     override val additionalSettings: Set<ServerSetting<*, *>> = setOf()
     override val applicationRegion: String get() = region.id()
     override val policyStatements: MutableCollection<AwsPolicyStatement> = ArrayList()
+
+    /**
+     * A list of ARNs of lambda layers you need.
+     */
+    public val lambdaLayers: MutableList<String> = ArrayList<String>()
+
+    public val lambdaEnvironment: MutableMap<String, String> = HashMap()
 
     override fun finalize() {
         super.finalize()
@@ -522,6 +532,8 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 "memory_size" - memory.inWholeMebibytes
                 "timeout" - timeout.inWholeSeconds
 
+                "layers" - lambdaLayers
+
                 "source_code_hash" - expression("data.archive_file.lambda.output_base64sha256")
 
                 "role" - expression("aws_iam_role.main_exec.arn")
@@ -533,6 +545,9 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 "environment" {
                     "variables" {
                         "LIGHTNING_SERVER_SETTINGS_DECRYPTION" - expression("random_password.settings.result")
+                        lambdaEnvironment.forEach { (key, value) ->
+                            key - value
+                        }
                     }
                 }
 

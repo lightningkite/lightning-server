@@ -1,6 +1,6 @@
 # Cache
 
-**OUT OF DATE**
+Last updated January 2025 (`version-5`)
 
 When building servers, it is frequently necessary to keep some information on hand that is shared between every instance.
 
@@ -11,9 +11,9 @@ That's where the cache comes in.  It uses `kotlinx.serialization` to serialize v
 Add a setting as follows:
 
 ```kotlin
-object Server {
+object Server : ServerBuilder() {
     //...
-    val cache = setting(name = "cache", default = CacheSettings())
+    val cache = setting("cache", Cache.Settings())
     //...
 }
 ```
@@ -23,14 +23,17 @@ object Server {
 Make sure you import the shortcuts (alt + enter).
 
 ```kotlin
-Server.cache().set("value", 1)
-Server.cache().get<Int>("value")
-Server.cache().remove("value")
+import kotlinx.serialization.Serializable
+
+val c = cache()
+c.set("value", 1)
+c.get<Int>("value")
+c.remove("value")
 
 @Serializable data class Example(val x: Int, val y: String)
-Server.cache().set("value2", Example(x = 1, y = "hi"))
-Server.cache().get<Example>("value2")
-Server.cache().remove("value2")
+c.set("value2", Example(x = 1, y = "hi"))
+c.get<Example>("value2")
+c.remove("value2")
 ```
 
 ## More operations
@@ -56,9 +59,13 @@ Simply use RAM as the cache.  Will only work if there is strictly one instance o
 
 ```kotlin
 // Server.kt
-object Server: ServerPathGroup(ServerPath.root) {
-    // Adds MongoDB to the possible database loaders
+import com.lightningkite.services.cache.dynamodb.DynamoDbCache
+
+object Server: ServerBuilder() {
+    // Register DynamoDB cache implementation
     init { DynamoDbCache }
+
+    val cache = setting("cache", Cache.Settings())
 }
 ```
 
@@ -73,9 +80,13 @@ object Server: ServerPathGroup(ServerPath.root) {
 
 ```kotlin
 // Server.kt
-object Server: ServerPathGroup(ServerPath.root) {
-    // Adds MongoDB to the possible database loaders
+import com.lightningkite.services.cache.redis.RedisCache
+
+object Server: ServerBuilder() {
+    // Register Redis cache implementation
     init { RedisCache }
+
+    val cache = setting("cache", Cache.Settings())
 }
 ```
 
@@ -101,9 +112,13 @@ object Server: ServerPathGroup(ServerPath.root) {
 
 ```kotlin
 // Server.kt
-object Server: ServerPathGroup(ServerPath.root) {
-    // Adds MongoDB to the possible database loaders
+import com.lightningkite.services.cache.memcached.MemcachedCache
+
+object Server: ServerBuilder() {
+    // Register Memcached cache implementation
     init { MemcachedCache }
+
+    val cache = setting("cache", Cache.Settings())
 }
 ```
 

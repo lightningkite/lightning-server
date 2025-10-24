@@ -1,6 +1,6 @@
 # Email
 
-**OUT OF DATE**
+Last updated January 2025 (`version-5`)
 
 Email's built in like many of the other service types a server can depend on.
 
@@ -9,9 +9,11 @@ Email's built in like many of the other service types a server can depend on.
 Add a setting as follows:
 
 ```kotlin
-object Server {
+import com.lightningkite.services.email.EmailService
+
+object Server : ServerBuilder() {
     //...
-    val email = setting(name = "email", default = EmailSettings())
+    val email = setting("email", EmailService.Settings())
     //...
 }
 ```
@@ -19,9 +21,13 @@ object Server {
 ## Sending an email
 
 ```kotlin
-email().send(
+import com.lightningkite.services.email.Email
+import com.lightningkite.services.email.EmailAddressWithName
+import com.lightningkite.toEmailAddress
+
+email().send(Email(
     subject = "Hello world",
-    to = listOf("joseph@lightningkite.com"),
+    to = listOf(EmailAddressWithName("joseph@lightningkite.com".toEmailAddress())),
     html = "<h1>Hello world!</h1>"
-)
+))
 ```
