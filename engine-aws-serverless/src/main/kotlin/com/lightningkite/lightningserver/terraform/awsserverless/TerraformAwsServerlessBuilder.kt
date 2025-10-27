@@ -74,14 +74,13 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
     public open val snapStart: Boolean get() = true
     public open val timeout: Duration get() = 30.seconds
     public open val memory: DataSize get() = 1.gibibytes
+    public open val monthlyBudgetUsd: Double get() = 10.00
 
     public open val alarms: Map<String, LambdaAlarm>
-        get() = mapOf(
-            "emergency_invocations" to LambdaInvocationAlarm(threshold = 150, description = "Emergency Invocations"),
-            "emergency_compute" to LambdaDurationAlarm(threshold = 3.minutes, description = "Emergency Computation"),
-            "panic_invocations" to LambdaInvocationAlarm(threshold = 450, description = "Panic Invocations"),
-            "panic_compute" to LambdaDurationAlarm(threshold = 5.minutes, description = "Panic Computation"),
-        )
+        get() = LambdaAlarm.defaultSpendAlarms(
+            computeSecondsPerMonth = (monthlyBudgetUsd / memory.gibibytes / 0.0000166667).seconds,
+            description = "$displayName Lambda Spend"
+        ).associate { it.description.lowercase().filter { it.isLetterOrDigit() || it == '-' } to it }
 
     override val additionalSettings: Set<ServerSetting<*, *>> = setOf()
     override val applicationRegion: String get() = region.id()

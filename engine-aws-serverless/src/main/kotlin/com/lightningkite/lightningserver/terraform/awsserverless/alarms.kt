@@ -1,6 +1,8 @@
 package com.lightningkite.lightningserver.terraform.awsserverless
 
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 
 public data class LambdaAlarm(
@@ -11,7 +13,30 @@ public data class LambdaAlarm(
     val evaluationPeriods: Int,
     val dataPointsToAlarm: Int,
     val description: String,
-)
+) {
+    public companion object {
+        private val defaultFlexTable = mapOf(
+            7.days to 1.0,
+            1.days to 2.0,
+            4.hours to 4.0,
+            1.hours to 8.0,
+            15.minutes to 16.0,
+            5.minutes to 32.0
+        )
+        public fun defaultSpendAlarms(
+            computeSecondsPerMonth: Duration,
+            description: String,
+            flexTable: Map<Duration, Double> = defaultFlexTable,
+        ): List<LambdaAlarm> = flexTable.entries.map {
+            LambdaDurationAlarm(
+                threshold = computeSecondsPerMonth * (it.key / 30.days) * it.value,
+                period = it.key,
+                statistic = LambdaAlarmStatistic.Sum,
+                description = "$description (${it.key})",
+            )
+        }
+    }
+}
 
 public fun LambdaInvocationAlarm(
     statistic: LambdaAlarmStatistic = LambdaAlarmStatistic.Sum,
