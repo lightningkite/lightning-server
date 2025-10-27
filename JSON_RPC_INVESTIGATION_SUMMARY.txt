@@ -1,0 +1,259 @@
+================================================================================
+LIGHTNING SERVER JSON-RPC INTEGRATION INVESTIGATION - SUMMARY
+================================================================================
+
+INVESTIGATION DATE: October 24, 2025
+SCOPE: Core modules, typed modules, endpoint patterns, routing, serialization
+THOROUGHNESS LEVEL: Very Thorough
+
+================================================================================
+KEY FINDINGS
+================================================================================
+
+1. ENDPOINT DEFINITION (REST/HTTP)
+   Location: /core/src/main/kotlin/com/lightningkite/lightningserver/
+   
+   Architecture:
+   - PathSpec: Type-safe path specifications (PathSpec0-3 with generics)
+   - HttpEndpoint: Pairs PathSpec with HttpMethod
+   - HttpHandler: Interface for handling typed requests
+   - ServerBuilder: DSL-based builder for registration
+   
+   Pattern: Declarative, type-safe, composable
+   Extensibility: High - supports custom paths, methods, and handlers
+   Example: path.path("models").get bind httpHandler { ... }
+
+2. REQUEST ROUTING
+   Location: /core/src/main/kotlin/com/lightningkite/lightningserver/pathing/
+   
+   Mechanism:
+   - PathSpecRegistry stores path->handler mappings
+   - RawHttpEndpoint matches path segments at runtime
+   - PathSpecMap.Match resolves to correct handler
+   - Lazy-loads with caching for performance
+   
+   Features:
+   - Typed path arguments extracted during matching
+   - Support for variable segments with trailing paths
+   - URL encoding/decoding built-in
+   - Query parameter parsing
+
+3. SERIALIZATION/DESERIALIZATION
+   Location: /core/src/main/kotlin/com/lightningkite/lightningserver/serialization/
+   
+   System: MediaTypeDecoder/Encoder/Coder interfaces
+   - Pluggable codec architecture
+   - Priority-based selection (float)
+   - Supports JSON, StringArray, KotlinBytes, FormData
+   - Context receivers for ServerRuntime
+   - Automatic based on Content-Type/Accept headers
+   
+   TypedData abstraction:
+   - Holds data (Text or Bytes) + MediaType
+   - Can be Text, Bytes, or Sink (streaming)
+   - Serialization via KSerializer from kotlinx.serialization
+
+4. TYPED ENDPOINT SYSTEM
+   Location: /typed/src/main/kotlin/com/lightningkite/lightningserver/typed/
+   
+   ApiHttpHandler interface:
+   - Extends HttpHandler with INPUT/OUTPUT types
+   - Requires inputType and outputType KSerializers
+   - Specifies auth requirement
+   - Defines success code and error cases
+   - Includes examples for documentation
+   - Automatic request/response conversion
+   
+   Factory functions:
+   - explicitApiHttpHandler(): Full control
+   - ApiHttpHandler(): Reified types (less boilerplate)
+   
+   Example: ModelRestEndpoints
+   - Shows complete CRUD endpoint implementation
+   - Demonstrates auth integration, error handling, validation
+   - All endpoints use ApiHttpHandler pattern
+
+5. ADVANCED PATTERNS
+   
+   A. HttpInterceptor (Chain of Responsibility)
+      Location: /core/src/main/kotlin/com/lightningkite/lightningserver/http/
+      - Can modify requests/responses
+      - Composable/stackable
+      - Examples: CORS, auth, logging
+      - Instrumented with telemetry
+   
+   B. Extensions System (Type-Safe Metadata)
+      Location: /core/src/main/kotlin/com/lightningkite/lightningserver/definition/
+      - Extensions (read-only)
+      - MutableExtensions (read-write)
+      - Key-based access with generics
+      - Used for attaching metadata without modification
+   
+   C. Exception Handling
+      Location: /core/src/main/kotlin/com/lightningkite/lightningserver/exceptions.kt
+      - HttpStatusException hierarchy
+      - BadRequestException (400)
+      - UnauthorizedException (401)
+      - ForbiddenException (403)
+      - NotFoundException (404)
+      - DefaultExceptionHttpHandler converts to LSError
+      - LSError: serializable error response
+   
+   D. SDK Documentation System
+      Location: /typed/src/main/kotlin/com/lightningkite/lightningserver/typed/sdk/
+      - SDK.Documentable interface
+      - Metadata: summary, description, functionName, auth, types
+      - Generates client SDKs and documentation
+      - Hierarchical module structure
+      - InterfaceInfo stored in extensions
+
+6. NO EXISTING JSON-RPC
+   - grep/search found zero existing JSON-RPC implementation
+   - Blank slate for implementation
+   - Full opportunity to design optimally
+
+================================================================================
+ARCHITECTURE STRENGTHS FOR JSON-RPC
+================================================================================
+
+1. Media Type Extensibility
+   - Already plugs in new codecs via MediaTypeDecoder/Encoder
+   - JSON-RPC would be one more codec
+   - Perfect fit for protocol-level serialization
+
+2. Request/Response Abstraction
+   - TypedData holds any content format
+   - Codecs handle serialization/deserialization
+   - JSON-RPC format is just another TypedData wrapper
+
+3. Handler Context
+   - ServerRuntime context in handlers
+   - Access to configuration, validators, auth, serialization
+   - Everything JSON-RPC needs is available
+
+4. Metadata System
+   - Extensions store RPC metadata without modifying core
+   - No pollution of HttpHandler or ApiHttpHandler
+   - Keeps concerns separated
+
+5. Modular Composition
+   - ServerBuilder composition allows RPC as optional module
+   - Include pattern: path.path("rpc") include JsonRpcEndpoints
+   - Can coexist with REST endpoints
+
+6. Type Safety
+   - Compile-time type information preserved
+   - Input/Output types via KSerializer
+   - Type validation in handlers
+
+7. Error Handling
+   - Unified exception->response pipeline
+   - LSError structure compatible with JSON-RPC errors
+   - Can map HttpStatusException to RPC error codes
+   - Debug mode includes stack traces
+
+8. Auth Integration
+   - AuthRequirement already in ApiHttpHandler
+   - Same access control for RPC methods
+   - Access context (HttpAccess) contains auth
+
+9. Validation Infrastructure
+   - Server.validators available in handlers
+   - Can validate RPC parameters same way
+   - No duplication of validation logic
+
+================================================================================
+RECOMMENDED JSON-RPC INTEGRATION STRATEGY
+================================================================================
+
+Design Principle: Treat JSON-RPC as transport layer over typed endpoints
+
+Components to Create:
+
+1. JsonRpcMediaTypeCoder
+   - Implements MediaTypeDecoder/Encoder
+   - Decodes "application/json-rpc" requests
+   - Encodes JSON-RPC 2.0 response format
+   - Handles batch requests
+   - Manages request ID tracking
+
+2. JsonRpcMethod
+   - Wraps existing ApiHttpHandler
+   - Associates method name with handler
+   - Stores in extensions as metadata
+   - Links input/output types to method schema
+
+3. JsonRpcEndpoints
+   - Extends ServerBuilder
+   - Registers methods at /rpc path
+   - Provides DSL: method("module.method", handler)
+   - Routes requests by method name to correct handler
+
+4. JsonRpcInterceptor (Optional)
+   - Implements HttpInterceptor
+   - Protocol validation
+   - Request/response wrapping
+   - Error response formatting
+
+Reuses (No Duplication):
+
+- Routing: PathSpec system (method name -> path)
+- Handlers: ApiHttpHandler pattern (input/output already defined)
+- Serialization: MediaTypeCodec (new format, same pipeline)
+- Auth: AuthRequirement (same access control)
+- Error Handling: HttpStatusException hierarchy (map to RPC codes)
+- Documentation: SDK.Documentable (RPC is just another format)
+- Validation: server.validators (same infrastructure)
+
+================================================================================
+KEY FILES FOR IMPLEMENTATION
+================================================================================
+
+Core Architecture:
+- /core/src/main/kotlin/com/lightningkite/lightningserver/definition/endpoints.kt
+- /core/src/main/kotlin/com/lightningkite/lightningserver/definition/builder/ServerBuilder.kt
+- /core/src/main/kotlin/com/lightningkite/lightningserver/http/HttpHandler.kt
+- /core/src/main/kotlin/com/lightningkite/lightningserver/http/HttpInterceptor.kt
+- /core/src/main/kotlin/com/lightningkite/lightningserver/serialization/MediaTypeCoder.kt
+
+Typed System:
+- /typed/src/main/kotlin/com/lightningkite/lightningserver/typed/ApiHttpHandler.kt
+- /typed/src/main/kotlin/com/lightningkite/lightningserver/typed/ApiHttpHandler.ext.kt
+- /typed/src/main/kotlin/com/lightningkite/lightningserver/typed/Access.kt
+
+Examples:
+- /typed/src/main/kotlin/com/lightningkite/lightningserver/typed/ModelRestEndpoints.kt
+- /core/src/main/kotlin/com/lightningkite/lightningserver/cors/CorsInterceptor.kt
+- /demo/src/main/kotlin/com/lightningkite/lightningserver/demo/TestModelEndpoints.kt
+
+Supporting:
+- /core/src/main/kotlin/com/lightningkite/lightningserver/exceptions.kt
+- /core/src/main/kotlin/com/lightningkite/lightningserver/definition/Extensions.kt
+- /typed/src/main/kotlin/com/lightningkite/lightningserver/typed/sdk/SDK.kt
+
+================================================================================
+CONCLUSION
+================================================================================
+
+Lightning Server has EXCEPTIONAL architecture for JSON-RPC integration:
+
+✓ Type-safe endpoint definitions
+✓ Extensible serialization system
+✓ Pluggable handler patterns
+✓ Modular composition
+✓ Full auth/validation integration
+✓ Unified error handling
+✓ Documentation infrastructure
+✓ Zero duplication with REST endpoints
+✓ Metadata storage without core modifications
+✓ Production-ready patterns (CORS interceptor as example)
+
+The system is designed with sufficient abstraction layers that JSON-RPC can be
+added as a peer to REST, not as a duplicate implementation.
+
+Implementation can start with JsonRpcMediaTypeCoder and JsonRpcEndpoints, 
+reusing everything else from the existing infrastructure.
+
+Full detailed report available in: JSON_RPC_INVESTIGATION.md
+
+================================================================================

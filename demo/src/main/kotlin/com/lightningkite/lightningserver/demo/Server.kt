@@ -110,6 +110,7 @@ object Server : ServerBuilder() {
     }
     val uploadEarly = path.path("upload") module UploadEarlyEndpoint(files, database, Runtime.Constant(listOf()))
     val testModel = path.path("test-model") module TestModelEndpoints
+    val rpcExample = path.path("rpc-example") module RpcExample
 
     val root = path.get bind HttpHandler {
         HttpResponse.plainText("Hello ${it.auth(UserAuth.require() or noAuth)?.fetch()}")
