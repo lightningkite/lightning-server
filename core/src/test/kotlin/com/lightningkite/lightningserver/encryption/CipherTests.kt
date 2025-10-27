@@ -8,6 +8,10 @@ import org.junit.Test
 import javax.crypto.AEADBadTagException
 import kotlin.random.Random
 
+/**
+ * Tests for cipher functionality including AES-GCM encryption/decryption
+ * and key derivation from SecretBasis.
+ */
 class CipherTests {
     fun assertContentEquals(expected: ByteArray, actual: ByteArray, lazyMessage: (() -> Any)? = null) =
         if (lazyMessage == null) assert(expected contentEquals actual)
@@ -18,6 +22,10 @@ class CipherTests {
         else assert(!expected.contentEquals(actual), lazyMessage)
 
 
+    /**
+     * Tests basic AES-GCM cipher operations including key generation,
+     * encryption, decryption, and key serialization.
+     */
     @Test
     fun basicCipherFunctionality(): Unit = runBlocking {
         val provider = CryptographyProvider.Default
@@ -52,6 +60,10 @@ class CipherTests {
 
     private val basis = SecretBasis()
 
+    /**
+     * Tests that ciphers derived from SecretBasis work correctly
+     * for encryption and decryption across multiple variants.
+     */
     @Test
     fun secretBasisCiphers(): Unit = runBlocking {
         repeat(100) {
@@ -60,6 +72,10 @@ class CipherTests {
         }
     }
 
+    /**
+     * Tests that different cipher variants produce cryptographically
+     * independent keys that cannot decrypt each other's ciphertext.
+     */
     @Test
     fun variantsAreUnique(): Unit = runBlocking {
         repeat(100) {

@@ -7,7 +7,14 @@ import kotlin.test.Test
 import kotlin.test.assertNotEquals
 import kotlin.time.measureTime
 
+/**
+ * Tests for secure password hashing using PBKDF2-HMAC-SHA512.
+ */
 class HashTests {
+    /**
+     * Tests that password hashing is consistent - the same password
+     * with the same salt produces the same hash.
+     */
     @Test
     fun hashingIsConsistent(): Unit = runBlocking {
         repeat(10) {
@@ -23,6 +30,10 @@ class HashTests {
         }
     }
 
+    /**
+     * Performance comparison between Kotlin cryptography library
+     * and Java javax.crypto implementations.
+     */
     @Test fun hashPerformance(): Unit = runBlocking {
         measureTime { repeat(5) { "asdfa".secureHash() } }.also { println("Kotlin: $it") }
         measureTime { repeat(5) { "asdfa".secureHashJava() } }.also { println("Java: $it") }
@@ -31,6 +42,10 @@ class HashTests {
         measureTime { repeat(5) { "asdfa".checkAgainstHashJava(hash) } }.also { println("Java: $it") }
     }
 
+    /**
+     * Tests that each hash uses a unique random salt, so the same
+     * password produces different hashes on each call.
+     */
     @Test
     fun hashingIsSalted(): Unit = runBlocking {
         val data = "Hello World"
@@ -39,6 +54,10 @@ class HashTests {
         assertNotEquals(h1, h2)
     }
 
+    /**
+     * Tests cross-compatibility between Kotlin and Java implementations -
+     * both should be able to verify hashes created by the other.
+     */
     @Test
     fun hashingIsConsistentWithOld(): Unit = runBlocking {
         val data = "Hello World"

@@ -1,6 +1,4 @@
 # TODO
 
- - [ ] Generate Kotlin SDK
- - [ ] Generate OpenAPI spec
- - [ ] Generate Lightning Server spec
- - [ ] Test AWS deployment
+ - [ ] CORS per-domain settings
+ - [ ] Prepare for secret rotation in the secretBasis setting
