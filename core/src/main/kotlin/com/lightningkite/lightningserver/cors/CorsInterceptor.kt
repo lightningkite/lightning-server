@@ -31,10 +31,10 @@ internal fun originMatches(allowed: List<String>, origin: String): Boolean {
         .any {
             val allowedSchema = it.substringBefore("://", "")
             val allowedTrimmed = it.substringAfter("://")
-            (allowedSchema.isBlank() || originSchema == allowedSchema) &&
-                    (allowedTrimmed == "*" ||
-                            allowedTrimmed == originTrimmed ||
-                            (allowedTrimmed.startsWith('*') && originTrimmed.endsWith(allowedTrimmed.removePrefix("*"))))
+            (allowedSchema.isBlank() || originSchema.equals(allowedSchema, ignoreCase = true)) &&
+                    (allowedTrimmed.equals("*", ignoreCase = true) ||
+                            allowedTrimmed.equals(originTrimmed, ignoreCase = true) ||
+                            (allowedTrimmed.startsWith('*', ignoreCase = true) && originTrimmed.endsWith(allowedTrimmed.removePrefix("*"), ignoreCase = true)))
         }
 }
 
@@ -181,20 +181,3 @@ public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpIn
         }
     }
 }
-
-// TODO: API Improvement Recommendations
-//
-// 1. The originMatches function could benefit from being public (or having a public variant)
-//    for testing purposes and for users who want to implement custom CORS logic.
-//
-// 2. Consider extracting the preflight response logic into a separate function to improve
-//    testability and readability. The intercept method is quite long.
-//
-// 3. The limitToMethods filtering uses string comparison (it.toString()) which may not be
-//    case-sensitive. Consider using a case-insensitive comparison or standardizing on uppercase.
-//
-// 4. When exposedHeaders is joined with joinToString(), it uses the default separator.
-//    This should explicitly use joinToString(",") for consistency with other headers.
-//
-// 5. Consider adding metrics/logging for CORS violations to help diagnose issues in production.
-//    Failed origin matches are currently silent unless forbidOnMatchFail is true.
