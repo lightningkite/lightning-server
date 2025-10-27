@@ -31,7 +31,7 @@ class ImplementationHelpersHandleTest {
         // Install permissive CORS for OPTIONS tests
         val cors = com.lightningkite.lightningserver.cors.CorsSettings(
             limitToDomains = listOf("example.com"),
-            limitToMethods = null
+            limitToMethods = listOf("*")
         )
         init {
             install(com.lightningkite.lightningserver.cors.CorsInterceptor(setting("cors", cors)))

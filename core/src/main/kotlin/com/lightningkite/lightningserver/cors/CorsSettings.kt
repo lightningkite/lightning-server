@@ -4,51 +4,71 @@ import kotlinx.serialization.Serializable
 
 
 /**
- * CorsSettings is used to configure Cross Origin Resource Sharing.
- * These settings determine how the server will apply CORS headers during requests.
+ * Configuration for Cross-Origin Resource Sharing (CORS) handling.
  *
- * limitToDomains will have a smart match applied to it. This allows for wildcard ("*") subdomains. If you add `https://\*.some.domain` as a limit,
- * any Origin provided that is a sub domain of `some.domain` will be allowed to share. This does mean the wildcard on it's own will
- * match every value in the Origins domain. The wildcard will not be returned in this case, but the Origin domain will be.
- * You can omit the Schema in your limit and any schema will be accepted from the Origin. If you provide a schema than it too must match.
+ * Controls how the server responds to cross-origin requests by managing CORS headers
+ * and origin validation.
  *
- * The engine will not attempt any smart functionality when it comes to limited values of methods and headers.
- * It does the dumb static method of dumping these values directly into the header responses. Any behavior changes
- * required for allowed credentials is up to the implementor to properly configure.
+ * ## Domain Matching
+ * The [limitToDomains] field supports wildcard subdomain matching:
+ * - `*.example.com` (no scheme) matches any subdomain with any scheme
+ * - `*` matches all origins (not recommended for production)
  *
- * Providing a null value to a limit field will allow literally everything by mirroring the request values into the
- * response headers. This is not recommended outside testing environments.
+ * When a match occurs, the actual request Origin is returned in the Access-Control-Allow-Origin
+ * header (not the pattern).
+ **
+ * ## Credentials Warning
+ * When [allowCredentials] is `true`, you cannot use wildcard origins (`*`) per CORS spec.
+ * You must specify exact origins or patterns. The implementation does not enforce this
+ * constraint - it's the developer's responsibility.
  *
- * @param limitToDomains Specifies what domains are limited for sharing.
- *      These values are NOT placed directly into the Access-Control-Allow-Origin.
- *      The values will be compared against the incoming Origin header.
- *      If a match is made, then the incoming Origin header will be placed into the response Access-Control-Allow-Origin header.
- *      A `null` value means there are no limits and the request Origin is mirrored onto the response Access-Control-Allow-Origin header.
- * @param limitToHeaders Specifies what headers are limited for sharing.
- *      These values get directly placed into the Access-Control-Allow-Headers header.
- *      A `null` value means there are no limits and the Access-Control-Request-Headers values are mirrored onto the Access-Control-Allow-Headers header.
- * @param limitToMethods Specifies what methods are limited for sharing.
- *      These values get directly placed into the Access-Control-Allow-Methods header.
- *      A `null` value means there are no limits and the Access-Control-Request-Method values are mirrored onto the Access-Control-Allow-Methods header.
- * @param exposedHeaders Specifies what headers are available for sharing beyond the request headers.
- *      These values get directly placed into the Access-Control-Expose-Methods header.
- * @param allowCredentials Specifies if Credentials are allowed for sharing.
- *      If allowCredentials is true, the header Access-Control-Allow-Credentials will be included with the value `true`.
- * @param cacheLength Specifics the allowed length(in seconds) for caching a prefight request.
- *      A non `null` value is placed directly into the Access-Control-Max-Age header.
- *      A `null` value means the header Access-Control-Max-Age is never sent.
- * @param forbidOnMatchFail If `true` ANY request with an `Origin` header that does not match any of the values in
- *      `limitToDomains` will result in an immediate Forbidden response. This response will happen before any further
- *      work is done. If `false` then all request play out as normal, and the headers returned in the response as
- *      expected. Websockets will always result in forbidden in these situations regardless of this value.
+ * @param limitToDomains Allowed origins for CORS. Compared against the incoming `Origin` header.
+ *      When matched, the request's `Origin` is reflected in `Access-Control-Allow-Origin`.
+ *      - single element list with a '*' = do not limit - mirror all origins (permissive)
+ *      - empty list = no origins allowed (default, restrictive)
+ *      - list of patterns = only matching origins allowed
+ * @param limitToHeaders Allowed request headers. Placed directly into `Access-Control-Allow-Headers`.
+ *      - single element list with a '*' = do not limit - mirror `Access-Control-Request-Headers` from request
+ *      - empty list = no additional headers allowed (default)
+ * @param limitToMethods Allowed HTTP methods. Placed directly into `Access-Control-Allow-Methods`.
+ *      - single element list with a '*' = do not limit - mirror `Access-Control-Request-Method` from request
+ *      - empty list = no methods allowed (default)
+ * @param exposedHeaders Response headers exposed to the client beyond CORS-safe headers.
+ *      Placed into `Access-Control-Expose-Headers`. Empty list means only safe headers are exposed.
+ * @param allowCredentials Whether to allow credentials (cookies, authorization headers, TLS certificates).
+ *      Sets `Access-Control-Allow-Credentials: true` when enabled. Default is `false`.
+ * @param cacheLength Duration in seconds to cache preflight responses. Sets `Access-Control-Max-Age`.
+ *      - `null` = no caching header sent (default)
+ *      - value = seconds to cache
+ * @param forbidOnMatchFail When `true`, requests with non-matching `Origin` headers receive 403 Forbidden
+ *      immediately, before endpoint processing. When `false`, requests continue but CORS headers are omitted.
+ *      **Note**: WebSocket connections always fail on origin mismatch regardless of this setting.
  */
 @Serializable
 public data class CorsSettings(
-    val limitToDomains: List<String>? = emptyList(),
-    val limitToHeaders: List<String>? = emptyList(),
-    val limitToMethods: List<String>? = emptyList(),
+    val limitToDomains: List<String> = emptyList(),
+    val limitToHeaders: List<String> = emptyList(),
+    val limitToMethods: List<String> = emptyList(),
     val exposedHeaders: List<String> = emptyList(),
     val allowCredentials: Boolean = false,
     val cacheLength: UInt? = null,
     val forbidOnMatchFail: Boolean = true,
-)
+) {
+    public companion object {
+        public fun allowAll(): CorsSettings = CorsSettings(
+            limitToDomains = listOf("*"),
+            limitToHeaders = listOf("*"),
+            limitToMethods = listOf("*"),
+            allowCredentials = true,
+            cacheLength = 10u,
+            forbidOnMatchFail = false,
+        )
+        public fun forProduction(vararg origins: String): CorsSettings = CorsSettings(
+            limitToDomains = origins.toList(),
+            limitToHeaders = listOf("*"),
+            limitToMethods = listOf("*"),
+            allowCredentials = true,
+            cacheLength = 10u,
+        )
+    }
+}
