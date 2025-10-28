@@ -7,7 +7,6 @@ import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketHandlerInterceptor
@@ -113,7 +112,7 @@ public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpIn
             else HttpResponse(
                 status = HttpStatus.NoContent,
                 headers = HttpHeaders {
-                    set(
+                    add(
                         HttpHeader.AccessControlAllowMethods,
                         // Filter methods by limitToMethods if configured
                         (config.limitToMethods.takeUnless { it == allowAll }?.let { limit -> existingMethods.filter { limit.contains(it.toString()) } }
@@ -132,13 +131,13 @@ public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpIn
         return baseResponse.copy(
             headers = baseResponse.headers.copy {
                 // Always set the actual origin (not wildcard) for allowed requests
-                set(HttpHeader.AccessControlAllowOrigin, origin)
+                add(HttpHeader.AccessControlAllowOrigin, origin)
 
-                if (config.allowCredentials) set(HttpHeader.AccessControlAllowCredentials, "true")
+                if (config.allowCredentials) add(HttpHeader.AccessControlAllowCredentials, "true")
 
                 if (request.path.method == HttpMethod.OPTIONS) {
                     // Preflight-specific headers
-                    set(
+                    add(
                         HttpHeader.AccessControlAllowHeaders,
                         // Use configured headers or mirror request headers
                         config.limitToHeaders.takeUnless { it == allowAll }?.joinToString(",")
@@ -146,14 +145,14 @@ public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpIn
                                 .joinToString(",") { it.root }
                     )
                     config.cacheLength?.let {
-                        set(HttpHeader.AccessControlMaxAge, it.toString())
+                        add(HttpHeader.AccessControlMaxAge, it.toString())
                     }
                 } else {
                     // Regular request - expose additional headers if configured
                     config.exposedHeaders
                         .takeUnless { it.isEmpty() }
                         ?.joinToString(",")
-                        ?.let { set(HttpHeader.AccessControlExposeHeaders, it) }
+                        ?.let { add(HttpHeader.AccessControlExposeHeaders, it) }
                 }
             }
         )

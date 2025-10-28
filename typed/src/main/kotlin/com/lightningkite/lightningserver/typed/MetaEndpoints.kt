@@ -152,7 +152,7 @@ public class MetaEndpoints(
                 """.trimIndent() + original.substringAfterLast("<head>"))
             }
         return HttpResponse.html(content = page, headers = HttpHeaders {
-            set(
+            add(
                 "Content-Security-Policy",
                 "script-src 'unsafe-eval' ${generalSettings().publicUrl}/ https://ls5admin.cs.lightningkite.com/"
             )

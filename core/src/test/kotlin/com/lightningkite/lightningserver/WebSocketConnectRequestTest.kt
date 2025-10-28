@@ -31,7 +31,7 @@ class WebSocketConnectRequestTest {
             queryParameters = QueryParameters(listOf("a" to "b", "c" to "d")),
             headers = HttpHeaders {
                 setCookie("test", "asdf")
-                set(HttpHeader.Location, "https://www.google.com")
+                add(HttpHeader.Location, "https://www.google.com")
             },
             domain = "localhost",
             protocol = "https",

@@ -12,7 +12,7 @@ Please do the following:
   - Good documentation in the /docs folder focuses on the basics of using the content in question.  It should be written in a way that a developer who is not familiar with the library can understand.
 - Update or create an 'index.md' in the package that describes the package's files and a short summary of their purpose.
 
-Thank you!
+Take your time and get these right.  Thank you!
 EOF
 echo $prompt
 claude --permission-mode acceptEdits "$prompt"

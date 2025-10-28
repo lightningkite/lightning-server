@@ -1,7 +1,25 @@
 package com.lightningkite.lightningserver.http
 
+/**
+ * Represents an HTTP status code.
+ *
+ * This is a lightweight value class wrapping an integer status code. Use the companion object
+ * constants for standard HTTP status codes, or construct with a custom code if needed.
+ *
+ * Example:
+ * ```kotlin
+ * val ok = HttpStatus.OK // 200
+ * val custom = HttpStatus(418) // I'm a teapot
+ * if (status.success) { /* handle success */ }
+ * ```
+ *
+ * @property code The numeric HTTP status code (100-599)
+ */
 @JvmInline
 public value class HttpStatus(public val code: Int) {
+    /**
+     * Returns true if this status code indicates success (2xx range).
+     */
     public val success: Boolean get() = code / 100 == 2
 
     public companion object {
@@ -58,6 +76,10 @@ public value class HttpStatus(public val code: Int) {
         public val VariantAlsoNegotiates: HttpStatus = HttpStatus(506)
         public val InsufficientStorage: HttpStatus = HttpStatus(507)
 
+        /**
+         * Map of status codes to their standard textual descriptions.
+         * Used by toString() to provide human-readable status representations.
+         */
         public val strings: Map<Int, String> = mapOf(
             100 to "Continue",
             101 to "Switching Protocols",

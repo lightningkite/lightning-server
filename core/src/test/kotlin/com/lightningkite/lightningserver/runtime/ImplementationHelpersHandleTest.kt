@@ -8,14 +8,12 @@ import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
-import com.lightningkite.lightningserver.runtime.test.TestRunner
 import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.services.LoggingSettings
 import io.github.oshai.kotlinlogging.Level
-import jdk.jfr.internal.LogLevel
 import kotlinx.coroutines.runBlocking
 import java.io.ByteArrayInputStream
 import java.util.zip.GZIPInputStream
@@ -169,7 +167,7 @@ class ImplementationHelpersHandleTest {
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.OPTIONS),
                         queryParameters = QueryParameters.EMPTY,
                         headers = HttpHeaders {
-                            set(HttpHeader.Origin, "example.com")
+                            add(HttpHeader.Origin, "example.com")
                         },
                         domain = "example.com",
                         protocol = "https",
@@ -307,7 +305,7 @@ class ImplementationHelpersHandleTest {
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
                         headers = HttpHeaders {
-                            set(HttpHeader.AcceptEncoding, "gzip")
+                            add(HttpHeader.AcceptEncoding, "gzip")
                         },
                         domain = "example.com",
                         protocol = "https",
@@ -342,7 +340,7 @@ class ImplementationHelpersHandleTest {
                         path = RawHttpEndpoint(asString = "/bigstream", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
                         headers = HttpHeaders {
-                            set(HttpHeader.AcceptEncoding, "gzip")
+                            add(HttpHeader.AcceptEncoding, "gzip")
                         },
                         domain = "example.com",
                         protocol = "https",

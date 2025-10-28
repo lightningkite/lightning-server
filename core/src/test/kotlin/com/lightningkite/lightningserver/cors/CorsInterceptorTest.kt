@@ -98,7 +98,7 @@ class CorsInterceptorTest {
             runBlocking {
                 val response = simpleGet.test(
                     headers = HttpHeaders {
-                        set(HttpHeader.Origin, "https://example.com")
+                        add(HttpHeader.Origin, "https://example.com")
                     }
                 )
                 assertEquals(HttpStatus.OK, response.status)
@@ -117,7 +117,7 @@ class CorsInterceptorTest {
             runBlocking {
                 val response = simpleGet.test(
                     headers = HttpHeaders {
-                        set(HttpHeader.Origin, "https://subdomain.trusted.com")
+                        add(HttpHeader.Origin, "https://subdomain.trusted.com")
                     }
                 )
                 assertEquals(HttpStatus.OK, response.status)
@@ -134,7 +134,7 @@ class CorsInterceptorTest {
             runBlocking {
                 val response = simpleGet.test(
                     headers = HttpHeaders {
-                        set(HttpHeader.Origin, "https://evil.com")
+                        add(HttpHeader.Origin, "https://evil.com")
                     }
                 )
                 assertEquals(HttpStatus.Forbidden, response.status)
@@ -154,7 +154,7 @@ class CorsInterceptorTest {
             runBlocking {
                 val socket = echo.test(
                     headers = HttpHeaders {
-                        set(HttpHeader.Origin, "https://example.com")
+                        add(HttpHeader.Origin, "https://example.com")
                     }
                 )
                 var lastMessage: WebSocketFrame? = null
@@ -175,7 +175,7 @@ class CorsInterceptorTest {
                 assertFailsWith<ForbiddenException> {
                     echo.test(
                         headers = HttpHeaders {
-                            set(HttpHeader.Origin, "https://evil.com")
+                            add(HttpHeader.Origin, "https://evil.com")
                         }
                     )
                 }
@@ -216,7 +216,7 @@ class CorsInterceptorPermissiveTest {
             runBlocking {
                 val response = simpleGet.test(
                     headers = HttpHeaders {
-                        set(HttpHeader.Origin, "https://any-origin.com")
+                        add(HttpHeader.Origin, "https://any-origin.com")
                     }
                 )
                 assertEquals(HttpStatus.OK, response.status)
@@ -260,7 +260,7 @@ class CorsInterceptorRestrictiveTest {
             runBlocking {
                 val response = simpleGet.test(
                     headers = HttpHeaders {
-                        set(HttpHeader.Origin, "https://example.com")
+                        add(HttpHeader.Origin, "https://example.com")
                     }
                 )
                 assertEquals(HttpStatus.Forbidden, response.status)
@@ -298,7 +298,7 @@ class CorsInterceptorNonBlockingTest {
             runBlocking {
                 val response = simpleGet.test(
                     headers = HttpHeaders {
-                        set(HttpHeader.Origin, "https://evil.com")
+                        add(HttpHeader.Origin, "https://evil.com")
                     }
                 )
                 // Request succeeds
@@ -318,7 +318,7 @@ class CorsInterceptorNonBlockingTest {
             runBlocking {
                 val response = simpleGet.test(
                     headers = HttpHeaders {
-                        set(HttpHeader.Origin, "https://example.com")
+                        add(HttpHeader.Origin, "https://example.com")
                     }
                 )
                 println(response.status)

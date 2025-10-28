@@ -3,12 +3,60 @@ package com.lightningkite.lightningserver.http
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.instrument
 
+/**
+ * Interface for intercepting and modifying HTTP requests and responses.
+ *
+ * Interceptors provide middleware functionality, allowing you to wrap request handling with
+ * cross-cutting concerns like authentication, logging, CORS, rate limiting, etc.
+ *
+ * Interceptors are chained together and execute in order. Each interceptor receives the request
+ * and a continuation function that represents "the rest of the chain". The interceptor can:
+ * - Modify the request before passing it forward
+ * - Short-circuit and return a response without calling the continuation
+ * - Modify the response after calling the continuation
+ * - Handle exceptions from downstream handlers
+ *
+ * Example:
+ * ```kotlin
+ * val loggingInterceptor = HttpInterceptor { request, cont ->
+ *     println("Request: ${request.path}")
+ *     val response = cont(request)
+ *     println("Response: ${response.status}")
+ *     response
+ * }
+ * ```
+ *
+ * Install interceptors in your ServerBuilder:
+ * ```kotlin
+ * object Server : ServerBuilder() {
+ *     init {
+ *         install(loggingInterceptor)
+ *         install(CorsInterceptor(corsSettings))
+ *     }
+ * }
+ * ```
+ */
 public fun interface HttpInterceptor {
+    /**
+     * The name of this interceptor, used for instrumentation and debugging.
+     * Defaults to the simple class name or "anonymous" for lambdas.
+     */
     public val name: String get() = this::class.simpleName ?: "anonymous"
 
+    /**
+     * Intercepts an HTTP request, potentially modifying it, and delegates to the continuation.
+     *
+     * @param request The incoming HTTP request
+     * @param cont The continuation representing the rest of the interceptor chain and final handler
+     * @return The HTTP response (potentially modified by this interceptor)
+     */
     context(runtime: ServerRuntime)
     public suspend fun intercept(request: HttpRequest<*>, cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse): HttpResponse
 
+    /**
+     * A no-op interceptor that simply passes requests through unchanged.
+     * Used as a placeholder when no interceptors are configured.
+     */
     public object None : HttpInterceptor {
         context(runtime: ServerRuntime)
         override suspend fun intercept(
@@ -20,6 +68,15 @@ public fun interface HttpInterceptor {
     }
 }
 
+/**
+ * Wraps the intercept call with instrumentation for performance monitoring.
+ *
+ * This is used internally to track the time spent in each interceptor.
+ *
+ * @param request The HTTP request to intercept
+ * @param action The continuation function
+ * @return The HTTP response
+ */
 context(server: ServerRuntime)
 public suspend inline fun HttpInterceptor.interceptInstrumented(request: HttpRequest<*>, noinline action: suspend ServerRuntime.(HttpRequest<*>) -> HttpResponse): HttpResponse {
     return instrument(name) {
@@ -27,6 +84,15 @@ public suspend inline fun HttpInterceptor.interceptInstrumented(request: HttpReq
     }
 }
 
+/**
+ * Compiles a list of interceptors into a single chained interceptor with instrumentation.
+ *
+ * This internal function is used by the framework to combine multiple interceptors into
+ * an efficient execution chain. The first interceptor in the list executes first, followed
+ * by each subsequent interceptor, and finally the actual handler.
+ *
+ * @return A single HttpInterceptor that represents the entire chain
+ */
 internal fun List<HttpInterceptor>.compileAndInstrument(): HttpInterceptor = when (size) {
     0 -> HttpInterceptor.None
     1 -> HttpInterceptor { request, cont -> first().interceptInstrumented(request, cont) }

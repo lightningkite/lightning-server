@@ -115,7 +115,7 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
             }
             result.copy(
                 headers = if (compressed) result.headers.copy {
-                    set(HttpHeader.ContentEncoding, "gzip")
+                    add(HttpHeader.ContentEncoding, "gzip")
                 } else result.headers,
                 body = TypedData(newData, result.body.mediaType)
             )

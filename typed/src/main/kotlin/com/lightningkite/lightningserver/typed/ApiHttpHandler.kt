@@ -11,7 +11,6 @@ import com.lightningkite.lightningserver.serialization.parse
 import com.lightningkite.lightningserver.serialization.queryParameters
 import com.lightningkite.lightningserver.serialization.toTypedData
 import com.lightningkite.lightningserver.typed.sdk.SDK
-import com.lightningkite.lightningserver.typed.sdk.functionCase
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
@@ -47,7 +46,7 @@ public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT
             body = if (result == Unit) null else result.toTypedData(request.headers.accept, outputType),
             status = successCode,
             headers = HttpHeaders {
-                set(HttpHeader.Vary, HttpHeader.Accept)
+                add(HttpHeader.Vary, HttpHeader.Accept)
             }
         )
     }
