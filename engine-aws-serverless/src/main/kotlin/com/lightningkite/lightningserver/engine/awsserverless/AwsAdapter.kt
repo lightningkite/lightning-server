@@ -81,7 +81,7 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
                 ?: bytes
             this.settings.include(
                 internalSerialization.json.decodeFromString(
-                    SettingsSerializer(settings.settings.toList(), internalSerialization.json),
+                    SettingsSerializer(settings.settings.toList(), internalSerialization.serializersModule, null),
                     decryptedBytes.toString(Charsets.UTF_8)
                 )
             )
