@@ -19,24 +19,108 @@ import com.lightningkite.services.SettingContext
 import kotlinx.serialization.modules.SerializersModule
 import kotlin.time.Clock
 
+/**
+ * Core interface representing a running Lightning Server instance.
+ *
+ * ServerRuntime provides the execution context for a server, including:
+ * - Access to the server definition (routes, handlers, settings)
+ * - Serialization configuration for external (API) and internal (storage) use
+ * - Settings management and access
+ * - WebSocket subscription messaging
+ * - Task execution
+ * - Telemetry and clock access
+ * - Reading settings
+ *
+ * Implementations of this interface are responsible for:
+ * - Managing the server lifecycle
+ * - Routing HTTP requests to appropriate handlers
+ * - Executing scheduled and startup tasks
+ * - Handling WebSocket connections and subscriptions
+ *
+ */
 public interface ServerRuntime: SettingContext {
+    /**
+     * The server definition containing all routes, handlers, settings, and tasks.
+     */
     public val server: ServerDefinition
+
+    /**
+     * The public URL at which this server is accessible.
+     *
+     * Defaults to the value from general settings.
+     */
     override val publicUrl: String
         get() = generalSettings().publicUrl
 
+    /**
+     * Serialization configuration for external API communication (HTTP bodies, etc.).
+     */
     public val externalSerialization: Serialization
+
+    /**
+     * Serialization configuration for internal use (database storage, caching, etc.).
+     */
     public val internalSerialization: Serialization
+
+    /**
+     * OpenTelemetry instance for distributed tracing and metrics.
+     *
+     * Currently returns null by default. Implementations should override this
+     * to provide telemetry support.
+     */
     override val openTelemetry: OpenTelemetry?
         get() = null // TODO
 
+    /**
+     * Clock used for time-based operations.
+     *
+     * Defaults to system clock but can be overridden for testing.
+     */
     override val clock: Clock get() = Clock.System
+
+    /**
+     * Settings manager for accessing configured server settings.
+     */
     public val settings: ServerSettings
+
+    /**
+     * Sends a WebSocket subscription message to all connections subscribed to the topic.
+     *
+     * The message will be delivered to all WebSocket connections that have subscribed
+     * to the topic with matching path parameters.
+     *
+     * @param event The subscription message to send, including topic, path args, and value
+     */
     public suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>)
+
+    /**
+     * Invokes a task for asynchronous execution.
+     *
+     * The exact execution mechanism (background thread, coroutine, queue, etc.)
+     * depends on the runtime implementation.
+     *
+     * @param input The input parameter for the task
+     */
     public suspend fun <T> Task<T>.invoke(input: T)
 
+    /**
+     * Serializers module used for internal serialization.
+     */
     override val internalSerializersModule: SerializersModule get() = internalSerialization.serializersModule
 
+    /**
+     * Unique identifier for this server instance.
+     *
+     * For single-machine engines, typically derived from network interface MAC address.
+     * For serverless deployments, may be a Lambda function ID or similar.
+     */
     public val serverId: String
+
+    /**
+     * Version identifier for the running server.
+     *
+     * May be "Unknown" if version information is not available.
+     */
     public val serverVersion: String
 }
 

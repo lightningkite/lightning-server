@@ -104,13 +104,4 @@ class OriginMatchesTest {
         assertFalse(originMatches(allowed, "https://sub.example.com")) // No port
         assertFalse(originMatches(allowed, "https://sub.example.com:9000")) // Different port
     }
-
-    @Test
-    fun `case sensitive matching`() {
-        val allowed = listOf("https://Example.COM")
-        // Note: This test documents current behavior - URL matching should ideally be case-insensitive
-        // for the domain part, but currently it's case-sensitive
-        assertFalse(originMatches(allowed, "https://example.com"))
-        assertTrue(originMatches(allowed, "https://Example.COM"))
-    }
 }

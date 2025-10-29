@@ -19,6 +19,15 @@ import kotlinx.serialization.modules.SerializersModuleCollector
 import kotlin.io.encoding.Base64
 import kotlin.reflect.KClass
 
+/**
+ * MediaTypeCoder implementation for binary serialization formats.
+ *
+ * Wraps a KotlinX Serialization BinaryFormat and provides MediaTypeCoder functionality.
+ * Caches the format instance after first access for performance.
+ *
+ * @param format A context-aware lambda that returns the BinaryFormat to use
+ * @param mediaType The media type this coder handles
+ */
 public open class BinaryFormatMediaTypeCoder(
     private val format: context(ServerRuntime) () -> BinaryFormat,
     override val mediaType: MediaType,
@@ -55,6 +64,15 @@ public open class BinaryFormatMediaTypeCoder(
     }
 }
 
+/**
+ * MediaTypeCoder implementation for string-based serialization formats.
+ *
+ * Wraps a KotlinX Serialization StringFormat and provides MediaTypeCoder functionality.
+ * Caches the format instance after first access for performance.
+ *
+ * @param format A context-aware lambda that returns the StringFormat to use
+ * @param mediaType The media type this coder handles
+ */
 public open class StringFormatMediaTypeCoder(
     private val format: context(ServerRuntime) () -> StringFormat,
     override val mediaType: MediaType,
@@ -95,6 +113,15 @@ public open class StringFormatMediaTypeCoder(
     }
 }
 
+/**
+ * Specialized MediaTypeCoder for JSON with streaming support.
+ *
+ * Extends StringFormatMediaTypeCoder with optimizations for JSON:
+ * - Higher priority (1.0) makes it the preferred encoder
+ * - Streaming support using Source/Sink for efficient large payloads
+ *
+ * @param json A context-aware lambda that returns the Json format to use
+ */
 public class JsonMediaTypeCoder(
     private val json: context(ServerRuntime) () -> Json,
 ) : StringFormatMediaTypeCoder(json, MediaType.Application.Json) {
@@ -109,6 +136,9 @@ public class JsonMediaTypeCoder(
         }
     }
 
+    /**
+     * Deserializes JSON content with streaming support for Source data.
+     */
     @OptIn(ExperimentalSerializationApi::class)
     override context(runtime: ServerRuntime) suspend fun <T> invoke(content: TypedData, serializer: DeserializationStrategy<T>): T {
         return when (val body = content.data) {
@@ -117,6 +147,9 @@ public class JsonMediaTypeCoder(
         }
     }
 
+    /**
+     * Serializes to JSON with streaming support via Sink.
+     */
     @OptIn(ExperimentalSerializationApi::class)
     override context(runtime: ServerRuntime) suspend fun <T> invoke(mediaType: MediaType, serializer: SerializationStrategy<T>, value: T): TypedData {
         return TypedData.sink(
@@ -128,6 +161,21 @@ public class JsonMediaTypeCoder(
     }
 }
 
+/**
+ * Registers the basic media type coders: JSON, form data, and Kotlin binary format.
+ *
+ * This extension function should be called during server setup to enable standard
+ * serialization formats. The JSON coder is configured with lenient settings suitable
+ * for web APIs.
+ *
+ * **Registered formats:**
+ * - application/json (priority 1.0, streaming enabled)
+ * - application/x-www-form-urlencoded
+ * - application/x-lightningserver-kotlin-bytes
+ *
+ * @param serializersModule Runtime provider for the SerializersModule to use.
+ *                         Defaults to the server's external serialization module.
+ */
 @OptIn(ExperimentalSerializationApi::class)
 public fun ServerBuilder.registerBasicMediaTypeCoders(serializersModule: Runtime<SerializersModule> = Runtime { serverRuntime.externalSerialization.serializersModule }) {
     register(JsonMediaTypeCoder { Json {
@@ -157,6 +205,14 @@ public fun ServerBuilder.registerBasicMediaTypeCoders(serializersModule: Runtime
     )
 }
 
+/**
+ * Debugging utility to create a human-readable string representation of a SerializersModule.
+ *
+ * Lists all contextual serializers, polymorphic mappings, and default providers registered
+ * in the module. Useful for troubleshooting serialization configuration issues.
+ *
+ * @return A comma-separated string of module contents
+ */
 @InternalLightningServerApi
 public fun SerializersModule.debugString(): String = buildString {
     dumpTo(object: SerializersModuleCollector {

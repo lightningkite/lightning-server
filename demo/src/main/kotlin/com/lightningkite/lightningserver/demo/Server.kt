@@ -345,7 +345,5 @@ object Server : ServerBuilder() {
         HttpResponse.plainText(auth.id.toString())
     }
 
-    init {
-        registerBasicMediaTypeCoders()
-    }
+    init { registerBasicMediaTypeCoders() }
 }

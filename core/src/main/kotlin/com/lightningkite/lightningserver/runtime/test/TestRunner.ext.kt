@@ -21,7 +21,19 @@ import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.services.data.TypedData
 
+/**
+ * Testing extensions for HTTP handlers and WebSocket handlers.
+ *
+ * These extensions provide a convenient `.test()` method on handlers that:
+ * - Creates properly formatted requests with path parameters
+ * - Applies interceptors automatically
+ * - Returns responses or test WebSocket connections
+ * - Uses default values from general settings for domain/protocol
+ */
 
+/**
+ * Sends a WebSocket subscription message in the test environment.
+ */
 context(test: TestRunner<*>)
 public suspend fun <PATH: PathSpec, T> sendWebSocketSubscriptionMessage(message: WebSocketSubscriptionMessage<PATH, T>) {
     test.sendWebSocketSubscriptionMessage(message)

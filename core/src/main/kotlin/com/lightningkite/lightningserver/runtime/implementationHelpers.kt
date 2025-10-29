@@ -21,6 +21,35 @@ import kotlinx.io.asSink
 import kotlinx.io.buffered
 import java.util.zip.GZIPOutputStream
 
+/**
+ * Handles an HTTP request through the server's routing and middleware system.
+ *
+ * This is the core request handler that:
+ * 1. Routes the request to the appropriate handler
+ * 2. Handles special HTTP methods (HEAD, OPTIONS) automatically
+ * 3. Provides trailing slash redirect logic when routes differ only by trailing slash
+ * 4. Applies GZIP compression when appropriate
+ * 5. Handles exceptions and logs errors
+ *
+ * ## Automatic HEAD support
+ * If no HEAD handler is registered, automatically transforms a GET request and strips the body.
+ *
+ * ## Trailing slash handling
+ * If a route is not found, checks if an alternate version with/without trailing slash exists
+ * and returns a redirect if found.
+ *
+ * ## GZIP compression
+ * Automatically compresses responses when:
+ * - Client sends Accept-Encoding: gzip header
+ * - Response body is at least 256 bytes
+ * - Content type is not already compressed (images, videos, fonts, archives, etc.)
+ *
+ * For payloads 256-1024 bytes, only compresses if compression reduces size.
+ * For larger payloads, always compresses.
+ *
+ * @param request The HTTP request to handle
+ * @return The HTTP response, potentially compressed
+ */
 public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpResponse {
     return try {
         server.compiledHttpInterceptors.intercept(request) { req ->
@@ -135,6 +164,14 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
     }
 }
 
+/**
+ * Wraps an HTTP handler invocation with telemetry metrics.
+ *
+ * Adds standard HTTP attributes to the telemetry span including method, route, status code, etc.
+ *
+ * @param request The HTTP request to handle
+ * @return The HTTP response from the handler
+ */
 context(serverRuntime: ServerRuntime) private suspend inline fun <PATH : PathSpec> HttpHandler<PATH>.handleWithMetrics(
     request: HttpRequest<PATH>,
 ): HttpResponse {
@@ -153,6 +190,14 @@ context(serverRuntime: ServerRuntime) private suspend inline fun <PATH : PathSpe
 }
 
 
+/**
+ * Wraps a WebSocket willConnect handler invocation with telemetry metrics.
+ *
+ * @param location The path specification for this WebSocket endpoint
+ * @param serverRuntime The server runtime context
+ * @param request The WebSocket connection request
+ * @return The connection storage state
+ */
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.willConnectWithMetrics(
     location: PATH,
     serverRuntime: ServerRuntime,
@@ -168,6 +213,12 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.wi
     }
 }
 
+/**
+ * Wraps a WebSocket didConnect handler invocation with telemetry metrics.
+ *
+ * @param location The path specification for this WebSocket endpoint
+ * @param connection The established WebSocket connection
+ */
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.didConnectWithMetrics(
     location: PATH,
     connection: WebSocketConnection<PATH, STORAGE>,
@@ -182,6 +233,15 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
     }
 }
 
+/**
+ * Wraps a WebSocket messageFromClient handler invocation with telemetry metrics.
+ *
+ * Records the frame type (text/binary) and size in telemetry.
+ *
+ * @param location The path specification for this WebSocket endpoint
+ * @param connection The WebSocket connection
+ * @param frame The frame received from the client
+ */
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.messageFromClientWithMetrics(
     location: PATH,
     connection: WebSocketConnection<PATH, STORAGE>,
@@ -209,6 +269,13 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
     }
 }
 
+/**
+ * Wraps a WebSocket messageFromSubscription handler invocation with telemetry metrics.
+ *
+ * @param location The path specification for this WebSocket endpoint
+ * @param connection The WebSocket connection
+ * @param topic The subscription message received
+ */
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.messageFromSubscriptionWithMetrics(
     location: PATH,
     connection: WebSocketConnection<PATH, STORAGE>,
@@ -225,6 +292,13 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
     }
 }
 
+/**
+ * Wraps a WebSocket disconnect handler invocation with telemetry metrics.
+ *
+ * @param location The path specification for this WebSocket endpoint
+ * @param connection The WebSocket connection being closed
+ * @param reason The close reason and code
+ */
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.disconnectWithMetrics(
     location: PATH,
     connection: WebSocketConnection<PATH, STORAGE>,
@@ -242,6 +316,12 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
     }
 }
 
+/**
+ * Executes a task with telemetry metrics.
+ *
+ * @param location The path specification for this task
+ * @param input The input parameter for the task
+ */
 context(serverRuntime: ServerRuntime)
 public suspend fun <T> Task<T>.executeWithMetrics(location: PathSpec0, input: T) {
     return instrument("TASK $location") { span ->
@@ -253,6 +333,11 @@ public suspend fun <T> Task<T>.executeWithMetrics(location: PathSpec0, input: T)
     }
 }
 
+/**
+ * Executes a scheduled task with telemetry metrics.
+ *
+ * @param location The path specification for this scheduled task
+ */
 context(serverRuntime: ServerRuntime)
 public suspend fun ScheduledTask.executeWithMetrics(location: PathSpec0) {
     return instrument("SCHEDULE $location") { span ->
@@ -264,6 +349,11 @@ public suspend fun ScheduledTask.executeWithMetrics(location: PathSpec0) {
     }
 }
 
+/**
+ * Executes a startup task with telemetry metrics.
+ *
+ * @param location The path specification for this startup task
+ */
 context(serverRuntime: ServerRuntime)
 public suspend fun StartupTask.executeWithMetrics(location: PathSpec0) {
     return instrument("STARTUP $location") { span ->
@@ -273,6 +363,17 @@ public suspend fun StartupTask.executeWithMetrics(location: PathSpec0) {
     }
 }
 
+/**
+ * Instruments a code block with OpenTelemetry tracing.
+ *
+ * If telemetry is enabled, creates a span with the given name and executes the action within it.
+ * If an exception occurs, records it in the telemetry before re-throwing.
+ * If telemetry is not enabled, executes the action directly without overhead.
+ *
+ * @param name The name of the telemetry span
+ * @param action The code block to execute, receiving an optional Span
+ * @return The result of the action
+ */
 context(runtime: ServerRuntime)
 public suspend inline fun <T> instrument(name: String, crossinline action: suspend (Span?) -> T): T {
     val tel = runtime.openTelemetry?.get("com.lightningkite.lightningserver")
