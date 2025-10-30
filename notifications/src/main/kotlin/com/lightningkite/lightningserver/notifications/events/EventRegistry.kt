@@ -4,7 +4,6 @@ import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.definition.builder.MapRegistry
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.post
-import com.lightningkite.lightningserver.notifications.EventType
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.ApiHttpHandler

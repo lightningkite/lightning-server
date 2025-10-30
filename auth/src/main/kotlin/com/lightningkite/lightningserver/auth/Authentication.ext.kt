@@ -38,3 +38,26 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>
 ): Authentication<SUBJECT> = Authentication(this, id = subject._id, issuedAt = issuedAt, expiration = null, scopes = scopes, sessionId = null)
 
 public fun Authentication<*>.meetsRequirements(scopes: Set<RequiredScope>): Boolean = this.scopes.meetsRequirements(scopes)
+
+context(server: ServerRuntime)
+public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
+    principalType: PrincipalType<SUBJECT, ID>,
+    subject: SUBJECT,
+    sessionId: String?,
+    issuedAt: Instant = server.clock.now(),
+    expiration: Instant? = null,
+    scopes: Set<GrantedScope> = setOf(GrantedScope.root),
+    fromMasquerade: Authentication<*>? = null,
+): Authentication<SUBJECT> =
+    Authentication(
+        principalType,
+        subject._id,
+        sessionId,
+        issuedAt,
+        expiration,
+        scopes,
+        fromMasquerade,
+        SerializableCache().apply {
+            set(principalType.subjectCacheKey, subject)
+        }
+    )

@@ -1,4 +1,4 @@
-package com.lightningkite.lightningserver.notifications
+package com.lightningkite.lightningserver.notifications.events
 
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.database.HasId
@@ -30,7 +30,10 @@ public data class Event(
 
 @Serializable
 @GenerateDataClassPaths
-public data class UserEventType<UID : Comparable<UID>>(val user: UID, val type: EventType) : Comparable<UserEventType<UID>> {
+public data class UserEventType<UID : Comparable<UID>>(
+    val user: UID,
+    val type: EventType
+) : Comparable<UserEventType<UID>> {
     override fun compareTo(other: UserEventType<UID>): Int =
         user.compareTo(other.user).takeIf { it != 0 } ?: type.name.compareTo(other.type.name)
 }

@@ -1,4 +1,5 @@
 import com.lightningkite.deployhelpers.*
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     alias(libs.plugins.kotlinJvm)
@@ -38,6 +39,7 @@ kotlin {
         optIn.add("kotlin.time.ExperimentalTime")
         optIn.add("kotlin.uuid.ExperimentalUuidApi")
         freeCompilerArgs.add("-Xcontext-parameters")
+        freeCompilerArgs.add("-Xnested-type-aliases")
     }
     sourceSets.main {
         kotlin.srcDir("build/generated/ksp/main/kotlin")

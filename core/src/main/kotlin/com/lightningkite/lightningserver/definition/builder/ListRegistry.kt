@@ -21,5 +21,6 @@ public fun <V> ListRegistry<V>.include(values: List<V>) {
 
 public fun <V> ListRegistry(): ListRegistry<V> = BasicListRegistry()
 public fun <V> ListRegistry(items: List<V>): ListRegistry<V> = BasicListRegistry(ArrayList(items))
+public fun <V> ListRegistry(vararg items: V): ListRegistry<V> = BasicListRegistry(ArrayList(items.toList()))
 
 public fun <V> buildListRegistry(setup: ListRegistry<V>.() -> Unit): List<V> = ListRegistry<V>().apply(setup).toSealedList()

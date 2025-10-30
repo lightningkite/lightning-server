@@ -1,94 +1,105 @@
 package com.lightningkite.lightningserver.notifications
 
-import com.lightningkite.lightningdb.HasId
-import com.lightningkite.lightningdb.getMany
-import com.lightningkite.lightningdb.insertMany
-import com.lightningkite.lightningserver.events.EventHandler
-import com.lightningkite.lightningserver.events.EventRegistry
-import com.lightningkite.lightningserver.events.TypedEvent
-import com.lightningkite.lightningserver.events.TypedEventType
-import com.lightningkite.lightningserver.exceptions.exceptionSettings
-import com.lightningkite.now
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
+import com.lightningkite.lightningserver.definition.builder.MapRegistry
+import com.lightningkite.lightningserver.notifications.events.EventHandler
+import com.lightningkite.lightningserver.notifications.events.EventRegistry
+import com.lightningkite.lightningserver.notifications.events.TypedEvent
+import com.lightningkite.lightningserver.notifications.events.TypedEventType
+import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.now
+import com.lightningkite.lightningserver.typed.ModelInfo
+import com.lightningkite.services.database.HasId
+import com.lightningkite.services.database.getMany
+import io.github.oshai.kotlinlogging.KLogger
+import io.github.oshai.kotlinlogging.KotlinLogging
 
-class NotificationEventHandler<USER : HasId<UID>, UID : Comparable<UID>, CONTENT : NotificationContent>(
-    val dispatcher: NotificationDispatcher<USER, UID, CONTENT>,
-    val subscriptions: SubscriptionManager<USER, UID>,
-    override val registry: EventRegistry<USER>,
-): EventHandler<USER> {
-    data class SendMethods<UID : Comparable<UID>>(
-        val user: UID,
-        val email: Frequency?,
-        val sms: Frequency?,
-        val push: Frequency?
-    )
+public open class NotificationEventHandler<USER : HasId<UID>, UID : Comparable<UID>, CONTENT>(
+    private val users: ModelInfo<*, USER, UID>,
+    public val dispatcher: Dispatcher<UID, CONTENT>,
+    public val subscriptions: SubscriptionProvider<USER, UID>,
+    override val registry: EventRegistry<USER> = EventRegistry(),
+) : EventHandler<USER> {
+    internal val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.notifications.NotificationEventHandler")
 
-    val logger: Logger = LoggerFactory.getLogger("com.lightningkite.lightningserver.notifications.NotificationEventHandler")
+    public interface SubscriptionProvider<USER : HasId<UID>, UID : Comparable<UID>> {
+        context(runtime: ServerRuntime)
+        public suspend fun <T : HasId<ID>, ID : Comparable<ID>> subscribed(event: TypedEvent<USER, T, ID>): List<ScheduledSendMethods<UID>>
+    }
 
-    interface SubscriptionManager<USER : HasId<UID>, UID : Comparable<UID>> {
-        suspend fun <T:HasId<ID>, ID:Comparable<ID>> subscribed(event: TypedEvent<USER, T, ID>): List<SendMethods<UID>>
+    public interface Dispatcher<UID : Comparable<UID>, CONTENT> {
+        context(runtime: ServerRuntime)
+        public suspend fun dispatch(notifications: List<Notification<UID, CONTENT>>)
     }
 
     // _____Content Generators_____
-    // These translate events into NotificationContent
+    // These translate events into CONTENT
 
-    private data class ContentGenerator<USER:HasId<*>, T:HasId<*>, CONTENT : NotificationContent>(
-        val type: TypedEventType<USER, T, *>,
-        val generator: suspend (T) -> (USER) -> CONTENT
-    )
+    private typealias ContentGenerator<T, USER, CONTENT> = suspend context(ServerRuntime) (T) -> (USER) -> CONTENT
 
-    private val contentGenerators = HashMap<String, ContentGenerator<USER, *, CONTENT>>()
+    private val contentGenerators = MapRegistry<String, ContentGenerator<*, USER, CONTENT>>()
 
     @Suppress("UNCHECKED_CAST")
-    private suspend fun <T : HasId<*>> getContent(event: TypedEvent<USER, T, *>) =
-        contentGenerators[event.type.name]
-            ?.let { (it as ContentGenerator<USER, T, CONTENT>).generator(event.subject) }
-            ?: throw EventRegistry.EventTypeRegistrationException(event.type.name, "Event type ${event.type.name} has no content generator")
+    context(_: ServerRuntime)
+    private suspend fun <T : HasId<*>> TypedEvent<USER, T, *>.content() =
+        contentGenerators[type.name]
+            ?.let { (it as ContentGenerator<T, USER, CONTENT>)(subject) }
+            ?: throw NoSuchElementException("Event ${type.name} has no content generator")
 
-    fun <T:HasId<*>> setContent(key: TypedEventType<USER, T, *>, generator: suspend (T) -> (USER) -> CONTENT) {
-        contentGenerators[key.type.name]?.let {
-            if (it.type.info != key.info) logger.warn("Event type '${key.name}' is overriding the content generator for event type '${it.type.name}'")
-        }
-        contentGenerators[key.type.name] = ContentGenerator(key, generator)
+    public fun <T : HasId<*>> setContent(
+        event: TypedEventType<USER, T, *>,
+        generator: suspend context(ServerRuntime) (T) -> (USER) -> CONTENT
+    ) {
+        contentGenerators.register(event.name, generator)
     }
 
+    context(runtime: ServerRuntime)
     override suspend fun <T : HasId<ID>, ID : Comparable<ID>> handle(event: TypedEvent<USER, T, ID>) {
         try {
-            logger.debug("Event occurred: {}", event)
+            logger.debug { "Event Occurred: $event" }
 
-            val content = getContent(event)
+            val content = event.content()
 
             val now = now()
 
             val subscribed = subscriptions.subscribed(event)
 
             if (subscribed.isEmpty()) {
-                logger.debug("No subscriptions found for ${event.type.name}")
+                logger.debug { "No subscriptions found for ${event.type.name}" }
                 return
-            } else logger.debug("${subscribed.size} subscriptions found for ${event.type.name}")
+            } else {
+                logger.debug { "${subscribed.size} subscriptions found for ${event.type.name}" }
+            }
 
-            val users = dispatcher.users.collection()
+            val users = users.table()
                 .getMany(subscribed.map { it.user }.toSet())
                 .associateBy { it._id }
 
             val notifications = subscribed.mapNotNull { sub ->
                 val user = users[sub.user] ?: return@mapNotNull null
 
-                NotificationForUser(
-                    event = event.toEvent(),
+                Notification(
+                    event = event.toInternalEvent(),
+                    createdAt = now(),
                     user = sub.user,
                     content = content(user),
-                    email = sub.email?.sendAt(now)?.let(::SendInfo),
-                    sms = sub.sms?.sendAt(now)?.let(::SendInfo),
-                    push = sub.push?.sendAt(now)?.let(::SendInfo)
+                    email = sub.email?.schedule(now)?.let(::SendInfo),
+                    sms = sub.sms?.schedule(now)?.let(::SendInfo),
+                    push = sub.push?.schedule(now)?.let(::SendInfo),
+                    inApp = sub.inApp?.schedule(now)?.let(::SendInfo)
                 )
             }
 
-            dispatcher.info.collection().insertMany(notifications)
+            dispatcher.dispatch(notifications)
 
-        } catch (e: EventRegistry.EventTypeRegistrationException) {
-            exceptionSettings().report(e)
+        } catch (e: Exception) {
+            logger.error(e) { "Exception occurred when handling event $event" }
         }
     }
+}
+
+context(handler: NotificationEventHandler<USER, UID, CONTENT>)
+public fun <USER : HasId<UID>, UID : Comparable<UID>, CONTENT, T : HasId<*>> TypedEventType<USER, T, *>.content(
+    generator: suspend context(ServerRuntime) (T) -> (USER) -> CONTENT
+) {
+    handler.setContent(this, generator)
 }

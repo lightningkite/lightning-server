@@ -1,7 +1,5 @@
 package com.lightningkite.lightningserver.notifications.events
 
-import com.lightningkite.lightningserver.notifications.Event
-import com.lightningkite.lightningserver.notifications.EventType
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.typed.ModelInfo
