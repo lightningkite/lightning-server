@@ -152,7 +152,7 @@ public class MetaEndpoints(
                 """.trimIndent() + original.substringAfterLast("<head>"))
             }
         return HttpResponse.html(content = page, headers = HttpHeaders {
-            set(
+            add(
                 "Content-Security-Policy",
                 "script-src 'unsafe-eval' ${generalSettings().publicUrl}/ https://ls5admin.cs.lightningkite.com/"
             )
@@ -385,6 +385,8 @@ public class MetaEndpoints(
                                 error = when (e) {
                                     is HttpStatusException -> e.toLSError()
                                     else -> LSError(500, "unknown", "An unknown server error occurred.")
+                                }.let {
+                                    if(generalSettings().debug) it.copy(stackTrace = e.stackTraceToString()) else it
                                 }
                             )
                         }

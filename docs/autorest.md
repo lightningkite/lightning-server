@@ -1,87 +1,172 @@
 # Automatically Generated REST Endpoints
 
-**OUT OF DATE**
+Last updated January 2025 (`version-5`)
 
 By combining [typed endpoints](typed-endpoints.md), [authentication](authentication.md), and [databases](database.md), we can conveniently generate REST endpoints for any given model automatically.
 
+## Basic Example
+
+Here's a complete example showing how to create REST endpoints for a Post model:
+
 ```kotlin
-
-object Server : ServerPathGroup(ServerPath.root) {
-    val settingName = setting(name = "settingName", default = "defaultValue")
-    val database = setting(name = "database", default = DatabaseSettings())
-    val cache = setting(name = "cache", default = CacheSettings())
-    val email = setting(name = "email", default = EmailSettings())
-    val jwt = setting(name = "jwt", default = JwtSigner())
-    val auth = AuthEndpoints(path("auth"))
-    val meta = path("meta").metaEndpoints<User>(isAdmin = { it: User -> it.email.endsWith("@lightningkite.com") })
-    val posts = PostEndpoints(path("posts"))
-}
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.typed.ModelRestEndpoints
+import com.lightningkite.services.database.*
+import com.lightningkite.services.data.GenerateDataClassPaths
+import kotlinx.serialization.Serializable
+import kotlin.uuid.Uuid
+import kotlin.time.Instant
+import kotlin.time.Clock
 
 @Serializable
-@DatabaseModel
-@AdminTableColumns(["name", "number", "status"])
+@GenerateDataClassPaths
+@AdminTableColumns(["title", "author", "createdAt"])
 data class Post(
-    override val _id: UUID = UUID.randomUUID(),
-    val timestamp: Instant = Instant.now(),
-    val name: String = "No Name",
-    @References(User::class) val author: UUID,
-    val content: String = "",
-) : HasId<UUID>
+    override val _id: Uuid = Uuid.random(),
+    val title: String,
+    val author: String,
+    val body: String,
+    val createdAt: Instant = Clock.System.now()
+) : HasId<Uuid>
 
-class PostEndpoints(path: ServerPath): ServerPathGroup(path) {
-    val info = ModelInfoWithDefault<User, Post, UUID>(
-        getCollection = { Server.database().collection() },
-        forUser = {  user ->
-            this.withPermissions(
+object Server : ServerBuilder() {
+    val database = setting("database", Database.Settings())
+
+    val posts = path.path("posts") include object : ServerBuilder() {
+        val info = database.modelInfo(
+            auth = UserAuth.require(),
+            permissions = {
+                val user = auth.fetch()
                 ModelPermissions(
-                    create = condition { it.author eq user._id },
+                    create = condition { it.author eq user.email },
                     read = condition { it.always },
-                    update = condition { it.author eq user._id },
-                    updateRestrictions = updateRestrictions {
-                        it.author.cannotBeModified()
-                    },
-                    delete = condition { it.author eq user._id }
+                    update = condition { it.author eq user.email },
+                    delete = condition { it.author eq user.email }
                 )
-            )
-        },
-        defaultItem = { user -> Post(author = user._id) }
-    )
-    val rest = ModelRestEndpoints(path("rest"), info)
+            }
+        )
+        val rest = path.path("rest") module ModelRestEndpoints(info)
+    }
 }
-
-//------------------
-//  Everything below is from other examples.
-//------------------
-
-// Our auth endpoints.
-class AuthEndpoints(path: ServerPath): ServerPathGroup(path) {
-    // You'll make one of these if you set up auto-rest for users regardless.
-    val userModelInfo = ModelInfo(
-        getCollection = { Server.database().collection<User>() },
-        forUser = { user: User -> this }
-    )
-    // Information about how to access users, including what to do if a user is not found using a certain email.
-    // In this case, a user is simply created if it does not exist.
-    val userAccess = userModelInfo.userEmailAccess { User(email = it) }
-    // The basic auth endpoint information.  Required no matter what kind of authentication you're doing.
-    val baseAuth = BaseAuthEndpoints(
-        path = path("auth"),
-        userAccess = userAccess,
-        jwtSigner = Server.jwt
-    )
-    // Authenticates user via email magic link / PIN
-    val emailAuth = EmailAuthEndpoints(
-        base = baseAuth,
-        emailAccess = userAccess,
-        cache = Server.cache,
-        email = Server.email
-    )
-}
-
-@Serializable
-@DatabaseModel
-data class User(
-    override val _id: UUID = UUID.randomUUID(),
-    override val email: String,
-) : HasId<UUID>, HasEmail
 ```
+
+## Understanding ModelInfo
+
+`ModelInfo` is the key to automatic REST endpoint generation. It combines:
+- **Authentication requirements** - Who can access the endpoints
+- **Permissions** - What operations users can perform on which items
+- **Database access** - How to access the underlying data
+
+```kotlin
+val postInfo = database.modelInfo(
+    auth = UserAuth.require(),  // Require authenticated user
+    permissions = {
+        // Context: `auth` is the authenticated user
+        val user = auth.fetch()
+        ModelPermissions(
+            create = condition { it.author eq user.email },
+            read = condition { it.always },
+            update = condition { it.author eq user.email },
+            delete = condition { it.author eq user.email }
+        )
+    }
+)
+```
+
+## Generated Endpoints
+
+When you create `ModelRestEndpoints`, the following endpoints are automatically generated:
+
+- `GET /posts/rest` - List all posts (respecting read permissions)
+  - Supports query parameters for filtering, sorting, and pagination
+- `POST /posts/rest` - Create a new post (respecting create permissions)
+- `GET /posts/rest/{id}` - Get a specific post
+- `PATCH /posts/rest/{id}` - Update a specific post (respecting update permissions)
+- `DELETE /posts/rest/{id}` - Delete a specific post (respecting delete permissions)
+- `POST /posts/rest/query` - Advanced query endpoint
+- `POST /posts/rest/count` - Count posts matching a condition
+- `POST /posts/rest/bulk-delete` - Delete multiple posts
+
+## Permission Masks
+
+You can also hide or mask certain fields based on conditions:
+
+```kotlin
+val postInfo = database.modelInfo(
+    auth = UserAuth.require() or AuthRequirement.None,
+    permissions = {
+        val user = authOrNull?.fetch()
+        ModelPermissions(
+            create = condition { it.always },
+            read = condition { it.always },
+            readMask = mask {
+                // Hide private notes unless you're the author
+                it.privateNotes.maskedTo(null).unless(
+                    condition { it.author eq user?.email }
+                )
+            },
+            update = condition { it.author eq user?.email },
+            delete = condition { it.author eq user?.email }
+        )
+    }
+)
+```
+
+## Update Restrictions
+
+You can also prevent certain fields from being modified:
+
+```kotlin
+ModelPermissions(
+    // ...
+    updateRestrictions = updateRestrictions {
+        it.author.cannotBeModified()
+        it.createdAt.cannotBeModified()
+    }
+)
+```
+
+## Adding WebSocket Updates
+
+You can also add real-time WebSocket updates for your REST endpoints:
+
+```kotlin
+import com.lightningkite.lightningserver.typed.ModelRestEndpoints
+import com.lightningkite.lightningserver.typed.ModelRestUpdatesWebsocket
+import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebsocket.Companion.plus
+
+val rest = path.path("rest") module (
+    ModelRestEndpoints(info) + ModelRestUpdatesWebsocket(info)
+)
+```
+
+This adds a WebSocket endpoint at `/posts/rest/updates` that sends real-time notifications when posts are created, updated, or deleted.
+
+## Example: Public Read, Authenticated Write
+
+A common pattern is to allow anyone to read but require authentication to write:
+
+```kotlin
+val postInfo = database.modelInfo(
+    auth = UserAuth.require() or AuthRequirement.None,
+    permissions = {
+        val user = authOrNull?.fetch()
+        val isAuthenticated = user != null
+
+        ModelPermissions(
+            create = if (isAuthenticated) condition { it.always } else condition { it.never },
+            read = condition { it.always },  // Anyone can read
+            update = if (isAuthenticated)
+                condition { it.author eq user!!.email }
+            else
+                condition { it.never },
+            delete = if (isAuthenticated)
+                condition { it.author eq user!!.email }
+            else
+                condition { it.never }
+        )
+    }
+)
+```
+
+NEXT: [Tasks](tasks.md)

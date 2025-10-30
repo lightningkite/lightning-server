@@ -1,16 +1,19 @@
 # Meta Tools
 
-**OUT OF DATE**
+Last updated January 2025 (`version-5`)
 
 Lightning Server comes with a bunch of easy tools for working with your server.
 
 You can enable them just like this:
 
 ```kotlin
-object Server : ServerPathGroup(ServerPath.root) {
-    val meta = path("meta").metaEndpoints<User>(
-        // We only let admins access some tools, like the metrics and health endpoints.
-        isAdmin = { it: User -> it.email.endsWith("@lightningkite.com") }
+import com.lightningkite.lightningserver.definition.MetaEndpoints
+
+object Server : ServerBuilder() {
+    val meta = path.path("meta") module MetaEndpoints(
+        packageName = "com.yourcompany.yourproject",
+        database = database,
+        cache = cache
     )
 }
 ```

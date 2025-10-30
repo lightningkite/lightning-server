@@ -68,44 +68,6 @@ private fun serveNetty() {
     }
 }
 
-object DemoEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
-    override val domain = "example.demo.ivieleague.com"
-    override val domainZone = "ivieleague.com"
-    override val terraformRoot: File = File("demo/terraform/example-new")
-
-    override val handler: KClass<out AwsAdapter> = AwsHandler::class
-
-    override val storageBucket = "ivieleague-deployment-states"
-    override val storageBucketPath = "demo/example"
-    override val displayName = "Demo Example"
-    override val debug = true
-    override val emergencyContact = "josephivie@gmail.com".toEmailAddress()
-
-    override val region = Region.US_WEST_2!!
-    override fun Server.settings() {
-        database.mongodbAtlasFree(orgId = "6323a65c43d66b56a2ea5aea", zoneName = "Zone 1")
-        email.awsSesSmtp("josephivie@gmail.com".toEmailAddress())
-        sms.direct(SMS.Settings())
-        files.awsS3Bucket(signedUrlDuration = 1.days)
-        cache.awsDynamoDb()
-        secretBasis.generated()
-        loggingSettings.direct(LoggingSettings())
-        telemetrySettings.direct(OpenTelemetrySettings("console", reportFrequency = null))
-        cors.direct(CorsSettings())
-        newSecret.byVariable()
-    }
-}
-
-object DemoEnvDeploy {
-    @JvmStatic
-    fun main(vararg args: String) = DemoEnv.deploy()
-}
-
-object DemoEnvEdit {
-    @JvmStatic
-    fun main(vararg args: String) = DemoEnv.editVars()
-}
-
 fun sdk() {
     println("Writing SDK")
     Server.writeSdk(FetcherSdk, KFile("demo/src/main/kotlin/sdk"), "com.lightningkite.lightningserver.demo")

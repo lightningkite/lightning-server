@@ -19,7 +19,6 @@ import kotlinx.io.buffered
 import kotlinx.serialization.Serializable
 import com.lightningkite.lightningserver.plainText
 import java.io.ByteArrayInputStream
-import kotlinx.serialization.serializer
 
 /**
  * Minimal server definition for testing KtorEngine HTTP and WebSocket adaptation.
@@ -31,9 +30,9 @@ object TestServerBuilder : ServerBuilder() {
             text = "Hello KtorEngine",
             status = HttpStatus.OK,
             headers = HttpHeaders {
-                set("X-Test", "A")
-                set("X-Multi", "B")
-                set("X-Multi", "C")
+                add("X-Test", "A")
+                add("X-Multi", "B")
+                add("X-Multi", "C")
             }
         )
     }
@@ -63,8 +62,8 @@ object TestServerBuilder : ServerBuilder() {
             body = null,
             status = HttpStatus.NoContent,
             headers = HttpHeaders {
-                set(HttpHeader.ContentType, "text/plain; charset=UTF-8")
-                set(HttpHeader.ContentLength, "0")
+                add(HttpHeader.ContentType, "text/plain; charset=UTF-8")
+                add(HttpHeader.ContentLength, "0")
             }
         )
     }

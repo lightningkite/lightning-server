@@ -6,13 +6,22 @@ import kotlinx.serialization.Serializable
 
 
 /**
- * GeneralServerSettings is used to configure the server itself and how it runs on the machine.
- * That includes the port it will bind too, the host it run on, cors setup, and whether it's in debug mode.
+ * Configuration for general server runtime settings.
  *
- * @param projectName Could also be called server name. [projectName] is used in many defaults here in Ktor Batteries but is not vital to the process.
- * @param publicUrl is meant to be a usable URL to the index of the server. This is used in many defaults here in Ktor Batteries.
- * @param wsUrl is meant to be a usable URL to the index of the server. This is used in many defaults here in Ktor Batteries.
- * @param debug states if the server should be in debug mode for development. This does not actually do anything particularly special to Ktor or Batteries. The only place it's used is in configureCors. This is meant to be used by the developer for their own use.
+ * These settings control how the server runs on the machine, including URLs for HTTP and WebSocket
+ * connections, debug mode, and project identification. These values are used throughout Lightning Server
+ * for constructing absolute URLs, CORS configuration, and other runtime behaviors.
+ *
+ * @property projectName A human-readable name for this server/project, used in various defaults and logging
+ * @property publicUrl The base URL where this server is accessible (e.g., "https://api.example.com"). Used for
+ *                     generating absolute URLs in responses, emails, and other contexts. Should not include a
+ *                     trailing slash.
+ * @property wsUrl The base WebSocket URL for this server (e.g., "wss://api.example.com"). Defaults to the
+ *                 appropriate WebSocket protocol based on [publicUrl] (wss for https, ws for http).
+ * @property debug Whether the server is running in debug/development mode. Affects CORS behavior and may be
+ *                 used by application code for development-specific features. Should be false in production.
+ * @property emergencyContact Optional contact information (email or phone) for emergency server issues.
+ *                            May be used in error pages or monitoring alerts.
  */
 @Serializable
 public data class GeneralServerSettings(
@@ -23,8 +32,34 @@ public data class GeneralServerSettings(
     val debug: Boolean = false,
     val emergencyContact: String? = null,
 ) {
+    /**
+     * Extracts the domain (host and port) from [publicUrl].
+     *
+     * For example, "https://api.example.com:8080/path" returns "api.example.com:8080".
+     */
     public val publicUrlDomain: String get() = publicUrl.substringAfter("://").substringBefore("/")
+
+    /**
+     * Extracts the domain (host and port) from [wsUrl].
+     *
+     * For example, "wss://api.example.com:8080/path" returns "api.example.com:8080".
+     */
     public val wsUrlDomain: String get() = wsUrl.substringAfter("://").substringBefore("/")
+
+    /**
+     * Adjusts an absolute path to account for the server being hosted at a subpath.
+     *
+     * If [publicUrl] includes a path component (e.g., "https://example.com/api"), this function
+     * prepends that path to absolute paths. Relative paths are returned unchanged.
+     *
+     * Examples:
+     * - publicUrl = "https://example.com", path = "/users" → "/users"
+     * - publicUrl = "https://example.com/api", path = "/users" → "/api/users"
+     * - publicUrl = "https://example.com/api", path = "users" → "users" (relative, unchanged)
+     *
+     * @param string The path to adjust
+     * @return The adjusted path that accounts for the server's base path
+     */
     public fun absolutePathAdjustment(string: String): String {
         return if (string.startsWith("/")) {
             val inbetween = publicUrl.substringAfter("://").substringAfter("/", "")

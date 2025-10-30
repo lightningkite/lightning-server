@@ -2,9 +2,29 @@
 
 package com.lightningkite.lightningserver.http
 
+/**
+ * Constants for standard HTTP header names.
+ *
+ * This object provides string constants for commonly used HTTP headers, following the
+ * IANA registry of permanent message headers. Use these constants instead of string literals
+ * to avoid typos and improve code consistency.
+ *
+ * Example:
+ * ```kotlin
+ * val contentType = request.headers[HttpHeader.ContentType]
+ * val auth = request.headers[HttpHeader.Authorization]
+ * ```
+ *
+ * The list includes:
+ * - Standard HTTP headers (Accept, Content-Type, etc.)
+ * - CORS headers (Access-Control-Allow-Origin, etc.)
+ * - WebSocket headers (Sec-WebSocket-Key, etc.)
+ * - Common non-standard headers (X-Forwarded-For, etc.)
+ *
+ * Source: http://www.iana.org/assignments/message-headers/message-headers.xml#perm-headers
+ */
 public object HttpHeader {
     // Permanently registered standard HTTP headers
-    // The list is taken from http://www.iana.org/assignments/message-headers/message-headers.xml#perm-headers
 
     public const val Accept: String = "Accept"
     public const val AcceptCharset: String = "Accept-Charset"
@@ -68,8 +88,8 @@ public object HttpHeader {
     public const val ProxyAuthenticate: String = "Proxy-Authenticate"
     public const val ProxyAuthenticationInfo: String = "Proxy-Authentication-Info"
     public const val ProxyAuthorization: String = "Proxy-Authorization"
-    public const val constKeyPins: String = "const-Key-Pins"
-    public const val constKeyPinsReportOnly: String = "const-Key-Pins-Report-Only"
+    public const val constKeyPins: String = "Public-Key-Pins"
+    public const val constKeyPinsReportOnly: String = "Public-Key-Pins-Report-Only"
     public const val Range: String = "Range"
     public const val Referrer: String = "Referer"
     public const val RetryAfter: String = "Retry-After"

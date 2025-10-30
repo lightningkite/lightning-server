@@ -31,6 +31,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.lambda.model.Architecture
 import java.io.File
 import java.util.Locale
 import java.util.Locale.getDefault
@@ -50,6 +51,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
     public override val projectPrefix: String
         get() = displayName.lowercase().replace(" ", "-").filter { it.isLetterOrDigit() || it == '-' }
     public open val storageBucketPath: String get() = projectPrefix
+    public open val storageEncryptionEnabled: Boolean get() = true
     override val terraformRoot: File get() = File("terraform/$projectPrefix")
     override val secretsSource: SecretSource by lazy {
         val fetcher = PasswordFetcher()
@@ -67,24 +69,29 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
     public abstract val debug: Boolean
     public abstract val emergencyContact: EmailAddress
 
+    public val architecture: Architecture get() = Architecture.X86_64
+
     public open val snapStart: Boolean get() = true
     public open val timeout: Duration get() = 30.seconds
     public open val memory: DataSize get() = 1.gibibytes
+    public open val monthlyBudgetUsd: Double get() = 10.00
 
-    public open val invocationAlarms: Map<String, LambdaInvocationAlarmThresholds>
-        get() = mapOf(
-            "emergency" to LambdaInvocationAlarmThresholds(threshold = 150),
-            "panic" to LambdaInvocationAlarmThresholds(threshold = 450),
-        )
-    public open val computeAlarms: Map<String, LambdaDurationAlarmThresholds>
-        get() = mapOf(
-            "emergency" to LambdaDurationAlarmThresholds(threshold = 3.minutes),
-            "panic" to LambdaDurationAlarmThresholds(threshold = 5.minutes),
-        )
+    public open val alarms: Map<String, LambdaAlarm>
+        get() = LambdaAlarm.defaultSpendAlarms(
+            computeSecondsPerMonth = (monthlyBudgetUsd / memory.gibibytes / 0.0000166667).seconds,
+            description = "$displayName Lambda Spend"
+        ).associate { it.description.lowercase().filter { it.isLetterOrDigit() || it == '-' } to it }
 
     override val additionalSettings: Set<ServerSetting<*, *>> = setOf()
     override val applicationRegion: String get() = region.id()
     override val policyStatements: MutableCollection<AwsPolicyStatement> = ArrayList()
+
+    /**
+     * A list of ARNs of lambda layers you need.
+     */
+    public val lambdaLayers: MutableList<String> = ArrayList<String>()
+
+    public val lambdaEnvironment: MutableMap<String, String> = HashMap()
 
     override fun finalize() {
         super.finalize()
@@ -222,14 +229,14 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
         }
         emit("ws") {
             "resource.aws_apigatewayv2_api.ws" {
-                "name" - "demo-example-gateway"
+                "name" - "${emitter.projectPrefix}-gateway"
                 "protocol_type" - "WEBSOCKET"
                 "route_selection_expression" - "constant"
             }
             "resource.aws_apigatewayv2_stage.ws" {
                 "api_id" - expression("aws_apigatewayv2_api.ws.id")
 
-                "name" - "demo-example-gateway-stage"
+                "name" - "${emitter.projectPrefix}-gateway-stage"
                 "auto_deploy" - true
 
                 "access_log_settings" {
@@ -246,7 +253,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 "integration_method" - "POST"
             }
             "resource.aws_cloudwatch_log_group.ws_api" {
-                "name" - "demo-example-ws-gateway-log"
+                "name" - "${emitter.projectPrefix}-ws-gateway-log"
 
                 "retention_in_days" - 30
             }
@@ -335,46 +342,26 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
         }
         emit("lambdaAlarms") {
             val functionName = expression("aws_lambda_function.main.function_name")
-            val namePrefix = emitter.projectPrefix
             "resource.aws_sns_topic.emergency" {
-                "name" - "${namePrefix}_emergencies"
+                "name" - "${emitter.projectPrefix}_emergencies"
             }
             "resource.aws_sns_topic_subscription.emergency_primary" {
                 "topic_arn" - expression("aws_sns_topic.emergency.arn")
                 "protocol" - "email"
                 "endpoint" - emergencyContact.raw
             }
-            invocationAlarms.entries.forEach { (key, value) ->
-                "resource.aws_cloudwatch_metric_alarm.${key}_invocations" {
-                    "alarm_name" - "${namePrefix}_${key}_invocations"
-                    "comparison_operator" - "GreaterThanOrEqualToThreshold"
-                    "evaluation_periods" - value.evaluationPeriods
-                    "datapoints_to_alarm" - value.dataPointsToAlarm
-                    "period" - value.period.inWholeSeconds
-                    "threshold" - value.threshold
-                    "metric_name" - "Invocations"
-                    "namespace" - "AWS/Lambda"
-                    "statistic" - "Sum"
-                    "alarm_description" - "${key.replaceFirstChar { if (it.isLowerCase()) it.titlecase(getDefault()) else it.toString() }} Invocations"
-                    "insufficient_data_actions" - listOf<JsonObject>()
-                    "dimensions" {
-                        "FunctionName" - functionName
-                    }
-                    "alarm_actions" - listOf(expression("aws_sns_topic.emergency.arn"))
-                }
-            }
-            computeAlarms.entries.forEach { (key, value) ->
-                "resource.aws_cloudwatch_metric_alarm.${key}_compute" {
-                    "alarm_name" - "${namePrefix}_${key}_compute"
+            alarms.entries.forEach { (key, value) ->
+                "resource.aws_cloudwatch_metric_alarm.${key}" {
+                    "alarm_name" - "${emitter.projectPrefix}_${key}"
                     "comparison_operator" - "GreaterThanOrEqualToThreshold"
                     "evaluation_periods" - value.evaluationPeriods
                     "datapoints_to_alarm" - value.dataPointsToAlarm
                     "period" - value.period.inWholeSeconds
                     "statistic" - value.statistic.name
-                    "threshold" - value.threshold.inWholeMilliseconds
-                    "metric_name" - "Duration"
+                    "threshold" - value.threshold
+                    "metric_name" - value.metric.name
                     "namespace" - "AWS/Lambda"
-                    "alarm_description" - "${key.replaceFirstChar { if (it.isLowerCase()) it.titlecase(getDefault()) else it.toString() }} Compute"
+                    "alarm_description" - value.description
                     "insufficient_data_actions" - listOf<JsonObject>()
                     "dimensions" {
                         "FunctionName" - functionName
@@ -521,6 +508,8 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 "memory_size" - memory.inWholeMebibytes
                 "timeout" - timeout.inWholeSeconds
 
+                "layers" - lambdaLayers
+
                 "source_code_hash" - expression("data.archive_file.lambda.output_base64sha256")
 
                 "role" - expression("aws_iam_role.main_exec.arn")
@@ -532,6 +521,9 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 "environment" {
                     "variables" {
                         "LIGHTNING_SERVER_SETTINGS_DECRYPTION" - expression("random_password.settings.result")
+                        lambdaEnvironment.forEach { (key, value) ->
+                            key - value
+                        }
                     }
                 }
 
@@ -651,7 +643,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                     "bucket" - storageBucket
                     "key" - storageBucketPath
                     "region" - applicationRegion
-                    "encrypt" - true
+                    "encrypt" - storageEncryptionEnabled
                 }
             }
             if (terraformProviders.isNotEmpty()) {

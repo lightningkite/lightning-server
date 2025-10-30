@@ -12,6 +12,8 @@ import com.lightningkite.services.terraform.TerraformProvider
 import com.lightningkite.services.terraform.TerraformProviderImport
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
@@ -185,7 +187,12 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
         variables.forEach { need ->
             @Suppress("UNCHECKED_CAST")
             val serializer = need.serializer as KSerializer<Any?>
-            env["TF_VAR_${need.name}"] = Json.encodeToString(serializer, secretsSource.get(need))
+            fun SerialDescriptor.isActuallyPrimitive(): Boolean = kind is PrimitiveKind || isInline && getElementDescriptor(0).isActuallyPrimitive()
+            if(serializer.descriptor.isActuallyPrimitive()) {
+                env["TF_VAR_${need.name}"] = Json.encodeToJsonElement(serializer, secretsSource.get(need)).jsonPrimitive.content
+            } else {
+                env["TF_VAR_${need.name}"] = Json.encodeToString(serializer, secretsSource.get(need))
+            }
         }
 
         return env
@@ -213,6 +220,14 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
         println("Settings fulfilled: ${settings.keys}")
         println("Variables from server: $variables")
         secretsSource.runTerminalEditor(psuedoVariables + variables)
+    }
+
+    public fun terraformShell() {
+        write()
+        while(true) {
+            val next = readlnOrNull()?.also { if(it.isBlank()) continue } ?: break
+            terraform(*next.split(' ').toTypedArray())
+        }
     }
 }
 

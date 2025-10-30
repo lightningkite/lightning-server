@@ -7,11 +7,22 @@ import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketHandlerInterceptor
 
+/**
+ * Checks if a given origin matches any of the allowed origin patterns.
+ *
+ * Supports three types of patterns:
+ * 1. Exact match: `https://example.com`
+ * 2. Scheme wildcard: `*.example.com` (matches any scheme)
+ * 3. Subdomain wildcard: `*.example.com`
+ *
+ * @param allowed List of allowed origin patterns
+ * @param origin The origin to check (e.g., "https://sub.example.com")
+ * @return true if the origin matches any allowed pattern
+ **/
 internal fun originMatches(allowed: List<String>, origin: String): Boolean {
     val originSchema = origin.substringBefore("://")
     val originTrimmed = origin.substringAfter("://")
@@ -19,21 +30,40 @@ internal fun originMatches(allowed: List<String>, origin: String): Boolean {
         .any {
             val allowedSchema = it.substringBefore("://", "")
             val allowedTrimmed = it.substringAfter("://")
-            (allowedSchema.isBlank() || originSchema == allowedSchema) &&
-                    (allowedTrimmed == "*" ||
-                            allowedTrimmed == originTrimmed ||
-                            (allowedTrimmed.startsWith('*') && originTrimmed.endsWith(allowedTrimmed.removePrefix("*"))))
+            (allowedSchema.isBlank() || originSchema.equals(allowedSchema, ignoreCase = true)) &&
+                    (allowedTrimmed.equals("*", ignoreCase = true) ||
+                            allowedTrimmed.equals(originTrimmed, ignoreCase = true) ||
+                            (allowedTrimmed.startsWith('*', ignoreCase = true) && originTrimmed.endsWith(allowedTrimmed.removePrefix("*"), ignoreCase = true)))
         }
 }
 
 /**
- * CorsInterceptor which will apply cors headers to responses as necessary.
- * It will also add OPTIONS handling for CORS Pre-flight requests
+ * HTTP interceptor that handles Cross-Origin Resource Sharing (CORS).
  *
- * @param config A runtime CorsSettings object. This is the configuration for the values used in the cors headers.
- */
+ * This interceptor:
+ * - Validates incoming origins against configured patterns
+ * - Adds appropriate CORS headers to responses
+ * - Handles OPTIONS preflight requests automatically
+ * - Enforces CORS policy for WebSocket connections
+ *
+ * ## Preflight Request Handling
+ * For OPTIONS requests, the interceptor:
+ * 1. Checks which HTTP methods are actually defined for the requested path
+ * 2. Filters methods against [CorsSettings.limitToMethods] if configured
+ * 3. Returns a 204 No Content response with appropriate CORS headers
+ * 4. Returns 404 if no methods are defined for the path
+ *
+ * ## GOTCHA: Empty limitToDomains
+ * An empty list in [CorsSettings.limitToDomains] means NO origins are allowed.
+ * Use `null` to allow all origins (mirroring behavior).
+ *
+ * @param config Runtime configuration for CORS behavior
+ **/
 public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpInterceptor, WebSocketHandlerInterceptor {
     override val name: String = "CORS"
+    public companion object {
+        private val allowAll = listOf("*")
+    }
 
     context(runtime: ServerRuntime)
     override suspend fun intercept(
@@ -41,14 +71,19 @@ public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpIn
         cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
     ): HttpResponse {
         val config = config()
-        val origin = request.headers[HttpHeader.Origin]?.root ?: return cont(request)
+        // If no Origin header, request is not cross-origin - pass through without CORS headers
+        val origin = request.headers[HttpHeader.Origin].takeUnless { it == allowAll }?.root ?: return cont(request)
 
-        val originAllowed = config.limitToDomains?.let { originMatches(it, origin) } ?: true
+        // Check if origin matches allowed patterns
+        // null limitToDomains = allow all, non-null = check against patterns
+        val originAllowed = config.limitToDomains.takeUnless { it == allowAll }?.let { originMatches(it, origin) } ?: true
 
+        // Reject requests with disallowed origins if forbidOnMatchFail is true
         if (config.forbidOnMatchFail && !originAllowed) throw ForbiddenException()
 
+        // Handle preflight OPTIONS requests
         val baseResponse = if (request.path.method == HttpMethod.OPTIONS) {
-
+            // Discover which HTTP methods are actually implemented for this path
             val perEndpoint = listOf(
                 HttpMethod.GET,
                 HttpMethod.POST,
@@ -66,57 +101,80 @@ public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpIn
 
             val existingMethods = perEndpoint.entries.filter { it.value != null }.mapTo(HashSet()) { it.key }
 
+            // HEAD is implicitly supported if GET is defined
             if (existingMethods.contains(HttpMethod.GET)) existingMethods += HttpMethod.HEAD
 
             if (existingMethods.isEmpty()) throw NotFoundException()
+            // TODO: Potential issue - if origin is not allowed, we still return 204 No Content
+            // instead of 403 Forbidden. This reveals that the endpoint exists even for
+            // disallowed origins. Consider whether this is desired behavior.
             else if (!originAllowed) return HttpResponse(status = HttpStatus.NoContent)
             else HttpResponse(
                 status = HttpStatus.NoContent,
                 headers = HttpHeaders {
-                    set(
+                    add(
                         HttpHeader.AccessControlAllowMethods,
-                        (config.limitToMethods?.let { limit -> existingMethods.filter { limit.contains(it.toString()) } }
+                        // Filter methods by limitToMethods if configured
+                        (config.limitToMethods.takeUnless { it == allowAll }?.let { limit -> existingMethods.filter { limit.contains(it.toString()) } }
                             ?: existingMethods).joinToString(",")
                     )
                 }
             )
         } else {
+            // Regular (non-preflight) request
             val response = cont(request)
-            if (!originAllowed) return response
+            if (!originAllowed) return response  // No CORS headers for disallowed origins
             else response
         }
 
+        // Add CORS headers to the response
         return baseResponse.copy(
             headers = baseResponse.headers.copy {
-                set(HttpHeader.AccessControlAllowOrigin, origin)
+                // Always set the actual origin (not wildcard) for allowed requests
+                add(HttpHeader.AccessControlAllowOrigin, origin)
 
-                if (config.allowCredentials) set(HttpHeader.AccessControlAllowCredentials, "true")
+                if (config.allowCredentials) add(HttpHeader.AccessControlAllowCredentials, "true")
 
                 if (request.path.method == HttpMethod.OPTIONS) {
-                    set(
+                    // Preflight-specific headers
+                    add(
                         HttpHeader.AccessControlAllowHeaders,
-                        config.limitToHeaders?.joinToString(",")
-                            ?: request.headers.getMany(HttpHeader.AccessControlRequestHeaders).joinToString(",") { it.root }
+                        // Use configured headers or mirror request headers
+                        config.limitToHeaders.takeUnless { it == allowAll }?.joinToString(",")
+                            ?: request.headers.getMany(HttpHeader.AccessControlRequestHeaders)
+                                .joinToString(",") { it.root }
                     )
                     config.cacheLength?.let {
-                        set(HttpHeader.AccessControlMaxAge, it.toString())
+                        add(HttpHeader.AccessControlMaxAge, it.toString())
                     }
                 } else {
+                    // Regular request - expose additional headers if configured
                     config.exposedHeaders
                         .takeUnless { it.isEmpty() }
-                        ?.joinToString()
-                        ?.let { set(HttpHeader.AccessControlExposeHeaders, it) }
+                        ?.joinToString(",")
+                        ?.let { add(HttpHeader.AccessControlExposeHeaders, it) }
                 }
             }
         )
     }
 
+    /**
+     * Intercepts WebSocket connection requests to enforce CORS policy.
+     *
+     * WebSocket connections always fail (403 Forbidden) for disallowed origins,
+     * regardless of the [CorsSettings.forbidOnMatchFail] setting. This is because
+     * WebSocket connections are persistent and must be validated at connection time.
+     *
+     * @param handler The WebSocket handler to intercept
+     * @return A wrapped handler that validates origins before connecting
+     */
     override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> {
         return object : WebSocketHandler<PATH, T> by handler {
             context(serverRuntime: ServerRuntime)
             override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
                 val origin = request.headers[HttpHeader.Origin]?.root ?: return handler.willConnect(request)
-                if (config().limitToDomains?.let { originMatches(it, origin) } == false) throw ForbiddenException()
+                // WebSocket connections always enforce origin checking (ignore forbidOnMatchFail)
+                if (config().limitToDomains.takeUnless { it == allowAll }?.let { originMatches(it, origin) } == false) throw ForbiddenException()
                 return handler.willConnect(request)
             }
         }

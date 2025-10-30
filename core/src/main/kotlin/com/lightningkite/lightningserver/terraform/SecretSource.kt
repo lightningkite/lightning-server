@@ -152,9 +152,11 @@ public fun SecretSource.runGuiEditor(variables: List<TerraformNeed<*>>) {
 public fun SecretSource.runTerminalEditor(variables: List<TerraformNeed<*>>) {
     if(this !is InteractiveSecretSource) return
     while(true) {
-        val sel = readSelection("What variable do you want to set?", variables + null, { it?.name ?: "Quit" })
-        if(sel == null) break
-        prompt(sel)
+        val sel = readSelection("What variable do you want to work with?", variables + null, { it?.name ?: "Quit" })
+        if (sel == null) break
+        val read = readSelection("Do you want to read or write this variable?", listOf(true, false), { if(it) "Read" else "Write" })
+        if (read) println("The current value is '${getOrNull(sel)}'.")
+        else prompt(sel)
     }
 }
 
@@ -254,11 +256,10 @@ public class ManySecretSources(
 }
 
 private fun <T> KSerializer<T>.parse(string: String): T = try {
-    if (this.descriptor.kind is PrimitiveKind) StringArrayFormat(EmptySerializersModule()).decodeFromString(
-        this,
-        string
-    )
-    else Json.decodeFromString(this, string)
+    if (this.descriptor.kind is PrimitiveKind)
+        StringArrayFormat(EmptySerializersModule()).decodeFromString(this, string)
+    else
+        Json.decodeFromString(this, string)
 } catch(e: SerializationException) {
     throw IllegalArgumentException("Does not fit format.  Expecting a ${this.descriptor.serialName}")
 }
@@ -408,7 +409,7 @@ public class EncryptedFileSecretSource(
     override fun <T> set(need: TerraformNeed<T>, value: T) {
         getMap()[need.name] = json.encodeToString(need.serializer, value)
         file.writeBytes(
-            encryptionKey!!.cipher().encryptBlocking(Json.encodeToString(map).toByteArray(Charsets.UTF_8))
+            encryptionKey!!.cipher().encryptBlocking(json.encodeToString(map).toByteArray(Charsets.UTF_8))
         )
     }
 }

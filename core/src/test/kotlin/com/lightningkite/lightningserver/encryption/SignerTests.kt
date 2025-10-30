@@ -4,6 +4,9 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import kotlin.random.Random
 
+/**
+ * Tests for signature generation and verification using HMAC-based signers.
+ */
 class SignerTests {
     val basis = SecretBasis()
 
@@ -21,6 +24,10 @@ class SignerTests {
         basis::HS512,
     )
 
+    /**
+     * Tests JWT-compatible signers (HS256, HS384, HS512) for correct
+     * signing and verification across multiple variants.
+     */
     @Test
     fun jwtSigners(): Unit = runBlocking {
         signers.forEach { getSigner ->
@@ -33,6 +40,10 @@ class SignerTests {
         }
     }
 
+    /**
+     * Tests that different signer variants produce cryptographically
+     * independent keys that cannot verify each other's signatures.
+     */
     @Test
     fun variantsAreUnique(): Unit = runBlocking {
         signers.forEach { getSigner ->

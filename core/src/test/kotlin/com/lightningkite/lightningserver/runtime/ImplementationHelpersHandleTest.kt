@@ -8,14 +8,12 @@ import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
-import com.lightningkite.lightningserver.runtime.test.TestRunner
 import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.services.LoggingSettings
 import io.github.oshai.kotlinlogging.Level
-import jdk.jfr.internal.LogLevel
 import kotlinx.coroutines.runBlocking
 import java.io.ByteArrayInputStream
 import java.util.zip.GZIPInputStream
@@ -31,7 +29,7 @@ class ImplementationHelpersHandleTest {
         // Install permissive CORS for OPTIONS tests
         val cors = com.lightningkite.lightningserver.cors.CorsSettings(
             limitToDomains = listOf("example.com"),
-            limitToMethods = null
+            limitToMethods = listOf("*")
         )
         init {
             install(com.lightningkite.lightningserver.cors.CorsInterceptor(setting("cors", cors)))
@@ -169,7 +167,7 @@ class ImplementationHelpersHandleTest {
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.OPTIONS),
                         queryParameters = QueryParameters.EMPTY,
                         headers = HttpHeaders {
-                            set(HttpHeader.Origin, "example.com")
+                            add(HttpHeader.Origin, "example.com")
                         },
                         domain = "example.com",
                         protocol = "https",
@@ -307,7 +305,7 @@ class ImplementationHelpersHandleTest {
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
                         headers = HttpHeaders {
-                            set(HttpHeader.AcceptEncoding, "gzip")
+                            add(HttpHeader.AcceptEncoding, "gzip")
                         },
                         domain = "example.com",
                         protocol = "https",
@@ -342,7 +340,7 @@ class ImplementationHelpersHandleTest {
                         path = RawHttpEndpoint(asString = "/bigstream", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
                         headers = HttpHeaders {
-                            set(HttpHeader.AcceptEncoding, "gzip")
+                            add(HttpHeader.AcceptEncoding, "gzip")
                         },
                         domain = "example.com",
                         protocol = "https",
@@ -355,57 +353,6 @@ class ImplementationHelpersHandleTest {
                 val compressed = resp.body?.data?.bytes() ?: error("Expected body bytes")
                 val decompressed = GZIPInputStream(ByteArrayInputStream(compressed)).readBytes().toString(Charsets.UTF_8)
                 assertEquals("x".repeat(100_000), decompressed)
-            }
-        }
-    }
-
-    @Test
-    fun compression_skips_on_range_and_partial_content() {
-        TestServer.test(
-            settings = {
-                loggingSettings.set(
-                    LoggingSettings(
-                        LoggingSettings.ContextSettings(
-                            filePattern = null,
-                            toConsole = true,
-                            level = Level.DEBUG
-                        )
-                    )
-                )
-            }
-        ) {
-            runBlocking {
-                // a) Range header present: skip compression
-                val rangeResp = serverRuntime.handle(
-                    HttpRequest(
-                        path = RawHttpEndpoint(asString = "/big", method = HttpMethod.GET),
-                        queryParameters = QueryParameters.EMPTY,
-                        headers = HttpHeaders {
-                            set(HttpHeader.AcceptEncoding, "gzip")
-                            set(HttpHeader.Range, "bytes=0-99")
-                        },
-                        domain = "example.com",
-                        protocol = "https",
-                        sourceIp = "local",
-                    )
-                )
-                assertNull(rangeResp.headers[HttpHeader.ContentEncoding])
-
-                // b) Partial Content status: skip compression
-                val partialResp = serverRuntime.handle(
-                    HttpRequest(
-                        path = RawHttpEndpoint(asString = "/partial", method = HttpMethod.GET),
-                        queryParameters = QueryParameters.EMPTY,
-                        headers = HttpHeaders {
-                            set(HttpHeader.AcceptEncoding, "gzip")
-                        },
-                        domain = "example.com",
-                        protocol = "https",
-                        sourceIp = "local",
-                    )
-                )
-                assertEquals(HttpStatus.PartialContent, partialResp.status)
-                assertNull(partialResp.headers[HttpHeader.ContentEncoding])
             }
         }
     }

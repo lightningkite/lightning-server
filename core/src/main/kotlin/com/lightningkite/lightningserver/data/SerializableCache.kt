@@ -13,23 +13,77 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlin.time.Duration
 
-
+/**
+ * A type-safe, serializable cache that can persist across requests or server restarts.
+ *
+ * Stores values keyed by string IDs, with optional expiration and local-only modes.
+ * Values are serialized to bytes for persistence and can be automatically calculated
+ * on cache misses using [CalculatingKey].
+ *
+ * The cache maintains two layers:
+ * - In-memory cache of deserialized objects
+ * - Serialized byte representation for persistence
+ *
+ * Example:
+ * ```kotlin
+ * val cache = SerializableCache()
+ * val userKey = SerializableCache.Key("user", User.serializer(), expireAfter = 5.minutes)
+ *
+ * with(serverRuntime) {
+ *     cache[userKey] = currentUser
+ *     val user = cache[userKey]  // Retrieve from cache
+ * }
+ * ```
+ *
+ * **Important**: This cache is designed to be attached to objects like [Request] via the [Caching]
+ * interface, providing request-scoped caching with optional persistence.
+ */
 @Serializable(SerializableCache.Serializer::class)
 public class SerializableCache private constructor(
     private val serialized: HashMap<String, ByteArray>,
 ) {
     internal constructor(serialized: Map<String, ByteArray>) : this(HashMap(serialized))
 
+    /** Creates an empty cache. */
     public constructor() : this(HashMap())
 
+    /**
+     * A cache key that identifies a cached value.
+     *
+     * @param T The type of value stored under this key
+     */
     public interface Key<T> {
+        /** Unique identifier for this cache entry. Must be unique across all keys. */
         public val id: String
+
+        /** Serializer for converting the value to/from bytes. */
         public val serializer: KSerializer<T>
+
+        /** Optional expiration duration. Null means the value never expires. */
         public val expireAfter: Duration? get() = null
+
+        /**
+         * If true, this value is only cached in memory and won't be serialized for persistence.
+         * Useful for values that shouldn't or can't be serialized.
+         */
         public val localOnly: Boolean get() = false
     }
 
+    /**
+     * A cache key that can automatically calculate its value on cache miss.
+     *
+     * When the cache doesn't contain this key, the [calculate] function is invoked
+     * to compute the value, which is then cached for future retrievals.
+     *
+     * @param INPUT The input type needed to calculate the value
+     * @param T The type of value stored/calculated
+     */
     public interface CalculatingKey<INPUT, T> : Key<T> {
+        /**
+         * Calculates the value for this key given the input.
+         *
+         * Called automatically when the value is not in the cache.
+         */
         context(server: ServerRuntime)
         public suspend fun calculate(input: INPUT): T
     }
@@ -38,9 +92,22 @@ public class SerializableCache private constructor(
 
     private val cache = HashMap<String, KeyAndResult<*>>()
 
+    /**
+     * Indicates whether the cache has been modified since creation or last clear.
+     *
+     * Useful for determining if the cache needs to be persisted.
+     */
     public var updated: Boolean = false
         private set
 
+    /**
+     * Retrieves a cached value with expiration checking.
+     *
+     * Checks both in-memory cache and serialized storage.
+     * Expired values are automatically removed.
+     *
+     * @return The cached Expiring wrapper, or null if not found or expired
+     */
     context(server: ServerRuntime)
     private fun <T> retrieve(key: Key<T>): Expiring<T>? {
         @Suppress("UNCHECKED_CAST")
@@ -76,6 +143,12 @@ public class SerializableCache private constructor(
         return null
     }
 
+    /**
+     * Stores a value in the cache with the given key.
+     *
+     * If the key is not local-only, the value is serialized for persistence.
+     * Sets the [updated] flag to true.
+     */
     context(server: ServerRuntime)
     private fun <T> cache(key: Key<T>, value: T) {
         val expiring = Expiring(
@@ -91,16 +164,44 @@ public class SerializableCache private constructor(
         updated = true
     }
 
+    /**
+     * Stores a value in the cache.
+     *
+     * @param key The cache key
+     * @param value The value to cache
+     */
     context(server: ServerRuntime)
     public operator fun <T> set(key: Key<T>, value: T): Unit = cache(key, value)
 
+    /**
+     * Retrieves a value from the cache.
+     *
+     * @param key The cache key
+     * @return The cached value, or null if not found or expired
+     */
     context(server: ServerRuntime)
     public operator fun <T> get(key: Key<T>): T? = retrieve(key)?.value
 
+    /**
+     * Retrieves or calculates a value using a calculating key.
+     *
+     * If the value is in the cache and not expired, returns it.
+     * Otherwise, calculates it using the key's calculate function and caches the result.
+     *
+     * @param key The calculating key
+     * @param input The input needed for calculation
+     * @return The cached or newly calculated value
+     */
     context(server: ServerRuntime)
     public suspend fun <INPUT, T> get(key: CalculatingKey<INPUT, T>, input: INPUT): T =
         retrieve(key)?.value ?: key.calculate(input).also { cache(key, it) }
 
+    /**
+     * Checks if the cache contains a non-expired value for the given key.
+     *
+     * @param key The cache key to check
+     * @return true if the key has a non-expired value, false otherwise
+     */
     context(server: ServerRuntime)
     public fun containsKey(key: Key<*>): Boolean = retrieve(key) != null
 
@@ -118,6 +219,11 @@ public class SerializableCache private constructor(
 
     override fun hashCode(): Int = bytes.hashCode()
 
+    /**
+     * Returns a human-readable string representation of the cache contents.
+     *
+     * Shows decoded values from the in-memory cache and "ENCODED" for serialized-only entries.
+     */
     override fun toString(): String = cache
         .map { entry ->
             entry.key to entry.value.result.let { if (it.expiresAt == null) it.value else it }
@@ -125,6 +231,9 @@ public class SerializableCache private constructor(
         .plus((serialized.keys - cache.keys).map { it to "ENCODED" })
         .joinToString(prefix = "{", separator = ", ", postfix = "}") { "${it.first}=${it.second}" }
 
+    /**
+     * Clears all cached values (both in-memory and serialized) and resets the updated flag.
+     */
     public fun clear() {
         cache.clear()
         serialized.clear()
@@ -139,6 +248,15 @@ public class SerializableCache private constructor(
             override val localOnly: Boolean = false,
         ) : Key<T>
 
+        /**
+         * Creates a simple cache key.
+         *
+         * @param id Unique identifier for this cache entry
+         * @param serializer Serializer for the value type
+         * @param expireAfter Optional expiration duration
+         * @param localOnly If true, value won't be serialized for persistence
+         * @return A new Key instance
+         */
         public fun <T> Key(
             id: String,
             serializer: KSerializer<T>,
@@ -162,20 +280,44 @@ public class SerializableCache private constructor(
     }
 }
 
+/**
+ * Retrieves a cached value or computes and caches it if missing.
+ *
+ * This is similar to Map's getOrPut but works with the ServerRuntime context.
+ *
+ * @param key The cache key
+ * @param default Function to compute the value if not cached
+ * @return The cached or newly computed value
+ */
 context(server: ServerRuntime)
 public inline fun <T> SerializableCache.getOrPut(key: Key<T>, default: () -> T): T =
     get(key) ?: default().also { set(key, it) }
 
-
+/**
+ * Interface for objects that have an attached [SerializableCache].
+ *
+ * This is typically implemented by request-like objects to provide
+ * request-scoped caching.
+ */
 public interface Caching {
     public val cache: SerializableCache
 }
 
+/**
+ * Stores a value in the cache of this Caching object.
+ */
 context(server: ServerRuntime)
 public operator fun <T> Caching.set(key: Key<T>, value: T): Unit = cache.set(key, value)
 
+/**
+ * Retrieves a value from the cache of this Caching object.
+ */
 context(server: ServerRuntime)
 public operator fun <T> Caching.get(key: Key<T>): T? = cache[key]
 
+/**
+ * Retrieves or calculates a value from the cache of this Caching object.
+ */
 context(server: ServerRuntime)
 public suspend fun <INPUT, T> Caching.get(key: CalculatingKey<INPUT, T>, input: INPUT): T = cache.get(key, input)
+

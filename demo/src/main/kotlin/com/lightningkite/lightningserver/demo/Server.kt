@@ -116,12 +116,12 @@ object Server : ServerBuilder() {
     }
 
     val slashEscaping = path.path("variable").arg<String>("stupidid").get bind HttpHandler { request ->
-        HttpResponse.plainText("The variable is '${request.path.first}'")
+        HttpResponse.plainText("The variable is '${request.path.arg1}'")
     }
 
     val topic = path.path("socket-topic").topic(String.serializer())
     val socketSideMessage = path.path("socket").arg<String>("tosend").get bind HttpHandler {
-        topic.send(it.first)
+        topic.send(it.arg1)
         HttpResponse.plainText("Sent!")
     }
     val socket = path.path("socket") bind WebSocketHandler(
@@ -313,7 +313,7 @@ object Server : ServerBuilder() {
     )
 
     val indirect = path.path("indirect").arg<String>("id").arg<Int>("arg2").post bind HttpHandler { request ->
-        arged(request, request.first, request.second, Unit)
+        arged(request, request.arg1, request.arg2, Unit)
 
         HttpResponse()
     }
@@ -345,7 +345,5 @@ object Server : ServerBuilder() {
         HttpResponse.plainText(auth.id.toString())
     }
 
-    init {
-        registerBasicMediaTypeCoders()
-    }
+    init { registerBasicMediaTypeCoders() }
 }

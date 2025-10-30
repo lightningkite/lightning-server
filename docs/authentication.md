@@ -1,88 +1,289 @@
 # Authentication
 
-**OUT OF DATE**
+Last updated January 2025 (`version-5`)
 
-Authentication is a fundamental concept in Lightning Server, and authentication works the same way across all endpoints.  Multiple methods can be checked.
+Authentication is a fundamental concept in Lightning Server, and authentication works the same way across all endpoints. Multiple methods can be checked, and the system is highly customizable while providing sensible defaults.
 
-We've built authentication out for you, but it is also extremely customizable.  We'll start with the easy one.
+## Quick Start: Setting Up Authentication
 
-## Quick Authentication
-
-Here's a most basic example.  This is the absolute minimum required to use the built-in authentication endpoints with magic-link / PIN auth.
+Here's a complete example showing how to set up authentication with email/password and email PIN support:
 
 ```kotlin
-
-import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.auth.*
-import com.lightningkite.lightningserver.cache.*
-import com.lightningkite.lightningserver.core.*
-import com.lightningkite.lightningserver.db.*
-import com.lightningkite.lightningserver.email.*
-import com.lightningkite.lightningserver.settings.*
+import com.lightningkite.lightningserver.sessions.*
+import com.lightningkite.lightningserver.sessions.proofs.*
+import com.lightningkite.services.database.*
+import com.lightningkite.services.email.*
 import kotlinx.serialization.*
-import java.time.Instant
-import java.util.*
-import com.lightningkite.UUID
-
-// Our primary server definition.
-object Server : ServerPathGroup(ServerPath.root) {
-    val settingName = setting(name = "settingName", default = "defaultValue")
-    val database = setting(name = "database", default = DatabaseSettings())
-    val cache = setting(name = "cache", default = CacheSettings())
-    val email = setting(name = "email", default = EmailSettings())
-    val jwt = setting(name = "jwt", default = JwtSigner())
-
-    val auth = AuthEndpoints(path("auth"))
-}
-
-// Our auth endpoints.
-class AuthEndpoints(path: ServerPath): ServerPathGroup(path) {
-    // You'll make one of these if you set up auto-rest for users regardless.
-    val userModelInfo = ModelInfo(
-        getCollection = { Server.database().collection<User>() },
-        forUser = { user: User -> this }
-    )
-    // Information about how to access users, including what to do if a user is not found using a certain email.
-    // In this case, a user is simply created if it does not exist.
-    val userAccess = userModelInfo.userEmailAccess { User(email = it) }
-    // The basic auth endpoint information.  Required no matter what kind of authentication you're doing.
-    val baseAuth = BaseAuthEndpoints(
-        path = path,
-        userAccess = userAccess,
-        jwtSigner = Server.jwt
-    )
-    // Authenticates user via email magic link / PIN
-    val emailAuth = EmailAuthEndpoints(
-        base = baseAuth,
-        emailAccess = userAccess,
-        cache = Server.cache,
-        email = Server.email,
-        // There are options in here for customizing the email that's sent, as well as what kinds of PINs are generated.
-    )
-}
+import kotlin.uuid.Uuid
 
 @Serializable
-@DatabaseModel
+@GenerateDataClassPaths
 data class User(
-    override val _id: UUID = UUID.randomUUID(),
+    override val _id: Uuid = Uuid.random(),
     override val email: String,
-) : HasId<UUID>, HasEmail
-```
+    override val hashedPassword: String = "",
+    val isSuperUser: Boolean = false
+) : HasId<Uuid>, HasEmail, HasPassword
 
-## Raw Authentication
+object Server : ServerBuilder() {
+    val database = setting("database", Database.Settings())
+    val cache = setting("cache", Cache.Settings())
+    val email = setting("email", EmailService.Settings())
 
-If you wish to implement your own authentication mechanisms, you need only provide your own handler:
+    // Define your principal type (user authentication)
+    object UserAuth : PrincipalType<User, Uuid> {
+        override val idSerializer = Uuid.serializer()
+        override val subjectSerializer = User.serializer()
+        override val name = "User"
 
-```kotlin
-Authentication.handler = object: Authentication.Handler<User> {
-    suspend fun http(request: HttpRequest): USER? = TODO()
-    suspend fun ws(request: WebSocketConnectRequest): USER? = TODO()
-    fun userToIdString(user: USER): String = TODO()
-    suspend fun idStringToUser(id: String): USER = TODO()
+        context(server: ServerRuntime)
+        override suspend fun fetch(id: Uuid): User =
+            database().table<User>().get(id) ?: throw NotFoundException()
+
+        context(server: ServerRuntime)
+        override suspend fun fetchByProperty(property: String, value: String): User? {
+            return when (property) {
+                "email" -> {
+                    val existing = database().table<User>()
+                        .findOne(condition { it.email eq value })
+                    existing ?: database().table<User>()
+                        .insertOne(User(email = value))
+                }
+                else -> super.fetchByProperty(property, value)
+            }
+        }
+    }
+
+    // Set up proof handlers
+    val pins = PinHandler(cache, "pins")
+
+    val proofEmail = path.path("proof").path("email") module EmailProofEndpoints(
+        pins = pins,
+        email = email,
+        emailBuilder = { to, pin ->
+            Email(
+                subject = "Your Login Code",
+                to = listOf(EmailAddressWithName(to)),
+                plainText = "Your PIN is: $pin"
+            )
+        }
+    )
+
+    val proofPassword = path.path("proof").path("password") module
+        PasswordProofEndpoints(database, cache)
+
+    // Set up authentication endpoints
+    val auth = path.path("auth") module object : AuthEndpoints<User, Uuid>(
+        principal = UserAuth,
+        database = database
+    ) {
+        context(server: ServerRuntime)
+        override suspend fun requiredProofStrengthFor(subject: User): Int = 5
+
+        context(server: ServerRuntime)
+        override suspend fun sessionExpiration(subject: User): Instant? = null
+
+        context(server: ServerRuntime)
+        override suspend fun sessionStaleAfter(subject: User): Duration? = null
+    }
 }
 ```
 
-## `JwtTypedAuthorizationHandler`
+## Understanding PrincipalType
 
-A more mid-level option for auth is `JwtTypedAuthorizationHandler`, which allows for multiple types of users over JWT bearer authentication.  This is what the `BaseAuthEndpoints` uses under the hood.
+`PrincipalType` defines how to work with a specific type of authenticated user:
 
+```kotlin
+object UserAuth : PrincipalType<User, Uuid> {
+    override val idSerializer = Uuid.serializer()
+    override val subjectSerializer = User.serializer()
+    override val name = "User"
+
+    context(server: ServerRuntime)
+    override suspend fun fetch(id: Uuid): User =
+        database().table<User>().get(id) ?: throw NotFoundException()
+
+    context(server: ServerRuntime)
+    override suspend fun fetchByProperty(property: String, value: String): User? {
+        return when (property) {
+            "email" -> {
+                // Find or create user by email
+                database().table<User>().findOne(condition { it.email eq value })
+                    ?: database().table<User>().insertOne(User(email = value))
+            }
+            else -> super.fetchByProperty(property, value)
+        }
+    }
+}
+```
+
+## Authentication Methods (Proofs)
+
+Lightning Server supports multiple authentication methods ("proofs"):
+
+### Email PIN
+
+```kotlin
+val pins = PinHandler(cache, "pins")
+
+val proofEmail = path.path("proof").path("email") module EmailProofEndpoints(
+    pins = pins,
+    email = email,
+    emailBuilder = { to, pin ->
+        Email(
+            subject = "Your Login Code",
+            to = listOf(EmailAddressWithName(to)),
+            plainText = "Your PIN is: $pin",
+            html = "<h1>Your PIN is: $pin</h1>"
+        )
+    }
+)
+```
+
+### SMS PIN
+
+```kotlin
+val proofSms = path.path("proof").path("sms") module SmsProofEndpoints(
+    pins = pins,
+    sms = sms
+)
+```
+
+### Password
+
+```kotlin
+val proofPassword = path.path("proof").path("password") module
+    PasswordProofEndpoints(database, cache)
+```
+
+### Time-Based OTP (TOTP)
+
+```kotlin
+val proofOtp = path.path("proof").path("otp") module
+    TimeBasedOTPProofEndpoints(database, cache)
+```
+
+### Known Device
+
+```kotlin
+val proofDevices = path.path("proof").path("devices") module
+    KnownDeviceProofEndpoints(database, cache)
+```
+
+## Using Authentication in Endpoints
+
+### Require Authentication
+
+```kotlin
+val protectedEndpoint = path.path("protected").get bind ApiHttpHandler(
+    auth = UserAuth.require(),
+    summary = "Protected Endpoint",
+    implementation = { _: Unit ->
+        val user = auth.fetch()
+        "Hello, ${user.email}!"
+    }
+)
+```
+
+### Optional Authentication
+
+```kotlin
+val optionalAuthEndpoint = path.path("optional").get bind ApiHttpHandler(
+    auth = UserAuth.require() or AuthRequirement.None,
+    summary = "Optional Auth",
+    implementation = { _: Unit ->
+        val user = authOrNull?.fetch()
+        if (user != null) {
+            "Hello, ${user.email}!"
+        } else {
+            "Hello, guest!"
+        }
+    }
+)
+```
+
+### Using in ModelInfo
+
+```kotlin
+val userInfo = database.modelInfo(
+    auth = UserAuth.require() or AuthRequirement.None,
+    permissions = {
+        val user = authOrNull?.fetch()
+        val self = condition<User> { it._id eq user?._id }
+        val admin = if (user?.isSuperUser == true)
+            condition { it.always }
+        else
+            condition { it.never }
+
+        ModelPermissions(
+            create = condition { it.never },
+            read = self or admin,
+            update = self or admin,
+            delete = admin
+        )
+    }
+)
+```
+
+## Authentication Flow
+
+1. **Client requests proof**:
+   - `POST /proof/email/request` with `{"property": "email", "value": "user@example.com"}`
+   - Server sends email with PIN
+
+2. **Client submits proof**:
+   - `POST /proof/email/prove` with `{"property": "email", "value": "user@example.com", "proof": "123456"}`
+   - Server returns a proof token
+
+3. **Client exchanges proof for session**:
+   - `POST /auth/login-anonymous` with proof token
+   - Server returns JWT session token
+
+4. **Client uses session**:
+   - Include `Authorization: Bearer <token>` header in requests
+
+## Customizing Authentication
+
+### Session Expiration
+
+Control when sessions expire:
+
+```kotlin
+object : AuthEndpoints<User, Uuid>(principal = UserAuth, database = database) {
+    context(server: ServerRuntime)
+    override suspend fun requiredProofStrengthFor(subject: User): Int = 5
+
+    context(server: ServerRuntime)
+    override suspend fun sessionExpiration(subject: User): Instant? {
+        // Sessions expire after 30 days
+        return Clock.System.now() + 30.days
+    }
+
+    context(server: ServerRuntime)
+    override suspend fun sessionStaleAfter(subject: User): Duration? {
+        // Require re-authentication after 7 days of inactivity
+        return 7.days
+    }
+}
+```
+
+### Proof Strength
+
+Different authentication methods have different "strengths". You can require a minimum strength:
+
+- Email PIN: strength 5
+- SMS PIN: strength 5
+- Password: strength 5
+- TOTP: strength 10
+- Known Device: strength 15
+
+```kotlin
+override suspend fun requiredProofStrengthFor(subject: User): Int {
+    // Admins need stronger authentication
+    return if (subject.isSuperUser) 10 else 5
+}
+```
+
+NEXT: [Typed Endpoints](typed-endpoints.md)

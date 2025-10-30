@@ -44,4 +44,6 @@ include(":engine-aws-serverless")
 include(":engine-netty")
 include(":engine-jdk-server")
 
+include(":secret-source-aws")
+
 include(":demo")

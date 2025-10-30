@@ -34,6 +34,19 @@ public operator fun <T : Any> MutableExtensions.Key<T>.setValue(thisRef: Extenda
     thisRef.extensions[this] = value
 }
 
+/**
+ * Retrieves the value associated with this [key], or computes and stores a default value if not present.
+ *
+ * This function behaves similarly to [MutableMap.getOrPut], ensuring thread-unsafe lazy initialization
+ * of extension values. If the key is already present, its value is returned. Otherwise, [default] is
+ * invoked, the result is stored, and then returned.
+ *
+ * Note: This is not thread-safe. If thread-safety is needed, consider using synchronization externally.
+ *
+ * @param key The key to look up or initialize
+ * @param default A function that computes the default value if the key is not present
+ * @return The existing or newly computed value for this key
+ */
 public fun <T : Any> MutableExtensions.getOrPut(key: MutableExtensions.Key<T>, default: () -> T): T = get(key) ?: default().also { set(key, it) }
 
 /**
@@ -138,4 +151,12 @@ public interface ListRegistryExtension<V> : MutableExtensions.DegradingKey<ListR
     }
 }
 
+/**
+ * Converts this read-only [Extensions] into a [MutableExtensions] by copying all entries.
+ *
+ * This creates a new mutable extensions container with all the entries from this extensions object.
+ * Modifications to the returned [MutableExtensions] will not affect this original [Extensions].
+ *
+ * @return A new [MutableExtensions] instance containing copies of all entries from this extensions
+ */
 public fun Extensions.toMutableExtensions(): MutableExtensions = MutableExtensions(this)

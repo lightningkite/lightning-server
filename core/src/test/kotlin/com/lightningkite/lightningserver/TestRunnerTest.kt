@@ -59,7 +59,7 @@ class TestRunnerTest {
 
     object TestModelEndpoints : ServerBuilder() {
         val describePerson = path.path("describe").arg<String>("id").get bind HttpHandler {
-            if (it.first == "hunter") HttpResponse.plainText("Really cool imo")
+            if (it.arg1 == "hunter") HttpResponse.plainText("Really cool imo")
             else HttpResponse(status = HttpStatus.NotFound)
         }
 

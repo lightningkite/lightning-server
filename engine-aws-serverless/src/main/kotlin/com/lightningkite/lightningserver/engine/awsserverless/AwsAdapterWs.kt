@@ -217,7 +217,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
         return APIGatewayV2HTTPResponse(200)
     }
 
-    val rootWs = QueryParamWebSocketHandler()
+    val rootWs = root.server.compiledWebsocketInterceptors.intercept(QueryParamWebSocketHandler())
     val rootPath = PathSpec0(listOf(), PathSpec.Afterwards.None)
     suspend fun <T> publish(topic: String, serializer: KSerializer<T>, output: T) {
         try {

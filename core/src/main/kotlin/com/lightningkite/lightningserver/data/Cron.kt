@@ -8,13 +8,45 @@ import kotlinx.datetime.YearMonth
 import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.number
 
-
+/**
+ * Represents a cron-like pattern for scheduling recurring tasks.
+ *
+ * Supports specifying minutes (0-59), hours (0-23), days (of month or week), and months.
+ * Format follows standard cron conventions with some limitations on advanced features.
+ *
+ * Example:
+ * ```kotlin
+ * // Every day at 3:30 AM
+ * CronPattern(minutes = listOf(30), hours = listOf(3))
+ *
+ * // Every Monday at 9:00 AM
+ * CronPattern(
+ *     minutes = listOf(0),
+ *     hours = listOf(9),
+ *     days = CronDays.DaysOfWeek(DayOfWeek.MONDAY)
+ * )
+ * ```
+ *
+ * @property minutes Bit set of valid minutes (0-59)
+ * @property hours Bit set of valid hours (0-23)
+ * @property days Day specification (all days, specific days of month, or specific days of week)
+ * @property months Bit set of valid months (1-12)
+ */
 public data class CronPattern(
     val minutes: LongBits,
     val hours: LongBits,
     val days: CronDays,
     val months: LongBits,
 ) {
+    /**
+     * Convenience constructor that accepts iterables of valid values.
+     *
+     * @param minutes Valid minute values (0-59). Defaults to every minute.
+     * @param hours Valid hour values (0-23). Defaults to every hour.
+     * @param days Day specification. Defaults to all days.
+     * @param months Valid months. Defaults to all months.
+     * @throws IllegalArgumentException if any time component has no valid values
+     */
     public constructor(
         minutes: Iterable<Int> = everyMinute,
         hours: Iterable<Int> = everyHour,
@@ -45,6 +77,14 @@ public data class CronPattern(
         private val allMonths = LongBits(everyMonth.map { it.number })
     }
 
+    /**
+     * Returns a cron-style string representation.
+     *
+     * Format: `minute hour day-of-month month day-of-week`
+     *
+     * Note: Uses `?` as a placeholder where appropriate for day fields,
+     * following standard cron conventions where day-of-month and day-of-week are mutually exclusive.
+     */
     override fun toString(): String = buildString {
         append(minutes.takeUnless { it == allMinutes }?.toString() ?: "*")
         append(' ')
@@ -66,36 +106,85 @@ public data class CronPattern(
     }
 }
 
+/**
+ * Specifies which days a cron pattern should run on.
+ *
+ * This sealed interface provides three options:
+ * - [All]: Run on all days
+ * - [DaysOfMonth]: Run on specific days of the month (1-31)
+ * - [DaysOfWeek]: Run on specific days of the week (Monday-Sunday)
+ *
+ * Note: DaysOfMonth and DaysOfWeek are mutually exclusive in standard cron syntax.
+ */
 public sealed interface CronDays {
+    /** Represents all days (no day restriction). */
     public data object All : CronDays
 
+    /**
+     * Represents specific days of the month.
+     *
+     * @property days Set of day specifications (e.g., Day(15) for the 15th)
+     */
     public data class DaysOfMonth(val days: Set<CronDayOfMonth>) : CronDays {
+        /** Convenience constructor that accepts day numbers. */
         public constructor(days: Iterable<Int>) : this(days.map(CronDayOfMonth::Day).toSet())
+        /** Convenience constructor that accepts day numbers as varargs. */
         public constructor(vararg days: Int) : this(days.map(CronDayOfMonth::Day).toSet())
     }
 
+    /**
+     * Represents specific days of the week.
+     *
+     * @property days Set of weekday specifications
+     */
     public data class DaysOfWeek(val days: Set<CronDayOfWeek>) : CronDays {
+        /** Convenience constructor that accepts DayOfWeek values. */
         public constructor(days: Iterable<DayOfWeek>) : this(days.map(::CronDayOfWeek).toSet())
+        /** Convenience constructor that accepts DayOfWeek values as varargs. */
         public constructor(vararg days: DayOfWeek) : this(days.map(::CronDayOfWeek).toSet())
     }
 }
 
+/**
+ * Represents a specific day-of-month specification in a cron pattern.
+ *
+ * Currently only [Day] (specific day number) is fully supported.
+ * Advanced features like [Last] and [NearestWeekday] are not yet implemented.
+ */
 public sealed class CronDayOfMonth {
+    /** Last day of the month. */
     @Deprecated("This does not work yet")
     public data object Last : CronDayOfMonth() {
         override fun toString(): String = "L"
     }
 
+    /**
+     * A specific day number (1-31).
+     *
+     * @property number The day of the month (1-31)
+     */
     public data class Day(val number: Int) : CronDayOfMonth() {
         override fun toString(): String = number.toString()
     }
 
+    /**
+     * The nearest weekday to a given day number.
+     *
+     * @property number The reference day number
+     */
     @Deprecated("This does not work yet")
     public data class NearestWeekday(val number: Int) : CronDayOfMonth() {
         override fun toString(): String = "${number}W"
     }
 }
 
+/**
+ * Represents a day-of-week specification in a cron pattern.
+ *
+ * @property day The day of the week
+ * @property last Whether this is the last occurrence of this weekday in the month (not yet implemented)
+ * @property recurrence Which occurrence in the month (e.g., 2 for "second Monday") (not yet implemented)
+ */
 public data class CronDayOfWeek(
     val day: DayOfWeek,
     @Deprecated("This does not work yet")
@@ -114,6 +203,15 @@ public data class CronDayOfWeek(
     }
 }
 
+/**
+ * Advances this datetime to the next occurrence matching the cron pattern.
+ *
+ * If the current datetime already matches the pattern, returns the same datetime.
+ * Otherwise, advances to the next valid time according to the pattern.
+ *
+ * @param pattern The cron pattern to match
+ * @return The next datetime that matches the pattern
+ */
 public operator fun LocalDateTime.plus(pattern: CronPattern): LocalDateTime {
     return LocalDateTime(year, month, day, hour, minute).makeValid(pattern)
 }
@@ -197,7 +295,7 @@ private fun LocalDateTime.makeValid(pattern: CronPattern): LocalDateTime {
         when (val days = pattern.days) {
             CronDays.All -> break
             is CronDays.DaysOfMonth -> {
-                // TODO: Full support
+                // TODO: Add support for CronDayOfMonth.Last and CronDayOfMonth.NearestWeekday
                 val validDays = days.days.mapNotNull { (it as? CronDayOfMonth.Day)?.number }.sorted()
                 if (dayOfMonth in validDays) break
 
@@ -235,9 +333,48 @@ private fun LocalDateTime.makeValid(pattern: CronPattern): LocalDateTime {
     return LocalDateTime(year, month, dayOfMonth, hour, minute)
 }
 
+/**
+ * Represents a range of days of the week.
+ *
+ * Allows creating ranges like `DayOfWeek.MONDAY..DayOfWeek.FRIDAY`.
+ *
+ * @property start The starting day of the range
+ * @property endInclusive The ending day of the range (inclusive)
+ */
 public class DayOfWeekRange(override val start: DayOfWeek, override val endInclusive: DayOfWeek) : Iterable<DayOfWeek>,
     ClosedRange<DayOfWeek> {
     override fun iterator(): Iterator<DayOfWeek> = DayOfWeek.entries.filter { it in this }.iterator()
 }
 
+/**
+ * Creates a range from this day of week to another.
+ *
+ * Example: `DayOfWeek.MONDAY..DayOfWeek.FRIDAY`
+ */
 public operator fun DayOfWeek.rangeTo(endInclusive: DayOfWeek): DayOfWeekRange = DayOfWeekRange(this, endInclusive)
+
+/*
+ * TODO: API Recommendations for Cron.kt
+ *
+ * 1. Complete implementation of advanced day-of-month features:
+ *    - CronDayOfMonth.Last (last day of month)
+ *    - CronDayOfMonth.NearestWeekday (nearest weekday to a given day)
+ *    - CronDayOfWeek.last and CronDayOfWeek.recurrence (nth occurrence patterns)
+ *
+ * 2. Add cron string parsing functionality:
+ *    - CronPattern.parse(cronString: String): CronPattern
+ *    This would allow users to create patterns from standard cron expressions
+ *
+ * 3. Add validation for day-of-month values (1-31) in CronDayOfMonth.Day constructor
+ *    to fail fast on invalid input rather than at pattern execution time
+ *
+ * 4. Consider adding a nextOccurrence() or getNextRun() method that doesn't modify the
+ *    receiver datetime, making the API more explicit:
+ *    - fun CronPattern.nextOccurrence(after: LocalDateTime): LocalDateTime
+ *
+ * 5. Add timezone-aware scheduling support by accepting Instant instead of just LocalDateTime,
+ *    to handle DST transitions correctly
+ *
+ * 6. Consider adding a method to list next N occurrences:
+ *    - fun CronPattern.nextOccurrences(after: LocalDateTime, count: Int): List<LocalDateTime>
+ */

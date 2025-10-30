@@ -3,10 +3,11 @@ package com.lightningkite.lightningserver.typed.sdk
 
 
 interface Api {
+	fun withHeaderCalculator(calculator: suspend () -> List<Pair<String, String>>): Api
 	/**
 	 * Index
 	 * 
-	 * **Auth Requirements:** Not Authenticated
+	 * **Auth Requirements:** No Requirements
 	 * */
 	suspend fun index(): kotlin.Int
 	/**
@@ -14,7 +15,7 @@ interface Api {
 	 * 
 	 * Does something really really cool...
 	 * 
-	 * **Auth Requirements:** User *or* Not Authenticated
+	 * **Auth Requirements:** User *or* No Requirements
 	 * */
 	suspend fun improperSDKFunctionName(): kotlin.Int
 	/**
@@ -22,7 +23,7 @@ interface Api {
 	 * 
 	 * This endpoint is sometimes inlined, sometimes not.
 	 * 
-	 * **Auth Requirements:** IsAdmin *or* IsSuperUser (User with scope * and an additional requirement)
+	 * **Auth Requirements:** IsAdmin *or* IsSuperUser (User with root access and an additional requirement)
 	 * */
 	suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int
 
@@ -32,7 +33,7 @@ interface Api {
 		 * 
 		 * This is an endpoint included through a pre-build definition
 		 * 
-		 * **Auth Requirements:** User with scope pre:defined *or* User with scope foo *or* IsSuperUser (User with scope * and an additional requirement)
+		 * **Auth Requirements:** User with scope pre:defined *or* User with scope foo *or* IsSuperUser (User with root access and an additional requirement)
 		 * */
 		suspend fun preDefinedEndpoint(input: kotlin.Int): kotlin.Int
 	}
@@ -44,7 +45,7 @@ interface Api {
 		 * 
 		 * This is a test endpoint for the sdk
 		 * 
-		 * **Auth Requirements:** Authenticated with scopes [[sdk:test, sdk:other]] and max age of 8h *or* IsSuperUser (User with scope * and an additional requirement)
+		 * **Auth Requirements:** Authenticated with scopes [[sdk:test, sdk:other]] and max age of 8h *or* IsSuperUser (User with root access and an additional requirement)
 		 * */
 		suspend fun testSdkEndpoint(first: kotlin.String, input: com.lightningkite.lightningserver.typed.sdk.TestInput): kotlin.String
 		/**
@@ -52,7 +53,7 @@ interface Api {
 		 * 
 		 * This endpoint is sometimes inlined, sometimes not.
 		 * 
-		 * **Auth Requirements:** IsAdmin *or* IsSuperUser (User with scope * and an additional requirement)
+		 * **Auth Requirements:** IsAdmin *or* IsSuperUser (User with root access and an additional requirement)
 		 * */
 		suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int
 		/**
@@ -60,7 +61,7 @@ interface Api {
 		 * 
 		 * This endpoint is sometimes inlined, sometimes not.
 		 * 
-		 * **Auth Requirements:** IsAdmin *or* IsSuperUser (User with scope * and an additional requirement)
+		 * **Auth Requirements:** IsAdmin *or* IsSuperUser (User with root access and an additional requirement)
 		 * */
 		suspend fun inlinedEndpoint2(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int
 
@@ -70,7 +71,7 @@ interface Api {
 			 * 
 			 * This is a test endpoint for the sdk
 			 * 
-			 * **Auth Requirements:** Authenticated with scopes [[sdk:test, sdk:other]] and max age of 8h *or* IsSuperUser (User with scope * and an additional requirement)
+			 * **Auth Requirements:** Authenticated with scopes [[sdk:test, sdk:other]] and max age of 8h *or* IsSuperUser (User with root access and an additional requirement)
 			 * */
 			suspend fun testSdkEndpoint(second: kotlin.String, input: com.lightningkite.lightningserver.typed.sdk.TestInput): kotlin.String
 
@@ -80,7 +81,7 @@ interface Api {
 				 * 
 				 * This endpoint is sometimes inlined, sometimes not.
 				 * 
-				 * **Auth Requirements:** IsAdmin *or* IsSuperUser (User with scope * and an additional requirement)
+				 * **Auth Requirements:** IsAdmin *or* IsSuperUser (User with root access and an additional requirement)
 				 * */
 				suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int
 			}
@@ -94,7 +95,7 @@ interface Api {
 			 * 
 			 * This is a test endpoint for the sdk
 			 * 
-			 * **Auth Requirements:** Authenticated with scopes [[sdk:test, sdk:other]] and max age of 8h *or* IsSuperUser (User with scope * and an additional requirement)
+			 * **Auth Requirements:** Authenticated with scopes [[sdk:test, sdk:other]] and max age of 8h *or* IsSuperUser (User with root access and an additional requirement)
 			 * */
 			suspend fun testSdkEndpoint(second: kotlin.String, input: com.lightningkite.lightningserver.typed.sdk.TestInput): kotlin.String
 
@@ -104,7 +105,7 @@ interface Api {
 				 * 
 				 * This endpoint is sometimes inlined, sometimes not.
 				 * 
-				 * **Auth Requirements:** IsAdmin *or* IsSuperUser (User with scope * and an additional requirement)
+				 * **Auth Requirements:** IsAdmin *or* IsSuperUser (User with root access and an additional requirement)
 				 * */
 				suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int
 			}
@@ -120,7 +121,7 @@ interface Api {
 		 * 
 		 * This is a test endpoint for the sdk
 		 * 
-		 * **Auth Requirements:** Authenticated with scopes [[sdk:test, sdk:other]] and max age of 8h *or* IsSuperUser (User with scope * and an additional requirement)
+		 * **Auth Requirements:** Authenticated with scopes [[sdk:test, sdk:other]] and max age of 8h *or* IsSuperUser (User with root access and an additional requirement)
 		 * */
 		suspend fun testSdkEndpoint(second: kotlin.String, input: com.lightningkite.lightningserver.typed.sdk.TestInput): kotlin.String
 
@@ -130,7 +131,7 @@ interface Api {
 			 * 
 			 * This endpoint is sometimes inlined, sometimes not.
 			 * 
-			 * **Auth Requirements:** IsAdmin *or* IsSuperUser (User with scope * and an additional requirement)
+			 * **Auth Requirements:** IsAdmin *or* IsSuperUser (User with root access and an additional requirement)
 			 * */
 			suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int
 		}
@@ -144,7 +145,7 @@ interface Api {
 		 * 
 		 * This is a test endpoint for the sdk
 		 * 
-		 * **Auth Requirements:** Authenticated with scopes [[sdk:test, sdk:other]] and max age of 8h *or* IsSuperUser (User with scope * and an additional requirement)
+		 * **Auth Requirements:** Authenticated with scopes [[sdk:test, sdk:other]] and max age of 8h *or* IsSuperUser (User with root access and an additional requirement)
 		 * */
 		suspend fun testSdkEndpoint(third: kotlin.String, input: com.lightningkite.lightningserver.typed.sdk.TestInput): kotlin.String
 		/**
@@ -152,7 +153,7 @@ interface Api {
 		 * 
 		 * This endpoint is sometimes inlined, sometimes not.
 		 * 
-		 * **Auth Requirements:** IsAdmin *or* IsSuperUser (User with scope * and an additional requirement)
+		 * **Auth Requirements:** IsAdmin *or* IsSuperUser (User with root access and an additional requirement)
 		 * */
 		suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int
 
