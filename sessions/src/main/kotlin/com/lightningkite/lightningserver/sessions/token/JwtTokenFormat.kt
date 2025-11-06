@@ -105,8 +105,12 @@ public class JwtTokenFormat(
 
         val signature = decoder.decode(parts[2])
 
-        @Suppress("UNUSED_VARIABLE")
         val header: JwtHeader = server.internalSerialization.json.decodeFromString(decoder.decode(parts[0]).toString(Charsets.UTF_8))
+
+        // Prevent algorithm confusion attacks by validating the algorithm matches what we expect
+        if (header.alg != name) {
+            throw JwtSignatureException("Algorithm mismatch: expected $name, got ${header.alg}")
+        }
 
         val claims: JwtClaims = server.internalSerialization.json.decodeFromString(decoder.decode(parts[1]).toString(Charsets.UTF_8))
 

@@ -117,7 +117,6 @@ public value class RequiredScope(public val asString: String) {
  *
  * @property asString The string representation of the granted scope
  * @see RequiredScope
- * @see Subscope
  */
 @JvmInline
 @Serializable

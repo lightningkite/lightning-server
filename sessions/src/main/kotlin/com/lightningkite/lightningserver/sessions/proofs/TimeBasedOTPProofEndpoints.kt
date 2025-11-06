@@ -22,6 +22,8 @@ import com.lightningkite.lightningserver.typed.sdk.clientInterface
 import com.lightningkite.lightningserver.typed.sdk.info
 import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.services.cache.Cache
+import com.lightningkite.services.cache.get
+import com.lightningkite.services.cache.set
 import com.lightningkite.services.database.*
 import dev.turingcomplete.kotlinonetimepassword.HmacAlgorithm
 import dev.turingcomplete.kotlinonetimepassword.TimeBasedOneTimePasswordConfig
@@ -31,6 +33,7 @@ import kotlinx.serialization.builtins.serializer
 import java.security.SecureRandom
 import java.util.concurrent.TimeUnit
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.toJavaInstant
 import kotlin.uuid.Uuid
 
@@ -169,6 +172,10 @@ public class TimeBasedOTPProofEndpoints(
 
                     val matching = active.find { it.generator.isValid(input.password, now.toJavaInstant()) }
                         ?: throw BadRequestException("User ID and code do not match")
+
+                    // It's OK to reuse TOTPs.  That's inherently part of how they work - they're time based hashes.
+                    // There can't be more than one valid code at a time, so if a user needed to sign in multiple times,
+                    // then they have to be able to use them twice.
 
                     modelInfo.table().updateOneById(matching._id, modification {
                         it.lastUsedAt assign now

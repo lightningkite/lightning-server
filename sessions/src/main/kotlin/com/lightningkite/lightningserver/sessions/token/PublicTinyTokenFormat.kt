@@ -47,6 +47,7 @@ public class PublicTinyTokenFormat(
         val signature = decoded.sliceArray(0 until resultSize.await())
         val data = decoded.sliceArray(resultSize.await() until decoded.size)
 
+        // Good: Signature verification happens before deserialization, preventing tampering
         if (!hasher.await().verify(data, signature)) throw TokenException("Incorrect signature")
 
         val auth = server.internalSerialization.kotlinBytesFormat.decodeFromByteArray(

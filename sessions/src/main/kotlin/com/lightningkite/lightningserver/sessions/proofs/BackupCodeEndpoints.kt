@@ -79,7 +79,7 @@ public class BackupCodeEndpoints(
     public val modelInfo: ModelInfo<HasId<*>?, BackupCodeSecret, Uuid> =
         database.modelInfo(
             auth = noAuth,
-            permissions = { ModelPermissions<BackupCodeSecret>() }
+            permissions = { ModelPermissions<BackupCodeSecret>(all = Condition.Never) }
         )
 
     public val resetCodes: ApiHttpHandler<PathSpec0, HasId<*>, Unit, List<String>> =
