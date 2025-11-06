@@ -51,6 +51,7 @@ public fun <V> ListRegistry(): ListRegistry<V> = BasicListRegistry()
  * @return A new registry containing the items
  */
 public fun <V> ListRegistry(items: List<V>): ListRegistry<V> = BasicListRegistry(ArrayList(items))
+public fun <V> ListRegistry(vararg items: V): ListRegistry<V> = BasicListRegistry(ArrayList(items.toList()))
 
 /**
  * Builds an immutable list using a [ListRegistry].

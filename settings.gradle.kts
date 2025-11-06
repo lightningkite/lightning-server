@@ -29,11 +29,14 @@ include(":media")
 include(":media-shared")
 
 include(":sessions")
+include(":sessions-shared")
 include(":sessions-email")
 //include(":sessions-oauth")
 //include(":sessions-oauth-shared")
-include(":sessions-shared")
 include(":sessions-sms")
+
+include(":notifications")
+include(":notifications-shared")
 
 include(":engine-local")
 include(":engine-ktor")
