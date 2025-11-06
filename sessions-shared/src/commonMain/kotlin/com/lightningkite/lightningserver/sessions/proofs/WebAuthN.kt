@@ -20,6 +20,26 @@ import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
 
+/**
+ * Stored credential for WebAuthn (Web Authentication) authentication.
+ * WebAuthn enables passwordless authentication using hardware security keys, biometrics, or platform authenticators.
+ *
+ * @property _id Credential ID (Base64 url-encoded), serves as unique identifier
+ * @property subjectId ID of the user this credential belongs to
+ * @property subjectType Type of subject (e.g., "User")
+ * @property displayName Human-readable name for this credential (e.g., "YubiKey 5C", "Touch ID")
+ * @property residentKey Whether this is a resident key (stored on the authenticator)
+ * @property authenticatorAttachment Type of authenticator ("platform" for built-in, "cross-platform" for external)
+ * @property attestationObject Base64 url-encoded attestation object containing public key and metadata
+ * @property lastSignCount Counter from last authentication (used to detect cloned authenticators)
+ * @property transports Available transport methods (USB, NFC, BLE, internal, hybrid)
+ * @property establishedAt When this credential was registered
+ * @property lastUsedAt Last time this credential was used for authentication
+ * @property expiresAt Optional expiration time for the credential
+ * @property disabledAt If set, this credential has been disabled
+ *
+ * Security: The sign count should increment on each use. A decrease indicates credential cloning.
+ */
 @Serializable
 @GenerateDataClassPaths
 @IndexSet(["subjectId", "subjectType", "expiresAt", "disabledAt"])
@@ -42,11 +62,28 @@ public data class WebAuthNCredential(
 ) : HasId<String>
 
 
+/**
+ * WebAuthn (Web Authentication API) models and utilities.
+ * Implements W3C WebAuthn specification for passwordless authentication using public key cryptography.
+ *
+ * WebAuthn allows users to authenticate using:
+ * - Hardware security keys (YubiKey, Titan)
+ * - Platform authenticators (Touch ID, Face ID, Windows Hello)
+ * - Cross-platform authenticators (USB, NFC, BLE devices)
+ */
 public object WebAuthN {
 
+    /**
+     * Base64 URL-safe encoder for WebAuthn data.
+     * Used for encoding binary data (challenges, credentials, signatures) for transmission.
+     */
     @OptIn(ExperimentalEncodingApi::class)
     public val base64Encoder: Base64 = Base64.UrlSafe
 
+    /**
+     * Base64 URL-safe decoder with optional padding.
+     * Accepts both padded and unpadded Base64 strings per WebAuthn specification.
+     */
     @OptIn(ExperimentalEncodingApi::class)
     public val base64Decoder: Base64 = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
 
@@ -412,3 +449,26 @@ public object WebAuthN {
         )
     }
 }
+
+/*
+ * TODO API Recommendations:
+ *
+ * 1. Consider adding helper functions for common WebAuthn operations:
+ *    - Generating random challenges with appropriate entropy
+ *    - Validating origin/RP ID matches
+ *    - Verifying signature format before server-side verification
+ *
+ * 2. Consider adding configuration models for:
+ *    - Timeout defaults (currently nullable Int, consider Duration type)
+ *    - Challenge expiration policies
+ *    - Allowed authenticator types per application security policy
+ *
+ * 3. The attestationObject in WebAuthNCredential contains the public key but it's Base64 encoded.
+ *    Consider adding a parsed representation or helper to extract the public key for easier verification.
+ *
+ * 4. Sign count security: Consider adding a helper function or validation to detect sign count anomalies
+ *    (backwards movement indicating cloned authenticators).
+ *
+ * 5. Transport hints: Consider using an enum instead of List<String> for transports to provide
+ *    type safety and prevent invalid values.
+ */

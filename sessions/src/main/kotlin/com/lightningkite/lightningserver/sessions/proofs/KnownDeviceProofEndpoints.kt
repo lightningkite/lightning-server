@@ -176,6 +176,7 @@ public class KnownDeviceProofEndpoints(
                     val active = modelInfo.table().get(id)
                         ?: throw BadRequestException("No such known device")
 
+                    // Good: Uses constant-time checkAgainstHash to prevent timing attacks
                     if (!secret.checkAgainstHash(active.hash))
                         throw BadRequestException("User ID and code do not match")
 

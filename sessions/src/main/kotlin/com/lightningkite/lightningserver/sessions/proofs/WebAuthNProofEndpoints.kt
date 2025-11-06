@@ -441,6 +441,10 @@ public class WebAuthNProofEndpoints(
                     throw BadRequestException("Failed to verify Authenticator")
                 }
 
+                // TODO: Security issue: Sign count anomaly detection is not implemented.
+                // The authenticator's sign count is updated but never checked for rollback (cloning attack).
+                // If authData.signCount < publicKeyCredential.lastSignCount, the credential may be cloned.
+                // Recommendation: Add validation: if (newSignCount < publicKeyCredential.lastSignCount) throw SecurityException("Possible credential cloning detected")
                 modelInfo.table().updateOneById(
                     publicKeyCredential._id,
                     modification {

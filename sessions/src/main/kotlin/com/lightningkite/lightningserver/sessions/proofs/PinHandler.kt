@@ -64,6 +64,10 @@ public open class PinHandler(
         }
         cache().add(attemptCacheKey(key), 1)
         val fixedPin = if (mixedCaseMode) pin else pin.lowercase()
+        // TODO: Security issue: Error message reveals number of remaining attempts.
+        // This information helps attackers optimize their brute-force strategy.
+        // Recommendation: Use a generic "Incorrect PIN" message without revealing attempt count.
+        // The attempt limiting still works, but attackers won't know how close they are to lockout.
         if (!fixedPin.checkAgainstHash(hashedPin)) throw BadRequestException(
             detail = "pin-incorrect",
             message = "Incorrect PIN.  ${maxAttempts - attempts} attempts remain."

@@ -21,7 +21,42 @@ import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer
 
-
+/**
+ * Live HTTP implementation of [ClientModelRestEndpoints] that makes actual REST API calls.
+ *
+ * This class implements the full CRUD API by making HTTP requests via a [Fetcher].
+ * All requests are made to endpoints under the specified subpath.
+ *
+ * Endpoint URL patterns:
+ * - GET /{subpath}/_default_ - default()
+ * - GET /{subpath}/_permissions_ - permissions()
+ * - POST /{subpath}/query - query()
+ * - POST /{subpath}/query-partial - queryPartial()
+ * - GET /{subpath}/{id} - detail()
+ * - POST /{subpath}/bulk - insertBulk()
+ * - POST /{subpath} - insert()
+ * - POST /{subpath}/{id} - upsert()
+ * - PUT /{subpath} - bulkReplace()
+ * - PUT /{subpath}/{id} - replace()
+ * - PATCH /{subpath}/bulk - bulkModify()
+ * - PATCH /{subpath}/{id}/delta - modifyWithDiff()
+ * - PATCH /{subpath}/{id} - modify()
+ * - POST /{subpath}/bulk-delete - bulkDelete()
+ * - DELETE /{subpath}/{id} - delete()
+ * - POST /{subpath}/count - count()
+ * - POST /{subpath}/group-count - groupCount()
+ * - POST /{subpath}/group-count-2 - groupCount2()
+ * - POST /{subpath}/aggregate - aggregate()
+ * - POST /{subpath}/group-aggregate - groupAggregate()
+ * - POST /{subpath}/group-aggregate-2 - groupAggregate2()
+ *
+ * @param T The model type
+ * @param ID The ID type
+ * @property fetcher HTTP client for making requests
+ * @property subpath Base path for all endpoints (e.g., "/api/posts")
+ * @property serializer Serializer for the model type
+ * @property idSerializer Serializer for the ID type
+ */
 public open class LiveClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
     public val fetcher: Fetcher,
     public val subpath: String,
@@ -201,6 +236,18 @@ public open class LiveClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID
     private fun ID.url() = fetcher.url(this, idSerializer)
 }
 
+/**
+ * Live WebSocket implementation of [ClientModelRestUpdatesWebsocket].
+ *
+ * Connects to a WebSocket endpoint that provides real-time updates for a model collection.
+ *
+ * @param T The model type
+ * @param ID The ID type
+ * @property fetcher HTTP/WebSocket client
+ * @property subpath Base path for the WebSocket endpoint
+ * @property serializer Serializer for the model type
+ * @property idSerializer Serializer for the ID type
+ */
 public open class LiveClientModelRestUpdatesWebsocket<T : HasId<ID>, ID : Comparable<ID>>(
     public val fetcher: Fetcher,
     public val subpath: String,
@@ -211,6 +258,18 @@ public open class LiveClientModelRestUpdatesWebsocket<T : HasId<ID>, ID : Compar
         fetcher.websocket(subpath, Condition.serializer(serializer), CollectionUpdates.serializer(serializer, idSerializer))
 }
 
+/**
+ * Combined live implementation providing both REST endpoints and WebSocket updates.
+ *
+ * Uses delegation to combine [LiveClientModelRestEndpoints] and [LiveClientModelRestUpdatesWebsocket].
+ *
+ * @param T The model type
+ * @param ID The ID type
+ * @property fetcher HTTP/WebSocket client
+ * @property subpath Base path for all endpoints
+ * @property serializer Serializer for the model type
+ * @property idSerializer Serializer for the ID type
+ */
 public class LiveClientModelRestEndpointsAndUpdatesWebsocket<T : HasId<ID>, ID : Comparable<ID>>(
     public val fetcher: Fetcher,
     public val subpath: String,

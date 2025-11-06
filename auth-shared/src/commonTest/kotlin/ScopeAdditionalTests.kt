@@ -10,7 +10,7 @@ class ScopeAdditionalTests {
     @Test
     fun rootBehavior() {
         // Granted root meets all requirements
-        assertTrue(GrantedScope.root.meetsRequirements(RequiredScope("*")))
+        assertTrue(GrantedScope.root.meetsRequirements(RequiredScope.root))
         assertTrue(GrantedScope.root.meetsRequirements(RequiredScope("a")))
         assertTrue(GrantedScope.root.meetsRequirements(RequiredScope("a:b:c")))
 
