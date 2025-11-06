@@ -15,15 +15,40 @@ import com.lightningkite.services.database.Query
 import com.lightningkite.services.database.comparator
 import kotlinx.serialization.builtins.ListSerializer
 
+/**
+ * Registry for managing typed event types in the notification system.
+ *
+ * This is a lightweight wrapper around a [MapRegistry] that ensures type-safe storage
+ * and retrieval of event types. Event types are automatically registered during construction
+ * of [TypedEventType] instances.
+ *
+ * @param USER The user type (nullable for public events)
+ */
 @JvmInline
 public value class EventRegistry<USER : HasId<*>?>(
     private val registry: MapRegistry<String, TypedEventType<USER, *, *>> = MapRegistry()
 ) : Map<String, TypedEventType<USER, *, *>> by registry {
+    /**
+     * Registers an event type with this registry.
+     *
+     * Called automatically by [TypedEventType] constructor.
+     */
     public fun register(eventType: TypedEventType<USER, *, *>) {
         registry.register(eventType.name, eventType)
     }
 }
 
+/**
+ * Provides REST endpoints for querying registered event types.
+ *
+ * Creates a POST endpoint that accepts [Query] objects to filter and retrieve
+ * event types based on permissions and query conditions.
+ *
+ * @param AUTH The authentication type
+ * @property registry The event registry to query
+ * @property auth Authentication requirement for the endpoint
+ * @property permissions Function to determine read permissions for event types
+ */
 public class EventEndpoints<AUTH : HasId<*>?>(
     private val registry: EventRegistry<*>,
     public val auth: AuthRequirement<AUTH>,
@@ -31,6 +56,12 @@ public class EventEndpoints<AUTH : HasId<*>?>(
 ) : ServerBuilder() {
     private fun <T> List<T>.sortedWithNullable(comparator: Comparator<T>?): List<T> = if (comparator == null) this else sortedWith(comparator)
 
+    /**
+     * Endpoint to query registered event types.
+     *
+     * Accepts a [Query] with filtering, sorting, and pagination options.
+     * Results are filtered by read permissions before being returned.
+     */
     public val queryEventTypes: ApiHttpHandler<PathSpec0, AUTH, Query<EventType>, List<EventType>> =
         path.post bind explicitApiHttpHandler(
             summary = "Query Event Types",

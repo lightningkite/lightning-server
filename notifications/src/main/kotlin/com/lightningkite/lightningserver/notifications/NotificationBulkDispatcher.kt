@@ -440,7 +440,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
 
     public val autoRefreshNotifications: ScheduledTask =
         path.path("refresh-notifs") bind ScheduledTask(1.minutes) {
-            val acquiredLock = cache().setIfNotExists(scheduleLockKey, "lock", String.serializer(), timeout*16)       // TODO: I'm not sure if this timeout will remove the item, if it doesn't that breaks this functionality
+            val acquiredLock = cache().setIfNotExists(scheduleLockKey, "lock", String.serializer(), timeout*16)
             if (acquiredLock) refreshNotifications()
         }
 }

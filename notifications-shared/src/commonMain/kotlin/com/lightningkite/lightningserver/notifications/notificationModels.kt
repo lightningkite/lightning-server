@@ -18,6 +18,12 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/**
+ * Represents a specific time in a specific time zone.
+ *
+ * @property time The local time (hour and minute)
+ * @property zone The time zone in which this time should be interpreted
+ */
 @Serializable
 @GenerateDataClassPaths
 public data class TimeInZone(
@@ -74,13 +80,12 @@ public data class Frequency private constructor(
         public fun batch(minutes: Int): Frequency = Frequency(null, null, minutes, null)
     }
 
-    // prioritizes longer specified time periods
     private fun weeklyAt(now: Instant): Instant? {
         val weekDay = onlyOn ?: return null
         val (time, timeZone) = onlyAt ?: return null
 
         val dateTime = now.toLocalDateTime(timeZone)
-        val numDays = (dateTime.date.dayOfWeek.ordinal - weekDay.ordinal) % 7
+        val numDays = (weekDay.ordinal - dateTime.date.dayOfWeek.ordinal) % 7
         var sendAt = LocalDateTime(dateTime.date.plus(numDays, DateTimeUnit.DAY), time).toInstant(timeZone)
         if (sendAt < now) {
             sendAt = sendAt.plus(1, DateTimeUnit.WEEK, timeZone)
@@ -124,6 +129,12 @@ public data class Frequency private constructor(
     public fun delayed(duration: Duration): Frequency = copy(delay = duration)
 }
 
+/**
+ * Tracks the send status for a specific notification delivery method.
+ *
+ * @property sendAt The scheduled time to send this notification
+ * @property sent Whether the notification has been successfully sent
+ */
 @Serializable
 @GenerateDataClassPaths
 public data class SendInfo(
@@ -131,6 +142,28 @@ public data class SendInfo(
     val sent: Boolean = false
 )
 
+/**
+ * Represents a notification to be delivered to a user.
+ *
+ * Notifications are created in response to events and contain the content to be delivered
+ * through various channels (email, SMS, push, in-app). Each channel has optional [SendInfo]
+ * that tracks when and whether the notification was sent.
+ *
+ * The database indexes on [user] and [sendAt] to efficiently query pending notifications.
+ *
+ * @param UID The type of user identifier
+ * @param CONTENT The type of notification content (application-specific)
+ * @property _id Unique identifier for this notification
+ * @property event The event that triggered this notification
+ * @property user The user who should receive this notification
+ * @property content The notification content (format determined by application)
+ * @property createdAt When this notification was created
+ * @property read When the user marked this notification as read (null if unread)
+ * @property email Email delivery info, or null if email delivery is disabled
+ * @property push Push notification delivery info, or null if push is disabled
+ * @property sms SMS delivery info, or null if SMS is disabled
+ * @property inApp In-app notification delivery info, or null if in-app is disabled
+ */
 @Serializable
 @GenerateDataClassPaths
 @IndexSet(["user", "sendAt",])
@@ -148,6 +181,14 @@ public data class Notification<UID, CONTENT>(
 ): HasId<Uuid>
 
 
+/**
+ * Interface for objects that specify notification delivery frequencies for each channel.
+ *
+ * Used to determine when notifications should be sent for a specific user and event type.
+ * A null frequency indicates that channel is disabled for this subscription.
+ *
+ * @param UID The type of user identifier
+ */
 public interface ScheduledSendMethods<UID : Comparable<UID>> {
     public val user: UID
     public val email: Frequency?
@@ -164,6 +205,15 @@ private data class ScheduledSendMethodsData<UID : Comparable<UID>>(
     override val inApp: Frequency?
 ) : ScheduledSendMethods<UID>
 
+/**
+ * Factory function to create a [ScheduledSendMethods] instance.
+ *
+ * @param user The user identifier
+ * @param email Email delivery frequency (defaults to immediate)
+ * @param sms SMS delivery frequency (defaults to immediate)
+ * @param push Push notification delivery frequency (defaults to immediate)
+ * @param inApp In-app notification delivery frequency (defaults to immediate)
+ */
 public fun <UID : Comparable<UID>> ScheduledSendMethods(
     user: UID,
     email: Frequency? = Frequency.immediately(),
@@ -171,3 +221,27 @@ public fun <UID : Comparable<UID>> ScheduledSendMethods(
     push: Frequency? = Frequency.immediately(),
     inApp: Frequency? = Frequency.immediately()
 ): ScheduledSendMethods<UID> = ScheduledSendMethodsData(user, email, sms, push, inApp)
+
+/*
+ * TODO: API Recommendations for notificationModels.kt:
+ *
+ * 1. Add a helper method to Frequency for common patterns:
+ *    - Frequency.disabled() or Frequency.never() to explicitly represent disabled channels
+ *    - Consider if null should represent "not configured" vs "disabled"
+ *
+ * 2. Consider adding validation to Frequency:
+ *    - batchMinutes should probably have a minimum value (e.g., 1 minute)
+ *    - Maximum batch interval might be useful
+ *
+ * 3. The Notification class could benefit from helper methods:
+ *    - isRead(): Boolean = read != null
+ *    - hasUnsentChannels(at: Instant): Boolean to check if any channel needs sending
+ *    - needsSending(at: Instant): Boolean to consolidate the private needsSending logic
+ *
+ * 4. Consider adding a MarkAsReadModification or similar to make marking notifications read
+ *    easier and more consistent across implementations.
+ *
+ * 5. The IndexSet annotation only includes ["user", "sendAt"] but queries likely need to filter
+ *    by sent status and sendAt together. Consider adding a composite index like
+ *    ["user", "email.sent", "email.sendAt"] or similar for each channel.
+ */
