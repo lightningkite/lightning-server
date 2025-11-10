@@ -128,3 +128,31 @@ public fun ScheduledTask(
             handler(server)
         }
     }
+
+/*
+ * TODO: API Recommendations for ScheduledTask.kt
+ *
+ * 1. Add support for missed execution handling:
+ *    - enum class MissedExecutionBehavior { SKIP, RUN_IMMEDIATELY, RUN_ALL_MISSED }
+ *    - val missedExecutionBehavior: MissedExecutionBehavior
+ *    This is important when server is down during scheduled time.
+ *
+ * 2. Add execution tracking/history:
+ *    - val lastExecutionTime: Instant?
+ *    - val nextExecutionTime: Instant?
+ *    - val executionCount: Long
+ *
+ * 3. Consider adding conditional execution:
+ *    - suspend fun shouldExecute(): Boolean
+ *    Allows tasks to check conditions before running.
+ *
+ * 4. Add lifecycle hooks for monitoring:
+ *    - suspend fun onScheduled()
+ *    - suspend fun onSkipped(reason: String)
+ *
+ * 5. The default timeout of 5 minutes in the factory functions is different from the
+ *    interface default of 30 seconds. This inconsistency could be confusing.
+ *
+ * 6. Add support for exclusive execution to prevent overlapping runs:
+ *    - val allowConcurrent: Boolean = false
+ */

@@ -76,3 +76,23 @@ public data class HttpRequest<PATH: PathSpec>(
         body = body,
     )
 }
+
+/*
+ * TODO: API Recommendations for HttpRequest.kt
+ *
+ * 1. The @Transient annotation on body means it won't be serialized, which could cause
+ *    issues if someone tries to serialize a request. Consider documenting this limitation
+ *    or providing a warning in the class KDoc.
+ *
+ * 2. Add convenience extension functions for common body operations:
+ *    - suspend fun HttpRequest<*>.textBody(): String
+ *    - suspend fun <T> HttpRequest<*>.jsonBody(serializer: KSerializer<T>): T
+ *    - fun HttpRequest<*>.requireBody(): TypedData (throws if null)
+ *
+ * 3. Consider adding a toString() method that doesn't include the full body content
+ *    for logging purposes (to avoid logging sensitive data or large payloads).
+ *
+ * 4. The cache is mutable but shared across request copies, which could lead to
+ *    unexpected behavior if not documented clearly. Consider adding a warning about
+ *    cache sharing in copyWithNewPathType documentation.
+ */

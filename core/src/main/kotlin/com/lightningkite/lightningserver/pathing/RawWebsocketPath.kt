@@ -10,6 +10,9 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
+/**
+ * Custom serializer for [RawWebsocketPath] that stores the path as a string.
+ */
 private class PathSerializer<T: PathSpec>(ignored: KSerializer<T>) : KSerializer<RawWebsocketPath<T>> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.lightningserver.Path", PrimitiveKind.STRING)
 
@@ -25,8 +28,29 @@ private class PathSerializer<T: PathSpec>(ignored: KSerializer<T>) : KSerializer
     }
 }
 
+/**
+ * Represents an unresolved WebSocket path that will be matched against registered endpoints.
+ *
+ * Similar to [RawHttpEndpoint] but for WebSocket connections. The path is parsed into segments
+ * and matched against the server's registered WebSocket handlers when accessed in a ServerRuntime context.
+ *
+ * **Usage:**
+ * ```kotlin
+ * context(serverRuntime) {
+ *     val wsPath = RawWebsocketPath<PathSpec0>("/chat")
+ *     val resolved = wsPath.pathInContext // Matches against registered WebSocket paths
+ * }
+ * ```
+ *
+ * @param PATH The path specification type that this path will be matched against
+ * @property pathSegments The parsed path segments
+ *
+ * @see RawHttpEndpoint
+ * @see HasContextualPath
+ */
 @Serializable(with = PathSerializer::class)
 public class RawWebsocketPath<PATH: PathSpec>(public val pathSegments: PathSegments): HasContextualPath<PATH> {
+    /** Constructs a raw WebSocket path from a string. */
     public constructor(path: String): this(PathSegments.parse(path))
 
     @Suppress("UNCHECKED_CAST")

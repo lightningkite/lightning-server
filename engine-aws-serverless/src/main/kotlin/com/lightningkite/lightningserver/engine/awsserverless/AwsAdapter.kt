@@ -158,9 +158,9 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
     }
 
     override val serverId: String
-        get() =  System.getenv("AWS_LAMBDA_LOG_STREAM_NAME")
+        get() =  System.getenv("AWS_LAMBDA_LOG_STREAM_NAME") ?: System.getenv("AWS_LAMBDA_FUNCTION_VERSION") ?: "Unknown"
     override val serverVersion: String
-        get() = System.getenv("AWS_LAMBDA_FUNCTION_VERSION")
+        get() = System.getenv("AWS_LAMBDA_FUNCTION_VERSION") ?: "Unknown"
 
     override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>) {
         ws.publish(event.path(internalSerialization.stringArrayFormat), event.topic.type, event.value)

@@ -83,3 +83,31 @@ public fun <INPUT> Task(
  */
 context(server: ServerRuntime)
 public suspend fun <INPUT> Task<INPUT>.launch(input: INPUT): Unit = with(server) { invoke(input) }
+
+/*
+ * TODO: API Recommendations for Task.kt
+ *
+ * 1. The launch() extension calls invoke() on the Task, but Task doesn't define an invoke operator.
+ *    This appears to be calling server.invoke(input) which suggests there's runtime lookup logic.
+ *    Document this behavior or make the invocation path more explicit.
+ *
+ * 2. Add support for task retries on failure:
+ *    - val maxRetries: Int
+ *    - val retryDelay: Duration
+ *    - fun shouldRetry(exception: Exception): Boolean
+ *
+ * 3. Consider adding task priority for queue-based execution:
+ *    - enum class TaskPriority { LOW, NORMAL, HIGH, CRITICAL }
+ *    - val priority: TaskPriority
+ *
+ * 4. Add lifecycle hooks for observability:
+ *    - suspend fun onStart(input: INPUT)
+ *    - suspend fun onComplete(input: INPUT)
+ *    - suspend fun onFailure(input: INPUT, exception: Exception)
+ *
+ * 5. The default timeout of 5 minutes in the factory functions is different from the
+ *    interface default of 30 seconds. This inconsistency could be confusing.
+ *
+ * 6. Add a way to cancel running tasks:
+ *    - suspend fun cancel(reason: String)
+ */

@@ -184,3 +184,36 @@ public value class QueryParameters(public val entries: List<Pair<String, String>
         override fun serialize(encoder: Encoder, value: QueryParameters) = encoder.encodeString(value.toString())
     }
 }
+
+/*
+ * TODO: API Recommendations and Issues for parse.kt
+ *
+ * 1. **ISSUE**: PathAndParams.parse() doesn't handle paths with multiple '?' correctly.
+ *    Only splits on first '?' but subsequent '?' in query string will be kept as-is.
+ *    This is probably fine but worth documenting.
+ *
+ * 2. **ISSUE**: PathSegments.parse() with an empty string results in a single empty segment [""]
+ *    instead of an empty list. This is because "".split("/") returns [""].
+ *    Consider: if (path.isEmpty()) return EMPTY
+ *
+ * 3. **ISSUE**: QueryParameters.parse() with an empty string results in one entry with empty key and value
+ *    instead of EMPTY. Consider: if (path.isEmpty()) return EMPTY
+ *
+ * 4. **CRITICAL TODO**: The pathHack() function is marked as a "fugly hack" and should be removed.
+ *    This appears to be a workaround for WebSocket authentication. Document the proper fix.
+ *
+ * 5. QueryParameters could benefit from a getAll(key: String): List<String> method
+ *    for retrieving all values for a given key (e.g., multiple tags).
+ *
+ * 6. The parsing doesn't handle invalid URL encoding gracefully - URLDecoder.decode can throw
+ *    IllegalArgumentException. Consider wrapping in try-catch or using Result type.
+ *
+ * 7. PathSegments removes leading slash but not trailing slash. A path like "/api/users/"
+ *    will have an empty string as the last segment. Document or handle this behavior.
+ *
+ * 8. Consider adding a merge/combine method for QueryParameters to easily combine
+ *    query strings from different sources.
+ *
+ * 9. The toString() implementation uses deprecated URLEncoder.encode(String, Charset).
+ *    While it still works, consider updating to URLEncoder.encode(String, String) with "UTF-8".
+ */

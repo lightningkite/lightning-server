@@ -10,6 +10,33 @@ import kotlinx.serialization.StringFormat
 
 /**
  * A [PathSpec] with all of its wildcard values fulfilled.
+ *
+ * ResolvedPath represents a path specification where all typed wildcards have been filled with
+ * concrete values. This is what you get in request handlers when a path is matched - the PathSpec
+ * pattern plus the actual values extracted from the URL.
+ *
+ * For example, if your PathSpec is `/users/{userId}/posts/{postId}` and a request comes in for
+ * `/users/john/posts/42`, the ResolvedPath would contain:
+ * - pathSpec: the PathSpec2<String, Int> pattern
+ * - rawPathArguments: ["john", 42]
+ * - Accessible via type-safe `.arg1` and `.arg2` properties
+ *
+ * Example usage in a handler:
+ * ```kotlin
+ * val userPost = path.path("users").arg<String>("userId")
+ *     .path("posts").arg<Int>("postId").get
+ *
+ * userPost bind HttpHandler { request ->
+ *     val userId: String = request.path.arg1  // "john"
+ *     val postId: Int = request.path.arg2     // 42
+ *     // Handle request...
+ * }
+ * ```
+ *
+ * @param PATH The PathSpec type (PathSpec0, PathSpec1<A>, etc.)
+ * @property pathSpec The path specification pattern that was matched
+ * @property rawPathArguments The parsed wildcard values in order
+ * @property trailingSegments Optional trailing path segments if the PathSpec uses [PathSpec.Afterwards.TrailingSegments]
  */
 @ConsistentCopyVisibility
 public data class ResolvedPath<out PATH: PathSpec> internal constructor(
@@ -56,10 +83,26 @@ public data class ResolvedPath<out PATH: PathSpec> internal constructor(
     public fun toString(stringArrayFormat: StringArrayFormat): String = path(stringArrayFormat)
 }
 
+/**
+ * Interface for objects that can provide a [ResolvedPath] when given a [ServerRuntime] context.
+ *
+ * This is used for lazy path resolution where the path cannot be determined until runtime context is available.
+ * Common use cases include paths that depend on server settings or need to look up endpoints.
+ *
+ * @param PATH The PathSpec type
+ */
 public interface HasContextualPath<out PATH : PathSpec> {
     context(server: ServerRuntime) public val pathInContext: ResolvedPath<PATH>
 }
 
+/**
+ * Interface for objects that directly contain a [ResolvedPath].
+ *
+ * This is simpler than [HasContextualPath] - the path is already resolved and available immediately
+ * without requiring server context. Request objects implement this interface.
+ *
+ * @param PATH The PathSpec type
+ */
 public interface HasResolvedPath<PATH : PathSpec> {
     public val path: ResolvedPath<PATH>
 }
@@ -148,3 +191,31 @@ context(serverRuntime: ServerRuntime)
 public fun HasContextualPath<*>.pathSegments(stringArrayFormat: StringArrayFormat): PathSegments = pathInContext.pathSegments(stringArrayFormat)
 context(serverRuntime: ServerRuntime)
 public fun HasContextualPath<*>.path(stringArrayFormat: StringArrayFormat): String = pathInContext.path(stringArrayFormat)
+
+/*
+ * TODO: API Recommendations for ResolvedPath.kt
+ *
+ * 1. The arg1, arg2, arg3 accessors use unchecked casts (as A, as B, as C). While this is safe
+ *    given the type system guarantees, if the internal state is corrupted it could cause ClassCastException.
+ *    Consider adding validation or using safe casts with better error messages.
+ *
+ * 2. The @JvmName annotations for arg accessors are necessary to avoid signature clashes, but this
+ *    creates many similar method names in the JVM bytecode. Document why these are necessary.
+ *
+ * 3. ResolvedPath construction silently filters out trailingSegments if path.after != TrailingSegments.
+ *    This could lead to data loss if caller provides trailing segments but the path doesn't support them.
+ *    Consider throwing an exception or at least logging a warning.
+ *
+ * 4. The Segment.WildcardWithValue constructor takes value: T but stores it with nullable type in the
+ *    rawPathArguments list. This means null values are technically possible even though the type system
+ *    suggests otherwise. Document this behavior or add validation.
+ *
+ * 5. The toString() method shows human-readable representation like "{name=value}" but this isn't URL-encoded.
+ *    This could be confusing since the actual path would have encoded values. Consider adding toDebugString().
+ *
+ * 6. No way to modify a ResolvedPath (e.g., change one argument value). This is probably intentional
+ *    for immutability, but adding a copy() function with argument replacement would be useful for testing.
+ *
+ * 7. The lazy segments calculation could fail if pathSpec.segments and rawPathArguments sizes don't match.
+ *    Add validation in the constructor to catch this early.
+ */

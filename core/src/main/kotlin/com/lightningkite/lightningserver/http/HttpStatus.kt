@@ -138,3 +138,24 @@ public value class HttpStatus(public val code: Int) {
 
     override fun toString(): String = code.toString() + (strings[code]?.let { " $it" } ?: "")
 }
+
+/*
+ * TODO: API Recommendations for HttpStatus.kt
+ *
+ * 1. Add convenience properties for status code categories:
+ *    - val isInformational: Boolean (1xx)
+ *    - val isRedirection: Boolean (3xx)
+ *    - val isClientError: Boolean (4xx)
+ *    - val isServerError: Boolean (5xx)
+ *
+ * 2. Missing some common status codes:
+ *    - 418 I'm a teapot (often used for testing/jokes)
+ *    - 451 Unavailable For Legal Reasons
+ *    - 425 Too Early
+ *
+ * 3. Consider adding a description property that returns the standard text for the code:
+ *    - val description: String?
+ *
+ * 4. Add validation to ensure status codes are in valid range (100-599):
+ *    - init { require(code in 100..599) { "Invalid HTTP status code: $code" } }
+ */

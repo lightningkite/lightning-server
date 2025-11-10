@@ -59,3 +59,34 @@ public data class MultiplexMessage(
     val data: String? = null,
     val error: String? = null
 )
+
+/*
+ * TODO: API Recommendations
+ *
+ * 1. LSError: Consider adding factory methods for common error types:
+ *    - LSError.notFound(message: String, detail: String = "not-found")
+ *    - LSError.badRequest(message: String, detail: String = "bad-request")
+ *    - LSError.unauthorized(message: String, detail: String = "unauthorized")
+ *    This would make error creation more consistent and less error-prone.
+ *
+ * 2. LSError: The 'data' field is a String but typically contains JSON. Consider:
+ *    - Making it more type-safe with a generic parameter or JsonElement type
+ *    - Adding a helper method: inline fun <reified T> dataAs(): T to deserialize
+ *    - Documenting that it should be valid JSON
+ *
+ * 3. LSError: Consider adding validation that 'http' is a valid HTTP status code (100-599)
+ *
+ * 4. MultiplexMessage: The mutual exclusivity of 'data' and 'error' is mentioned in docs but
+ *    not enforced. Consider:
+ *    - Using a sealed interface with DataMessage and ErrorMessage subclasses
+ *    - Adding an init block that validates only one is set
+ *    - Using a when-exhaustive pattern helper
+ *
+ * 5. MultiplexMessage: Consider adding validation that 'path' and 'queryParams' are only
+ *    present when 'start' is true (or document if other combinations are valid)
+ *
+ * 6. Both classes: Consider adding convenience methods for common patterns:
+ *    - LSError.isClientError: Boolean (http in 400..499)
+ *    - LSError.isServerError: Boolean (http in 500..599)
+ *    - MultiplexMessage.isControl: Boolean (start || end)
+ */

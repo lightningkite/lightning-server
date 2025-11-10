@@ -18,9 +18,16 @@ import io.ktor.server.request.*
 import io.ktor.util.*
 import kotlinx.io.asSource
 
+/**
+ * Converts a Ktor ContentType to a Lightning Server MediaType.
+ */
 internal fun ContentType.adapt(): MediaType =
     MediaType(type = contentType, subtype = contentSubtype, parameters = parameters.associate { it.name to it.value })
 
+/**
+ * Converts Ktor Headers to Lightning Server HttpHeaders.
+ * Handles comma-separated header values by splitting them into separate entries.
+ */
 internal fun Headers.adapt(): HttpHeaders = HttpHeaders(
     entry = flattenEntries()
         .flatMap { (key, value) ->
@@ -32,6 +39,12 @@ internal fun Headers.adapt(): HttpHeaders = HttpHeaders(
         .toTypedArray()
 )
 
+/**
+ * Converts a Ktor ApplicationCall to a Lightning Server HttpRequest.
+ *
+ * Extracts the real client IP from the configured proxy header if available.
+ * Falls back to the origin remote address if the header is not present.
+ */
 context(server: ServerRuntimeBase)
 internal suspend fun ApplicationCall.adapt(): HttpRequest<PathSpec> {
     return HttpRequest(
@@ -45,7 +58,7 @@ internal suspend fun ApplicationCall.adapt(): HttpRequest<PathSpec> {
                 ?: run { server.logger.warn { "Real IP address header for proxy '$it' was missing from the request." }; null }
         } ?: request.origin.remoteAddress,
         body = run {
-            // MutliPart Support?
+            // TODO: Add MultiPart support
             val stream = receiveStream()
 
             TypedData.sink(request.contentType().adapt(), request.contentLength() ?: -1) {
@@ -55,7 +68,7 @@ internal suspend fun ApplicationCall.adapt(): HttpRequest<PathSpec> {
     )
 }
 
-// MutliPart Support?
+// TODO: Implement MultiPart support - the code below is a partial implementation that needs completion
 
 //internal fun MultiPartData.adapt(myType: MediaType):Flow<TypedData> {
 //    return flow{
@@ -103,3 +116,13 @@ internal suspend fun ApplicationCall.adapt(): HttpRequest<PathSpec> {
 //        }
 //    }
 //}
+
+/*
+ * TODO: API Recommendations
+ *
+ * 1. Complete the MultiPart support implementation or remove the commented code
+ * 2. The Headers.adapt() function splits comma-separated values, but some headers
+ *    (like Set-Cookie) shouldn't be split this way. Consider header-specific handling.
+ * 3. Consider adding error handling for invalid content types in adapt()
+ * 4. The typo "MutliPart" appears in comments - should be "MultiPart"
+ */

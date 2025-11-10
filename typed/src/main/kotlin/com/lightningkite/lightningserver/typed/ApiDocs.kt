@@ -65,7 +65,7 @@ public class ApiDocs(private val packageName: String) : ServerBuilder() {
         fun KSerializer<*>.uncontextualize(): KSerializer<*>? {
             return if (this.descriptor.kind == SerialKind.CONTEXTUAL) {
                 module.getContextual(
-                    descriptor.capturedKClass ?: throw IllegalStateException("No captured KClass found for $descriptor")
+                    descriptor.capturedKClass ?: return null
                 )
             } else this
         }

@@ -19,6 +19,28 @@ import kotlinx.io.asInputStream
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
+/**
+ * Processes a server file to generate preview variants according to the specified options.
+ *
+ * This function downloads the original file, extracts metadata (size, dimensions for images),
+ * and generates preview variants for each specified option. Preview files are stored alongside
+ * the original file with descriptive suffixes (e.g., "filename-800-jpg.jpg").
+ *
+ * **Behavior:**
+ * - If no options are provided, returns the original metadata unchanged
+ * - If previews already exist, returns the metadata unchanged (idempotent)
+ * - Only processes image files (checks MIME type)
+ * - Skips options that don't require any transformation (optimization)
+ * - Executes on IO dispatcher for file operations
+ *
+ * **File naming:** Generated previews use the pattern: `{original-name}-{options}.{extension}`
+ * where `{options}` is the string representation of [MediaPreviewOptions].
+ *
+ * @param options Collection of preview options to generate
+ * @return Updated metadata including all generated preview variants
+ * @receiver ServerFileWithMetadata to process
+ * @throws NullPointerException if the original file's parent directory is null
+ */
 context(runtime: ServerRuntime)
 public suspend fun ServerFileWithMetadata.process(options: Collection<MediaPreviewOptions>): ServerFileWithMetadata =
     withContext(Dispatchers.IO) {
@@ -48,6 +70,8 @@ public suspend fun ServerFileWithMetadata.process(options: Collection<MediaPrevi
 
         for (option in options) {
             val result = basis.apply(option, content.mediaType) ?: continue
+            // TODO: This will throw NPE if parent is null. Consider handling this case gracefully
+            // or documenting that files must have a parent directory.
             val fileObject =
                 originalFileObject.parent!!.then(originalFileObject.nameWithoutExtension + "-${option}." + result.mimeType.extension)
 
@@ -67,6 +91,32 @@ public suspend fun ServerFileWithMetadata.process(options: Collection<MediaPrevi
         out
     }
 
+/**
+ * Creates a background task that automatically processes images when database records change.
+ *
+ * This function sets up a listener on the specified model that triggers image processing whenever
+ * the targeted [ServerFileWithMetadata] field is modified. The task must be registered with the
+ * server (bound to a path) to function properly.
+ *
+ * **How it works:**
+ * 1. Registers a change listener on the model's database table
+ * 2. When a record is created or the specified field changes, triggers the task
+ * 3. The task processes the image and updates the database with preview metadata
+ *
+ * **Important:** The returned task must be bound to a server path (e.g., `val myTask = path.task bind processImagesInBackground(...)`)
+ * or it will log a warning and not execute.
+ *
+ * @param USER The user type for authentication (use `Nothing?` for unauthenticated)
+ * @param T The model type containing the file metadata field
+ * @param ID The ID type of the model
+ * @param info Model metadata including serializer and table access
+ * @param options Preview generation options to apply
+ * @param timeout Maximum time allowed for processing a single image (default: 5 minutes)
+ * @param makePath Function that maps from the model root to the ServerFileWithMetadata field
+ * @return A Task that processes images in the background
+ *
+ * @see interceptImagesForProcessing for synchronous processing during create/update operations
+ */
 public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> processImagesInBackground(
     info: ModelInfo<USER, T, ID>,
     vararg options: MediaPreviewOptions,
@@ -106,6 +156,31 @@ public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> processImagesI
     return task
 }
 
+/**
+ * Intercepts database operations to synchronously process images before they are stored.
+ *
+ * This function wraps a database table to automatically process images during create and update
+ * operations. Unlike [processImagesInBackground], this processes images **synchronously** before
+ * the database write completes, ensuring previews are always generated.
+ *
+ * **Use cases:**
+ * - When previews must be available immediately after creation
+ * - When you need guaranteed preview generation
+ * - For critical images where background processing is not acceptable
+ *
+ * **Trade-offs:**
+ * - **Synchronous:** Blocks the API response until processing completes
+ * - **Guaranteed:** Previews are always generated before the response returns
+ * - **Performance:** May slow down create/update operations for large images
+ *
+ * @param T The model type
+ * @param options Preview generation options to apply
+ * @param makePath Function that maps from the model root to the ServerFileWithMetadata field (nullable)
+ * @return The table with processing interceptors applied
+ *
+ * @see processImagesInBackground for asynchronous processing
+ * @see interceptImagesForProcessingNotNull for non-nullable field variant
+ */
 context(_: ServerRuntime)
 public fun <T : Any> Table<T>.interceptImagesForProcessing(
     vararg options: MediaPreviewOptions,
@@ -135,6 +210,20 @@ public fun <T : Any> Table<T>.interceptImagesForProcessing(
         }
 }
 
+/**
+ * Intercepts database operations to synchronously process images before they are stored.
+ *
+ * This is a convenience variant of [interceptImagesForProcessing] for non-nullable
+ * [ServerFileWithMetadata] fields. The behavior is identical, but the type signature
+ * ensures the field is always present.
+ *
+ * @param T The model type
+ * @param options Preview generation options to apply
+ * @param makePath Function that maps from the model root to the ServerFileWithMetadata field (non-null)
+ * @return The table with processing interceptors applied
+ *
+ * @see interceptImagesForProcessing for the nullable variant
+ */
 @Suppress("UNCHECKED_CAST")
 context(_: ServerRuntime)
 public fun <T : Any> Table<T>.interceptImagesForProcessingNotNull(
@@ -145,3 +234,25 @@ public fun <T : Any> Table<T>.interceptImagesForProcessingNotNull(
         *options,
         makePath = makePath as (DataClassPath<T, T>) -> DataClassPath<T, ServerFileWithMetadata?>
     )
+
+/*
+ * TODO: API Recommendations
+ *
+ * 1. Consider adding a hybrid approach: fast synchronous processing for small images, background
+ *    queue for large ones, with a configurable size threshold.
+ *
+ * 2. The interceptImagesForProcessing methods process on every update, even if the file field
+ *    didn't change. Consider optimizing to only process when the field actually changes.
+ *
+ * 3. Consider adding error handling and retry logic for failed image processing operations.
+ *
+ * 4. The naming distinction between processImagesInBackground and interceptImagesForProcessing
+ *    could be clearer. Consider renaming to emphasize sync vs async (e.g., processImagesAsync
+ *    and processImagesSync).
+ *
+ * 5. Consider adding telemetry/metrics for image processing operations (processing time, file sizes,
+ *    success/failure rates) to help users optimize their preview configurations.
+ *
+ * 6. Consider allowing users to specify which operations to intercept (create only, update only,
+ *    or both) for more granular control.
+ */

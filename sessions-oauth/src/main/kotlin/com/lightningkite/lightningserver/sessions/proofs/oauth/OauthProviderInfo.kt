@@ -14,6 +14,44 @@ import kotlinx.serialization.json.jsonPrimitive
 import java.util.*
 import kotlin.uuid.Uuid
 
+/**
+ * Configuration for an OAuth 2.0 identity provider.
+ *
+ * This class encapsulates all the information needed to integrate with an OAuth provider
+ * like Google, Apple, Microsoft, or GitHub. It handles the OAuth authorization code flow,
+ * token exchange, and profile retrieval.
+ *
+ * **Built-in Providers:**
+ * - [google] - Google OAuth with email verification
+ * - [apple] - Apple Sign In with email verification
+ * - [microsoft] - Microsoft/Azure AD with OpenID Connect
+ * - [github] - GitHub OAuth with email verification
+ *
+ * **Custom Providers:**
+ * You can create custom provider configurations for any OAuth 2.0 compliant service:
+ * ```kotlin
+ * val customProvider = OauthProviderInfo(
+ *     niceName = "MyProvider",
+ *     loginUrl = "https://provider.com/oauth/authorize",
+ *     tokenUrl = "https://provider.com/oauth/token",
+ *     scopeForProfile = "email profile",
+ *     getProfile = { response ->
+ *         // Fetch user profile using access token
+ *         ExternalProfile(email = "user@example.com")
+ *     }
+ * )
+ * ```
+ *
+ * @property niceName Human-readable name (e.g., "Google", "Apple")
+ * @property pathName URL-safe name derived from niceName (e.g., "google", "my-provider")
+ * @property identifierName Code-safe identifier derived from niceName (e.g., "google", "my_provider")
+ * @property loginUrl OAuth authorization endpoint URL
+ * @property tokenUrl OAuth token exchange endpoint URL
+ * @property mode How the OAuth provider sends the authorization code (form_post or query)
+ * @property settings Configuration for credentials serialization (standard or provider-specific)
+ * @property scopeForProfile OAuth scopes required to retrieve user profile information
+ * @property getProfile Async function that retrieves user profile from the provider
+ */
 public class OauthProviderInfo(
     public val niceName: String,
     public val pathName: String = niceName.lowercase().map { if (it.isLetterOrDigit()) it else '-' }.joinToString(""),
@@ -115,6 +153,10 @@ public class OauthProviderInfo(
 
 
     public companion object {
+        /**
+         * Registry of all available OAuth providers.
+         * Built-in providers are automatically added to this list.
+         */
         public val all = ArrayList<OauthProviderInfo>()
 
         public val google = OauthProviderInfo(
@@ -242,3 +284,38 @@ private data class GithubEmail(
     val primary: Boolean,
     val visibility: String? = null,
 )
+
+/*
+ * TODO: API Recommendations
+ *
+ * 1. The pathName and identifierName transformations replace non-alphanumeric characters
+ *    with '-' and '_', but consecutive non-alphanumeric characters become consecutive
+ *    delimiters (e.g., "My  Provider" -> "my--provider"). Consider collapsing consecutive
+ *    delimiters into a single one.
+ *
+ * 2. Consider making the 'all' list immutable (List instead of ArrayList) to prevent
+ *    accidental modification. Providers should be registered during initialization only.
+ *
+ * 3. The Apple provider decodes the JWT id_token manually (line 148). Consider using a
+ *    JWT library for proper validation (signature, expiration, issuer, audience).
+ *    Current implementation doesn't verify the JWT signature, which is a potential security risk.
+ *
+ * 4. Error handling for profile retrieval could be more specific. Consider wrapping
+ *    provider-specific exceptions with context about which provider failed.
+ *
+ * 5. The Google provider checks `verified_email` but other providers have different
+ *    verification approaches. Consider documenting the email verification guarantees
+ *    for each provider.
+ *
+ * 6. Consider adding a 'validate()' method to check if required configuration is present
+ *    and URLs are well-formed.
+ *
+ * 7. The GitHub provider makes two API calls (user + emails). Consider if the user endpoint's
+ *    email field could be used when it's available and verified to save an API call.
+ *
+ * 8. HTTP client configuration (timeouts, retries) is not exposed. Consider making it
+ *    configurable for production reliability.
+ *
+ * 9. The accessToken methods for refresh tokens (line 99) don't handle the case where
+ *    the refresh token is expired or revoked. Consider more specific error handling.
+ */

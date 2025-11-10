@@ -118,4 +118,41 @@ class HttpMethodTest {
         assertEquals(HttpMethod.DELETE, method)
         assertEquals("DELETE", method.toString())
     }
+
+    // Additional tests for edge cases
+    @Test
+    fun testCustomMethod() {
+        // Test that custom HTTP methods can be deserialized (e.g., TRACE, CONNECT, custom methods)
+        val customJson = "\"TRACE\""
+        val customMethod = Json.decodeFromString<HttpMethod>(customJson)
+        assertEquals("TRACE", customMethod.toString())
+    }
+
+    @Test
+    fun testCasePreservation() {
+        // HTTP methods should preserve case (they're case-sensitive per RFC 7231)
+        val lowerCaseJson = "\"get\""
+        val lowerMethod = Json.decodeFromString<HttpMethod>(lowerCaseJson)
+        assertEquals("get", lowerMethod.toString())
+        assertNotEquals(HttpMethod.GET, lowerMethod) // lowercase "get" != "GET"
+    }
+
+    @Test
+    fun testWebSocketMethod() {
+        // Verify WEBSOCKET is properly handled
+        assertEquals("WEBSOCKET", HttpMethod.WEBSOCKET.toString())
+
+        val json = Json.encodeToString(HttpMethod.WEBSOCKET)
+        val decoded = Json.decodeFromString<HttpMethod>(json)
+        assertEquals(HttpMethod.WEBSOCKET, decoded)
+    }
+
+    @Test
+    fun testMethodInSet() {
+        val safeMethods = setOf(HttpMethod.GET, HttpMethod.HEAD, HttpMethod.OPTIONS)
+
+        assertTrue(safeMethods.contains(HttpMethod.GET))
+        assertTrue(safeMethods.contains(HttpMethod.HEAD))
+        assertTrue(!safeMethods.contains(HttpMethod.POST))
+    }
 }

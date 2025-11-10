@@ -52,3 +52,35 @@ public fun StartupTask(
             return handler(server)
         }
     }
+
+/*
+ * TODO: API Recommendations for StartupTask.kt
+ *
+ * 1. **POTENTIAL ISSUE**: Circular dependencies are not detected or prevented.
+ *    Consider adding validation to detect dependency cycles at server build time.
+ *
+ * 2. Add failure handling options:
+ *    - enum class FailureBehavior { FAIL_STARTUP, LOG_AND_CONTINUE, RETRY }
+ *    - val failureBehavior: FailureBehavior
+ *    Currently a failed startup task likely crashes the server.
+ *
+ * 3. Add task naming for better logging/debugging:
+ *    - val name: String
+ *    This would help identify which task failed during startup.
+ *
+ * 4. Consider adding priority within the same dependency level:
+ *    - val priority: Int
+ *    For tasks with no dependencies, determines execution order.
+ *
+ * 5. The default timeout of 5 minutes in the factory function is different from the
+ *    interface default of 30 seconds. This inconsistency could be confusing.
+ *
+ * 6. Add lifecycle hooks:
+ *    - suspend fun onComplete()
+ *    - suspend fun onFailure(exception: Exception)
+ *    For observability and cleanup.
+ *
+ * 7. Consider adding conditional execution:
+ *    - suspend fun shouldExecute(): Boolean
+ *    Allows skipping tasks based on environment or configuration.
+ */

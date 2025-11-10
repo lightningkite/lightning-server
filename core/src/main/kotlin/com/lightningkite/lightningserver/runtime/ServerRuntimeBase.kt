@@ -111,3 +111,32 @@ public abstract class ServerRuntimeBase(override val server: ServerDefinition): 
         }.joinAll()
     }
 }
+
+/*
+ * TODO: API Recommendations for ServerRuntimeBase.kt
+ *
+ * 1. **POTENTIAL BUG**: runStartupTasks() uses !! operators on taskToJob[dep] and taskToJob[task].
+ *    If a task has a dependency that wasn't registered, this will throw NPE with an unclear error.
+ *    Add validation that all dependencies are registered, or use requireNotNull with descriptive message.
+ *
+ * 2. The runStartupTasks() method launches all tasks concurrently but doesn't limit concurrency.
+ *    For servers with many startup tasks, this could create resource contention.
+ *    Consider adding a concurrency limit or sequential execution option.
+ *
+ * 3. Startup task failures don't provide context about which task failed or the dependency chain.
+ *    Consider wrapping exceptions with more context before rethrowing.
+ *
+ * 4. The lazy initialization of serialization could fail with an unclear error if the module
+ *    returns null or throws. Consider eager initialization with better error messages.
+ *
+ * 5. Settings are automatically augmented with system settings (general, secret, telemetry, logging).
+ *    If user code defines settings with the same names, they'll be silently overridden by the toSet().
+ *    Consider detecting conflicts and throwing an error, or documenting the override behavior.
+ *
+ * 6. SharedResources is created but never cleaned up in this base class. Subclasses should call
+ *    sharedResources.close() on shutdown, but there's no enforcement. Consider adding a cleanup method.
+ *
+ * 7. The settings list is deduplicated by toSet() but ServerSetting equality is based on object identity
+ *    (data class), so settings with the same name but different instances won't be deduplicated.
+ *    This could lead to duplicate settings. Consider using distinctBy { it.name }.
+ */

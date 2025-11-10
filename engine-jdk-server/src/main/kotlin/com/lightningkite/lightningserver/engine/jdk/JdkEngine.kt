@@ -30,6 +30,13 @@ import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import kotlin.time.Clock
 
+/**
+ * Configuration settings for the JDK HTTP server engine.
+ *
+ * @property host The host address to bind to (defaults to "0.0.0.0" for all interfaces)
+ * @property port The port number to listen on (defaults to 8080)
+ * @property realIpHeader Optional header name to extract the real client IP from (useful behind proxies)
+ */
 @Serializable
 public data class JdkRuntimeSettings(
     val host: String = "0.0.0.0",
@@ -37,6 +44,9 @@ public data class JdkRuntimeSettings(
     val realIpHeader: String? = null,
 )
 
+/**
+ * Server setting for configuring the JDK engine runtime parameters.
+ */
 public val jdkRunConfig: ServerSetting.Direct<JdkRuntimeSettings> = ServerSetting(
     "jdkRunConfig",
     JdkRuntimeSettings(),
@@ -44,7 +54,20 @@ public val jdkRunConfig: ServerSetting.Direct<JdkRuntimeSettings> = ServerSettin
 )
 
 /**
- * DOES NOT SUPPORT WEBSOCKETS.
+ * A Lightning Server engine implementation using the JDK's built-in HTTP server.
+ *
+ * **IMPORTANT: This engine does NOT support WebSockets.**
+ *
+ * This engine is useful for:
+ * - Minimal dependencies (no external server library required)
+ * - Simple deployments
+ * - Testing environments
+ * - Applications that don't need WebSocket support
+ *
+ * For production use or WebSocket support, consider using KtorEngine instead.
+ *
+ * @param server The server definition to run
+ * @param clock The clock to use for timing operations (defaults to System clock)
  */
 public class JdkEngine(
     server: ServerDefinition,
@@ -53,6 +76,18 @@ public class JdkEngine(
 
     override val settings: ServerSettings = ServerSettings(super.settings.settings.plus(jdkRunConfig).toSet())
 
+    /**
+     * Starts the JDK HTTP server.
+     *
+     * This method:
+     * 1. Ensures settings are ready and validated
+     * 2. Runs any startup tasks defined in the server
+     * 3. Starts the schedule coordinator
+     * 4. Creates and starts the HTTP server
+     * 5. Blocks indefinitely (server runs until process termination)
+     *
+     * Note: This method blocks the calling thread.
+     */
     public fun start() {
         // Prepare configuration and lifecycle
         this.settings.ready()
@@ -94,7 +129,10 @@ public class JdkEngine(
     }
 }
 
-
+/**
+ * Writes a Lightning Server HttpResponse to a JDK HttpExchange.
+ * Handles all response types including empty bodies, bytes, text, sinks, and sources.
+ */
 private fun HttpExchange.write(response: HttpResponse) {
     // Copy headers from response
     for ((key, values) in response.headers.normalizedEntries) {
@@ -145,7 +183,12 @@ private fun HttpExchange.write(response: HttpResponse) {
     }
 }
 
-
+/**
+ * Converts a JDK HttpExchange to a Lightning Server HttpRequest.
+ *
+ * @param realIpHeader Optional header name to extract the real client IP from
+ * @return The converted HttpRequest
+ */
 private fun HttpExchange.requestToLightningServer(realIpHeader: String?): HttpRequest<PathSpec> {
     val method = this.requestMethod
     val uri = this.requestURI
@@ -155,6 +198,8 @@ private fun HttpExchange.requestToLightningServer(realIpHeader: String?): HttpRe
     val hostHeader = this.requestHeaders.getFirst("Host") ?: ""
     val domain = hostHeader.substringBefore(":").ifEmpty { this.localAddress.hostString }
     val protocol = if (this.httpContext.server is com.sun.net.httpserver.HttpsServer) "https" else "http"
+    // TODO: Potential NPE if realIpHeader is configured but the header is missing from the request
+    // Should use ?: operator or log a warning like in KtorEngine
     val sourceIp = realIpHeader?.let { h ->
         this.requestHeaders.getFirst(h)!!
     } ?: this.remoteAddress?.address?.hostAddress ?: ""
@@ -179,6 +224,10 @@ private fun HttpExchange.requestToLightningServer(realIpHeader: String?): HttpRe
     )
 }
 
+/**
+ * Converts JDK HTTP Headers to Lightning Server HttpHeaders.
+ * Splits comma-separated header values into separate entries.
+ */
 private fun com.sun.net.httpserver.Headers.adapt(): HttpHeaders = HttpHeaders(
     this.entries.flatMap { (key, values) ->
         values.flatMap { v ->
@@ -186,3 +235,18 @@ private fun com.sun.net.httpserver.Headers.adapt(): HttpHeaders = HttpHeaders(
         }
     }
 )
+
+/*
+ * TODO: API Recommendations
+ *
+ * 1. Fix the potential NPE when realIpHeader is configured but missing from request (line 196)
+ * 2. The DEFAULT_BUFFER constant is defined but never used - remove or implement buffering
+ * 3. Consider adding graceful shutdown support (currently runs indefinitely)
+ * 4. The error handling in start() catches all exceptions and sends generic 500 - consider
+ *    more specific error responses based on exception type
+ * 5. The adapt() function splits comma-separated headers, but some headers (like Set-Cookie)
+ *    shouldn't be split. Consider header-specific handling.
+ * 6. Consider logging when realIpHeader is configured but missing (similar to KtorEngine)
+ * 7. Document the WebSocket limitation more prominently (e.g., throw exception if WebSocket
+ *    endpoints are registered)
+ */

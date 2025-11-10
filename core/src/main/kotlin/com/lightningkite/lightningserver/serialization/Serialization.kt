@@ -65,3 +65,25 @@ public open class Serialization(public val serializersModule: SerializersModule 
         encodeDefaults = false
     }
 }
+
+/*
+ * TODO: API Recommendations for Serialization.kt
+ *
+ * 1. The class is open and all properties are open, allowing subclasses to override formats.
+ *    However, there's no clear use case documented for when/why you'd subclass this.
+ *    Consider making it final or documenting the extension points.
+ *
+ * 2. Both JSON configurations use isLenient=true which accepts non-standard JSON.
+ *    This could allow malformed input to pass through. Document the security implications
+ *    or consider making this configurable.
+ *
+ * 3. No validation limits on the formats (max nesting depth, max string length, etc.).
+ *    Large or deeply nested JSON could cause DoS. Consider adding configurable limits.
+ *
+ * 4. The serializersModule defaults to empty, which means no polymorphic serialization
+ *    or contextual serializers by default. This could be surprising. Document clearly.
+ *
+ * 5. No prettyPrint option exposed for JSON. While prettyPrint=false is usually right
+ *    for production, having a debug mode could be useful. Consider adding a companion
+ *    object factory method like Serialization.debug().
+ */

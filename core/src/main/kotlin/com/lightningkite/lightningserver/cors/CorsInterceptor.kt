@@ -180,3 +180,16 @@ public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpIn
         }
     }
 }
+
+// TODO: API Recommendations
+// 1. The OPTIONS preflight handling reveals endpoint existence even for disallowed origins
+//    (returns 204 No Content instead of 403 Forbidden). Consider whether this is desired behavior
+//    for security reasons - it could be used to map API endpoints.
+// 2. Consider adding metrics/logging for CORS rejections to help debug configuration issues
+// 3. The originMatches function could be optimized with compiled regex patterns for wildcard matching
+//    instead of string operations on every request
+// 4. Consider exposing originMatches as a public testing utility for users to validate their patterns
+// 5. Missing handling for the Vary header - should add "Vary: Origin" to cacheable responses
+//    to prevent cache poisoning across different origins
+// 6. The WebSocket origin checking could provide a more descriptive error message rather than
+//    just ForbiddenException to help developers debug CORS issues

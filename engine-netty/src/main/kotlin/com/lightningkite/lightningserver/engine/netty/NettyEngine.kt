@@ -53,7 +53,43 @@ import com.lightningkite.lightningserver.http.HttpHeaders as LsHttpHeaders
 import com.lightningkite.lightningserver.websockets.WebSocketFrame as LkWebSocketFrame
 import io.netty.handler.codec.http.HttpHeaders as NettyHttpHeaders
 
-
+/**
+ * A Lightning Server engine implementation using Netty's high-performance asynchronous I/O framework.
+ *
+ * This engine provides production-grade HTTP and WebSocket support with native transport optimizations:
+ * - **Linux**: Uses epoll for optimal performance
+ * - **macOS/BSD**: Uses kqueue for optimal performance
+ * - **Other platforms**: Falls back to NIO
+ *
+ * **Features:**
+ * - Full HTTP/1.1 support with keep-alive
+ * - WebSocket support with pub/sub subscriptions
+ * - Optional WebSocket compression (per-message deflate)
+ * - Configurable worker thread pool
+ * - Graceful shutdown support
+ * - Real IP header support for proxy deployments
+ * - Idle connection timeout (120 seconds)
+ *
+ * **Performance characteristics:**
+ * - Uses pooled byte buffer allocation for memory efficiency
+ * - TCP_NODELAY enabled (disables Nagle's algorithm)
+ * - SO_KEEPALIVE enabled for connection health checks
+ * - Configurable buffer sizes and backlog
+ * - Write buffer water marks: 32 KiB low, 64 KiB high
+ *
+ * **Usage:**
+ * ```kotlin
+ * val engine = NettyEngine(serverDefinition)
+ * engine.settings.loadFromFile(KFile("settings.json"), serializersModule)
+ * engine.start() // Blocks until shutdown
+ * ```
+ *
+ * @param server The server definition to run
+ * @param clock The clock to use for timing operations (defaults to System clock)
+ *
+ * @see NettyRuntimeSettings for configuration options
+ * @see KtorEngine for an alternative production engine
+ */
 public class NettyEngine(
     server: ServerDefinition,
     override val clock: Clock = Clock.System,
@@ -68,6 +104,10 @@ public class NettyEngine(
     private lateinit var bossGroup: EventLoopGroup
     private lateinit var workerGroup: EventLoopGroup
 
+    /**
+     * The bound address after the server starts, or null if not yet started.
+     * Useful for determining the actual port when binding to port 0 (random port).
+     */
     @Volatile
     public var boundAddress: InetSocketAddress? = null
 
@@ -79,6 +119,29 @@ public class NettyEngine(
     private lateinit var PATHSPEC_KEY: AttributeKey<PathSpec>
     private lateinit var HANDLER_KEY: AttributeKey<WebSocketHandler<PathSpec, Any?>>
 
+    /**
+     * Starts the Netty HTTP server.
+     *
+     * This method:
+     * 1. Ensures settings are ready and validated
+     * 2. Runs any startup tasks defined in the server
+     * 3. Starts the schedule coordinator
+     * 4. Creates boss and worker event loop groups (with native transport if available)
+     * 5. Configures the server bootstrap with performance optimizations
+     * 6. Binds to the configured host and port
+     * 7. Blocks indefinitely until the server shuts down
+     *
+     * **Transport selection:**
+     * - Prefers epoll on Linux for best performance
+     * - Falls back to kqueue on macOS/BSD
+     * - Uses NIO as final fallback
+     *
+     * **Thread configuration:**
+     * - Boss group: 1 thread (handles accept operations)
+     * - Worker group: Configurable via [NettyRuntimeSettings.workerThreads] (handles I/O and request processing)
+     *
+     * Note: This method blocks the calling thread.
+     */
     public fun start() {
         // Prepare configuration and lifecycle
         this.settings.ready()
@@ -171,6 +234,12 @@ public class NettyEngine(
 
     }
 
+    /**
+     * Initiates a graceful shutdown of the Netty server.
+     *
+     * This method shuts down both the worker and boss event loop groups, allowing
+     * in-flight requests to complete before fully terminating.
+     */
     public fun shutdown() {
         try {
             workerGroup.shutdownGracefully()
@@ -570,4 +639,35 @@ public class NettyEngine(
         }
     }
 }
+
+/*
+ * TODO: API Recommendations
+ *
+ * 1. Consider extracting magic numbers to named constants:
+ *    - Idle timeout (120 seconds, line 156)
+ *    - Write buffer water marks (32 KiB / 64 KiB, line 145)
+ *    - Boss thread count (1, line 96/102/108)
+ *
+ * 2. The toLightningHeaders() function splits comma-separated headers, but some headers (like Set-Cookie)
+ *    shouldn't be split. Consider header-specific handling.
+ *
+ * 3. Consider adding metrics/telemetry for:
+ *    - Active connection count
+ *    - Request throughput
+ *    - WebSocket connection count
+ *    - Event loop queue depth
+ *
+ * 4. The toNettyResponse() function loads the entire response body into memory (line 489).
+ *    Consider streaming support for large responses.
+ *
+ * 5. Consider making the idle timeout configurable via NettyRuntimeSettings instead of hardcoding to 120 seconds.
+ *
+ * 6. The error handling for WebSocket operations catches and ignores Throwables silently (line 387, 413).
+ *    Consider adding logging or metrics for these failures.
+ *
+ * 7. Consider documenting the thread safety characteristics of currentState in LocalWebSocketConnection,
+ *    as modifications are not synchronized.
+ *
+ * 8. The TypeRetriever class at the end appears unused in this file. Consider removing if not referenced elsewhere.
+ */
 

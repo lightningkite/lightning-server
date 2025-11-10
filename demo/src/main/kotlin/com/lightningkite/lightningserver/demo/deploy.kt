@@ -36,6 +36,7 @@ object DemoEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
     override val displayName = "Demo Example"
     override val debug = true
     override val emergencyContact = "josephivie@gmail.com".toEmailAddress()
+    override val storageEncryptionEnabled: Boolean get() = false
 
     override val region = Region.US_WEST_2!!
     override fun Server.settings() {
@@ -54,7 +55,7 @@ object DemoEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
 
 object DemoEnvDeploy {
     @JvmStatic
-    fun main(vararg args: String) = DemoEnv.deploy()
+    fun main(vararg args: String) = DemoEnv.deploy(autoApprove = true)
 }
 
 object DemoEnvEdit {

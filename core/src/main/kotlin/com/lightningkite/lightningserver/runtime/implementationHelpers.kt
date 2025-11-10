@@ -386,3 +386,39 @@ public suspend inline fun <T> instrument(name: String, crossinline action: suspe
         }
     } else action(null)
 }
+
+/*
+ * TODO: API Recommendations for implementationHelpers.kt
+ *
+ * 1. The handle() function is extremely complex (160+ lines) with multiple responsibilities:
+ *    routing, compression, HEAD/OPTIONS handling, trailing slash redirects, exception handling.
+ *    Consider breaking into smaller, testable functions.
+ *
+ * 2. GZIP compression logic has magic numbers (256 bytes, 1024 bytes) without constants.
+ *    Define these as named constants with documentation explaining the thresholds.
+ *
+ * 3. The compression denylist (images, videos, fonts, archives) is hardcoded. Consider making
+ *    this configurable via settings for applications with different compression needs.
+ *
+ * 4. The automatic HEAD support silently falls back to GET. This could be surprising and cause
+ *    unnecessary computation for expensive GET handlers. Document this behavior clearly or add
+ *    a way to opt out.
+ *
+ * 5. Trailing slash redirect uses PathSegments.toString() which may not preserve query parameters
+ *    or fragments. Verify this behavior and document it.
+ *
+ * 6. The exception handler itself can throw exceptions (catch block line 152-163), but those are
+ *    caught and return a generic 500 with no logging. The error is silently swallowed.
+ *
+ * 7. Compression for Data.Sink and Data.Source always returns `true` for compressed flag even if
+ *    GZIP might fail or produce larger output. Consider checking actual compression ratio.
+ *
+ * 8. The telemetry span names use different formats: "http.route" vs "WEBSOCKET.WILLCONNECT".
+ *    Standardize naming conventions for consistency.
+ *
+ * 9. The *WithMetrics functions are public but marked as internal in some cases with @PublishedApi.
+ *    Clarify the intended visibility and usage patterns.
+ *
+ * 10. UnregisteredException provides minimal context - just "Item $item is unregistered".
+ *     Consider adding which server it was looked up in, or suggestions for common mistakes.
+ */

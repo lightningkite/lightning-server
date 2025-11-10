@@ -6,6 +6,13 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import kotlinx.serialization.Serializable
 
+/**
+ * Converts an LSError to an HttpStatusException.
+ *
+ * @param message Optional override for the error message (defaults to the LSError's message)
+ * @param data Optional override for the error data (defaults to the LSError's data)
+ * @return An HttpStatusException with the same HTTP status and details
+ */
 public fun LSError.toException(
     message: String = this.message,
     data: String = this.data
@@ -108,6 +115,11 @@ public open class NotFoundException(
  */
 public fun NotFoundException(message: String): NotFoundException = NotFoundException(message = message, detail = "")
 
+/**
+ * A specialized NotFoundException thrown when a requested route cannot be matched.
+ *
+ * @property requestedRoute The endpoint that was requested but not found
+ */
 public class RouteNotFoundException(
     public val requestedRoute: RawHttpEndpoint<*>
 ): NotFoundException(
@@ -115,3 +127,13 @@ public class RouteNotFoundException(
     message = "No route matching ${requestedRoute} was found.",
     data = requestedRoute.toString(),
 )
+
+/*
+ * TODO: API Recommendations
+ *
+ * 1. Consider adding more common HTTP status exceptions (e.g., ConflictException for 409,
+ *    UnprocessableEntityException for 422, TooManyRequestsException for 429)
+ * 2. Consider adding builder-style methods for adding headers to exceptions
+ * 3. The detail field could benefit from documentation explaining its intended use vs message
+ * 4. Consider making LSError a documented public type if it isn't already
+ */

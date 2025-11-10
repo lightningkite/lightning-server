@@ -334,13 +334,15 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
      *
      * This is the primary method for deploying your server to cloud infrastructure.
      */
-    public open fun deploy() {
+    public open fun deploy(autoApprove: Boolean = false) {
         println("Initializing...")
         terraform("init", "-upgrade", "-input=false", "-no-color")
         println("Planning...")
         terraform("plan", "-input=false", "-no-color", "-out=plan.tfplan")
-        println("Press enter to continue with plan...")
-        readln()
+        if (!autoApprove) {
+            println("Press enter to continue with plan...")
+            readln()
+        }
         println("Applying...")
         terraform("apply", "-input=false", "-auto-approve", "-no-color", "plan.tfplan")
         println("Deployed!")

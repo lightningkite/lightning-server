@@ -55,3 +55,23 @@ context(server: ServerRuntime)
 public suspend operator fun <T> Request<*>.get(key: SerializableCache.CalculatingKey<Request<*>, T>): T {
     return cache.get(key, this)
 }
+
+/*
+ * TODO: API Recommendations for Request.kt
+ *
+ * 1. Consider adding convenience accessors for common operations:
+ *    - val fullUrl: String (protocol + domain + path)
+ *    - val isSecure: Boolean (protocol == "https")
+ *    - val origin: String (protocol + domain)
+ *
+ * 2. The sourceIp field doesn't account for proxies/load balancers.
+ *    Consider adding realIp that checks X-Forwarded-For or similar headers.
+ *
+ * 3. Add utility methods for common header checks:
+ *    - fun accepts(mediaType: MediaType): Boolean
+ *    - fun isAjax(): Boolean (X-Requested-With header check)
+ *
+ * 4. Consider adding a typed body accessor pattern to avoid repetitive deserialization code
+ *
+ * 5. The Request class could benefit from a toString() implementation for logging/debugging
+ */

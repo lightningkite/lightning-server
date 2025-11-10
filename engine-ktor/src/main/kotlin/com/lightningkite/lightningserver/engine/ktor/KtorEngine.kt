@@ -32,6 +32,14 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlin.time.Clock
 
+/**
+ * Configuration settings for the Ktor HTTP server engine.
+ *
+ * @property host The host address to bind to (defaults to "0.0.0.0" for all interfaces)
+ * @property port The port number to listen on (defaults to 8080)
+ * @property realIpHeader Optional header name to extract the real client IP from (useful behind proxies).
+ *                        Common values: "X-Forwarded-For", "X-Real-IP"
+ */
 @Serializable
 public data class KtorRuntimeSettings(
     val host: String = "0.0.0.0",
@@ -39,17 +47,46 @@ public data class KtorRuntimeSettings(
     val realIpHeader: String? = null,
 )
 
+/**
+ * Server setting for configuring the Ktor engine runtime parameters.
+ */
 public val ktorRunConfig: ServerSetting.Direct<KtorRuntimeSettings> = ServerSetting(
     "ktorRunConfig",
     KtorRuntimeSettings(),
     KtorRuntimeSettings.serializer()
 )
 
-
+/**
+ * A Lightning Server engine implementation using Ktor as the HTTP server.
+ *
+ * This is the recommended engine for local development and production deployment
+ * when running on a dedicated server or container. It provides:
+ * - Full HTTP/1.1 and HTTP/2 support (depending on Ktor engine choice)
+ * - WebSocket support
+ * - Background task execution
+ * - Scheduled task coordination
+ *
+ * The engine can be started with different Ktor engine factories (Netty, CIO, Jetty, etc.)
+ * using the `start()` method.
+ *
+ * Example usage:
+ * ```kotlin
+ * val engine = KtorEngine(Server.build())
+ * engine.settings.loadFromFile(File("settings.json"), internalSerializersModule)
+ * engine.start(Netty) // or CIO, Jetty, etc.
+ * ```
+ *
+ * @param server The server definition to run
+ * @param clock The clock to use for timing operations (defaults to System clock, overridable for testing)
+ */
 public class KtorEngine(server: ServerDefinition, override val clock: Clock = Clock.System) : LocalEngine(server) {
 
     override val settings: ServerSettings = ServerSettings(super.settings.settings.plus(ktorRunConfig).toSet())
 
+    /**
+     * Adapts a Ktor Application to handle Lightning Server requests.
+     * Sets up routing for both HTTP and WebSocket connections.
+     */
     internal fun Application.adapt() {
         install(WebSockets)
 
@@ -183,6 +220,24 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
         }
     }
 
+    /**
+     * Starts the Ktor server with the specified engine factory.
+     *
+     * This method:
+     * 1. Ensures settings are ready and validated
+     * 2. Runs any startup tasks defined in the server
+     * 3. Starts the schedule coordinator
+     * 4. Starts the HTTP server and blocks until shutdown
+     *
+     * @param TEngine The type of Ktor engine
+     * @param TConfiguration The type of engine configuration
+     * @param factory The Ktor engine factory (e.g., Netty, CIO, Jetty)
+     *
+     * Example:
+     * ```kotlin
+     * engine.start(Netty)
+     * ```
+     */
     public fun <TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.Configuration> start(factory: ApplicationEngineFactory<TEngine, TConfiguration>) {
         this.settings.ready()
         runBlocking { runStartupTasks() }
@@ -198,6 +253,10 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
 
 }
 
+/**
+ * Implementation of WebSocketConnection for local (in-process) WebSocket handling.
+ * Manages subscriptions via PubSub channels and state synchronization.
+ */
 private abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
     startingState: STORAGE,
     override val request: WebSocketConnectRequest<PATH>,
@@ -238,6 +297,10 @@ private abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
     }
 }
 
+/**
+ * Helper class for type-safe retrieval of values with serializers.
+ * Wraps a retrieval function that takes a serializer and returns the corresponding value.
+ */
 @JvmInline
 private value class TypeRetriever(val retriever: (KSerializer<*>) -> Any?) {
     @Suppress("UNCHECKED_CAST")
@@ -252,3 +315,17 @@ private value class TypeRetriever(val retriever: (KSerializer<*>) -> Any?) {
         fun literal(value: Any?) = TypeRetriever { value }
     }
 }
+
+/*
+ * TODO: API Recommendations
+ *
+ * 1. The start() method uses runBlocking which could block the calling thread unexpectedly.
+ *    Consider documenting this behavior or providing a suspending alternative.
+ * 2. The watchPaths parameter in embeddedServer is always empty - consider exposing this
+ *    for development-time auto-reload functionality.
+ * 3. The realIpHeader warning logs but doesn't fail - consider documenting the security
+ *    implications of a missing real IP header when behind a proxy.
+ * 4. Consider adding a graceful shutdown method that stops schedules and drains connections.
+ * 5. The WebSocket path is extracted from query parameter with a "pathHack" - this seems
+ *    like a workaround that should be documented or cleaned up.
+ */

@@ -51,3 +51,21 @@ internal object DefaultExceptionHttpHandler : ExceptionHttpHandler {
     }
 }
 
+/*
+ * TODO: API Recommendations for DefaultExceptionHttpHandler.kt
+ *
+ * 1. The handler doesn't log exceptions - consider adding logging here for all unhandled exceptions
+ *    to ensure errors are captured even if monitoring/logging interceptors aren't configured.
+ *
+ * 2. Stack traces in debug mode could expose sensitive information (file paths, internal logic).
+ *    Consider sanitizing or limiting stack trace depth even in debug mode.
+ *
+ * 3. The generic error message in production ("An unknown error occurred") isn't helpful for debugging.
+ *    Consider including a correlation ID that maps to server-side logs.
+ *
+ * 4. No special handling for common exception types like IllegalArgumentException, NullPointerException.
+ *    These could be mapped to 400 Bad Request instead of 500 Internal Server Error when appropriate.
+ *
+ * 5. The toTypedData call could fail if the Accept header specifies an unsupported format.
+ *    Consider wrapping this in a try-catch and falling back to JSON or plain text.
+ */

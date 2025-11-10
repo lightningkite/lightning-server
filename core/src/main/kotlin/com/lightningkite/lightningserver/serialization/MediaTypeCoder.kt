@@ -150,3 +150,31 @@ public interface MediaTypeCoder : MediaTypeDecoder, MediaTypeEncoder {
     override val priority: Float get() = 0f
     override context(runtime: ServerRuntime) fun accepts(parameters: Map<String, String>): Boolean = true
 }
+
+/*
+ * TODO: API Recommendations for MediaTypeCoder.kt
+ *
+ * 1. The priority system allows multiple coders for the same media type, but there's no
+ *    documentation on how ties are resolved when priorities are equal. Document the behavior
+ *    (first registered? last registered? undefined?).
+ *
+ * 2. The accepts() function defaults to returning true, meaning coders accept all parameters
+ *    by default. This could lead to incorrect handling of charset or other parameters.
+ *    Consider requiring explicit parameter handling or at least logging when accepts() is not overridden.
+ *
+ * 3. MediaTypeEncoder.ws() converts Data.Text to Text frame but everything else to Binary.
+ *    JSON is typically text but would be sent as Binary. Document this behavior or consider
+ *    checking the media type (application/json -> Text, application/octet-stream -> Binary).
+ *
+ * 4. MediaTypeEncoder.streaming() has a default implementation but no guidance on when to override.
+ *    Document use cases like JSON streaming, CSV generation, etc.
+ *
+ * 5. No error handling guidance for malformed input in invoke(). Should implementations throw
+ *    specific exceptions? Return null? Document expected error handling patterns.
+ *
+ * 6. The MediaTypeCoder interface has duplicate default implementations of priority and accepts()
+ *    due to inheriting from both interfaces. While this works, it's redundant and could be confusing.
+ *
+ * 7. No size limits or validation requirements documented. Implementations could accept
+ *    unbounded input leading to memory issues. Add guidance on defensive parsing.
+ */

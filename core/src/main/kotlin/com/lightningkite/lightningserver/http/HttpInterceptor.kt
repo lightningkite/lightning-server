@@ -109,3 +109,31 @@ internal fun List<HttpInterceptor>.compileAndInstrument(): HttpInterceptor = whe
         }
     }
 }
+
+/*
+ * TODO: API Recommendations for HttpInterceptor.kt
+ *
+ * 1. Add a priority or ordering mechanism for interceptors to ensure correct execution order
+ *    (e.g., authentication should run before authorization). Currently order depends on
+ *    installation order which is implicit.
+ *
+ * 2. Consider adding lifecycle hooks for interceptors:
+ *    - fun onServerStart(runtime: ServerRuntime)
+ *    - fun onServerStop(runtime: ServerRuntime)
+ *    This would allow interceptors to initialize/cleanup resources.
+ *
+ * 3. The compileAndInstrument logic is complex and uses idx checking that's fragile.
+ *    The comment "will start at 1" suggests the logic is not immediately obvious.
+ *    Consider simplifying or adding more detailed comments about why idx==1 is special.
+ *
+ * 4. Add a way to skip remaining interceptors and jump directly to the handler:
+ *    - This would be useful for caching interceptors that want to return cached responses
+ *      without executing authentication, etc.
+ *
+ * 5. Consider adding typed metadata that can be attached to requests by interceptors
+ *    for downstream interceptors/handlers to use (e.g., authenticated user, rate limit info).
+ *    Currently this must be done via the SerializableCache which requires serialization.
+ *
+ * 6. The fun interface is convenient but limits having state in interceptors unless you
+ *    use a class. Document the pattern for stateful interceptors clearly.
+ */

@@ -321,3 +321,32 @@ public operator fun <T> Caching.get(key: Key<T>): T? = cache[key]
 context(server: ServerRuntime)
 public suspend fun <INPUT, T> Caching.get(key: CalculatingKey<INPUT, T>, input: INPUT): T = cache.get(key, input)
 
+/*
+ * TODO: API Recommendations for SerializableCache.kt
+ *
+ * 1. Add thread-safety documentation - is this cache safe for concurrent access?
+ *    If not, consider adding synchronization or documenting usage constraints.
+ *
+ * 2. Consider adding a remove() method to explicitly invalidate cache entries:
+ *    - fun remove(key: Key<*>): Boolean
+ *
+ * 3. Add bulk operations for efficiency:
+ *    - fun removeAll(predicate: (String) -> Boolean)
+ *    - fun getAll(keys: List<Key<*>>): Map<String, Any?>
+ *
+ * 4. The equals() implementation could be expensive for large caches due to contentEquals
+ *    on every ByteArray. Consider caching hash codes or using a different approach.
+ *
+ * 5. Add size/statistics methods to help with debugging and monitoring:
+ *    - val size: Int (number of cached entries)
+ *    - val memorySize: Long (approximate size in bytes)
+ *    - fun getStats(): CacheStats (hit/miss ratios, etc.)
+ *
+ * 6. Consider adding a max size limit with eviction policy (LRU, LFU) to prevent
+ *    unbounded growth in long-running applications.
+ *
+ * 7. The Key interface could benefit from a validation method to ensure id uniqueness
+ *    at compile time or startup rather than at runtime during retrieval.
+ *
+ * 8. Add a typed CalculatingKey factory method similar to the Key factory for consistency
+ */

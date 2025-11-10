@@ -51,3 +51,21 @@ public interface ExceptionHttpHandler {
 
 }
 
+/*
+ * TODO: API Recommendations for ExceptionHttpHandler.kt
+ *
+ * 1. Add lifecycle hooks for exception logging/monitoring before response generation:
+ *    - fun onException(request: HttpRequest<PathSpec>, exception: Exception)
+ *    This would allow centralized error tracking without duplicating response logic.
+ *
+ * 2. Consider supporting exception handler chains similar to interceptors:
+ *    - Allow multiple exception handlers to try handling an exception
+ *    - Fall back to next handler if one returns null
+ *
+ * 3. Add a way to provide context-specific error details based on the exception type:
+ *    - Interface could include error codes, user-friendly messages, etc.
+ *
+ * 4. The timeout applies to exception handling but what happens if handling times out?
+ *    Document the fallback behavior or add a simple emergency handler.
+ */
+

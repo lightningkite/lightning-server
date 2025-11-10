@@ -124,3 +124,27 @@ public interface ServerRuntime: SettingContext {
     public val serverVersion: String
 }
 
+/*
+ * TODO: API Recommendations for ServerRuntime.kt
+ *
+ * 1. The openTelemetry property returns null by default with a TODO comment. This should either be
+ *    implemented or the TODO removed if telemetry is truly optional. Document the expected behavior.
+ *
+ * 2. No lifecycle methods for server startup/shutdown. Consider adding:
+ *    - suspend fun start()
+ *    - suspend fun stop()
+ *    - val isRunning: Boolean
+ *
+ * 3. The Task.invoke() method doesn't provide any feedback about task execution status or errors.
+ *    Consider returning a result or providing a callback mechanism for task completion/failure.
+ *
+ * 4. sendWebSocketSubscriptionMessage doesn't document what happens if no connections are subscribed.
+ *    Does it silently succeed? Document this behavior.
+ *
+ * 5. No way to query the server state (number of active connections, running tasks, etc.).
+ *    Consider adding health/metrics accessors for observability.
+ *
+ * 6. The serverId and serverVersion have no validation. Consider validating that these are set
+ *    properly during initialization or providing defaults.
+ */
+

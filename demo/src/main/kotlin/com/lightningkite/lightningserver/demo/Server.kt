@@ -34,9 +34,15 @@ import com.lightningkite.services.email.javasmtp.JavaSmtpEmailService
 import com.lightningkite.services.files.*
 import com.lightningkite.services.files.s3.*
 import com.lightningkite.services.http.*
+import com.lightningkite.services.otel.OpenTelemetrySettings
 import com.lightningkite.services.sms.*
 import io.ktor.client.request.*
 import io.ktor.server.plugins.NotFoundException
+import io.opentelemetry.exporter.otlp.logs.OtlpGrpcLogRecordExporter
+import io.opentelemetry.exporter.otlp.metrics.OtlpGrpcMetricExporter
+import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter
+import io.opentelemetry.sdk.OpenTelemetrySdk
+import io.opentelemetry.sdk.resources.Resource
 import kotlinx.coroutines.*
 import kotlinx.html.*
 import kotlinx.serialization.*
@@ -209,6 +215,39 @@ object Server : ServerBuilder() {
             TestModel()
         }
     )
+
+    // Test nullable primitives as input
+    val testNullableInput = path.path("test-nullable-input").post bind ApiHttpHandler(
+        auth = UserAuth.require(),
+        summary = "Test Nullable Primitive Input",
+        errorCases = listOf(),
+        implementation = { input: Int? ->
+            "Received: ${input ?: "null"}"
+        }
+    )
+
+    // Test nullable primitives as output
+    val testNullableOutput = path.path("test-nullable-output").get bind ApiHttpHandler(
+        auth = UserAuth.require(),
+        summary = "Test Nullable Primitive Output",
+        errorCases = listOf(),
+        implementation = { input: Unit ->
+            val result: String? = if (Random.nextBoolean()) "value" else null
+            result
+        }
+    )
+
+    // Test nullable primitives both input and output
+    val testNullableBoth = path.path("test-nullable-both").post bind ApiHttpHandler(
+        auth = UserAuth.require(),
+        summary = "Test Nullable Primitive Both",
+        errorCases = listOf(),
+        implementation = { input: Double? ->
+            val result: Double? = input?.times(2)
+            result
+        }
+    )
+
     val die = path.path("die").get bind HttpHandler {  throw Exception("OUCH") }
 
     val fileSignPerfCheck = path.path("file-sign-perf-check").get bind HttpHandler {

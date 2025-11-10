@@ -207,3 +207,32 @@ public class ServerSettings(public val settings: Set<ServerSetting<*, *>>) {
     context(_: ServerRuntime)
     public fun allGoals(): Map<ServerSetting<*, *>, Any?> = settings.associateWith { get(it) }
 }
+
+/*
+ * TODO: API Recommendations for ServerSettings.kt
+ *
+ * 1. The `ready()` function throws `Error` (not Exception) when settings fail to preload.
+ *    This is unusual - consider using a more specific exception type that extends Exception.
+ *
+ * 2. The missing settings check in `ready()` doesn't distinguish between truly required settings
+ *    and optional settings with no default. The error message could be more helpful.
+ *
+ * 3. The `get()` function performs lazy transformation but the caching isn't thread-safe.
+ *    If called concurrently during initial ready phase, could transform the same setting twice.
+ *    (Though this is documented in ServerSetting.kt TODO, worth noting here too.)
+ *
+ * 4. `readyUsingDefaults()` bypasses all validation with a warning, but doesn't actually
+ *    enforce that defaults exist for all settings. Could still throw during get().
+ *
+ * 5. The serializable registry uses `Any?` type which loses type safety. A setting configured
+ *    with the wrong type won't be caught until transformation time, potentially late in startup.
+ *
+ * 6. No way to query if a specific setting has been configured before calling ready().
+ *    Adding `isSet(setting)` or `hasValue(setting)` would be useful for conditional logic.
+ *
+ * 7. The `allSerializable()` and `allGoals()` functions create new maps on every call.
+ *    Consider caching these after ready() since they won't change.
+ *
+ * 8. No mechanism to reload or hot-reload settings after ready(). Once ready, settings are
+ *    permanently locked. Consider adding support for reloadable settings.
+ */

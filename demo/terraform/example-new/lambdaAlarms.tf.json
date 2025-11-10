@@ -6,76 +6,114 @@
             }
         },
         "aws_cloudwatch_metric_alarm": {
-            "panic_invocations": {
-                "alarm_name": "demo-example_panic_invocations",
-                "period": 60,
+            "demoexamplelambdaspend1d": {
+                "alarm_name": "demo-example_demoexamplelambdaspend1d",
+                "period": 86400,
                 "statistic": "Sum",
                 "alarm_actions": [
                     "${aws_sns_topic.emergency.arn}"
                 ],
-                "threshold": 450,
-                "datapoints_to_alarm": 1,
-                "insufficient_data_actions": [],
-                "metric_name": "Invocations",
-                "evaluation_periods": 1,
-                "alarm_description": "Panic Invocations",
-                "comparison_operator": "GreaterThanOrEqualToThreshold",
-                "namespace": "AWS/Lambda",
-                "dimensions": {
-                    "FunctionName": "${aws_lambda_function.main.function_name}"
-                }
-            },
-            "emergency_compute": {
-                "alarm_name": "demo-example_emergency_compute",
-                "period": 60,
-                "statistic": "Sum",
-                "alarm_actions": [
-                    "${aws_sns_topic.emergency.arn}"
-                ],
-                "threshold": 180000,
+                "threshold": 39999920,
                 "datapoints_to_alarm": 1,
                 "insufficient_data_actions": [],
                 "metric_name": "Duration",
                 "evaluation_periods": 1,
-                "alarm_description": "Emergency Compute",
+                "alarm_description": "Demo Example Lambda Spend (1d)",
                 "comparison_operator": "GreaterThanOrEqualToThreshold",
                 "namespace": "AWS/Lambda",
                 "dimensions": {
                     "FunctionName": "${aws_lambda_function.main.function_name}"
                 }
             },
-            "panic_compute": {
-                "alarm_name": "demo-example_panic_compute",
-                "period": 60,
+            "demoexamplelambdaspend1h": {
+                "alarm_name": "demo-example_demoexamplelambdaspend1h",
+                "period": 3600,
                 "statistic": "Sum",
                 "alarm_actions": [
                     "${aws_sns_topic.emergency.arn}"
                 ],
-                "threshold": 300000,
+                "threshold": 6666653,
                 "datapoints_to_alarm": 1,
                 "insufficient_data_actions": [],
                 "metric_name": "Duration",
                 "evaluation_periods": 1,
-                "alarm_description": "Panic Compute",
+                "alarm_description": "Demo Example Lambda Spend (1h)",
                 "comparison_operator": "GreaterThanOrEqualToThreshold",
                 "namespace": "AWS/Lambda",
                 "dimensions": {
                     "FunctionName": "${aws_lambda_function.main.function_name}"
                 }
             },
-            "emergency_invocations": {
-                "alarm_name": "demo-example_emergency_invocations",
-                "period": 60,
+            "demoexamplelambdaspend4h": {
+                "alarm_name": "demo-example_demoexamplelambdaspend4h",
+                "period": 14400,
                 "statistic": "Sum",
                 "alarm_actions": [
                     "${aws_sns_topic.emergency.arn}"
                 ],
-                "threshold": 150,
+                "threshold": 13333306,
                 "datapoints_to_alarm": 1,
                 "insufficient_data_actions": [],
-                "metric_name": "Invocations",
+                "metric_name": "Duration",
                 "evaluation_periods": 1,
-                "alarm_description": "Emergency Invocations",
+                "alarm_description": "Demo Example Lambda Spend (4h)",
+                "comparison_operator": "GreaterThanOrEqualToThreshold",
+                "namespace": "AWS/Lambda",
+                "dimensions": {
+                    "FunctionName": "${aws_lambda_function.main.function_name}"
+                }
+            },
+            "demoexamplelambdaspend15m": {
+                "alarm_name": "demo-example_demoexamplelambdaspend15m",
+                "period": 900,
+                "statistic": "Sum",
+                "alarm_actions": [
+                    "${aws_sns_topic.emergency.arn}"
+                ],
+                "threshold": 3333326,
+                "datapoints_to_alarm": 1,
+                "insufficient_data_actions": [],
+                "metric_name": "Duration",
+                "evaluation_periods": 1,
+                "alarm_description": "Demo Example Lambda Spend (15m)",
+                "comparison_operator": "GreaterThanOrEqualToThreshold",
+                "namespace": "AWS/Lambda",
+                "dimensions": {
+                    "FunctionName": "${aws_lambda_function.main.function_name}"
+                }
+            },
+            "demoexamplelambdaspend5m": {
+                "alarm_name": "demo-example_demoexamplelambdaspend5m",
+                "period": 300,
+                "statistic": "Sum",
+                "alarm_actions": [
+                    "${aws_sns_topic.emergency.arn}"
+                ],
+                "threshold": 2222217,
+                "datapoints_to_alarm": 1,
+                "insufficient_data_actions": [],
+                "metric_name": "Duration",
+                "evaluation_periods": 1,
+                "alarm_description": "Demo Example Lambda Spend (5m)",
+                "comparison_operator": "GreaterThanOrEqualToThreshold",
+                "namespace": "AWS/Lambda",
+                "dimensions": {
+                    "FunctionName": "${aws_lambda_function.main.function_name}"
+                }
+            },
+            "demoexamplelambdaspend7d": {
+                "alarm_name": "demo-example_demoexamplelambdaspend7d",
+                "period": 604800,
+                "statistic": "Sum",
+                "alarm_actions": [
+                    "${aws_sns_topic.emergency.arn}"
+                ],
+                "threshold": 139999720,
+                "datapoints_to_alarm": 1,
+                "insufficient_data_actions": [],
+                "metric_name": "Duration",
+                "evaluation_periods": 1,
+                "alarm_description": "Demo Example Lambda Spend (7d)",
                 "comparison_operator": "GreaterThanOrEqualToThreshold",
                 "namespace": "AWS/Lambda",
                 "dimensions": {

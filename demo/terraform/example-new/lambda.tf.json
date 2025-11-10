@@ -138,6 +138,13 @@
                 "memory_size": 1024,
                 "environment": {
                     "variables": {
+                        "DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_GRPC_ENDPOINT": "localhost:4317",
+                        "DD_API_KEY": "${var.datadog_api_key}",
+                        "DD_SITE": "datadoghq.com",
+                        "DD_VERSION": "1.0.0",
+                        "DD_TRACE_OTEL_ENABLED": "true",
+                        "DD_SERVICE": "com.lightningkite.lightningserver.demo.AwsHandler",
+                        "DD_ENV": "demo-example",
                         "LIGHTNING_SERVER_SETTINGS_DECRYPTION": "${random_password.settings.result}"
                     }
                 },
@@ -146,7 +153,10 @@
                 },
                 "function_name": "demo-example-main",
                 "publish": true,
-                "s3_key": "${aws_s3_object.app_storage.key}"
+                "s3_key": "${aws_s3_object.app_storage.key}",
+                "layers": [
+                    "arn:aws:lambda:us-west-2:464622532012:layer:Datadog-Extension:88"
+                ]
             }
         },
         "aws_s3_bucket": {
@@ -176,7 +186,7 @@
                 "debug": true,
                 "emergencyContact": "josephivie@gmail.com"
             },
-            "database": "mongodb+srv://demo-exampledatabase-main:${random_password.database.result}@${replace(mongodbatlas_advanced_cluster.database.connection_strings[0].standard_srv, \"mongodb+srv://\", \"\")}/default?retryWrites=true&w=majority",
+            "database": "mongodb+srv://demoexampledatabase-main:${random_password.database.result}@${replace(mongodbatlas_advanced_cluster.database.connection_strings[0].standard_srv, \"mongodb+srv://\", \"\")}/default?retryWrites=true&w=majority",
             "cache": "dynamodb://us-west-2/demo_example",
             "cors": {
                 "limitToDomains": [],
@@ -200,11 +210,10 @@
                 "logger": null
             },
             "telemetry": {
-                "url": "print",
-                "reportFrequency": null,
-                "metricReportFrequency": null,
-                "traceReportFrequency": null,
-                "logReportFrequency": null
+                "url": "otlp-grpc",
+                "batching": {
+                    "frequency": "PT1M"
+                }
             },
             "someSecret": "${var.someSecret}",
             "email": "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587?fromEmail=noreply@example.demo.ivieleague.com"
@@ -213,6 +222,16 @@
         "servicesAccessPolicy": {
             "Version": "2012-10-17",
             "Statement": [
+                {
+                    "Action": [
+                        "s3:*"
+                    ],
+                    "Effect": "Allow",
+                    "Resource": [
+                        "${aws_s3_bucket.files.arn}",
+                        "${aws_s3_bucket.files.arn}/*"
+                    ]
+                },
                 {
                     "Action": [
                         "execute-api:ManageConnections"

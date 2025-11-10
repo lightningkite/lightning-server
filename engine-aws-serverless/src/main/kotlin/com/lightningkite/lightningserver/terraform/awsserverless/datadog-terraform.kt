@@ -5,8 +5,11 @@ import com.lightningkite.services.terraform.TerraformJsonObject
 import com.lightningkite.services.terraform.TerraformNeed
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.encodeToJsonElement
 import software.amazon.awssdk.services.lambda.model.Architecture
+import kotlin.time.Duration.Companion.minutes
 
 context(emitter: TerraformAwsServerlessBuilder<*>) public fun TerraformNeed<OpenTelemetrySettings?>.otelDatadog(
     version: Int = 88
@@ -27,5 +30,10 @@ context(emitter: TerraformAwsServerlessBuilder<*>) public fun TerraformNeed<Open
     emitter.lambdaEnvironment["DD_SITE"] = "datadoghq.com"
     emitter.lambdaEnvironment["DD_SERVICE"] = emitter.handler.qualifiedName!!
     emitter.lambdaEnvironment["DD_VERSION"] = "1.0.0"
-    emitter.fulfillSetting(name, JsonPrimitive("otel-grpc://localhost:4317"))
+    emitter.lambdaEnvironment["DD_TRACE_OTEL_ENABLED"] = "true"
+    emitter.lambdaEnvironment["DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_GRPC_ENDPOINT"] = "localhost:4317"
+    emitter.fulfillSetting(name, Json.encodeToJsonElement(OpenTelemetrySettings(
+        url = "otlp-grpc",
+        batching = OpenTelemetrySettings.BatchingRules(frequency = 1.minutes)
+    )))
 }

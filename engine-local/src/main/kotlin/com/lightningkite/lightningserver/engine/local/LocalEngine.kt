@@ -28,21 +28,57 @@ import java.net.NetworkInterface
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
+/**
+ * Server setting for configuring the PubSub implementation used by the local engine.
+ * Used for WebSocket subscription messages and inter-process communication.
+ */
 public val enginePubSub: ServerSetting<PubSub.Settings, PubSub> =
     ServerSetting("pubSub", PubSub.Settings(), PubSub.Settings.serializer())
+
+/**
+ * Server setting for configuring the Cache implementation used by the local engine.
+ * Used for distributed locking and schedule coordination.
+ */
 public val engineCache: ServerSetting<Cache.Settings, Cache> =
     ServerSetting("cache", Cache.Settings(), Cache.Settings.serializer())
 
+/**
+ * Base class for local server engines that run within a single JVM process.
+ *
+ * This engine is primarily used for:
+ * - Unit testing with the `LocalEngine` implementation
+ * - Local development servers
+ * - Engines that need in-process task execution and schedule management
+ *
+ * The engine handles:
+ * - WebSocket subscriptions via PubSub
+ * - Background task execution
+ * - Scheduled task coordination using distributed locks
+ *
+ * @param server The server definition to run
+ */
 public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(server) {
+    /**
+     * The coroutine scope used for launching background tasks and schedules.
+     * Defaults to GlobalScope but can be overridden for testing or custom lifecycle management.
+     */
     @OptIn(DelicateCoroutinesApi::class)
     protected open val scope: CoroutineScope = GlobalScope
 
+    /**
+     * A unique identifier for this server instance, derived from the network interface's hardware address.
+     * Falls back to "?" if no network interfaces are available.
+     */
     public override val serverId:String = NetworkInterface.getNetworkInterfaces().toList()
         .minByOrNull { it.name }
         ?.hardwareAddress
         ?.sumOf { it.hashCode() }
         ?.toString(16)
         ?: "?"
+
+    /**
+     * The version of this server instance. Always "Unknown" for local engines.
+     */
     public override val serverVersion:String =  "Unknown"
 
     override val settings: ServerSettings = ServerSettings(
@@ -54,19 +90,41 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
         ).distinctBy { it.name }.toSet()
     )
 
+    /**
+     * The PubSub instance used for WebSocket subscriptions and inter-process messaging.
+     */
     public val pubSub: PubSub by lazy { enginePubSub() }
+
+    /**
+     * The Cache instance used for distributed locking and schedule coordination.
+     */
     public val cache: Cache by lazy { engineCache() }
 
+    /**
+     * Gets a PubSub channel for a WebSocket subscription message.
+     */
     protected fun <PATH : PathSpec, T> pubSubChannel(event: WebSocketSubscriptionMessage<PATH, T>): PubSubChannel<T> =
         pubSub.get(event.path(internalSerialization.stringArrayFormat), event.topic.type)
 
+    /**
+     * Gets a PubSub channel for a WebSocket subscription request.
+     */
     protected fun <PATH : PathSpec, T> pubSubChannel(event: WebSocketSubscriptionRequest<PATH, T>): PubSubChannel<T> =
         pubSub.get(event.path(internalSerialization.stringArrayFormat), event.topic.type)
 
+    /**
+     * Sends a WebSocket subscription message by emitting it to the appropriate PubSub channel.
+     */
     override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>) {
         pubSubChannel(event).emit(event.value)
     }
 
+    /**
+     * Collects WebSocket events from a subscription request.
+     *
+     * @param event The subscription request
+     * @param collector The function to call for each received event
+     */
     protected suspend fun <PATH : PathSpec, T> webSocketEventCollect(
         event: WebSocketSubscriptionRequest<PATH, T>,
         collector: suspend (T) -> Unit,
@@ -74,6 +132,12 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
         pubSubChannel(event).collect(collector)
     }
 
+    /**
+     * Invokes a background task asynchronously.
+     * The task is launched in the engine's coroutine scope and errors are caught and reported.
+     *
+     * @param input The input value for the task
+     */
     override suspend fun <T> Task<T>.invoke(input: T) {
         scope.launch {
             try {
@@ -84,6 +148,15 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
         }
     }
 
+    /**
+     * Starts all scheduled tasks defined in the server.
+     *
+     * Each schedule runs in its own coroutine and uses distributed locking via cache
+     * to ensure only one instance runs the task at a time. This allows multiple server
+     * instances to coordinate without duplicate execution.
+     *
+     * The schedule's next run time is stored in cache to persist across server restarts.
+     */
     protected fun startSchedules() {
         server.schedules.forEach { locationed ->
             val location = locationed.key
@@ -142,3 +215,18 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
         }
     }
 }
+
+/*
+ * TODO: API Recommendations
+ *
+ * 1. The serverId generation could fail or produce "?" - consider documenting this behavior more clearly
+ *    or providing a way to override it for testing
+ * 2. The startSchedules() function launches infinite loops but provides no way to stop them. Consider
+ *    adding a shutdown/cleanup method
+ * 3. The 1-hour lock timeout in startSchedules() is hardcoded - consider making this configurable
+ * 4. Consider adding a method to manually trigger a schedule for testing purposes
+ * 5. The schedule lock mechanism could lead to missed executions if a task takes longer than 1 hour.
+ *    Consider documenting this limitation or adding monitoring
+ * 6. GlobalScope usage is marked as DelicateCoroutinesApi - consider providing guidance on when/how
+ *    to override the scope property for proper structured concurrency
+ */

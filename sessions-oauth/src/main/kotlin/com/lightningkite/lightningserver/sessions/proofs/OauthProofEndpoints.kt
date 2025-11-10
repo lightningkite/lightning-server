@@ -15,6 +15,41 @@ import com.lightningkite.lightningserver.typed.*
 import kotlinx.datetime.*
 import java.util.*
 
+/**
+ * Provides OAuth-based authentication proof endpoints for external identity providers.
+ *
+ * This class creates endpoints that enable users to authenticate via OAuth providers like
+ * Google, Apple, Microsoft, and GitHub. OAuth authentication provides the highest proof
+ * strength (10) because the identity is verified by a trusted third party.
+ *
+ * **Authentication Flow:**
+ * 1. Client calls `start` or `loginApi` to get an OAuth authorization URL
+ * 2. User is redirected to the provider (Google, Apple, etc.)
+ * 3. Provider authenticates the user and redirects back to the callback endpoint
+ * 4. Callback exchanges the authorization code for an access token
+ * 5. User profile is retrieved from the provider
+ * 6. Email is extracted and wrapped in a cryptographically signed proof
+ * 7. User is redirected back to the UI with the proof as a query parameter
+ *
+ * **Proof Strength:** 10 (highest) - OAuth verification by trusted identity provider
+ *
+ * **Example usage:**
+ * ```kotlin
+ * val googleAuth = OauthProofEndpoints(
+ *     provider = OauthProviderInfo.google,
+ *     credentials = { googleOAuthCredentials() },
+ *     continueUiAuthUrl = { "https://myapp.com/auth/continue" }
+ * )
+ * ```
+ *
+ * @param proofSigner The signer used to create cryptographic proofs (defaults to derived from secretBasis)
+ * @param provider The OAuth provider configuration (Google, Apple, Microsoft, GitHub, or custom)
+ * @param credentials Function that returns the OAuth client credentials (ID and secret)
+ * @param continueUiAuthUrl Function that returns the UI URL to redirect to after successful authentication
+ *
+ * @see OauthProviderInfo for built-in providers (Google, Apple, Microsoft, GitHub)
+ * @see ExternalProofMethod
+ */
 public class OauthProofEndpoints(
     proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
     private val provider: OauthProviderInfo,
@@ -81,3 +116,26 @@ public class OauthProofEndpoints(
         }
     )
 }
+
+/*
+ * TODO: API Recommendations
+ *
+ * 1. The callback endpoint constructs a redirect URL with manually encoded query parameters.
+ *    Consider using a URL builder utility for safety and readability.
+ *
+ * 2. The continueUiAuthUrl function returns a String, but it's concatenated with query params.
+ *    Consider documenting that it should NOT include a trailing '?' or existing query params,
+ *    or make it more robust by handling both cases.
+ *
+ * 3. Consider adding error handling for when profile.email is null with more specific error messages
+ *    indicating which OAuth provider failed to provide an email.
+ *
+ * 4. The 'backend' query parameter is added to the redirect but never used in the documented flow.
+ *    Consider documenting its purpose or removing it if unused.
+ *
+ * 5. Consider adding telemetry/metrics for OAuth login attempts, successes, and failures
+ *    to help diagnose provider-specific issues.
+ *
+ * 6. The UUID state parameter in callback is generated but not validated. Consider using the
+ *    state parameter for CSRF protection by storing and validating it.
+ */

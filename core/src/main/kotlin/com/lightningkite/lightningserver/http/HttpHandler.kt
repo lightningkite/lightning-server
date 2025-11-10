@@ -69,3 +69,23 @@ public fun <PATH : PathSpec> HttpHandler(
         return handler(server, request)
     }
 }
+
+/*
+ * TODO: API Recommendations for HttpHandler.kt
+ *
+ * 1. Consider adding timeout validation to prevent nonsensical values:
+ *    - Negative durations
+ *    - Excessively long timeouts (e.g., > 10 minutes for HTTP handlers)
+ *
+ * 2. Add a mechanism to observe or intercept timeouts for logging/metrics:
+ *    - onTimeout: ((HttpRequest<PATH>) -> Unit)? parameter
+ *
+ * 3. Consider providing common handler compositions:
+ *    - fun <PATH> cached(handler: HttpHandler<PATH>): HttpHandler<PATH>
+ *    - fun <PATH> withRetry(handler: HttpHandler<PATH>): HttpHandler<PATH>
+ *
+ * 4. Add documentation about what happens when a timeout occurs:
+ *    - Is an exception thrown?
+ *    - What response is sent to the client?
+ *    - Are resources cleaned up properly?
+ */

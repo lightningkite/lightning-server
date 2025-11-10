@@ -43,3 +43,16 @@ public val <T : PathSpec> T.options: HttpEndpoint<T> get() = HttpEndpoint(this, 
 
 /** Creates a HEAD endpoint from this path specification. */
 public val <T : PathSpec> T.head: HttpEndpoint<T> get() = HttpEndpoint(this, HttpMethod.HEAD)
+
+/*
+ * TODO: API Recommendations for HttpEndpoint.kt
+ *
+ * 1. Consider adding extension properties for less common HTTP methods if needed:
+ *    - TRACE, CONNECT (though these are rarely used in REST APIs)
+ *
+ * 2. The extension properties create new HttpEndpoint instances on every access.
+ *    For frequently accessed endpoints, consider caching or using lazy properties.
+ *
+ * 3. Add a method to check if a path matches this endpoint's pattern:
+ *    - fun matches(method: HttpMethod, path: PathSegments): Boolean
+ */

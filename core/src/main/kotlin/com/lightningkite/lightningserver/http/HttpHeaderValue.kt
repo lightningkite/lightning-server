@@ -85,3 +85,26 @@ public data class HttpHeaderValue(
 
     override fun toString(): String = toHttpString()
 }
+
+/*
+ * TODO: API Recommendations for HttpHeaderValue.kt
+ *
+ * 1. The parsing doesn't handle quoted values in parameters (common in headers like Content-Disposition).
+ *    For example: filename="file; with; semicolons.txt" would be incorrectly parsed.
+ *    Consider supporting RFC 2616 quoted-string format.
+ *
+ * 2. The parseCookies function may not correctly handle cookies without values (just the name).
+ *    substringAfter('=', "") returns empty string but should probably check if '=' exists.
+ *
+ * 3. Parameter names and values should preserve case sensitivity, but the implementation
+ *    doesn't document this. Some headers have case-sensitive parameters.
+ *
+ * 4. The parse() method could fail silently on malformed input. Consider throwing
+ *    an exception or returning a Result type for invalid header values.
+ *
+ * 5. Add convenience methods for common parameter access patterns:
+ *    - fun getParameter(name: String, ignoreCase: Boolean = false): String?
+ *    - fun hasParameter(name: String): Boolean
+ *
+ * 6. The emptyMap import from kotlinx.html is unusual - should use kotlin.collections.emptyMap()
+ */

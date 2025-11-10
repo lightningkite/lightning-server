@@ -105,6 +105,35 @@ class LSErrorTest {
         assertEquals("bad-request", withMessage.detail)
         assertEquals("Invalid input", withMessage.message)
     }
+
+    // Additional edge case tests
+    @Test
+    fun testEdgeCaseHttpCodes() {
+        // Test boundary HTTP codes
+        val minCode = LSError(http = 100, detail = "continue")
+        val maxCode = LSError(http = 599, detail = "custom-error")
+
+        assertEquals(100, minCode.http)
+        assertEquals(599, maxCode.http)
+    }
+
+    @Test
+    fun testEmptyStrings() {
+        val error = LSError(http = 200, detail = "", message = "", data = "")
+
+        assertEquals("", error.detail)
+        assertEquals("", error.message)
+        assertEquals("", error.data)
+    }
+
+    @Test
+    fun testJsonDataField() {
+        // Verify that data field can hold valid JSON
+        val complexJson = """{"nested":{"field":"value"},"array":[1,2,3]}"""
+        val error = LSError(http = 400, detail = "validation", data = complexJson)
+
+        assertEquals(complexJson, error.data)
+    }
 }
 
 class MultiplexMessageTest {
@@ -238,5 +267,59 @@ class MultiplexMessageTest {
         assertEquals("ch1", withData.channel)
         assertEquals("new-data", withData.data)
         assertEquals(false, withData.start)
+    }
+
+    // Additional edge case tests
+    @Test
+    fun testBothDataAndError() {
+        // Document behavior when both data and error are set (not recommended but valid)
+        val msg = MultiplexMessage(
+            channel = "ch1",
+            data = "some-data",
+            error = "some-error"
+        )
+
+        // Both fields are preserved
+        assertEquals("some-data", msg.data)
+        assertEquals("some-error", msg.error)
+    }
+
+    @Test
+    fun testStartAndEnd() {
+        // Test message that has both start and end set
+        val msg = MultiplexMessage(
+            channel = "ch1",
+            start = true,
+            end = true
+        )
+
+        assertEquals(true, msg.start)
+        assertEquals(true, msg.end)
+    }
+
+    @Test
+    fun testEmptyQueryParams() {
+        val msg = MultiplexMessage(
+            channel = "ch1",
+            path = "/api",
+            queryParams = emptyMap(),
+            start = true
+        )
+
+        assertEquals(emptyMap(), msg.queryParams)
+    }
+
+    @Test
+    fun testMultiValueQueryParams() {
+        val params = mapOf(
+            "key1" to listOf("value1", "value2", "value3"),
+            "key2" to emptyList()
+        )
+        val msg = MultiplexMessage(
+            channel = "ch1",
+            queryParams = params
+        )
+
+        assertEquals(params, msg.queryParams)
     }
 }
