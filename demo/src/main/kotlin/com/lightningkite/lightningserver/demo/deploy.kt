@@ -62,3 +62,8 @@ object DemoEnvEdit {
     @JvmStatic
     fun main(vararg args: String) = DemoEnv.editVars()
 }
+
+object DemoEnvDestroy {
+    @JvmStatic
+    fun main(vararg args: String) = DemoEnv.terraform("destroy", "--auto-approve")
+}

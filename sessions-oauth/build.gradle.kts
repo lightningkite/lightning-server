@@ -12,6 +12,8 @@ plugins {
 dependencies {
     api(project(":sessions"))
     api(project(":sessions-oauth-shared"))
+    testImplementation(libs.kotlinTest)
+    testImplementation(libs.kotlinTestJunit)
 }
 
 kotlin {

@@ -5,10 +5,9 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.test.serverRuntime
 import com.lightningkite.lightningserver.serialization.*
-import com.lightningkite.services.database.contextualSerializerIfHandled
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.json.Json
 
 public class OauthCallbackEndpoint<STATE>(
     path: PathSpec,
@@ -17,12 +16,18 @@ public class OauthCallbackEndpoint<STATE>(
     public val credentials: () -> OauthProviderCredentials,
     public val defaultScope: String = oauthProviderInfo.scopeForProfile,
     public val defaultAccessType: OauthAccessType = OauthAccessType.online,
-    public val onError: suspend (OauthCode) -> HttpResponse = {
+    public val onError: suspend context(ServerRuntime) (OauthCode) -> HttpResponse = {
         throw Exception("Got Oauth error from ${oauthProviderInfo.niceName}: ${it}")
     },
-    public val onAccess: suspend (OauthResponse, STATE) -> HttpResponse
+    public val onAccess: suspend context(ServerRuntime) (OauthResponse, STATE) -> HttpResponse
 ): ServerBuilder() {
 
+    private val json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+    }
+
+    context(runtime: ServerRuntime)
     public fun loginUrl(
         state: STATE,
         scope: String = defaultScope,
@@ -32,33 +37,32 @@ public class OauthCallbackEndpoint<STATE>(
         credentials = credentials,
         callback = callback,
         scope = scope,
-        state = externalSerialization.json.encodeToString(stateSerializer, state),
+        state = json.encodeToString(stateSerializer, state),
         accessType = accessType,
         loginHint = loginHint,
     )
 
-    context(_: ServerRuntime)
-    public val callback: HttpHandler<PathSpec> get() = when (oauthProviderInfo.mode) {
+    public val callback: HttpHandler<*> = when (oauthProviderInfo.mode) {
         OauthResponseMode.form_post -> {
-            endpoint bind HttpHandler { request ->
-                val code = request.body!!.parse<OauthCode>()
+            path.post bind HttpHandler { request ->
+                val code = request.body!!.parse<OauthCode>(OauthCode.serializer())
                 code.error?.let { onError(code) }
-                val response = oauthProviderInfo.accessToken(credentials, endpoint, code)
-                onAccess(response, Serialization.json.decodeFromString(stateSerializer, code.state!!))
+                val response = oauthProviderInfo.accessToken(credentials, path, code)
+                onAccess(response, json.decodeFromString(stateSerializer, code.state!!))
             }
         }
 
         OauthResponseMode.query -> {
-            val endpoint = path.get
-            endpoint bind HttpHandler { request ->
-                val code = request.queryParameters<OauthCode>()
+            path.get bind HttpHandler { request ->
+                val code = request.queryParameters<OauthCode>(OauthCode.serializer())
                 code.error?.let { onError(code) }
-                val response = oauthProviderInfo.accessToken(credentials, endpoint, code)
-                onAccess(response, Serialization.json.decodeFromString(stateSerializer, code.state!!))
+                val response = oauthProviderInfo.accessToken(credentials, path, code)
+                onAccess(response, json.decodeFromString(stateSerializer, code.state!!))
             }
         }
     }
 
+    context(runtime: ServerRuntime)
     public suspend fun accessToken(refreshToken: String): OauthResponse = oauthProviderInfo.accessToken(credentials, refreshToken)
 }
 
@@ -68,13 +72,13 @@ public inline fun <reified STATE> HttpEndpoint<PathSpec0>.oauthCallback(
     noinline credentials: () -> OauthProviderCredentials,
     defaultScope: String = oauthProviderInfo.scopeForProfile,
     defaultAccessType: OauthAccessType = OauthAccessType.online,
-    noinline onError: suspend (OauthCode) -> HttpResponse = {
+    noinline onError: suspend context(ServerRuntime) (OauthCode) -> HttpResponse = {
         throw Exception("Got Oauth error from ${oauthProviderInfo.niceName}: ${it}")
     },
-    noinline onAccess: suspend (OauthResponse, STATE) -> HttpResponse
+    noinline onAccess: suspend context(ServerRuntime) (OauthResponse, STATE) -> HttpResponse
 ):OauthCallbackEndpoint<STATE> = OauthCallbackEndpoint(
     path = path,
-    stateSerializer = builder.externalSerialization.contextualSerializerIfHandled<STATE>(),
+    stateSerializer = serializerOrContextual<STATE>(),
     oauthProviderInfo = oauthProviderInfo,
     credentials = credentials,
     defaultScope = defaultScope,

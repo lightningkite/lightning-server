@@ -1,15 +1,20 @@
 package com.lightningkite.lightningserver.sessions.proofs.oauth
 
-import com.lightningkite.lightningserver.encryption.SecureHasher
-import com.lightningkite.lightningserver.encryption.Signer
+import com.lightningkite.lightningserver.encryption.ES256
+import com.lightningkite.lightningserver.encryption.signBlocking
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
-import com.lightningkite.now
+import dev.whyoleg.cryptography.CryptographyProvider
+import dev.whyoleg.cryptography.algorithms.EC
+import dev.whyoleg.cryptography.algorithms.ECDSA
+import dev.whyoleg.cryptography.algorithms.SHA256
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.util.*
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.days
 
 /**
@@ -43,21 +48,22 @@ public data class OauthProviderCredentialsApple(
         secret = generateJwt()
     )
 
+    @OptIn(ExperimentalEncodingApi::class)
     context(_: ServerRuntime)
     public fun generateJwt(): String {
         return buildString {
             val withDefaults = Json { encodeDefaults = true; explicitNulls = false }
             append(
-                Base64.getUrlEncoder().withoutPadding().encodeToString(withDefaults.encodeToString(buildJsonObject {
+                Base64.UrlSafe.encode(withDefaults.encodeToString(buildJsonObject {
 //                    put("typ", "JWT")
                     put("kid", keyId)
                     put("alg", "ES256")
-                }).toByteArray())
+                }).toByteArray()).trimEnd('=')
             )
             append('.')
             val issuedAt = now().minus(1.days)
             append(
-                Base64.getUrlEncoder().withoutPadding().encodeToString(
+                Base64.UrlSafe.encode(
                     withDefaults.encodeToString(
                         buildJsonObject {
                             put("iss", teamId)
@@ -67,13 +73,30 @@ public data class OauthProviderCredentialsApple(
                             put("sub", serviceId)
                         }
                     ).toByteArray()
-                )
+                ).trimEnd('=')
             )
             val soFar = this.toString()
             append('.')
+            
+            // Parse the ECDSA P-256 private key and sign
+            // The cryptography library API: get ECDSA algorithm, then get key decoder with curve only
+            val ecdsaAlgorithm = CryptographyProvider.Default.get(ECDSA)
+            val privateKeyDecoder = ecdsaAlgorithm.privateKeyDecoder(EC.Curve.P256)
+            val privateKey = privateKeyDecoder.decodeFromByteArrayBlocking(EC.PrivateKey.Format.PEM, keyString.toByteArray())
+
+            // We only have private key, but KeyPair interface requires both. Create a minimal public key.
+            val publicKeyDecoder = ecdsaAlgorithm.publicKeyDecoder(EC.Curve.P256)
+            val publicKey = publicKeyDecoder.decodeFromByteArrayBlocking(EC.PublicKey.Format.DER, ByteArray(0))
+
+            @OptIn(dev.whyoleg.cryptography.CryptographyProviderApi::class)
+            val keyPair = object : ECDSA.KeyPair {
+                override val privateKey = privateKey
+                override val publicKey = publicKey
+            }
+            val signer = keyPair.ES256()
+            
             append(
-                Base64.getUrlEncoder().withoutPadding()
-                    .encodeToString(Signer.ECDSA256(keyString).sign(soFar.toByteArray()))
+                Base64.UrlSafe.encode(signer.signBlocking(soFar.toByteArray())).trimEnd('=')
             )
         }
     }

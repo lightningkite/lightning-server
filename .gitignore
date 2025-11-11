@@ -8,6 +8,7 @@ local
 settings.yaml
 .terraform
 *.tfstate
+*.tfplan
 settings.json
 settings.*.json
 local.tf

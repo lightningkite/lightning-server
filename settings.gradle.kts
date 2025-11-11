@@ -1,5 +1,5 @@
-rootProject.name = "lightning-server"
-
+//rootProject.name = "lightning-server"
+//
 pluginManagement {
     repositories {
         mavenLocal()
@@ -31,8 +31,8 @@ include(":media-shared")
 include(":sessions")
 include(":sessions-shared")
 include(":sessions-email")
-//include(":sessions-oauth")
-//include(":sessions-oauth-shared")
+include(":sessions-oauth")
+include(":sessions-oauth-shared")
 include(":sessions-sms")
 
 include(":notifications")

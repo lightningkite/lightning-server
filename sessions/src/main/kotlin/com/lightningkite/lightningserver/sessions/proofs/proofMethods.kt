@@ -53,7 +53,6 @@ public interface StartedProofMethod : ProofMethod {
 
 public interface ExternalProofMethod : ProofMethod {
     public val start: ApiHttpHandler<PathSpec0, HasId<*>?, String, String>
-    public val indirectLink: PathSpec
 }
 
 public val ProofMethod.proofMethodAuth: AuthRequirement.Authenticated get() =
