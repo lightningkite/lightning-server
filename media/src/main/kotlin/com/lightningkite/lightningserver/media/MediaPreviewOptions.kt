@@ -14,6 +14,38 @@ import java.io.File
 import kotlin.jvm.optionals.getOrNull
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.math.min
+
+/**
+ * Resizes the image to match the specified aspect ratio by cropping.
+ *
+ * This function adjusts the image dimensions to achieve the target aspect ratio (width/height)
+ * by cropping from the center. The image is cropped to the largest size that maintains the
+ * target ratio while fitting within the original dimensions.
+ *
+ * @param targetRatio The desired aspect ratio (width/height). Must be positive.
+ * @return A new ImmutableImage cropped to the target aspect ratio
+ */
+private fun ImmutableImage.resizeToRatio(targetRatio: Double?): ImmutableImage {
+    if (targetRatio == null) return this
+
+    val currentRatio = width.toDouble() / height
+
+    // If already at the target ratio (within tolerance), return as-is
+    if (abs(currentRatio - targetRatio) <= 0.01) return this
+
+    return if (currentRatio > targetRatio) {
+        // Image is too wide, crop width
+        val newWidth = (height * targetRatio).toInt()
+        val xOffset = (width - newWidth) / 2
+        this.subimage(xOffset, 0, newWidth, height)
+    } else {
+        // Image is too tall, crop height
+        val newHeight = (width / targetRatio).toInt()
+        val yOffset = (height - newHeight) / 2
+        this.subimage(0, yOffset, width, newHeight)
+    }
+}
 
 /**
  * Configuration options for generating media previews (thumbnails, resized images, format conversions).
@@ -178,18 +210,9 @@ public fun ImmutableImage.apply(
 /*
  * TODO: API Recommendations
  *
- * 1. Consider validating that sizeInPixels is positive and forceRatio is positive in MediaPreviewOptions.
- *    Currently, negative or zero values could cause unexpected behavior.
+ * 1. Consider adding support for APNG and AVIF formats, which are becoming more common for web use.
  *
- * 2. Consider adding support for APNG and AVIF formats, which are becoming more common for web use.
+ * 2. Consider adding a callback or progress indicator for long-running image processing operations.
  *
- * 3. The quality parameter could have better validation/documentation. Consider enforcing 0.0-1.0 range
- *    or documenting what happens with out-of-range values.
- *
- * 4. Consider adding a callback or progress indicator for long-running image processing operations.
- *
- * 5. The resizeToRatio extension function is called but not defined in this file. Consider documenting
- *    where it comes from or making it part of this API.
- *
- * 6. Consider adding an option to preserve EXIF metadata in the output file for cases where this is desired.
+ * 3. Consider adding an option to preserve EXIF metadata in the output file for cases where this is desired.
  */
