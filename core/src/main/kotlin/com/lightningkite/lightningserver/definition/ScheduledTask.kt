@@ -17,13 +17,13 @@ import kotlin.time.Duration.Companion.seconds
  * data synchronization, and other periodic maintenance operations.
  *
  * @property schedule The schedule defining when this task should run
- * @property timeout Maximum duration this task is allowed to run before being cancelled. Defaults to 30 seconds.
+ * @property timeout Maximum duration this task is allowed to run before being cancelled. Defaults to 5 minutes.
  * @see StartupTask
  * @see Task
  */
 public interface ScheduledTask {
     public val schedule: Schedule
-    public val timeout: Duration get() = 30.seconds
+    public val timeout: Duration get() = 5.minutes
     context(server: ServerRuntime)
     public suspend fun execute()
 }
@@ -150,9 +150,6 @@ public fun ScheduledTask(
  *    - suspend fun onScheduled()
  *    - suspend fun onSkipped(reason: String)
  *
- * 5. The default timeout of 5 minutes in the factory functions is different from the
- *    interface default of 30 seconds. This inconsistency could be confusing.
- *
- * 6. Add support for exclusive execution to prevent overlapping runs:
+ * 5. Add support for exclusive execution to prevent overlapping runs:
  *    - val allowConcurrent: Boolean = false
  */

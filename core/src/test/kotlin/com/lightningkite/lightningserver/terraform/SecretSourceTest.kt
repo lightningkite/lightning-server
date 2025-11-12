@@ -101,7 +101,6 @@ class SecretSourceTest {
         }
     }
 
-    @Ignore("Complex test involving file encryption - may fail in headless environments")
     @Test
     fun `EncryptedFileSecretSource creates new file when it doesn't exist`() {
         val tempFile = File.createTempFile("test-secrets", ".json.enc")
@@ -120,10 +119,10 @@ class SecretSourceTest {
         }
     }
 
-    @Ignore("Complex test involving file encryption - may fail in headless environments")
     @Test
     fun `EncryptedFileSecretSource can store and retrieve values`() {
         val tempFile = File.createTempFile("test-secrets", ".json.enc")
+        tempFile.delete() // Delete it so we can test creation
 
         try {
             val source = EncryptedFileSecretSource(tempFile, "test-source", mockPasswordFetcher("test-password-123"))
@@ -139,10 +138,10 @@ class SecretSourceTest {
         }
     }
 
-    @Ignore("Complex test involving file encryption - may fail in headless environments")
     @Test
     fun `EncryptedFileSecretSource persists values across instances`() {
         val tempFile = File.createTempFile("test-secrets", ".json.enc")
+        tempFile.delete() // Delete it so we can test creation
 
         try {
             val password = "test-password-123"
@@ -168,7 +167,3 @@ class SecretSourceTest {
         fetcher.clear()  // Should not throw
     }
 }
-
-// TODO: The EncryptedFileSecretSource tests are marked as @Ignore because they require interactive
-// password prompting or mocking that's difficult in a unit test environment. Consider refactoring
-// EncryptedFileSecretSource to accept a simpler password provider interface that's easier to mock.

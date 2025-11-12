@@ -18,13 +18,13 @@ import kotlin.time.Duration.Companion.seconds
  *
  * @property dependencies Other startup tasks that must complete before this task can run.
  *                        Use this to establish execution order when tasks depend on each other.
- * @property timeout Maximum duration this task is allowed to run before being cancelled. Defaults to 30 seconds.
+ * @property timeout Maximum duration this task is allowed to run before being cancelled. Defaults to 5 minutes.
  * @see ScheduledTask
  * @see Task
  */
 public interface StartupTask {
     public val dependencies: Collection<StartupTask> get() = emptyList()
-    public val timeout: Duration get() = 30.seconds
+    public val timeout: Duration get() = 5.minutes
 
     context(server: ServerRuntime)
     public suspend fun execute()
@@ -53,34 +53,71 @@ public fun StartupTask(
         }
     }
 
+/**
+ * Validates that there are no circular dependencies in the given startup tasks.
+ *
+ * Uses depth-first search to detect cycles in the dependency graph.
+ *
+ * @param tasks Collection of startup tasks to validate
+ * @throws IllegalStateException if a circular dependency is detected
+ */
+public fun validateStartupTaskDependencies(tasks: Collection<StartupTask>) {
+    if (tasks.isEmpty()) return
+
+    val visiting = mutableSetOf<StartupTask>()
+    val visited = mutableSetOf<StartupTask>()
+
+    fun dfs(task: StartupTask, path: List<StartupTask>) {
+        if (task in visiting) {
+            // Found a cycle
+            val cycleStart = path.indexOf(task)
+            val cycle = path.subList(cycleStart, path.size) + task
+            val cycleDescription = cycle.joinToString(" -> ") {
+                it.toString().substringAfterLast('.').substringBefore('@')
+            }
+            throw IllegalStateException(
+                "Circular dependency detected in startup tasks: $cycleDescription"
+            )
+        }
+        if (task in visited) return
+
+        visiting.add(task)
+        for (dep in task.dependencies) {
+            dfs(dep, path + task)
+        }
+        visiting.remove(task)
+        visited.add(task)
+    }
+
+    for (task in tasks) {
+        if (task !in visited) {
+            dfs(task, emptyList())
+        }
+    }
+}
+
 /*
  * TODO: API Recommendations for StartupTask.kt
  *
- * 1. **POTENTIAL ISSUE**: Circular dependencies are not detected or prevented.
- *    Consider adding validation to detect dependency cycles at server build time.
- *
- * 2. Add failure handling options:
+ * 1. Add failure handling options:
  *    - enum class FailureBehavior { FAIL_STARTUP, LOG_AND_CONTINUE, RETRY }
  *    - val failureBehavior: FailureBehavior
  *    Currently a failed startup task likely crashes the server.
  *
- * 3. Add task naming for better logging/debugging:
+ * 2. Add task naming for better logging/debugging:
  *    - val name: String
  *    This would help identify which task failed during startup.
  *
- * 4. Consider adding priority within the same dependency level:
+ * 3. Consider adding priority within the same dependency level:
  *    - val priority: Int
  *    For tasks with no dependencies, determines execution order.
  *
- * 5. The default timeout of 5 minutes in the factory function is different from the
- *    interface default of 30 seconds. This inconsistency could be confusing.
- *
- * 6. Add lifecycle hooks:
+ * 4. Add lifecycle hooks:
  *    - suspend fun onComplete()
  *    - suspend fun onFailure(exception: Exception)
  *    For observability and cleanup.
  *
- * 7. Consider adding conditional execution:
+ * 5. Consider adding conditional execution:
  *    - suspend fun shouldExecute(): Boolean
  *    Allows skipping tasks based on environment or configuration.
  */

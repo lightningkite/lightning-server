@@ -72,7 +72,7 @@ public class TestRunner<SERVER: ServerBuilder> @Deprecated("Please use SERVER.te
     private val subscriptions = ConcurrentHashMap<WebSocketSubscriptionRequest<*, *>, ArrayList<suspend (WebSocketSubscriptionMessage<*, *>)->Unit>>()
     override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>) {
         val subscribers = subscriptions[WebSocketSubscriptionRequest(topic = event.topic, rawPathArguments = event.rawPathArguments)]
-        /*logger.debug*/run { "'${event.path(externalSerialization.stringArrayFormat)}': ${event.value} (${subscribers?.size ?: 0} subscribers)" }.let(::println)
+        /*logger.debug*/run { "'${event.path()}': ${event.value} (${subscribers?.size ?: 0} subscribers)" }.let(::println)
         subscribers?.forEach {
             it(event)
         }
@@ -153,14 +153,12 @@ public class TestRunner<SERVER: ServerBuilder> @Deprecated("Please use SERVER.te
 
             private val topics = HashSet<WebSocketSubscriptionRequest<*, *>>()
             override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-                /*logger.debug*/run { "$name subscribes to '${topic.path(externalSerialization.stringArrayFormat)}'" }.let(::println)
                 if(topics.add(topic)) {
                     subscriptions.getOrPut(topic) { ArrayList() }.add(sub)
                 }
             }
 
             override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-                /*logger.debug*/run { "$name unsubscribes from '${topic.path(externalSerialization.stringArrayFormat)}'" }.let(::println)
                 if(topics.remove(topic)) {
                     subscriptions.getOrPut(topic) { ArrayList() }.remove(sub)
                 }

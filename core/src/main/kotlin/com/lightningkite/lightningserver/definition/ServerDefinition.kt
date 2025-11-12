@@ -144,7 +144,10 @@ public data class ServerDefinition(
                 for ((_, mod) in flattenedModules) include(mod.mediaTypeEncoders)
             },
             exceptionHandler = thisLayer.exceptionHandler,
-            startupTasks = flattenMap { it.startupTasks },
+            startupTasks = flattenMap { it.startupTasks }.also { tasks ->
+                // Validate startup task dependencies for circular references
+                validateStartupTaskDependencies(tasks.values)
+            },
         )
     }
 

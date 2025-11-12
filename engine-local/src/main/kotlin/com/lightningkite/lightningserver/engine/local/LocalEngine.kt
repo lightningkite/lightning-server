@@ -104,13 +104,13 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
      * Gets a PubSub channel for a WebSocket subscription message.
      */
     protected fun <PATH : PathSpec, T> pubSubChannel(event: WebSocketSubscriptionMessage<PATH, T>): PubSubChannel<T> =
-        pubSub.get(event.path(internalSerialization.stringArrayFormat), event.topic.type)
+        pubSub.get(event.path(), event.topic.type)
 
     /**
      * Gets a PubSub channel for a WebSocket subscription request.
      */
     protected fun <PATH : PathSpec, T> pubSubChannel(event: WebSocketSubscriptionRequest<PATH, T>): PubSubChannel<T> =
-        pubSub.get(event.path(internalSerialization.stringArrayFormat), event.topic.type)
+        pubSub.get(event.path(), event.topic.type)
 
     /**
      * Sends a WebSocket subscription message by emitting it to the appropriate PubSub channel.

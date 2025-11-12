@@ -12,6 +12,7 @@ import com.sksamuel.scrimage.webp.WebpWriter
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.File
 import kotlin.jvm.optionals.getOrNull
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -37,6 +38,11 @@ public data class MediaPreviewOptions(
     val quality: Double? = null,
     val destination: File? = null,
 ) {
+    init {
+        require(sizeInPixels == null || sizeInPixels > 0) { "sizeInPixels must be positive" }
+        require(forceRatio == null || forceRatio in 0.00001..10000.0) { "forceRatio must be positive" }
+        require(quality == null || quality in 0.0..1.0) { "quality must be between 0.0 and 1.0" }
+    }
     public companion object {
         /**
          * A preview option that only corrects EXIF orientation and other image metadata issues
@@ -109,7 +115,7 @@ public fun ImmutableImage.apply(
     originalType: MediaType,
 ): FileMediaInfo? {
     val needsScaling = options.sizeInPixels != null && (options.sizeInPixels < width || options.sizeInPixels < height)
-    val needsRatio = options.forceRatio != null && width.toDouble() / height != options.forceRatio
+    val needsRatio = options.forceRatio != null && abs(width.toDouble() / height - options.forceRatio) > 0.01
     val canSkip = !needsScaling &&
             !needsRatio &&
             (options.type == null || originalType == options.type) &&
@@ -124,15 +130,13 @@ public fun ImmutableImage.apply(
     if (needsRatio)
         processing = processing.resizeToRatio(options.forceRatio)
 
-    // TODO: The condition here seems incorrect. When both needsRatio and needsScaling are true,
-    // the second check `options.sizeInPixels < processing.width || options.sizeInPixels < processing.height`
-    // might always be true after ratio adjustment, potentially skipping necessary scaling.
-    // Consider simplifying to just check needsScaling, or verify the logic is correct.
-    if (needsScaling && (!needsRatio || options.sizeInPixels < processing.width || options.sizeInPixels < processing.height)) {
+    if (needsScaling) {
+        // After ratio adjustment (if any), check if scaling is still needed
+        // Use processing dimensions (after ratio adjustment) for scale factor calculation
         val scaleFactor =
             kotlin.math.max(
-                options.sizeInPixels / basis.width.toDouble(),
-                options.sizeInPixels / basis.height.toDouble()
+                options.sizeInPixels / processing.width.toDouble(),
+                options.sizeInPixels / processing.height.toDouble()
             ).coerceAtMost(1.0)
         processing = processing.scale(scaleFactor)
     }

@@ -4,7 +4,14 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.Setting
 import com.lightningkite.services.SettingContext
 import com.lightningkite.services.terraform.TerraformNeed
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.KSerializer
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 /**
  * Represents a computation that can be deferred until runtime and executed asynchronously.
@@ -28,15 +35,22 @@ public fun interface RuntimeDeferred<out T> {
      *
      * Subsequent calls to [await] return the cached value without re-executing.
      *
-     * **Thread Safety**: The cache is not thread-safe. Concurrent calls may execute
-     * the computation multiple times.
+     * **Thread Safety**: The cache is thread-safe. Concurrent calls will only execute
+     * the computation once, with other threads waiting for the result.
      */
+    @OptIn(ExperimentalAtomicApi::class)
     public data class Cached<out T>(private val wraps: RuntimeDeferred<T>) : RuntimeDeferred<T> {
-        private var cache: NullWrapper<T>? = null
-
+        @kotlin.concurrent.Volatile private var deferred: Deferred<T>? = null
+        private val mutex = Mutex()
         context(server: ServerRuntime)
-        override suspend fun await(): T =
-            cache?.value ?: wraps.await().also { cache = NullWrapper(it) }
+        override suspend fun await(): T {
+            return mutex.withLock {
+                deferred?.let { return@withLock it }
+                val n = GlobalScope.async { wraps.await() }
+                deferred = n
+                n
+            }.await()
+        }
     }
 }
 
@@ -76,15 +90,19 @@ public fun interface Runtime<out T> : RuntimeDeferred<T> {
      * Subsequent calls to [invoke] return the cached value without re-executing.
      * This is useful for expensive operations that should only run once per server instance.
      *
-     * **Thread Safety**: The cache is not thread-safe. Concurrent calls may execute
-     * the computation multiple times.
+     * **Thread Safety**: The cache is thread-safe. Concurrent calls will only execute
+     * the computation once, with other threads waiting for the result.
      */
     public data class Cached<out T>(private val wraps: Runtime<T>) : Runtime<T> {
+        @Volatile
         private var cache: NullWrapper<T>? = null
+        private val lock = Any()
 
         context(server: ServerRuntime)
         override operator fun invoke(): T =
-            cache?.value ?: wraps.invoke().also { cache = NullWrapper(it) }
+            cache?.value ?: synchronized(lock) {
+                cache?.value ?: wraps.invoke().also { cache = NullWrapper(it) }
+            }
     }
 
     /**
@@ -190,15 +208,21 @@ private data class BasicServerSetting<SETTING, RESULT>(
     override val optional: Boolean,
     private val getter: SettingContext.(SETTING) -> RESULT
 ) : ServerSetting<SETTING, RESULT> {
+    @Volatile
     private var cached: NullWrapper<RESULT>? = null
+    private val lock = Any()
 
     context(settings: SettingContext)
     override fun get(setting: SETTING): RESULT =
-        cached?.value ?: getter(settings, setting).also { cached = NullWrapper(it) }
+        cached?.value ?: synchronized(lock) {
+            cached?.value ?: getter(settings, setting).also { cached = NullWrapper(it) }
+        }
 
     context(server: ServerRuntime)
     override fun invoke(): RESULT =
-        cached?.value ?: server.settings.get(this)
+        cached?.value ?: synchronized(lock) {
+            cached?.value ?: server.settings.get(this)
+        }
 }
 
 /**
@@ -265,11 +289,15 @@ private data class BasicDirectServerSetting<SETTING>(
     override val instructions: String = "No instructions",
     override val optional: Boolean,
 ) : ServerSetting.Direct<SETTING> {
+    @Volatile
     private var cached: NullWrapper<SETTING>? = null
+    private val lock = Any()
 
     context(server: ServerRuntime)
     override fun invoke(): SETTING =
-        cached?.value ?: server.settings.get(this).also { cached = NullWrapper(it) }
+        cached?.value ?: synchronized(lock) {
+            cached?.value ?: server.settings.get(this).also { cached = NullWrapper(it) }
+        }
 }
 
 /**

@@ -163,7 +163,7 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
         get() = System.getenv("AWS_LAMBDA_FUNCTION_VERSION") ?: "Unknown"
 
     override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>) {
-        ws.publish(event.path(internalSerialization.stringArrayFormat), event.topic.type, event.value)
+        ws.publish(event.path(), event.topic.type, event.value)
     }
 
     override fun beforeCheckpoint(context: org.crac.Context<out Resource>?) {

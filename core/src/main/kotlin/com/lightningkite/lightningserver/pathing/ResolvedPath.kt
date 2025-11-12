@@ -2,6 +2,7 @@
 
 package com.lightningkite.lightningserver.pathing
 
+import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.data.StringArrayFormat
@@ -83,6 +84,13 @@ public data class ResolvedPath<out PATH: PathSpec> internal constructor(
     public fun toString(stringArrayFormat: StringArrayFormat): String = path(stringArrayFormat)
 }
 
+context(serverRuntime: ServerRuntime)
+public fun ResolvedPath<*>.pathSegments(): PathSegments = pathSegments(serverRuntime.externalSerialization.stringArrayFormat)
+context(serverRuntime: ServerRuntime)
+public fun ResolvedPath<*>.path(): String = path(serverRuntime.externalSerialization.stringArrayFormat)
+context(serverRuntime: ServerRuntime)
+public fun ResolvedPath<*>.fullUrl(): String = generalSettings().publicUrl + path()
+
 /**
  * Interface for objects that can provide a [ResolvedPath] when given a [ServerRuntime] context.
  *
@@ -118,6 +126,13 @@ public fun <A, B, C> ResolvedPath(path: PathSpec3<A, B, C>, first: A, second: B,
 
 public fun HasResolvedPath<*>.pathSegments(stringArrayFormat: StringArrayFormat): PathSegments = path.pathSegments(stringArrayFormat)
 public fun HasResolvedPath<*>.path(stringArrayFormat: StringArrayFormat): String = path.path(stringArrayFormat)
+
+context(serverRuntime: ServerRuntime)
+public fun HasResolvedPath<*>.pathSegments(): PathSegments = path.pathSegments(serverRuntime.externalSerialization.stringArrayFormat)
+context(serverRuntime: ServerRuntime)
+public fun HasResolvedPath<*>.path(): String = path.path(serverRuntime.externalSerialization.stringArrayFormat)
+context(serverRuntime: ServerRuntime)
+public fun HasResolvedPath<*>.fullUrl(): String = generalSettings().publicUrl + path()
 
 @get:JvmName("arg1_1")
 public val <A> ResolvedPath<PathSpec1<A>>.arg1: A get() = rawPathArguments[0] as A
@@ -188,34 +203,8 @@ context(serverRuntime: ServerRuntime)
 public val <A, B, C> HasContextualPath<PathSpec3<A, B, C>>.arg3: C get() = pathInContext.arg3
 
 context(serverRuntime: ServerRuntime)
-public fun HasContextualPath<*>.pathSegments(stringArrayFormat: StringArrayFormat): PathSegments = pathInContext.pathSegments(stringArrayFormat)
+public fun HasContextualPath<*>.pathSegments(): PathSegments = pathInContext.pathSegments(serverRuntime.externalSerialization.stringArrayFormat)
 context(serverRuntime: ServerRuntime)
-public fun HasContextualPath<*>.path(stringArrayFormat: StringArrayFormat): String = pathInContext.path(stringArrayFormat)
-
-/*
- * TODO: API Recommendations for ResolvedPath.kt
- *
- * 1. The arg1, arg2, arg3 accessors use unchecked casts (as A, as B, as C). While this is safe
- *    given the type system guarantees, if the internal state is corrupted it could cause ClassCastException.
- *    Consider adding validation or using safe casts with better error messages.
- *
- * 2. The @JvmName annotations for arg accessors are necessary to avoid signature clashes, but this
- *    creates many similar method names in the JVM bytecode. Document why these are necessary.
- *
- * 3. ResolvedPath construction silently filters out trailingSegments if path.after != TrailingSegments.
- *    This could lead to data loss if caller provides trailing segments but the path doesn't support them.
- *    Consider throwing an exception or at least logging a warning.
- *
- * 4. The Segment.WildcardWithValue constructor takes value: T but stores it with nullable type in the
- *    rawPathArguments list. This means null values are technically possible even though the type system
- *    suggests otherwise. Document this behavior or add validation.
- *
- * 5. The toString() method shows human-readable representation like "{name=value}" but this isn't URL-encoded.
- *    This could be confusing since the actual path would have encoded values. Consider adding toDebugString().
- *
- * 6. No way to modify a ResolvedPath (e.g., change one argument value). This is probably intentional
- *    for immutability, but adding a copy() function with argument replacement would be useful for testing.
- *
- * 7. The lazy segments calculation could fail if pathSpec.segments and rawPathArguments sizes don't match.
- *    Add validation in the constructor to catch this early.
- */
+public fun HasContextualPath<*>.path(): String = pathInContext.path(serverRuntime.externalSerialization.stringArrayFormat)
+context(serverRuntime: ServerRuntime)
+public fun HasContextualPath<*>.fullUrl(): String = generalSettings().publicUrl + path()

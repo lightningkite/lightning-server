@@ -20,13 +20,13 @@ import kotlin.time.Duration.Companion.seconds
  *
  * @param INPUT The type of input data this task accepts, must be serializable
  * @property serializer The serializer for the input type, used for task queuing
- * @property timeout Maximum duration this task is allowed to run before being cancelled. Defaults to 30 seconds.
+ * @property timeout Maximum duration this task is allowed to run before being cancelled. Defaults to 5 minutes.
  * @see StartupTask
  * @see ScheduledTask
  */
 public interface Task<INPUT> {
     public val serializer: KSerializer<INPUT>
-    public val timeout: Duration get() = 30.seconds
+    public val timeout: Duration get() = 5.minutes
 
     context(server: ServerRuntime)
     public suspend fun executeInline(input: INPUT)
@@ -105,9 +105,6 @@ public suspend fun <INPUT> Task<INPUT>.launch(input: INPUT): Unit = with(server)
  *    - suspend fun onComplete(input: INPUT)
  *    - suspend fun onFailure(input: INPUT, exception: Exception)
  *
- * 5. The default timeout of 5 minutes in the factory functions is different from the
- *    interface default of 30 seconds. This inconsistency could be confusing.
- *
- * 6. Add a way to cancel running tasks:
+ * 5. Add a way to cancel running tasks:
  *    - suspend fun cancel(reason: String)
  */

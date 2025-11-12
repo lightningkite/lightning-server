@@ -20,6 +20,8 @@ import kotlinx.serialization.modules.SerializersModule
  */
 @Serializable(with = AnonTypeSerializer::class)
 public class AnonType {
+
+    // Constructors enforce that we have either serializedBytes or kotlinBytesFormat/direct/hasDirect/serializer.
     private var kotlinBytesFormat: KotlinBytesFormat? = null
     private var serializedBytes: ByteArray? = null
     private var serializer: KSerializer<*>? = null
@@ -83,13 +85,11 @@ public class AnonType {
         return d
     }
 
-    // TODO: Potential null safety issue - serializedBytes could be null when both instances have hasDirect=false but serializedBytes not yet populated
     override fun equals(other: Any?): Boolean = other is AnonType && (
             this.hasDirect && other.hasDirect && this.direct == other.direct ||
                     this.serializedBytes.contentEquals(other.serializedBytes)
             )
 
-    // TODO: Potential NPE if hasDirect=true but direct=null. Should handle null case: direct?.hashCode() ?: 0
     override fun hashCode(): Int =
         if (hasDirect) direct.hashCode() else serializedBytes?.contentHashCode() ?: 0
 
@@ -112,12 +112,6 @@ internal object AnonTypeSerializer : KSerializer<AnonType> {
 
 /*
  * TODO: API Recommendations
- *
- * 1. Fix null safety issues in equals() and hashCode() methods to prevent potential NPEs
- * 2. Consider making the value() method throw a more descriptive exception when deserialization fails
- *    rather than relying on the !! operator
- * 3. Consider adding a convenience factory method like:
- *    inline fun <reified T> AnonType.Companion.of(value: T, format: KotlinBytesFormat)
  * 4. Consider adding a method to check if the value has been deserialized without triggering deserialization
  * 5. Thread safety: Consider whether concurrent access scenarios need to be documented or handled
  */

@@ -61,16 +61,16 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
             run { wrapped.repullState().map[channel]!!.storage.value(this.internalSerialization.kotlinBytesFormat, handler.storageSerializer) }
 
         override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-            if (topic.path(this.externalSerialization.stringArrayFormat) !in wrapped.currentState) wrapped.subscribe(topic)
+            if (topic.path() !in wrapped.currentState) wrapped.subscribe(topic)
             wrapped.updateStateImmediately { data ->
                 data.copy(map = data.map + (channel to data.map.getValue(channel).let {
-                    it.copy(topics = it.topics + topic.path(this.externalSerialization.stringArrayFormat))
+                    it.copy(topics = it.topics + topic.path())
                 }))
             }
         }
 
         override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-            val asString = topic.path(this.externalSerialization.stringArrayFormat)
+            val asString = topic.path()
             val newstate = wrapped.updateStateImmediately { data ->
                 data.copy(map = data.map + (channel to data.map.getValue(channel).let {
                     it.copy(topics = it.topics + asString)
@@ -240,7 +240,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
         topic: WebSocketSubscriptionMessage<*, *>
     ): Unit = with(connection) {
         for ((channel, info) in currentState.map) {
-            if (info.topics.contains(topic.path(externalSerialization.stringArrayFormat))) {
+            if (info.topics.contains(topic.path())) {
                 val match = with(connection) { info.request.path.match }
                 val otherHandler = match.value
                 @Suppress("UNCHECKED_CAST")

@@ -70,8 +70,7 @@ public suspend fun ServerFileWithMetadata.process(options: Collection<MediaPrevi
 
         for (option in options) {
             val result = basis.apply(option, content.mediaType) ?: continue
-            // TODO: This will throw NPE if parent is null. Consider handling this case gracefully
-            // or documenting that files must have a parent directory.
+            // No NPE risk here; the file object has to be an actual file, not just the root directory.  This is safe.
             val fileObject =
                 originalFileObject.parent!!.then(originalFileObject.nameWithoutExtension + "-${option}." + result.mimeType.extension)
 

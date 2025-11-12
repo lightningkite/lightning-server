@@ -99,13 +99,15 @@ public abstract class ServerRuntimeBase(override val server: ServerDefinition): 
         server.startupTasks.entries.map { (location, task) ->
             launch {
                 for(dep in task.dependencies) {
-                    taskToJob[dep]!!.await()
+                    (taskToJob[dep] ?: throw IllegalStateException("Dependency '${dep.location}' marked, but not registered to server.")).await()
                 }
+                // This can't ever be null - see taskToJob definition in connection with loop.
+                val job = taskToJob[task]!!
                 try {
                     task.executeWithMetrics(location)
-                    taskToJob[task]!!.complete(Unit)
+                    job.complete(Unit)
                 } catch(e: Exception) {
-                    taskToJob[task]!!.completeExceptionally(e)
+                    job.completeExceptionally(e)
                 }
             }
         }.joinAll()
@@ -114,10 +116,6 @@ public abstract class ServerRuntimeBase(override val server: ServerDefinition): 
 
 /*
  * TODO: API Recommendations for ServerRuntimeBase.kt
- *
- * 1. **POTENTIAL BUG**: runStartupTasks() uses !! operators on taskToJob[dep] and taskToJob[task].
- *    If a task has a dependency that wasn't registered, this will throw NPE with an unclear error.
- *    Add validation that all dependencies are registered, or use requireNotNull with descriptive message.
  *
  * 2. The runStartupTasks() method launches all tasks concurrently but doesn't limit concurrency.
  *    For servers with many startup tasks, this could create resource contention.

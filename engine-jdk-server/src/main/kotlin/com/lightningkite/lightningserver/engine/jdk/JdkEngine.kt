@@ -99,7 +99,7 @@ public class JdkEngine(
 
         httpServer.createContext("/") { exchange ->
             try {
-                val request = exchange.requestToLightningServer(cfg.realIpHeader)
+                val request = exchange.requestToLightningServer(cfg.realIpHeader, this@JdkEngine)
                 val result: HttpResponse = runBlocking { this@JdkEngine.handle(request) }
                 exchange.write(result)
             } catch (e: Throwable) {
@@ -187,9 +187,10 @@ private fun HttpExchange.write(response: HttpResponse) {
  * Converts a JDK HttpExchange to a Lightning Server HttpRequest.
  *
  * @param realIpHeader Optional header name to extract the real client IP from
+ * @param engine The JdkEngine instance (used for logging)
  * @return The converted HttpRequest
  */
-private fun HttpExchange.requestToLightningServer(realIpHeader: String?): HttpRequest<PathSpec> {
+private fun HttpExchange.requestToLightningServer(realIpHeader: String?, engine: JdkEngine): HttpRequest<PathSpec> {
     val method = this.requestMethod
     val uri = this.requestURI
     val path = PathSegments.parse(uri.path ?: "/")
@@ -198,10 +199,9 @@ private fun HttpExchange.requestToLightningServer(realIpHeader: String?): HttpRe
     val hostHeader = this.requestHeaders.getFirst("Host") ?: ""
     val domain = hostHeader.substringBefore(":").ifEmpty { this.localAddress.hostString }
     val protocol = if (this.httpContext.server is com.sun.net.httpserver.HttpsServer) "https" else "http"
-    // TODO: Potential NPE if realIpHeader is configured but the header is missing from the request
-    // Should use ?: operator or log a warning like in KtorEngine
     val sourceIp = realIpHeader?.let { h ->
-        this.requestHeaders.getFirst(h)!!
+        this.requestHeaders.getFirst(h)
+            ?: run { engine.logger.warn { "Real IP address header for proxy '$h' was missing from the request." }; null }
     } ?: this.remoteAddress?.address?.hostAddress ?: ""
 
     val contentTypeHeader = headers.contentType
@@ -239,14 +239,12 @@ private fun com.sun.net.httpserver.Headers.adapt(): HttpHeaders = HttpHeaders(
 /*
  * TODO: API Recommendations
  *
- * 1. Fix the potential NPE when realIpHeader is configured but missing from request (line 196)
- * 2. The DEFAULT_BUFFER constant is defined but never used - remove or implement buffering
- * 3. Consider adding graceful shutdown support (currently runs indefinitely)
- * 4. The error handling in start() catches all exceptions and sends generic 500 - consider
+ * 1. The DEFAULT_BUFFER constant is defined but never used - remove or implement buffering
+ * 2. Consider adding graceful shutdown support (currently runs indefinitely)
+ * 3. The error handling in start() catches all exceptions and sends generic 500 - consider
  *    more specific error responses based on exception type
- * 5. The adapt() function splits comma-separated headers, but some headers (like Set-Cookie)
+ * 4. The adapt() function splits comma-separated headers, but some headers (like Set-Cookie)
  *    shouldn't be split. Consider header-specific handling.
- * 6. Consider logging when realIpHeader is configured but missing (similar to KtorEngine)
- * 7. Document the WebSocket limitation more prominently (e.g., throw exception if WebSocket
+ * 5. Document the WebSocket limitation more prominently (e.g., throw exception if WebSocket
  *    endpoints are registered)
  */

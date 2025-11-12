@@ -78,7 +78,10 @@ public data class SecretBasis(public val string: String) {
     }
 
     @Transient
+    @Volatile
     private var hmac: HMAC.Key? = null
+
+    private val hmacLock = Any()
 
     /**
      * Lazily initializes and returns the HMAC-SHA512 key for this [SecretBasis].
@@ -86,12 +89,18 @@ public data class SecretBasis(public val string: String) {
      * The key is cached after first access to avoid repeated deserialization.
      * This is the suspending version for use in coroutine contexts.
      *
+     * **Thread Safety**: The cache is thread-safe. Concurrent calls will only decode
+     * the key once, with other threads waiting for the result.
+     *
      * @return The HMAC-SHA512 cryptographic key
      */
-    public suspend fun key(): HMAC.Key = hmac ?: CryptographyProvider.Default.get(HMAC)
-        .keyDecoder(SHA512)
-        .decodeFromByteArray(HMAC.Key.Format.RAW, bytes)
-        .also { hmac = it }
+    public suspend fun key(): HMAC.Key = hmac ?: synchronized(hmacLock) {
+        hmac ?: kotlinx.coroutines.runBlocking {
+            CryptographyProvider.Default.get(HMAC)
+                .keyDecoder(SHA512)
+                .decodeFromByteArray(HMAC.Key.Format.RAW, bytes)
+        }.also { hmac = it }
+    }
 
     /**
      * Lazily initializes and returns the HMAC-SHA512 key for this [SecretBasis].
@@ -99,12 +108,17 @@ public data class SecretBasis(public val string: String) {
      * The key is cached after first access to avoid repeated deserialization.
      * This is the blocking version for use in non-coroutine contexts.
      *
+     * **Thread Safety**: The cache is thread-safe. Concurrent calls will only decode
+     * the key once, with other threads waiting for the result.
+     *
      * @return The HMAC-SHA512 cryptographic key
      */
-    public fun keyBlocking(): HMAC.Key = hmac ?: CryptographyProvider.Default.get(HMAC)
-        .keyDecoder(SHA512)
-        .decodeFromByteArrayBlocking(HMAC.Key.Format.RAW, bytes)
-        .also { hmac = it }
+    public fun keyBlocking(): HMAC.Key = hmac ?: synchronized(hmacLock) {
+        hmac ?: CryptographyProvider.Default.get(HMAC)
+            .keyDecoder(SHA512)
+            .decodeFromByteArrayBlocking(HMAC.Key.Format.RAW, bytes)
+            .also { hmac = it }
+    }
 
     /**
      * Resizes this byte array to match the specified [size].
@@ -258,9 +272,6 @@ public data class SecretBasis(public val string: String) {
 /*
  * TODO: API Recommendations
  *
- * 3. Thread safety consideration: The lazy `hmac` field is not thread-safe. While this may not be an issue
- *    in typical usage, consider using `@Volatile` or a thread-safe lazy delegate if concurrent access is expected.
- *
- * 4. Consider adding a companion factory method: `SecretBasis.fromBytes(bytes: ByteArray)` for users who
+ * 1. Consider adding a companion factory method: `SecretBasis.fromBytes(bytes: ByteArray)` for users who
  *    want to construct from raw bytes instead of Base64.
  */

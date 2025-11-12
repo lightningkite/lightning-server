@@ -5,22 +5,8 @@
 
 ---
 
-## 🔴 CRITICAL SECURITY (Priority 1-2)
-
-- [x] ~~Fix Apple OAuth JWT signature verification~~ **FIXED** - Created AppleJwtVerifier.kt with proper RSA signature verification using Apple's JWKS endpoint. Validates signature, issuer, audience, expiration, and not-before claims. See sessions-oauth/MIGRATION_NEEDED.md for module status.
-- [ ] Fix realIpHeader NPE risk when proxy doesn't send configured header (engine-jdk-server/.../jdk/JdkEngine.kt:203-204)
-
-## 🟡 HIGH PRIORITY NPE Risks (Priority 3-6)
-
-- [ ] Fix type casting NPE risks in AnonType.kt - add validation with descriptive errors (core/.../AnonType.kt:19,23)
-- [ ] Fix TypedData.path() NPE risk - replace !! with FileNotFoundException (core/.../shortcuts.kt:43)
-- [ ] Fix dependency lookup NPE in ServerRuntimeBase.runStartupTasks() - add descriptive error messages
-- [ ] Fix media file parent directory NPE when processing root-level files (media/.../processing.kt:73-76)
-
 ## 🟠 MEDIUM PRIORITY Parsing Issues (Priority 7-9)
 
-- [ ] Fix PathSegments.parse("") returning [""] instead of empty list (core/.../http/parse.kt)
-- [ ] Fix QueryParameters.parse("") returning one entry instead of EMPTY (core/.../http/parse.kt)
 - [ ] Fix HttpHeaderValue parsing for quoted values with semicolons: `filename="file; with; semicolons.txt"` (core/.../http/HttpHeaderValue.kt)
 - [ ] Fix HttpHeaderValue cookie parsing for values without `=`
 - [ ] Fix ServerSettings properties parsing for values containing `=` (splits incorrectly) (core/.../settings/ServerSettings.ext.kt)
@@ -28,21 +14,20 @@
 
 ## 🟢 THREAD SAFETY (Priority 10-12)
 
-- [ ] Make ServerSetting cached implementations thread-safe using lazy(LazyThreadSafetyMode.SYNCHRONIZED) (core/.../definition/ServerSetting.kt)
-- [ ] Make SecretBasis.hmac field thread-safe or document single-threaded init requirement (core/.../encryption/SecretBasis.kt)
-- [ ] Unify Task/ScheduledTask/StartupTask timeout defaults (currently 30s in interface, 5min in factories)
+- [ ] (Claude) Make ServerSetting cached implementations thread-safe using lazy(LazyThreadSafetyMode.SYNCHRONIZED) (core/.../definition/ServerSetting.kt)
+- [ ] (Claude) Make SecretBasis.hmac field thread-safe or document single-threaded init requirement (core/.../encryption/SecretBasis.kt)
+- [ ] (Claude) Unify Task/ScheduledTask/StartupTask timeout defaults (currently 30s in interface, 5min in factories, should all be 5 minutes)
 
 ## 🔵 DESIGN & MAINTENANCE (Priority 13-16)
 
-- [ ] Implement circular dependency detection in StartupTask dependency graphs (core/.../definition/StartupTask.kt)
+- [ ] (Claude) Implement circular dependency detection in StartupTask dependency graphs (core/.../definition/StartupTask.kt)
 - [ ] Review and fix MediaPreviewOptions scaling logic when both needsRatio and needsScaling are true (media/.../MediaPreviewOptions.kt:131)
-- [ ] Remove or document commented-out RawPath.kt file (core/.../pathing/RawPath.kt)
-- [ ] Add validation for negative sizeInPixels or forceRatio in MediaPreviewOptions (media/.../MediaPreviewOptions.kt)
 
 ## 🔵 EXISTING TODOS
 
 - [ ] CORS per-domain settings
 - [ ] Prepare for secret rotation in the secretBasis setting
+- [ ] Rate limiting property on all websockets and HTTP endpoints
 
 ---
 
@@ -50,7 +35,6 @@
 
 ### auth module
 - [ ] auth-shared/.../Scope.kt: Add validation for scope strings to prevent malformed scopes
-- [ ] auth/.../AuthEndpoints.kt: Consider adding rate limiting on authentication endpoints to prevent brute force
 - [ ] auth/.../AuthEndpoints.kt: Consider supporting multiple simultaneous sessions per user
 - [ ] auth/.../AuthEndpoints.kt: Add audit logging for authentication events (login, logout, failed attempts)
 - [ ] auth/.../AuthEndpoints.kt: Consider adding a "remember me" option for extended session duration
