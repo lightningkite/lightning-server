@@ -13,6 +13,7 @@ import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.prepareModelsShared
+import com.lightningkite.prepareModelsServerMediaTest
 import kotlinx.coroutines.runBlocking
 
 object TestSettings {
