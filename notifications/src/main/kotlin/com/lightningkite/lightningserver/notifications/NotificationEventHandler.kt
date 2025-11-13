@@ -13,6 +13,8 @@ import com.lightningkite.services.database.getMany
 import io.github.oshai.kotlinlogging.KLogger
 import io.github.oshai.kotlinlogging.KotlinLogging
 
+internal typealias ContentGenerator<T, USER, CONTENT> = suspend context(ServerRuntime) (T) -> (USER) -> CONTENT
+
 public open class NotificationEventHandler<USER : HasId<UID>, UID : Comparable<UID>, CONTENT>(
     private val users: ModelInfo<*, USER, UID>,
     public val dispatcher: Dispatcher<UID, CONTENT>,
@@ -33,8 +35,6 @@ public open class NotificationEventHandler<USER : HasId<UID>, UID : Comparable<U
 
     // _____Content Generators_____
     // These translate events into CONTENT
-
-    private typealias ContentGenerator<T, USER, CONTENT> = suspend context(ServerRuntime) (T) -> (USER) -> CONTENT
 
     private val contentGenerators = MapRegistry<String, ContentGenerator<*, USER, CONTENT>>()
 

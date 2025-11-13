@@ -24,8 +24,7 @@ import kotlinx.serialization.builtins.ListSerializer
  *
  * @param USER The user type (nullable for public events)
  */
-@JvmInline
-public value class EventRegistry<USER : HasId<*>?>(
+public class EventRegistry<USER : HasId<*>?>(
     private val registry: MapRegistry<String, TypedEventType<USER, *, *>> = MapRegistry()
 ) : Map<String, TypedEventType<USER, *, *>> by registry {
     /**

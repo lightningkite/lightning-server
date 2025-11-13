@@ -37,8 +37,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UID>> : NotificationEventHandler.SubscriptionProvider<USER, UID> {
     private val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.notifications.subscriptions.NonCustomizableSubscriptions")
 
-    @JvmInline
-    private value class SendMethodsGenerator<USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>>(
+    private class SendMethodsGenerator<USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>>(
         val generator: suspend context(ServerRuntime) (TypedEvent<USER, T, ID>) -> List<ScheduledSendMethods<UID>>
     )
 
@@ -109,7 +108,7 @@ public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UI
 
         val now = now()
 
-        interested.map { (user, methods) ->
+        return interested.map { (user, methods) ->
             ScheduledSendMethods(
                 user,
                 email = methods.mapNotNull { it.email }.minByOrNull { it.schedule(now) },
