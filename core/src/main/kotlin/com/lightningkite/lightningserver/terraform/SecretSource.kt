@@ -6,21 +6,17 @@ import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.AES
 import dev.whyoleg.cryptography.algorithms.SHA256
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.SerializationException
-import kotlinx.serialization.Serializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.PairSerializer
-import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.EmptySerializersModule
-import kotlinx.serialization.properties.Properties
 import java.io.File
 import java.security.SecureRandom
+import java.util.*
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 import javax.swing.JOptionPane
-import kotlin.collections.HashMap
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -41,7 +37,8 @@ public interface SecretSource {
      * Retrieves the value for a required secret.
      * @throws IllegalStateException if the secret is not found and no fallback is available
      */
-    public fun <T> get(need: TerraformNeed<T>): T = getOrNull(need) ?: throw IllegalStateException("Missing secret ${need.name}, no backup methodology established")
+    public fun <T> get(need: TerraformNeed<T>): T =
+        getOrNull(need) ?: throw IllegalStateException("Missing secret ${need.name}, no backup methodology established")
 
     /**
      * Retrieves the value for a secret, or null if not found.
@@ -66,7 +63,7 @@ public interface InteractiveSecretSource {
  * A [SecretSource] that can both retrieve and store secrets, with interactive prompting support.
  * When a secret is not found, it prompts the user and stores the entered value for future use.
  */
-public interface PopulatableSecretSource: SecretSource, InteractiveSecretSource {
+public interface PopulatableSecretSource : SecretSource, InteractiveSecretSource {
     /**
      * Stores a secret value in this source.
      */
@@ -86,8 +83,17 @@ public interface PopulatableSecretSource: SecretSource, InteractiveSecretSource 
      */
     override fun <T> prompt(need: TerraformNeed<T>): T {
         println("${need.name}: ${need.instructions}")
-        println("Enter value for '${need.name}'${need.default?.let { " (leave blank to default to ${need.serializer.emit(it)})" } ?: ""}: ")
-        val typed = readInput { secret -> if(secret.isBlank()) need.default!! else need.serializer.parse(secret) }
+        println(
+            "Enter value for '${need.name}'${
+                need.default?.let {
+                    " (leave blank to default to ${
+                        need.serializer.emit(
+                            it
+                        )
+                    })"
+                } ?: ""
+            }: ")
+        val typed = readInput { secret -> if (secret.isBlank()) need.default!! else need.serializer.parse(secret) }
         set(need, typed)
         return typed
     }
@@ -101,15 +107,16 @@ public interface PopulatableSecretSource: SecretSource, InteractiveSecretSource 
  * @param stringify Function to convert each option to a display string
  * @return The selected option
  */
-internal fun <T> readSelection(prompt: String, options: List<T>, stringify: (T)->String = { it.toString() }): T {
+internal fun <T> readSelection(prompt: String, options: List<T>, stringify: (T) -> String = { it.toString() }): T {
     println(prompt)
-    for((index, option) in options.withIndex()) {
-        println("  ${index+1}) ${stringify(option)}")
+    for ((index, option) in options.withIndex()) {
+        println("  ${index + 1}) ${stringify(option)}")
     }
     return readInput {
-        val index = it.toIntOrNull() ?: throw IllegalArgumentException("Please enter a number between 1 and ${options.size}")
-        if(index < 1 || index > options.size) throw IllegalArgumentException("Please enter a number between 1 and ${options.size}")
-        options[index-1]
+        val index =
+            it.toIntOrNull() ?: throw IllegalArgumentException("Please enter a number between 1 and ${options.size}")
+        if (index < 1 || index > options.size) throw IllegalArgumentException("Please enter a number between 1 and ${options.size}")
+        options[index - 1]
     }
 }
 
@@ -135,11 +142,17 @@ public fun SecretSource.runGuiEditor(variables: List<TerraformNeed<*>>) {
         }
 
         val optionLabels = (variables.map { v ->
-            val current = try { this.getOrNull(v) } catch (_: Exception) { null }
+            val current = try {
+                this.getOrNull(v)
+            } catch (_: Exception) {
+                null
+            }
             val currentStr = try {
                 @Suppress("UNCHECKED_CAST")
                 current?.let { emitAny((v as TerraformNeed<Any?>).serializer as KSerializer<Any?>, it as Any) }
-            } catch (_: Exception) { null }
+            } catch (_: Exception) {
+                null
+            }
             if (currentStr != null) "${v.name} (set)" else v.name
         } + listOf("Quit")).toTypedArray()
 
@@ -159,11 +172,23 @@ public fun SecretSource.runGuiEditor(variables: List<TerraformNeed<*>>) {
         // If we can directly populate, prompt for value; otherwise delegate to interactive prompt.
         if (pop != null) {
             while (true) {
-                val currentVal = try { this.getOrNull(selectedNeed) } catch (_: Exception) { null }
+                val currentVal = try {
+                    this.getOrNull(selectedNeed)
+                } catch (_: Exception) {
+                    null
+                }
                 val currentStr = try {
                     @Suppress("UNCHECKED_CAST")
-                    (selectedNeed as TerraformNeed<Any?>).serializer.let { s -> currentVal?.let { (s as KSerializer<Any?>).emit(it) } }
-                } catch (_: Exception) { null }
+                    (selectedNeed as TerraformNeed<Any?>).serializer.let { s ->
+                        currentVal?.let {
+                            (s as KSerializer<Any?>).emit(
+                                it
+                            )
+                        }
+                    }
+                } catch (_: Exception) {
+                    null
+                }
 
                 val message = buildString {
                     append("${selectedNeed.name}: ${selectedNeed.instructions}\n")
@@ -171,9 +196,13 @@ public fun SecretSource.runGuiEditor(variables: List<TerraformNeed<*>>) {
                     selectedNeed.default?.let { def ->
                         try {
                             @Suppress("UNCHECKED_CAST")
-                            val defStr = emitAny((selectedNeed as TerraformNeed<Any?>).serializer as KSerializer<Any?>, def as Any)
+                            val defStr = emitAny(
+                                (selectedNeed as TerraformNeed<Any?>).serializer as KSerializer<Any?>,
+                                def as Any
+                            )
                             append("Leave blank to default to $defStr\n")
-                        } catch (_: Exception) {}
+                        } catch (_: Exception) {
+                        }
                     }
                 }
 
@@ -191,9 +220,19 @@ public fun SecretSource.runGuiEditor(variables: List<TerraformNeed<*>>) {
                     JOptionPane.showMessageDialog(null, "Saved '${selectedNeed.name}' to ${pop.name}.")
                     break
                 } catch (e: IllegalArgumentException) {
-                    JOptionPane.showMessageDialog(null, e.message ?: "Invalid value", "Error", JOptionPane.ERROR_MESSAGE)
+                    JOptionPane.showMessageDialog(
+                        null,
+                        e.message ?: "Invalid value",
+                        "Error",
+                        JOptionPane.ERROR_MESSAGE
+                    )
                 } catch (e: Exception) {
-                    JOptionPane.showMessageDialog(null, e.message ?: "Failed to save", "Error", JOptionPane.ERROR_MESSAGE)
+                    JOptionPane.showMessageDialog(
+                        null,
+                        e.message ?: "Failed to save",
+                        "Error",
+                        JOptionPane.ERROR_MESSAGE
+                    )
                 }
             }
         } else if (interactive != null) {
@@ -201,15 +240,31 @@ public fun SecretSource.runGuiEditor(variables: List<TerraformNeed<*>>) {
                 @Suppress("UNCHECKED_CAST")
                 interactive.prompt(selectedNeed as TerraformNeed<Any?>)
             } catch (e: Exception) {
-                JOptionPane.showMessageDialog(null, e.message ?: "Failed to prompt for value", "Error", JOptionPane.ERROR_MESSAGE)
+                JOptionPane.showMessageDialog(
+                    null,
+                    e.message ?: "Failed to prompt for value",
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE
+                )
             }
         } else {
             // Not editable; just show the current value
-            val currentVal = try { this.getOrNull(selectedNeed) } catch (_: Exception) { null }
+            val currentVal = try {
+                this.getOrNull(selectedNeed)
+            } catch (_: Exception) {
+                null
+            }
             val currentStr = try {
                 @Suppress("UNCHECKED_CAST")
-                currentVal?.let { emitAny((selectedNeed as TerraformNeed<Any?>).serializer as KSerializer<Any?>, it as Any) } ?: "<unset>"
-            } catch (_: Exception) { "<unset>" }
+                currentVal?.let {
+                    emitAny(
+                        (selectedNeed as TerraformNeed<Any?>).serializer as KSerializer<Any?>,
+                        it as Any
+                    )
+                } ?: "<unset>"
+            } catch (_: Exception) {
+                "<unset>"
+            }
             JOptionPane.showMessageDialog(null, "${selectedNeed.name} = $currentStr\n(Source: ${this.name})")
         }
     }
@@ -227,11 +282,14 @@ public fun SecretSource.runGuiEditor(variables: List<TerraformNeed<*>>) {
  * @param variables List of secrets that can be edited
  */
 public fun SecretSource.runTerminalEditor(variables: List<TerraformNeed<*>>) {
-    if(this !is InteractiveSecretSource) return
-    while(true) {
+    if (this !is InteractiveSecretSource) return
+    while (true) {
         val sel = readSelection("What variable do you want to work with?", variables + null, { it?.name ?: "Quit" })
         if (sel == null) break
-        val read = readSelection("Do you want to read or write this variable?", listOf(true, false), { if(it) "Read" else "Write" })
+        val read = readSelection(
+            "Do you want to read or write this variable?",
+            listOf(true, false),
+            { if (it) "Read" else "Write" })
         if (read) println("The current value is '${getOrNull(sel)}'.")
         else prompt(sel)
     }
@@ -253,9 +311,10 @@ public fun SecretSource.runTerminalEditor(variables: List<TerraformNeed<*>>) {
  * ```
  */
 public class ManySecretSources(
-    public val sources: List<SecretSource>
-): SecretSource, InteractiveSecretSource {
-    public constructor(vararg sources: SecretSource): this(sources.toList())
+    public val sources: List<SecretSource>,
+) : SecretSource, InteractiveSecretSource {
+    public constructor(vararg sources: SecretSource) : this(sources.toList())
+
     override val name: String = "Many"
 
     override fun <T> getOrNull(need: TerraformNeed<T>): T? {
@@ -265,20 +324,41 @@ public class ManySecretSources(
     override fun <T> prompt(need: TerraformNeed<T>): T {
         val options = sources.filterIsInstance<PopulatableSecretSource>()
         println("${need.name}: ${need.instructions}")
-        return when(options.size) {
+        return when (options.size) {
             0 -> throw IllegalStateException("Missing secret ${need.name}, no backup methodology established")
             1 -> {
                 val destination = options.single()
-                println("Enter value for '${need.name}' to be stored in ${destination.name}${need.default?.let { " (leave blank to default to ${need.serializer.emit(it)})" } ?: ""}: ")
-                val typed = readInput { secret -> if(secret.isBlank()) need.default!! else need.serializer.parse(secret) }
+                println(
+                    "Enter value for '${need.name}' to be stored in ${destination.name}${
+                        need.default?.let {
+                            " (leave blank to default to ${
+                                need.serializer.emit(
+                                    it
+                                )
+                            })"
+                        } ?: ""
+                    }: ")
+                val typed =
+                    readInput { secret -> if (secret.isBlank()) need.default!! else need.serializer.parse(secret) }
                 destination.set(need, typed)
                 typed
             }
+
             else -> {
                 println()
                 val destination = readSelection("Where would you like to store '${need.name}'?", options) { it.name }
-                println("Enter value for '${need.name}' to be stored in ${destination.name}${need.default?.let { " (leave blank to default to ${need.serializer.emit(it)})" } ?: ""}: ")
-                val typed = readInput { secret -> if(secret.isBlank()) need.default!! else need.serializer.parse(secret) }
+                println(
+                    "Enter value for '${need.name}' to be stored in ${destination.name}${
+                        need.default?.let {
+                            " (leave blank to default to ${
+                                need.serializer.emit(
+                                    it
+                                )
+                            })"
+                        } ?: ""
+                    }: ")
+                val typed =
+                    readInput { secret -> if (secret.isBlank()) need.default!! else need.serializer.parse(secret) }
                 destination.set(need, typed)
                 typed
             }
@@ -301,7 +381,7 @@ private fun <T> KSerializer<T>.parse(string: String): T = try {
         StringArrayFormat(EmptySerializersModule()).decodeFromString(this, string)
     else
         Json.decodeFromString(this, string)
-} catch(e: SerializationException) {
+} catch (e: SerializationException) {
     throw IllegalArgumentException("Does not fit format.  Expecting a ${this.descriptor.serialName}")
 }
 
@@ -323,12 +403,12 @@ private fun <T> KSerializer<T>.emit(value: T): String =
  * @param process Function to validate and transform the input string
  * @return The processed result
  */
-internal fun <T> readInput(process: (String)->T): T {
-    while(true) {
+internal fun <T> readInput(process: (String) -> T): T {
+    while (true) {
         val input = readlnOrNull()
         try {
             return process(input ?: "")
-        } catch(e: IllegalArgumentException) {
+        } catch (e: IllegalArgumentException) {
             println("Try again: " + e.message)
         }
     }
@@ -343,9 +423,10 @@ internal fun <T> readInput(process: (String)->T): T {
  *
  * This is useful for CI/CD environments where secrets are injected as environment variables.
  */
-public object EnvironmentSecretSource: SecretSource {
+public object EnvironmentSecretSource : SecretSource {
     override val name: String = "environment"
-    override fun <T> getOrNull(need: TerraformNeed<T>): T? = System.getenv("LS_SECRET_${need.name}")?.let { need.serializer.parse(it) }
+    override fun <T> getOrNull(need: TerraformNeed<T>): T? =
+        System.getenv("LS_SECRET_${need.name}")?.let { need.serializer.parse(it) }
 }
 
 /**
@@ -358,7 +439,9 @@ public open class PasswordFetcher() {
     private var present: String? = null
 
     /** Clears the cached password, forcing a re-prompt on next [read] call. */
-    public fun clear() { present = null }
+    public fun clear() {
+        present = null
+    }
 
     /**
      * Prompts for a password, with optional verification.
@@ -370,16 +453,17 @@ public open class PasswordFetcher() {
      * @param verify Function to validate the password (e.g., by attempting decryption)
      * @return The validated password
      */
-    public open fun read(prompt: String, verify: (String)->Unit): String {
+    public open fun read(prompt: String, verify: (String) -> Unit): String {
         return present ?: run {
-            while(true) {
+            while (true) {
                 println(prompt)
-                val password = System.console()?.readPassword()?.toString() ?: JOptionPane.showInputDialog(null, prompt, "")
+                val password =
+                    System.console()?.readPassword()?.toString() ?: JOptionPane.showInputDialog(null, prompt, "")
                 try {
                     verify(password)
                     present = password
                     break
-                } catch(e: Exception) {
+                } catch (e: Exception) {
                     println("Invalid password: ${e.message}.  Try again:")
                 }
             }
@@ -397,7 +481,7 @@ private data class EncryptedFileFormat(
     val version: Int = 2,
     val salt: String,
     val iterations: Int = 100_000,
-    val encryptedData: String
+    val encryptedData: String,
 )
 
 /**
@@ -561,7 +645,8 @@ public class EncryptedFileSecretSource(
                 }
             } else {
                 // Create new file with version 2 format
-                val password = passwordFetcher.read("Pick your secrets password for $file:") { /* no verification needed */ }
+                val password =
+                    passwordFetcher.read("Pick your secrets password for $file:") { /* no verification needed */ }
                 val newSalt = ByteArray(32).apply { SecureRandom.getInstanceStrong().nextBytes(this) }
                 this.salt = newSalt
                 this.encryptionKey = deriveKey(password, newSalt)
@@ -602,6 +687,116 @@ public class EncryptedFileSecretSource(
         getMap()[need.name] = json.encodeToString(need.serializer, value)
         saveEncrypted()
     }
+}
+
+
+
+/**
+ * A Wrapper around [EncryptedFileSecretSource] that allows a runtime input for the location of the secrets file.
+ * Without hard coding the file location into the VCS you can have multiple developers with deploy capabilities
+ * work on a project.
+ *
+ * This does support keeping a cache of the location so you do not need to enter it every time.
+ * The cache file 'local.secrets.properties' will be placed at the process root directory.
+ * You must *NOT* check this file into Version Control Systems as it is for local deployment configurations.
+ *
+ * The cache fully supports multiple secret file locations. If you have multiple deployments you are making for a
+ * project, each secrets location can be cached in the same file.
+ *
+ * A [PopulatableSecretSource] that stores secrets in an encrypted JSON file.
+ * Secrets are encrypted using AES-256-CBC with a key derived from a password via PBKDF2.
+ *
+ * **Security Features**:
+ * - AES-256 encryption
+ * - PBKDF2 key derivation with 100,000 iterations
+ * - Random salt per file (32 bytes)
+ * - Password validation on file read (attempts decryption to verify)
+ * - Creates ~/.lightningserver/{name}.json.enc if not specified
+ * - Automatic migration from legacy format (version 1) on first write
+ *
+ * **File Format** (JSON):
+ * ```json
+ * {
+ *   "version": 2,
+ *   "salt": "<base64-encoded-salt>",
+ *   "iterations": 100000,
+ *   "encryptedData": "<base64-encoded-encrypted-json>"
+ * }
+ * ```
+ *
+ * **Security Notes**:
+ * - This implementation provides strong encryption suitable for local development and testing
+ * - For production deployments, consider using a dedicated secret manager (AWS Secrets Manager, HashiCorp Vault, etc.)
+ * - The encrypted file should still be protected with filesystem permissions
+ * - Password strength is critical - use a strong, unique password
+ *
+ * **Backward Compatibility**:
+ * - Version 2 (current): PBKDF2 with salt
+ * - Version 1 (legacy): SHA-256 without salt (auto-migrated on write)
+ *
+ * @param name Display name for this secret source
+ * @param passwordFetcher Helper for password prompting and caching
+ * @param cacheLocation An option that will turn on caching the encrypted files location in a properties file at the
+ * process directory. The cache file should NOT be stored in VCS.
+ */
+public class DynamicEncryptedFileSecretSource(
+    override val name: String,
+    private val passwordFetcher: PasswordFetcher = PasswordFetcher(),
+    private val cacheLocation: Boolean = false,
+) : PopulatableSecretSource {
+    private var wraps: EncryptedFileSecretSource? = null
+
+    private fun getWraps(): EncryptedFileSecretSource {
+        return wraps
+            ?: run {
+                if(cacheLocation){
+                    File("local.secretFiles.properties")
+                        .takeIf { it.exists() }
+                        ?.let {
+                            val props = Properties()
+                            props.load(it.inputStream())
+                            props.getProperty(name)
+                        }
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { location ->
+                            EncryptedFileSecretSource(File(location), name, passwordFetcher)
+                        }
+                } else null
+
+            }
+            ?: run {
+                println("Enter the secrets file location for $name:")
+                val location = readInput { it.ifBlank { throw IllegalArgumentException("Invalid file path") } }
+                if (cacheLocation) {
+                    val file = File("local.secrets.properties")
+                    val props = Properties()
+                    if (file.exists())
+                        props.load(file.inputStream())
+                    props.setProperty(name, location)
+                    props.store(
+                        file.outputStream(),
+                        """ This file must *NOT* be checked into Version Control Systems
+ as it contains information specific to your local deployment configuration
+  
+ This file was written automatically by the DynamicEncryptedFileSecretSource
+ 
+ Location of the secret files for your deploy environments.
+""".trimMargin()
+                    )
+                }
+                wraps = EncryptedFileSecretSource(File(location), name, passwordFetcher)
+                wraps!!
+            }
+    }
+
+    override fun <T> set(need: TerraformNeed<T>, value: T) {
+        return getWraps().set(need, value)
+    }
+
+    override fun <T> getOrNull(need: TerraformNeed<T>): T? {
+        return getWraps().get(need)
+    }
+
 }
 
 /*
