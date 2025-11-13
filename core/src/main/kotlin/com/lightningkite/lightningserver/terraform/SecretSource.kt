@@ -459,6 +459,9 @@ public open class PasswordFetcher() {
                 println(prompt)
                 val password =
                     System.console()?.readPassword()?.toString() ?: JOptionPane.showInputDialog(null, prompt, "")
+                if(password == null){
+                    throw IllegalStateException("No Input Provided")
+                }
                 try {
                     verify(password)
                     present = password
