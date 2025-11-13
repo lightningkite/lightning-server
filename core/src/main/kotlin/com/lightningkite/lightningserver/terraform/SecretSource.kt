@@ -690,7 +690,6 @@ public class EncryptedFileSecretSource(
 }
 
 
-
 /**
  * A Wrapper around [EncryptedFileSecretSource] that allows a runtime input for the location of the secrets file.
  * Without hard coding the file location into the VCS you can have multiple developers with deploy capabilities
@@ -746,11 +745,15 @@ public class DynamicEncryptedFileSecretSource(
 ) : PopulatableSecretSource {
     private var wraps: EncryptedFileSecretSource? = null
 
+    private companion object {
+        private const val fileName = "local.secretFiles.properties"
+    }
+
     private fun getWraps(): EncryptedFileSecretSource {
         return wraps
             ?: run {
-                if(cacheLocation){
-                    File("local.secretFiles.properties")
+                if (cacheLocation) {
+                    File(fileName)
                         .takeIf { it.exists() }
                         ?.let {
                             val props = Properties()
@@ -768,7 +771,7 @@ public class DynamicEncryptedFileSecretSource(
                 println("Enter the secrets file location for $name:")
                 val location = readInput { it.ifBlank { throw IllegalArgumentException("Invalid file path") } }
                 if (cacheLocation) {
-                    val file = File("local.secrets.properties")
+                    val file = File(fileName)
                     val props = Properties()
                     if (file.exists())
                         props.load(file.inputStream())
