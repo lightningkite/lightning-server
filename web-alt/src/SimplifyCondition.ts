@@ -1,11 +1,4 @@
 import { Condition } from "./Condition";
-import { inspect } from "util";
-// Helper for mock field
-// const field = (name: string): SerializableProperty<any, any> => ({ name });
-
-const log = (...args: any[]) => {
-  console.log(args.map((x) => inspect(x, { depth: null })));
-};
 
 function isAnd<T>(c: Condition<T>): c is { And: Condition<T>[] } {
   return "And" in c;
@@ -15,6 +8,7 @@ function isOr<T>(c: Condition<T>): c is { Or: Condition<T>[] } {
 }
 
 function stringIsField(c: string): boolean {
+  if (!c) return false;
   return ![
     "Never",
     "Always",
@@ -77,8 +71,9 @@ export function simplify<T>(condition: Condition<T>): Condition<T> {
         const final = finalSimplify(reduced);
         if (isAlways(final)) return null;
         if (isNever(final)) return { Never: true } as Condition<T>;
-        if (stringIsField(p1)) {
-          return { [p1]: final };
+        const pathArr = p1 ? p1.split(".") : [];
+        if (pathArr.length > 0) {
+          return buildNested(pathArr, final);
         }
         return final as Condition<T>;
       })
@@ -104,8 +99,9 @@ export function simplify<T>(condition: Condition<T>): Condition<T> {
         const final = finalSimplify(reduced);
         if (isNever(final)) return null;
         if (isAlways(final)) return { Always: true } as Condition<T>;
-        if (stringIsField(p1)) {
-          return { [p1]: final };
+        const pathArr = p1 ? p1.split(".") : [];
+        if (pathArr.length > 0) {
+          return buildNested(pathArr, final);
         }
         return final as Condition<T>;
       })
@@ -119,8 +115,6 @@ export function simplify<T>(condition: Condition<T>): Condition<T> {
   const field = getFieldKey(condition);
   if (field) {
     const simp = finalSimplify((condition as any)[field]);
-    // console.log("COND", (condition as any)[field]);
-    // console.log({ simp });
     if (isAlways(simp) || isNever(simp)) {
       return simp as Condition<T>;
     }
@@ -169,11 +163,7 @@ function orByField(cond: Condition<any>): Array<[string[], Condition<any>]> {
   }
   const onField = getFieldKey(cond);
   if (onField) {
-    console.log();
-    return orByField(cond[onField]).map(([list, c]) => [
-      [cond[onField], ...list],
-      c,
-    ]);
+    return orByField(cond[onField]).map(([list, c]) => [[onField, ...list], c]);
   } else {
     const s = simplify(cond);
     const onField = getFieldKey(s);
@@ -204,4 +194,9 @@ export function reduceOr<T>(a: Condition<T>, b: Condition<T>): Condition<T> {
   if (isOr(a)) return { Or: [...a.Or, b] };
   if (isOr(b)) return { Or: [a, ...b.Or] };
   return { Or: [a, b] };
+}
+function buildNested(path: string[], value: any): any {
+  if (path.length === 0) return value;
+  const [head, ...tail] = path;
+  return { [head]: buildNested(tail, value) };
 }
