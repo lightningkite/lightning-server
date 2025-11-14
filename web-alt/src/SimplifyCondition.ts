@@ -6,6 +6,18 @@ function isAnd<T>(c: Condition<T>): c is { And: Condition<T>[] } {
 function isOr<T>(c: Condition<T>): c is { Or: Condition<T>[] } {
   return "Or" in c;
 }
+function isNever<T>(c: Condition<T>): c is { Never: true } {
+  return "Never" in c;
+}
+function isAlways<T>(c: Condition<T>): c is { Always: true } {
+  return "Always" in c;
+}
+function isInside<T>(c: Condition<T>): c is { Inside: T[] } {
+  return "Inside" in c;
+}
+function isNotInside<T>(c: Condition<T>): c is { NotInside: T[] } {
+  return "NotInside" in c;
+}
 
 function stringIsField(c: string): boolean {
   if (!c) return false;
@@ -40,28 +52,14 @@ function getFieldKey<T extends Condition<any>>(c: T): keyof T | null {
   return null;
 }
 
-function isNever<T>(c: Condition<T>): c is { Never: true } {
-  return "Never" in c;
-}
-function isAlways<T>(c: Condition<T>): c is { Always: true } {
-  return "Always" in c;
-}
-function isInside<T>(c: Condition<T>): c is { Inside: T[] } {
-  return "Inside" in c;
-}
-function isNotInside<T>(c: Condition<T>): c is { NotInside: T[] } {
-  return "NotInside" in c;
-}
-
 export function simplifyCondition<T>(condition: Condition<T>): Condition<T> {
   if (isAnd(condition)) {
     const groups = new Map<string, Array<Condition<any>>>();
 
     for (const sub of condition.And) {
-      for (const [path, subCond] of andByField(sub)) {
-        const key = path.join(".");
-        if (!groups.has(key)) groups.set(key, []);
-        groups.get(key)!.push(subCond);
+      for (const [path, subCond] of Object.entries(andByField(sub))) {
+        if (!groups.has(path)) groups.set(path, []);
+        groups.get(path)!.push(...subCond);
       }
     }
 
@@ -86,10 +84,9 @@ export function simplifyCondition<T>(condition: Condition<T>): Condition<T> {
     const groups = new Map<string, Array<Condition<any>>>();
 
     for (const sub of condition.Or) {
-      for (const [path, subCond] of orByField(sub)) {
-        const key = path.join(".");
-        if (!groups.has(key)) groups.set(key, []);
-        groups.get(key)!.push(subCond);
+      for (const [path, subCond] of Object.entries(orByField(sub))) {
+        if (!groups.has(path)) groups.set(path, []);
+        groups.get(path)!.push(...subCond);
       }
     }
 
@@ -137,41 +134,75 @@ function finalSimplify<T>(cond: Condition<T>): Condition<T> {
   return cond;
 }
 
-function andByField(cond: Condition<any>): Array<[string[], Condition<any>]> {
-  if (isAnd(cond)) {
-    return cond.And.flatMap((it) => andByField(it));
+function andByField(cond: Condition<any>): Record<string, Condition<any>[]> {
+  const result: Record<string, Condition<any>[]> = {};
+
+  function add(path: string, c: Condition<any>) {
+    if (!result[path]) result[path] = [];
+    result[path].push(c);
   }
-  const onField = getFieldKey(cond);
-  if (onField) {
-    return andByField(cond[onField]).map(([list, c]) => [
-      [onField, ...list],
-      c,
-    ]);
-  } else {
-    const s = simplifyCondition(cond);
-    const onField = getFieldKey(s);
-    if (onField) {
-      return andByField(s[onField]).map(([list, c]) => [[onField, ...list], c]);
+
+  function walk(c: Condition<any>, path: string[]) {
+    if (isAnd(c)) {
+      for (const sub of c.And) walk(sub, path);
+      return;
     }
-    return [[[], s]];
+
+    const field = getFieldKey(c);
+    if (field) {
+      walk((c as any)[field], [...path, field]);
+      return;
+    }
+
+    const s = simplifyCondition(c);
+    const sField = getFieldKey(s);
+    if (sField) {
+      walk((s as any)[sField], [...path, sField]);
+      return;
+    }
+
+    const key = path.join(".");
+
+    add(key, s);
   }
+
+  walk(cond, []);
+  return result;
 }
 
-function orByField(cond: Condition<any>): Array<[string[], Condition<any>]> {
-  if (isOr(cond)) {
-    return cond.Or.flatMap((it) => orByField(it));
+function orByField(cond: Condition<any>): Record<string, Condition<any>[]> {
+  const result: Record<string, Condition<any>[]> = {};
+
+  function add(path: string, c: Condition<any>) {
+    if (!result[path]) result[path] = [];
+    result[path].push(c);
   }
-  const onField = getFieldKey(cond);
-  if (onField) {
-    return orByField(cond[onField]).map(([list, c]) => [[onField, ...list], c]);
-  } else {
-    const s = simplifyCondition(cond);
-    const onField = getFieldKey(s);
-    if (onField) {
-      return orByField(s[onField]).map(([list, c]) => [[onField, ...list], c]);
+
+  function walk(c: Condition<any>, path: string[]) {
+    if (isOr(c)) {
+      for (const sub of c.Or) walk(sub, path);
+      return;
     }
-    return [[[], s]];
+
+    const field = getFieldKey(c);
+    if (field) {
+      walk((c as any)[field], [...path, field]);
+      return;
+    }
+
+    const s = simplifyCondition(c);
+    const sField = getFieldKey(s);
+    if (sField) {
+      walk((s as any)[sField], [...path, sField]);
+      return;
+    }
+
+    const key = path.join(".");
+    add(key, s);
   }
+
+  walk(cond, []);
+  return result;
 }
 
 function reduceAnd<T>(a: Condition<T>, b: Condition<T>): Condition<T> {
