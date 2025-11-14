@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.mockRestEndpointFunctions = void 0;
 const Condition_1 = require("./Condition");
@@ -99,12 +90,10 @@ function mockRestEndpointFunctions(items, label) {
             }
             return Promise.reject();
         },
-        bulkModify(input, userToken) {
-            return __awaiter(this, void 0, void 0, function* () {
-                console.info(label, "bulkModify", { input });
-                const filteredItems = items.filter((item) => (0, Condition_1.evaluateCondition)(input.condition, item));
-                return filteredItems.length;
-            });
+        async bulkModify(input, userToken) {
+            console.info(label, "bulkModify", { input });
+            const filteredItems = items.filter((item) => (0, Condition_1.evaluateCondition)(input.condition, item));
+            return filteredItems.length;
         },
         modifyWithDiff(id, input, userToken) {
             return Promise.resolve({});
