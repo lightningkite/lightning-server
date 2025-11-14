@@ -1,8 +1,11 @@
 import { Condition } from "./Condition";
+import { inspect } from "util";
+// Helper for mock field
+// const field = (name: string): SerializableProperty<any, any> => ({ name });
 
-export interface SerializableProperty<Owner, Value> {
-  name: string;
-}
+const log = (...args: any[]) => {
+  console.log(args.map((x) => inspect(x, { depth: null })));
+};
 
 function isAnd<T>(c: Condition<T>): c is { And: Condition<T>[] } {
   return "And" in c;
@@ -10,9 +13,39 @@ function isAnd<T>(c: Condition<T>): c is { And: Condition<T>[] } {
 function isOr<T>(c: Condition<T>): c is { Or: Condition<T>[] } {
   return "Or" in c;
 }
-function isOnField<T>(c: Condition<T>): c is { OnField: { key: SerializableProperty<any, any>; condition: Condition<any> } } {
-  return "OnField" in c;
+
+function stringIsField(c: string): boolean {
+  return ![
+    "Never",
+    "Always",
+    "And",
+    "Or",
+    "Not",
+    "Equal",
+    "NotEqual",
+    "Inside",
+    "NotInside",
+    "GreaterThan",
+    "LessThan",
+    "GreaterThanOrEqual",
+    "LessThanOrEqual",
+    "IntBitsClear",
+    "IntBitsSet",
+    "IntBitsAnyClear",
+    "IntBitsAnySet",
+    "Exists",
+    "IfNotNull",
+  ].includes(c);
 }
+
+function getFieldKey<T extends Condition<any>>(c: T): keyof T | null {
+  const fieldKey = Object.keys(c).find((k) => stringIsField(k));
+  if (fieldKey) {
+    return fieldKey as keyof T;
+  }
+  return null;
+}
+
 function isNever<T>(c: Condition<T>): c is { Never: true } {
   return "Never" in c;
 }
@@ -32,49 +65,66 @@ export function simplify<T>(condition: Condition<T>): Condition<T> {
 
     for (const sub of condition.And) {
       for (const [path, subCond] of andByField(sub)) {
-        console.log("Path: ", path)
-        console.log("subCond: ", subCond)
-        const key = path.map(p => p.name).join(".");
+        const key = path.join(".");
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key)!.push(subCond);
       }
     }
 
-    const simplified = Array.from(groups.entries()).map(([_, list]) => {
-      const reduced = list.reduce((a, b) => reduceAnd(a, b));
-      const final = finalSimplify(reduced);
-      if (isAlways(final)) return null;
-      if (isNever(final)) return { Never: true } as Condition<T>;
-      return make(list.length ? [] : [], final) as Condition<T>;
-    }).filter(Boolean) as Condition<T>[];
+    const simplified = Array.from(groups.entries())
+      .map(([p1, list]) => {
+        const reduced = list.reduce((a, b) => reduceAnd(a, b));
+        const final = finalSimplify(reduced);
+        if (isAlways(final)) return null;
+        if (isNever(final)) return { Never: true } as Condition<T>;
+        if (stringIsField(p1)) {
+          return { [p1]: final };
+        }
+        return final as Condition<T>;
+      })
+      .filter(Boolean) as Condition<T>[];
 
     if (simplified.length === 0) return { Always: true };
     if (simplified.length === 1) return simplified[0];
     return { And: simplified };
-
   } else if (isOr(condition)) {
     const groups = new Map<string, Array<Condition<any>>>();
 
     for (const sub of condition.Or) {
       for (const [path, subCond] of orByField(sub)) {
-        const key = path.map(p => p.name).join(".");
+        const key = path.join(".");
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key)!.push(subCond);
       }
     }
 
-    const simplified = Array.from(groups.entries()).map(([_, list]) => {
-      const reduced = list.reduce((a, b) => reduceOr(a, b));
-      const final = finalSimplify(reduced);
-      if (isNever(final)) return null;
-      if (isAlways(final)) return { Always: true } as Condition<T>;
-      return make(list.length ? [] : [], final) as Condition<T>;
-    }).filter(Boolean) as Condition<T>[];
+    const simplified = Array.from(groups.entries())
+      .map(([p1, list]) => {
+        const reduced = list.reduce((a, b) => reduceOr(a, b));
+        const final = finalSimplify(reduced);
+        if (isNever(final)) return null;
+        if (isAlways(final)) return { Always: true } as Condition<T>;
+        if (stringIsField(p1)) {
+          return { [p1]: final };
+        }
+        return final as Condition<T>;
+      })
+      .filter(Boolean) as Condition<T>[];
 
     if (simplified.length === 0) return { Never: true };
     if (simplified.length === 1) return simplified[0];
     return { Or: simplified };
+  }
 
+  const field = getFieldKey(condition);
+  if (field) {
+    const simp = finalSimplify((condition as any)[field]);
+    // console.log("COND", (condition as any)[field]);
+    // console.log({ simp });
+    if (isAlways(simp) || isNever(simp)) {
+      return simp as Condition<T>;
+    }
+    return { [field]: simp } as Condition<T>;
   } else {
     return finalSimplify(condition);
   }
@@ -93,43 +143,45 @@ export function finalSimplify<T>(cond: Condition<T>): Condition<T> {
   return cond;
 }
 
-function andByField(cond: Condition<any>): Array<[SerializableProperty<any, any>[], Condition<any>]> {
+function andByField(cond: Condition<any>): Array<[string[], Condition<any>]> {
   if (isAnd(cond)) {
-    return cond.And.flatMap(it => andByField(it));
-  } else if (isOnField(cond)) {
-    return andByField(cond.OnField.condition).map(([list, c]) => [[cond.OnField.key, ...list], c]);
+    return cond.And.flatMap((it) => andByField(it));
+  }
+  const onField = getFieldKey(cond);
+  if (onField) {
+    return andByField(cond[onField]).map(([list, c]) => [
+      [onField, ...list],
+      c,
+    ]);
   } else {
     const s = simplify(cond);
-    if (isOnField(s)) {
-      return andByField(s.OnField.condition).map(([list, c]) => [[s.OnField.key, ...list], c]);
+    const onField = getFieldKey(s);
+    if (onField) {
+      return andByField(s[onField]).map(([list, c]) => [[onField, ...list], c]);
     }
     return [[[], s]];
   }
 }
 
-function orByField(cond: Condition<any>): Array<[SerializableProperty<any, any>[], Condition<any>]> {
+function orByField(cond: Condition<any>): Array<[string[], Condition<any>]> {
   if (isOr(cond)) {
-    return cond.Or.flatMap(it => orByField(it));
-  } else if (isOnField(cond)) {
-    return orByField(cond.OnField.condition).map(([list, c]) => [[cond.OnField.key, ...list], c]);
+    return cond.Or.flatMap((it) => orByField(it));
+  }
+  const onField = getFieldKey(cond);
+  if (onField) {
+    console.log();
+    return orByField(cond[onField]).map(([list, c]) => [
+      [cond[onField], ...list],
+      c,
+    ]);
   } else {
     const s = simplify(cond);
-    if (isOnField(s)) {
-      return orByField(s.OnField.condition).map(([list, c]) => [[s.OnField.key, ...list], c]);
+    const onField = getFieldKey(s);
+    if (onField) {
+      return orByField(s[onField]).map(([list, c]) => [[onField, ...list], c]);
     }
     return [[[], s]];
   }
-}
-
-function make(props: SerializableProperty<any, any>[], cond: Condition<any>): Condition<any> {
-  if (props.length === 0) return cond;
-  return {
-    OnField: {
-        // @ts-ignore
-      key: props[0],
-      condition: make(props.slice(1), cond),
-    },
-  };
 }
 
 export function reduceAnd<T>(a: Condition<T>, b: Condition<T>): Condition<T> {
