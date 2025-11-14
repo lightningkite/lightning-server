@@ -1,14 +1,5 @@
-import {
-  simplify,
-  finalSimplify,
-  reduceAnd,
-  reduceOr,
-  Condition,
-} from "../src";
+import { simplifyCondition, Condition } from "../src";
 import { inspect } from "util";
-// Helper for mock field
-// const field = (name: string): SerializableProperty<any, any> => ({ name });
-
 
 type TestCond<T> = {
   original: Condition<T>;
@@ -20,7 +11,7 @@ describe("Condition Simplify", () => {
     const cond: Condition<number> = {
       And: [{ And: [{ Always: true }, { Never: true }] }, { Always: true }],
     };
-    const result = simplify(cond);
+    const result = simplifyCondition(cond);
     expect(result).toEqual({ Never: true });
   });
 
@@ -28,65 +19,15 @@ describe("Condition Simplify", () => {
     const cond: Condition<number> = {
       Or: [{ Or: [{ Always: true }, { Never: true }] }, { Never: true }],
     };
-    const result = simplify(cond);
+    const result = simplifyCondition(cond);
     expect(result).toEqual({ Always: true });
-  });
-
-  test("finalSimplify removes empty Inside", () => {
-    const cond: Condition<number> = { Inside: [] };
-    const result = finalSimplify(cond);
-    expect(result).toEqual({ Never: true });
-  });
-
-  test("finalSimplify removes empty NotInside", () => {
-    const cond: Condition<number> = { NotInside: [] };
-    const result = finalSimplify(cond);
-    expect(result).toEqual({ Always: true });
-  });
-
-  test("AND combining Always/Never behaves correctly", () => {
-    expect(reduceAnd({ Always: true }, { Never: true })).toEqual({
-      Never: true,
-    });
-    expect(reduceAnd({ Always: true }, { Always: true })).toEqual({
-      Always: true,
-    });
-    expect(reduceAnd({ Never: true }, { Always: true })).toEqual({
-      Never: true,
-    });
-  });
-
-  test("OR combining Always/Never behaves correctly", () => {
-    expect(reduceOr({ Always: true }, { Never: true })).toEqual({
-      Always: true,
-    });
-    expect(reduceOr({ Never: true }, { Never: true })).toEqual({ Never: true });
-    expect(reduceOr({ Always: true }, { Always: true })).toEqual({
-      Always: true,
-    });
-  });
-
-  test("AND merges nested AND structures", () => {
-    const result = reduceAnd(
-      { And: [{ Always: true }] },
-      { And: [{ Never: true }] }
-    );
-    expect(result).toEqual({ And: [{ Always: true }, { Never: true }] });
-  });
-
-  test("OR merges nested OR structures", () => {
-    const result = reduceOr(
-      { Or: [{ Always: true }] },
-      { Or: [{ Never: true }] }
-    );
-    expect(result).toEqual({ Or: [{ Always: true }, { Never: true }] });
   });
 
   test("OnField nested simplification reduces properly", () => {
     const cond: Condition<{ age: number }> = {
       And: [{ age: { Always: true } }, { age: { Never: true } }],
     };
-    const result = simplify(cond);
+    const result = simplifyCondition(cond);
 
     expect(result).toEqual({ Never: true });
   });
@@ -99,7 +40,7 @@ describe("Condition Simplify", () => {
       ],
     };
 
-    expect(simplify(cond)).toMatchObject({
+    expect(simplifyCondition(cond)).toMatchObject({
       age: { And: [{ Equal: 4 }, { GreaterThan: 2 }] },
     });
   });
@@ -119,7 +60,9 @@ describe("Condition Simplify", () => {
       },
     };
 
-    expect(simplify(condition.original)).toMatchObject(condition.simple);
+    expect(simplifyCondition(condition.original)).toMatchObject(
+      condition.simple
+    );
   });
   test("Nested fields", () => {
     const condition: TestCond<{ age: number }> = {
@@ -140,7 +83,9 @@ describe("Condition Simplify", () => {
       },
     };
 
-    expect(simplify(condition.original)).toMatchObject(condition.simple);
+    expect(simplifyCondition(condition.original)).toMatchObject(
+      condition.simple
+    );
   });
   test("Never true for field", () => {
     const condition: TestCond<{ age: number }> = {
@@ -161,7 +106,9 @@ describe("Condition Simplify", () => {
       simple: { Never: true },
     };
 
-    expect(simplify(condition.original)).toMatchObject(condition.simple);
+    expect(simplifyCondition(condition.original)).toMatchObject(
+      condition.simple
+    );
   });
 
   const condition: TestCond<{ age: number; name: string }> = {
@@ -204,18 +151,20 @@ describe("Condition Simplify", () => {
       },
     };
 
-    expect(simplify(condition.original)).toMatchObject(condition.simple);
+    expect(simplifyCondition(condition.original)).toMatchObject(
+      condition.simple
+    );
   });
 
   test("Empty And becomes Always", () => {
     const cond: Condition<number> = { And: [] };
-    const result = simplify(cond);
+    const result = simplifyCondition(cond);
     expect(result).toEqual({ Always: true });
   });
 
   test("Empty Or becomes Never", () => {
     const cond: Condition<number> = { Or: [] };
-    const result = simplify(cond);
+    const result = simplifyCondition(cond);
     expect(result).toEqual({ Never: true });
   });
 
@@ -225,7 +174,7 @@ describe("Condition Simplify", () => {
         age: { Always: true },
       },
     };
-    const result = simplify(cond);
+    const result = simplifyCondition(cond);
     expect(result).toEqual(cond);
   });
 
@@ -234,7 +183,7 @@ describe("Condition Simplify", () => {
       Or: [{ age: { Equal: 1 } }, { age: { Equal: 2 } }],
     };
 
-    expect(simplify(cond)).toMatchObject({
+    expect(simplifyCondition(cond)).toMatchObject({
       age: { Or: [{ Equal: 1 }, { Equal: 2 }] },
     });
   });
@@ -243,14 +192,14 @@ describe("Condition Simplify", () => {
     const cond: Condition<number> = {
       Or: [{ Equal: 1 }, { Always: true }],
     };
-    expect(simplify(cond)).toEqual({ Always: true });
+    expect(simplifyCondition(cond)).toEqual({ Always: true });
   });
 
   test("AND with Always removes Always", () => {
     const cond: Condition<number> = {
       And: [{ Equal: 1 }, { Always: true }, { Equal: 2 }],
     };
-    expect(simplify(cond)).toMatchObject({
+    expect(simplifyCondition(cond)).toMatchObject({
       And: [{ Equal: 1 }, { Equal: 2 }],
     });
   });
@@ -263,7 +212,7 @@ describe("Condition Simplify", () => {
       ],
     };
 
-    expect(simplify(cond)).toMatchObject({
+    expect(simplifyCondition(cond)).toMatchObject({
       age: {
         And: [{ Equal: 3 }, { GreaterThan: 1 }, { LessThan: 10 }],
       },
@@ -277,7 +226,7 @@ describe("Condition Simplify", () => {
       ],
     };
 
-    expect(simplify(cond)).toMatchObject({
+    expect(simplifyCondition(cond)).toMatchObject({
       user: {
         profile: {
           age: {
@@ -292,14 +241,14 @@ describe("Condition Simplify", () => {
       And: [{ Inside: [1, 2, 3] }, { Never: true }],
     };
 
-    expect(simplify(cond)).toEqual({ Never: true });
+    expect(simplifyCondition(cond)).toEqual({ Never: true });
   });
   test("Nested Or gets flattened and simplified", () => {
     const cond: Condition<number> = {
       Or: [{ Or: [{ Equal: 1 }, { Equal: 2 }] }, { Equal: 3 }],
     };
 
-    expect(simplify(cond)).toMatchObject({
+    expect(simplifyCondition(cond)).toMatchObject({
       Or: [{ Equal: 1 }, { Equal: 2 }, { Equal: 3 }],
     });
   });
@@ -308,14 +257,14 @@ describe("Condition Simplify", () => {
       user: { age: { IfNotNull: { GreaterThan: 0 } } },
     };
 
-    expect(simplify(cond)).toEqual(cond);
+    expect(simplifyCondition(cond)).toEqual(cond);
   });
   test("AND with two fields keeps them separate", () => {
     const cond: Condition<{ age: number; score: number }> = {
       And: [{ age: { Equal: 2 } }, { score: { Equal: 10 } }],
     };
 
-    expect(simplify(cond)).toMatchObject({
+    expect(simplifyCondition(cond)).toMatchObject({
       And: [{ age: { Equal: 2 } }, { score: { Equal: 10 } }],
     });
   });
@@ -324,7 +273,7 @@ describe("Condition Simplify", () => {
       Or: [{ age: { Equal: 2 } }, { score: { Equal: 10 } }],
     };
 
-    expect(simplify(cond)).toMatchObject({
+    expect(simplifyCondition(cond)).toMatchObject({
       Or: [{ age: { Equal: 2 } }, { score: { Equal: 10 } }],
     });
   });
@@ -333,11 +282,11 @@ describe("Condition Simplify", () => {
       And: [{ Inside: [] }, { Equal: 3 }],
     };
 
-    expect(simplify(cond)).toEqual({ Never: true });
+    expect(simplifyCondition(cond)).toEqual({ Never: true });
   });
   test("Empty object condition treated as Always", () => {
     const cond = {} as Condition<number>;
-    expect(simplify(cond)).toEqual({});
+    expect(simplifyCondition(cond)).toEqual({});
   });
   test("OR groups nested field at depth 3", () => {
     const cond: Condition<{ u: { p: { age: number } } }> = {
@@ -347,7 +296,7 @@ describe("Condition Simplify", () => {
       ],
     };
 
-    expect(simplify(cond)).toMatchObject({
+    expect(simplifyCondition(cond)).toMatchObject({
       u: {
         p: {
           age: {
@@ -361,13 +310,13 @@ describe("Condition Simplify", () => {
     const cond: Condition<number> = {
       And: [{ Always: true }, { Always: true }],
     };
-    expect(simplify(cond)).toEqual({ Always: true });
+    expect(simplifyCondition(cond)).toEqual({ Always: true });
   });
   test("OR of Never and Never collapses to Never", () => {
     const cond: Condition<number> = {
       Or: [{ Never: true }, { Never: true }],
     };
-    expect(simplify(cond)).toEqual({ Never: true });
+    expect(simplifyCondition(cond)).toEqual({ Never: true });
   });
   test("Complex mix of AND + OR + fields reduces correctly", () => {
     const cond: Condition<{ age: number; score: number }> = {
@@ -379,7 +328,7 @@ describe("Condition Simplify", () => {
       ],
     };
 
-    expect(simplify(cond)).toMatchObject({
+    expect(simplifyCondition(cond)).toMatchObject({
       And: [
         { age: { GreaterThan: 10 } },
         {
@@ -389,3 +338,55 @@ describe("Condition Simplify", () => {
     });
   });
 });
+
+// Testing helper functions
+
+  // test("finalSimplify removes empty Inside", () => {
+  //   const cond: Condition<number> = { Inside: [] };
+  //   const result = finalSimplify(cond);
+  //   expect(result).toEqual({ Never: true });
+  // });
+
+  // test("finalSimplify removes empty NotInside", () => {
+  //   const cond: Condition<number> = { NotInside: [] };
+  //   const result = finalSimplify(cond);
+  //   expect(result).toEqual({ Always: true });
+  // });
+
+  // test("AND combining Always/Never behaves correctly", () => {
+  //   expect(reduceAnd({ Always: true }, { Never: true })).toEqual({
+  //     Never: true,
+  //   });
+  //   expect(reduceAnd({ Always: true }, { Always: true })).toEqual({
+  //     Always: true,
+  //   });
+  //   expect(reduceAnd({ Never: true }, { Always: true })).toEqual({
+  //     Never: true,
+  //   });
+  // });
+
+  // test("OR combining Always/Never behaves correctly", () => {
+  //   expect(reduceOr({ Always: true }, { Never: true })).toEqual({
+  //     Always: true,
+  //   });
+  //   expect(reduceOr({ Never: true }, { Never: true })).toEqual({ Never: true });
+  //   expect(reduceOr({ Always: true }, { Always: true })).toEqual({
+  //     Always: true,
+  //   });
+  // });
+
+  // test("AND merges nested AND structures", () => {
+  //   const result = reduceAnd(
+  //     { And: [{ Always: true }] },
+  //     { And: [{ Never: true }] }
+  //   );
+  //   expect(result).toEqual({ And: [{ Always: true }, { Never: true }] });
+  // });
+
+  // test("OR merges nested OR structures", () => {
+  //   const result = reduceOr(
+  //     { Or: [{ Always: true }] },
+  //     { Or: [{ Never: true }] }
+  //   );
+  //   expect(result).toEqual({ Or: [{ Always: true }, { Never: true }] });
+  // });

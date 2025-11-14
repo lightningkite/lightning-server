@@ -53,7 +53,7 @@ function isNotInside<T>(c: Condition<T>): c is { NotInside: T[] } {
   return "NotInside" in c;
 }
 
-export function simplify<T>(condition: Condition<T>): Condition<T> {
+export function simplifyCondition<T>(condition: Condition<T>): Condition<T> {
   if (isAnd(condition)) {
     const groups = new Map<string, Array<Condition<any>>>();
 
@@ -124,7 +124,7 @@ export function simplify<T>(condition: Condition<T>): Condition<T> {
   }
 }
 
-export function finalSimplify<T>(cond: Condition<T>): Condition<T> {
+function finalSimplify<T>(cond: Condition<T>): Condition<T> {
   if (isAnd(cond)) {
     if (cond.And.some(isNever)) return { Never: true };
   } else if (isOr(cond)) {
@@ -148,7 +148,7 @@ function andByField(cond: Condition<any>): Array<[string[], Condition<any>]> {
       c,
     ]);
   } else {
-    const s = simplify(cond);
+    const s = simplifyCondition(cond);
     const onField = getFieldKey(s);
     if (onField) {
       return andByField(s[onField]).map(([list, c]) => [[onField, ...list], c]);
@@ -165,7 +165,7 @@ function orByField(cond: Condition<any>): Array<[string[], Condition<any>]> {
   if (onField) {
     return orByField(cond[onField]).map(([list, c]) => [[onField, ...list], c]);
   } else {
-    const s = simplify(cond);
+    const s = simplifyCondition(cond);
     const onField = getFieldKey(s);
     if (onField) {
       return orByField(s[onField]).map(([list, c]) => [[onField, ...list], c]);
@@ -174,7 +174,7 @@ function orByField(cond: Condition<any>): Array<[string[], Condition<any>]> {
   }
 }
 
-export function reduceAnd<T>(a: Condition<T>, b: Condition<T>): Condition<T> {
+function reduceAnd<T>(a: Condition<T>, b: Condition<T>): Condition<T> {
   if (isAlways(a)) return b;
   if (isNever(a)) return a;
   if (isAlways(b)) return a;
@@ -185,7 +185,7 @@ export function reduceAnd<T>(a: Condition<T>, b: Condition<T>): Condition<T> {
   return { And: [a, b] };
 }
 
-export function reduceOr<T>(a: Condition<T>, b: Condition<T>): Condition<T> {
+function reduceOr<T>(a: Condition<T>, b: Condition<T>): Condition<T> {
   if (isAlways(a)) return a;
   if (isNever(a)) return b;
   if (isAlways(b)) return b;
