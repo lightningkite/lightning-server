@@ -215,7 +215,8 @@ class WebAuthNProofEndpoints(
                     residentKeyPreference = residentKeyPreference,
                     allowedAlgorithms = options.pubKeyCredParams,
                     userVerification = options.authenticatorSelection.userVerification == WebAuthN.GeneralPreference.Required
-                )
+                ),
+                timeToLive = 15.minutes
             )
 
             WebAuthN.Registration.RegistrationResponse(
@@ -384,7 +385,8 @@ class WebAuthNProofEndpoints(
                     challenge = challenge,
                     userVerification = options.userVerification == WebAuthN.GeneralPreference.Required,
                     subjectType = subjectType,
-                )
+                ),
+                timeToLive = 15.minutes
             )
 
             WebAuthN.Authentication.StartResponse(
