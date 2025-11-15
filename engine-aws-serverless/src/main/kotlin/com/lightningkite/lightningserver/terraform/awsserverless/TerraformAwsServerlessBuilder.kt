@@ -7,42 +7,22 @@ import com.lightningkite.lightningserver.data.Schedule
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
+import com.lightningkite.lightningserver.definition.loggingSettings
+import com.lightningkite.lightningserver.definition.secretBasis
+import com.lightningkite.lightningserver.definition.telemetrySettings
 import com.lightningkite.lightningserver.engine.awsserverless.AwsAdapter
-import com.lightningkite.lightningserver.terraform.BaseTerraformEmitter
-import com.lightningkite.lightningserver.terraform.EncryptedFileSecretSource
-import com.lightningkite.lightningserver.terraform.EnvironmentSecretSource
-import com.lightningkite.lightningserver.terraform.ManySecretSources
-import com.lightningkite.lightningserver.terraform.PasswordFetcher
-import com.lightningkite.lightningserver.terraform.SecretSource
-import com.lightningkite.services.Setting
-import com.lightningkite.services.terraform.AwsPolicyStatement
-import com.lightningkite.services.terraform.TerraformEmitterAws
-import com.lightningkite.services.terraform.TerraformEmitterAwsDomain
-import com.lightningkite.services.terraform.TerraformProvider
-import com.lightningkite.services.terraform.TerraformProviderImport
-import com.lightningkite.services.terraform.include
-import com.lightningkite.services.terraform.terraformJsonObject
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.addJsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.encodeToJsonElement
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
-import kotlinx.serialization.json.putJsonObject
+import com.lightningkite.lightningserver.terraform.*
+import com.lightningkite.services.terraform.*
+import kotlinx.serialization.json.*
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.lambda.model.Architecture
 import java.io.File
-import java.util.Locale
-import java.util.Locale.getDefault
-import kotlin.collections.distinct
 import kotlin.reflect.KClass
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
-    override val builder: S
+    override val builder: S,
 ) : BaseTerraformEmitter<S>(), TerraformEmitterAws {
     public abstract val storageBucket: String
     public abstract val region: Region
@@ -82,7 +62,11 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
             description = "$displayName Lambda Spend"
         ).associate { it.description.lowercase().filter { it.isLetterOrDigit() || it == '-' } to it }
 
-    override val additionalSettings: Set<ServerSetting<*, *>> = setOf()
+    override val additionalSettings: Set<ServerSetting<*, *>> = setOf(
+        secretBasis,
+        telemetrySettings,
+        loggingSettings,
+    )
     override val applicationRegion: String get() = region.id()
     override val policyStatements: MutableCollection<AwsPolicyStatement> = ArrayList()
 
@@ -416,7 +400,9 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
         emit("lambda") {
             // BASELINE LAMBDA
             "resource.aws_s3_bucket.lambda_bucket" {
-                "bucket_prefix" - "${emitter.projectPrefix}-lambda-bucket"
+                // .lowercase().replace("_", "") on projectPrefix is backwards compatibility with V4 and earlier.
+                // We can't really remove this at this time.
+                "bucket_prefix" - "${emitter.projectPrefix.lowercase().replace("_", "")}-lambda-bucket"
                 "force_destroy" - true
             }
             "resource.aws_iam_role.main_exec" {

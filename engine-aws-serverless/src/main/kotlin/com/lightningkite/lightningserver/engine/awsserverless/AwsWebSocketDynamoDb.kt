@@ -41,6 +41,15 @@ internal class AwsWebSocketDynamoDb(
 
     companion object {
         internal val logger = KotlinLogging.logger("com.lightningkite.lightningserver.engine.awsserverless.AwsWebSocketDynamoDb")
+
+        // Everything is prefixed with 'ws' because dynamoDB has an absurd amount of reserved keywords.
+        private const val socketIdKey = "wsSocketId"
+        private const val topicKey = "wsTopic"
+        private const val expireKey = "wsExpire"
+        private const val pathKey = "wsPath"
+        private const val stateKey = "wsState"
+        private const val fromStateKey = "wsFromState"
+        private const val requestKey = "wsRequest"
     }
 
     private val initMutex = Mutex()
@@ -56,19 +65,19 @@ internal class AwsWebSocketDynamoDb(
                         it.tableName(tableSubs)
                         it.billingMode(BillingMode.PAY_PER_REQUEST)
                         it.keySchema(
-                            { it.attributeName("topic").keyType(KeyType.HASH) },
-                            { it.attributeName("socketId").keyType(KeyType.RANGE) })
+                            { it.attributeName(topicKey).keyType(KeyType.HASH) },
+                            { it.attributeName(socketIdKey).keyType(KeyType.RANGE) })
                         it.attributeDefinitions(
-                            { it.attributeName("topic").attributeType(ScalarAttributeType.S) },
-                            { it.attributeName("socketId").attributeType(ScalarAttributeType.S) },
+                            { it.attributeName(topicKey).attributeType(ScalarAttributeType.S) },
+                            { it.attributeName(socketIdKey).attributeType(ScalarAttributeType.S) },
                         )
                         it.globalSecondaryIndexes(
                             {
                                 it.keySchema(
-                                    { it.attributeName("socketId").keyType(KeyType.HASH) },
-                                    { it.attributeName("topic").keyType(KeyType.RANGE) })
+                                    { it.attributeName(socketIdKey).keyType(KeyType.HASH) },
+                                    { it.attributeName(topicKey).keyType(KeyType.RANGE) })
                                 it.projection {
-                                    it.projectionType(ProjectionType.INCLUDE).nonKeyAttributes("path", "expire")
+                                    it.projectionType(ProjectionType.INCLUDE).nonKeyAttributes(pathKey, expireKey)
                                 }
                                 it.indexName(tableSubsReverse)
                             }
@@ -77,7 +86,7 @@ internal class AwsWebSocketDynamoDb(
                     timeToLive = {
                         it.tableName(tableSubs)
                         it.timeToLiveSpecification {
-                            it.attributeName("expire")
+                            it.attributeName(expireKey)
                             it.enabled(true)
                         }
                     }
@@ -86,15 +95,15 @@ internal class AwsWebSocketDynamoDb(
                     createTableRequest = {
                         it.tableName(tableStates)
                         it.billingMode(BillingMode.PAY_PER_REQUEST)
-                        it.keySchema({ it.attributeName("socketId").keyType(KeyType.HASH) })
+                        it.keySchema({ it.attributeName(socketIdKey).keyType(KeyType.HASH) })
                         it.attributeDefinitions(
-                            { it.attributeName("socketId").attributeType(ScalarAttributeType.S) },
+                            { it.attributeName(socketIdKey).attributeType(ScalarAttributeType.S) },
                         )
                     },
                     timeToLive = {
                         it.tableName(tableStates)
                         it.timeToLiveSpecification {
-                            it.attributeName("expire")
+                            it.attributeName(expireKey)
                             it.enabled(true)
                         }
                     }
@@ -115,15 +124,14 @@ internal class AwsWebSocketDynamoDb(
         measureTime {
             client.queryPaginator {
                 it.tableName(tableSubs)
-                it.expressionAttributeValues(mapOf(":topic" to AttributeValue.fromS(topic)))
-                it.keyConditionExpression("topic = :topic")
-                it.expressionAttributeNames(mapOf("#path" to "path"))
-                it.projectionExpression("socketId, #path")
+                it.expressionAttributeValues(mapOf(":${topicKey}" to AttributeValue.fromS(topic)))
+                it.keyConditionExpression("$topicKey = :${topicKey}")
+                it.projectionExpression("$socketIdKey, $pathKey")
                 it.limit(1000)
             }.asFlow().collect { response ->
                 for ((key, value) in response.items().groupBy(
-                    keySelector = { it["path"]!!.s() },
-                    valueTransform = { it["socketId"]!!.s() }
+                    keySelector = { it[pathKey]!!.s() },
+                    valueTransform = { it[socketIdKey]!!.s() }
                 ).entries) {
                     perSubscriber(key, value)
                 }
@@ -138,10 +146,10 @@ internal class AwsWebSocketDynamoDb(
                 it.tableName(tableSubs)
                 it.item(
                     mapOf(
-                        "topic" to AttributeValue.fromS(topic),
-                        "socketId" to AttributeValue.fromS(socketId),
-                        "path" to AttributeValue.fromS(path),
-                        "expire" to AttributeValue.fromN(Clock.System.now().plus(socketExpiration).epochSeconds.toString())
+                        topicKey to AttributeValue.fromS(topic),
+                        socketIdKey to AttributeValue.fromS(socketId),
+                        pathKey to AttributeValue.fromS(path),
+                        expireKey to AttributeValue.fromN(Clock.System.now().plus(socketExpiration).epochSeconds.toString())
                     )
                 )
             }.await()
@@ -155,8 +163,8 @@ internal class AwsWebSocketDynamoDb(
                 it.tableName(tableSubs)
                 it.key(
                     mapOf(
-                        "topic" to AttributeValue.fromS(topic),
-                        "socketId" to AttributeValue.fromS(socketId),
+                        topicKey to AttributeValue.fromS(topic),
+                        socketIdKey to AttributeValue.fromS(socketId),
                     )
                 )
             }.await()
@@ -169,13 +177,13 @@ internal class AwsWebSocketDynamoDb(
             client.queryPaginator {
                 it.tableName(tableSubs)
                 it.indexName(tableSubsReverse)
-                it.expressionAttributeValues(mapOf(":socketId" to AttributeValue.fromS(socketId)))
-                it.keyConditionExpression("socketId = :socketId")
-                it.projectionExpression("topic, socketId")
+                it.expressionAttributeValues(mapOf(":$socketIdKey" to AttributeValue.fromS(socketId)))
+                it.keyConditionExpression("$socketIdKey = :$socketIdKey")
+                it.projectionExpression("$topicKey, $socketIdKey")
                 it.limit(100)
             }.asFlow().collect { page ->
                 val keys = page.items().map { item ->
-                    item.filter { (k, _) -> k == "topic" || k == "socketId" }
+                    item.filter { (k, _) -> k == topicKey || k == socketIdKey }
                 }
                 keys.chunked(25).forEach { batch ->
                     client.batchWriteItem {
@@ -197,7 +205,7 @@ internal class AwsWebSocketDynamoDb(
             }
             client.deleteItem {
                 it.tableName(tableStates)
-                it.key(mapOf("socketId" to AttributeValue.fromS(socketId)))
+                it.key(mapOf(socketIdKey to AttributeValue.fromS(socketId)))
             }.await()
         }.also { logger.debug { "AwsWebSocketDynamoDb.clean took $it" } }
     }
@@ -207,12 +215,12 @@ internal class AwsWebSocketDynamoDb(
         val out = HashMap<String, StateAndConnectRequest>()
         client.scanPaginator {
             it.tableName(tableStates)
-            it.projectionExpression("socketId, state, request")
+            it.projectionExpression("$socketIdKey, $stateKey, $requestKey")
         }.asFlow().collect {
             it.items()?.forEach {
-                out[it["socketId"]!!.s()] = StateAndConnectRequest(
-                    it["state"]!!.b().asByteArray(),
-                    encoding.decodeFromByteArray(WebSocketConnectRequest.serializer(NothingSerializer()), it["request"]!!.b().asByteArray())
+                out[it[socketIdKey]!!.s()] = StateAndConnectRequest(
+                    it[stateKey]!!.b().asByteArray(),
+                    encoding.decodeFromByteArray(WebSocketConnectRequest.serializer(NothingSerializer()), it[requestKey]!!.b().asByteArray())
                 )
             }
         }
@@ -225,12 +233,12 @@ internal class AwsWebSocketDynamoDb(
         measureTime {
             result = client.getItem {
                 it.tableName(tableStates)
-                it.key(mapOf("socketId" to AttributeValue.fromS(id)))
-                it.projectionExpression("state, request")
+                it.key(mapOf(socketIdKey to AttributeValue.fromS(id)))
+                it.projectionExpression("$stateKey, $requestKey")
             }.await().item()?.let {
                 StateAndConnectRequest(
-                    it["state"]!!.b().asByteArray(),
-                    encoding.decodeFromByteArray(WebSocketConnectRequest.serializer(NothingSerializer()), it.get("request")!!.b().asByteArray()),
+                    it[stateKey]!!.b().asByteArray(),
+                    encoding.decodeFromByteArray(WebSocketConnectRequest.serializer(NothingSerializer()), it.get(requestKey)!!.b().asByteArray()),
                 )
             }
         }.also { logger.debug { "AwsWebSocketDynamoDb.state($id) took $it" } }
@@ -241,16 +249,17 @@ internal class AwsWebSocketDynamoDb(
         ensureTables()
         val out = HashMap<String, ByteArray>()
         measureTime {
-            val getState = KeysAndAttributes.builder().projectionExpression("socketId, state")
-                .keys(ids.map { mapOf("socketId" to AttributeValue.fromS(it)) }).build()
+            val getState = KeysAndAttributes.builder()
+                .projectionExpression("$socketIdKey, $stateKey")
+                .keys(ids.map { mapOf(socketIdKey to AttributeValue.fromS(it)) }).build()
             client.batchGetItemPaginator {
                 it.requestItems(mapOf(tableStates to getState))
             }.asFlow().collect {
                 it.responses()?.get(tableStates)?.forEach {
-                    out[it["socketId"]!!.s()] = it["state"]!!.b().asByteArray()
+                    out[it[socketIdKey]!!.s()] = it[stateKey]!!.b().asByteArray()
                 }
             }
-        }.also { logger.debug { "AwsWebSocketDynamoDb.statesAlone(${ids.joinToString()}) took $it" } }
+        }//.also { logger.debug { "AwsWebSocketDynamoDb.statesAlone(${ids.joinToString()}) took $it" } }
         return out
     }
 
@@ -258,15 +267,16 @@ internal class AwsWebSocketDynamoDb(
         ensureTables()
         val out = HashMap<String, StateAndConnectRequest>()
         measureTime {
-            val getState = KeysAndAttributes.builder().projectionExpression("socketId, state, request")
-                .keys(ids.map { mapOf("socketId" to AttributeValue.fromS(it)) }).build()
+            val getState = KeysAndAttributes.builder()
+                .projectionExpression("$socketIdKey, $stateKey, $requestKey")
+                .keys(ids.map { mapOf(socketIdKey to AttributeValue.fromS(it)) }).build()
             client.batchGetItemPaginator {
                 it.requestItems(mapOf(tableStates to getState))
             }.asFlow().collect {
                 it.responses()?.get(tableStates)?.forEach {
-                    out[it["socketId"]!!.s()] = StateAndConnectRequest(
-                        it["state"]!!.b().asByteArray(),
-                        encoding.decodeFromByteArray(WebSocketConnectRequest.serializer(NothingSerializer()), it["request"]!!.b().asByteArray())
+                    out[it[socketIdKey]!!.s()] = StateAndConnectRequest(
+                        it[stateKey]!!.b().asByteArray(),
+                        encoding.decodeFromByteArray(WebSocketConnectRequest.serializer(NothingSerializer()), it[requestKey]!!.b().asByteArray())
                     )
                 }
             }
@@ -282,9 +292,9 @@ internal class AwsWebSocketDynamoDb(
                 @Suppress("UNCHECKED_CAST")
                 it.item(
                     mapOf(
-                        "socketId" to AttributeValue.fromS(socketId),
-                        "state" to AttributeValue.fromB(SdkBytes.fromByteArray(toState)),
-                        "request" to AttributeValue.fromB(
+                        socketIdKey to AttributeValue.fromS(socketId),
+                        stateKey to AttributeValue.fromB(SdkBytes.fromByteArray(toState)),
+                        requestKey to AttributeValue.fromB(
                             SdkBytes.fromByteArray(
                                 encoding.encodeToByteArray(
                                     WebSocketConnectRequest.serializer(NothingSerializer()),
@@ -292,7 +302,7 @@ internal class AwsWebSocketDynamoDb(
                                 )
                             )
                         ),
-                        "expire" to AttributeValue.fromN(Clock.System.now().plus(socketExpiration).epochSeconds.toString())
+                        expireKey to AttributeValue.fromN(Clock.System.now().plus(socketExpiration).epochSeconds.toString())
                     )
                 )
             }.await()
@@ -305,21 +315,21 @@ internal class AwsWebSocketDynamoDb(
             measureTime {
                 client.updateItem {
                     it.tableName(tableStates)
-                    it.key(mapOf("socketId" to AttributeValue.fromS(socketId)))
-                    it.expressionAttributeNames(mapOf("#state" to "state", "#expire" to "expire"))
+                    it.key(mapOf(socketIdKey to AttributeValue.fromS(socketId)))
                     it.expressionAttributeValues(
                         mapOf(
-                            ":fromState" to AttributeValue.fromB(SdkBytes.fromByteArray(fromState)),
-                            ":state" to AttributeValue.fromB(SdkBytes.fromByteArray(toState)),
-                            ":expire" to AttributeValue.fromN(Clock.System.now().plus(socketExpiration).epochSeconds.toString()),
+                            ":$fromStateKey" to AttributeValue.fromB(SdkBytes.fromByteArray(fromState)),
+                            ":$stateKey" to AttributeValue.fromB(SdkBytes.fromByteArray(toState)),
+                            ":$expireKey" to AttributeValue.fromN(Clock.System.now().plus(socketExpiration).epochSeconds.toString()),
                         )
                     )
-                    it.conditionExpression("#state = :fromState")
-                    it.updateExpression("SET #state = :state, #expire = :expire")
+                    it.conditionExpression("$stateKey = :$fromStateKey")
+                    it.updateExpression("SET $stateKey = :$stateKey, $expireKey = :$expireKey")
                 }.await()
             }.also { logger.debug { "AwsWebSocketDynamoDb.updateState($socketId) took $it" } }
             true
-        } catch (_: ConditionalCheckFailedException) {
+        } catch (e: ConditionalCheckFailedException) {
+            logger.error { e.stackTraceToString() }
             false
         }
     }
