@@ -40,8 +40,23 @@ import com.lightningkite.services.otel.applyToLogback
  * @property ready Indicates whether settings have been validated and are ready for use
  */
 public class ServerSettings(public val settings: Set<ServerSetting<*, *>>) {
+    public class ConflictingSettingsException internal constructor(message: String) : IllegalStateException(message)
+
+    init {
+        settings
+            .distinct()     // Allow duplicate instances (same object registered multiple times)
+            .groupBy { it.name }
+            .filterValues { it.size > 1 }
+            .keys
+            .takeIf { it.isNotEmpty() }
+            ?.let { conflicts ->
+                throw ConflictingSettingsException("Settings found with conflicting names. All server settings must have unique names. Conflicts: $conflicts")
+            }
+    }
+
     public var ready: Boolean = false
         private set
+
     private val serializable: MapRegistry<ServerSetting<*, *>, Any?> = MapRegistry()
     private val goal: MapRegistry<ServerSetting<*, *>, Any?> = MapRegistry()
 
@@ -135,12 +150,12 @@ public class ServerSettings(public val settings: Set<ServerSetting<*, *>>) {
     context(server: ServerRuntime)
     public fun ready() {
         val missing = settings.minus(serializable.keys + goal.keys)
-        if(missing.isNotEmpty()) throw IllegalStateException("Settings ${missing.joinToString { it.name }} are missing.")
+        if (missing.isNotEmpty()) throw IllegalStateException("Settings ${missing.joinToString { it.name }} are missing.")
         ready = true
 
         val errors = mutableMapOf<ServerSetting<*, *>, Exception>()
 
-        if(loggingSettings in settings)
+        if (loggingSettings in settings)
             get(loggingSettings).applyToLogback()
         settings.forEach { setting ->
             try {
@@ -206,6 +221,9 @@ public class ServerSettings(public val settings: Set<ServerSetting<*, *>>) {
      */
     context(_: ServerRuntime)
     public fun allGoals(): Map<ServerSetting<*, *>, Any?> = settings.associateWith { get(it) }
+
+    public operator fun plus(requirement: ServerSetting<*, *>): ServerSettings = ServerSettings(settings + requirement)
+    public operator fun plus(requirements: Collection<ServerSetting<*, *>>): ServerSettings = ServerSettings(settings + requirements)
 }
 
 /*

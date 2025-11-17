@@ -227,7 +227,7 @@ public object SDK { // namespace object
     }
 
     context(runtime: ServerRuntime)
-    public fun ServerBuilder.writeSdk(format: Format, folder: KFile, packageName: String) {
-        format.write(build(), folder, packageName)
+    public fun writeSdk(format: Format, folder: KFile, packageName: String) {
+        format.write(runtime.server, folder, packageName)
     }
 }

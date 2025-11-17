@@ -74,7 +74,7 @@ public class JdkEngine(
     override val clock: Clock = Clock.System
 ) : LocalEngine(server) {
 
-    override val settings: ServerSettings = ServerSettings(super.settings.settings.plus(jdkRunConfig).toSet())
+    override val settings: ServerSettings = super.settings + jdkRunConfig
 
     /**
      * Starts the JDK HTTP server.

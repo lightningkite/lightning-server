@@ -99,7 +99,7 @@ public class NettyEngine(
         internal val logger = KotlinLogging.logger("com.lightningkite.lightningserver.engine.netty.NettyEngine")
     }
 
-    override val settings: ServerSettings = ServerSettings(super.settings.settings.plus(nettyRunConfig).toSet())
+    override val settings: ServerSettings = super.settings + nettyRunConfig
 
     private lateinit var bossGroup: EventLoopGroup
     private lateinit var workerGroup: EventLoopGroup

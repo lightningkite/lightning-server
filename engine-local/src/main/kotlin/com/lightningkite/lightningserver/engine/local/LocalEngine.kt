@@ -33,14 +33,14 @@ import kotlin.time.Instant
  * Used for WebSocket subscription messages and inter-process communication.
  */
 public val enginePubSub: ServerSetting<PubSub.Settings, PubSub> =
-    ServerSetting("pubSub", PubSub.Settings(), PubSub.Settings.serializer())
+    ServerSetting("engine-pubSub", PubSub.Settings(), PubSub.Settings.serializer())
 
 /**
  * Server setting for configuring the Cache implementation used by the local engine.
  * Used for distributed locking and schedule coordination.
  */
 public val engineCache: ServerSetting<Cache.Settings, Cache> =
-    ServerSetting("cache", Cache.Settings(), Cache.Settings.serializer())
+    ServerSetting("engine-cache", Cache.Settings(), Cache.Settings.serializer())
 
 /**
  * Base class for local server engines that run within a single JVM process.
@@ -69,7 +69,7 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
      * A unique identifier for this server instance, derived from the network interface's hardware address.
      * Falls back to "?" if no network interfaces are available.
      */
-    public override val serverId:String = NetworkInterface.getNetworkInterfaces().toList()
+    public override val serverId: String = NetworkInterface.getNetworkInterfaces().toList()
         .minByOrNull { it.name }
         ?.hardwareAddress
         ?.sumOf { it.hashCode() }
@@ -79,16 +79,9 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
     /**
      * The version of this server instance. Always "Unknown" for local engines.
      */
-    public override val serverVersion:String =  "Unknown"
+    public override val serverVersion: String = "Unknown"
 
-    override val settings: ServerSettings = ServerSettings(
-        super.settings.settings.plus(
-            listOf(
-                enginePubSub,
-                engineCache,
-            )
-        ).distinctBy { it.name }.toSet()
-    )
+    override val settings: ServerSettings = super.settings + listOf(enginePubSub, engineCache)
 
     /**
      * The PubSub instance used for WebSocket subscriptions and inter-process messaging.

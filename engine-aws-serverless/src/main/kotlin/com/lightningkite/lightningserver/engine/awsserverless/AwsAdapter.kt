@@ -59,7 +59,6 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
     internal var preventLambdaTimeoutReuse: Boolean = false
 
 //    override val settings: ServerSettings = ServerSettings(super.settings.settings.plus(awsLambdaRuntimeSettings).toSet())
-    override val settings: ServerSettings = ServerSettings(super.settings.settings.toSet())
 
     init {
         logger.info { "Initializing AwsAdapter..." }

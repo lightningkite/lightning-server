@@ -81,7 +81,7 @@ public val ktorRunConfig: ServerSetting.Direct<KtorRuntimeSettings> = ServerSett
  */
 public class KtorEngine(server: ServerDefinition, override val clock: Clock = Clock.System) : LocalEngine(server) {
 
-    override val settings: ServerSettings = ServerSettings(super.settings.settings.plus(ktorRunConfig).toSet())
+    override val settings: ServerSettings = super.settings + ktorRunConfig
 
     /**
      * Adapts a Ktor Application to handle Lightning Server requests.
