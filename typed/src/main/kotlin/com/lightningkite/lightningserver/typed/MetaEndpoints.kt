@@ -384,7 +384,7 @@ public class MetaEndpoints(
                                 durationMs = start.elapsedNow().inWholeMilliseconds,
                                 error = when (e) {
                                     is HttpStatusException -> e.toLSError()
-                                    else -> LSError(500, "unknown", "An unknown server error occurred.")
+                                    else -> LSError(500, "unknown", if(generalSettings().debug) e.message ?: "An unknown server error occurred." else "An unknown server error occurred.", if(generalSettings().debug) e.stackTraceToString() else "")
                                 }.let {
                                     if(generalSettings().debug) it.copy(stackTrace = e.stackTraceToString()) else it
                                 }
