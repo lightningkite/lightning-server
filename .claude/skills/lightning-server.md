@@ -329,26 +329,80 @@ suspend fun getExpensiveData(id: String): Data {
 
 ### 10. Testing
 
-Use `LocalEngine` for testing:
+**⚠️ CRITICAL: Build Server Once Per Test Suite**
+
+When writing tests, ensure `Server.build()` is only called once across all tests to avoid `DuplicateRegistrationError`. Create a shared `TestHelper`:
 
 ```kotlin
+// TestHelper.kt - shared across all test files
+object TestHelper {
+    val testRunner by lazy { TestRunner(Server.build()) }
+}
+
+// In your test file
 class ServerTest {
-    companion object {
-        @BeforeAll
-        @JvmStatic
-        fun setup() {
-            JsonFileDatabase  // Ensure mock implementations are loaded
-        }
+    init {
+        JsonFileDatabase  // Ensure mock implementations are loaded
     }
 
     @Test
     fun testEndpoint() = runBlocking {
-        val engine = LocalEngine(Server.build())
-        val response = Server.someEndpoint.test(engine)
-        assertEquals("expected", response.body!!.text())
+        with(TestHelper.testRunner) {
+            val response = Server.someEndpoint.test()
+            assertEquals("expected", response.body!!.text())
+        }
     }
 }
 ```
+
+**Test Method Signatures**
+
+For basic `HttpHandler` endpoints:
+```kotlin
+// No path args
+Server.endpoint.test(
+    queryParameters = QueryParameters(listOf("key" to "value")),
+    body = TypedData.text("content", MediaType.Text.Plain)
+)
+
+// With path args
+Server.endpoint.test(
+    "pathArg1",
+    42,  // pathArg2
+    queryParameters = QueryParameters.EMPTY
+)
+```
+
+For `ApiHttpHandler` endpoints:
+```kotlin
+// No path args
+Server.typedEndpoint.test(auth = null, input = RequestData(...))
+
+// With path args
+Server.typedEndpoint.test("pathArg", auth = null, input = RequestData(...))
+```
+
+**Common Testing Pitfalls**
+
+⚠️ **Duplicate UploadEarlyEndpoint Declarations**
+
+If you create multiple instances of `UploadEarlyEndpoint` (e.g., in different modules or endpoints), they will have **conflicting declarations for how `ServerFile` is serialized**. This causes runtime serialization errors that manifest as `500 Internal Server Error` responses in tests, even though the code compiles successfully.
+
+**Solution:** Only instantiate `UploadEarlyEndpoint` once in your server definition:
+
+```kotlin
+object Server : ServerBuilder() {
+    // ✅ Good - single instance
+    val uploadEarly = path.path("upload") module
+        UploadEarlyEndpoint(files, database, Runtime.Constant(listOf()))
+
+    // ❌ Bad - creates duplicate with conflicting ServerFile serialization
+    // val anotherUpload = path.path("upload2") module
+    //     UploadEarlyEndpoint(files, database, Runtime.Constant(listOf()))
+}
+```
+
+If you need multiple upload endpoints, reuse the same `UploadEarlyEndpoint` instance or use different endpoint patterns.
 
 ## Common Patterns
 
@@ -490,6 +544,8 @@ First run generates `settings.json`:
 ## Anti-Patterns
 
 ❌ **Don't manually create CRUD endpoints** - Use ModelRestEndpoints instead
+❌ **Don't create multiple UploadEarlyEndpoint instances** - Causes ServerFile serialization conflicts
+❌ **Don't call Server.build() multiple times in tests** - Use shared TestHelper with lazy initialization
 ❌ Don't access database implementations directly
 ❌ Don't hardcode configuration
 ❌ Don't skip endpoint reference storage
