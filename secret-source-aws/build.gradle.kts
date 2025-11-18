@@ -14,7 +14,7 @@ dependencies {
         exclude("software.amazon.awssdk:netty-nio-client")
         exclude("software.amazon.awssdk:apache-client")
     }
-    api(libs.awsSecrets) { excludeNetty() }
+    api(libs.awsSecretsManager) { excludeNetty() }
     testImplementation(libs.kotlinTest)
     testImplementation(libs.kotlinTestJunit)
 }
