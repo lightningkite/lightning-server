@@ -3,6 +3,7 @@
 package com.lightningkite.lightningserver.demo
 
 import com.lightningkite.DataSize.Companion.bytes
+import com.lightningkite.lightningserver.demo.endpoints.*
 import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.cors.CorsInterceptor
@@ -116,6 +117,63 @@ object Server : ServerBuilder() {
     }
     val uploadEarly = path.path("upload") module UploadEarlyEndpoint(files, database, Runtime.Constant(listOf()))
     val testModel = path.path("test-model") module TestModelEndpoints
+
+    // ========================================
+    // New Organized Demo Endpoints
+    // ========================================
+
+    /**
+     * Basic Examples - Simple HTTP endpoints demonstrating fundamental patterns.
+     */
+    val basic = path include BasicExamplesEndpoints
+
+    /**
+     * Typed API Examples - Type-safe endpoints with auto-documentation.
+     */
+    val typedApi = path include TypedApiExamplesEndpoints
+
+    /**
+     * Database Examples - CRUD operations with the query DSL.
+     *
+     * ⚠️ NOTE: These are LOW-LEVEL examples for educational purposes.
+     * For production, use ModelRestEndpoints (see testModel below for the recommended pattern).
+     */
+    val databaseExamples = path.path("database") module DatabaseExamplesEndpoints(database)
+
+    /**
+     * File Examples - File upload, download, and signed URLs.
+     */
+    val fileExamples = path.path("files") module FileExamplesEndpoints(files, database)
+
+    /**
+     * WebSocket Examples - Real-time communication patterns.
+     */
+    val websocketExamples = path include WebSocketExamplesEndpoints
+
+    /**
+     * Cache Examples - Caching patterns and operations.
+     */
+    val cacheExamples = path.path("cache") module CacheExamplesEndpoints(cache)
+
+    /**
+     * Task Examples - Background tasks and scheduled jobs.
+     */
+    val taskExamples = path.path("tasks") module TaskExamplesEndpoints(cache)
+
+    /**
+     * Notification Examples - Push notifications, email, SMS, and in-app notifications.
+     */
+    val notificationExamples = path include NotificationExamplesEndpoints
+
+    /**
+     * Media Examples - Image processing, thumbnails, and format conversion.
+     */
+    val mediaExamples = path include MediaExamplesEndpoints
+
+    /**
+     * JSON-RPC Examples - RPC-style API endpoints using JSON-RPC 2.0 protocol.
+     */
+    val jsonRpcExamples = path include JsonRpcExamplesEndpoints
 
     val root = path.get bind HttpHandler {
         HttpResponse.plainText("Hello ${it.auth(UserAuth.require() or noAuth)?.fetch()}")
@@ -296,7 +354,7 @@ object Server : ServerBuilder() {
         HttpResponse.plainText("Impossible.")
     }
 
-    val multiplex = path.path("multiplex").websocket(MultiplexWebSocketHandler())
+    val multiplex = path.path("multiplex") bind MultiplexWebSocketHandler()
 
     val meta = path.path("meta") module MetaEndpoints("com.lightningkite.lightningserver.demo", database, cache)
 
