@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import kotlinx.serialization.Serializable
 
@@ -22,11 +23,12 @@ object TypedApiExamplesEndpoints : ServerBuilder() {
     
     /**
      * POST /api/calculator
-     * 
+     *
      * A simple calculator endpoint demonstrating basic typed API usage.
      * Shows input validation and structured error responses.
      */
-    val calculator = path.path("api").path("calculator").post bind ApiHttpHandler(
+    val calculator: ApiHttpHandler<PathSpec0, Nothing?, CalculatorRequest, CalculatorResponse> =
+        path.path("api").path("calculator").post bind ApiHttpHandler(
         summary = "Perform basic arithmetic operations",
         description = "Calculates the result of two numbers using the specified operation (+, -, *, /)",
         auth = noAuth,
@@ -71,10 +73,11 @@ object TypedApiExamplesEndpoints : ServerBuilder() {
     
     /**
      * POST /api/validate-email
-     * 
+     *
      * Demonstrates input validation and conditional responses.
      */
-    val validateEmail = path.path("api").path("validate-email").post bind ApiHttpHandler(
+    val validateEmail: ApiHttpHandler<PathSpec0, Nothing?, EmailValidationRequest, EmailValidationResponse> =
+        path.path("api").path("validate-email").post bind ApiHttpHandler(
         summary = "Validate an email address",
         description = "Checks if the provided email address is in a valid format",
         auth = noAuth,
@@ -103,10 +106,11 @@ object TypedApiExamplesEndpoints : ServerBuilder() {
     
     /**
      * POST /api/search
-     * 
+     *
      * Demonstrates complex input/output with optional fields and lists.
      */
-    val search = path.path("api").path("search").post bind ApiHttpHandler(
+    val search: ApiHttpHandler<PathSpec0, Nothing?, SearchRequest, SearchResponse> =
+        path.path("api").path("search").post bind ApiHttpHandler(
         summary = "Search for items",
         description = "Performs a search with optional filtering and sorting",
         auth = noAuth,
@@ -151,10 +155,11 @@ object TypedApiExamplesEndpoints : ServerBuilder() {
     
     /**
      * POST /api/transform
-     * 
+     *
      * Demonstrates nullable inputs and outputs.
      */
-    val transform = path.path("api").path("transform").post bind ApiHttpHandler(
+    val transform: ApiHttpHandler<PathSpec0, Nothing?, TransformRequest, TransformResponse> =
+        path.path("api").path("transform").post bind ApiHttpHandler(
         summary = "Transform text with optional operations",
         description = "Applies various transformations to text. Returns null if input is null.",
         auth = noAuth,

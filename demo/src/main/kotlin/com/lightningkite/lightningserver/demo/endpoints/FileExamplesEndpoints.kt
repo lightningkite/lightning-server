@@ -31,17 +31,6 @@ class FileExamplesEndpoints(
 ) : ServerBuilder() {
     
     /**
-     * Early upload endpoint - uploads files before the main request.
-     * This is useful for large file uploads where you want to show progress.
-     */
-    val uploadEarly = path.path("files").path("upload-early") include
-        UploadEarlyEndpoint(
-            files = files,
-            database = database,
-            fileScanner = { listOf() }
-        )
-    
-    /**
      * POST /files/upload
      * 
      * Upload a file and store it in the file system.

@@ -175,9 +175,14 @@ object Server : ServerBuilder() {
      */
     val jsonRpcExamples = path include JsonRpcExamplesEndpoints
 
-    val root = path.get bind HttpHandler {
-        HttpResponse.plainText("Hello ${it.auth(UserAuth.require() or noAuth)?.fetch()}")
-    }
+    // Note: The root endpoint (GET /) is now defined in BasicExamplesEndpoints
+    // which is included above. This avoids endpoint duplication.
+    // If you need an authenticated root endpoint, access it via a different path.
+    //
+    // Old root endpoint (commented out to avoid duplicate registration):
+    // val root = path.get bind HttpHandler {
+    //     HttpResponse.plainText("Hello ${it.auth(UserAuth.require() or noAuth)?.fetch()}")
+    // }
 
     val slashEscaping = path.path("variable").arg<String>("stupidid").get bind HttpHandler { request ->
         HttpResponse.plainText("The variable is '${request.path.arg1}'")
