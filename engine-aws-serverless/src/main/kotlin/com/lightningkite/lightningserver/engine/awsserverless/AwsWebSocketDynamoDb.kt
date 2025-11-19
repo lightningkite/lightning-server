@@ -329,7 +329,8 @@ internal class AwsWebSocketDynamoDb(
             }.also { logger.debug { "AwsWebSocketDynamoDb.updateState($socketId) took $it" } }
             true
         } catch (e: ConditionalCheckFailedException) {
-            logger.error { e.stackTraceToString() }
+            // This is expected during optimistic locking retries, logged at debug level in commit()
+            logger.debug { "Optimistic lock failed for $socketId (expected during concurrent updates)" }
             false
         }
     }

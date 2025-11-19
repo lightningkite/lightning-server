@@ -128,7 +128,9 @@ ModelPermissions(
 
 ## Adding WebSocket Updates
 
-You can also add real-time WebSocket updates for your REST endpoints:
+You can add real-time WebSocket updates to your REST endpoints to enable live data synchronization with clients.
+
+### Using the Plus Operator
 
 ```kotlin
 import com.lightningkite.lightningserver.typed.ModelRestEndpoints
@@ -140,7 +142,21 @@ val rest = path.path("rest") module (
 )
 ```
 
-This adds a WebSocket endpoint at `/posts/rest/updates` that sends real-time notifications when posts are created, updated, or deleted.
+### Using ModelRestEndpointsAndUpdatesWebsocket
+
+Alternatively, use the combined class directly:
+
+```kotlin
+import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebsocket
+
+val rest = path.path("rest") module ModelRestEndpointsAndUpdatesWebsocket(info)
+```
+
+Both patterns add a WebSocket endpoint at `/posts/rest/updates` that provides:
+- Real-time notifications when posts are created, updated, or deleted
+- Automatic filtering based on user permissions
+- Initial snapshot of existing data matching the query
+- Incremental updates as changes occur
 
 ## Example: Public Read, Authenticated Write
 

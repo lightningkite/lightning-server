@@ -94,12 +94,44 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
         suspend fun commit(): T {
             if (queue.isEmpty()) return currentState
             var newState = currentState
+            // Track original bytes from DB to avoid serialization round-trip issues
+            var currentStateBytes: ByteArray = stateAnonType.serializedBytes()
+            var attempts = 0
+            val maxAttempts = 50 // Safety limit to prevent infinite loops
+
             while (true) {
-                val stateString = encoding.encodeToByteArray(handler.storageSerializer, currentState)
+                attempts++
+                if (attempts > maxAttempts) {
+                    root.logger.error {
+                        "Failed to commit WebSocket state for $socketId after $maxAttempts attempts. " +
+                        "This indicates either extreme contention or a serialization issue. Queue size: ${queue.size}"
+                    }
+                    throw IllegalStateException(
+                        "Failed to commit WebSocket state for $socketId after $maxAttempts attempts"
+                    )
+                }
+
+                // Use cached bytes if available (from DB), otherwise serialize current state
+                // This prevents infinite loops caused by non-deterministic serialization
+                val stateString = currentStateBytes
+
                 newState = queue.fold(currentState) { item, apply -> apply(item) }
                 val newStateString = encoding.encodeToByteArray(handler.storageSerializer, newState)
-                if (webSocketDynamo.updateState(socketId, stateString, newStateString)) break
-                currentState = repullState()
+
+                if (webSocketDynamo.updateState(socketId, stateString, newStateString)) {
+                    if (attempts > 1) {
+                        root.logger.debug { "WebSocket state committed for $socketId after $attempts attempts" }
+                    }
+                    break
+                }
+
+                // Pull fresh state from DB and cache the original bytes
+                // Critical: we must use the exact bytes from DB for the next optimistic lock check,
+                // not re-serialized bytes which may differ due to serialization non-determinism
+                root.logger.debug { "WebSocket state update retry $attempts for $socketId" }
+                val freshBytes = webSocketDynamo.statesAlone(listOf(socketId))[socketId]!!
+                currentState = encoding.decodeFromByteArray(handler.storageSerializer, freshBytes)
+                currentStateBytes = freshBytes
             }
             queue.clear()
             currentState = newState

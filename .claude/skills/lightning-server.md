@@ -116,10 +116,6 @@ val postInfo = database.modelInfo(
 
 // Create REST endpoints automatically (provides list, get, create, update, delete, query)
 val posts = path.path("posts").path("rest") module ModelRestEndpoints(postInfo)
-
-// Optional: Add WebSocket updates for real-time changes
-val postsWithWs = path.path("posts").path("rest") include
-    ModelRestEndpoints(postInfo) + ModelRestUpdatesWebsocket(postInfo)
 ```
 
 This gives you:
@@ -129,7 +125,34 @@ This gives you:
 - `PUT /posts/rest/{id}` - Update
 - `DELETE /posts/rest/{id}` - Delete
 - `POST /posts/rest/query` - Advanced querying
-- `WS /posts/rest/watch` - Real-time updates (if WebSocket added)
+
+**Adding Real-time WebSocket Updates**
+
+Use `ModelRestUpdatesWebsocket` to add real-time updates to your REST endpoints:
+
+```kotlin
+// Pattern 1: Using the + operator
+val postsWithWs = path.path("posts").path("rest") module (
+    ModelRestEndpoints(postInfo) + ModelRestUpdatesWebsocket(postInfo)
+)
+
+// Pattern 2: Using ModelRestEndpointsAndUpdatesWebsocket directly
+val postsWithWs = path.path("posts").path("rest") module
+    ModelRestEndpointsAndUpdatesWebsocket(postInfo)
+```
+
+Both patterns add a WebSocket endpoint that provides:
+- `WS /posts/rest/updates` - Real-time notifications for creates, updates, deletes
+- Automatic filtering based on user permissions
+- Initial snapshot of data matching the query
+- Incremental updates as changes occur
+
+**When to Use WebSocket Updates:**
+- Real-time dashboards or live data displays
+- Collaborative editing features
+- Chat or messaging systems
+- Live notifications for data changes
+- Mobile apps that need to stay in sync
 
 **Manual Database Operations (use only when needed)**
 

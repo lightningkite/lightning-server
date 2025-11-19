@@ -38,6 +38,8 @@ include(":sessions-sms")
 include(":notifications")
 include(":notifications-shared")
 
+include(":ai")
+
 include(":engine-local")
 include(":engine-ktor")
 include(":engine-aws-serverless")
