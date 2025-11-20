@@ -77,7 +77,7 @@ internal class AwsWebSocketDynamoDb(
                                     { it.attributeName(socketIdKey).keyType(KeyType.HASH) },
                                     { it.attributeName(topicKey).keyType(KeyType.RANGE) })
                                 it.projection {
-                                    it.projectionType(ProjectionType.INCLUDE).nonKeyAttributes(pathKey, expireKey)
+                                    it.projectionType(ProjectionType.INCLUDE).nonKeyAttributes(expireKey, pathKey)
                                 }
                                 it.indexName(tableSubsReverse)
                             }
