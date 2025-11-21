@@ -43,13 +43,12 @@ public class UploadEarlyEndpoint(
 ) : ServerBuilder() {
 
     /**
- * Contextual serializer used for ServerFile values that integrates with the configured PublicFileSystem
- * and scanners to produce signed URLs, enforce jail/ready flows, and clean up single-use records.
- */
-public val serializer: Runtime<ExternalServerFileSerializer> = Runtime.Cached {
-        val rt = contextOf<ServerRuntime>()
+     * Contextual serializer used for ServerFile values that integrates with the configured PublicFileSystem
+     * and scanners to produce signed URLs, enforce jail/ready flows, and clean up single-use records.
+     */
+    public val serializer: Runtime<ExternalServerFileSerializer> = Runtime.Cached {
         ExternalServerFileSerializer(
-            clock = rt.clock,
+            clock = serverRuntime.clock,
             scanners = fileScanner(),
             jail = files().root.then(jailFilePath),
             ready = files().root.then(filePath),
@@ -65,85 +64,85 @@ public val serializer: Runtime<ExternalServerFileSerializer> = Runtime.Cached {
     }
 
     /**
- * Registers [serializer] as the contextual serializer for ServerFile so that endpoints and tests can
- * encode/decode values without having to pass a serializer explicitly.
- */
-override val externalSerialization: Runtime<SerializersModule> = Runtime.Cached {
+     * Registers [serializer] as the contextual serializer for ServerFile so that endpoints and tests can
+     * encode/decode values without having to pass a serializer explicitly.
+     */
+    override val externalSerialization: Runtime<SerializersModule> = Runtime.Cached {
         SerializersModule {
             contextual(ServerFile::class, serializer())
         }
     }
 
     /**
- * GET handler to prepare an upload. Returns [UploadInformation] containing the presigned upload URL and
- * the token to reference the file in a subsequent call.
- */
-public val endpoint: ApiHttpHandler<PathSpec0, HasId<*>?, Unit, UploadInformation> =
+     * GET handler to prepare an upload. Returns [UploadInformation] containing the presigned upload URL and
+     * the token to reference the file in a subsequent call.
+     */
+    public val endpoint: ApiHttpHandler<PathSpec0, HasId<*>?, Unit, UploadInformation> =
         path.get bind ApiHttpHandler(
-        auth = authOptions,
-        summary = "Upload File for Request",
-        description = "Upload a file to make a request later.  Times out in around 10 minutes.",
-        errorCases = listOf(),
-        implementation = { _: Unit ->
-            val id = Uuid.random()
-            val key = "$id.file"
-            if (fileScanner().isEmpty()) {
-                val newFile = serializer().ready.then(key)
-                val newItem = UploadForNextRequest(
-                    expires = now().plus(expiration),
-                    file = ServerFile(newFile.url)
-                )
-                database().table<UploadForNextRequest>().insertOne(newItem)
-                UploadInformation(
-                    uploadUrl = newFile.uploadUrl(expiration),
-                    futureCallToken = serializer().certifyAlreadyScannedForUse(key, expiration)
-                )
-            } else {
-                val newFile = serializer().jail.then(key)
-                val newItem = UploadForNextRequest(
-                    expires = now().plus(expiration),
-                    file = ServerFile(newFile.url)
-                )
-                database().table<UploadForNextRequest>().insertOne(newItem)
-                UploadInformation(
-                    uploadUrl = newFile.uploadUrl(expiration),
-                    futureCallToken = serializer().certifyForUse(key, expiration)
-                )
+            auth = authOptions,
+            summary = "Upload File for Request",
+            description = "Upload a file to make a request later.  Times out in around 10 minutes.",
+            errorCases = listOf(),
+            implementation = { _: Unit ->
+                val id = Uuid.random()
+                val key = "$id.file"
+                if (fileScanner().isEmpty()) {
+                    val newFile = serializer().ready.then(key)
+                    val newItem = UploadForNextRequest(
+                        expires = now().plus(expiration),
+                        file = ServerFile(newFile.url)
+                    )
+                    database().table<UploadForNextRequest>().insertOne(newItem)
+                    UploadInformation(
+                        uploadUrl = newFile.uploadUrl(expiration),
+                        futureCallToken = serializer().certifyAlreadyScannedForUse(key, expiration)
+                    )
+                } else {
+                    val newFile = serializer().jail.then(key)
+                    val newItem = UploadForNextRequest(
+                        expires = now().plus(expiration),
+                        file = ServerFile(newFile.url)
+                    )
+                    database().table<UploadForNextRequest>().insertOne(newItem)
+                    UploadInformation(
+                        uploadUrl = newFile.uploadUrl(expiration),
+                        futureCallToken = serializer().certifyForUse(key, expiration)
+                    )
+                }
             }
-        }
-    )
+        )
 
     /**
- * POST handler to verify a previously uploaded file, scanning and moving it to the ready location if safe.
- * Returns a URL that can be decoded as a ServerFile for later use.
- */
-public val verify: ApiHttpHandler<PathSpec0, HasId<*>?, String, String> =
+     * POST handler to verify a previously uploaded file, scanning and moving it to the ready location if safe.
+     * Returns a URL that can be decoded as a ServerFile for later use.
+     */
+    public val verify: ApiHttpHandler<PathSpec0, HasId<*>?, String, String> =
         path.path("verify").post bind ApiHttpHandler(
-        auth = authOptions,
-        summary = "Verify uploaded file",
-        description = "Checks out a file and moves it out of jail if it's safe.  Makes for significantly faster subsequent requests.",
-        errorCases = listOf(),
-        implementation = { url: String ->
-            // TODO: Avoid shadowing the 'url' parameter with a new local 'url' variable; consider using a different name for clarity.
-            val url = serializer().scan(url, expiration)
+            auth = authOptions,
+            summary = "Verify uploaded file",
+            description = "Checks out a file and moves it out of jail if it's safe.  Makes for significantly faster subsequent requests.",
+            errorCases = listOf(),
+            implementation = { url: String ->
+                // TODO: Avoid shadowing the 'url' parameter with a new local 'url' variable; consider using a different name for clarity.
+                val url = serializer().scan(url, expiration)
 
-            // TODO: Avoid relying on magic string prefix 'future-prescanned:'; prefer a structured token or helper method to extract the path.
-            val filePath = url.substringAfter("future-prescanned:").substringBefore('?')
-            val safe = serializer().ready.then(filePath)
-            val newItem = UploadForNextRequest(
-                expires = now().plus(expiration),
-                file = ServerFile(safe.url)
-            )
-            database().table<UploadForNextRequest>().insertOne(newItem)
+                // TODO: Avoid relying on magic string prefix 'future-prescanned:'; prefer a structured token or helper method to extract the path.
+                val filePath = url.substringAfter("future-prescanned:").substringBefore('?')
+                val safe = serializer().ready.then(filePath)
+                val newItem = UploadForNextRequest(
+                    expires = now().plus(expiration),
+                    file = ServerFile(safe.url)
+                )
+                database().table<UploadForNextRequest>().insertOne(newItem)
 
-            url
-        }
-    )
+                url
+            }
+        )
 
-/**
- * Daily cleanup of expired uploads. Removes database entries and attempts to delete the associated file.
- */
-public val cleanupSchedule: ScheduledTask = path.path("cleanupUploads") bind ScheduledTask(frequency = 1.days) {
+    /**
+     * Daily cleanup of expired uploads. Removes database entries and attempts to delete the associated file.
+     */
+    public val cleanupSchedule: ScheduledTask = path.path("cleanupUploads") bind ScheduledTask(frequency = 1.days) {
         database().table<UploadForNextRequest>().deleteMany(condition { it.expires lt now() }).forEach {
             try {
                 files().parseInternalUrl(it.file.location)!!.delete()
