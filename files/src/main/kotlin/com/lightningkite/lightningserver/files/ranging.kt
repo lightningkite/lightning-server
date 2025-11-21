@@ -177,12 +177,14 @@ public fun TypedData.getRanges(
                         is HttpRange.Bounded -> {
                             sink.write(source, range.size)
                             pos = range.rangeEnd + 1
+                            sink.writeString(LINE_FEED)
                         }
                         is HttpRange.Last, is HttpRange.UntilEnd -> {
                             source.transferTo(sink)
+                            sink.writeString(LINE_FEED)
+                            break // If no ranges overlap this should be the last range regardless
                         }
                     }
-                    sink.writeString(LINE_FEED)
                 }
                 sink.writeString(rangeBoundary)
             }

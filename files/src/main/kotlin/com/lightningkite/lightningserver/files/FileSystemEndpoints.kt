@@ -100,7 +100,7 @@ public class FileSystemEndpoints(
                 HttpRange.MalformedBehavior.BadRequest -> throw BadRequestException("Too many overlapping ranges provided")
             }
 
-            if (ranges.any { it.rangeStart(size) < 0 || it.rangeEnd(size) > size }) return@HttpHandler HttpResponse(
+            if (ranges.any { it.rangeStart(size) < 0 || it.rangeEnd(size) >= size }) return@HttpHandler HttpResponse(
                 status = HttpStatus.RequestedRangeNotSatisfiable,
                 headers = HttpHeaders(
                     HttpHeader.ContentRange to "bytes */$size"

@@ -81,7 +81,6 @@ public suspend fun doOnce(
 /**
  * Creates a [StartupTask] that calls [doOnce] with its bound path as its key.
  * */
-@Suppress("FunctionName")
 public fun startupOnce(
     database: Runtime<Database>,
     dependencies: List<StartupTask> = emptyList(),
