@@ -329,10 +329,18 @@ public class HttpHeaders internal constructor (public val normalizedEntries: Map
 /**
  * Creates HttpHeaders from an iterable of key-value pairs.
  *
- * @param entry Iterable of header name to value pairs
+ * @param entries Iterable of header name to value pairs
  * @return The constructed HttpHeaders
  */
-public fun HttpHeaders(entry: Iterable<Pair<String, String>>): HttpHeaders = HttpHeaders(entry.groupBy { it.first.lowercase() }.mapValues { (key, value) -> value.map { HttpHeaderValue.parse(key, it.second) }})
+public fun HttpHeaders(entries: Iterable<Pair<String, String>>): HttpHeaders = HttpHeaders(
+    entries
+        .groupBy { it.first.lowercase() }
+        .mapValues { (key, value) ->
+            value
+                .flatMap { it.second.split(',') }
+                .map { HttpHeaderValue.parse(key, it.trim()) }
+        }
+)
 
 /**
  * Creates HttpHeaders from vararg key-value pairs.
@@ -345,10 +353,10 @@ public fun HttpHeaders(entry: Iterable<Pair<String, String>>): HttpHeaders = Htt
  * )
  * ```
  *
- * @param entry Variable number of header name to value pairs
+ * @param entries Variable number of header name to value pairs
  * @return The constructed HttpHeaders
  */
-public fun HttpHeaders(vararg entry: Pair<String, String>): HttpHeaders = HttpHeaders(entry.groupBy { it.first.lowercase() }.mapValues { (key, value) -> value.map { HttpHeaderValue.parse(key, it.second) }})
+public fun HttpHeaders(vararg entries: Pair<String, String>): HttpHeaders = HttpHeaders(entries.toList())
 
 /**
  * Creates HttpHeaders using a builder DSL.

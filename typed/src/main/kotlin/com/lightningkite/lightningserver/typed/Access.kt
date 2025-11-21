@@ -59,6 +59,20 @@ public suspend fun <REQUEST : Request<PATH>, PATH : PathSpec, SUBJECT : HasId<*>
         authOrNull = requirement.assert(this[Authentication.CacheKey])
     )
 
+/**
+ * Creates a new [Access] for this request by retrieving this request's [Authentication]
+ * and then checking the provided [AuthRequirement]. This method differs from [access] in that
+ * a failed check against [requirement] will return `null` instead of throwing a [ForbiddenException].
+ * */
+context(server: ServerRuntime)
+public suspend fun <REQUEST : Request<PATH>, PATH : PathSpec, SUBJECT : HasId<*>?> REQUEST.accessOrNull(
+    requirement: AuthRequirement<SUBJECT>
+): Access<REQUEST, PATH, SUBJECT>? =
+    when (val r = requirement.check(this[Authentication.CacheKey])) {
+        is AuthRequirement.Result.Accepted<SUBJECT> -> Access(this, r.auth)
+        is AuthRequirement.Result.Rejected -> null
+    }
+
 @JvmName("AuthAccessNullable")
 public fun <SUBJECT : HasId<*>?> AuthAccess(auth: Authentication<SUBJECT & Any>?): AuthAccess<SUBJECT> = Access<Nothing?, Nothing, SUBJECT>(null, auth)
 public fun <SUBJECT : HasId<*>> AuthAccess(auth: Authentication<SUBJECT>): AuthAccess<SUBJECT> = Access<Nothing?, Nothing, SUBJECT>(null, auth)
@@ -75,6 +89,10 @@ context(server: ServerRuntime)
 public suspend fun <SUBJECT: HasId<*>> Request<*>.auth(auth: AuthRequirement<SUBJECT>): Authentication<SUBJECT> {
     return auth.assert(this[Authentication.CacheKey])!!
 }
+
+context(server: ServerRuntime)
+public suspend fun <SUBJECT: HasId<*>?> Request<*>.tryAuth(auth: AuthRequirement<SUBJECT>): AuthRequirement.Result<SUBJECT> =
+    auth.check(this[Authentication.CacheKey])
 
 context(server: ServerRuntime, access: Access<*, *, *>)
 public suspend operator fun AuthRequirement.AuthSetting.invoke(): Boolean = accepts(access.authOrNull)

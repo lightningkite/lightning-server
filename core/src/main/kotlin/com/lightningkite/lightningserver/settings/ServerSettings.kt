@@ -40,17 +40,14 @@ import com.lightningkite.services.otel.applyToLogback
  * @property ready Indicates whether settings have been validated and are ready for use
  */
 public class ServerSettings(public val settings: Set<ServerSetting<*, *>>) {
-    public class ConflictingSettingsException internal constructor(message: String) : IllegalStateException(message)
-
     init {
         settings
             .distinct()     // Allow duplicate instances (same object registered multiple times)
             .groupBy { it.name }
             .filterValues { it.size > 1 }
-            .keys
             .takeIf { it.isNotEmpty() }
             ?.let { conflicts ->
-                throw ConflictingSettingsException("Settings found with conflicting names. All server settings must have unique names. Conflicts: $conflicts")
+                throw ConflictingSettingsException(conflicts)
             }
     }
 

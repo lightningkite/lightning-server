@@ -33,3 +33,25 @@ public class IncompleteSettingsException(public val missing: Set<ServerSetting<*
  */
 public class MissingSettingFile(suggestedFile: KFile) :
     Exception("Settings file does not exists. Created file at ${suggestedFile.resolved.path}")
+
+/**
+ * Exception thrown when multiple [ServerSetting] instances are registered with the same name.
+ *
+ * This exception is thrown during [ServerSettings] initialization when the validation check
+ * detects that different setting instances share the same name. While duplicate instances
+ * (same object reference) are allowed, different instances with the same name create ambiguity
+ * and potential type conflicts.
+ *
+ * **Why this check exists:**
+ * - Prevents type conflicts (e.g., one setting expects `Int`, another expects `String`)
+ * - Ensures deterministic behavior when retrieving settings by name
+ * - Catches configuration errors early during application startup
+ *
+ * **Example of conflict:**
+ * ```kotlin
+ * val portSetting1 = ServerSetting<Int>("port", 8080)
+ * val portSetting2 = ServerSetting<String>("port", "8080") // Conflict!
+ * ServerSettings(listOf(portSetting1, portSetting2)) // Throws ConflictingSettingsException
+ * */
+public class ConflictingSettingsException(conflicting: Map<String, Collection<ServerSetting<*, *>>>) :
+    IllegalStateException("Settings found with conflicting names. All server settings must have unique names. Conflicts: ${conflicting.keys}")

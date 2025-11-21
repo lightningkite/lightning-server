@@ -577,10 +577,7 @@ public class NettyEngine(
         }
 
         private fun NettyHttpHeaders.toLightningHeaders(): LsHttpHeaders =
-            HttpHeaders(this@toLightningHeaders.entries().flatMap { (key, raw) ->
-                raw.split(',')
-                    .map { key to it.trim() }
-            })
+            HttpHeaders(this@toLightningHeaders.entries().map { Pair(it.key, it.value) })
 
     }
 
