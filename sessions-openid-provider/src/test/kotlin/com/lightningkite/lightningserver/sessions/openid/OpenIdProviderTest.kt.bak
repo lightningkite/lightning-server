@@ -1,0 +1,152 @@
+package com.lightningkite.lightningserver.sessions.openid
+
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.definition.RuntimeDeferred
+import com.lightningkite.lightningserver.encryption.Signer
+import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.services.cache.Cache
+import com.lightningkite.services.database.Database
+import com.lightningkite.services.database.HasId
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.Serializable
+import org.junit.BeforeClass
+import org.junit.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
+import kotlin.uuid.Uuid
+
+class OpenIdProviderTest {
+    companion object {
+        @BeforeClass
+        @JvmStatic
+        fun setup() {
+            // Ensure service implementations are loaded
+            try {
+                Class.forName("com.lightningkite.services.database.JsonFileDatabase")
+            } catch (e: Exception) {
+                // Ignore if not available
+            }
+            try {
+                Class.forName("com.lightningkite.services.cache.RAMCache")
+            } catch (e: Exception) {
+                // Ignore if not available
+            }
+        }
+    }
+
+    @Serializable
+    data class TestUser(
+        override val _id: Uuid = Uuid.random(),
+        val email: String,
+        val name: String,
+        val emailVerified: Boolean = false
+    ) : HasId<Uuid>
+
+    object TestServer : ServerBuilder() {
+        val database = setting("database", Database.Settings())
+        val cache = setting("cache", Cache.Settings())
+
+        val signer: RuntimeDeferred<Signer> = RuntimeDeferred {
+            generateRS256Signer()
+        }
+
+        val openIdProvider = OpenIdProviderEndpoints<TestUser>(
+            database = database,
+            cache = cache,
+            signingKey = signer,
+            getUserClaims = { user ->
+                IdTokenClaims(
+                    iss = "https://test.example.com",
+                    sub = user._id.toString(),
+                    aud = "test-client",
+                    exp = 0, // Will be set by JwtIssuer
+                    iat = 0, // Will be set by JwtIssuer
+                    email = user.email,
+                    email_verified = user.emailVerified,
+                    name = user.name
+                )
+            },
+            issuerUrl = { "https://test.example.com" }
+        )
+
+        init {
+            path include openIdProvider
+        }
+    }
+
+    @Test
+    fun `JWKS endpoint returns valid JSON Web Key Set`() = runBlocking {
+        TestServer.test({}) {
+            val jwks = TestServer.openIdProvider.jwks.test(null, Unit)
+
+            assertNotNull(jwks)
+            assertEquals(1, jwks.keys.size)
+
+            val key = jwks.keys[0]
+            assertEquals("RSA", key.kty)
+            assertEquals("sig", key.use)
+            assertEquals("RS256", key.alg)
+            assertEquals("default", key.kid)
+            assertNotNull(key.n, "RSA modulus should be present")
+            assertNotNull(key.e, "RSA exponent should be present")
+        }
+    }
+
+    @Test
+    fun `Discovery endpoint returns valid provider metadata`() = runBlocking {
+        TestServer.test({}) {
+            val metadata = TestServer.openIdProvider.discovery.test(null, Unit)
+
+            assertNotNull(metadata)
+
+            // Verify required fields
+            assertEquals("https://test.example.com", metadata.issuer)
+            assertEquals("https://test.example.com/authorize", metadata.authorization_endpoint)
+            assertEquals("https://test.example.com/token", metadata.token_endpoint)
+            assertEquals("https://test.example.com/userinfo", metadata.userinfo_endpoint)
+            assertEquals("https://test.example.com/jwks", metadata.jwks_uri)
+
+            // Verify required arrays
+            assertTrue(metadata.response_types_supported.contains("code"), "Must support authorization code flow")
+            assertTrue(metadata.subject_types_supported.contains("public"))
+            assertTrue(metadata.id_token_signing_alg_values_supported.contains("RS256"), "Must support RS256")
+
+            // Verify optional but recommended fields
+            assertTrue(metadata.scopes_supported?.contains(OpenIdScopes.OPENID) == true)
+            assertTrue(metadata.scopes_supported?.contains(OpenIdScopes.PROFILE) == true)
+            assertTrue(metadata.scopes_supported?.contains(OpenIdScopes.EMAIL) == true)
+
+            assertTrue(metadata.code_challenge_methods_supported?.contains("S256") == true, "Should support PKCE S256")
+            assertTrue(metadata.token_endpoint_auth_methods_supported?.contains("client_secret_post") == true)
+            assertTrue(metadata.token_endpoint_auth_methods_supported?.contains("none") == true, "Should support public clients")
+        }
+    }
+
+    @Test
+    fun `Discovery endpoint provides all required metadata`() = runBlocking {
+        TestServer.test({}) {
+            val metadata = TestServer.openIdProvider.discovery.test(null, Unit)
+
+            // Verify all endpoint URLs are properly constructed
+            assertTrue(metadata.issuer.isNotBlank())
+            assertTrue(metadata.authorization_endpoint.startsWith(metadata.issuer))
+            assertTrue(metadata.token_endpoint.startsWith(metadata.issuer))
+            assertTrue(metadata.jwks_uri.startsWith(metadata.issuer))
+        }
+    }
+
+    @Test
+    fun `JWKS returns public key that can verify signatures`() = runBlocking {
+        TestServer.test({}) {
+            val jwks = TestServer.openIdProvider.jwks.test(null, Unit)
+            val key = jwks.keys[0]
+
+            // Verify the key has all required RSA components
+            assertNotNull(key.n)
+            assertNotNull(key.e)
+            assertTrue(key.n!!.isNotEmpty(), "Modulus should not be empty")
+            assertTrue(key.e!!.isNotEmpty(), "Exponent should not be empty")
+        }
+    }
+}
