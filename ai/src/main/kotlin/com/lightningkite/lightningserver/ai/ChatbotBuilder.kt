@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.ai
 import ai.koog.agents.core.tools.SimpleTool
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.typed.AuthAccess
 import com.lightningkite.lightningserver.typed.ModelInfo
 import com.lightningkite.services.ai.koog.LLMClientAndModel
 import com.lightningkite.services.database.HasId
@@ -19,8 +20,8 @@ import com.lightningkite.services.database.HasId
  * ```
  */
 public class ChatbotBuilder(
-    private val llmClientAndModel: Runtime<LLMClientAndModel>,
-    private val systemPrompt: String
+    private val llmClientAndModel: LLMClientAndModel,
+    private val systemPrompt: String,
 ) {
     private val tools = mutableListOf<SimpleTool<*>>()
 
@@ -31,9 +32,11 @@ public class ChatbotBuilder(
      */
     public fun <SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> addModelInfo(
         modelInfo: ModelInfo<SUBJECT, T, ID>,
-        runtime: ServerRuntime
+        authAccess: AuthAccess<SUBJECT>,
+        queryLimit: Int,
+        runtime: ServerRuntime,
     ) {
-        tools.addAll(createModelInfoTools(modelInfo, runtime))
+        tools.addAll(createModelInfoTools(modelInfo, authAccess, queryLimit, runtime))
     }
 
     /**
@@ -45,9 +48,12 @@ public class ChatbotBuilder(
      */
     public fun <SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> addModelInfoWithWrites(
         modelInfo: ModelInfo<SUBJECT, T, ID>,
-        runtime: ServerRuntime
+        authAccess: AuthAccess<SUBJECT>,
+        limit: Int,
+        modelExamples: List<T>,
+        runtime: ServerRuntime,
     ) {
-        tools.addAll(createModelInfoToolsWithWrites(modelInfo, runtime))
+        tools.addAll(createModelInfoToolsWithWrites(modelInfo, authAccess, limit, modelExamples, runtime))
     }
 
     /**
@@ -79,9 +85,9 @@ public class ChatbotBuilder(
  * ```
  */
 public fun chatbot(
-    llmClientAndModel: Runtime<LLMClientAndModel>,
+    llmClientAndModel: LLMClientAndModel,
     systemPrompt: String = "You are a helpful assistant with access to database information.",
-    configure: ChatbotBuilder.() -> Unit = {}
+    configure: ChatbotBuilder.() -> Unit = {},
 ): Chatbot {
     return ChatbotBuilder(llmClientAndModel, systemPrompt)
         .apply(configure)
@@ -92,28 +98,33 @@ public fun chatbot(
  * Creates a Chatbot with read-only access to a single ModelInfo.
  */
 public fun <SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> chatbotFor(
-    llmClientAndModel: Runtime<LLMClientAndModel>,
+    llmClientAndModel: LLMClientAndModel,
     modelInfo: ModelInfo<SUBJECT, T, ID>,
+    queryLimit:Int,
+    authAccess: AuthAccess<SUBJECT>,
     runtime: ServerRuntime,
-    systemPrompt: String = "You are a helpful assistant with access to database information."
+    systemPrompt: String = "You are a helpful assistant with access to database information.",
 ): Chatbot = Chatbot(
     llmClientAndModel = llmClientAndModel,
-    tools = createModelInfoTools(modelInfo, runtime),
+    tools = createModelInfoTools(modelInfo, authAccess, queryLimit, runtime),
     systemPrompt = systemPrompt
 )
 
 /**
- * Creates a Chatbot with read AND write access to a single ModelInfo.
+ * Creates a Chatbot with write access to a single ModelInfo.
  *
  * **WARNING**: This gives the LLM the ability to INSERT, UPDATE, and DELETE records.
  */
 public fun <SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> chatbotForWithWrites(
-    llmClientAndModel: Runtime<LLMClientAndModel>,
+    llmClientAndModel: LLMClientAndModel,
     modelInfo: ModelInfo<SUBJECT, T, ID>,
+    authAccess: AuthAccess<SUBJECT>,
+    limit: Int,
+    modelExamples: List<T>,
     runtime: ServerRuntime,
-    systemPrompt: String = "You are an admin assistant. Always confirm before making changes."
+    systemPrompt: String = "You are an admin assistant. Always confirm before making changes.",
 ): Chatbot = Chatbot(
     llmClientAndModel = llmClientAndModel,
-    tools = createModelInfoToolsWithWrites(modelInfo, runtime),
+    tools = createModelInfoTools(modelInfo, authAccess, limit, runtime) + createModelInfoToolsWithWrites(modelInfo, authAccess, limit, modelExamples, runtime),
     systemPrompt = systemPrompt
 )

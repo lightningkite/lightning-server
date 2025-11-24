@@ -1,27 +1,26 @@
 package com.lightningkite.lightningserver.ai
 
 import ai.koog.agents.core.agent.AIAgent
-import ai.koog.agents.core.agent.strategy.node
-import ai.koog.agents.core.agent.strategy.strategy
-import ai.koog.agents.core.config.AIAgentConfig
+import ai.koog.agents.core.dsl.builder.forwardTo
+import ai.koog.agents.core.dsl.builder.strategy
+import ai.koog.agents.core.dsl.extension.nodeExecuteTool
+import ai.koog.agents.core.dsl.extension.nodeLLMRequest
+import ai.koog.agents.core.dsl.extension.nodeLLMSendToolResult
+import ai.koog.agents.core.dsl.extension.onAssistantMessage
+import ai.koog.agents.core.dsl.extension.onToolCall
+import ai.koog.agents.core.dsl.extension.replaceHistoryWithTLDR
 import ai.koog.agents.core.tools.SimpleTool
 import ai.koog.agents.core.tools.ToolRegistry
-import ai.koog.prompt.core.appendPrompt
-import ai.koog.prompt.core.prompt.assistant
-import ai.koog.prompt.core.prompt.system
-import ai.koog.prompt.core.prompt.user
+import ai.koog.agents.ext.agent.chatAgentStrategy
 import ai.koog.prompt.executor.llms.SingleLLMPromptExecutor
-import ai.koog.prompt.executor.requestLLM
-import ai.koog.prompt.executor.writeSession
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.now
+import com.lightningkite.lightningserver.serialization.parse
 import com.lightningkite.services.ai.koog.LLMClientAndModel
-import com.lightningkite.services.database.Condition
-import com.lightningkite.services.database.SerializableProperty
-import com.lightningkite.services.database.Table
-import com.lightningkite.services.database.serializableProperties
+import com.lightningkite.services.database.*
+import com.lightningkite.services.files.FileObject
 import kotlinx.coroutines.flow.toList
-import kotlin.uuid.Uuid
 
 /**
  * An immutable chatbot configuration with LLM and tool access.
@@ -48,10 +47,11 @@ import kotlin.uuid.Uuid
  * @property systemPrompt System prompt that guides the chatbot's behavior
  */
 public class Chatbot(
-    public val llmClientAndModel: Runtime<LLMClientAndModel>,
+    public val llmClientAndModel: LLMClientAndModel,
     public val tools: List<SimpleTool<*>> = emptyList(),
     public val systemPrompt: String = "You are a helpful assistant with access to database information.",
 ) {
+
     /**
      * Sends a message to the chatbot and gets a response.
      *
@@ -59,40 +59,34 @@ public class Chatbot(
      * to the LLM with access to tools, and stores the new messages back to the database.
      *
      * @param conversationId The unique ID for this conversation
-     * @param message The user's message
+     * @param userMessage The user's message
      * @param conversationTable The database table storing conversation history
+     * @param maxIterations How many iterations the bot can make.
      * @return The chatbot's response
      */
     context(runtime: ServerRuntime)
     public suspend fun chat(
-        conversationId: Uuid,
-        message: String,
-        conversationTable: Table<ConversationMessage>
-    ): String {
-        // Load conversation history
-        val conversationIdProp = ConversationMessage.serializer().serializableProperties!!
-            .first { it.name == "conversationId" }
-        @Suppress("UNCHECKED_CAST")
-        val history = conversationTable.find(
-            Condition.OnField(
-                conversationIdProp as SerializableProperty<ConversationMessage, Uuid>,
-                Condition.Equal(conversationId)
-            )
-        ).toList().sortedBy { it.timestamp }
+        userMessage: ConversationMessage,
+        conversationTable: Table<ConversationMessage>,
+        maxIterations: Int = 10,
+    ): ConversationMessage {
 
-        // Create tool registry
-        val toolRegistry = ToolRegistry {
-            tools.forEach { tool(it) }
-        }
+        // Load conversation history
+        val history = conversationTable.find(
+            condition { it.conversationId.eq(userMessage.conversationId) },
+            orderBy = sort { it.createdAt.ascending() }
+        )
+            .toList()
 
         // Create strategy that manages conversation history using sessions
         val chatStrategy = strategy("chat-with-history") {
-            val chatNode by node<String, String> { userMessage ->
+            val nodeCallLLM by node<String, String> { input ->
                 // Within node context, we have access to llm
                 llm.writeSession {
                     // Add conversation history to the prompt
                     appendPrompt {
                         system(systemPrompt)
+
                         history.forEach { msg ->
                             when (msg.role) {
                                 ConversationMessage.Role.User -> user(msg.content)
@@ -100,54 +94,68 @@ public class Chatbot(
                                 ConversationMessage.Role.System -> system(msg.content)
                             }
                         }
-                        user(userMessage) // Add the new user message
+
+                        user(input)
                     }
 
-                    // Request LLM response with tools
-                    val response = requestLLM()
-                    response.text
+//                    replaceHistoryWithTLDR()
+
+                    val response = if(this@Chatbot.tools.isNotEmpty()){
+                        requestLLM()
+                    } else {
+                        requestLLMWithoutTools()
+                    }
+                    response.content
                 }
             }
 
-            // Simple linear flow: start -> chat -> finish
-            edge(nodeStart forwardTo chatNode)
-            edge(chatNode forwardTo nodeFinish)
+            val nodeExecuteTool by nodeExecuteTool("nodeExecuteTool")
+            val nodeSendToolResult by nodeLLMSendToolResult("nodeSendToolResult")
+
+            edge(nodeStart forwardTo nodeCallLLM)
+
+            edge(nodeCallLLM forwardTo nodeFinish onAssistantMessage { true })
+
+            edge(nodeCallLLM forwardTo nodeExecuteTool onToolCall { true })
+            edge(nodeExecuteTool forwardTo nodeSendToolResult)
+
+            edge(nodeSendToolResult forwardTo nodeFinish onAssistantMessage { true })
+            edge(
+                nodeSendToolResult forwardTo nodeFinish
+                        onToolCall { tc -> tc.tool == "__exit__" }
+                        transformed { "Chat finished" }
+            )
+            edge(nodeSendToolResult forwardTo nodeExecuteTool onToolCall { true })
         }
 
-        // Create agent with strategy
-        val llm = llmClientAndModel()
-        val agentConfig = AIAgentConfig(
-            model = llm.model,
-            maxAgentIterations = 10
-        )
 
         val agent = AIAgent(
-            promptExecutor = SingleLLMPromptExecutor(llm.client),
-            toolRegistry = toolRegistry,
+            promptExecutor = SingleLLMPromptExecutor(llmClientAndModel.client),
+            llmModel = llmClientAndModel.model,
             strategy = chatStrategy,
-            agentConfig = agentConfig
+            toolRegistry = ToolRegistry {
+                tools.forEach { tool(it) }
+            },
+            maxIterations = maxIterations,
         )
 
         // Store the user's message
-        val userMessage = ConversationMessage(
-            conversationId = conversationId,
-            role = ConversationMessage.Role.User,
-            content = message
-        )
-        conversationTable.insert(listOf(userMessage))
+        conversationTable.insertOne(userMessage)
 
         // Run the agent with full conversation history
-        val response = agent.run(message)
+        val response = agent.run(userMessage.content)
 
         // Store the assistant's response
         val assistantMessage = ConversationMessage(
-            conversationId = conversationId,
+            conversationId = userMessage.conversationId,
+            subjectId = userMessage.subjectId,
             role = ConversationMessage.Role.Assistant,
-            content = response
+            content = response,
+            createdAt = now()
         )
-        conversationTable.insert(listOf(assistantMessage))
+        conversationTable.insertOne(assistantMessage)
 
-        return response
+        return assistantMessage
     }
 }
 

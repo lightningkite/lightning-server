@@ -12,12 +12,13 @@ plugins {
 dependencies {
     api(project(":typed"))
     api(libs.serviceAbstractionsDatabase)
+    api(libs.serviceAbstractionsFiles)
     api(libs.serviceAbstractionsAiKoog)
     api(libs.serviceAbstractionsAiKoogAwsOpensearch)
     api(libs.kotlinReflect)
 
     // Direct Koog dependency for session management API
-    api("ai.koog:koog-agents:0.5.3")
+    api("ai.koog:koog-agents:0.5.4-SNAPSHOT")
 
     testImplementation(libs.kotlinTest)
     testImplementation(libs.kotlinTestJunit)

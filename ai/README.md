@@ -5,7 +5,7 @@ This module provides AI capabilities for Lightning Server, including chatbots wi
 ## Features
 
 - **LLM Integration**: Support for OpenAI, Anthropic, Google, Ollama, and other LLM providers via Koog
-- **Database Tools**: Give chatbots read-only access to database tables through ModelInfo
+- **Database Tools**: Give chatbots read and or write access to database tables through ModelInfo
 - **Type-Safe**: Fully type-safe chatbot configuration
 
 ## Installation
@@ -14,7 +14,7 @@ Add the `ai` module to your Lightning Server project dependencies:
 
 ```kotlin
 dependencies {
-    implementation(project(":ai"))
+    implementation("com.lightningkite.lightningserver:ai:<Lastest_Version>")
 }
 ```
 
@@ -36,7 +36,7 @@ object Server : ServerBuilder() {
         )
     )
 
-    val chatEndpoint = path.path("chat").post.api(
+    val chatEndpoint = path.path("chat").post bind ApiHttpHandler(
         summary = "Chat with AI",
         authOptions = noAuth,
         errorCases = listOf(),
@@ -59,19 +59,19 @@ val chatEndpoint = path.path("chat").post.api(
     implementation = { input: String ->
         Chatbot(llm())
             .withSystemPrompt("You are a helpful assistant with access to user and post data.")
-            .addModelInfo(usersInfo, this)
-            .addModelInfo(postsInfo, this)
+            .addModelInfo(usersInfo, this, 100, serverRuntime)
+            .addModelInfo(postsInfo, this, 100, serverRuntime)
             .chat(input)
     }
 )
 // When user asks "How many users do we have?", the chatbot will automatically call the count_user tool
 ```
 
-Each ModelInfo you add provides four tools:
-- `count_{table}()` - Count total records in the table
-- `get_{table}_by_id(id: String)` - Get a single record by ID
-- `list_{table}(limit: Int)` - List recent records from the table
-- `query_{table}(condition: String, limit: Int?, sortBy: String?, descending: Boolean?)` - Advanced queries using Condition format
+Each read ModelInfo you add provides four tools:
+- `get_{table}_by_id(id: ID)` - Get a single record by ID
+- `count_{table}(condition: Condition)` - Count records in the table that match the condition
+- `query_{table}(condition: Condition, orderBy: List<SortPart>, skip: Int, limit: Int)` - Advanced queries
+- `aggregate_query_{table}(aggregate: Aggregate, condition: Condition, property: DataClassPathPartial)` - Aggregate Queries
 
 The chatbot automatically chooses which tools to use based on the user's question.
 
@@ -122,17 +122,17 @@ val adminEndpoint = path.path("admin-chat").post.api(
                 IMPORTANT: Always confirm with the user before making any changes.
                 Be extremely careful with delete and update operations.
             """.trimIndent())
-            .addModelInfoWithWrites(usersInfo, this) // Write-capable!
+            .addModelInfo(usersInfo, this, serverRuntime)
+            .addModelInfoWithWrites(usersInfo, this, 100, listOf(/*Put model examples in here*/), serverRuntime) // Write-capable!
             .chat(input)
     }
 )
 ```
 
-Write-capable chatbots get **4 minimal tools per table**:
-- `query_{table}(condition, limit, sortBy, descending)` - Read records
-- `insert_{table}(record_json)` - Insert a single record
-- `update_{table}(condition, modifications_json)` - Update matching records
-- `delete_from_{table}(condition)` - Delete matching records
+Write-capable chatbots get **3 minimal tools per table**:
+- `insert_{table}(records)` - Insert a set of records
+- `update_{table}(ids, Modification)` - Update a set of records by _id
+- `delete_{table}(ids)` - Delete a set of records by _id
 
 Example interactions:
 - User: "Add a new user named John with email john@example.com"
@@ -195,17 +195,16 @@ This module uses:
 - [x] Basic chatbot settings and configuration
 - [x] LLM provider integration (OpenAI, Anthropic, Google, Ollama)
 - [x] ModelInfo tool descriptor implementation
-- [x] Read-only database query tools (count, get by ID, list)
+- [x] Read-only database query tools (count, get by ID, query, aggregate)
 - [x] Advanced query tools using Condition serialization
   - [x] All Condition operators (Equal, GreaterThan, LessThan, StringContains, etc.)
   - [x] Multiple conditions with And/Or logic
   - [x] Optional sorting and pagination
   - [x] Direct Condition deserialization
+- [x] Limited database write tools (Insert, Update, Delete)
+  - [x] Hard limits to the amount of changes that can be made at once
 - [ ] RAG (Retrieval-Augmented Generation) support
 - [ ] Vector storage integration for semantic search
 - [ ] Streaming chat responses
 - [ ] Conversation history/memory
 
-## License
-
-Part of Lightning Server framework.

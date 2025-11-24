@@ -101,4 +101,3 @@ package com.lightningkite.lightningserver.ai
  * - Set `OPENAI_API_KEY` in your environment
  * - The chatbot will automatically use it if not specified in the URL
  */
-public object Example
