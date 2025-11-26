@@ -4,31 +4,32 @@ import com.lightningkite.atZone
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.now
-import io.ktor.http.*
-import io.ktor.utils.io.charsets.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toJavaInstant
 import kotlinx.datetime.toKotlinInstant
 import software.amazon.awssdk.core.sync.RequestBody
-import software.amazon.awssdk.services.s3.model.*
+import software.amazon.awssdk.http.ContentStreamProvider
+import software.amazon.awssdk.services.s3.model.GetObjectRequest
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException
+import software.amazon.awssdk.services.s3.model.PutObjectRequest
 import java.io.File
 import java.io.InputStream
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.security.MessageDigest
-import kotlin.time.Duration
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
-import kotlin.text.Charsets
-import kotlin.time.TimeSource
+import kotlin.time.Duration
 import kotlin.time.toJavaDuration
 
 data class S3File(val system: S3FileSystem, val path: File) : FileObject {
-    override fun resolve(path: String): FileObject = S3File(system, this.path.resolve(path))
+    override fun resolve(path: String): FileObject = S3File(
+        system,
+        this.path.resolve(path.also { if (it.contains("+")) throw IllegalArgumentException("File Path cannot contain '+'") })
+    )
+
     override val name: String
         get() = path.name
 
@@ -36,7 +37,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
         get() = path.parentFile?.let { S3File(system, path) } ?: if (path.unixPath.isNotEmpty()) system.root else null
 
     override suspend fun copyTo(other: FileObject) {
-        if(other is S3File) {
+        if (other is S3File) {
             system.s3Async.copyObject {
                 it.sourceBucket(system.bucket)
                 it.destinationBucket(other.system.bucket)
@@ -102,14 +103,19 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
                 it.key(path.unixPath)
             }.build(), content.length?.let {
                 RequestBody.fromContentProvider(
-                    { runBlocking { content.stream() } }, it, content.type.toString()
+                    ContentStreamProvider.fromInputStream(content.stream()),
+                    it,
+                    content.type.toString()
                 )
-            } ?: RequestBody.fromContentProvider({ runBlocking { content.stream() } }, content.type.toString())
+            } ?: RequestBody.fromContentProvider(
+                ContentStreamProvider.fromInputStream(content.stream()),
+                content.type.toString()
+            )
             )
         }
     }
 
-    override suspend fun get(): HttpContent? {
+    override suspend fun get(): HttpContent {
         val s = system.s3.getObject(
             GetObjectRequest.builder().also {
                 it.bucket(system.bucket)
@@ -180,11 +186,11 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
         } else return true
     }
 
-    private fun String.encodeURLPathSafe(): String = URLEncoder.encode(this, Charsets.UTF_8).replace("%2F", "/").replace("+", "%20")
-
+    private fun String.encodeURLPathSafe(): String =
+        URLEncoder.encode(this, Charsets.UTF_8).replace("%2F", "/").replace("+", "%20")
 
     override val url: String
-        get() = "https://${system.bucket}.s3.${system.region.id()}.amazonaws.com/${path.unixPath.encodeURLPathSafe()}"
+        get() = "https://${system.bucket}.s3.${system.region.id()}.amazonaws.com/${path.unixPath}"
 
     override val signedUrl: String
         get() = system.signedUrlDuration?.let { e ->
@@ -279,10 +285,11 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
 
 //internal fun ByteArray.toHex(): String = BigInteger(1, this@toHex).toString(16).padStart(64, '0')
 internal fun ByteArray.toHex(): String = buildString {
-    for(item in this@toHex) {
+    for (item in this@toHex) {
         append(item.toUByte().toString(16).padStart(2, '0'))
     }
 }
+
 internal fun ByteArray.mac(key: ByteArray): ByteArray = Mac.getInstance("HmacSHA256").apply {
     init(SecretKeySpec(key, "HmacSHA256"))
 }.doFinal(this)
