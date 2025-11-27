@@ -40,7 +40,7 @@ public class AiChatEndpoints<Subject : HasId<*>>(
     database: ServerSetting<Database.Settings, Database>,
 //    private val files: ServerSetting<PublicFileSystem.Settings, PublicFileSystem>,
 //    private val filePath: String,
-    private val tools: List<SimpleTool<*>>,
+    private val tools: suspend context(ServerRuntime) AuthAccess<Subject>.() -> List<SimpleTool<*>>,
     private val systemPrompt: String,
     private val maxIterations: Int,
     authRequirement: AuthRequirement<Subject>,
@@ -85,7 +85,7 @@ public class AiChatEndpoints<Subject : HasId<*>>(
 
 //        val historicFile = files().root.then(filePath).then("${userMessage.conversationId}.json")
 
-        Chatbot(llm(), tools, systemPrompt)
+        Chatbot(llm(), tools(this), systemPrompt)
             .chat(userMessage, messageInfo.table(), maxIterations)
     }
 

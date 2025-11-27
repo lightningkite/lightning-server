@@ -2,12 +2,15 @@ package com.lightningkite.lightningserver.ai
 
 import ai.koog.agents.core.tools.SimpleTool
 import ai.koog.agents.core.tools.ToolDescriptor
+import ai.koog.agents.core.tools.asToolDescriptor
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.AuthAccess
 import com.lightningkite.lightningserver.typed.ModelInfo
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlin.getValue
 
 /**
  * Creates tools for querying a database table through ModelInfo.
@@ -43,24 +46,17 @@ public class CountTableTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<
     private val modelInfo: ModelInfo<SUBJECT, T, ID>,
     private val authAccess: AuthAccess<SUBJECT>,
     private val runtime: ServerRuntime,
-) : SimpleTool<Condition<T>>() {
+) : LsSimpleTool<ConditionExpression<T>>(runtime.externalSerialization.serializersModule) {
 
     override val name: String = "count_${modelInfo.tableName.lowercase()}"
 
     override val description: String =
         "Count the total number of records in the ${modelInfo.tableName} table that match the given condition"
 
-    override val argsSerializer: KSerializer<Condition<T>> = ConditionSerializer(modelInfo.serializer)
+    override val argsSerializer: KSerializer<ConditionExpression<T>> = ConditionExpressionSerializer(modelInfo.serializer)
 
-    override val descriptor: ToolDescriptor
-        get() = argsSerializer.descriptor.lsAsToolDescriptor(
-            name,
-            description,
-            maxDepth = 1
-        )
-
-    override suspend fun doExecute(args: Condition<T>): String {
-        val count = with(runtime) { modelInfo.table(authAccess) }.count(args)
+    override suspend fun doExecute(args: ConditionExpression<T>): String {
+        val count = with(runtime) { modelInfo.table(authAccess) }.count(args.condition)
         return "Found $count records in the ${modelInfo.tableName} table."
     }
 }
@@ -72,7 +68,7 @@ public class GetByIdTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>
     private val modelInfo: ModelInfo<SUBJECT, T, ID>,
     private val authAccess: AuthAccess<SUBJECT>,
     private val runtime: ServerRuntime,
-) : SimpleTool<ID>() {
+) : LsSimpleTool<ID>(runtime.externalSerialization.serializersModule) {
 
     override val name: String = "get_${modelInfo.tableName.lowercase()}_by_id"
 
@@ -109,62 +105,32 @@ public class QueryTableTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<
     private val authAccess: AuthAccess<SUBJECT>,
     private val queryLimit: Int,
     private val runtime: ServerRuntime,
-) : SimpleTool<Query<T>>() {
+) : LsSimpleTool<QueryTableTool.Request<T>>(runtime.externalSerialization.serializersModule) {
 
     override val name: String = "query_${modelInfo.tableName.lowercase()}"
 
     override val description: String = """
         Query the ${modelInfo.tableName} table with advanced filters and optional sorting.
-
-        The condition parameter uses Lightning Server's Condition format. Examples:
-
-        Simple equality:
-        {"fieldName": {"Equal": "value"}}
-
-        Greater than:
-        {"age": {"GreaterThan": 18}}
-
-        String contains (case-insensitive):
-        {"name": {"StringContains": {"value": "John", "ignoreCase": true}}}
-
-        Multiple conditions with AND:
-        {"And": [{"role": {"Equal": "admin"}}, {"active": {"Equal": true}}]}
-
-        Multiple conditions with OR:
-        {"Or": [{"status": {"Equal": "active"}}, {"status": {"Equal": "pending"}}]}
-
-        Complex nested query:
-        {"And": [{"Or": [{"role": {"Equal": "admin"}}, {"role": {"Equal": "moderator"}}]}, {"active": {"Equal": true}}]}
-
-        Match all records:
-        {"Always": true}
-
-        Available operators: Equal, NotEqual, GreaterThan, LessThan, GreaterThanOrEqual, LessThanOrEqual,
-        Inside, NotInside, StringContains, RegexMatches
-
-        Optional parameters:
-        - orderBy: List of SortPart specifications (default: [] - database-dependent ordering)
-        - limit: Maximum number of results (default 100)
-        - skip: Number of records to skip for pagination (default 0)
     """.trimIndent()
 
-    override val argsSerializer: KSerializer<Query<T>> = Query.serializer(modelInfo.serializer)
+    @Serializable
+    public data class Request<T>(
+        val condition: ConditionExpression<T>,
+        val orderBy: List<SortPart<T>>,
+        val skip: Int = 0,
+        val limit: Int = 10,
+    )
 
-    override val descriptor: ToolDescriptor
-        get() = argsSerializer.descriptor.lsAsToolDescriptor(
-            name,
-            description,
-            maxDepth = 1
-        )
+    override val argsSerializer: KSerializer<Request<T>> = Request.serializer(modelInfo.serializer)
 
-    override suspend fun doExecute(args: Query<T>): String {
+    override suspend fun doExecute(args: Request<T>): String {
 
         if (args.limit > queryLimit) return "Error Querying Records. Max limit: $queryLimit"
 
         // Execute the query
         val results = with(runtime) { modelInfo.table(authAccess) }
             .find(
-                condition = args.condition,
+                condition = args.condition.condition,
                 orderBy = args.orderBy,
                 skip = args.skip,
                 limit = args.limit,
@@ -196,7 +162,14 @@ public class AggregateQueryTableTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Co
     private val modelInfo: ModelInfo<SUBJECT, T, ID>,
     private val authAccess: AuthAccess<SUBJECT>,
     private val runtime: ServerRuntime,
-) : SimpleTool<AggregateQuery<T>>() {
+) : LsSimpleTool<AggregateQueryTableTool.Request<T>>(runtime.externalSerialization.serializersModule) {
+
+    @Serializable
+    public data class Request<T>(
+        val aggregate: Aggregate,
+        val condition: ConditionExpression<T> = ConditionExpression(Condition.Always),
+        val property: DataClassPathPartial<T>,
+    )
 
     override val description: String = """
         Aggregate Query the ${modelInfo.tableName} table with advanced filters. It works on Number type fields only.
@@ -204,52 +177,19 @@ public class AggregateQueryTableTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Co
         The aggregate parameter is an Aggregate enum with the values: Sum, Average, StandardDeviationSample, and StandardDeviationPopulation.
         
         The property parameter is the model field for which to run the aggregate on.
-        
-        The condition parameter uses Lightning Server's Condition format. Examples:
-
-        Simple equality:
-        {"fieldName": {"Equal": "value"}}
-
-        Greater than:
-        {"age": {"GreaterThan": 18}}
-
-        String contains (case-insensitive):
-        {"name": {"StringContains": {"value": "John", "ignoreCase": true}}}
-
-        Multiple conditions with AND:
-        {"And": [{"role": {"Equal": "admin"}}, {"active": {"Equal": true}}]}
-
-        Multiple conditions with OR:
-        {"Or": [{"status": {"Equal": "active"}}, {"status": {"Equal": "pending"}}]}
-
-        Complex nested query:
-        {"And": [{"Or": [{"role": {"Equal": "admin"}}, {"role": {"Equal": "moderator"}}]}, {"active": {"Equal": true}}]}
-
-        Match all records:
-        {"Always": true}
-
-        Available operators: Equal, NotEqual, GreaterThan, LessThan, GreaterThanOrEqual, LessThanOrEqual,
-        Inside, NotInside, StringContains, RegexMatches
     """.trimIndent()
 
     override val name: String = "aggregate_${modelInfo.tableName.lowercase()}"
 
-    override val argsSerializer: KSerializer<AggregateQuery<T>> = AggregateQuery.serializer(modelInfo.serializer)
+    override val argsSerializer: KSerializer<Request<T>> = Request.serializer(modelInfo.serializer)
 
-    override val descriptor: ToolDescriptor
-        get() = argsSerializer.descriptor.lsAsToolDescriptor(
-            name,
-            description,
-            maxDepth = 1
-        )
-
-    override suspend fun doExecute(args: AggregateQuery<T>): String {
+    override suspend fun doExecute(args: Request<T>): String {
 
         // Execute the query
         @Suppress("UNCHECKED_CAST")
         val result = with(runtime) { modelInfo.table(authAccess) }.aggregate(
             aggregate = args.aggregate,
-            condition = args.condition,
+            condition = args.condition.condition,
             property = args.property as DataClassPath<T, Number>
         )
 

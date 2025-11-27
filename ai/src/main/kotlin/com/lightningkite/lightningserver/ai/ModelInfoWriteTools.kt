@@ -48,7 +48,7 @@ public class InsertTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>
     private val limit: Int,
     private val modelExamples: List<T>,
     private val runtime: ServerRuntime,
-) : SimpleTool<List<T>>() {
+) : LsSimpleTool<List<T>>(runtime.externalSerialization.serializersModule) {
 
     override val description: String = """
         Insert records into the ${modelInfo.tableName} table.
@@ -99,7 +99,7 @@ public class UpdateTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>
     private val authAccess: AuthAccess<SUBJECT>,
     private val limit: Int,
     private val runtime: ServerRuntime,
-) : SimpleTool<UpdateTool.Args<T, ID>>() {
+) : LsSimpleTool<UpdateTool.Args<T, ID>>(runtime.externalSerialization.serializersModule) {
 
     override val description: String = """
         Update records in the ${modelInfo.tableName} table that match a condition.
@@ -127,13 +127,6 @@ public class UpdateTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>
 
     override val argsSerializer: KSerializer<Args<T, ID>> = Args.serializer(modelInfo.serializer, modelInfo.idSerializer)
 
-    override val descriptor: ToolDescriptor
-        get() = argsSerializer.descriptor.lsAsToolDescriptor(
-            name,
-            description,
-            maxDepth = 1
-        )
-
     override suspend fun doExecute(args: Args<T, ID>): String {
         return try {
 
@@ -142,7 +135,7 @@ public class UpdateTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>
             val updateResults = with(runtime) { modelInfo.table(authAccess) }
                 .updateMany(
                     Condition.OnField(modelInfo.serializer._id(), Condition.Inside(args.ids)),
-                    args.modification
+                    args.modification.modification
                 )
                 .changes
                 .mapNotNull { it.new }
@@ -162,7 +155,7 @@ public class UpdateTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>
     @Serializable
     public data class Args<T, ID>(
         val ids: List<ID>,
-        val modification: Modification<T>,
+        val modification: ModificationExpression<T>,
     )
 }
 
@@ -174,7 +167,7 @@ public class DeleteTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>
     private val authAccess: AuthAccess<SUBJECT>,
     private val limit: Int,
     private val runtime: ServerRuntime,
-) : SimpleTool<List<ID>>() {
+) : LsSimpleTool<List<ID>>(runtime.externalSerialization.serializersModule) {
 
     override val description: String = """
         Delete records from the ${modelInfo.tableName} table that have the provided ids.
