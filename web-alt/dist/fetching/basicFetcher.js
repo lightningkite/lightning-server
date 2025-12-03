@@ -20,7 +20,15 @@ exports.createBasicFetcher = void 0;
 function createBasicFetcher(baseUrl, additionalHeaders = () => ({}), responseInterceptors) {
     return function (path, method, body) {
         return __awaiter(this, void 0, void 0, function* () {
-            return apiCall(`${baseUrl}/${path}`, body, { method, headers: yield additionalHeaders() }, responseInterceptors).then((x) => x.json());
+            return apiCall(`${baseUrl}/${path}`, body, { method, headers: yield additionalHeaders() }, responseInterceptors).then((x) => __awaiter(this, void 0, void 0, function* () {
+                try {
+                    return yield x.json();
+                }
+                catch (e) {
+                    console.log("CAUGHT HERE: ", e);
+                    return undefined;
+                }
+            }));
         });
     };
 }
