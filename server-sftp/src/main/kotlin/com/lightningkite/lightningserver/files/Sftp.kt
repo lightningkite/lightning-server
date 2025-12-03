@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.Instant
 import net.schmizz.sshj.DefaultConfig
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.sftp.OpenMode
@@ -12,7 +13,6 @@ import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
 import java.io.File
 import kotlin.time.Duration
-import kotlinx.datetime.Instant
 
 class Sftp(
     val host: String,
@@ -24,38 +24,47 @@ class Sftp(
     companion object {
         init {
             FilesSettings.register("sftp") { settings ->
-                Regex("""sftp://(?<user>[^@]+)@(?<host>[^:]+):(?<port>[0-9]+)/(?<path>[^?]*)\?(?<params>.*)""").matchEntire(
-                    settings.url
-                )?.let { match ->
-                    val host = match.groups["host"]!!.value
-                    val port = match.groups["port"]!!.value.toInt()
-                    val params: Map<String, List<String>> =
-                        FilesSettings.parseParameterString(match.groups["params"]!!.value)
-                    val rootPath = match.groups["path"]!!.value
-                    val user = match.groups["user"]!!.value
-                    Sftp(host, port, rootPath) {
-                        SSHClient(DefaultConfig().apply {
-                            if (params["algorithm"]?.firstOrNull() == "ssh-rsa")
-                                prioritizeSshRsaKeyAlgorithm()
-                        }).apply {
-                            params["host"]?.let { addHostKeyVerifier(it.first()) } ?: addHostKeyVerifier(
-                                PromiscuousVerifier()
-                            )
-                            connect(host, port)
-                            params["identity"]?.firstOrNull()?.let { id ->
-                                val pk = buildString {
-                                    appendLine("-----BEGIN OPENSSH PRIVATE KEY-----")
-                                    id.chunked(70).forEach { l -> appendLine(l) }
-                                    appendLine("-----END OPENSSH PRIVATE KEY-----")
-                                }
-                                authPublickey(user, loadKeys(pk, null, null))
-                            } ?: params["password"]?.firstOrNull()?.let {
-                                authPassword(user, it)
+                Regex(
+                    """sftp://(?<user>[^:@]+)(?::(?<password>.+))?@(?<host>[^:@]+):(?<port>[0-9]+)/(?<path>[^?]*)(?:\?(?<params>.*))?""",
+                    options = setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.UNIX_LINES)
+                )
+                    .matchEntire(settings.url)
+                    ?.let { match ->
+                        val host = match.groups["host"]!!.value
+                        val port = match.groups["port"]!!.value.toInt()
+                        val params: Map<String, List<String>> = match.groups["params"]?.value
+                            ?.let { FilesSettings.parseParameterString(it) }
+                            ?: emptyMap()
+
+                        val rootPath = match.groups["path"]!!.value
+                        val user = match.groups["user"]!!.value
+                        Sftp(host, port, rootPath) {
+                            SSHClient(DefaultConfig().apply {
+                                if (params["algorithm"]?.firstOrNull() == "ssh-rsa")
+                                    prioritizeSshRsaKeyAlgorithm()
+                            }).apply {
+                                params["host"]?.let { addHostKeyVerifier(it.first()) }
+                                    ?: addHostKeyVerifier(PromiscuousVerifier())
+
+                                connect(host, port)
+                                params["identity"]?.firstOrNull()
+                                    ?.let { id ->
+                                        val pk = if (Regex("""-----BEGIN .+ PRIVATE KEY-----""").matchesAt(id, 0))
+                                            id
+                                        else
+                                            buildString {
+                                                appendLine("-----BEGIN OPENSSH PRIVATE KEY-----")
+                                                id.chunked(70).forEach { l -> appendLine(l) }
+                                                appendLine("-----END OPENSSH PRIVATE KEY-----")
+                                            }
+                                        authPublickey(user, loadKeys(pk, null, null))
+                                    }
+                                    ?: match.groups["password"]?.value?.let { authPassword(user, it) }
+                                    ?: params["password"]?.firstOrNull()?.let { authPassword(user, it) }
                             }
                         }
                     }
-                }
-                    ?: throw IllegalStateException("Invalid sftp storageUrl. The URL should match the pattern: sftp://[user]@[host]:[port]/[path]?[params]\nParams available are: host, identity.")
+                    ?: throw IllegalStateException("Invalid sftp storageUrl. The URL should match the pattern: sftp://[user](:[password] Optional)@[host]:[port]/[path]?[params]\nParams available are: host, identity, algorithm, and password.")
             }
         }
     }

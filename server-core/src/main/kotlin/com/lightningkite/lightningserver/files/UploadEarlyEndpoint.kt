@@ -41,9 +41,9 @@ class UploadEarlyEndpoint(
     val unsafeResolver = object : FileSystem.SpecialResolver {
         override val prefix: String = "future://$path/"
         override fun resolve(url: String): FileObject {
-            val id = url.substringAfter(prefix).substringBefore('?')
-            val originalFo = files().root.resolve(jailFilePath).resolve("$id.file")
-            val safeFo = files().root.resolve(filePath).resolve("$id.file")
+            val fileName = url.substringAfter(prefix).substringBefore('?')
+            val originalFo = files().root.resolve(jailFilePath).resolve(fileName)
+            val safeFo = files().root.resolve(filePath).resolve(fileName)
             runBlocking { fileScanner().copyAndScan(originalFo, safeFo) }
             runBlocking {
                 database().collection<UploadForNextRequest>()
@@ -54,9 +54,9 @@ class UploadEarlyEndpoint(
 
         override fun resolveWithSignature(url: String): FileObject {
             if(!verifyUrl(url)) throw BadRequestException("Failed to verify: $url")
-            val id = url.substringAfter(prefix).substringBefore('?')
-            val originalFo = files().root.resolve(jailFilePath).resolve("$id.file")
-            val safeFo = files().root.resolve(filePath).resolve("$id.file")
+            val fileName = url.substringAfter(prefix).substringBefore('?')
+            val originalFo = files().root.resolve(jailFilePath).resolve(fileName)
+            val safeFo = files().root.resolve(filePath).resolve(fileName)
             runBlocking { fileScanner().copyAndScan(originalFo, safeFo) }
             runBlocking {
                 database().collection<UploadForNextRequest>()
@@ -68,8 +68,8 @@ class UploadEarlyEndpoint(
     val safeResolver = object : FileSystem.SpecialResolver {
         override val prefix: String = "future-safe://$path/"
         override fun resolve(url: String): FileObject {
-            val id = url.substringAfter(prefix).substringBefore('?')
-            val safeFo = files().root.resolve(filePath).resolve("$id.file")
+            val fileName = url.substringAfter(prefix).substringBefore('?')
+            val safeFo = files().root.resolve(filePath).resolve(fileName)
             runBlocking {
                 database().collection<UploadForNextRequest>()
                     .deleteManyIgnoringOld(condition { it.file eq ServerFile(safeFo.url) })
@@ -79,8 +79,8 @@ class UploadEarlyEndpoint(
 
         override fun resolveWithSignature(url: String): FileObject {
             if(!verifyUrl(url)) throw BadRequestException("Failed to verify: $url")
-            val id = url.substringAfter(prefix).substringBefore('?')
-            val safeFo = files().root.resolve(filePath).resolve("$id.file")
+            val fileName = url.substringAfter(prefix).substringBefore('?')
+            val safeFo = files().root.resolve(filePath).resolve(fileName)
             runBlocking {
                 database().collection<UploadForNextRequest>()
                     .deleteManyIgnoringOld(condition { it.file eq ServerFile(safeFo.url) })
@@ -109,9 +109,9 @@ class UploadEarlyEndpoint(
         description = "Upload a file to make a request later.  Times out in around 10 minutes.",
         errorCases = listOf(),
         implementation = { _: Unit ->
-            val id = UUID.random()
+            val fileName = "${UUID.random()}.file"
             if (fileScanner().isEmpty()) {
-                val newFile = files().root.resolve(filePath).resolve("$id.file")
+                val newFile = files().root.resolve(filePath).resolve(fileName)
                 val newItem = UploadForNextRequest(
                     expires = now().plus(expiration),
                     file = ServerFile(newFile.url)
@@ -119,10 +119,10 @@ class UploadEarlyEndpoint(
                 database().collection<UploadForNextRequest>().insertOne(newItem)
                 UploadInformation(
                     uploadUrl = newFile.uploadUrl(expiration),
-                    futureCallToken = signUrl(safeResolver.prefix + id.toString())
+                    futureCallToken = signUrl(safeResolver.prefix + fileName)
                 )
             } else {
-                val newFile = files().root.resolve(jailFilePath).resolve("$id.file")
+                val newFile = files().root.resolve(jailFilePath).resolve(fileName)
                 val newItem = UploadForNextRequest(
                     expires = now().plus(expiration),
                     file = ServerFile(newFile.url)
@@ -130,7 +130,7 @@ class UploadEarlyEndpoint(
                 database().collection<UploadForNextRequest>().insertOne(newItem)
                 UploadInformation(
                     uploadUrl = newFile.uploadUrl(expiration),
-                    futureCallToken = signUrl(unsafeResolver.prefix + id.toString())
+                    futureCallToken = signUrl(unsafeResolver.prefix + fileName)
                 )
             }
         }
@@ -145,9 +145,9 @@ class UploadEarlyEndpoint(
             if (url.startsWith(safeResolver.prefix)) return@api url
             if (!url.startsWith(unsafeResolver.prefix)) throw BadRequestException("URL expected to start with ${unsafeResolver.prefix}")
             if(!verifyUrl(url)) throw BadRequestException("Failed to verify: $url")
-            val id = url.substringAfter(unsafeResolver.prefix).substringBefore('?')
-            val originalFo = files().root.resolve(jailFilePath).resolve("$id.file")
-            val safeFo = files().root.resolve(filePath).resolve("$id.file")
+            val fileName = url.substringAfter(unsafeResolver.prefix).substringBefore('?')
+            val originalFo = files().root.resolve(jailFilePath).resolve(fileName)
+            val safeFo = files().root.resolve(filePath).resolve(fileName)
             runBlocking {
                 fileScanner().copyAndScan(originalFo, safeFo)
                 val newItem = UploadForNextRequest(
@@ -156,7 +156,7 @@ class UploadEarlyEndpoint(
                 )
                 database().collection<UploadForNextRequest>().insertOne(newItem)
             }
-            signUrl(safeResolver.prefix + id)
+            signUrl(safeResolver.prefix + fileName)
         }
     )
 

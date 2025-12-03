@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class, SealedSerializationApi::class)
 
 package com.lightningkite.serialization
 

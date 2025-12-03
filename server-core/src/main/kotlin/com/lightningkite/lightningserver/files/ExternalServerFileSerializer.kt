@@ -14,6 +14,7 @@ import kotlinx.serialization.encoding.Encoder
 import org.slf4j.LoggerFactory
 import java.util.*
 import com.lightningkite.UUID
+import kotlinx.serialization.SealedSerializationApi
 
 /**
  * Used to serialize and deserialize a ServerFile as a String. This will also handle security for ServerFiles.
@@ -23,7 +24,7 @@ object ExternalServerFileSerializer : KSerializer<ServerFile> {
 
     lateinit var uploadFile: suspend (data: HttpContent) -> FileObject
 
-    @OptIn(ExperimentalSerializationApi::class)
+    @OptIn(ExperimentalSerializationApi::class, SealedSerializationApi::class)
     override val descriptor: SerialDescriptor = object : SerialDescriptor {
         override val kind: SerialKind = PrimitiveKind.STRING
         override val serialName: String = "com.lightningkite.lightningserver.files.ServerFile"

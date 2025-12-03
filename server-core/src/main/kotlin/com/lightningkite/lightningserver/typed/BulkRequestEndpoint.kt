@@ -12,6 +12,7 @@ import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.settings.generalSettings
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -83,7 +84,7 @@ fun ServerPath.bulkRequestEndpoint() = post.api(
                             entry.key to BulkResponse(
                                 error = when (e) {
                                     is HttpStatusException -> e.toLSError()
-                                    else -> LSError(500, "unknown", "An unknown server error occurred.")
+                                    else -> LSError(500, "unknown", if(generalSettings().debug) e.message ?: "An unknown server error occurred." else "An unknown server error occurred.", if(generalSettings().debug) e.stackTraceToString() else "")
                                 }
                             )
                         }

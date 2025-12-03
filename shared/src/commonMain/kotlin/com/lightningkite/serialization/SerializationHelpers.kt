@@ -43,7 +43,7 @@ abstract class TrueObjectSerializer<T>(name: String, val value: T): WrappingSeri
     override fun outer(it: Boolean) = value
 }
 
-@OptIn(ExperimentalSerializationApi::class)
+@OptIn(ExperimentalSerializationApi::class, SealedSerializationApi::class)
 internal fun defer(serialName: String, kind: SerialKind, deferred: () -> SerialDescriptor): SerialDescriptor =
     object : SerialDescriptor {
 

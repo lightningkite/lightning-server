@@ -105,7 +105,7 @@ class ConditionOnFieldSerializer<K : Any, V>(
     override fun outer(it: Condition<V>): Condition.OnField<K, V> = Condition.OnField(field, it)
 }
 
-@OptIn(ExperimentalSerializationApi::class)
+@OptIn(ExperimentalSerializationApi::class, SealedSerializationApi::class)
 class LazyRenamedSerialDescriptor(override val serialName: String, val getter: () -> SerialDescriptor) :
     SerialDescriptor {
     override val elementsCount: Int get() = getter().elementsCount

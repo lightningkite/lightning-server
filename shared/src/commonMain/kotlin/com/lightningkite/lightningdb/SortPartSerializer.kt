@@ -5,6 +5,7 @@ package com.lightningkite.lightningdb
 import com.lightningkite.serialization.*
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SealedSerializationApi
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.SerialKind
@@ -14,7 +15,7 @@ import kotlinx.serialization.encoding.Encoder
 class SortPartSerializer<T>(val inner: KSerializer<T>): KSerializerWithDefault<SortPart<T>> {
     override val default: SortPart<T>
         get() = SortPart(DataClassPathAccess(DataClassPathSelf(inner), inner.serializableProperties!!.first()))
-    @OptIn(ExperimentalSerializationApi::class)
+    @OptIn(ExperimentalSerializationApi::class, SealedSerializationApi::class)
     override val descriptor: SerialDescriptor = object: SerialDescriptor {
         override val kind: SerialKind = PrimitiveKind.STRING
         override val serialName: String = "com.lightningkite.lightningdb.SortPart"
