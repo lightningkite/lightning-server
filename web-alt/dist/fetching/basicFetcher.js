@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createBasicFetcher = void 0;
 /**
@@ -9,10 +18,18 @@ exports.createBasicFetcher = void 0;
  * @returns a 'Fetcher' function for making requests
  */
 function createBasicFetcher(baseUrl, additionalHeaders = () => ({}), responseInterceptors) {
-    return async function (path, method, body) {
-        return apiCall(`${baseUrl}/${path}`, body, { method, headers: await additionalHeaders() }, responseInterceptors)
-            .then((x) => x.json())
-            .catch((e) => undefined);
+    return function (path, method, body) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return apiCall(`${baseUrl}/${path}`, body, { method, headers: yield additionalHeaders() }, responseInterceptors).then((x) => __awaiter(this, void 0, void 0, function* () {
+                try {
+                    return yield x.json();
+                }
+                catch (e) {
+                    console.log("CAUGHT HERE: ", e);
+                    return undefined;
+                }
+            }));
+        });
     };
 }
 exports.createBasicFetcher = createBasicFetcher;

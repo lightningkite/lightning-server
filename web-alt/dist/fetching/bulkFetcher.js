@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createBulkFetcher = exports.LsErrorException = exports.BulkFetcher = void 0;
 class BulkFetcher {
@@ -10,10 +19,10 @@ class BulkFetcher {
         this.delayMs = delayMs;
         this.fetchQueue = new Map();
         this.scheduled = false;
-        this.fetch = async (path, method, body) => {
+        this.fetch = (path, method, body) => __awaiter(this, void 0, void 0, function* () {
             const id = crypto.randomUUID();
             if (this.notBatchable(path, method, body)) {
-                const headers = await this.headerCalculator();
+                const headers = yield this.headerCalculator();
                 headers["Content-Type"] = "application/json";
                 return fetch(`${this.serverUrl}${path}`, {
                     method: method,
@@ -52,43 +61,45 @@ class BulkFetcher {
                     return undefined; // for void return types
                 }
             });
-        };
+        });
     }
-    async executeFetch() {
+    executeFetch() {
         var _a;
-        const batch = new Map(this.fetchQueue);
-        this.fetchQueue.clear();
-        this.scheduled = false;
-        const headers = await this.headerCalculator();
-        headers["Content-Type"] = "application/json";
-        headers["Accept"] = "application/json";
-        const requestBody = JSON.stringify(Object.fromEntries([...batch.entries()].map(([id, entry]) => [id, entry.request])));
-        try {
-            const response = await fetch(`${this.serverUrl}/meta/bulk`, {
-                method: "POST",
-                headers,
-                body: requestBody,
-            });
-            (_a = this.responseInterceptor) === null || _a === void 0 ? void 0 : _a.call(this, response);
-            if (!response.ok) {
-                const errorText = await response.text();
-                batch.forEach(({ reject }) => reject(new Error(`${response.status}: ${errorText}`)));
-                return;
+        return __awaiter(this, void 0, void 0, function* () {
+            const batch = new Map(this.fetchQueue);
+            this.fetchQueue.clear();
+            this.scheduled = false;
+            const headers = yield this.headerCalculator();
+            headers["Content-Type"] = "application/json";
+            headers["Accept"] = "application/json";
+            const requestBody = JSON.stringify(Object.fromEntries([...batch.entries()].map(([id, entry]) => [id, entry.request])));
+            try {
+                const response = yield fetch(`${this.serverUrl}/meta/bulk`, {
+                    method: "POST",
+                    headers,
+                    body: requestBody,
+                });
+                (_a = this.responseInterceptor) === null || _a === void 0 ? void 0 : _a.call(this, response);
+                if (!response.ok) {
+                    const errorText = yield response.text();
+                    batch.forEach(({ reject }) => reject(new Error(`${response.status}: ${errorText}`)));
+                    return;
+                }
+                const responses = yield response.json();
+                batch.forEach(({ resolve, reject }, id) => {
+                    const res = responses[id];
+                    if (res) {
+                        resolve(res);
+                    }
+                    else {
+                        reject(new Error(`Bulk key ${id} not found`));
+                    }
+                });
             }
-            const responses = await response.json();
-            batch.forEach(({ resolve, reject }, id) => {
-                const res = responses[id];
-                if (res) {
-                    resolve(res);
-                }
-                else {
-                    reject(new Error(`Bulk key ${id} not found`));
-                }
-            });
-        }
-        catch (e) {
-            batch.forEach(({ reject }) => reject(e));
-        }
+            catch (e) {
+                batch.forEach(({ reject }) => reject(e));
+            }
+        });
     }
 }
 exports.BulkFetcher = BulkFetcher;
