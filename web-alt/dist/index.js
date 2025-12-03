@@ -23,4 +23,5 @@ __exportStar(require("./mockRestEndpoints"), exports);
 __exportStar(require("./sessionRest"), exports);
 __exportStar(require("./annotateEndpoint"), exports);
 __exportStar(require("./fetching"), exports);
+__exportStar(require("./SimplifyCondition"), exports);
 //# sourceMappingURL=index.js.map
