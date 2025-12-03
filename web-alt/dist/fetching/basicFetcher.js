@@ -25,7 +25,7 @@ function createBasicFetcher(baseUrl, additionalHeaders = () => ({}), responseInt
                     return yield x.json();
                 }
                 catch (e) {
-                    console.log("CAUGHT HERE: ", e);
+                    // When the response is 'void'
                     return undefined;
                 }
             }));
