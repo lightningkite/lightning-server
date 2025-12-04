@@ -23,6 +23,7 @@ import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.typed.route
 import com.lightningkite.lightningserver.typed.sdk.module
 import com.lightningkite.lightningserver.websockets.*
+import com.lightningkite.services.ai.koog.LLMClientAndModelSettings
 import com.lightningkite.services.cache.*
 import com.lightningkite.services.cache.dynamodb.*
 import com.lightningkite.services.cache.memcached.*
@@ -56,6 +57,7 @@ import kotlin.uuid.*
 object Server : ServerBuilder() {
 
     val database = setting("database", Database.Settings())
+    val llm = setting("llm", LLMClientAndModelSettings(""))
     val email = setting("email", EmailService.Settings())
     val sms = setting("sms", SMS.Settings())
     val files = setting("files", PublicFileSystem.Settings())
@@ -447,5 +449,15 @@ object Server : ServerBuilder() {
         HttpResponse.plainText(auth.id.toString())
     }
 
+    val blogAssist = path.path("assistant") module BlogAssistantChat(database, llm, blogPostInfo = databaseExamples.info)
+
     init { registerBasicMediaTypeCoders() }
+
+    val tokenOnStartup = path.path("tokenOnStartupForDebug") bind StartupTask {
+        val myUser = userInfo.table().findOne(condition {
+            it.email.eq("joseph+root@lightningkite.com")
+        })!!
+        val s = subjects.newSession(myUser._id)
+        println("Token for main user is ${s.second}")
+    }
 }

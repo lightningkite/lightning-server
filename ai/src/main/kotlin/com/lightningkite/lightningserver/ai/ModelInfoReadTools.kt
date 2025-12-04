@@ -1,16 +1,15 @@
 package com.lightningkite.lightningserver.ai
 
-import ai.koog.agents.core.tools.SimpleTool
-import ai.koog.agents.core.tools.ToolDescriptor
-import ai.koog.agents.core.tools.asToolDescriptor
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.typed.AuthAccess
 import com.lightningkite.lightningserver.typed.ModelInfo
+import com.lightningkite.lightningserver.typed.auth
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlin.getValue
+import kotlinx.serialization.builtins.ListSerializer
 
 /**
  * Creates tools for querying a database table through ModelInfo.
@@ -21,22 +20,19 @@ import kotlin.getValue
  * - query_{table}(condition: Condition, orderBy: List<SortPart>, skip: Int, limit: Int) - Advanced queries
  * - aggregate_query_{table}(aggregate: Aggregate, condition: Condition, property: DataClassPathPartial) - Aggregate Queries
  *
- * @param modelInfo The model info to create tools for
+ * @param this@createModelInfoTools The model info to create tools for
  * @param authAccess The auth for the client making the request
  * @param queryLimit The max size for the query limit
  * @param runtime The server runtime context
  * @return List of tools for this table
  */
-public fun <SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> createModelInfoTools(
-    modelInfo: ModelInfo<SUBJECT, T, ID>,
-    authAccess: AuthAccess<SUBJECT>,
+public fun <SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ModelInfo<SUBJECT, T, ID>.readTools(
     queryLimit: Int,
-    runtime: ServerRuntime,
-): List<SimpleTool<*>> = listOf(
-    GetByIdTool(modelInfo, authAccess, runtime),
-    CountTableTool(modelInfo, authAccess, runtime),
-    QueryTableTool(modelInfo, authAccess, queryLimit, runtime),
-    AggregateQueryTableTool(modelInfo, authAccess, runtime),
+): List<ChatTool<SUBJECT, *>> = listOf(
+    GetByIdTool(this),
+    CountTableTool(this),
+    QueryTableTool(this, queryLimit),
+    AggregateQueryTableTool(this),
 )
 
 /**
@@ -44,9 +40,7 @@ public fun <SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> createModel
  */
 public class CountTableTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     private val modelInfo: ModelInfo<SUBJECT, T, ID>,
-    private val authAccess: AuthAccess<SUBJECT>,
-    private val runtime: ServerRuntime,
-) : LsSimpleTool<ConditionExpression<T>>(runtime.externalSerialization.serializersModule) {
+) : AutoApprovedTool<SUBJECT, ConditionExpression<T>>() {
 
     override val name: String = "count_${modelInfo.tableName.lowercase()}"
 
@@ -55,8 +49,11 @@ public class CountTableTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<
 
     override val argsSerializer: KSerializer<ConditionExpression<T>> = ConditionExpressionSerializer(modelInfo.serializer)
 
-    override suspend fun doExecute(args: ConditionExpression<T>): String {
-        val count = with(runtime) { modelInfo.table(authAccess) }.count(args.condition)
+    context(serverRuntime: ServerRuntime) override suspend fun execute(
+        auth: AuthAccess<SUBJECT>,
+        args: ConditionExpression<T>
+    ): String {
+        val count = modelInfo.table(auth).count(args.condition)
         return "Found $count records in the ${modelInfo.tableName} table."
     }
 }
@@ -66,9 +63,7 @@ public class CountTableTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<
  */
 public class GetByIdTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     private val modelInfo: ModelInfo<SUBJECT, T, ID>,
-    private val authAccess: AuthAccess<SUBJECT>,
-    private val runtime: ServerRuntime,
-) : LsSimpleTool<ID>(runtime.externalSerialization.serializersModule) {
+) : AutoApprovedTool<SUBJECT, ID>() {
 
     override val name: String = "get_${modelInfo.tableName.lowercase()}_by_id"
 
@@ -76,13 +71,12 @@ public class GetByIdTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>
 
     override val argsSerializer: KSerializer<ID> = modelInfo.idSerializer
 
-    override suspend fun doExecute(args: ID): String {
-        val record = with(runtime) { modelInfo.table(authAccess) }.get(args)
+    context(serverRuntime: ServerRuntime)
+    override suspend fun execute(auth: AuthAccess<SUBJECT>, args: ID): String {
+        val record =  modelInfo.table(auth).get(args)
 
         return if (record != null) {
-            val json = with(runtime) {
-                externalSerialization.json.encodeToString(modelInfo.serializer, record)
-            }
+            val json = serverRuntime.externalSerialization.json.encodeToString(modelInfo.serializer, record)
             "Found record:\n$json"
         } else {
             "No record found with ID: ${args}"
@@ -102,10 +96,8 @@ public class GetByIdTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>
  */
 public class QueryTableTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     private val modelInfo: ModelInfo<SUBJECT, T, ID>,
-    private val authAccess: AuthAccess<SUBJECT>,
     private val queryLimit: Int,
-    private val runtime: ServerRuntime,
-) : LsSimpleTool<QueryTableTool.Request<T>>(runtime.externalSerialization.serializersModule) {
+) : AutoApprovedTool<SUBJECT, QueryTableTool.Request<T>>() {
 
     override val name: String = "query_${modelInfo.tableName.lowercase()}"
 
@@ -123,12 +115,13 @@ public class QueryTableTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<
 
     override val argsSerializer: KSerializer<Request<T>> = Request.serializer(modelInfo.serializer)
 
-    override suspend fun doExecute(args: Request<T>): String {
+    context(serverRuntime: ServerRuntime)
+    override suspend fun execute(auth: AuthAccess<SUBJECT>, args: Request<T>): String {
 
         if (args.limit > queryLimit) return "Error Querying Records. Max limit: $queryLimit"
 
         // Execute the query
-        val results = with(runtime) { modelInfo.table(authAccess) }
+        val results =  modelInfo.table(auth)
             .find(
                 condition = args.condition.condition,
                 orderBy = args.orderBy,
@@ -140,9 +133,7 @@ public class QueryTableTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<
         return if (results.isEmpty()) {
             "No records found matching the query criteria in the ${modelInfo.tableName} table."
         } else {
-            val json = with(runtime) {
-                externalSerialization.json.encodeToString(results)
-            }
+            val json =  serverRuntime.externalSerialization.json.encodeToString(ListSerializer(modelInfo.serializer), results)
             "Found ${results.size} records:\n$json"
         }
     }
@@ -160,9 +151,7 @@ public class QueryTableTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<
  */
 public class AggregateQueryTableTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     private val modelInfo: ModelInfo<SUBJECT, T, ID>,
-    private val authAccess: AuthAccess<SUBJECT>,
-    private val runtime: ServerRuntime,
-) : LsSimpleTool<AggregateQueryTableTool.Request<T>>(runtime.externalSerialization.serializersModule) {
+) : AutoApprovedTool<SUBJECT, AggregateQueryTableTool.Request<T>>() {
 
     @Serializable
     public data class Request<T>(
@@ -183,11 +172,12 @@ public class AggregateQueryTableTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Co
 
     override val argsSerializer: KSerializer<Request<T>> = Request.serializer(modelInfo.serializer)
 
-    override suspend fun doExecute(args: Request<T>): String {
+    context(serverRuntime: ServerRuntime)
+    override suspend fun execute(auth: AuthAccess<SUBJECT>, args: Request<T>): String {
 
         // Execute the query
         @Suppress("UNCHECKED_CAST")
-        val result = with(runtime) { modelInfo.table(authAccess) }.aggregate(
+        val result =  modelInfo.table(auth).aggregate(
             aggregate = args.aggregate,
             condition = args.condition.condition,
             property = args.property as DataClassPath<T, Number>

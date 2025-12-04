@@ -23,6 +23,7 @@ dependencies {
     testImplementation(libs.kotlinTest)
     testImplementation(libs.kotlinTestJunit)
     testImplementation(libs.serviceAbstractionsDatabaseTest)
+    testImplementation(libs.serviceAbstractionsDatabaseJsonfile)
     testImplementation(project(":engine-local"))
 
     configurations.filter { it.name.startsWith("ksp") }.forEach {

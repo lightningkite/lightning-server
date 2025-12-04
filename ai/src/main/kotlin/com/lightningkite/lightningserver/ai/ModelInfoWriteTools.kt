@@ -1,7 +1,6 @@
 package com.lightningkite.lightningserver.ai
 
 import ai.koog.agents.core.tools.SimpleTool
-import ai.koog.agents.core.tools.ToolDescriptor
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.AuthAccess
 import com.lightningkite.lightningserver.typed.ModelInfo
@@ -21,22 +20,19 @@ import kotlinx.serialization.builtins.ListSerializer
  * - update_{table}(ids, modification) - Update a set of records by _id
  * - delete_{table}(ids) - Delete a set of records by _id
  *
- * @param modelInfo The model info to create tools for
+ * @param this@createModelInfoToolsWithWrites The model info to create tools for
  * @param authAccess The auth for the client making the request
  * @param writeLimit The hard limit for how many items can be inserted or modified at once.
  * @param runtime The server runtime context
  * @return List of tools for this table (4 total)
  */
-public fun <SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> createModelInfoToolsWithWrites(
-    modelInfo: ModelInfo<SUBJECT, T, ID>,
-    authAccess: AuthAccess<SUBJECT>,
+public fun <SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ModelInfo<SUBJECT, T, ID>.writeTools(
     writeLimit: Int,
     modelExamples: List<T>,
-    runtime: ServerRuntime,
-): List<SimpleTool<*>> = listOf(
-    InsertTool(modelInfo, authAccess, writeLimit, modelExamples, runtime),
-    UpdateTool(modelInfo, authAccess, writeLimit, runtime),
-    DeleteTool(modelInfo, authAccess, writeLimit, runtime)
+): List<ChatTool<SUBJECT, *>> = listOf(
+    InsertTool(this, writeLimit, modelExamples),
+    UpdateTool(this, writeLimit),
+    DeleteTool(this, writeLimit)
 )
 
 /**
@@ -44,44 +40,31 @@ public fun <SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> createModel
  */
 public class InsertTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     private val modelInfo: ModelInfo<SUBJECT, T, ID>,
-    private val authAccess: AuthAccess<SUBJECT>,
     private val limit: Int,
     private val modelExamples: List<T>,
-    private val runtime: ServerRuntime,
-) : LsSimpleTool<List<T>>(runtime.externalSerialization.serializersModule) {
+) : AlwaysRequiresApprovalTool<SUBJECT, List<T>>("This tool modifies the database."){
 
     override val description: String = """
         Insert records into the ${modelInfo.tableName} table.
 
         Provide the list of records. The records will be validated and inserted. (Max size $limit)
-    ${
-        if (modelExamples.isNotEmpty()) {
-            """
-                
-            Example:
-            ${
-                with(runtime) { externalSerialization.json.encodeToString(modelExamples) }
-            }  
-            """.trimIndent()
-        } else ""
-    }
-        
     """.trimIndent()
 
     override val name: String = "insert_${modelInfo.tableName.lowercase()}"
 
     override val argsSerializer: KSerializer<List<T>> = ListSerializer(modelInfo.serializer)
 
-    override suspend fun doExecute(args: List<T>): String {
+    context(serverRuntime: ServerRuntime)
+    override suspend fun execute(auth: AuthAccess<SUBJECT>, args: List<T>): String {
         return try {
             if (args.size > limit) return "Error inserting records. Records list is too large. Max $limit records allowed"
 
-            val results = with(runtime) { modelInfo.table(authAccess) }.insertMany(args)
+            val results = modelInfo.table(auth).insertMany(args)
 
             if (results.isEmpty())
                 "Failed to insert any records"
             else {
-                val json = with(runtime) { externalSerialization.json.encodeToString(results) }
+                val json = serverRuntime.externalSerialization.json.encodeToString(ListSerializer(modelInfo.serializer), results)
                 "Successfully inserted records into ${modelInfo.tableName}: $json"
             }
         } catch (e: Exception) {
@@ -96,10 +79,8 @@ public class InsertTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>
  */
 public class UpdateTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     private val modelInfo: ModelInfo<SUBJECT, T, ID>,
-    private val authAccess: AuthAccess<SUBJECT>,
     private val limit: Int,
-    private val runtime: ServerRuntime,
-) : LsSimpleTool<UpdateTool.Args<T, ID>>(runtime.externalSerialization.serializersModule) {
+) : AlwaysRequiresApprovalTool<SUBJECT, UpdateTool.Args<T, ID>>("This tool modifies your data."){
 
     override val description: String = """
         Update records in the ${modelInfo.tableName} table that match a condition.
@@ -126,13 +107,13 @@ public class UpdateTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>
     override val name: String = "update_${modelInfo.tableName.lowercase()}"
 
     override val argsSerializer: KSerializer<Args<T, ID>> = Args.serializer(modelInfo.serializer, modelInfo.idSerializer)
-
-    override suspend fun doExecute(args: Args<T, ID>): String {
+    context(serverRuntime: ServerRuntime)
+    override suspend fun execute(auth: AuthAccess<SUBJECT>, args: Args<T, ID>): String {
         return try {
 
             if (args.ids.size > limit) return "Error Updating Records. ids list is too large. Max $limit ids allowed"
 
-            val updateResults = with(runtime) { modelInfo.table(authAccess) }
+            val updateResults = modelInfo.table(auth)
                 .updateMany(
                     Condition.OnField(modelInfo.serializer._id(), Condition.Inside(args.ids)),
                     args.modification.modification
@@ -143,7 +124,7 @@ public class UpdateTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>
             if (updateResults.isEmpty())
                 "Failed to update any records"
             else {
-                val json = with(runtime) { externalSerialization.json.encodeToString(updateResults) }
+                val json = serverRuntime.externalSerialization.json.encodeToString(ListSerializer(modelInfo.serializer), updateResults)
                 "Successfully updated records from ${modelInfo.tableName}: $json"
             }
         } catch (e: Exception) {
@@ -164,10 +145,10 @@ public class UpdateTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>
  */
 public class DeleteTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     private val modelInfo: ModelInfo<SUBJECT, T, ID>,
-    private val authAccess: AuthAccess<SUBJECT>,
     private val limit: Int,
-    private val runtime: ServerRuntime,
-) : LsSimpleTool<List<ID>>(runtime.externalSerialization.serializersModule) {
+) : AlwaysRequiresApprovalTool<SUBJECT, List<ID>>("This tool permanently deletes some data."){
+
+    override val name: String = "delete_${modelInfo.tableName.lowercase()}"
 
     override val description: String = """
         Delete records from the ${modelInfo.tableName} table that have the provided ids.
@@ -188,17 +169,18 @@ public class DeleteTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>
 
     override val argsSerializer: KSerializer<List<ID>> = ListSerializer(modelInfo.idSerializer)
 
-    override suspend fun doExecute(args: List<ID>): String {
+    context(serverRuntime: ServerRuntime)
+    override suspend fun execute(auth: AuthAccess<SUBJECT>, args: List<ID>): String {
         return try {
 
             if (args.size > limit) return "Error Updating Records. ids list is too large. Max $limit ids allowed"
 
-            val deletedResults = with(runtime) { modelInfo.table(authAccess) }
+            val deletedResults =  modelInfo.table(auth)
                 .deleteMany(Condition.OnField(modelInfo.serializer._id(), Condition.Inside(args)))
             if (deletedResults.isEmpty())
                 "Failed to delete any records"
             else {
-                val json = with(runtime) { externalSerialization.json.encodeToString(deletedResults) }
+                val json = serverRuntime.externalSerialization.json.encodeToString(ListSerializer(modelInfo.serializer), deletedResults)
                 "Successfully deleted records from ${modelInfo.tableName}: $json"
             }
         } catch (e: Exception) {

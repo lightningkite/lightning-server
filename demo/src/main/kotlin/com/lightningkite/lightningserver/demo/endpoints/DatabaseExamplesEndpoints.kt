@@ -4,13 +4,20 @@ import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.auth.noAuth
+import com.lightningkite.lightningserver.auth.require
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.demo.models.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.arg1
 import com.lightningkite.lightningserver.definition.Runtime
+import com.lightningkite.lightningserver.demo.Server
+import com.lightningkite.lightningserver.demo.TestModel
 import com.lightningkite.lightningserver.demo.models.status
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
+import com.lightningkite.lightningserver.typed.ModelRestEndpoints
+import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebsocket.Companion.plus
+import com.lightningkite.lightningserver.typed.ModelRestUpdatesWebsocket
+import com.lightningkite.lightningserver.typed.modelInfo
 import com.lightningkite.lightningserver.typed.route
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
@@ -55,6 +62,15 @@ import kotlin.uuid.Uuid
 class DatabaseExamplesEndpoints(
     private val database: Runtime<Database>
 ) : ServerBuilder() {
+    // The correct way of doing it
+    val info = Server.database.modelInfo(
+        auth = Server.UserAuth.require(),
+        permissions = {
+            // TODO: Real permissions
+            ModelPermissions.allowAll<BlogPost>()
+        },
+    )
+    val rest = path.path("rest") include ModelRestEndpoints(info) + ModelRestUpdatesWebsocket(info)
 
     /**
      * POST /blog/posts

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package com.lightningkite.lightningserver.ai
 
 import ai.koog.agents.core.tools.SimpleTool
@@ -19,6 +21,7 @@ import com.lightningkite.services.database.innerElement
 import com.lightningkite.services.database.innerElement2
 import com.lightningkite.services.database.nullElement
 import com.lightningkite.services.database.serializableProperties
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.*
@@ -34,32 +37,21 @@ internal fun KSerializer<*>.asToolDescriptor(
     maxDepth: Int = 3,
 ): ToolDescriptor {
     if (descriptor.kind != StructureKind.CLASS)
-        return ToolDescriptor(
-            name, description, requiredParameters = listOf(
-                ToolParameterDescriptor(
-                    descriptor.serialName.substringBefore('/').substringAfterLast('.').decapitalize(),
-                    descriptor.annotations.filterIsInstance<Description>().firstOrNull()?.text ?: "",
-                    toolParameterType(module, maxDepth)
-                )
-            )
-        )
+        throw IllegalArgumentException("Can only generate tool descriptors for classes")
     val props = this.serializableProperties
-        ?: return ToolDescriptor(
-            name, description, requiredParameters = listOf(
-                ToolParameterDescriptor(
-                    descriptor.serialName.substringBefore('/').substringAfterLast('.').decapitalize(),
-                    descriptor.annotations.filterIsInstance<Description>().firstOrNull()?.text ?: "",
-                    toolParameterType(module, maxDepth)
-                )
-            )
-        )
+        ?: throw IllegalArgumentException("Can only generate tool descriptors for classes")
     return ToolDescriptor(
         name,
         description,
         requiredParameters = props.map {
+            println("Prop ${it.name} has direct annos ${it.annotations}")
+            println("Prop ${it.name} has type annos ${it.serializer.descriptor.annotations}")
             ToolParameterDescriptor(
                 name = it.name,
-                description = it.annotations.filterIsInstance<Description>().firstOrNull()?.text ?: "",
+                description = listOfNotNull(
+                    it.annotations.filterIsInstance<Description>().firstOrNull()?.text,
+                    it.serializer.descriptor.annotations.filterIsInstance<Description>().firstOrNull()?.text
+                ).joinToString("\n") ,
                 type = it.serializer.toolParameterType(module, maxDepth - 1)
             )
         }
@@ -93,10 +85,18 @@ internal fun KSerializer<*>.toolParameterType(
         PrimitiveKind.DOUBLE -> ToolParameterType.Float
 
         SerialKind.CONTEXTUAL -> {
-            (module.getContextual<Any>(this.descriptor.capturedKClass as KClass<Any>) as KSerializer<*>).toolParameterType(
-                module,
-                maxDepth
-            )
+            (
+                    this.descriptor.capturedKClass
+                        ?: throw IllegalArgumentException("Could not find capturedKClass for ${this.descriptor.serialName}'s serial descriptor")
+                    ).let {
+                    @Suppress("UNCHECKED_CAST")
+                    module.getContextual<Any>(it as KClass<Any>)
+                        ?: throw IllegalArgumentException("Could not find contextual implementation for ${this.descriptor.serialName}")
+                }
+                .toolParameterType(
+                    module,
+                    maxDepth
+                )
         }
 
         SerialKind.ENUM -> ToolParameterType.Enum(descriptor.elementNames.toList().toTypedArray())
@@ -107,6 +107,10 @@ internal fun KSerializer<*>.toolParameterType(
                 true,
                 additionalPropertiesType = ToolParameterType.String
             )
+
+            if (descriptor.isInline) {
+                return@run innerElement().toolParameterType(module, maxDepth)
+            }
 
             if (descriptor.serialName == "com.lightningkite.services.database.Condition") {
                 val subtype = (this as ConditionSerializer<*>).inner
@@ -148,13 +152,19 @@ internal fun KSerializer<*>.toolParameterType(
                     }.toTypedArray()
                 )
             }
+            println("Normal struct")
             val props = this.serializableProperties
                 ?: throw IllegalStateException("Serializable properties not found for ${this.descriptor.serialName}")
             ToolParameterType.Object(
                 properties = props.map {
+                    println("Prop ${it.name} has direct annos ${it.annotations}")
+                    println("Prop ${it.name} has type annos ${it.serializer.descriptor.annotations}")
                     ToolParameterDescriptor(
                         name = it.name,
-                        description = it.annotations.filterIsInstance<Description>().firstOrNull()?.text ?: "",
+                        description = listOfNotNull(
+                            it.annotations.filterIsInstance<Description>().firstOrNull()?.text,
+                            it.serializer.descriptor.annotations.filterIsInstance<Description>().firstOrNull()?.text
+                        ).joinToString("\n") ,
                         type = it.serializer.toolParameterType(module, maxDepth - 1)
                     )
                 }
@@ -171,11 +181,5 @@ internal fun KSerializer<*>.toolParameterType(
 
         StructureKind.OBJECT -> ToolParameterType.Object(listOf(), listOf(), false, null)
         else -> TODO()
-    }
-}
-
-public abstract class LsSimpleTool<TArgs>(module: SerializersModule) : SimpleTool<TArgs>() {
-    override val descriptor: ToolDescriptor by lazy {
-        argsSerializer.asToolDescriptor(name, description, module, 4)
     }
 }

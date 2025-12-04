@@ -1,14 +1,16 @@
 package com.lightningkite.lightningserver.ai
 
+import com.lightningkite.services.data.Description
 import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.SerializableProperty
 import com.lightningkite.services.database.serializableProperties
-import jdk.jfr.Description
+import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.buildSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.serializer
@@ -94,7 +96,7 @@ name ICONTAINS 'john'
 status IN ('active', 'pending')
 role = 'admin' AND active = true
 status = 'active' OR status = 'pending'
-(role = 'admin' OR role = 'moderator') AND active = true"
+(role = 'admin' OR role = 'moderator') AND active = true
 true
 """)
 @Serializable(ConditionExpressionSerializer::class)
@@ -110,7 +112,11 @@ public value class ConditionExpression<T>(public val condition: Condition<T>) {
 }
 
 public class ConditionExpressionSerializer<T>(public val inner: KSerializer<T>): KSerializer<ConditionExpression<T>> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.lightningserver.ai.ConditionExpression", PrimitiveKind.STRING)
+    @OptIn(InternalSerializationApi::class)
+    override val descriptor: SerialDescriptor = buildSerialDescriptor("com.lightningkite.lightningserver.ai.ConditionExpression", PrimitiveKind.STRING) {
+        this.annotations = listOf(Description("An SQL-style condition expression for querying a table.  Some examples:\n\nrole = 'admin'\nage > 18\nname ICONTAINS 'john'\nstatus IN ('active', 'pending')\nrole = 'admin' AND active = true\nstatus = 'active' OR status = 'pending'\n(role = 'admin' OR role = 'moderator') AND active = true\ntrue"))
+    }
+//    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.lightningserver.ai.ConditionExpression", PrimitiveKind.STRING)
 
     override fun serialize(
         encoder: Encoder,

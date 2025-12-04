@@ -297,7 +297,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
      * @return Pair of the created Session and its RefreshToken (containing plaintext secret)
      */
     context(_: ServerRuntime)
-    protected suspend fun newSession(
+    public suspend fun newSession(
         subjectId: ID,
         label: String? = null,
         expires: Instant? = null,
