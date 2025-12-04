@@ -39,10 +39,10 @@ import com.lightningkite.services.otel.applyToLogback
  * @property settings The complete set of [ServerSetting] instances to manage
  * @property ready Indicates whether settings have been validated and are ready for use
  */
-public class ServerSettings(public val settings: Set<ServerSetting<*, *>>) {
+public class ServerSettings(public val settings: Set<ServerSetting<*, *>>) {    // duplicate settings by identity can be ignored
+
     init {
-        settings
-            .distinct()     // Allow duplicate instances (same object registered multiple times)
+        this.settings
             .groupBy { it.name }
             .filterValues { it.size > 1 }
             .takeIf { it.isNotEmpty() }

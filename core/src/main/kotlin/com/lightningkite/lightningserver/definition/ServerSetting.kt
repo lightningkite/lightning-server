@@ -335,10 +335,6 @@ public fun <SETTING> ServerSetting(
 /*
  * TODO: API Recommendations for ServerSetting.kt
  *
- * 1. **THREAD SAFETY**: The Cached implementations use mutable var without synchronization.
- *    Document that these are not thread-safe, or add synchronization for concurrent access.
- *    In a typical server, settings are initialized once during startup, but this should be documented.
- *
  * 2. The default instructions "No instructions" is not helpful. Consider making instructions
  *    a required parameter or using a more descriptive default like "No configuration instructions provided".
  *

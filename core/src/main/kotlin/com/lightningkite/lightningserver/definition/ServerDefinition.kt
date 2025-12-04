@@ -30,7 +30,8 @@ import kotlinx.serialization.modules.plus
  * execute tasks, and provide runtime lookups for handlers and resources.
  *
  * The server is composed in a tree structure with a root [Module] (`thisLayer`) and any number of submodules (`modules`),
- * each of which may contain their own endpoints, tasks, schedules, settings, other resources, and nested submodules.
+ * each of which may contain their own endpoints, tasks, schedules, settings, other resources, and nested submodules. This tree
+ * structure is flattened before endpoints and other resources are routed during runtime.
  */
 public data class ServerDefinition(
     val thisLayer: Module,
@@ -131,7 +132,7 @@ public data class ServerDefinition(
                     for ((relPath, topic) in module.webSocketTopics)
                         register(modPath + relPath, topic)
             },
-            settings = (thisLayer.settings + flattenedModules.flatMap { it.item.settings }).distinctBy { it.name },
+            settings = thisLayer.settings + flattenedModules.flatMap { it.item.settings },
             extensions = thisLayer.extensions.toMutableExtensions().apply {
                 flattenedModules.forEach { include(it.item.extensions, it.location) }
             },
