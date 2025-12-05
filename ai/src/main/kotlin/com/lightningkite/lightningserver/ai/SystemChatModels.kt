@@ -137,8 +137,10 @@ public data class SystemChatMessage(
     val subjectId: String,
     /** The type/role of this message */
     val role: Role,
-    /** Additional context/categorization as needed by implementors */
+    /** Channel type: "sms", "email", or custom value for WebSocket filtering */
     val channel: String? = null,
+    /** External identifier for SMS/email channels (phone number or email address) */
+    val externalIdentifier: String? = null,
     /** The message content (text for most roles, human-readable description for ToolRequest) */
     val content: String,
     /** File attachments */

@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.UnauthorizedException
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.Authentication
+import com.lightningkite.lightningserver.auth.options
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -91,6 +92,17 @@ public abstract class SystemChatEndpoints<Subject : HasId<*>>(
         conversation: SystemChatConversation,
     )
 
+    /**
+     * Find a tool by name for approved tool execution.
+     * Subclasses must implement this to provide tools when executing approved requests.
+     */
+    protected abstract fun findToolByName(
+        serverRuntime: ServerRuntime,
+        auth: AuthAccess<Subject>,
+        conversation: SystemChatConversation,
+        toolName: String,
+    ): ChatTool<Subject, *>?
+
     // Paths
     private val conversationPath = path.path("conversations")
     private val messagePath = path.path("messages")
@@ -110,7 +122,6 @@ public abstract class SystemChatEndpoints<Subject : HasId<*>>(
         permissions = messagePermissions,
         postPermissionsForUser = {
             it.postCreate { message ->
-                println("Postcreate $message")
                 when (message.role) {
                     SystemChatMessage.Role.User -> {
                         // User message triggers response generation
@@ -203,30 +214,44 @@ public abstract class SystemChatEndpoints<Subject : HasId<*>>(
         tool: ChatTool<Subject, T>,
         argumentsJson: String,
     ): ToolCallResult {
-        // Parse arguments
-        val args = try {
-            parseToolArg(tool, argumentsJson)
-        } catch (e: Exception) {
-            val message1 = SystemChatMessage(
+        // Helper to create and insert tool request messages
+        suspend fun insertToolMessage(
+            content: String,
+            requiresApproval: Boolean,
+            approvalReason: String? = null,
+            result: String? = null,
+            error: String? = null,
+        ): SystemChatMessage {
+            val message = SystemChatMessage(
                 conversationId = conversation._id,
                 subjectId = conversation.subjectId,
                 role = SystemChatMessage.Role.ToolRequest,
-                content = "Failed to parse arguments",
+                content = content,
                 createdAt = now(),
                 tool = ToolRequestData(
                     toolName = tool.name,
                     arguments = argumentsJson,
-                    requiresApproval = false,
-                    approvalReason = null,
+                    requiresApproval = requiresApproval,
+                    approvalReason = approvalReason,
+                    result = result,
+                    error = error,
                 )
             )
-            messageInfo.table().insertOne(message1)
-            val message = message1
-            messageInfo.table().updateOneById(
-                message._id,
-                modification { it.tool.notNull.error assign "Invalid arguments: ${e.message}" }
+            messageInfo.table().insertOne(message)
+            return message
+        }
+
+        // Parse arguments
+        val args = try {
+            parseToolArg(tool, argumentsJson)
+        } catch (e: Exception) {
+            val errorMsg = "Invalid arguments: ${e.message}"
+            insertToolMessage(
+                content = "Failed to parse arguments",
+                requiresApproval = false,
+                error = errorMsg,
             )
-            return ToolCallResult.Error("Invalid arguments: ${e.message}")
+            return ToolCallResult.Error(errorMsg)
         }
 
         // Check approval requirement
@@ -237,53 +262,51 @@ public abstract class SystemChatEndpoints<Subject : HasId<*>>(
 
         return when (approvalResult) {
             is ApprovalRequirement.AutoApproved -> {
-                // Execute immediately
                 val description = tool.describeCall(args)
                 val result = try {
-                    with(serverRuntime) {
-                        tool.execute(access, args)
-                    }
+                    with(serverRuntime) { tool.execute(access, args) }
                 } catch (e: Exception) {
                     "Error: ${e.message ?: "Unknown error"}"
                 }
-
-                // Store tool request with result
-                val message = SystemChatMessage(
-                    conversationId = conversation._id,
-                    subjectId = conversation.subjectId,
-                    role = SystemChatMessage.Role.ToolRequest,
+                insertToolMessage(
                     content = description,
-                    createdAt = now(),
-                    tool = ToolRequestData(
-                        toolName = tool.name,
-                        arguments = argumentsJson,
-                        requiresApproval = false,
-                        result = result,
-                    )
+                    requiresApproval = false,
+                    result = result,
                 )
-                messageInfo.table().insertOne(message)
                 ToolCallResult.Executed(result)
             }
 
             is ApprovalRequirement.RequiresApproval -> {
-                // Create pending tool request
-                val message = SystemChatMessage(
-                    conversationId = conversation._id,
-                    subjectId = conversation.subjectId,
-                    role = SystemChatMessage.Role.ToolRequest,
+                insertToolMessage(
                     content = approvalResult.description,
-                    createdAt = now(),
-                    tool = ToolRequestData(
-                        toolName = tool.name,
-                        arguments = argumentsJson,
-                        requiresApproval = true,
-                        approvalReason = approvalResult.reason,
-                    )
+                    requiresApproval = true,
+                    approvalReason = approvalResult.reason,
                 )
-                messageInfo.table().insertOne(message)
                 ToolCallResult.WaitingForApproval
             }
         }
+    }
+
+    /**
+     * Find the most recent pending tool request in a conversation.
+     */
+    context(_: ServerRuntime)
+    private suspend fun findPendingToolRequest(
+        access: AuthAccess<Subject>,
+        conversationId: Uuid,
+    ): SystemChatMessage? {
+        return messageInfo.table(access)
+            .find(
+                condition {
+                    (it.conversationId eq conversationId) and
+                    (it.role eq SystemChatMessage.Role.ToolRequest)
+                },
+                orderBy = sort { it.createdAt.descending() }
+            )
+            .toList()
+            .firstOrNull { msg ->
+                msg.tool?.requiresApproval == true && msg.tool?.approval == null
+            }
     }
 
     //
@@ -337,9 +360,7 @@ public abstract class SystemChatEndpoints<Subject : HasId<*>>(
         val lockId = tryAcquireProcessingLock(conversation._id) ?: return
 
         try {
-            println("starting response")
             respond(serverRuntime, access, conversation)
-            println("finished response")
         } catch (e: Exception) {
             e.printStackTrace()
             val message = SystemChatMessage(
@@ -361,9 +382,6 @@ public abstract class SystemChatEndpoints<Subject : HasId<*>>(
         arguments: String,
     ): T {
         val ser = tool.koogSerializer(serverRuntime.externalSerialization.json.serializersModule)
-        println("Tool info: ${tool.koogDescriptor(serverRuntime.externalSerialization.json.serializersModule)}")
-        println("Tool parser: ${ser}")
-        println("Arguments from LLM: ${arguments}")
         return tool.koogArgParse(Json.decodeFromString(ser, arguments))
     }
 
@@ -385,7 +403,6 @@ public abstract class SystemChatEndpoints<Subject : HasId<*>>(
         val args = try {
             parseToolArg(tool, toolData.arguments)
         } catch (e: Exception) {
-            println("Parsing ${toolData.arguments} failed:")
             e.printStackTrace()
             messageInfo.table().updateOneById(
                 message._id,
@@ -414,44 +431,24 @@ public abstract class SystemChatEndpoints<Subject : HasId<*>>(
 
         if (!lockAcquired) return
 
-        try {
-            val result = with(serverRuntime) {
-                tool.execute(access, args)
-            }
-            messageInfo.table().updateOne(
-                condition {
-                    (it._id eq message._id) and
-                    (it.tool.notNull.executionLock.notNull.holderId eq lockId)
-                },
-                modification {
-                    it.tool.notNull.result assign result
-                    it.tool.notNull.executionLock assign null
-                }
-            )
+        val (result, error) = try {
+            with(serverRuntime) { tool.execute(access, args) } to null
         } catch (e: Exception) {
-            messageInfo.table().updateOne(
-                condition {
-                    (it._id eq message._id) and
-                    (it.tool.notNull.executionLock.notNull.holderId eq lockId)
-                },
-                modification {
-                    it.tool.notNull.error assign (e.message ?: "Unknown error")
-                    it.tool.notNull.executionLock assign null
-                }
-            )
+            null to (e.message ?: "Unknown error")
         }
-    }
 
-    /**
-     * Find a tool by name for approved tool execution.
-     * Subclasses must implement this to provide tools when executing approved requests.
-     */
-    protected abstract fun findToolByName(
-        serverRuntime: ServerRuntime,
-        auth: AuthAccess<Subject>,
-        conversation: SystemChatConversation,
-        toolName: String,
-    ): ChatTool<Subject, *>?
+        messageInfo.table().updateOne(
+            condition {
+                (it._id eq message._id) and
+                (it.tool.notNull.executionLock.notNull.holderId eq lockId)
+            },
+            modification {
+                if (result != null) it.tool.notNull.result assign result
+                if (error != null) it.tool.notNull.error assign error
+                it.tool.notNull.executionLock assign null
+            }
+        )
+    }
 
     //
     // Tasks
@@ -459,7 +456,6 @@ public abstract class SystemChatEndpoints<Subject : HasId<*>>(
 
     private val triggerResponseTask: Task<TaskInput> =
         path.path("trigger-response") bind Task<TaskInput> { input ->
-            println("triggerResponseTask")
             @Suppress("UNCHECKED_CAST")
             val access = AuthAccess(input.auth as Authentication<Subject>)
             val conversation = conversationInfo.table(access).get(input.message.conversationId) ?: return@Task
@@ -517,51 +513,6 @@ public abstract class SystemChatEndpoints<Subject : HasId<*>>(
     public val messageUpdates: ModelRestUpdatesWebsocket<Subject, SystemChatMessage, Uuid> =
         messagePath include ModelRestUpdatesWebsocket(messageInfo)
 
-    context(runtime: ServerRuntime)
-    private suspend fun approve(access: AuthAccess<Subject>, messageId: Uuid, input: ToolApprovalRequest): SystemChatMessage {
-        val message = messageInfo.table(access).get(messageId)
-            ?: throw NotFoundException("Message not found")
-        val allowedToChatAsUser = messageInfo.permissions(access).create(SystemChatMessage(
-            conversationId = message.conversationId,
-            subjectId = message.subjectId,
-            role = SystemChatMessage.Role.User,
-            content = "",
-            createdAt = now()
-        ))
-        if(!allowedToChatAsUser) throw ForbiddenException(detail = "not-found", message = "Item not found")
-
-        if (message.role != SystemChatMessage.Role.ToolRequest)
-            throw BadRequestException(detail = "not-tool-request", message = "Message is not a tool request")
-
-        val tool = message.tool
-            ?: throw BadRequestException(detail = "not-tool-request", message = "Message has no tool data")
-
-        if (!tool.requiresApproval)
-            throw BadRequestException(detail = "no-approval-required", message = "Tool request does not require approval")
-
-        if (tool.approval != null)
-            throw BadRequestException(detail = "already-processed", message = "Tool request already approved or rejected")
-
-        val approval = ToolApproval(
-            approved = input.approved,
-            approvedBy = access.auth.rawId,
-            approvedAt = now(),
-            reason = input.reason
-        )
-
-        val updated = messageInfo.table().updateOneById(
-            messageId,
-            modification { it.tool.notNull.approval assign approval }
-        ).new ?: throw NotFoundException("Failed to update message")
-
-        if (input.approved) {
-            executeToolTask(TaskInput(updated, access.auth))
-        } else {
-            continueResponseTask(TaskInput(updated, access.auth))
-        }
-
-        return updated
-    }
     public val approveToolRequest: ApiHttpHandler<PathSpec1<Uuid>, Subject, ToolApprovalRequest, SystemChatMessage> =
         messagePath.arg<Uuid>("id").path("approve").post bind ApiHttpHandler(
             summary = "Approve Tool Request",
@@ -614,6 +565,52 @@ public abstract class SystemChatEndpoints<Subject : HasId<*>>(
                 ).new ?: throw NotFoundException("Failed to update conversation")
             }
         )
+
+    context(runtime: ServerRuntime)
+    private suspend fun approve(access: AuthAccess<Subject>, messageId: Uuid, input: ToolApprovalRequest): SystemChatMessage {
+        val message = messageInfo.table(access).get(messageId)
+            ?: throw NotFoundException("Message not found")
+        val allowedToChatAsUser = messageInfo.permissions(access).create(SystemChatMessage(
+            conversationId = message.conversationId,
+            subjectId = message.subjectId,
+            role = SystemChatMessage.Role.User,
+            content = "",
+            createdAt = now()
+        ))
+        if(!allowedToChatAsUser) throw ForbiddenException(detail = "not-found", message = "Item not found")
+
+        if (message.role != SystemChatMessage.Role.ToolRequest)
+            throw BadRequestException(detail = "not-tool-request", message = "Message is not a tool request")
+
+        val tool = message.tool
+            ?: throw BadRequestException(detail = "not-tool-request", message = "Message has no tool data")
+
+        if (!tool.requiresApproval)
+            throw BadRequestException(detail = "no-approval-required", message = "Tool request does not require approval")
+
+        if (tool.approval != null)
+            throw BadRequestException(detail = "already-processed", message = "Tool request already approved or rejected")
+
+        val approval = ToolApproval(
+            approved = input.approved,
+            approvedBy = access.auth.rawId,
+            approvedAt = now(),
+            reason = input.reason
+        )
+
+        val updated = messageInfo.table().updateOneById(
+            messageId,
+            modification { it.tool.notNull.approval assign approval }
+        ).new ?: throw NotFoundException("Failed to update message")
+
+        if (input.approved) {
+            executeToolTask(TaskInput(updated, access.auth))
+        } else {
+            continueResponseTask(TaskInput(updated, access.auth))
+        }
+
+        return updated
+    }
 
     //
     // Simple Chat WebSocket
@@ -677,7 +674,6 @@ public abstract class SystemChatEndpoints<Subject : HasId<*>>(
                     is WebSocketFrame.Text -> frame.content
                     is WebSocketFrame.Binary -> return@WebSocketHandler
                 }
-                println("Got message '$text'")
 
                 if (text.isBlank()) return@WebSocketHandler
 
@@ -686,50 +682,23 @@ public abstract class SystemChatEndpoints<Subject : HasId<*>>(
 
                 val access = AuthAccess(authResult)
 
-                // Check if user is approving a pending tool request
-                if (text.trim().equals("YES", ignoreCase = true)) {
-                    // Find pending tool request in this conversation
-                    val pendingToolRequest = messageInfo.table(access)
-                        .find(
-                            condition {
-                                (it.conversationId eq currentState.conversationId) and
-                                (it.role eq SystemChatMessage.Role.ToolRequest)
-                            },
-                            orderBy = sort { it.createdAt.descending() }
-                        )
-                        .toList()
-                        .firstOrNull { msg ->
-                            msg.tool?.requiresApproval == true && msg.tool?.approval == null
-                        }
+                // Check for tool approval/rejection commands
+                val trimmedText = text.trim()
+                val isApproval = trimmedText.equals("YES", ignoreCase = true)
+                val isRejection = trimmedText.equals("NO", ignoreCase = true) || trimmedText.lowercase().startsWith("no:")
 
+                if (isApproval || isRejection) {
+                    val pendingToolRequest = findPendingToolRequest(access, currentState.conversationId)
                     if (pendingToolRequest != null) {
-                        approve(AuthAccess(authResult), pendingToolRequest._id, ToolApprovalRequest(true, null))
-                        // Tool execution will be triggered by the update listener
-                        return@WebSocketHandler
-                    }
-                }
-
-                // Check if user is rejecting a pending tool request
-                if (text.trim().equals("NO", ignoreCase = true) || text.trim().lowercase().startsWith("no:")) {
-                    val pendingToolRequest = messageInfo.table(access)
-                        .find(
-                            condition {
-                                (it.conversationId eq currentState.conversationId) and
-                                (it.role eq SystemChatMessage.Role.ToolRequest)
-                            },
-                            orderBy = sort { it.createdAt.descending() }
-                        )
-                        .toList()
-                        .firstOrNull { msg ->
-                            msg.tool?.requiresApproval == true && msg.tool?.approval == null
+                        val (approved, reason) = if (isApproval) {
+                            true to null
+                        } else {
+                            val rejectionReason = if (trimmedText.lowercase().startsWith("no:")) {
+                                trimmedText.substringAfter(":").trim()
+                            } else null
+                            false to rejectionReason
                         }
-
-                    if (pendingToolRequest != null) {
-                        val reason = if (text.trim().lowercase().startsWith("no:")) {
-                            text.trim().substringAfter(":").trim()
-                        } else null
-                        approve(AuthAccess(authResult), pendingToolRequest._id, ToolApprovalRequest(false, reason))
-                        // Response generation will continue after rejection
+                        approve(AuthAccess(authResult), pendingToolRequest._id, ToolApprovalRequest(approved, reason))
                         return@WebSocketHandler
                     }
                 }
@@ -744,7 +713,6 @@ public abstract class SystemChatEndpoints<Subject : HasId<*>>(
                     createdAt = now()
                 )
 
-                println("Inserting $message into the table")
 
                 messageInfo.table(access).insertOne(message)
             },
@@ -782,23 +750,23 @@ public abstract class SystemChatEndpoints<Subject : HasId<*>>(
             disconnect = { _ -> }
         )
 
+    /**
+     * Determine if a message should be broadcast to websocket clients.
+     */
+    private fun shouldBroadcastMessage(message: SystemChatMessage): Boolean = when (message.role) {
+        SystemChatMessage.Role.Assistant,
+        SystemChatMessage.Role.Error -> true
+        SystemChatMessage.Role.ToolRequest ->
+            message.tool?.requiresApproval == true && message.tool?.approval == null
+        else -> false
+    }
+
     init {
         messageInfo.registerChangeListener { changes ->
-            println("Table had changes $changes")
             changes.changes.forEach { change ->
                 change.new?.let { message ->
-                    when (message.role) {
-                        SystemChatMessage.Role.Assistant,
-                        SystemChatMessage.Role.Error -> {
-                            simpleChatMessageTopic.send(message.conversationId, message)
-                        }
-                        SystemChatMessage.Role.ToolRequest -> {
-                            // Only broadcast tool requests that need approval and haven't been processed
-                            if (message.tool?.requiresApproval == true && message.tool?.approval == null) {
-                                simpleChatMessageTopic.send(message.conversationId, message)
-                            }
-                        }
-                        else -> { /* Don't broadcast other message types */ }
+                    if (shouldBroadcastMessage(message)) {
+                        simpleChatMessageTopic.send(message.conversationId, message)
                     }
                 }
             }

@@ -17,6 +17,12 @@ dependencies {
     api(libs.serviceAbstractionsAiKoogAwsOpensearch)
     api(libs.kotlinReflect)
 
+    // SMS and Email support for external channels
+    api(libs.serviceAbstractionsSms)
+    api(libs.serviceAbstractionsSmsInbound)
+    api(libs.serviceAbstractionsEmail)
+    api(libs.serviceAbstractionsEmailInbound)
+
     // Direct Koog dependency for session management API
     api("ai.koog:koog-agents:0.5.4-SNAPSHOT")
 

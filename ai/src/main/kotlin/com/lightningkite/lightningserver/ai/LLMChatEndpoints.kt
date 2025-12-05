@@ -192,147 +192,88 @@ public suspend fun <Subject : HasId<*>> SystemChatEndpoints<Subject>.runLLMLoop(
     systemPrompt: String,
     maxIterations: Int = 15,
 ) {
-    val toolDescriptors: List<ToolDescriptor> =
-        tools.values.map { it.koogDescriptor(serverRuntime.externalSerialization.json.serializersModule) }
+    val toolDescriptors = tools.values.map {
+        it.koogDescriptor(serverRuntime.externalSerialization.json.serializersModule)
+    }
     val pendingToolResults = mutableListOf<PendingToolResult>()
 
-    var iterations = 0
-    while (iterations < maxIterations) {
-        iterations++
+    suspend fun insertMessage(role: SystemChatMessage.Role, content: String) {
+        messageInfo.table().insertOne(SystemChatMessage(
+            conversationId = conversation._id,
+            subjectId = conversation.subjectId,
+            role = role,
+            content = content,
+            createdAt = now()
+        ))
+    }
 
+    repeat(maxIterations) {
         val history = getConversationHistory(auth, conversation._id)
-
-        // Check for pending approval
         if (history.hasPendingApproval()) return
 
-        val currentPrompt = history.toKoogPrompt(systemPrompt, pendingToolResults)
-
-        val start = TimeSource.Monotonic.markNow()
-        val responses: List<Message.Response> = llm.execute(
-            prompt = currentPrompt,
+        val responses = llm.execute(
+            prompt = history.toKoogPrompt(systemPrompt, pendingToolResults),
             tools = toolDescriptors
         )
-        println("Responses took ${start.elapsedNow()}.  Got: $responses")
 
         if (responses.isEmpty()) {
-            val message = SystemChatMessage(
-                conversationId = conversation._id,
-                subjectId = conversation.subjectId,
-                role = SystemChatMessage.Role.Error,
-                content = "LLM returned no response",
-                createdAt = now()
-            )
-            messageInfo.table().insertOne(message)
+            insertMessage(SystemChatMessage.Role.Error, "LLM returned no response")
             return
+        }
+
+        val textContent = responses
+            .filterIsInstance<Message.Assistant>()
+            .map { it.content }
+            .filter { it.isNotBlank() }
+            .joinToString("\n")
+
+        if (textContent.isNotBlank()) {
+            insertMessage(SystemChatMessage.Role.Assistant, textContent)
         }
 
         val toolCalls = responses.filterIsInstance<Message.Tool.Call>()
 
         if (toolCalls.isEmpty()) {
-            // Final text response
-            val textContent = responses
-                .filterIsInstance<Message.Assistant>()
-                .map { it.content }
-                .filter { it.isNotBlank() }
-                .joinToString("\n")
-
-            println("Final response: $textContent")
-
-            if (textContent.isNotBlank()) {
-                val message = SystemChatMessage(
-                    conversationId = conversation._id,
-                    subjectId = conversation.subjectId,
-                    role = SystemChatMessage.Role.Assistant,
-                    content = textContent,
-                    createdAt = now()
-                )
-                messageInfo.table().insertOne(message)
-            }
             return
         }
 
         // Process tool calls
         pendingToolResults.clear()
         for (tc in toolCalls) {
-            val result = processToolCallFromLLM(
-                tools = tools,
-                auth = auth,
-                conversation = conversation,
-                toolCall = tc,
-            )
-
-            when (result) {
-                is ToolCallLoopResult.WaitingForApproval -> return  // CHECK: Will this be problematic if the first result is waiting for approval, but the second was processed?
-                is ToolCallLoopResult.Processed -> pendingToolResults.add(result.record)
-            }
+            val result = processLLMToolCall(tools, auth, conversation, tc)
+            if (result == null) return  // Waiting for approval
+            pendingToolResults.add(result)
         }
     }
 
-    val message1 = SystemChatMessage(
-        conversationId = conversation._id,
-        subjectId = conversation.subjectId,
-        role = SystemChatMessage.Role.Error,
-        content = "Response generation stopped: max iterations ($maxIterations) reached",
-        createdAt = now()
-    )
-    messageInfo.table().insertOne(message1)
-}
-
-/**
- * Result of processing a tool call within the LLM loop.
- */
-private sealed class ToolCallLoopResult {
-    data class Processed(val record: PendingToolResult) : ToolCallLoopResult()
-    data object WaitingForApproval : ToolCallLoopResult()
+    insertMessage(SystemChatMessage.Role.Error, "Response generation stopped: max iterations ($maxIterations) reached")
 }
 
 /**
  * Process a single tool call from the LLM response.
+ * Returns null if waiting for approval, otherwise returns the tool result record.
  */
 context(_: ServerRuntime)
-private suspend fun <Subject : HasId<*>> SystemChatEndpoints<Subject>.processToolCallFromLLM(
+private suspend fun <Subject : HasId<*>> SystemChatEndpoints<Subject>.processLLMToolCall(
     tools: Map<String, ChatTool<Subject, *>>,
     auth: AuthAccess<Subject>,
     conversation: SystemChatConversation,
     toolCall: Message.Tool.Call,
-): ToolCallLoopResult {
-    val toolName = toolCall.tool
+): PendingToolResult? {
     val toolCallId = toolCall.id ?: ""
+    val toolName = toolCall.tool
     val arguments = toolCall.content
 
+    fun result(output: String) = PendingToolResult(toolCallId, toolName, arguments, output)
+
     val tool = tools[toolName]
-    if (tool == null) {
-        return ToolCallLoopResult.Processed(PendingToolResult(
-            toolCallId = toolCallId,
-            toolName = toolName,
-            arguments = arguments,
-            result = "Error: Unknown tool '$toolName'"
-        ))
-    }
+        ?: return result("Error: Unknown tool '$toolName'")
 
     @Suppress("UNCHECKED_CAST")
-    val typedTool = tool as ChatTool<Subject, Any>
-    val result = processToolCall(
-        access = auth,
-        conversation = conversation,
-        tool = typedTool,
-        argumentsJson = arguments
-    )
-
-    return when (result) {
-        is SystemChatEndpoints.ToolCallResult.WaitingForApproval -> ToolCallLoopResult.WaitingForApproval
-        is SystemChatEndpoints.ToolCallResult.Executed -> ToolCallLoopResult.Processed(PendingToolResult(
-            toolCallId = toolCallId,
-            toolName = toolName,
-            arguments = arguments,
-            result = result.result
-        ))
-        is SystemChatEndpoints.ToolCallResult.Error -> ToolCallLoopResult.Processed(PendingToolResult(
-            toolCallId = toolCallId,
-            toolName = toolName,
-            arguments = arguments,
-            result = "Error: ${result.error}"
-        ))
+    return when (val callResult = processToolCall(auth, conversation, tool as ChatTool<Subject, Any>, arguments)) {
+        is SystemChatEndpoints.ToolCallResult.WaitingForApproval -> null
+        is SystemChatEndpoints.ToolCallResult.Executed -> result(callResult.result)
+        is SystemChatEndpoints.ToolCallResult.Error -> result("Error: ${callResult.error}")
     }
 }
 
