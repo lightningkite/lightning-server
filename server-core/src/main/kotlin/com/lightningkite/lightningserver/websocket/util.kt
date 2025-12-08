@@ -6,7 +6,7 @@ import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.serialization.TypeRetriever
 
 suspend fun <STORAGE> WebSocketHandler<STORAGE>.messageFromSubscriptionTracked(path: ServerPath, mid: WebSocketConnection<STORAGE>, topic: String, retriever: TypeRetriever) {
-    Metrics.handlerPerformance<Unit>(
+    Metrics.handlerPerformanceNoLog<Unit>(
         WebSockets.HandlerContext(
             path,
             WebSockets.WsHandlerType.WSSUB,
@@ -23,7 +23,7 @@ suspend fun <STORAGE> WebSocketHandler<STORAGE>.messageFromSubscriptionTracked(p
 }
 
 suspend fun <STORAGE> WebSocketHandler<STORAGE>.messageFromClientTracked(path: ServerPath, mid: WebSocketConnection<STORAGE>, message: WebSocketFrame) {
-    Metrics.handlerPerformance<Unit>(
+    Metrics.handlerPerformanceNoLog<Unit>(
         WebSockets.HandlerContext(
             path,
             WebSockets.WsHandlerType.MESSAGE,
@@ -57,7 +57,7 @@ suspend fun <STORAGE> WebSocketHandler<STORAGE>.didConnectTracked(path: ServerPa
 }
 
 suspend fun <STORAGE> WebSocketHandler<STORAGE>.willConnectTracked(path: ServerPath, request: WebSocketConnectRequest): STORAGE {
-    return Metrics.handlerPerformance<STORAGE>(
+    return Metrics.handlerPerformanceNoLog<STORAGE>(
         WebSockets.HandlerContext(
             path,
             WebSockets.WsHandlerType.CONNECTING,

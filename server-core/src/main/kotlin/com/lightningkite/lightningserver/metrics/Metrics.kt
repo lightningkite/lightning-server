@@ -13,6 +13,7 @@ import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.tasks.Tasks
 import kotlinx.datetime.Clock
 import com.lightningkite.now
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 import kotlin.time.Duration
@@ -101,6 +102,20 @@ interface Metrics: HealthCheckable {
 
         suspend fun <T> handlerPerformance(handler: ServerContext, action: suspend () -> T): T {
             return serverContext(handler) {
+                val result = performancePerHandler(executionTime, action)
+                try {
+                    kotlin.coroutines.coroutineContext[ServerContextElement.Key]?.metricSums?.forEach {
+                        reportPerHandler(it.key, it.value)
+                    }
+                } catch(e: Exception) {
+                    e.report()
+                }
+                result
+            }
+        }
+
+        suspend fun <T> handlerPerformanceNoLog(handler: ServerContext, action: suspend () -> T): T {
+            return withContext(ServerContextElement(handler)) {
                 val result = performancePerHandler(executionTime, action)
                 try {
                     kotlin.coroutines.coroutineContext[ServerContextElement.Key]?.metricSums?.forEach {
