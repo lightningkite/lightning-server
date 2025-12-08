@@ -5,7 +5,7 @@
 
 variable "metrics_tracked" {
     type = list(string)
-    default = ["Health Checks Run", "Execution Time"]
+    default = ["Execution Time", "Health Checks Run"]
     nullable = false
 }
 variable "metrics_namespace" {

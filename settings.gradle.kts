@@ -1,5 +1,5 @@
-rootProject.name = "lightning-server"
-
+//rootProject.name = "lightning-server"
+//
 pluginManagement {
     repositories {
         mavenLocal()
@@ -11,43 +11,41 @@ pluginManagement {
         maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
         maven(url = "https://s01.oss.sonatype.org/content/repositories/releases/")
     }
-
-    plugins {
-        kotlin("plugin.serialization") version "2.0.0"
-        id("com.google.devtools.ksp") version "2.0.20-1.0.25"
-    }
-
-    dependencyResolutionManagement {
-        repositories {
-            mavenLocal()
-            google()
-            gradlePluginPortal()
-            mavenCentral()
-            maven("https://jitpack.io")
-        }
-
-    }
 }
 
-include(":demo")
-include(":processor")
-include(":shared")
-include(":server")
-include(":server-aws")
-include(":server-azure")
-//include(":server-cassandra")
-include(":server-clamav")
-include(":server-core")
-include(":server-testing")
-include(":server-dynamodb")
-include(":server-firebase")
-include(":server-ktor")
-include(":server-memcached")
-include(":server-mongo")
-include(":server-postgresql")
-include(":server-redis")
-include(":server-scim")
-include(":server-sentry")
-include(":server-sentry9")
-include(":server-sftp")
+include(":core")
+include(":core-shared")
 
+include(":typed")
+include(":typed-shared")
+
+include(":auth")
+include(":auth-shared")
+
+include(":files")
+include(":files-shared")
+
+include(":media")
+include(":media-shared")
+
+include(":sessions")
+include(":sessions-shared")
+include(":sessions-email")
+include(":sessions-oauth")
+include(":sessions-oauth-shared")
+include(":sessions-sms")
+
+include(":notifications")
+include(":notifications-shared")
+
+//include(":ai")
+
+include(":engine-local")
+include(":engine-ktor")
+include(":engine-aws-serverless")
+include(":engine-netty")
+include(":engine-jdk-server")
+
+include(":secret-source-aws")
+
+include(":demo")

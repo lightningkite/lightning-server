@@ -8,8 +8,11 @@ lambda_in_vpc       = false
 lambda_snapstart    = true
 database_org_id     = "6323a65c43d66b56a2ea5aea"
 cors                = {
-  allowedDomains = ["*"]
-  allowedHeaders = ["*"]
+  limitToDomains = null
+  limitToHeaders = null
+  limitToMethods = null
+  allowCredentials = true
+  exposedHeaders = null
 }
 oauth_google    = null
 oauth_apple     = null
@@ -39,3 +42,5 @@ logging = {
     toConsole = true
   }
 }
+database_existing_project_id = null
+database_zone_name = "Zone 1"

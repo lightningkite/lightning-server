@@ -1,0 +1,7 @@
+{
+    "variable": {
+        "someSecret": {
+            "type": "string"
+        }
+    }
+}

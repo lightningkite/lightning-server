@@ -1,0 +1,9 @@
+{
+    "data": {
+        "aws_route53_zone": {
+            "main": {
+                "name": "ivieleague.com"
+            }
+        }
+    }
+}

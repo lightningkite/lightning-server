@@ -1,5 +1,7 @@
 # Using Lightning Server: Client Perspective
 
+Last updated April 16, 2025 (`version-4`)
+
 Lightning Server, while being a flexible system with which any HTTP spec could be implemented, generally tends to follow certain patterns as it is significantly easier to build that way.
 
 ## Request MIME Types

@@ -1,5 +1,7 @@
 # Database
 
+Last updated January 2025 (`version-5`)
+
 Lightning Server contains a database abstraction that enables you to build applications without worrying about exactly which database will be used.  It is abstracted over both NoSQL and SQL databases.
 
 ## Declaring the need for a database
@@ -7,34 +9,37 @@ Lightning Server contains a database abstraction that enables you to build appli
 Add a setting as follows:
 
 ```kotlin
-object Server {
+object Server : ServerBuilder() {
     //...
-    val database = setting(name = "database", default = DatabaseSettings())
+    val database = setting("database", Database.Settings())
     //...
 }
 ```
 
 ## Declaring a model
 
-Next we need to declare a model.  All models are serializable via `kotlinx.serialization`, and need the additional annotation `@DatabaseModel` which we'll discuss later.  To make `UUID`s serializable, we must also place `@file:UseContextualSerialization(UUID::class)` at the top of the file. 
+Next we need to declare a model.  All models are serializable via `kotlinx.serialization`, and need the additional annotation `@GenerateDataClassPaths` for the query DSL to work properly.
 
 It is strongly recommended you define the primary key yourself by making the class implement `HasId<T>`.
 
 ```kotlin
-@file:UseContextualSerialization(UUID::class, Instant::class)
-
-//...
+import kotlinx.serialization.*
+import com.lightningkite.services.database.HasId
+import com.lightningkite.services.data.GenerateDataClassPaths
+import kotlin.uuid.Uuid
+import kotlin.time.Instant
+import kotlin.time.Clock
 
 @Serializable
-@DatabaseModel
+@GenerateDataClassPaths
 data class Post(
-    @Contextual override val _id: UUID = UUID.randomUUID(),
+    override val _id: Uuid = Uuid.random(),
     val title: String,
-    val poster: String,
+    val author: String,
     val body: String,
     val privateNotes: String? = null,
-    val updatedAt: Instant = Instant.now()
-) : HasId<UUID>
+    val updatedAt: Instant = Clock.System.now()
+) : HasId<Uuid>
 ```
 
 ## Accessing the database
@@ -42,78 +47,129 @@ data class Post(
 You can now access a table of these objects like this:
 
 ```kotlin
-collection.insertOne(Post(title = "Test", poster = "joseph@lightningkite.com", body = "Example"))
-collection.find(condition { it.title eq "Test" }).toList()
-collection.updateOne(
+val db = database()
+val posts = db.table<Post>()
+
+// Insert a new post
+posts.insertOne(Post(
+    title = "Test",
+    author = "joseph@lightningkite.com",
+    body = "Example"
+))
+
+// Query posts
+posts.find(condition { it.title eq "Test" }).toList()
+
+// Update a post
+posts.updateOne(
     condition { it.title eq "Test" },
     modification { it.title assign "Test Post" }
 )
-collection.deleteMany(condition { it.always })
-collection.count()
+
+// Delete posts
+posts.deleteMany(condition { it.always })
+
+// Count posts
+posts.count()
+```
+
+## Working with ModelInfo
+
+For more advanced use cases with permissions and authentication, use `ModelInfo`:
+
+```kotlin
+val postInfo = database.modelInfo(
+    auth = UserAuth.require(),
+    permissions = {
+        val user = auth.fetch()
+        ModelPermissions(
+            create = condition { it.author eq user.email },
+            read = condition { it.always },
+            update = condition { it.author eq user.email },
+            delete = condition { it.author eq user.email }
+        )
+    }
+)
 ```
 
 ## Conditions and Modifications
 
 There are many conditions and modifications available.
 
-To write a condition or modification, simply use  the `condition { it }` and `modification { it }` starters like you see above.
+To write a condition or modification, use the `condition { it }` and `modification { it }` DSL:
 
+```kotlin
+// Conditions
+condition { it.title eq "Test" }
+condition { it.author eq "joe@example.com" }
+condition { it.updatedAt gt Clock.System.now() - 1.days }
+condition { (it.title eq "Test") and (it.author eq "joe@example.com") }
+
+// Modifications
+modification { it.title assign "New Title" }
+modification { it.updatedAt assign Clock.System.now() }
+modification { it.body.append(" - Updated") }
+```
+
+### Common Condition Operations
+
+- `eq` - Equals
+- `neq` - Not equals
+- `gt` - Greater than
+- `gte` - Greater than or equal
+- `lt` - Less than
+- `lte` - Less than or equal
+- `inside` - Value is in a collection
+- `notInside` - Value is not in a collection
+- `contains` - String contains (case-sensitive)
+- `containsIgnoreCase` - String contains (case-insensitive)
+- `and` - Logical AND
+- `or` - Logical OR
+- `always` - Always true
+- `never` - Never true
+
+### Common Modification Operations
+
+- `assign` - Set a value
+- `plus` - Add to a number
+- `times` - Multiply a number
+- `append` - Append to a string
+- `listAppend` - Add items to a list
+- `listRemove` - Remove items from a list based on condition
+- `setAppend` - Add items to a set
+- `setRemove` - Remove items from a set based on condition
 
 ## Adding Signals
 
 Signals occur when a change is made to the database.
 
-You can wrap a collection with actions that will occur on those changes.
+You can wrap a collection with actions that will occur on those changes:
 
 ```kotlin
-val collection = Server.database().collection<Post>()
-    .postNewValue { value ->
-        println("$value was inserted or updated in the database.")
+val collection = database().table<Post>()
+    .interceptCreate { value ->
+        println("About to insert: $value")
+        value.copy(title = value.title + " (New)")
+    }
+    .postCreate { value ->
+        println("$value was inserted in the database.")
+    }
+    .postChange { value ->
+        println("$value was updated in the database.")
     }
     .postDelete { value ->
         println("$value was removed from the database.")
     }
 ```
 
-There are many more signals available than the above, and there are intercepting options available as well:
+Available interceptors and signals:
 
-```kotlin
-val collection = Server.database().collection<Post>()
-    .interceptCreate { it.copy(title = it.title + " (Unverified)") }
-    .interceptChange { m ->
-        modification {
-            add(m)
-            it.updatedAt assign Instant.now()
-        }
-    }
-```
-
-## Permissions
-
-You can also restrict the usage of a collection to a certain set of permissions.
-
-```kotlin
-val currentUser = "joseph@lightningkite.com"
-val collection = Server.database().collection<Post>()
-    .withPermissions(
-        ModelPermissions(
-            create = condition { it.always },
-            read = condition { it.always },
-            readMask = mask {
-                it.privateNotes.maskedTo(null).unless(condition { it.poster eq currentUser })
-            },
-            update = condition { it.poster eq currentUser },
-            updateRestrictions = updateRestrictions {
-                it.updatedAt.cannotBeModified()
-            },
-            delete = condition { it.poster eq currentUser },
-        )
-    )
-```
-
-Creating views of databases like this is incredibly useful for centralizing rules about what users can and cannot do.
-
-Later, we'll even show you how to use this to automatically generate REST endpoints with proper permissions.
+- `interceptCreate` - Modify a value before creation
+- `interceptChange` - Modify a modification before application
+- `postCreate` - Called after successful creation
+- `postChange` - Called after successful update
+- `postDelete` - Called after successful deletion
+- `postNewValue` - Called after creation or update
 
 ## Available Backends
 
@@ -133,25 +189,7 @@ Later, we'll even show you how to use this to automatically generate REST endpoi
 ```json5
 // settings.json
 {
-  "database": { "url": "ram-unsafe-persist://path-to-folder" }
-}
-```
-
-#### In-Memory + Preset from JSON file
-
-```json5
-// settings.json
-{
-  "database": { "url": "ram-preload://path-to-folder" }
-}
-```
-
-#### In-Memory + Store to JSON File
-
-```json5
-// settings.json
-{
-  "database": { "url": "ram-unsafe-persist://path-to-folder" }
+  "database": { "url": "json://path-to-folder" }
 }
 ```
 
@@ -159,9 +197,11 @@ Later, we'll even show you how to use this to automatically generate REST endpoi
 
 ```kotlin
 // Server.kt
-object Server: ServerPathGroup(ServerPath.root) {
+object Server: ServerBuilder() {
     // Adds MongoDB to the possible database loaders
     init { MongoDatabase }
+
+    val database = setting("database", Database.Settings())
 }
 ```
 
@@ -215,12 +255,13 @@ Most things work, but `Map` modifications do not.
 
 ```kotlin
 // Server.kt
-object Server: ServerPathGroup(ServerPath.root) {
-    // Adds MongoDB to the possible database loaders
+object Server: ServerBuilder() {
+    // Adds PostgreSQL to the possible database loaders
     init { PostgresDatabase }
+
+    val database = setting("database", Database.Settings())
 }
 ```
-
 
 ```json5
 // settings.json
@@ -229,3 +270,35 @@ object Server: ServerPathGroup(ServerPath.root) {
   "database": { "url": "postgresql://YourUserName:YourPassword@YourHostname:5432/YourDatabaseName" }
 }
 ```
+
+## Model Annotations
+
+Lightning Server provides several annotations to enhance your models for use with the admin panel and documentation:
+
+```kotlin
+@Serializable
+@GenerateDataClassPaths
+@AdminTableColumns(["title", "author", "updatedAt"])
+@Description("A blog post in the system")
+data class Post(
+    override val _id: Uuid = Uuid.random(),
+    @Description("The post title") val title: String,
+    @Description("Email of the author") val author: String,
+    @Multiline @MimeType("text/html") val body: String,
+    @AdminHidden val privateNotes: String? = null,
+    val updatedAt: Instant = Clock.System.now()
+) : HasId<Uuid>
+```
+
+Available annotations:
+
+- `@GenerateDataClassPaths` - Required for query DSL
+- `@AdminTableColumns([...])` - Columns to show in admin table view
+- `@Description("...")` - Description for documentation
+- `@AdminHidden` - Hide field from admin panel
+- `@Multiline` - Render as textarea in admin panel
+- `@MimeType("...")` - Specify content type for rich fields
+- `@References(Model::class)` - Indicates field references another model
+- `@MultipleReferences(Model::class)` - Indicates field references multiple models
+
+NEXT: [Cache](cache.md)

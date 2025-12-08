@@ -1,33 +1,25 @@
 # Set Up Lightning Server
 
+Last updated January 2025 (`version-5`)
+
 ## Create a new Kotlin/Gradle KTS project.
 
 IntelliJ has a quick option for this under "New Project".  Make sure you select Kotlin, Gradle, and Kotlin as your DSL language.
 
-If your project's `build.gradle.kts` was generated with this line, comment it out.
-
-```kotlin
-//    jvmToolchain(8)
-```
-
 ## Add Gradle Plugins
 
-```properties
-# gradle.properties
-kotlinVersion=1.9.10
-kspVersion=1.9.10-1.0.13
-lightningServerVersion=version-2-SNAPSHOT
-```
+Use the version catalog pattern in `gradle/libs.versions.toml` or configure plugins directly in your build files.
 
 ```kotlin
 // settings.gradle.kts
 pluginManagement {
-    val kotlinVersion: String by settings
-    val kspVersion: String by settings
-    plugins {
-        kotlin("jvm") version kotlinVersion
-        kotlin("plugin.serialization") version kotlinVersion
-        id("com.google.devtools.ksp") version kspVersion
+    repositories {
+        mavenLocal()
+        google()
+        gradlePluginPortal()
+        mavenCentral()
+        maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
+        maven(url = "https://s01.oss.sonatype.org/content/repositories/releases/")
     }
 }
 ```
@@ -35,16 +27,16 @@ pluginManagement {
 ```kotlin
 // build.gradle.kts
 plugins {
-    //...
-    id("com.google.devtools.ksp")
-    kotlin("plugin.serialization")
-    //...
+    kotlin("jvm") version "2.1.0" // or your preferred Kotlin version
+    kotlin("plugin.serialization") version "2.1.0"
+    id("com.google.devtools.ksp") version "2.1.0-1.0.29"
 }
 
 repositories {
+    mavenLocal()
     maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
     maven(url = "https://s01.oss.sonatype.org/content/repositories/releases/")
-    //...
+    mavenCentral()
 }
 ```
 
@@ -52,50 +44,43 @@ repositories {
 
 ```kotlin
 // build.gradle.kts
-val lightningServerVersion = "version-2-SNAPSHOT"
+val lightningServerVersion = "version-5-SNAPSHOT"
+
 dependencies {
-    //...
-    
-    // An annotation processor.  Gives a nice DSL for forming queries.  You'll always want this.
+    // Core modules - always needed
     ksp("com.lightningkite.lightningserver:processor:$lightningServerVersion")
-    
-    // The core server dependencies.  You'll always want this for the server itself.
-    api("com.lightningkite.lightningserver:server-core:$lightningServerVersion")
-    
-    // Implementations of interfaces for AWS and a terraform generator for deploying to Lambda/API Gateway
-    api("com.lightningkite.lightningserver:server-aws:$lightningServerVersion")
-    
-    // Implementations of interfaces for Microsoft Azure (experimental)
-    api("com.lightningkite.lightningserver:server-azure:$lightningServerVersion")
-    
-    // Run your server via Ktor
-    api("com.lightningkite.lightningserver:server-ktor:$lightningServerVersion")
-    
-    // AWS DynamoDB Cache implementation
-    api("com.lightningkite.lightningserver:server-dynamodb:$lightningServerVersion")
-    
-    // Firebase Cloud Messaging Notification implementation
-    api("com.lightningkite.lightningserver:server-firebase:$lightningServerVersion")
-    
-    // Memcached Cache implementation
-    api("com.lightningkite.lightningserver:server-memcached:$lightningServerVersion")
-    
-    // MongoDB Database implementation
-    api("com.lightningkite.lightningserver:server-mongo:$lightningServerVersion")
-    
-    // PostgreSQL Database implementation (experimental)
-    api("com.lightningkite.lightningserver:server-postgresql:$lightningServerVersion")
-    
-    // Redis Cache implementation
-    api("com.lightningkite.lightningserver:server-redis:$lightningServerVersion")
-    
-    // Sentry exception reporting
-    api("com.lightningkite.lightningserver:server-sentry:$lightningServerVersion")
-    
-    // SFTP File System Implementation (warning: does not work as public file store)
-    api("com.lightningkite.lightningserver:server-sftp:$lightningServerVersion")
-    
-    //...
+    implementation("com.lightningkite.lightningserver:core:$lightningServerVersion")
+    implementation("com.lightningkite.lightningserver:core-shared:$lightningServerVersion")
+
+    // Typed endpoints - recommended for API development
+    implementation("com.lightningkite.lightningserver:typed:$lightningServerVersion")
+    implementation("com.lightningkite.lightningserver:typed-shared:$lightningServerVersion")
+
+    // Choose an engine for local development:
+    implementation("com.lightningkite.lightningserver:engine-ktor:$lightningServerVersion")
+    // OR
+    implementation("com.lightningkite.lightningserver:engine-netty:$lightningServerVersion")
+    // OR
+    implementation("com.lightningkite.lightningserver:engine-jdk-server:$lightningServerVersion")
+
+    // Optional: AWS serverless deployment
+    implementation("com.lightningkite.lightningserver:engine-aws-serverless:$lightningServerVersion")
+
+    // Optional: Authentication
+    implementation("com.lightningkite.lightningserver:auth:$lightningServerVersion")
+    implementation("com.lightningkite.lightningserver:auth-shared:$lightningServerVersion")
+
+    // Optional: Session management
+    implementation("com.lightningkite.lightningserver:sessions:$lightningServerVersion")
+    implementation("com.lightningkite.lightningserver:sessions-shared:$lightningServerVersion")
+    implementation("com.lightningkite.lightningserver:sessions-email:$lightningServerVersion")
+    implementation("com.lightningkite.lightningserver:sessions-sms:$lightningServerVersion")
+
+    // Optional: File handling
+    implementation("com.lightningkite.lightningserver:files:$lightningServerVersion")
+    implementation("com.lightningkite.lightningserver:files-shared:$lightningServerVersion")
+
+    // Add service implementations as needed (see individual documentation)
 }
 ```
 
@@ -103,14 +88,12 @@ dependencies {
 
 ```kotlin
 // src/main/kotlin/Server.kt
-import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.core.ServerPathGroup
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.http.handler
 
-object Server : ServerPathGroup(ServerPath.root) {
-    val root = path.get.handler {
+object Server : ServerBuilder() {
+    val root = path.get bind HttpHandler {
         HttpResponse.plainText("Hello world!")
     }
 }
@@ -120,21 +103,17 @@ object Server : ServerPathGroup(ServerPath.root) {
 
 ```kotlin
 // src/main/kotlin/Main.kt
-import com.lightningkite.lightningserver.cache.LocalCache
-import com.lightningkite.lightningserver.ktor.runServer
-import com.lightningkite.lightningserver.pubsub.LocalPubSub
-import com.lightningkite.lightningserver.settings.loadSettings
-import java.io.File
+import com.lightningkite.lightningserver.engine.ktor.KtorEngine
+import com.lightningkite.lightningserver.settings.loadFromFile
+import com.lightningkite.KFile
+import io.ktor.server.netty.Netty
 
 fun main(args: Array<String>) {
-    // Load our server declaration
-    Server
-
-    // Load the settings file
-    loadSettings(File("settings.json"))
-
-    // Run the server using Ktor
-    runServer(LocalPubSub, LocalCache)
+    val built = Server.build()
+    KtorEngine(built).apply {
+        settings.loadFromFile(KFile("settings.json"), internalSerializersModule)
+        start(Netty)
+    }
 }
 ```
 
@@ -148,36 +127,32 @@ Go to [http://localhost:8080](http://localhost:8080) to see your "Hello world!"
 
 ## Create a unit test
 
+Unit tests in Lightning Server use mock services to avoid external dependencies:
+
 ```kotlin
 // src/test/kotlin/ServerTest.kt
-import com.lightningkite.lightningserver.engine.UnitTestEngine
-import com.lightningkite.lightningserver.engine.engine
+import com.lightningkite.lightningserver.engine.local.LocalEngine
 import com.lightningkite.lightningserver.http.test
-import com.lightningkite.lightningserver.settings.Settings
+import com.lightningkite.services.database.jsonfile.JsonFileDatabase
 import kotlinx.coroutines.runBlocking
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
-object TestSettings {
-    init {
-        // Load the full server definition.
-        Server
-
-        // Set up our settings for the test environment
-        Settings.populateDefaults(mapOf())
-
-        // Use the UnitTestEngine for testing - makes async tasks run on the spot for easy testing.
-        engine = UnitTestEngine
-    }
-}
-
 class ServerTest {
-    // Make sure this gets loaded in.
-    init { TestSettings }
+    companion object {
+        @BeforeAll
+        @JvmStatic
+        fun setup() {
+            // Ensure service implementations are loaded
+            JsonFileDatabase
+        }
+    }
 
     @Test
-    fun test(): Unit = runBlocking {
-        val response = Server.root.test()
+    fun testRoot(): Unit = runBlocking {
+        val engine = LocalEngine(Server.build())
+        val response = Server.root.test(engine)
         assertEquals("Hello world!", response.body!!.text())
     }
 }

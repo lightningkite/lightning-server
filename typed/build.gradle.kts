@@ -1,0 +1,48 @@
+import com.lightningkite.deployhelpers.*
+
+plugins {
+    alias(libs.plugins.kotlinJvm)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.serialization)
+    alias(libs.plugins.dokka)
+    id("signing")
+    alias(libs.plugins.vanniktechMavenPublish)
+}
+
+dependencies {
+    api(project(":core"))
+    api(project(":auth"))
+    api(project(":typed-shared"))
+    api(libs.serviceAbstractionsDatabase)
+    api(libs.serviceAbstractionsCache)
+    api(libs.serviceAbstractionsHttpClient)
+    api(libs.kotlinReflect)
+    testImplementation(libs.kotlinTestJunit)
+
+    configurations.filter { it.name.startsWith("ksp") }.forEach {
+        add(it.name, libs.serviceAbstractionsDatabaseProcessor)
+    }
+}
+
+ksp {
+    arg("generateFields", "true")
+}
+
+kotlin {
+    explicitApi()
+    compilerOptions {
+        optIn.add("kotlin.time.ExperimentalTime")
+        optIn.add("kotlin.uuid.ExperimentalUuidApi")
+        freeCompilerArgs.add("-Xcontext-parameters")
+    }
+    sourceSets.main {
+        kotlin.srcDir("build/generated/ksp/main/kotlin")
+    }
+    sourceSets.test {
+        kotlin.srcDir("build/generated/ksp/test/kotlin")
+    }
+}
+
+lkLibrary("lightningkite", "lightning-server") {
+    description.set("A set of tools to fill in/replace what Ktor is lacking in.")
+}

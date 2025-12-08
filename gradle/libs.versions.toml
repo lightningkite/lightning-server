@@ -1,54 +1,63 @@
 
 [versions]
-agp = "8.2.2"
-androidDesugaring = "2.1.4"
-angusMail = "2.0.3"
-apacheTika = "2.9.2"
-awsVersion = "2.25.24"
-azureFunctions = "3.1.0"
-azureStorage = "12.25.3"
-bouncyCastle = "1.78.1"
-bson = "5.1.2"
+agp = "8.11.2"
+androidDesugaring = "2.1.5"
+angusMail = "2.0.5"
+apacheTika = "3.2.3"
+awsVersion = "2.38.5"
+azureFunctions = "3.2.2"
+azureStorage = "12.32.0"
+bouncyCastle = "1.82"
+bson = "5.6.1"
 clamAv = "2.1.2"
-coroutines = "1.9.0"
-dokka = "2.0.0"
-dynamodb = "2.23.4"
-embedMongo = "4.18.1"
-embeddedPostgres = "2.0.6"
-embeddedRedis = "0.9.0"
-exposed = "0.49.0"
-firebaseAdmin = "9.3.0"
-graalVmNative = "0.9.24"
-guava = "33.1.0-jre"
-hierynomusSshj = "0.38.0"
-javaJwt = "4.4.0"
-kaml = "0.61.0"
+coroutines = "1.10.2"
+cryptographyKotlin = "0.5.0"
+dokka = "2.1.0"
+dynamodb = "2.38.5"
+embedMongo = "4.21.0"
+embeddedPostgres = "2.2.0"
+embeddedRedis = "0.9.1"
+exposed = "0.61.0"
+firebaseAdmin = "9.5.0"
+graalVmNative = "0.11.3"
+guava = "33.5.0-jre"
+hierynomusSshj = "0.40.0"
+javaJwt = "4.5.0"
+kaml = "0.104.0"
 kbson = "0.5.0"
-kotlin = "2.0.21"
-kotlinHtmlJvm = "0.11.0"
-kotlinXDatetime = "0.6.1"
-kotlinXSerialization = "1.7.3"
+kotlin = "2.2.20"
+kotlinHtmlJvm = "0.12.0"
+kotlinLogging = "7.0.13"
+kotlinXDatetime = "0.7.1"
+kotlinXIO = "0.8.0"
+kotlinXSerialization = "1.9.0"
 kotlinerCli = "1.0.5"
-ksp = "2.0.21-1.0.25"
-ktor = "3.0.3"
-lambdaJavaCore = "1.2.3"
-lambdaJavaEvents = "3.11.4"
+kotlinxSerializationCsvDurable = "0.2.21-1"
+ksp = "2.2.20-2.0.3"
+ktor = "3.3.2"
+lambdaJavaCore = "1.4.0"
+lambdaJavaEvents = "3.16.1"
 lambdaJavaLog4j2 = "1.6.0"
-lettuce = "6.3.2.RELEASE"
-logBackClassic = "1.5.3"
+lettuce = "6.7.1.RELEASE"
+lkGradleHelpers = "4.0.6"
+mcp = "0.8.0"
 memcached = "2.4.8"
-mongoDriver = "5.1.2"
-oneTimePass = "2.4.0"
+metadataExtractor = "2.19.0"
+mongoDriver = "5.6.1"
+netty = "4.1.114.Final"
+okio = "3.16.2"
+oneTimePass = "2.4.1"
 orgCrac = "0.1.3"
-postgresql = "42.7.3"
-proguard = "7.3.2"
-sentry = "7.14.0"
-sentry9 = "1.7.30"
-serializationLibs = "1.7.3"
-serializationXmlUtil = "0.86.3"
+postgresql = "42.7.8"
+proguard = "7.8.1"
+scrimage = "4.3.3"
+sentry = "8.26.0"
+serializationLibs = "1.9.0"
+serviceAbstractions = "0.0.1-87"
 shadow = "8.1.1"
-vanniktechMavenPublish = "0.30.0"
-xmlUtilJvm = "0.90.1"
+vanniktechMavenPublish = "0.34.0"
+webauthn4jCore = "0.29.4.RELEASE"
+xmlUtilJvm = "0.91.3"
 
 [libraries]
 androidDesugaring = { module = "com.android.tools:desugar_jdk_libs", version = { ref = "androidDesugaring" } }
@@ -60,17 +69,18 @@ awsCrtClient = { module = "software.amazon.awssdk:aws-crt-client", version = { r
 awsLambda = { module = "software.amazon.awssdk:lambda", version = { ref = "awsVersion" } }
 awsRds = { module = "software.amazon.awssdk:rds", version = { ref = "awsVersion" } }
 awsS3 = { module = "software.amazon.awssdk:s3", version = { ref = "awsVersion" } }
+awsSecretsManager = { module = "software.amazon.awssdk:secretsmanager", version = { ref = "awsVersion" } }
 awsSes = { module = "software.amazon.awssdk:ses", version = { ref = "awsVersion" } }
 azureFunctions = { module = "com.microsoft.azure.functions:azure-functions-java-library", version = { ref = "azureFunctions" } }
 azureStorage = { module = "com.azure:azure-storage-blob", version = { ref = "azureStorage" } }
 bouncyCastleBcpkix = { module = "org.bouncycastle:bcpkix-jdk18on", version = { ref = "bouncyCastle" } }
 bouncyCastleBcprov = { module = "org.bouncycastle:bcprov-jdk18on", version = { ref = "bouncyCastle" } }
 clamAv = { module = "xyz.capybara:clamav-client", version = { ref = "clamAv" } }
-comLightningkiteKotlinxSerializationCsvDurable = { module = "com.lightningkite:kotlinx-serialization-csv-durable", version = "0.2.6" }
+comLightningkiteKotlinxSerializationCsvDurable = { module = "com.lightningkite:kotlinx-serialization-csv-durable", version = { ref = "kotlinxSerializationCsvDurable" } }
 coroutinesCore = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version = { ref = "coroutines" } }
 coroutinesJdk = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8", version = { ref = "coroutines" } }
 coroutinesReactive = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactive", version = { ref = "coroutines" } }
-deployHelpers = { module = "com.lightningkite:deploy-helpers", version = "0.0.7" }
+coroutinesTesting = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version = { ref = "coroutines" } }
 dynamodb = { module = "software.amazon.awssdk:dynamodb", version = { ref = "dynamodb" } }
 embedMongo = { module = "de.flapdoodle.embed:de.flapdoodle.embed.mongo", version = { ref = "embedMongo" } }
 embeddedPostgres = { module = "io.zonky.test:embedded-postgres", version = { ref = "embeddedPostgres" } }
@@ -86,12 +96,19 @@ kBson = { module = "com.github.jershell:kbson", version = { ref = "kbson" } }
 kaml = { module = "com.charleskorn.kaml:kaml", version = { ref = "kaml" } }
 kotlinCompiler = { module = "org.jetbrains.kotlin:kotlin-compiler", version = { ref = "kotlin" } }
 kotlinHtmlJvm = { module = "org.jetbrains.kotlinx:kotlinx-html-jvm", version = { ref = "kotlinHtmlJvm" } }
+kotlinLogging = { module = "io.github.oshai:kotlin-logging", version = { ref = "kotlinLogging" } }
 kotlinReflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version = { ref = "kotlin" } }
 kotlinStdLib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version = { ref = "kotlin" } }
-kotlinTest = { module = "org.jetbrains.kotlin:kotlin-test-junit", version = { ref = "kotlin" } }
+kotlinTest = { module = "org.jetbrains.kotlin:kotlin-test", version = { ref = "kotlin" } }
+kotlinTestJs = { module = "org.jetbrains.kotlin:kotlin-test-js", version = { ref = "kotlin" } }
+kotlinTestJunit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version = { ref = "kotlin" } }
 kotlinXDatetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version = { ref = "kotlinXDatetime" } }
+kotlinXIO = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version = { ref = "kotlinXIO" } }
 kotlinXJson = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version = { ref = "kotlinXSerialization" } }
+kotlinXJsonIO = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json-io", version = { ref = "kotlinXSerialization" } }
 kotlinerCli = { module = "com.lightningkite:kotliner-cli", version = { ref = "kotlinerCli" } }
+kotlinxCryptoCore = { module = "dev.whyoleg.cryptography:cryptography-core", version = { ref = "cryptographyKotlin" } }
+kotlinxCryptoOptimal = { module = "dev.whyoleg.cryptography:cryptography-provider-optimal", version = { ref = "cryptographyKotlin" } }
 ksp = { module = "com.google.devtools.ksp:symbol-processing-api", version = { ref = "ksp" } }
 ktorCallLogging = { module = "io.ktor:ktor-server-call-logging", version = { ref = "ktor" } }
 ktorCioJvm = { module = "io.ktor:ktor-server-cio-jvm", version = { ref = "ktor" } }
@@ -107,21 +124,75 @@ lambdaJavaCore = { module = "com.amazonaws:aws-lambda-java-core", version = { re
 lambdaJavaEvents = { module = "com.amazonaws:aws-lambda-java-events", version = { ref = "lambdaJavaEvents" } }
 lambdaJavaLog4j2 = { module = "com.amazonaws:aws-lambda-java-log4j2", version = { ref = "lambdaJavaLog4j2" } }
 lettuce = { module = "io.lettuce:lettuce-core", version = { ref = "lettuce" } }
-logBackClassic = { module = "ch.qos.logback:logback-classic", version = { ref = "logBackClassic" } }
+lkGradleHelpers = { module = "com.lightningkite:lk-gradle-helpers", version = { ref = "lkGradleHelpers" } }
+mcp = { module = "io.modelcontextprotocol:kotlin-sdk", version = { ref = "mcp" } }
 memcached = { module = "com.googlecode.xmemcached:xmemcached", version = { ref = "memcached" } }
+metadataExtractor = { module = "com.drewnoakes:metadata-extractor", version = { ref = "metadataExtractor" } }
 mongoBson = { module = "org.mongodb:bson", version = { ref = "bson" } }
 mongoDriver = { module = "org.mongodb:mongodb-driver-kotlin-coroutine", version = { ref = "mongoDriver" } }
+nettyBom = { module = "io.netty:netty-bom", version = { ref = "netty" } }
+nettyBuffer = { module = "io.netty:netty-buffer", version = "0.0.0" }
+nettyCodec = { module = "io.netty:netty-codec", version = "0.0.0" }
+nettyCodecHttp = { module = "io.netty:netty-codec-http", version = "0.0.0" }
+nettyHandler = { module = "io.netty:netty-handler", version = "0.0.0" }
+nettyTransport = { module = "io.netty:netty-transport", version = "0.0.0" }
+nettyTransportClassesEpoll = { module = "io.netty:netty-transport-classes-epoll", version = "0.0.0" }
+nettyTransportClassesKqueue = { module = "io.netty:netty-transport-classes-kqueue", version = "0.0.0" }
+okio = { module = "com.squareup.okio:okio", version = { ref = "okio" } }
 oneTimePass = { module = "dev.turingcomplete:kotlin-onetimepassword", version = { ref = "oneTimePass" } }
 orgCrac = { module = "io.github.crac:org-crac", version = { ref = "orgCrac" } }
 postgresql = { module = "org.postgresql:postgresql", version = { ref = "postgresql" } }
 proguard = { module = "com.guardsquare:proguard-gradle", version = { ref = "proguard" } }
+scrimage = { module = "com.sksamuel.scrimage:scrimage-core", version = { ref = "scrimage" } }
+scrimageFormats = { module = "com.sksamuel.scrimage:scrimage-formats-extra", version = { ref = "scrimage" } }
+scrimageWebP = { module = "com.sksamuel.scrimage:scrimage-webp", version = { ref = "scrimage" } }
 sentry = { module = "io.sentry:sentry", version = { ref = "sentry" } }
-sentry9 = { module = "io.sentry:sentry", version = { ref = "sentry9" } }
-sentry9Logback = { module = "io.sentry:sentry-logback", version = { ref = "sentry9" } }
 serialization = { module = "org.jetbrains.kotlin:kotlin-serialization", version = { ref = "kotlin" } }
 serializationCbor = { module = "org.jetbrains.kotlinx:kotlinx-serialization-cbor", version = { ref = "serializationLibs" } }
 serializationProperties = { module = "org.jetbrains.kotlinx:kotlinx-serialization-properties", version = { ref = "serializationLibs" } }
 serializationProtobuf = { module = "org.jetbrains.kotlinx:kotlinx-serialization-protobuf", version = { ref = "serializationLibs" } }
+serviceAbstractionsAwsClient = { module = "com.lightningkite.services:aws-client", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsBasis = { module = "com.lightningkite.services:basis", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsCache = { module = "com.lightningkite.services:cache", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsCacheDynamodb = { module = "com.lightningkite.services:cache-dynamodb", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsCacheMemcached = { module = "com.lightningkite.services:cache-memcached", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsCacheRedis = { module = "com.lightningkite.services:cache-redis", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsCacheTest = { module = "com.lightningkite.services:cache-test", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsData = { module = "com.lightningkite.services:data", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsDatabase = { module = "com.lightningkite.services:database", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsDatabaseJsonfile = { module = "com.lightningkite.services:database-jsonfile", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsDatabaseMongodb = { module = "com.lightningkite.services:database-mongodb", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsDatabasePostgres = { module = "com.lightningkite.services:database-postgres", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsDatabaseProcessor = { module = "com.lightningkite.services:database-processor", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsDatabaseShared = { module = "com.lightningkite.services:database-shared", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsDatabaseTest = { module = "com.lightningkite.services:database-test", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsDemo = { module = "com.lightningkite.services:demo", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsEmail = { module = "com.lightningkite.services:email", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsEmailJavasmtp = { module = "com.lightningkite.services:email-javasmtp", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsEmailTest = { module = "com.lightningkite.services:email-test", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsExceptionsSentry = { module = "com.lightningkite.services:exceptions-sentry", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsFiles = { module = "com.lightningkite.services:files", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsFilesClamav = { module = "com.lightningkite.services:files-clamav", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsFilesClient = { module = "com.lightningkite.services:files-client", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsFilesS3 = { module = "com.lightningkite.services:files-s3", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsFilesTest = { module = "com.lightningkite.services:files-test", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsHttpClient = { module = "com.lightningkite.services:http-client", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsMetricsCloudwatch = { module = "com.lightningkite.services:metrics-cloudwatch", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsNotifications = { module = "com.lightningkite.services:notifications", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsNotificationsFcm = { module = "com.lightningkite.services:notifications-fcm", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsNotificationsTest = { module = "com.lightningkite.services:notifications-test", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsOtelJvm = { module = "com.lightningkite.services:otel-jvm", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsPubsub = { module = "com.lightningkite.services:pubsub", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsPubsubRedis = { module = "com.lightningkite.services:pubsub-redis", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsPubsubTest = { module = "com.lightningkite.services:pubsub-test", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsShouldBeStandardLibrary = { module = "com.lightningkite.services:should-be-standard-library", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsSms = { module = "com.lightningkite.services:sms", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsSmsTest = { module = "com.lightningkite.services:sms-test", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsSmsTwilio = { module = "com.lightningkite.services:sms-twilio", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsAiKoog = { module = "com.lightningkite.services:ai-koog", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsAiKoogAwsOpensearch = { module = "com.lightningkite.services:ai-koog-aws-opensearch", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsTest = { module = "com.lightningkite.services:test", version = { ref = "serviceAbstractions" } }
+webauthn4jCore = { module = "com.webauthn4j:webauthn4j-core", version = { ref = "webauthn4jCore" } }
 xmlUtilJvm = { module = "io.github.pdvrieze.xmlutil:serialization-jvm", version = { ref = "xmlUtilJvm" } }
 
 [plugins]
