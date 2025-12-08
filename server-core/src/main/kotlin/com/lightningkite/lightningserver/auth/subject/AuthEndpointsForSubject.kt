@@ -261,7 +261,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             SecureRandom.getInstanceStrong().nextBytes(this)
         })
         return Session<SUBJECT, ID>(
-            secretHash = secret.secureHash(),
+            secretHash = secret.fastHash(),
             subjectId = subjectId,
             label = label,
             expires = expires,
@@ -641,12 +641,17 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             if (generalSettings().debug) serverLogger.debug("Auth failed because session.terminated != null")
             throw UnauthorizedException("Session has been terminated.")
         }
+        // Lazy migration: if using old slow PBKDF2 hash, upgrade to fast SHA-256 hash
+        val shouldMigrate = session.secretHash.isSlowHash()
         sessionInfo.collection().updateOneById(_id, modification(dataClassPath) {
             it.lastUsed assign now()
             it.userAgents addAll setOf(request?.headers?.get(HttpHeader.UserAgent) ?: "")
             it.ips addAll setOf(request?.sourceIp ?: "test")
             handler.getSessionStaleLength(handler.fetch(session.subjectId))
                 ?.let { length -> it.stale assign now() + length }
+            if (shouldMigrate) {
+                it.secretHash assign plainTextSecret.fastHash()
+            }
         })
         return session
     }

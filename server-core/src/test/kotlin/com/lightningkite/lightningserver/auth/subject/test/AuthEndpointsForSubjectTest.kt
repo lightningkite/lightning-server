@@ -37,6 +37,11 @@ import io.ktor.http.decodeURLQueryComponent
 import kotlin.test.*
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
+import com.lightningkite.lightningserver.encryption.secureHash
+import com.lightningkite.lightningserver.encryption.isSlowHash
+import com.lightningkite.lightningserver.auth.subject.Session
+import com.lightningkite.lightningserver.auth.subject.RefreshToken
+import com.lightningkite.lightningserver.testmodels.TestUser
 
 class AuthEndpointsForSubjectTest {
 
@@ -451,6 +456,67 @@ class AuthEndpointsForSubjectTest {
             wildcard = m.wildcard,
             queryParameters = url.substringAfter('?', "").split('&').map { it.substringBefore('=') to it.substringAfter('=').decodeURLQueryComponent() }
         ).status)
+    }
+
+    @Test
+    fun testSessionHashMigration(): Unit = runBlocking {
+        // This test verifies that sessions with old PBKDF2 hashes get migrated to fast SHA-256 hashes
+        // when they are used for authentication.
+
+        val user = TestSettings.testUser.await()
+
+        // Create a session with an old-style PBKDF2 hash (simulating a pre-migration session)
+        val secret = java.util.Base64.getEncoder().encodeToString(ByteArray(24).apply {
+            java.security.SecureRandom.getInstanceStrong().nextBytes(this)
+        })
+        val oldStyleHash = secret.secureHash()
+
+        // Verify the hash is PBKDF2 style
+        assertTrue(oldStyleHash.startsWith("PBKDF2WithHmacSHA512."), "Hash should be slow PBKDF2 style")
+        assertTrue(oldStyleHash.isSlowHash(), "Hash should be detected as slow")
+
+        // Insert session directly with the old-style hash
+        val session = Session<TestUser, UUID>(
+            secretHash = oldStyleHash,
+            subjectId = user._id,
+            scopes = setOf("*"),
+            label = "Migration Test Session"
+        )
+        TestSettings.testUserSubject.sessionInfo.collection().insertOne(session)
+
+        // Create a refresh token that would have been issued with this session
+        val refreshToken = RefreshToken(
+            TestSettings.subjectHandler.name,
+            session._id,
+            secret
+        )
+
+        // Verify the session currently has a slow hash
+        val sessionBefore = TestSettings.testUserSubject.sessionInfo.collection().get(session._id)!!
+        assertTrue(sessionBefore.secretHash.startsWith("PBKDF2WithHmacSHA512."), "Session should have slow hash before migration")
+
+        // Use the refresh token to authenticate - this should trigger migration
+        val auth = TestSettings.testUserSubject.tokenToAuth(refreshToken.string, null)
+        assertNotNull(auth, "Should be able to authenticate with old-style hash")
+        assertEquals(user._id, auth!!.rawId, "Auth should be for correct user")
+
+        // Verify the session hash has been migrated to fast hash
+        val sessionAfter = TestSettings.testUserSubject.sessionInfo.collection().get(session._id)!!
+        assertTrue(sessionAfter.secretHash.startsWith("SHA256."), "Session should have fast SHA256 hash after migration")
+        assertFalse(sessionAfter.secretHash.isSlowHash(), "Session should no longer have slow hash")
+
+        // Verify we can still authenticate with the same refresh token after migration
+        val auth2 = TestSettings.testUserSubject.tokenToAuth(refreshToken.string, null)
+        assertNotNull(auth2, "Should still be able to authenticate after migration")
+        assertEquals(user._id, auth2!!.rawId, "Auth should still be for correct user")
+
+        // Verify hash hasn't changed again (already migrated)
+        val sessionFinal = TestSettings.testUserSubject.sessionInfo.collection().get(session._id)!!
+        assertEquals(sessionAfter.secretHash, sessionFinal.secretHash, "Hash should not change on subsequent authentications")
+
+        println("Migration test passed: PBKDF2 -> SHA256")
+        println("  Before: ${sessionBefore.secretHash.take(30)}...")
+        println("  After:  ${sessionAfter.secretHash.take(30)}...")
     }
 
 }
