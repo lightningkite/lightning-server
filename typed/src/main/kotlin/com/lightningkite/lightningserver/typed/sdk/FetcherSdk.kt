@@ -1,42 +1,27 @@
 package com.lightningkite.lightningserver.typed.sdk
 
-import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.naturalLanguage
-import com.lightningkite.lightningserver.definition.ServerDefinition
-import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.plus
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.LiveVersion
-import com.lightningkite.lightningserver.typed.sdk.SDK.sdk
 import com.lightningkite.lightningserver.typed.sdk.SDK.processToModules
-import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
+import com.lightningkite.lightningserver.typed.sdk.SDK.sdk
 import com.lightningkite.services.data.KFile
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.builtins.nullable
-import kotlin.reflect.KClass
-import kotlin.reflect.KType
 
-public object FetcherSdk : SDK.Format {
+public class FetcherSdk(
+    public val packageName: String,
+    public val rootInfo: SdkModule.Info = SdkModule.Info("Api"),
+    public val interfaceFileName: String = "${rootInfo.interfaceName}.kt",
+    public val liveFileName: String = "Live${rootInfo.interfaceName}.kt"
+) : SDK.Format {
+
     context(server: ServerRuntime)
-    override fun write(data: ServerDefinition, folder: KFile, packageName: String) {
-        val processed = data.sdk().processToModules().ensureUniqueNames()
+    override fun write(folder: KFile) {
+        val processed = server.server.sdk(rootInfo).processToModules().ensureUniqueNames()
 
-        val rootName = processed.info.interfaceName
-
-        folder.then("$rootName.kt").overwrite { writeInterface(processed, packageName) }
-        folder.then("Live$rootName.kt").overwrite { writeLive(processed, packageName) }
-    }
-
-    private fun KFile.overwrite(action: Appendable.() -> Unit) {
-        parent?.createDirectories()
-        sink().useAsAppendable(action)
-    }
-
-    private fun Appendable.appendDepth(depth: Int, value: CharSequence) {
-        repeat(depth) { append('\t') }
-        append(value)
-        append('\n')
+        folder.then(interfaceFileName).overwrite { writeInterface(processed) }
+        folder.then(liveFileName).overwrite { writeLive(processed) }
     }
 
     context(buffer: Appendable)
@@ -52,7 +37,7 @@ public object FetcherSdk : SDK.Format {
     }
 
     context(_: ServerRuntime)
-    private fun Appendable.writeInterface(module: SDK.Module, packageName: String) {
+    private fun Appendable.writeInterface(module: SDK.Module) {
         appendLine("package $packageName")
 
         module.appendImports()
@@ -64,9 +49,9 @@ public object FetcherSdk : SDK.Format {
             appendLine()
 
             if (singleInterface == null) {
-                appendDepth(depth, "interface ${info.interfaceName}" + (if (extendsInterfaces.isEmpty()) "" else " : ${extendsInterfaces.joinToString { it.item.kotlinString() }}") + " {")
+                appendIdtLine(depth, "interface ${info.interfaceName}" + (if (extendsInterfaces.isEmpty()) "" else " : ${extendsInterfaces.joinToString { it.item.kotlinString() }}") + " {")
 
-                if (depth == 0) appendDepth(1, "fun withHeaderCalculator(calculator: suspend () -> List<Pair<String, String>>): ${info.interfaceName}")
+                if (depth == 0) appendIdtLine(1, "fun withHeaderCalculator(calculator: suspend () -> List<Pair<String, String>>): ${info.interfaceName}")
 
                 for (function in declaredFunctions) {
                     val docs = buildList {
@@ -77,26 +62,26 @@ public object FetcherSdk : SDK.Format {
                         add("**Auth Requirements:** ${function.auth.naturalLanguage(true).replace("[", "[[").replace("]", "]]")}")
                     }
 
-                    appendDepth(depth + 1, "/**")
-                    for (line in docs) appendDepth(depth + 1, " * $line")
-                    appendDepth(depth + 1, " * */")
+                    appendIdtLine(depth + 1, "/**")
+                    for (line in docs) appendIdtLine(depth + 1, " * $line")
+                    appendIdtLine(depth + 1, " * */")
 
-                    appendDepth(depth + 1, function.kotlinString())
+                    appendIdtLine(depth + 1, function.kotlinString())
                 }
 
                 for (module in children) module.writeInterface(depth + 1)
 
-                appendDepth(depth, "}")
+                appendIdtLine(depth, "}")
             }
 
-            if (depth > 0) appendDepth(depth, "val ${info.valueName}: ${singleInterface?.kotlinString() ?: (info.interfaceName)}")
+            if (depth > 0) appendIdtLine(depth, "val ${info.valueName}: ${singleInterface?.kotlinString() ?: (info.interfaceName)}")
         }
 
         module.writeInterface(0)
     }
 
     context(server: ServerRuntime)
-    private fun Appendable.writeLive(module: SDK.Module, packageName: String) {
+    private fun Appendable.writeLive(module: SDK.Module) {
         appendLine("package $packageName")
 
         module.appendImports(
@@ -126,10 +111,10 @@ public object FetcherSdk : SDK.Format {
             return "$live(fetcher, ${path.toCodeString()}, ${typeParameters.joinToString { it.kotlinSerializer() }})"
         }
 
-        fun SDK.Module.writeLive(chain: List<SDK.Module>) {
-            val depth = chain.size
+        fun SDK.Module.writeLive(ancestors: List<SDK.Module>) {
+            val depth = ancestors.size
 
-            val pathPrefix = (chain + this).fold(PathSpec.root) { acc, mod -> acc + mod.path }
+            val pathPrefix = (ancestors + this).fold(PathSpec.root) { acc, mod -> acc + mod.path }
             fun PathSpec.absolute(): PathSpec = pathPrefix + this
 
             val singleInterface = extendsInterfaces.singleOrNull()?.takeIf { declaredFunctions.isEmpty() && depth > 0 }
@@ -137,21 +122,21 @@ public object FetcherSdk : SDK.Format {
             appendLine()
 
             if (singleInterface == null) {
-                val extendsInterfaces = listOf((chain + this).joinToString(".") { it.info.interfaceName }) + extendsInterfaces.map { inter ->
+                val extendsInterfaces = listOf((ancestors + this).joinToString(".") { it.info.interfaceName }) + extendsInterfaces.map { inter ->
                     "${inter.item.kotlinString()} by ${inter.item.liveString(pathPrefix + inter.location)}"
                 }
 
                 if (depth == 0) {
                     appendLine("class Live${info.interfaceName}(val fetcher: Fetcher) : ${extendsInterfaces.joinToString()} {")
 
-                    appendDepth(1, "override fun withHeaderCalculator(calculator: suspend () -> List<Pair<String, String>>): Live${info.interfaceName} = ")
-                    appendDepth(2, "Live${info.interfaceName}(fetcher.withHeaderCalculator(calculator))")
+                    appendIdtLine(1, "override fun withHeaderCalculator(calculator: suspend () -> List<Pair<String, String>>): Live${info.interfaceName} = ")
+                    appendIdtLine(2, "Live${info.interfaceName}(fetcher.withHeaderCalculator(calculator))")
                 }
-                else appendDepth(depth, "inner class Live${info.interfaceName} : ${extendsInterfaces.joinToString()} {")
+                else appendIdtLine(depth, "inner class Live${info.interfaceName} : ${extendsInterfaces.joinToString()} {")
 
                 for (function in declaredFunctions) {
-                    appendDepth(depth + 1, "override ${function.kotlinString()} =")
-                    appendDepth(
+                    appendIdtLine(depth + 1, "override ${function.kotlinString()} =")
+                    appendIdtLine(
                         depth + 2,
                         when (function) {
                             is SDK.Function.Endpoint -> "fetcher(" + listOf(
@@ -171,12 +156,12 @@ public object FetcherSdk : SDK.Format {
                     )
                 }
 
-                for (module in children) module.writeLive(chain + this)
+                for (module in children) module.writeLive(ancestors + this)
 
-                appendDepth(depth, "}")
+                appendIdtLine(depth, "}")
             }
 
-            if (depth > 0) appendDepth(depth, "override val ${info.valueName} = ${singleInterface?.item?.liveString(pathPrefix + singleInterface.location) ?: "Live${info.interfaceName}()"}")
+            if (depth > 0) appendIdtLine(depth, "override val ${info.valueName} = ${singleInterface?.item?.liveString(pathPrefix + singleInterface.location) ?: "Live${info.interfaceName}()"}")
         }
 
         module.writeLive(emptyList())

@@ -40,7 +40,7 @@ public object SDK { // namespace object
 
     public interface Format {
         context(server: ServerRuntime)
-        public fun write(data: ServerDefinition, folder: KFile, packageName: String)
+        public fun write(folder: KFile)
     }
 
     public data class Data(
@@ -219,15 +219,10 @@ public object SDK { // namespace object
             throw NotImplementedError("SDK Runner only exists to retrieve serialization information")
     }
 
-    public fun ServerBuilder.writeSdk(format: Format, folder: KFile, packageName: String) {
+    public fun ServerBuilder.writeSdk(format: Format, folder: KFile) {
         with(Runtime(this)) {
             settings.readyUsingDefaults()
-            writeSdk(format, folder, packageName)
+            format.write(folder)
         }
-    }
-
-    context(runtime: ServerRuntime)
-    public fun ServerBuilder.writeSdk(format: Format, folder: KFile, packageName: String) {
-        format.write(build(), folder, packageName)
     }
 }
