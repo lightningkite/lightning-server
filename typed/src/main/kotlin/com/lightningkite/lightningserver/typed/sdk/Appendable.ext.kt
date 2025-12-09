@@ -1,7 +1,20 @@
 package com.lightningkite.lightningserver.typed.sdk
 
+import com.lightningkite.services.data.KFile
 import kotlinx.io.Sink
 import kotlinx.io.writeString
+import kotlin.use
+
+public fun Appendable.appendIdt(depth: Int): Appendable {
+    repeat(depth) { append('\t') }
+    return this
+}
+
+public fun Appendable.appendIdtLine(depth: Int, csq: CharSequence): Appendable =
+    appendIdt(depth).appendLine(csq)
+
+public fun Appendable.appendIdtLine(depth: Int, c: Char): Appendable =
+    appendIdt(depth).appendLine(c)
 
 public fun Sink.useAsAppendable(action: Appendable.() -> Unit) {
     this.use { sink ->
@@ -23,4 +36,9 @@ public fun Sink.useAsAppendable(action: Appendable.() -> Unit) {
         }
         action(appendable)
     }
+}
+
+public fun KFile.overwrite(action: Appendable.() -> Unit) {
+    parent?.createDirectories()
+    sink().useAsAppendable(action)
 }

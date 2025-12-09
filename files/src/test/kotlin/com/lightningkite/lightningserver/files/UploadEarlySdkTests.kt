@@ -48,6 +48,6 @@ class UploadEarlySdkTests {
 
     @Test
     fun generateSdk() {
-        Server.writeSdk(FetcherSdk, KFile("./src/test/kotlin/com/lightningkite/lightningserver/files/generated"), "com.lightningkite.lightningserver.files")
+        Server.writeSdk(FetcherSdk("com.lightningkite.lightningserver.files"), KFile("./src/test/kotlin/com/lightningkite/lightningserver/files/generated"))
     }
 }

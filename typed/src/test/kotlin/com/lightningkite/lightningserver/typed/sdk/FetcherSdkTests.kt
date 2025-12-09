@@ -9,18 +9,11 @@ import com.lightningkite.services.data.KFile
 import kotlin.test.Test
 
 class FetcherSdkTests {
-    private val folder = KFile("./src/test/kotlin/com/lightningkite/lightningserver/typed/sdk/generated")
+    private val folder = KFile("./src/test/kotlin/com/lightningkite/lightningserver/typed/sdk/generated/fetcher")
 
     @Test
     fun test() {
-        val build = Server.build()
-        println("Modules: ${build.modules}")
-        println("Extensions: ${build.extensions.entries.size}")
-
-        build.sdk().let {
-            println("Children: ${it.children}")
-        }
-        Server.writeSdk(FetcherSdk, folder, "com.lightningkite.lightningserver.typed.sdk")
+        Server.writeSdk(FetcherSdk("com.lightningkite.lightningserver.typed.sdk"), folder)
     }
 
     @Test
