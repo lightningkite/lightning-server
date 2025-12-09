@@ -5,33 +5,20 @@ import com.lightningkite.lightningdb.*
 import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.cache.Cache
-import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.modelInfo
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
-import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.encryption.*
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.http.HttpStatus
-import com.lightningkite.lightningserver.http.delete
-import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.routes.docName
-import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.serialization.decodeUnwrappingString
-import com.lightningkite.lightningserver.serialization.encodeUnwrappingString
-import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.now
 import kotlinx.coroutines.flow.toList
-import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.InternalSerializationApi
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer
-import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.minutes
 
 @OptIn(InternalSerializationApi::class)
 class PasswordProofEndpoints(
@@ -167,7 +154,8 @@ class PasswordProofEndpoints(
                 val subject = input.type
                 val handler = Authentication.subjects.values.find { it.name == subject }
                     ?: throw IllegalArgumentException("No subject $subject recognized")
-                val subjectId = handler.findUserIdString(input.property, input.value)
+                val normalizedValue = handler.normalizePropertyValue(input.property, input.value)
+                val subjectId = handler.findUserIdString(input.property, normalizedValue)
                     ?: throw BadRequestException("User ID and code do not match")
 
                 val active = modelInfo.collection().find(condition {
@@ -184,7 +172,7 @@ class PasswordProofEndpoints(
                 proofHasher().makeProof(
                     info = info,
                     property = input.property,
-                    value = input.value,
+                    value = normalizedValue,
                     at = now()
                 )
             }
