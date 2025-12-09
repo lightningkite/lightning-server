@@ -12,16 +12,17 @@ import com.lightningkite.services.data.KFile
 public class FetcherSdk(
     public val packageName: String,
     public val rootInfo: SdkModule.Info = SdkModule.Info("Api"),
-    public val interfaceFileName: String = "${rootInfo.interfaceName}.kt",
-    public val liveFileName: String = "Live${rootInfo.interfaceName}.kt"
+    public val interfaceFilename: String = "${rootInfo.interfaceName}.kt",
+    public val liveFilename: String = "Live${rootInfo.interfaceName}.kt",
+    public val includeDocComments: Boolean = true,
 ) : SDK.Format {
 
     context(server: ServerRuntime)
     override fun write(folder: KFile) {
         val processed = server.server.sdk(rootInfo).processToModules().ensureUniqueNames()
 
-        folder.then(interfaceFileName).overwrite { writeInterface(processed) }
-        folder.then(liveFileName).overwrite { writeLive(processed) }
+        folder.then(interfaceFilename).overwrite { writeInterface(processed) }
+        folder.then(liveFilename).overwrite { writeLive(processed) }
     }
 
     context(buffer: Appendable)
@@ -54,17 +55,21 @@ public class FetcherSdk(
                 if (depth == 0) appendIdtLine(1, "fun withHeaderCalculator(calculator: suspend () -> List<Pair<String, String>>): ${info.interfaceName}")
 
                 for (function in declaredFunctions) {
-                    val docs = buildList {
-                        fun line(string: String) { add(string); add("") }
-                        if (function.summary.isNotBlank()) line(function.summary)
-                        if (function.description.isNotBlank()) line(function.description)
+                    if (includeDocComments) {
+                        val docs = buildList {
+                            fun line(string: String) {
+                                add(string); add("")
+                            }
+                            if (function.summary.isNotBlank()) line(function.summary)
+                            if (function.description.isNotBlank()) line(function.description)
 
-                        add("**Auth Requirements:** ${function.auth.naturalLanguage(true).replace("[", "[[").replace("]", "]]")}")
+                            add("**Auth Requirements:** ${function.auth.naturalLanguage(true).replace("[", "[[").replace("]", "]]")}")
+                        }
+
+                        appendIdtLine(depth + 1, "/**")
+                        for (line in docs) appendIdtLine(depth + 1, " * $line")
+                        appendIdtLine(depth + 1, " * */")
                     }
-
-                    appendIdtLine(depth + 1, "/**")
-                    for (line in docs) appendIdtLine(depth + 1, " * $line")
-                    appendIdtLine(depth + 1, " * */")
 
                     appendIdtLine(depth + 1, function.kotlinString())
                 }
@@ -87,6 +92,7 @@ public class FetcherSdk(
         module.appendImports(
             "com.lightningkite.lightningserver.HttpMethod",
             "com.lightningkite.lightningserver.typed.Fetcher",
+            "kotlinx.serialization.ContextualSerializer",
             "kotlinx.serialization.builtins.serializer",
             "kotlinx.serialization.builtins.MapSerializer",
             "kotlinx.serialization.builtins.ListSerializer",

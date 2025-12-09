@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.typed.sdk
 
+import com.lightningkite.lightningserver.auth.naturalLanguage
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.plus
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -24,101 +25,138 @@ import kotlin.collections.fold
 import kotlin.collections.plus
 
 public class TypescriptFetcherSDK(
-    public val filename: String = "sdk.ts",
-    public val rootInfo: SdkModule.Info = SdkModule.Info("Api")
+    public val rootInfo: SdkModule.Info = SdkModule.Info("Api"),
+    public val fileStructure: Files = Files.MultipleFiles(
+        modelsFilename = "models.ts",
+        interfaceFilename = "${rootInfo.interfaceName}.ts",
+        liveFilename = "Live${rootInfo.interfaceName}.ts"
+    ),
+    public val includeDocComments: Boolean = true
 ) : SDK.Format {
+    public sealed interface Files {
+        public data class SingleFile(val filename: String) : Files
+
+        public data class MultipleFiles(
+            val modelsFilename: String,
+            val interfaceFilename: String,
+            val liveFilename: String
+        ) : Files
+    }
 
     context(server: ServerRuntime)
-    override fun write(folder: KFile) {
-        val processed = server.server.sdk(rootInfo).processToModules().ensureUniqueNames()
+    override fun write(folder: KFile): Unit = when (fileStructure) {
+        is Files.SingleFile -> {
+            val processed = server.server.sdk(rootInfo).processToModules().ensureUniqueNames()
 
-        fun Appendable.bigGap() = append("\n\n\n")
+            fun Appendable.bigGap() = append("\n\n\n")
 
-        folder.then(filename).overwrite {
-            writeImports()
-            appendLine()
-            writeTypeDefinitions()
-            bigGap()
-            writeInterface(processed)
-            bigGap()
-            writeLive(processed)
+            folder.then(fileStructure.filename).overwrite {
+                appendLsImports()
+                appendLine()
+                writeTypeDefinitions()
+                bigGap()
+                writeInterface(processed)
+                bigGap()
+                writeLive(processed)
+            }
+        }
+        is Files.MultipleFiles -> {
+            val processed = server.server.sdk(rootInfo).processToModules().ensureUniqueNames()
+
+            val models = server.models()
+
+            fun Appendable.appendModelImports() =
+                appendLine("import type { ${models.joinToString { it.tsType().substringBefore('<') }} } from './${fileStructure.modelsFilename}'")
+
+            folder.then(fileStructure.modelsFilename).overwrite {
+                appendLsImports()
+                appendLine()
+                writeTypeDefinitions(models)
+            }
+
+            folder.then(fileStructure.interfaceFilename).overwrite {
+                appendLsImports()
+                appendModelImports()
+                appendLine()
+                writeInterface(processed)
+            }
+
+            folder.then(fileStructure.liveFilename).overwrite {
+                appendLsImports()
+                appendModelImports()
+                appendLine("import type { ${rootInfo.interfaceName} } from './${fileStructure.interfaceFilename}'")
+                appendLine()
+                writeLive(processed)
+            }
         }
     }
 
-    private fun Appendable.writeImports() {
+    private fun Appendable.appendLsImports() =
         appendLine("import type { ${fromLightningServerPackage.joinToString()} } from '@lightningkite/lightning-server-simplified'")
-        appendLine()
-    }
 
     context(server: ServerRuntime)
-    private fun Appendable.writeTypeDefinitions() {
+    private fun Appendable.writeTypeDefinitions(types: List<KSerializer<*>> = server.models()) {
         val stringSerialNames = HashSet<String>()
 
-        server.usedTypes()
-            .filter { it.descriptor.simpleSerialName !in skipFromLsPackage }
-            .sortedBy { it.descriptor.simpleSerialName }
-            .distinctBy { it.tsType() }
-            .forEach { type ->
-                when (type.descriptor.kind) {
-                    StructureKind.CLASS -> {
-                        if (type is MySealedClassSerializer) return@forEach
-
-                        val genericMap: Map<String, String> = type
-                            .getGenerics()
-                            ?.withIndex()
-                            ?.associate { (index, value) ->
-                                value.tsType() to "T${if (index > 0) index else ""}"
-                            }
-                            ?: emptyMap()
-
-                        fun String.replaceGenerics(): String =
-                            genericMap.entries.fold(this) { acc, (old, new) -> acc.replace(old, new) }
-
-                        appendLine("export interface ${type.tsType().replaceGenerics()} {")
-
-                        val properties = type
-                            .serializableProperties?.map { it.serializer }
-                            ?: type.childSerializersOrNull()?.toList()
-                            ?: emptyList()
-
-                        for ((idx, prop) in properties.withIndex()) {
-                            appendLine("\t${type.descriptor.getElementName(idx)}: ${prop.tsType().replaceGenerics()}")
+        for (type in types) {
+            when (type.descriptor.kind) {
+                StructureKind.CLASS -> {
+                    val genericMap: Map<String, String> = type
+                        .getGenerics()
+                        ?.withIndex()
+                        ?.associate { (index, value) ->
+                            value.tsType() to "T${if (index > 0) index else ""}"
                         }
+                        ?: emptyMap()
 
-                        appendLine('}')
+                    fun String.replaceGenerics(): String =
+                        genericMap.entries.fold(this) { acc, (old, new) -> acc.replace(old, new) }
+
+                    appendLine("export interface ${type.tsType().replaceGenerics()} {")
+
+                    val properties = type
+                        .serializableProperties?.map { it.serializer }
+                        ?: type.childSerializersOrNull()?.toList()
+                        ?: emptyList()
+
+                    for ((idx, prop) in properties.withIndex()) {
+                        appendLine("\t${type.descriptor.getElementName(idx)}: ${prop.tsType().replaceGenerics()}")
                     }
 
-                    SerialKind.ENUM -> {
-                        appendLine("export enum ${type.tsType()} {")
-                        for (index in 0 until type.descriptor.elementsCount) {
-                            append('\t')
-                            val name = type.descriptor.getElementName(index)
-                            name.forEachIndexed { idx, it ->
-                                if ((idx == 0 && it.isJavaIdentifierStart()) || (idx != 0 && it.isJavaIdentifierPart()))
-                                    append(it)
-                                else
-                                    append('_')
-                            }
-                            append(" = \"$name\",")
-                            appendLine()
-                        }
-                        appendLine('}')
-                    }
-
-                    PrimitiveKind.STRING -> {
-                        val name = type.descriptor.simpleSerialName
-                        if (name != "String" && stringSerialNames.add(name)) {
-                            appendLine(
-                                "export type $name = string  // ${type.descriptor.serialName}"
-                                    .replace("/loose", "")
-                            )
-                        }
-                    }
-
-                    else -> { return@forEach }
+                    appendLine('}')
                 }
-                appendLine()
+
+                SerialKind.ENUM -> {
+                    appendLine("export enum ${type.tsType()} {")
+                    for (index in 0 until type.descriptor.elementsCount) {
+                        append('\t')
+                        val name = type.descriptor.getElementName(index)
+                        name.forEachIndexed { idx, it ->
+                            if ((idx == 0 && it.isJavaIdentifierStart()) || (idx != 0 && it.isJavaIdentifierPart()))
+                                append(it)
+                            else
+                                append('_')
+                        }
+                        append(" = \"$name\",")
+                        appendLine()
+                    }
+                    appendLine('}')
+                }
+
+                PrimitiveKind.STRING -> {
+                    val name = type.descriptor.simpleSerialName
+                    if (name != "String" && stringSerialNames.add(name)) {
+                        appendLine(
+                            "export type $name = string  // ${type.descriptor.serialName}"
+                                .replace("/loose", "")
+                        )
+                    }
+                }
+
+                else -> continue
             }
+            appendLine()
+        }
     }
 
     context(server: ServerRuntime)
@@ -128,6 +166,22 @@ public class TypescriptFetcherSDK(
             else appendIdtLine(depth, "readonly ${module.info.valueName}: {")
 
             for (func in module.functions.filter { it is SDK.Function.Endpoint }) {
+                if (includeDocComments) {
+                    val docs = buildList {
+                        fun line(string: String) {
+                            add(string); add("")
+                        }
+                        if (func.summary.isNotBlank()) line(func.summary)
+                        if (func.description.isNotBlank()) line(func.description)
+
+                        add("**Auth Requirements:** ${func.auth.naturalLanguage(true).replace("[", "[[").replace("]", "]]")}")
+                    }
+
+                    appendIdtLine(depth + 1, "/**")
+                    for (line in docs) appendIdtLine(depth + 1, " * $line")
+                    appendIdtLine(depth + 1, " * */")
+                }
+
                 appendIdt(depth + 1)
                 append(func.functionName)
                 func.arguments.joinTo(this, ", ", "(", "): ") {
@@ -174,17 +228,27 @@ public class TypescriptFetcherSDK(
             }
             else {
                 appendIdt(depth)
-                append("readonly ${module.info.valueName}: Api")
-                for (mod in ancestors.drop(1) + module) append("[\"${mod.info.valueName}\"]")
-                appendLine(" = {")
+                if (depth == 1) append("readonly ")
+                append(module.info.valueName)
+                if (depth == 1) {
+                    append(": Api")
+                    for (mod in ancestors.drop(1) + module) append("[\"${mod.info.valueName}\"]")
+                    append(" = {")
+                }
+                else append(": {")
+                appendLine()
             }
 
             for (func in module.functions.filter { it is SDK.Function.Endpoint }) {
                 appendIdt(depth + 1)
                 append(func.functionName)
-                append(": ")
+
+                if (depth == 0) append(": ${module.info.interfaceName}[\"${func.functionName}\"] = ")
+                else append(": ")
+
                 func.arguments.joinTo(this, ", ", "(", ")") { it.name }
                 append(" => ")
+
                 when (func) {
                     is SDK.Function.Endpoint -> {
                         append("this.fetcher(")
@@ -193,7 +257,9 @@ public class TypescriptFetcherSDK(
                             "\"${func.endpoint.method}\"",
                             if (func.inputType.isUnit()) "undefined" else "input"
                         ).joinTo(this)
-                        appendLine("),")
+                        append(')')
+                        if (depth > 0) append(',')
+                        appendLine()
                     }
                     is SDK.Function.Websocket -> {
                         // websockets not supported yet
@@ -205,11 +271,30 @@ public class TypescriptFetcherSDK(
 
             for (child in module.children) appendLive(child, ancestors + module)
 
-            appendIdtLine(depth, '}')
+            appendIdt(depth)
+            append('}')
+            if (depth > 1) append(',')
+            appendLine()
         }
 
         appendLive(root, emptyList())
     }
+
+
+    private fun ServerRuntime.models() = usedTypes()
+        .filter { it.descriptor.simpleSerialName !in skipFromLsPackage }
+        .sortedBy { it.descriptor.simpleSerialName }
+        .distinctBy { it.tsType() }
+        .filter {
+            when (it.descriptor.kind) {
+                SerialKind.ENUM -> true
+                StructureKind.CLASS if (it !is MySealedClassSerializer) -> true
+                PrimitiveKind.STRING if (it.descriptor.simpleSerialName != "String") -> true
+
+                else -> false
+            }
+        }
+
 
     @OptIn(ExperimentalSerializationApi::class)
     context(runtime: ServerRuntime)

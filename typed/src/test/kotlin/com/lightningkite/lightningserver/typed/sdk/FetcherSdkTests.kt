@@ -1,10 +1,8 @@
 package com.lightningkite.lightningserver.typed.sdk
 
 import com.lightningkite.lightningserver.runtime.test.test
-import com.lightningkite.lightningserver.typed.ModelRestEndpoints
 import com.lightningkite.lightningserver.typed.jsonschema.openApiDescription
-import com.lightningkite.lightningserver.typed.sdk.SDK.sdk
-import com.lightningkite.lightningserver.typed.sdk.SDK.writeSdk
+import com.lightningkite.lightningserver.typed.sdk.SDK.writeSdkUsingDefaultSettings
 import com.lightningkite.services.data.KFile
 import kotlin.test.Test
 
@@ -13,7 +11,7 @@ class FetcherSdkTests {
 
     @Test
     fun test() {
-        Server.writeSdk(FetcherSdk("com.lightningkite.lightningserver.typed.sdk"), folder)
+        Server.writeSdkUsingDefaultSettings(FetcherSdk("com.lightningkite.lightningserver.typed.sdk"), folder)
     }
 
     @Test

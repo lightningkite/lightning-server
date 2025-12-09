@@ -219,7 +219,7 @@ public object SDK { // namespace object
             throw NotImplementedError("SDK Runner only exists to retrieve serialization information")
     }
 
-    public fun ServerBuilder.writeSdk(format: Format, folder: KFile) {
+    public fun ServerBuilder.writeSdkUsingDefaultSettings(format: Format, folder: KFile) {
         with(Runtime(this)) {
             settings.readyUsingDefaults()
             format.write(folder)
