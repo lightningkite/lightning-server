@@ -70,7 +70,7 @@ private fun serveNetty() {
 
 fun sdk() {
     println("Writing SDK")
-    Server.writeSdk(FetcherSdk, KFile("demo/src/main/kotlin/sdk"), "com.lightningkite.lightningserver.demo")
+    Server.writeSdk(FetcherSdk("com.lightningkite.lightningserver.demo"), KFile("demo/src/main/kotlin/sdk"))
     println("Finished")
 }
 
