@@ -31,7 +31,7 @@ public class ImmutablePathSpecMap<V>(start: MutablePathSpecMap<V>) : PathSpecMap
 
         override fun toString(): String {
             return """
-                MutablePathSpecMap.Node(
+                ImmutablePathSpecMap.Node(
                     path = $path, 
                     pathValue = $pathValue, 
                     chainedWildcard = $chainedWildcard, 

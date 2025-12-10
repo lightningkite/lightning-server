@@ -28,28 +28,28 @@ import com.lightningkite.services.files.PublicFileSystem
 public class FileSystemEndpoints(
     public val files: Runtime<PublicFileSystem>,
 ) : ServerBuilder() {
-/**
- * The root file/directory of the configured PublicFileSystem for the current runtime.
- */
-context(runtime: ServerRuntime)
-public val rootFile: FileObject get() = files().root
+    /**
+     * The root file/directory of the configured PublicFileSystem for the current runtime.
+     */
+    context(runtime: ServerRuntime)
+    public val rootFile: FileObject get() = files().root
 
-/**
- * Builds the internal path+query portion used to address files relative to the file system's root.
- *
- * Note: This currently concatenates the query string manually. Consider using a URI builder and only
- * appending '?' when the query is non-empty to avoid dangling question marks or encoding issues.
- */
-context(runtime: ServerRuntime)
-private fun Request<*>.filePath(): String =
+    /**
+     * Builds the internal path+query portion used to address files relative to the file system's root.
+     *
+     * Note: This currently concatenates the query string manually. Consider using a URI builder and only
+     * appending '?' when the query is non-empty to avoid dangling question marks or encoding issues.
+     */
+    context(runtime: ServerRuntime)
+    private fun Request<*>.filePath(): String =
         // TODO: Only append '?' when the query string is non-empty; prefer proper URI building to manual concatenation.
         path.trailingSegments?.toString()?.removePrefix("/")?.plus("?")?.plus(queryParameters.toString())
             ?: throw BadRequestException("No file to look up")
 
     /**
- * HEAD handler. Returns metadata headers for a file without a body.
- */
-public val fetchHead: HttpHandler<PathSpec0> = path.any.head bind HttpHandler {
+     * HEAD handler. Returns metadata headers for a file without a body.
+     */
+    public val fetchHead: HttpHandler<PathSpec0> = path.any.head bind HttpHandler {
         val filePath = it.filePath()
         // We use !! on the line below since the URL in question ALWAYS matches the file system.
         // If you ever see a NPE, logic itself has broken and the universe will cease to exist shortly.
@@ -74,11 +74,11 @@ public val fetchHead: HttpHandler<PathSpec0> = path.any.head bind HttpHandler {
     }
 
     /**
- * GET handler. Streams the file bytes.
- *
- * TODO: Implement HTTP Range support; currently any Range header will be rejected.
- */
-public val fetch: HttpHandler<PathSpec0> = path.any.get bind HttpHandler {
+     * GET handler. Streams the file bytes.
+     *
+     * TODO: Implement HTTP Range support; currently any Range header will be rejected.
+     */
+    public val fetch: HttpHandler<PathSpec0> = path.any.get bind HttpHandler {
         val filePath = it.filePath()
         val file = try {
             files().parseExternalUrl(files().rootUrls[0] + filePath)!!
@@ -98,12 +98,12 @@ public val fetch: HttpHandler<PathSpec0> = path.any.get bind HttpHandler {
     }
 
     /**
- * PUT handler. Accepts an upload to a signed upload URL understood by KotlinxIoPublicFileSystem.
- *
- * Only KotlinxIoPublicFileSystem supports server-generated upload URLs; other implementations will
- * reject uploads here.
- */
-public val upload: HttpHandler<PathSpec0> = path.any.put bind HttpHandler {
+     * PUT handler. Accepts an upload to a signed upload URL understood by KotlinxIoPublicFileSystem.
+     *
+     * Only KotlinxIoPublicFileSystem supports server-generated upload URLs; other implementations will
+     * reject uploads here.
+     */
+    public val upload: HttpHandler<PathSpec0> = path.any.put bind HttpHandler {
         val kotlinx = files() as? KotlinxIoPublicFileSystem
             ?: throw BadRequestException("You can't upload files to this reflection of the real file system.")
 
