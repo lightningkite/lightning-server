@@ -33,16 +33,7 @@ import java.util.zip.ZipOutputStream
 
 @OptIn(ExperimentalLightningServer::class)
 public class ApiDocs(private val packageName: String) : ServerBuilder() {
-//    public val typeScript: Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>> =
-//        path.path("sdk.ts").get bind HttpHandler {
-//            HttpResponse(
-//                TypedData.text(
-//                    text = buildString { /*Documentable.typescriptSdk2(this)*/ },
-//                    mediaType = MediaType.Text.Plain
-//                )
-//            )
-//        }
-//
+//    TODO: Dart SDK
 //    public val dart: Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>> =
 //        path.path("sdk.dart").get bind HttpHandler {
 //            HttpResponse(
@@ -188,8 +179,8 @@ public class ApiDocs(private val packageName: String) : ServerBuilder() {
                 div {
                     h2 { +"Links" }
                     ol {
-//                        li { a(href = "sdk.ts") { +"Typescript SDK" } }
-//                        li { a(href = "sdk.zip") { +"Kotlin SDK" } }
+                        li { a(href = "sdk.ts") { +"Typescript SDK" } }
+                        li { a(href = "sdk.kt") { +"Kotlin SDK" } }
 //                        li { a(href = "sdk.protobuf") { +"Protobuf Types" } }
 //                        li { a(href = "sdk.dart") { +"Dart SDK" } }
                         li { a(href = "#types") { +"Types" } }
