@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.typed.sdk
 
-import com.lightningkite.lightningserver.typed.sdk.SDK.writeSdkUsingDefaultSettings
+import com.lightningkite.lightningserver.typed.sdk.SDK.writeUsingDefaultSettings
 import com.lightningkite.services.data.KFile
 import kotlin.test.Test
 
@@ -9,17 +9,13 @@ class TypescriptFetcherSdkTests {
 
     @Test
     fun testSingleFile() {
-        Server.writeSdkUsingDefaultSettings(
-            TypescriptFetcherSDK(fileStructure = TypescriptFetcherSDK.Files.SingleFile("sdk.ts")),
-            folder
+        TypescriptFetcherSdk(fileStructure = TypescriptFetcherSdk.Structure.SingleFile("sdk.ts")).writeUsingDefaultSettings(
+            Server, folder
         )
     }
 
     @Test
     fun testMultiFile() {
-        Server.writeSdkUsingDefaultSettings(
-            TypescriptFetcherSDK(includeDocComments = false),
-            folder,
-        )
+        TypescriptFetcherSdk(includeDocComments = false).writeUsingDefaultSettings(Server, folder)
     }
 }

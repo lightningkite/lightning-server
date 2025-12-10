@@ -7,42 +7,173 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.LiveVersion
 import com.lightningkite.lightningserver.typed.sdk.SDK.processToModules
 import com.lightningkite.lightningserver.typed.sdk.SDK.sdk
-import com.lightningkite.services.data.KFile
+import com.lightningkite.services.data.ExperimentalLightningServer
 
+/**
+ * Kotlin SDK generator using Fetcher-based HTTP clients.
+ *
+ * This [SDK.Format] implementation generates Kotlin/Multiplatform client code for a Lightning Server API,
+ * creating type-safe interfaces and implementations that use the Lightning Server `Fetcher` for making
+ * HTTP requests and WebSocket connections.
+ *
+ * ## Generated Code Structure
+ *
+ * The generator produces:
+ * - **API Interface**: A Kotlin interface defining the client API contract with suspend functions
+ * - **Live Implementation**: A concrete class implementing the API interface with Fetcher-based calls
+ *
+ * ## File Structure Options
+ *
+ * Choose between:
+ * - **Single File**: All code in one `.kt` file (useful for small APIs)
+ * - **Multiple Files**: Separated into interface and implementation files (recommended for larger APIs)
+ *
+ * ## Example Usage
+ *
+ * ```kotlin
+ * // Basic usage with default settings
+ * val format = FetcherSdk(
+ *     packageName = "com.example.api",
+ *     rootInfo = SdkModule.Info("MyApi")
+ * )
+ *
+ * // Custom file structure
+ * val format = FetcherSdk(
+ *     packageName = "com.example.api.client",
+ *     rootInfo = SdkModule.Info("MyApi"),
+ *     fileStructure = FetcherSdk.Structure.SingleFile("ApiClient.kt"),
+ *     includeDocComments = true
+ * )
+ *
+ * // Generate to a directory
+ * Archive.folder(outputDir).use { archive ->
+ *     format.writeUsingDefaultSettings(serverBuilder, archive)
+ * }
+ * ```
+ *
+ * ## Features
+ *
+ * - **Type Safety**: Full Kotlin type safety with kotlinx.serialization
+ * - **Suspend Functions**: All HTTP endpoints are suspend functions for coroutine support
+ * - **WebSocket Support**: WebSocket handlers generate `ClientWebSocket` instances
+ * - **Interface Extension**: Supports extending custom client interfaces with `@LiveVersion`
+ * - **Header Injection**: Built-in support for dynamic header calculation (auth tokens, etc.)
+ * - **Multiplatform**: Generated code works on all Kotlin/Multiplatform targets
+ *
+ * ## Requirements
+ *
+ * Generated code requires:
+ * - `com.lightningkite.lightningserver:typed-shared` dependency for `Fetcher` and `ClientWebSocket`
+ * - `kotlinx.serialization` for serialization support
+ * - Shared models are defined in the same package as `packageName`
+ * - Client interfaces must be annotated with `@LiveVersion` to reference their implementations
+ *
+ * @property packageName The package name for generated Kotlin files, must be the same package as model files
+ * @property rootInfo The root module naming information for the generated API
+ * @property fileStructure The file organization strategy (single file or multiple files)
+ * @property includeDocComments Whether to include KDoc comments in the generated code.
+ *                             Comments include endpoint summaries, descriptions, and auth requirements.
+ *
+ * @see SDK.Format
+ * @see TypescriptFetcherSdk
+ * @see Structure
+ */
+@OptIn(ExperimentalLightningServer::class)
 public class FetcherSdk(
     public val packageName: String,
     public val rootInfo: SdkModule.Info = SdkModule.Info("Api"),
-    public val interfaceFilename: String = "${rootInfo.interfaceName}.kt",
-    public val liveFilename: String = "Live${rootInfo.interfaceName}.kt",
+    public val fileStructure: Structure = Structure.MultipleFiles(
+        interfaceFilename = "${rootInfo.interfaceName}.kt",
+        liveFilename = "Live${rootInfo.interfaceName}.kt"
+    ),
     public val includeDocComments: Boolean = true,
 ) : SDK.Format {
-
-    context(server: ServerRuntime)
-    override fun write(folder: KFile) {
-        val processed = server.server.sdk(rootInfo).processToModules().ensureUniqueNames()
-
-        folder.then(interfaceFilename).overwrite { writeInterface(processed) }
-        folder.then(liveFilename).overwrite { writeLive(processed) }
+    /**
+     * File organization strategies for generated Kotlin code.
+     *
+     * Determines how the generated SDK files are structured and named.
+     *
+     * @see SingleFile
+     * @see MultipleFiles
+     */
+    public sealed interface Structure {
+        public data class SingleFile(val filename: String) : Structure
+        public data class MultipleFiles(
+            val interfaceFilename: String,
+            val liveFilename: String
+        ) : Structure
     }
 
-    context(buffer: Appendable)
-    private fun SDK.Module.appendImports(
+    /**
+     * Generates Kotlin SDK files and writes them to the archive.
+     *
+     * This method:
+     * 1. Extracts and processes the API structure from the server
+     * 2. Generates Kotlin code (interface and implementation)
+     * 3. Writes files according to the configured [fileStructure]
+     *
+     * @param archive The archive where generated files will be written
+     */
+    context(server: ServerRuntime)
+    override fun write(archive: Archive) {
+        val processed = server.server.sdk(rootInfo).processToModules().ensureUniqueNames()
+
+        when (fileStructure) {
+            is Structure.MultipleFiles -> {
+                archive.appendableEntry(fileStructure.interfaceFilename) {
+                    appendLine("package $packageName")
+                    appendImports(processed)
+                    writeInterface(processed)
+                }
+                archive.appendableEntry(fileStructure.liveFilename) {
+                    appendLine("package $packageName")
+                    appendImports(
+                        processed,
+                        "com.lightningkite.lightningserver.HttpMethod",
+                        "com.lightningkite.lightningserver.typed.Fetcher",
+                        "kotlinx.serialization.ContextualSerializer",
+                        "kotlinx.serialization.builtins.serializer",
+                        "kotlinx.serialization.builtins.MapSerializer",
+                        "kotlinx.serialization.builtins.ListSerializer",
+                        "kotlinx.serialization.builtins.nullable"
+                    )
+                    writeLive(processed)
+                }
+            }
+            is Structure.SingleFile -> {
+                archive.appendableEntry(fileStructure.filename) {
+                    appendLine("package $packageName")
+                    appendImports(
+                        processed,
+                        "com.lightningkite.lightningserver.HttpMethod",
+                        "com.lightningkite.lightningserver.typed.Fetcher",
+                        "kotlinx.serialization.ContextualSerializer",
+                        "kotlinx.serialization.builtins.serializer",
+                        "kotlinx.serialization.builtins.MapSerializer",
+                        "kotlinx.serialization.builtins.ListSerializer",
+                        "kotlinx.serialization.builtins.nullable"
+                    )
+                    writeInterface(processed)
+                    writeLive(processed)
+                }
+            }
+        }
+    }
+
+    private fun Appendable.appendImports(
+        module: SDK.Module,
         vararg imports: String
     ) {
         fun SDK.Module.imports(): List<String> =
             extendsInterfaces.flatMap { it.item.imports } + children.flatMap { it.imports() }
 
-        (imports.toList() + imports())
+        (imports.toList() + module.imports())
             .distinct()
-            .joinTo(buffer, "\n", prefix = "\n", postfix = "\n") { "import $it" }
+            .joinTo(this, "\n", prefix = "\n", postfix = "\n") { "import $it" }
     }
 
     context(_: ServerRuntime)
     private fun Appendable.writeInterface(module: SDK.Module) {
-        appendLine("package $packageName")
-
-        module.appendImports()
-
         fun SDK.Module.writeInterface(depth: Int) {
 
             val singleInterface = extendsInterfaces.singleOrNull()?.item?.takeIf { declaredFunctions.isEmpty() && children.isEmpty() && depth > 0 }
@@ -87,18 +218,6 @@ public class FetcherSdk(
 
     context(server: ServerRuntime)
     private fun Appendable.writeLive(module: SDK.Module) {
-        appendLine("package $packageName")
-
-        module.appendImports(
-            "com.lightningkite.lightningserver.HttpMethod",
-            "com.lightningkite.lightningserver.typed.Fetcher",
-            "kotlinx.serialization.ContextualSerializer",
-            "kotlinx.serialization.builtins.serializer",
-            "kotlinx.serialization.builtins.MapSerializer",
-            "kotlinx.serialization.builtins.ListSerializer",
-            "kotlinx.serialization.builtins.nullable"
-        )
-
         fun PathSpec.toCodeString() = segments.joinToString("/", prefix = "\"", postfix = "\"") {
             when (it) {
                 is PathSpec.Segment.Constant -> it.value

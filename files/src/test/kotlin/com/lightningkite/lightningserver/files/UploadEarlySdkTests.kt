@@ -6,7 +6,7 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.typed.ModelRestEndpoints
 import com.lightningkite.lightningserver.typed.modelInfo
 import com.lightningkite.lightningserver.typed.sdk.FetcherSdk
-import com.lightningkite.lightningserver.typed.sdk.SDK.writeSdkUsingDefaultSettings
+import com.lightningkite.lightningserver.typed.sdk.SDK.writeUsingDefaultSettings
 import com.lightningkite.lightningserver.typed.sdk.module
 import com.lightningkite.services.data.KFile
 import com.lightningkite.services.database.Database
@@ -48,6 +48,6 @@ class UploadEarlySdkTests {
 
     @Test
     fun generateSdk() {
-        Server.writeSdkUsingDefaultSettings(FetcherSdk("com.lightningkite.lightningserver.files"), KFile("./src/test/kotlin/com/lightningkite/lightningserver/files/generated"))
+        FetcherSdk("com.lightningkite.lightningserver.files").writeUsingDefaultSettings(Server, KFile("./src/test/kotlin/com/lightningkite/lightningserver/files/generated"))
     }
 }

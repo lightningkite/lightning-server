@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.typed
 
+import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.auth.options
 import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.ServerDefinition
@@ -47,15 +48,15 @@ public class ApiDocs(private val packageName: String) : ServerBuilder() {
 //            )
 //        }
 //
-//    public val kotlin: Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>> =
-//        path.path("sdk.zip").get bind HttpHandler {
-//            HttpResponse(
-//                TypedData.sink(
-//                    mediaType = MediaType.Application.Zip,
-//                    emit = { /*Documentable.kotlinSdk(packageName, it)*/ },
-//                )
-//            )
-//        }
+    public val kotlin: HttpHandler<PathSpec0> =
+        path.path("sdk.zip").get bind HttpHandler {
+            HttpResponse(
+                TypedData.sink(
+                    mediaType = MediaType.Application.Zip,
+                    emit = { /*Documentable.kotlinSdk(packageName, it)*/ },
+                )
+            )
+        }
 
     public val index: HttpHandler<PathSpec0> = path.slash.get bind HttpHandler { _ ->
 

@@ -6,7 +6,7 @@ import com.lightningkite.lightningserver.pathing.plus
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.sdk.SDK.processToModules
 import com.lightningkite.lightningserver.typed.sdk.SDK.sdk
-import com.lightningkite.services.data.KFile
+import com.lightningkite.services.data.ExperimentalLightningServer
 import com.lightningkite.services.database.MySealedClassSerializer
 import com.lightningkite.services.database.childSerializersOrNull
 import com.lightningkite.services.database.listElement
@@ -24,33 +24,165 @@ import kotlinx.serialization.descriptors.StructureKind
 import kotlin.collections.fold
 import kotlin.collections.plus
 
-public class TypescriptFetcherSDK(
+
+/**
+ * TypeScript SDK generator using Fetcher-based HTTP clients.
+ *
+ * This [SDK.Format] implementation generates TypeScript client code for a Lightning Server API,
+ * creating type-safe interfaces and implementations that use the `@lightningkite/lightning-server-simplified`
+ * Fetcher for making HTTP requests.
+ *
+ * ## Generated Code Structure
+ *
+ * The generator produces:
+ * - **Type Definitions**: TypeScript interfaces and enums for all data models
+ * - **API Interface**: A TypeScript interface defining the client API contract
+ * - **Live Implementation**: A concrete class implementing the API interface with Fetcher-based HTTP calls
+ *
+ * ## File Structure Options
+ *
+ * Choose between:
+ * - **Single File**: All code in one `.ts` file (useful for small APIs)
+ * - **Multiple Files**: Separated into models, interface, and implementation files (recommended for larger APIs)
+ *
+ * ## Example Usage
+ *
+ * ```kotlin
+ * // Basic usage with default settings
+ * val format = TypescriptFetcherSdk(
+ *     rootInfo = SdkModule.Info("MyApi")
+ * )
+ *
+ * // Custom file structure
+ * val format = TypescriptFetcherSdk(
+ *     rootInfo = SdkModule.Info("MyApi"),
+ *     fileStructure = TypescriptFetcherSdk.Files.SingleFile("api-client.ts"),
+ *     includeDocComments = true
+ * )
+ *
+ * // Generate to a ZIP file
+ * Archive.zip(ZipOutputStream(outputStream)).use { archive ->
+ *     format.writeUsingDefaultSettings(serverBuilder, archive)
+ * }
+ * ```
+ *
+ * ## Generated TypeScript Example
+ *
+ * For a server with user endpoints, this generates:
+ *
+ * ```typescript
+ * // Interface
+ * export interface MyApi {
+ *     users: {
+ *         list(): Promise<User[]>
+ *         create(input: CreateUserRequest): Promise<User>
+ *     }
+ * }
+ *
+ * // Implementation
+ * export class LiveMyApi implements MyApi {
+ *     constructor(public fetcher: Fetcher) {}
+ *
+ *     users = {
+ *         list: () => this.fetcher("/api/users/list", "GET", undefined),
+ *         create: (input) => this.fetcher("/api/users/create", "POST", input)
+ *     }
+ * }
+ * ```
+ *
+ * ## Type Mapping
+ *
+ * Kotlin types are mapped to TypeScript as follows:
+ * - `String`, `Char` → `string`
+ * - `Int`, `Long`, `Float`, `Double` → `number`
+ * - `Boolean` → `boolean`
+ * - `List<T>` → `Array<T>`
+ * - `Map<String, V>` → `Record<string, V>`
+ * - `T?` → `T | null | undefined`
+ * - Data classes → TypeScript interfaces
+ * - Enums → TypeScript enums
+ *
+ * ## Requirements
+ *
+ * Generated code requires the `@lightningkite/lightning-server-simplified` npm package
+ * which provides the `Fetcher` type and utility types like `Query`, `Modification`, etc.
+ *
+ * @property rootInfo The root module naming information for the generated API
+ * @property fileStructure The file organization strategy (single file or multiple files)
+ * @property includeDocComments Whether to include JSDoc comments in the generated code.
+ *                             Comments include endpoint summaries, descriptions, and auth requirements.
+ *
+ * @see SDK.Format
+ * @see FetcherSdk
+ * @see Structure
+ */
+@OptIn(ExperimentalLightningServer::class)
+public class TypescriptFetcherSdk(
     public val rootInfo: SdkModule.Info = SdkModule.Info("Api"),
-    public val fileStructure: Files = Files.MultipleFiles(
+    public val fileStructure: Structure = Structure.MultipleFiles(
         modelsFilename = "models.ts",
         interfaceFilename = "${rootInfo.interfaceName}.ts",
         liveFilename = "Live${rootInfo.interfaceName}.ts"
     ),
     public val includeDocComments: Boolean = true
 ) : SDK.Format {
-    public sealed interface Files {
-        public data class SingleFile(val filename: String) : Files
+    /**
+     * File organization strategies for generated TypeScript code.
+     *
+     * Determines how the generated SDK files are structured and named.
+     *
+     * @see SingleFile
+     * @see MultipleFiles
+     */
+    public sealed interface Structure {
+        /**
+         * Generates all code in a single TypeScript file.
+         *
+         * This strategy combines type definitions, interface, and implementation
+         * into one file. Useful for smaller APIs or when you want a single
+         * distributable file.
+         *
+         * @property filename The name of the generated TypeScript file
+         */
+        public data class SingleFile(val filename: String) : Structure
 
+        /**
+         * Generates code split across multiple TypeScript files.
+         *
+         * This strategy separates concerns into three files:
+         * - **Models file**: Type definitions (interfaces, enums, type aliases)
+         * - **Interface file**: API interface contract
+         * - **Live file**: Concrete implementation with Fetcher calls
+         *
+         * @property modelsFilename The filename for type definitions (default: "models.ts")
+         * @property interfaceFilename The filename for the API interface (default: "{ApiName}.ts")
+         * @property liveFilename The filename for the implementation (default: "Live{ApiName}.ts")
+         */
         public data class MultipleFiles(
             val modelsFilename: String,
             val interfaceFilename: String,
             val liveFilename: String
-        ) : Files
+        ) : Structure
     }
 
+    /**
+     * Generates TypeScript SDK files and writes them to the archive.
+     *
+     * This method:
+     * 1. Extracts and processes the API structure from the server
+     * 2. Generates TypeScript code (types, interface, implementation)
+     * 3. Writes files according to the configured [fileStructure]
+     *
+     * @param archive The archive where generated files will be written
+     */
     context(server: ServerRuntime)
-    override fun write(folder: KFile): Unit = when (fileStructure) {
-        is Files.SingleFile -> {
+    override fun write(archive: Archive): Unit = when (fileStructure) {
+        is Structure.SingleFile -> {
             val processed = server.server.sdk(rootInfo).processToModules().ensureUniqueNames()
 
             fun Appendable.bigGap() = append("\n\n\n")
 
-            folder.then(fileStructure.filename).overwrite {
+            archive.appendableEntry(fileStructure.filename) {
                 appendLsImports()
                 appendLine()
                 writeTypeDefinitions()
@@ -60,7 +192,7 @@ public class TypescriptFetcherSDK(
                 writeLive(processed)
             }
         }
-        is Files.MultipleFiles -> {
+        is Structure.MultipleFiles -> {
             val processed = server.server.sdk(rootInfo).processToModules().ensureUniqueNames()
 
             val models = server.models()
@@ -68,20 +200,20 @@ public class TypescriptFetcherSDK(
             fun Appendable.appendModelImports() =
                 appendLine("import type { ${models.joinToString { it.tsType().substringBefore('<') }} } from './${fileStructure.modelsFilename}'")
 
-            folder.then(fileStructure.modelsFilename).overwrite {
+            archive.appendableEntry(fileStructure.modelsFilename) {
                 appendLsImports()
                 appendLine()
                 writeTypeDefinitions(models)
             }
 
-            folder.then(fileStructure.interfaceFilename).overwrite {
+            archive.appendableEntry(fileStructure.interfaceFilename) {
                 appendLsImports()
                 appendModelImports()
                 appendLine()
                 writeInterface(processed)
             }
 
-            folder.then(fileStructure.liveFilename).overwrite {
+            archive.appendableEntry(fileStructure.liveFilename) {
                 appendLsImports()
                 appendModelImports()
                 appendLine("import type { ${rootInfo.interfaceName} } from './${fileStructure.interfaceFilename}'")
@@ -159,6 +291,16 @@ public class TypescriptFetcherSDK(
         }
     }
 
+    /**
+     * Generates the TypeScript interface definition for the API.
+     *
+     * Creates a hierarchical interface structure with:
+     * - Methods for each endpoint (returning Promises)
+     * - Nested properties for sub-modules
+     * - JSDoc comments (if enabled) with summaries, descriptions, and auth requirements
+     *
+     * @param root The root module to generate an interface for
+     */
     context(server: ServerRuntime)
     private fun Appendable.writeInterface(root: SDK.Module) {
         fun Appendable.appendInterface(module: SDK.Module, depth: Int) {

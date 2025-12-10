@@ -6,7 +6,7 @@ import com.lightningkite.lightningserver.engine.ktor.*
 import com.lightningkite.lightningserver.engine.netty.*
 import com.lightningkite.lightningserver.settings.*
 import com.lightningkite.lightningserver.typed.sdk.*
-import com.lightningkite.lightningserver.typed.sdk.SDK.writeSdkUsingDefaultSettings
+import com.lightningkite.lightningserver.typed.sdk.SDK.writeUsingDefaultSettings
 import com.lightningkite.services.data.*
 import io.ktor.server.netty.*
 import kotlin.time.*
@@ -44,7 +44,7 @@ private fun serveNetty() {
 
 fun sdk() {
     println("Writing SDK")
-    Server.writeSdkUsingDefaultSettings(FetcherSdk("com.lightningkite.lightningserver.demo"), KFile("demo/src/main/kotlin/sdk"))
+    FetcherSdk("com.lightningkite.lightningserver.demo").writeUsingDefaultSettings(Server, KFile("demo/src/main/kotlin/sdk"))
     println("Finished")
 }
 
