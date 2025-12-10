@@ -156,6 +156,7 @@ public interface Archive : AutoCloseable {
  *
  * @see Archive.folder
  */
+@ExperimentalLightningServer("This is unstable and may change at any time.")
 public class KFileArchive(private val folder: KFile) : Archive {
     override fun sub(name: String): KFileArchive = KFileArchive(folder.then(name))
 
@@ -206,6 +207,7 @@ private fun pathOf(base: String, new: String) = if (base.isEmpty()) new else "$b
  * @param delimiter Optional function that generates delimiter text based on the file path.
  *                  Called before each file is written. Returns null to skip delimiter.
  */
+@ExperimentalLightningServer("This is unstable and may change at any time.")
 public class SingleStreamArchive private constructor(
     private val out: Sink,
     private val basePath: String,
@@ -279,6 +281,7 @@ public class SingleStreamArchive private constructor(
  *
  * @see Archive.zip
  */
+@ExperimentalLightningServer("This is unstable and may change at any time.")
 public class ZipArchive private constructor(
     private val zip: ZipOutputStream,
     private val basePath: String,
