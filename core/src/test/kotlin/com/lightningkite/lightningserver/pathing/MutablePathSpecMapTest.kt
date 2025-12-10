@@ -25,10 +25,10 @@ class MutablePathSpecMapTest {
         map.match(saf, "/variable/asdf%2fwithslash") { it }?.let { println(it) }
     }
 
+    val saf = StringArrayFormat(EmptySerializersModule())
 
     @Test
     fun pathSpecCheck(): Unit {
-        val saf = StringArrayFormat(EmptySerializersModule())
         val map = MutablePathSpecMap<TestHoldingThing>()
 
         map[PathSpec.root] = TestHoldingThing(a = "root", b = 21)
@@ -37,6 +37,7 @@ class MutablePathSpecMapTest {
         map[PathSpec.root.path("test")] = TestHoldingThing(a = "test")
         map[PathSpec.root.path("test").path("a")] = TestHoldingThing(a = "test-a")
         map[PathSpec.root.path("test").arg<Int>("id")] = TestHoldingThing(a = "test-x")
+        map[PathSpec.root.path("test").path("trailing").slash] = TestHoldingThing(a = "trailing-slash-test")
         val sealed = map.toSealedPathSpecMap()
 
         fun sample(path: String) {
@@ -155,6 +156,41 @@ class MutablePathSpecMapTest {
             assertEquals("/test/22/asdf", match?.path?.toString())
             assertEquals(listOf(), match?.path?.rawPathArguments?.toList())
         }
+        run {
+            val match = sealed.match(saf, "test/trailing/") { it.a }
+            assertEquals("/test/trailing/", match?.path?.toString())
+            assertEquals(listOf(), match?.path?.rawPathArguments?.toList())
+        }
+    }
+
+    @Test
+    fun testTrailingSlashes() {
+        val map = MutablePathSpecMap<Int>()
+
+        map[PathSpec.root.path("test").slash] = 0
+
+        val sealed = map.toSealedPathSpecMap()
+
+        val match = map.match(saf, "test/")
+        val match2 = sealed.match(saf, "test/")
+
+        assertEquals("/test/", match?.path?.toString(), match.toString())
+        assertEquals("/test/", match2?.path?.toString(), "Sealed: ${match2.toString()}")
+    }
+
+    @Test
+    fun testArgs() {
+        val map = MutablePathSpecMap<Int>()
+
+        map[PathSpec.root.arg<String>("hi").path("test")] = 0
+
+        val sealed = map.toSealedPathSpecMap()
+
+        val match = map.match(saf, "asdf/test")
+        val match2 = sealed.match(saf, "asdf/test")
+
+        assertEquals("asdf", match?.path?.rawPathArguments?.firstOrNull(), match.toString())
+        assertEquals("asdf", match2?.path?.rawPathArguments?.firstOrNull(), "Sealed: ${match2.toString()}")
     }
 }
 
