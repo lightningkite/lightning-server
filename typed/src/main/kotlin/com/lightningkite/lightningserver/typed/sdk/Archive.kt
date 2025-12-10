@@ -23,10 +23,10 @@ import java.util.zip.ZipOutputStream
  * ```kotlin
  * Archive.zip(ZipOutputStream(outputStream)).use { archive ->
  *     archive.entry("readme.txt") {
- *         writeString("Hello World")
+ *         it.writeString("Hello World")
  *     }
  *     archive.sub("src").entry("Main.kt") {
- *         writeString("fun main() {}")
+ *         it.writeString("fun main() {}")
  *     }
  * }
  * ```
@@ -71,7 +71,7 @@ public interface Archive : AutoCloseable {
      * provided [name]. With [ZipArchive] an `entry` corresponds to a zip entry.
      *
      * This method creates a new file entry at the specified path and immediately
-     * executes the provided [entry] lambda with a [Sink] as the receiver. All
+     * executes the provided [entry] lambda with a [Sink] as its argument. All
      * writing must be completed within the lambda - the file entry is closed
      * when the lambda returns.
      *
@@ -93,11 +93,11 @@ public interface Archive : AutoCloseable {
      * @sample
      * ```kotlin
      * archive.entry("config.json") {
-     *     writeString("""{"port": 8080}""")
+     *     it.writeString("""{"port": 8080}""")
      * }
      * ```
      */
-    public fun entry(name: String, write: Sink.() -> Unit)
+    public fun entry(name: String, write: (Sink) -> Unit)
 
     public companion object {
         /**
@@ -108,13 +108,6 @@ public interface Archive : AutoCloseable {
          *
          * @param folder The root directory for the archive
          * @return A [KFileArchive] instance
-         *
-         * @sample
-         * ```kotlin
-         * val archive = Archive.folder(KFile("/path/to/output"))
-         * archive.entry("file.txt") { writeString("content") }
-         * // Writes to: /path/to/output/file.txt
-         * ```
          */
         public fun folder(folder: KFile): KFileArchive = KFileArchive(folder)
 
@@ -126,17 +119,20 @@ public interface Archive : AutoCloseable {
          *
          * @param zip The [ZipOutputStream] to write ZIP entries to
          * @return A [ZipArchive] instance
-         *
-         * @sample
-         * ```kotlin
-         * val zipOut = ZipOutputStream(FileOutputStream("output.zip"))
-         * Archive.zip(zipOut).use { archive ->
-         *     archive.entry("readme.txt") { writeString("Hello") }
-         *     archive.sub("src").entry("Main.kt") { writeString("fun main()") }
-         * }
-         * ```
          */
         public fun zip(zip: ZipOutputStream): ZipArchive = ZipArchive(zip)
+
+        /**
+         * Creates a single-stream archive that writes entries to a single underlying [Sink].
+         *
+         * Files are written directly to the provided sink, with an optional delimiter written
+         * before the file.
+         *
+         * @param out the [Sink] to write to
+         * @param delimiter an optional delimiter to write when a new entry is created
+         * @return A [SingleStreamArchive] instance
+         */
+        public fun singleStream(out: Sink, delimiter: ((path: String) -> String)? = null): SingleStreamArchive = SingleStreamArchive(out, delimiter)
     }
 }
 
@@ -160,7 +156,7 @@ public interface Archive : AutoCloseable {
 public class KFileArchive(private val folder: KFile) : Archive {
     override fun sub(name: String): KFileArchive = KFileArchive(folder.then(name))
 
-    override fun entry(name: String, write: Sink.() -> Unit) {
+    override fun entry(name: String, write: (Sink) -> Unit) {
         folder.createDirectories()
         folder.then(name).sink().use(write)
     }
@@ -213,22 +209,16 @@ public class SingleStreamArchive private constructor(
     private val basePath: String,
     public val delimiter: ((path: String) -> String)?
 ) : Archive {
-    /**
-     * Creates a root [SingleStreamArchive].
-     *
-     * @param out The output sink to write all content to
-     * @param delimiter Optional function to generate delimiters before each file
-     */
     public constructor(out: Sink, delimiter: ((path: String) -> String)? = null) : this(out, "", delimiter)
 
     override fun sub(name: String): SingleStreamArchive =
         SingleStreamArchive(out, pathOf(basePath, name), delimiter)
 
-    override fun entry(name: String, write: Sink.() -> Unit) {
+    override fun entry(name: String, write: (Sink) -> Unit) {
         delimiter?.invoke(pathOf(basePath, name))?.let(out::writeString)
 
         object : RawSink by out {
-            override fun close() {}
+            override fun close() = Unit
         }
             .buffered()
             .use(write)
@@ -286,30 +276,41 @@ public class ZipArchive private constructor(
     private val zip: ZipOutputStream,
     private val basePath: String,
 ): Archive {
-    /**
-     * Creates a root [ZipArchive].
-     *
-     * @param zip The [ZipOutputStream] to write ZIP entries to
-     */
     public constructor(zip: ZipOutputStream) : this(zip, "")
 
     override fun sub(name: String): ZipArchive =
         ZipArchive(zip, pathOf(basePath, name))
 
-    override fun entry(name: String, write: Sink.() -> Unit) {
-        zip.putNextEntry(ZipEntry(pathOf(basePath, name)))
+    override fun entry(name: String, write: (Sink) -> Unit) {
+        val path = pathOf(basePath, name)
+
+        zip.putNextEntry(ZipEntry(path))
+
+        var closed = false
+        fun checkClosed() {
+            if (closed) throw IllegalStateException("Zip entry $path already closed")
+        }
 
         val sink = object : java.io.OutputStream() {
-            override fun write(b: Int) = zip.write(b)
-            override fun write(b: ByteArray, off: Int, len: Int) = zip.write(b, off, len)
-            override fun flush() = zip.flush()
-
-            override fun close() {}
+            override fun write(b: Int) {
+                checkClosed()
+                zip.write(b)
+            }
+            override fun write(b: ByteArray, off: Int, len: Int) {
+                checkClosed()
+                zip.write(b, off, len)
+            }
+            override fun flush() {
+                zip.flush()
+            }
+            override fun close() {
+                if (closed) return
+                zip.closeEntry()
+                closed = true
+            }
         }.asSink().buffered()
 
         sink.use(write)
-
-        zip.closeEntry()
     }
 
     override fun close() { zip.close() }

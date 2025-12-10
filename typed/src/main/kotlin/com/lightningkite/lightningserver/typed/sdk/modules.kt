@@ -161,7 +161,10 @@ public data class SdkModule<S>(
 }
 
 /**
- * Includes a server module at the specified path with SDK generation metadata.
+ * Includes a server configuration at the specified path as an SDK module.
+ *
+ * SDK modules are separated into their own interfaces and classes when the SDK
+ * is generated.
  *
  * This DSL function registers the module's SDK metadata and includes it in the server
  * at the given path. The metadata is used by SDK generators to create properly structured
@@ -184,7 +187,10 @@ public infix fun <S : ServerBuilder> PathSpec0.module(module: SdkModule<S>): S {
 }
 
 /**
- * Includes a server module at the specified path with automatically inferred SDK metadata.
+ * Includes a server configuration at the specified path as an SDK module.
+ *
+ * SDK modules are separated into their own interfaces and classes when the SDK
+ * is generated.
  *
  * This convenience overload automatically wraps the module with [withSdkInfo], inferring
  * the SDK interface and value names from the module's class name.

@@ -16,7 +16,6 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.typed.sdk.Archive
 import com.lightningkite.lightningserver.typed.sdk.FetcherSdk
-import com.lightningkite.lightningserver.typed.sdk.SingleStreamArchive
 import com.lightningkite.lightningserver.typed.sdk.TypescriptFetcherSdk
 import com.lightningkite.services.data.Description
 import com.lightningkite.services.data.ExperimentalLightningServer
@@ -32,7 +31,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.*
 import java.util.zip.ZipOutputStream
 
-
+@OptIn(ExperimentalLightningServer::class)
 public class ApiDocs(private val packageName: String) : ServerBuilder() {
 //    public val typeScript: Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>> =
 //        path.path("sdk.ts").get bind HttpHandler {
@@ -54,66 +53,72 @@ public class ApiDocs(private val packageName: String) : ServerBuilder() {
 //            )
 //        }
 
-    @OptIn(ExperimentalLightningServer::class)
     public val typescript: HttpHandler<PathSpec0> =
         path.path("sdk.ts").get bind HttpHandler {
             HttpResponse(
                 TypedData.sink(
                     mediaType = MediaType.Text.Plain,
                     emit = { sink ->
-                        TypescriptFetcherSdk(
-                            fileStructure = TypescriptFetcherSdk.Structure.SingleFile("sdk.kt")
-                        ).write(SingleStreamArchive(sink))
+                        Archive.singleStream(sink).use {
+                            TypescriptFetcherSdk(
+                                fileStructure = TypescriptFetcherSdk.Structure.SingleFile("sdk.kt")
+                            ).write(it)
+                        }
                     },
                 )
             )
         }
 
-    @OptIn(ExperimentalLightningServer::class)
     public val typescriptZip: HttpHandler<PathSpec0> =
         path.path("sdk.ts.zip").get bind HttpHandler {
             HttpResponse(
                 TypedData.sink(
                     mediaType = MediaType.Application.Zip,
                     emit = { sink ->
-                        TypescriptFetcherSdk().write(
-                            Archive.zip(ZipOutputStream(sink.asOutputStream()))
-                        )
+                        Archive.zip(
+                            ZipOutputStream(sink.asOutputStream())
+                        ).use { zip ->
+                            TypescriptFetcherSdk().write(zip.sub("sdk"))
+                        }
                     },
                 )
             )
         }
 
-    @OptIn(ExperimentalLightningServer::class)
     public val kotlin: HttpHandler<PathSpec0> =
         path.path("sdk.kt").get bind HttpHandler {
             HttpResponse(
                 TypedData.sink(
                     mediaType = MediaType.Text.Plain,
                     emit = { sink ->
-                        FetcherSdk(
-                            packageName,
-                            fileStructure = FetcherSdk.Structure.SingleFile("sdk.kt")
-                        ).write(SingleStreamArchive(sink))
+                        Archive.singleStream(sink).use {
+                            FetcherSdk(
+                                packageName,
+                                fileStructure = FetcherSdk.Structure.SingleFile("sdk.kt")
+                            ).write(it)
+                        }
                     },
                 )
             )
         }
 
-    @OptIn(ExperimentalLightningServer::class)
     public val kotlinZip: HttpHandler<PathSpec0> =
         path.path("sdk.kt.zip").get bind HttpHandler {
             HttpResponse(
                 TypedData.sink(
                     mediaType = MediaType.Application.Zip,
                     emit = { sink ->
-                        FetcherSdk(packageName).write(
-                            Archive.zip(ZipOutputStream(sink.asOutputStream()))
-                        )
+                        Archive.zip(
+                            ZipOutputStream(sink.asOutputStream())
+                        ).use { zip ->
+                            FetcherSdk(packageName).write(zip.sub("sdk"))
+                        }
                     },
                 )
             )
         }
+
+    private val oldPath = path.path("sdk.zip").get bind kotlinZip
 
     public val index: HttpHandler<PathSpec0> = path.slash.get bind HttpHandler { _ ->
 

@@ -51,6 +51,6 @@ public fun KFile.overwrite(action: Appendable.() -> Unit) {
 @OptIn(ExperimentalLightningServer::class)
 public fun Archive.appendableEntry(name: String, write: Appendable.() -> Unit) {
     entry(name) {
-        this.asAppendable().write()
+        write(it.asAppendable())
     }
 }
