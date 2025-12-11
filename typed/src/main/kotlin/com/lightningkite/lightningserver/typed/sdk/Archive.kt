@@ -4,11 +4,13 @@ package com.lightningkite.lightningserver.typed.sdk
 
 import com.lightningkite.services.data.ExperimentalLightningServer
 import com.lightningkite.services.data.KFile
+import kotlinx.io.IOException
 import kotlinx.io.RawSink
 import kotlinx.io.Sink
 import kotlinx.io.asSink
 import kotlinx.io.buffered
 import kotlinx.io.writeString
+import java.io.OutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -199,32 +201,57 @@ private fun pathOf(base: String, new: String) = if (base.isEmpty()) new else "$b
  * ```
  *
  * @param out The output sink where all content is written
- * @param basePath The current path prefix (empty for root, used internally for sub-archives)
  * @param delimiter Optional function that generates delimiter text based on the file path.
  *                  Called before each file is written. Returns null to skip delimiter.
  */
 @ExperimentalLightningServer("This is unstable and may change at any time.")
-public class SingleStreamArchive private constructor(
+public class SingleStreamArchive(
     private val out: Sink,
-    private val basePath: String,
-    public val delimiter: ((path: String) -> String)?
+    private val delimiter: ((path: String) -> String)?
 ) : Archive {
-    public constructor(out: Sink, delimiter: ((path: String) -> String)? = null) : this(out, "", delimiter)
+    public var closed: Boolean = false
+        private set
 
-    override fun sub(name: String): SingleStreamArchive =
-        SingleStreamArchive(out, pathOf(basePath, name), delimiter)
-
-    override fun entry(name: String, write: (Sink) -> Unit) {
-        delimiter?.invoke(pathOf(basePath, name))?.let(out::writeString)
-
-        object : RawSink by out {
-            override fun close() = Unit
-        }
-            .buffered()
-            .use(write)
+    private inline fun ensureOpen(crossinline message: () -> String) {
+        if (closed) throw IOException("SingleStreamArchive already closed. ${message()}.")
     }
 
-    override fun close() { out.close() }
+    private fun entry(path: String): Sink {
+        ensureOpen { "Cannot create entry $path" }
+        delimiter?.invoke(path)?.let(out::writeString)
+
+        return object : RawSink by out {
+            override fun close() = Unit
+        }.buffered()
+    }
+
+    public inner class Sub(public val path: String) : Archive {
+        init {
+            ensureOpen { "Cannot create sub at /$path" }
+        }
+
+        override fun sub(name: String): Sub = Sub("$path/$name")
+
+        override fun entry(name: String, write: (Sink) -> Unit) {
+            entry("/$path/$name")
+        }
+
+        override fun close() {}
+    }
+
+    override fun sub(name: String): Sub = Sub(name)
+
+    override fun entry(name: String, write: (Sink) -> Unit) {
+        ensureOpen { "Cannot create entry /$name" }
+        delimiter?.invoke("/$name")?.let(out::writeString)
+        entry().use(write)
+    }
+
+    override fun close() {
+        if (closed) return
+        closed = true
+        out.close()
+    }
 }
 
 /**
@@ -267,52 +294,89 @@ public class SingleStreamArchive private constructor(
  * ```
  *
  * @param zip The [ZipOutputStream] to write entries to
- * @param basePath The current path prefix (empty for root, used internally for sub-archives)
  *
  * @see Archive.zip
  */
 @ExperimentalLightningServer("This is unstable and may change at any time.")
-public class ZipArchive private constructor(
+public class ZipArchive(
     private val zip: ZipOutputStream,
-    private val basePath: String,
 ): Archive {
-    public constructor(zip: ZipOutputStream) : this(zip, "")
+    public var closed: Boolean = false
+        private set
 
-    override fun sub(name: String): ZipArchive =
-        ZipArchive(zip, pathOf(basePath, name))
-
-    override fun entry(name: String, write: (Sink) -> Unit) {
-        val path = pathOf(basePath, name)
-
-        zip.putNextEntry(ZipEntry(path))
-
-        var closed = false
-        fun checkClosed() {
-            if (closed) throw IllegalStateException("Zip entry $path already closed")
-        }
-
-        val sink = object : java.io.OutputStream() {
-            override fun write(b: Int) {
-                checkClosed()
-                zip.write(b)
-            }
-            override fun write(b: ByteArray, off: Int, len: Int) {
-                checkClosed()
-                zip.write(b, off, len)
-            }
-            override fun flush() {
-                zip.flush()
-            }
-            override fun close() {
-                if (closed) return
-                zip.closeEntry()
-                closed = true
-            }
-        }.asSink().buffered()
-
-        sink.use(write)
+    private inline fun ensureOpen(crossinline message: () -> String) {
+        if (closed) throw IOException("ZipArchive already closed. ${message()}.")
     }
 
-    override fun close() { zip.close() }
+    private inner class Entry(val path: String) : OutputStream() {
+        private var closed = false
+
+        init {
+            zip.putNextEntry(ZipEntry(path))
+        }
+
+        private inline fun ensureEntryOpen(crossinline message: () -> String) {
+            ensureOpen(message)
+            if (closed) throw IOException("Zip entry already closed. ${message()}.")
+        }
+
+        override fun write(b: Int) {
+            ensureEntryOpen { "Cannot write to entry /$path" }
+            zip.write(b)
+        }
+        override fun write(b: ByteArray, off: Int, len: Int) {
+            ensureEntryOpen { "Cannot write to entry /$path" }
+            zip.write(b, off, len)
+        }
+        override fun flush() {
+            zip.flush()
+        }
+        override fun close() {
+            if (closed) return
+            zip.closeEntry()
+            closed = true
+        }
+
+        override fun toString(): String = "ZipArchive.Entry(/$path)"
+    }
+
+    /**
+     * Represents a subdirectory within a ZIP archive.
+     *
+     * This is essentially the same as [ZipArchive], except that it does nothing
+     * when closed. Only the root archive owns the underlying zip stream that
+     * need to be released.
+     *
+     * @param path The full path prefix for this subdirectory (e.g., "src/main")
+     */
+    public inner class Sub(public val path: String) : Archive {
+        init {
+            ensureOpen { "Cannot create sub at /$path" }
+        }
+
+        override fun sub(name: String): Sub = Sub("$path/$name")
+
+        override fun entry(name: String, write: (Sink) -> Unit) {
+            ensureOpen { "Cannot create entry /$path/$name" }
+            Entry("$path/$name").asSink().buffered().use(write)
+        }
+
+        override fun close() {}
+
+        override fun toString(): String = "ZipArchive.Sub(/$path)"
+    }
+
+    override fun sub(name: String): Sub = Sub(name)
+
+    override fun entry(name: String, write: (Sink) -> Unit) {
+        ensureOpen { "Cannot create entry /$name" }
+        Entry(name).asSink().buffered().use(write)
+    }
+
+    override fun close() {
+        if (closed) return
+        closed = true
+        zip.close()
+    }
 }
 
