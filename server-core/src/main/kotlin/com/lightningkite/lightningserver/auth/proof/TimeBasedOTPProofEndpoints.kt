@@ -28,6 +28,7 @@ import kotlinx.serialization.builtins.serializer
 import java.security.SecureRandom
 import kotlinx.datetime.toJavaInstant
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.seconds
 
 
 @Deprecated("Use TimeBasedOTPProofEndpoints instead", replaceWith = ReplaceWith("TimeBasedOTPProofEndpoints", "com.lightningkite.lightningserver.auth.proof.TimeBasedOTPProofEndpoints") )
@@ -168,6 +169,7 @@ class TimeBasedOTPProofEndpoints(
         successCode = HttpStatus.OK,
         implementation = { input: IdentificationAndPassword ->
             val now = now()
+            val gracePeriod = now().minus(5.seconds)
             cache().constrainAttemptRate(
                 cacheKey = "totp-count-${input.property}-${input.value}"
             ) {
@@ -181,7 +183,10 @@ class TimeBasedOTPProofEndpoints(
                     it.subjectId.eq(subjectId) and it.subjectType.eq(subject) and active
                 }).toList()
 
-                val matching = active.find { it.generator.isValid(input.password, now.toJavaInstant()) }
+                val matching = active.find {
+                    it.generator.isValid(input.password, now.toJavaInstant()) ||
+                            it.generator.isValid(input.password, gracePeriod.toJavaInstant())
+                }
                     ?: throw BadRequestException("User ID and code do not match")
 
                 modelInfo.collection().updateOneById(matching._id, modification {
