@@ -351,7 +351,8 @@ class WebAuthNProofEndpoints(
 
             val subjectId = subjectProperty?.let { property ->
                 value?.let { value ->
-                    val id = handler.findUserIdString(subjectProperty, value)
+                    val normalizedValue = handler.normalizePropertyValue(property, value)
+                    val id = handler.findUserIdString(property, normalizedValue)
                     if (id == null || authOrNull != null && id != authOrNull.idString)
                         // Something didn't add up properly. Return a valid looking useless response
                         return@api WebAuthN.Authentication.StartResponse(

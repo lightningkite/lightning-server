@@ -176,7 +176,8 @@ class TimeBasedOTPProofEndpoints(
                 val subject = input.type
                 val handler = Authentication.subjects.values.find { it.name == subject }
                     ?: throw IllegalArgumentException("No subject $subject recognized")
-                val subjectId = handler.findUserIdString(input.property, input.value)
+                val normalizedValue = handler.normalizePropertyValue(input.property, input.value)
+                val subjectId = handler.findUserIdString(input.property, normalizedValue)
                     ?: throw BadRequestException("User ID and code do not match")
 
                 val active = modelInfo.collection().find(condition {
@@ -196,7 +197,7 @@ class TimeBasedOTPProofEndpoints(
                 proofHasher().makeProof(
                     info = info,
                     property = input.property,
-                    value = input.value,
+                    value = normalizedValue,
                     at = now()
                 )
             }
