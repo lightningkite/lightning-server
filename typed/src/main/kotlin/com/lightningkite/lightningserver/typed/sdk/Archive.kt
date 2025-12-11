@@ -242,9 +242,7 @@ public class SingleStreamArchive(
     override fun sub(name: String): Sub = Sub(name)
 
     override fun entry(name: String, write: (Sink) -> Unit) {
-        ensureOpen { "Cannot create entry /$name" }
-        delimiter?.invoke("/$name")?.let(out::writeString)
-        entry().use(write)
+        entry("/$name").use(write)
     }
 
     override fun close() {
