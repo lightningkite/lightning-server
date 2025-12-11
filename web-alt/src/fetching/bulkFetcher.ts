@@ -25,7 +25,7 @@ export class BulkFetcher {
       const headers = await this.headerCalculator();
       headers["Content-Type"] = "application/json";
 
-      return fetch(`${this.serverUrl}/${path}`, {
+      return fetch(`${this.serverUrl}${path}`, {
         method: method,
         body: JSON.stringify(body),
         headers: headers,

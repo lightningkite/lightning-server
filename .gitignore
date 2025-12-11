@@ -19,3 +19,4 @@ kotlin-js-store/
 local.version.txt
 local.auto.tfvars
 *.hprof
+*.tgz
