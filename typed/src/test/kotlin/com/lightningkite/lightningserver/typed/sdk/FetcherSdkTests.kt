@@ -1,26 +1,25 @@
 package com.lightningkite.lightningserver.typed.sdk
 
 import com.lightningkite.lightningserver.runtime.test.test
-import com.lightningkite.lightningserver.typed.ModelRestEndpoints
 import com.lightningkite.lightningserver.typed.jsonschema.openApiDescription
-import com.lightningkite.lightningserver.typed.sdk.SDK.sdk
-import com.lightningkite.lightningserver.typed.sdk.SDK.writeSdk
+import com.lightningkite.lightningserver.typed.sdk.SDK.writeUsingDefaultSettings
 import com.lightningkite.services.data.KFile
 import kotlin.test.Test
 
 class FetcherSdkTests {
-    private val folder = KFile("./src/test/kotlin/com/lightningkite/lightningserver/typed/sdk/generated")
+    private val folder = KFile("./src/test/kotlin/com/lightningkite/lightningserver/typed/sdk/generated/kotlin")
 
     @Test
-    fun test() {
-        val build = Server.build()
-        println("Modules: ${build.modules}")
-        println("Extensions: ${build.extensions.entries.size}")
+    fun testMultipleFiles() {
+        FetcherSdk("com.lightningkite.lightningserver.typed.sdk").writeUsingDefaultSettings(Server, folder)
+    }
 
-        build.sdk().let {
-            println("Children: ${it.children}")
-        }
-        Server.writeSdk(FetcherSdk, folder, "com.lightningkite.lightningserver.typed.sdk")
+    @Test
+    fun testSingleFile() {
+        FetcherSdk(
+            "com.lightningkite.lightningserver.typed.singlesdk",
+            fileStructure = FetcherSdk.Structure.SingleFile("sdk.kt")
+        ).writeUsingDefaultSettings(Server, folder)
     }
 
     @Test

@@ -157,6 +157,7 @@ public class TimeBasedOTPProofEndpoints(
             successCode = HttpStatus.OK,
             implementation = { input: IdentificationAndPassword ->
                 val now = now()
+                val gracePeriod = now().minus(5.seconds)
                 cache().constrainAttemptRate(
                     cacheKey = "totp-count-${input.property}-${input.value}"
                 ) {
@@ -170,7 +171,10 @@ public class TimeBasedOTPProofEndpoints(
                         it.subjectId.eq(subjectId) and it.subjectType.eq(subject) and active
                     }).toList()
 
-                    val matching = active.find { it.generator.isValid(input.password, now.toJavaInstant()) }
+                    val matching = active.find {
+                        it.generator.isValid(input.password, now.toJavaInstant()) ||
+                                it.generator.isValid(input.password, gracePeriod.toJavaInstant())
+                    }
                         ?: throw BadRequestException("User ID and code do not match")
 
                     // It's OK to reuse TOTPs.  That's inherently part of how they work - they're time based hashes.
