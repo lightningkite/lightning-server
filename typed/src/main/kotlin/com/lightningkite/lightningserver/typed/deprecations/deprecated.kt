@@ -23,7 +23,7 @@ import com.lightningkite.services.database.Table
 
 @Deprecated(
     "Use the standard syntax",
-    ReplaceWith("path.path(key) bind StartupOnce(database, action = action)")
+    ReplaceWith("path.path(key) bind startupOnce(database, action = action)")
 )
 context(builder: ServerBuilder)
 public fun startupOnce(
