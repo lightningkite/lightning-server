@@ -53,7 +53,7 @@ proguard = "7.8.1"
 scrimage = "4.3.3"
 sentry = "8.26.0"
 serializationLibs = "1.9.0"
-serviceAbstractions = "0.0.1-89-local"
+serviceAbstractions = "0.0.1-aimodules-91-local"
 shadow = "8.1.1"
 vanniktechMavenPublish = "0.34.0"
 webauthn4jCore = "0.29.4.RELEASE"
@@ -190,7 +190,6 @@ serviceAbstractionsSms = { module = "com.lightningkite.services:sms", version = 
 serviceAbstractionsSmsTest = { module = "com.lightningkite.services:sms-test", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsSmsTwilio = { module = "com.lightningkite.services:sms-twilio", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsAiKoog = { module = "com.lightningkite.services:ai-koog", version = { ref = "serviceAbstractions" } }
-serviceAbstractionsAiKoogAwsOpensearch = { module = "com.lightningkite.services:ai-koog-aws-opensearch", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsTest = { module = "com.lightningkite.services:test", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsEmailInbound = { module = "com.lightningkite.services:email-inbound", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsEmailInboundSendgrid = { module = "com.lightningkite.services:email-inbound-sendgrid", version = { ref = "serviceAbstractions" } }
@@ -202,6 +201,9 @@ serviceAbstractionsSmsInboundTwilio = { module = "com.lightningkite.services:sms
 serviceAbstractionsPhonecall = { module = "com.lightningkite.services:phonecall", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsPhonecallTwilio = { module = "com.lightningkite.services:phonecall-twilio", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsPhonecallTest = { module = "com.lightningkite.services:phonecall-test", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsVoiceagent = { module = "com.lightningkite.services:voiceagent", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsVoiceagentOpenai = { module = "com.lightningkite.services:voiceagent-openai", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsVoiceagentPhonecall = { module = "com.lightningkite.services:voiceagent-phonecall", version = { ref = "serviceAbstractions" } }
 webauthn4jCore = { module = "com.webauthn4j:webauthn4j-core", version = { ref = "webauthn4jCore" } }
 xmlUtilJvm = { module = "io.github.pdvrieze.xmlutil:serialization-jvm", version = { ref = "xmlUtilJvm" } }
 

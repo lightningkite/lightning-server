@@ -220,6 +220,41 @@ class ImplementationHelpersHandleTest {
     }
 
     @Test
+    fun trailing_slash_no_redirect_when_correct() {
+        // Test that a request WITH a trailing slash to an endpoint that requires trailing slash
+        // does NOT redirect (would cause infinite loop if it did)
+        TestServer.test(
+            settings = {
+                loggingSettings.set(
+                    LoggingSettings(
+                        LoggingSettings.ContextSettings(
+                            filePattern = null,
+                            toConsole = true,
+                            level = Level.DEBUG
+                        )
+                    )
+                )
+            }
+        ) {
+            runBlocking {
+                val resp = serverRuntime.handle(
+                    HttpRequest(
+                        path = RawHttpEndpoint(asString = "/slash/", method = HttpMethod.GET),
+                        queryParameters = QueryParameters.EMPTY,
+                        headers = HttpHeaders.EMPTY,
+                        domain = "example.com",
+                        protocol = "https",
+                        sourceIp = "local",
+                    )
+                )
+                // Should succeed directly, NOT redirect (which would cause infinite loop)
+                assertEquals(HttpStatus.OK, resp.status, "Request to /slash/ should succeed directly")
+                assertEquals("slash", resp.body?.text())
+            }
+        }
+    }
+
+    @Test
     fun trailing_slash_redirects_root() {
         TestServer.test(
             settings = {
@@ -282,6 +317,22 @@ class ImplementationHelpersHandleTest {
                 assertNotEquals(HttpStatus.TemporaryRedirect, resp.status)
             }
         }
+    }
+
+    @Test
+    fun path_segments_parse_preserves_trailing_slash() {
+        // Verify PathSegments.parse correctly preserves trailing slashes
+        val withTrailing = PathSegments.parse("/foo/")
+        assertEquals(listOf("foo", ""), withTrailing.segments, "Trailing slash should be empty string segment")
+
+        val withoutTrailing = PathSegments.parse("/foo")
+        assertEquals(listOf("foo"), withoutTrailing.segments, "No trailing slash should have no empty segment")
+
+        val rootOnly = PathSegments.parse("/")
+        assertEquals(listOf(""), rootOnly.segments, "Root slash parses to single empty segment")
+
+        val empty = PathSegments.parse("")
+        assertEquals(listOf(""), empty.segments, "Empty string parses to single empty segment")
     }
 
     @Test

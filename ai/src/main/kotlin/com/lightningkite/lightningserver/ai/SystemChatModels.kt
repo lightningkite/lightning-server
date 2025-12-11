@@ -112,6 +112,12 @@ public data class SystemChatConversation(
     val processingLock: ProcessingLock? = null,
     /** Tools (or patterns) the user has pre-authorized for this conversation */
     val toolAuthorizations: List<ToolAuthorization> = emptyList(),
+    /**
+     * Timestamp of the most recent Summary message for context compression.
+     * When set, only messages after this timestamp need to be loaded for LLM context.
+     * The Summary message itself should be included.
+     */
+    val summaryUpTo: Instant? = null,
     /** When the conversation was created */
     val createdAt: Instant,
     /** When the conversation was last updated */
@@ -137,7 +143,7 @@ public data class SystemChatMessage(
     val subjectId: String,
     /** The type/role of this message */
     val role: Role,
-    /** Channel type: "sms", "email", or custom value for WebSocket filtering */
+    /** Channel type: "sms", "email", "voice", "phone", or custom value for WebSocket filtering */
     val channel: String? = null,
     /** External identifier for SMS/email channels (phone number or email address) */
     val externalIdentifier: String? = null,
@@ -149,6 +155,12 @@ public data class SystemChatMessage(
     val createdAt: Instant,
     /** Tool-specific data (only present when role == ToolRequest) */
     val tool: ToolRequestData? = null,
+    /**
+     * When true, this message should NOT trigger automatic LLM response generation.
+     * Used by voice/phone channels where the response is handled directly by the voice agent,
+     * or for imported/migrated messages that don't need processing.
+     */
+    val skipAutoResponse: Boolean = false,
 ) : HasId<Uuid> {
 
     /**
@@ -167,7 +179,13 @@ public data class SystemChatMessage(
         /** LLM reasoning/chain-of-thought */
         Thinking,
         /** Error messages from the system */
-        Error
+        Error,
+        /**
+         * A compressed summary of earlier conversation history.
+         * Used for context compression to reduce token usage.
+         * When present, earlier messages can be omitted from LLM context.
+         */
+        Summary
     }
 }
 

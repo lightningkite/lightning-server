@@ -62,7 +62,7 @@ public abstract class ChatTool<Subject: HasId<*>?, T> {
     public fun koogSerializer(module: SerializersModule): KSerializer<*> = if(noWrappingNeeded) argsSerializer else Box.serializer(argsSerializer)
     @Suppress("UNCHECKED_CAST")
     public fun koogArgParse(fromKoog: Any?): T = if(noWrappingNeeded) fromKoog as T else (fromKoog as Box<T>).argument
-    public fun koogDescriptor(module: SerializersModule): ToolDescriptor = koogSerializer(module).asToolDescriptor(name, description, module, 3)
+    public fun koogDescriptor(module: SerializersModule): ToolDescriptor = koogSerializer(module).asToolDescriptor(name, description, module, 6)
 
     /**
      * Check if this specific call requires approval.

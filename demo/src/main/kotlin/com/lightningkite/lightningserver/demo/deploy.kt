@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.demo
 
+import ai.koog.prompt.executor.clients.bedrock.BedrockModels
 import com.lightningkite.lightningserver.cors.CorsSettings
 import com.lightningkite.lightningserver.definition.loggingSettings
 import com.lightningkite.lightningserver.definition.secretBasis
@@ -20,10 +21,15 @@ import com.lightningkite.services.terraform.direct
 import com.lightningkite.toEmailAddress
 import com.lightningkite.EmailAddress
 import com.lightningkite.lightningserver.terraform.*
+import com.lightningkite.services.ai.koog.awsBedrock
+import com.lightningkite.services.email.javasmtp.awsSesDomain
+import com.lightningkite.services.email.javasmtp.awsSesSmtpLegacy
+import com.lightningkite.services.email.ses.awsSesInbound
 import software.amazon.awssdk.regions.Region
 import java.io.File
 import kotlin.reflect.KClass
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.seconds
 
 
 object LkEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
@@ -50,21 +56,36 @@ object LkEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
 
     override fun Server.settings() {
         database.mongodbAtlasFree(orgId = "6323a65c43d66b56a2ea5aea", zoneName = "Zone 1")
-        email.awsSesSmtp("joseph@lightningkite.com".toEmailAddress())
-        sms.direct(SMS.Settings())
         files.awsS3Bucket(signedUrlDuration = 1.days)
         cache.awsDynamoDb()
         secretBasis.generated()
         loggingSettings.direct(LoggingSettings())
         telemetrySettings.direct(null)
-        cors.direct(CorsSettings())
+        cors.direct(CorsSettings(
+            limitToDomains = listOf("lightningserver.cs.lightningkite.com"),
+            limitToHeaders = listOf("*"),
+            limitToMethods = listOf("*"),
+            exposedHeaders = listOf("*"),
+            allowCredentials = true,
+            cacheLength = 5.seconds,
+            forbidOnMatchFail = true
+        ))
         newSecret.byVariable()
+        llm.awsBedrock(BedrockModels.MoonshotKimiK2Thinking.id, region.id())
+        awsSesDomain("email", "joseph@lightningkite.com".toEmailAddress())
+        email.awsSesSmtp("email")
+        emailInbound.awsSesInbound("email", "https://lightningserver.cs.lightningkite.com/assistant-channels/email/webhook")
+        sms.byVariable()
+        smsInbound.byVariable()
     }
 }
 
 object LkEnvDeploy {
     @JvmStatic
-    fun main(vararg args: String) = LkEnv.deploy(autoApprove = true)
+    fun main(vararg args: String) {
+        ProcessBuilder("./gradlew", "demo:lambda").inheritIO().start().waitFor()
+        LkEnv.deploy(autoApprove = true)
+    }
 }
 
 object LkEnvEdit {
@@ -96,7 +117,7 @@ object JosephPersonalEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
     override val region = Region.US_WEST_2!!
     override fun Server.settings() {
         database.mongodbAtlasFree(orgId = "6323a65c43d66b56a2ea5aea", zoneName = "Zone 1")
-        email.awsSesSmtp("josephivie@gmail.com".toEmailAddress())
+        email.awsSesSmtpLegacy("josephivie@gmail.com".toEmailAddress())
         sms.direct(SMS.Settings())
         files.awsS3Bucket(signedUrlDuration = 1.days)
         cache.awsDynamoDb()

@@ -38,7 +38,7 @@ import kotlin.uuid.Uuid
  * - OpenAPI documentation
  * - WebSocket updates (optional)
  *
- * See TestModelEndpoints.kt for the RECOMMENDED pattern:
+ * See BlogEndpoints.kt for the RECOMMENDED pattern:
  * ```kotlin
  * val info = database.modelInfo(
  *     auth = noAuth,
@@ -62,15 +62,6 @@ import kotlin.uuid.Uuid
 class DatabaseExamplesEndpoints(
     private val database: Runtime<Database>
 ) : ServerBuilder() {
-    // The correct way of doing it
-    val info = Server.database.modelInfo(
-        auth = Server.UserAuth.require(),
-        permissions = {
-            // TODO: Real permissions
-            ModelPermissions.allowAll<BlogPost>()
-        },
-    )
-    val rest = path.path("rest") include ModelRestEndpoints(info) + ModelRestUpdatesWebsocket(info)
 
     /**
      * POST /blog/posts

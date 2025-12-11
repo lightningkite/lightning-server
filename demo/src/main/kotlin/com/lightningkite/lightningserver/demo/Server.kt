@@ -3,6 +3,8 @@
 package com.lightningkite.lightningserver.demo
 
 import com.lightningkite.DataSize.Companion.bytes
+import com.lightningkite.lightningserver.ai.ExternalChannelSupport
+import com.lightningkite.lightningserver.ai.VoiceChannelSupport
 import com.lightningkite.lightningserver.demo.endpoints.*
 import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
@@ -33,11 +35,20 @@ import com.lightningkite.services.database.jsonfile.JsonFileDatabase
 import com.lightningkite.services.database.mongodb.*
 import com.lightningkite.services.email.*
 import com.lightningkite.services.email.javasmtp.JavaSmtpEmailService
+import com.lightningkite.services.email.ses.SesEmailInboundService
 import com.lightningkite.services.files.*
 import com.lightningkite.services.files.s3.*
 import com.lightningkite.services.http.*
 import com.lightningkite.services.otel.OpenTelemetrySettings
 import com.lightningkite.services.sms.*
+import com.lightningkite.services.sms.twilio.TwilioSMS
+import com.lightningkite.services.sms.twilio.TwilioSmsInboundService
+import com.lightningkite.services.phonecall.PhoneCallService
+import com.lightningkite.services.phonecall.twilio.TwilioPhoneCallService
+import com.lightningkite.services.pubsub.PubSub
+import com.lightningkite.services.voiceagent.VoiceAgentService
+import com.lightningkite.services.voiceagent.openai.OpenAIVoiceAgentService
+import com.lightningkite.toPhoneNumber
 import io.ktor.client.request.*
 import io.ktor.server.plugins.NotFoundException
 import io.opentelemetry.exporter.otlp.logs.OtlpGrpcLogRecordExporter
@@ -59,25 +70,35 @@ object Server : ServerBuilder() {
     val database = setting("database", Database.Settings())
     val llm = setting("llm", LLMClientAndModelSettings(""))
     val email = setting("email", EmailService.Settings())
+    val emailInbound = setting("emailInbound", EmailInboundService.Settings())
     val sms = setting("sms", SMS.Settings())
+    val smsInbound = setting("smsInbound", SmsInboundService.Settings())
     val files = setting("files", PublicFileSystem.Settings())
     val cache = setting("cache", Cache.Settings())
     val cors = setting("cors", CorsSettings())
+    val voiceAgent = setting("voiceAgent", VoiceAgentService.Settings())
+    val pubsub = setting("pubSub", PubSub.Settings())
+    val phoneCall = setting("phoneCall", PhoneCallService.Settings())
     val newSecret = setting("someSecret", "???", instructions = "This can be whatever you dream, you madman.")
 
     val corsInterceptor = install(CorsInterceptor(cors))
 
     init {
         JavaSmtpEmailService
+        SesEmailInboundService
+        TwilioSmsInboundService
+        TwilioSMS
+        TwilioPhoneCallService
         JsonFileDatabase
         DynamoDbCache
         MongoDatabase
         MemcachedCache
         S3PublicFileSystem
+        OpenAIVoiceAgentService
     }
 
-    val setupAdmins = path.path("setup-admins") bind startupOnce(database) {
-        userInfo.table().insertOne(User(email = "joseph+root@lightningkite.com", isSuperUser = true))
+    val setupAdmins = path.path("setup-admins2") bind startupOnce(database) {
+        userInfo.table().insertOne(User(email = "joseph@lightningkite.com", isSuperUser = true, phone = "+18013693729".toPhoneNumber()))
     }
 
     object UserAuth: PrincipalType<User, Uuid> {
@@ -118,11 +139,6 @@ object Server : ServerBuilder() {
         val rest = path.path("rest") module ModelRestEndpoints(userInfo)
     }
     val uploadEarly = path.path("upload") module UploadEarlyEndpoint(files, database, Runtime.Constant(listOf()))
-    val testModel = path.path("test-model") module TestModelEndpoints
-
-    // ========================================
-    // New Organized Demo Endpoints
-    // ========================================
 
     /**
      * Basic Examples - Simple HTTP endpoints demonstrating fundamental patterns.
@@ -134,13 +150,8 @@ object Server : ServerBuilder() {
      */
     val typedApi = path include TypedApiExamplesEndpoints
 
-    /**
-     * Database Examples - CRUD operations with the query DSL.
-     *
-     * ⚠️ NOTE: These are LOW-LEVEL examples for educational purposes.
-     * For production, use ModelRestEndpoints (see testModel below for the recommended pattern).
-     */
-    val databaseExamples = path.path("database") module DatabaseExamplesEndpoints(database)
+    val blog = path.path("blog") module BlogEndpoints
+//    val comment = path.path("comment") module CommentEndpoints
 
     /**
      * File Examples - File upload, download, and signed URLs.
@@ -163,203 +174,9 @@ object Server : ServerBuilder() {
     val taskExamples = path.path("tasks") module TaskExamplesEndpoints(cache)
 
     /**
-     * Notification Examples - Push notifications, email, SMS, and in-app notifications.
-     */
-    val notificationExamples = path include NotificationExamplesEndpoints
-
-    /**
-     * Media Examples - Image processing, thumbnails, and format conversion.
-     */
-    val mediaExamples = path include MediaExamplesEndpoints
-
-    /**
      * JSON-RPC Examples - RPC-style API endpoints using JSON-RPC 2.0 protocol.
      */
     val jsonRpcExamples = path include JsonRpcExamplesEndpoints
-
-    // Note: The root endpoint (GET /) is now defined in BasicExamplesEndpoints
-    // which is included above. This avoids endpoint duplication.
-    // If you need an authenticated root endpoint, access it via a different path.
-    //
-    // Old root endpoint (commented out to avoid duplicate registration):
-    // val root = path.get bind HttpHandler {
-    //     HttpResponse.plainText("Hello ${it.auth(UserAuth.require() or noAuth)?.fetch()}")
-    // }
-
-    val slashEscaping = path.path("variable").arg<String>("stupidid").get bind HttpHandler { request ->
-        HttpResponse.plainText("The variable is '${request.path.arg1}'")
-    }
-
-    val topic = path.path("socket-topic").topic(String.serializer())
-    val socketSideMessage = path.path("socket").arg<String>("tosend").get bind HttpHandler {
-        topic.send(it.arg1)
-        HttpResponse.plainText("Sent!")
-    }
-    val socket = path.path("socket") bind WebSocketHandler(
-        willConnect = { Uuid.random().toString() },
-        didConnect = {
-            println("didConnect $currentState")
-            subscribe(topic)
-        },
-        messageFromClient = {
-            println("messageFromClient $currentState $it")
-            send(it.text)
-            if (it.content == "die") {
-                throw Exception("You asked me to die!")
-            }
-        },
-        topicHandlers = {
-            topic bind {
-                println("topicHandlers $currentState $it")
-                send(it.value)
-            }
-        },
-        disconnect = { println("Disconnect $currentState") }
-    )
-
-    val mockWorkGet = path.path("mock-work").get bind HttpHandler {
-        repeat(5) {
-            // Mocking DB requests
-            delay(10)
-        }
-        HttpResponse.plainText("ok")
-    }
-    val mockWorkPost = path.path("mock-work").post bind HttpHandler {
-        val bytes = it.body?.data?.bytes()
-        repeat(5) {
-            // Mocking DB requests
-            delay(10)
-        }
-        HttpResponse(body = bytes?.let { bytes -> TypedData.bytes(bytes, it.body!!.mediaType) })
-    }
-
-    val mem = path.path("mem").get bind HttpHandler {
-        repeat(5) { System.gc() }
-        val max = java.lang.Runtime.getRuntime().maxMemory().bytes
-        val total = java.lang.Runtime.getRuntime().totalMemory().bytes
-        val free = java.lang.Runtime.getRuntime().freeMemory().bytes
-        val memory = ServerHealth.Memory(
-            max = max,
-            total = total,
-            free = free,
-            systemAllocated = total - free,
-            usage = ((total - free).bytes.toDouble() / max.bytes.toDouble()).toFloat()
-        )
-        HttpResponse.plainText("Memory usage: ${memory}")
-    }
-
-    val task = path.path("Sample Task") bind Task { it: Int ->
-        val id = Uuid.random()
-        println("Got input $it in the sample task $id")
-        var value = cache().get<Int>("key")
-        println("From cache is $value for task $id")
-        delay(1000L)
-        value = cache().get<Int>("key")
-        println("One second later, from cache is $value for task $id")
-        println("Finishing sample task $id")
-    }
-
-    val runTask = path.path("run-task").get bind HttpHandler {
-        val number = Random.nextInt(0, 100)
-        task.invoke(number)
-        HttpResponse.plainText("OK")
-    }
-
-    val testPrimitive = path.path("test-primitive").get bind ApiHttpHandler(
-        auth = UserAuth.require(),
-        summary = "Get Test Primitive",
-        errorCases = listOf(),
-        implementation = { input: Unit -> "42 is great" }
-    )
-    val testObject = path.path("test-object").get bind ApiHttpHandler(
-        auth = UserAuth.require(),
-        summary = "Get Test Object",
-        errorCases = listOf(),
-        examples = listOf(ApiHttpHandler.Example(input = Unit, output = TestModel())),
-        implementation = { input: Unit ->
-            TestModel()
-        }
-    )
-
-    // Test nullable primitives as input
-    val testNullableInput = path.path("test-nullable-input").post bind ApiHttpHandler(
-        auth = UserAuth.require(),
-        summary = "Test Nullable Primitive Input",
-        errorCases = listOf(),
-        implementation = { input: Int? ->
-            "Received: ${input ?: "null"}"
-        }
-    )
-
-    // Test nullable primitives as output
-    val testNullableOutput = path.path("test-nullable-output").get bind ApiHttpHandler(
-        auth = UserAuth.require(),
-        summary = "Test Nullable Primitive Output",
-        errorCases = listOf(),
-        implementation = { input: Unit ->
-            val result: String? = if (Random.nextBoolean()) "value" else null
-            result
-        }
-    )
-
-    // Test nullable primitives both input and output
-    val testNullableBoth = path.path("test-nullable-both").post bind ApiHttpHandler(
-        auth = UserAuth.require(),
-        summary = "Test Nullable Primitive Both",
-        errorCases = listOf(),
-        implementation = { input: Double? ->
-            val result: Double? = input?.times(2)
-            result
-        }
-    )
-
-    val die = path.path("die").get bind HttpHandler {  throw Exception("OUCH") }
-
-    val fileSignPerfCheck = path.path("file-sign-perf-check").get bind HttpHandler {
-        val system = files()
-        var endAt = System.currentTimeMillis() + 1000
-        while(System.currentTimeMillis() < endAt)
-            system.root.then("test.txt").signedUrl
-        var count = 0
-        endAt = System.currentTimeMillis() + 1000
-        var last = ""
-        while(System.currentTimeMillis() < endAt) {
-            count++
-            last = system.root.then("test.txt").signedUrl
-        }
-        HttpResponse.plainText("$count - $last")
-    }
-
-    val databaseCheck = path.path("database-check").get bind HttpHandler {
-        HttpResponse.plainText(database().table<User>()::class.qualifiedName ?: "???")
-    }
-
-    val testSchedule = path.path("test-schedule") bind ScheduledTask(frequency = 5.minutes) {
-        println("Hello schedule!")
-    }
-
-    val testPathed = path.path("a").arg<String>("b").arg<Int>("c").post bind ApiHttpHandler(
-        summary = "Test Pathing",
-        auth = UserAuth.require(),
-        implementation = { _: Unit ->
-            println("A = $path1")
-            println("A = ${route.arg1}")
-
-            println("B = ${route.arg2}")
-            println("Hello ${auth.fetch()}")
-        }
-    )
-
-    val hasInternet = path.path("has-internet").get bind HttpHandler {
-        println("Checking for internet...")
-        val response = client.get("https://lightningkite.com")
-        HttpResponse.plainText("Got status ${response.status}")
-    }
-
-    val dieSlowly = path.path("die-slowly").get bind HttpHandler {
-        Thread.sleep(60_000L)
-        HttpResponse.plainText("Impossible.")
-    }
 
     val multiplex = path.path("multiplex") bind MultiplexWebSocketHandler()
 
@@ -391,73 +208,51 @@ object Server : ServerBuilder() {
         override suspend fun sessionStaleAfter(subject: User): Duration? = null
     }
 
-    val permanentMemory = ArrayList<ByteArray>()
-    val causeOutOfMemory = path.path("cause-out-of-memory").get bind HttpHandler {
-        while (true) {
-            permanentMemory += ByteArray(1024 * 1024)
-            println("Allocated ${permanentMemory.size} times")
-        }
-        HttpResponse.plainText("This should not be reachable.")
-    }
-
-    val arged = path.path("arged").arg<String>("name").arg<Int>("arg2").get bind ApiHttpHandler(
-        auth = UserAuth.require(),
-        summary = "Arged",
-        implementation = { input: Unit ->
-
-        }
+    val blogAssist = BlogAssistantChat(database, llm, blogPostInfo = blog.info)
+    val blogAssistEndpoints = path.path("assistant") module blogAssist
+    val blogAssistChannels = path.path("assistant-channels") module ExternalChannelSupport(
+        chatEndpoints = blogAssist,
+        principalType = UserAuth,
+        smsInbound = smsInbound,
+        smsOutbound = sms,
+        emailInbound = emailInbound,
+        emailOutbound = email,
+        files = files,
+        resolveSubjectByEmail = { emailAddr ->
+            userInfo.table().findOne(condition { it.email eq emailAddr.raw })
+        },
+        resolveSubjectByPhone = {  phone ->
+            userInfo.table().findOne(condition { it.phone eq phone })
+        },
     )
 
-    val arged2 = path.path("arged2").arg<String>("name").arg<Int>("arg2").get bind ApiHttpHandler(
-        auth = UserAuth.require(),
-        summary = "Arged",
-        implementation = { input: Unit ->
-            arged(input)
-        }
+    val blogAssistVoice = path.path("assistant-voice") module VoiceChannelSupport(
+        chatEndpoints = blogAssist,
+        authRequirement = UserAuth.require(),
+        principalType = UserAuth,
+        voiceAgent = voiceAgent,
+        pubsub = pubsub,
+        phoneCall = phoneCall, // Enable phone call integration
+        voiceInstructions = """
+            You are a helpful blog management assistant. You can help users:
+            - Search and browse blog posts
+            - Create new blog posts
+            - Edit existing posts (title, content, excerpt, tags)
+            - Publish or archive posts
+            - Delete posts (requires user approval)
+
+            Be conversational and friendly. Ask clarifying questions when needed.
+            For destructive operations like delete, always explain what will happen first.
+        """.trimIndent(),
+        resolveTools = { auth, conversation ->
+            blogAssist.tools.values.toList()
+        },
+        resolveSubjectByPhone = { phone ->
+            userInfo.table().findOne(condition { it.phone eq phone })
+        },
+        greeting = "Hello! I'm your blog assistant. How can I help you today?",
+        historyMessageLimit = 10,
     )
-
-    val indirect = path.path("indirect").arg<String>("id").arg<Int>("arg2").post bind HttpHandler { request ->
-        arged(request, request.arg1, request.arg2, Unit)
-
-        HttpResponse()
-    }
-
-    val sample = path.path("page").get bind HttpHandler {
-        HttpResponse.html {
-
-            head {
-
-            }
-
-            body {
-                div {
-                    p { +"My text here" }
-                }
-                input(InputType.email) {
-                    id = "asdf"
-                }
-            }
-
-        }
-    }
-
-    val memLeakCheck = path.path("memLeakCheck").post bind HttpHandler {
-        // Not reading the body.  Is that it?
-//        HttpResponse.plainText("OK")
-//        HttpResponse.json(testModel.info.collection().all().toList())
-        val auth = it.auth(UserAuth.require())
-        HttpResponse.plainText(auth.id.toString())
-    }
-
-    val blogAssist = path.path("assistant") module BlogAssistantChat(database, llm, blogPostInfo = databaseExamples.info)
 
     init { registerBasicMediaTypeCoders() }
-
-    val tokenOnStartup = path.path("tokenOnStartupForDebug") bind StartupTask {
-        val myUser = userInfo.table().findOne(condition {
-            it.email.eq("joseph+root@lightningkite.com")
-        })!!
-        val s = subjects.newSession(myUser._id)
-        println("Token for main user is ${s.second}")
-    }
 }

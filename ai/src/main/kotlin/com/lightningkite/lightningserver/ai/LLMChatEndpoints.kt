@@ -1,66 +1,38 @@
 package com.lightningkite.lightningserver.ai
 
 import ai.koog.prompt.dsl.Prompt
-import ai.koog.prompt.dsl.prompt
+import ai.koog.prompt.markdown.markdown
 import ai.koog.prompt.message.Message
-import ai.koog.agents.core.tools.ToolDescriptor
 import com.lightningkite.lightningserver.auth.AuthRequirement
-import com.lightningkite.lightningserver.auth.fetch
+import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.ServerSetting
+import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
-import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.typed.AuthAccess
 import com.lightningkite.services.ai.koog.LLMClientAndModel
-import com.lightningkite.services.ai.koog.LLMClientAndModelSettings
+import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.ModelPermissions
+import com.lightningkite.services.database.and
+import com.lightningkite.services.database.condition
+import com.lightningkite.services.database.eq
+import com.lightningkite.services.database.gte
 import com.lightningkite.services.database.insertOne
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.json.Json
+import com.lightningkite.services.database.modification
+import com.lightningkite.services.database.sort
+import com.lightningkite.services.database.updateOneById
+import kotlinx.coroutines.flow.toList
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.TimeSource
+import kotlin.time.Duration.Companion.seconds
 
-/**
- * A convenient base class for chat endpoints that use direct LLM execution.
- *
- * Extends [SystemChatEndpoints] with a standard LLM execution loop that:
- * - Builds prompts from conversation history
- * - Calls the LLM with tool definitions
- * - Processes tool calls through the approval workflow
- * - Loops until a final text response or max iterations
- *
- * Subclasses implement abstract properties to configure the assistant.
- *
- * Example:
- * ```kotlin
- * class MyAssistant(
- *     database: ServerSetting<Database.Settings, Database>,
- *     llm: ServerSetting<LLMClientAndModelSettings, LLMClientAndModel>,
- *     myModelInfo: ModelInfo<User, MyModel, Uuid>,
- * ) : LLMChatEndpoints<User>(
- *     database = database,
- *     llmSetting = llm,
- *     authRequirement = MyAuth.require(),
- *     conversationPermissions = { ... },
- *     messagePermissions = { ... },
- * ) {
- *     override val subjectSerializer = User.serializer()
- *     override val systemPrompt = "You are a helpful assistant..."
- *     override val tools = (myModelInfo.readTools(20) + myModelInfo.writeTools(5))
- *         .associateBy { it.name }
- * }
- * ```
- */
 public abstract class LLMChatEndpoints<Subject : HasId<*>>(
     database: ServerSetting<Database.Settings, Database>,
-    private val llmSetting: ServerSetting<LLMClientAndModelSettings, LLMClientAndModel>,
     authRequirement: AuthRequirement<Subject>,
     conversationPermissions: suspend context(ServerRuntime) AuthAccess<Subject>.() -> ModelPermissions<SystemChatConversation>,
     messagePermissions: suspend context(ServerRuntime) AuthAccess<Subject>.() -> ModelPermissions<SystemChatMessage>,
-    private val maxIterations: Int = 15,
     responseLockTimeout: Duration = 5.minutes,
     toolLockTimeout: Duration = 5.minutes,
 ) : SystemChatEndpoints<Subject>(
@@ -71,266 +43,272 @@ public abstract class LLMChatEndpoints<Subject : HasId<*>>(
     responseLockTimeout = responseLockTimeout,
     toolLockTimeout = toolLockTimeout,
 ) {
-    /**
-     * The system prompt that instructs the LLM on its role and capabilities.
-     */
-    protected abstract val systemPrompt: String
 
     /**
      * Map of tool name to ChatTool. Typically built from ModelInfo.readTools() and writeTools().
      */
-    protected abstract val tools: Map<String, ChatTool<Subject, *>>
+    public abstract val tools: Map<String, ChatTool<Subject, *>>
 
-    /**
-     * Serializer for the Subject type. Used to serialize user info for the LLM context.
-     */
-    protected abstract val subjectSerializer: KSerializer<Subject>
+    public abstract val defaultLlm: Runtime<LLMClientAndModel>
 
-    /**
-     * Build additional sections to include in the system prompt.
-     *
-     * Override this to add custom context for your use case. Each section is a pair
-     * of (label, content) that will be formatted as "label:\ncontent" in the prompt.
-     *
-     * The default implementation includes the current user's data. Call `super` and
-     * add your own sections, or return a completely custom list.
-     *
-     * Example:
-     * ```kotlin
-     * override suspend fun buildPromptSections(
-     *     auth: AuthAccess<User>,
-     *     conversation: SystemChatConversation,
-     * ): List<Pair<String, String>> = buildList {
-     *     addAll(super.buildPromptSections(auth, conversation))
-     *     add("Current time" to Clock.System.now().toString())
-     *     add("User's recent orders" to fetchRecentOrders(auth).joinToString("\n"))
-     * }
-     * ```
-     *
-     * @return List of (label, content) pairs to include in the system prompt
-     */
-    context(_: ServerRuntime)
-    protected open suspend fun buildPromptSections(
+    context(serverRuntime: ServerRuntime)
+    public open suspend fun prompt(
+        builder: PromptBuilderAlt,
         auth: AuthAccess<Subject>,
-        conversation: SystemChatConversation,
-    ): List<Pair<String, String>> = buildList {
-        auth.authOrNull?.let { authentication ->
-            val subject = authentication.fetch()
-            val subjectJson = Json.encodeToString(subjectSerializer, subject)
-            add("Current user" to subjectJson)
+        conversation: SystemChatConversation
+    ) {
+        builder.append(
+            messages.info.table().find(
+                condition<SystemChatMessage> {
+                    val range = conversation.summaryUpTo?.let { s -> it.createdAt.gte(s) } ?: Condition.Always
+                    it.conversationId.eq(conversation._id) and range
+                },
+                orderBy = sort<SystemChatMessage> { it.createdAt.ascending() },
+                skip = 0,
+                limit = Int.MAX_VALUE
+            ).toList()
+        )
+    }
+
+    public open val maxIterations: Int = 50
+
+    context(serverRuntime: ServerRuntime)
+    override suspend fun respond(
+        auth: AuthAccess<Subject>,
+        conversation: SystemChatConversation
+    ) {
+        with(serverRuntime) {
+            val toolDescriptors = tools.values.map {
+                it.koogDescriptor(com.lightningkite.lightningserver.runtime.serverRuntime.externalSerialization.json.serializersModule)
+            }
+            try {
+                repeat(maxIterations) {
+                    defaultLlm()
+                        .execute(getPrompt(conversation, auth), toolDescriptors)
+                        .handle(conversation, auth)
+                }
+            } finally {
+                if(getPrompt(conversation, auth).messages.sumOf { it.content.estimateTokens() } > compressAfter)
+                    compressTask.invoke(conversation)
+            }
         }
     }
 
-    override fun findToolByName(
-        serverRuntime: ServerRuntime,
+
+
+
+
+
+    context(serverRuntime: ServerRuntime)
+    public suspend fun getPrompt(
+        conversation: SystemChatConversation,
+        auth: AuthAccess<Subject>,
+    ): Prompt = promptAlt(existing = Prompt.Empty) { prompt(this, auth, conversation) }
+
+    context(serverRuntime: ServerRuntime) override fun findToolByName(
         auth: AuthAccess<Subject>,
         conversation: SystemChatConversation,
         toolName: String
     ): ChatTool<Subject, *>? = tools[toolName]
 
-    override suspend fun respond(
-        serverRuntime: ServerRuntime,
-        auth: AuthAccess<Subject>,
-        conversation: SystemChatConversation,
-    ) {
-        with(serverRuntime) {
-            val llm = llmSetting()
-            val sections = buildPromptSections(auth, conversation)
+    context(serverRuntime: ServerRuntime)
+    protected open val compressAfter: Long get() = defaultLlm().model.contextLength / 2
 
-            val fullSystemPrompt = buildString {
-                append(systemPrompt)
-                for ((label, content) in sections) {
-                    append("\n\n")
-                    append(label)
-                    append(":\n")
-                    append(content)
-                }
-            }
+    public val compressTask: Task<SystemChatConversation> =
+        path.path("compress") bind Task { conversation: SystemChatConversation ->
+            val toCompress = messages.info.table().find(
+                condition<SystemChatMessage> {
+                    val range = conversation.summaryUpTo?.let { s -> it.createdAt.gte(s) } ?: Condition.Always
+                    it.conversationId.eq(conversation._id) and range
+                },
+                orderBy = sort<SystemChatMessage> { it.createdAt.ascending() },
+                skip = 0,
+                limit = Int.MAX_VALUE
+            ).toList().let { it.subList(0, it.size / 2) }
 
-            runLLMLoop(
-                llm = llm,
-                tools = tools,
-                auth = auth,
-                conversation = conversation,
-                systemPrompt = fullSystemPrompt,
-                maxIterations = maxIterations,
+            val newMessage = SystemChatMessage(
+                conversationId = conversation._id,
+                subjectId = conversation.subjectId,
+                role = SystemChatMessage.Role.Summary,
+                createdAt = toCompress.last().createdAt + 0.01.seconds,
+                content = defaultLlm().execute(
+                    promptAlt(existing = Prompt.Empty) {
+                        append(toCompress)
+                        user {
+                            markdown {
+                                +"Create a comprehensive summary of this conversation."
+                                br()
+                                +"Include the following in your summary:"
+                                numbered {
+                                    item("Key objectives and problems being addressed")
+                                    item("All tools used along with their purpose and outcomes")
+                                    item("Critical information discovered or generated")
+                                    item("Current progress status and conclusions reached")
+                                    item("Any pending questions or unresolved issues")
+                                }
+                                br()
+                                +"FORMAT YOUR SUMMARY WITH CLEAR SECTIONS for easy reference, including:"
+                                bulleted {
+                                    item("Key Objectives")
+                                    item("Tools Used & Results")
+                                    item("Key Findings")
+                                    item("Current Status")
+                                    item("Next Steps")
+                                }
+                                br()
+                                +"This summary will be the ONLY context available for continuing this conversation, along with the system message."
+                                +"Ensure it contains ALL essential information needed to proceed effectively."
+                            }
+                        }
+                    },
+                    listOf()
+                )
+                    .mapNotNull { (it as? Message.Assistant)?.content }
+                    .joinToString("\n")
             )
-        }
-    }
-}
-
-//
-// Helper functions for LLM chat execution
-//
-
-/**
- * Tracks tool results within a single LLM execution loop.
- */
-public data class PendingToolResult(
-    val toolCallId: String,
-    val toolName: String,
-    val arguments: String,
-    val result: String
-)
-
-/**
- * Runs an LLM execution loop that processes tool calls through the approval workflow.
- *
- * This function:
- * 1. Checks for pending approvals and stops if found
- * 2. Builds a prompt from conversation history
- * 3. Calls the LLM
- * 4. Processes tool calls or returns the final text response
- * 5. Loops until done or max iterations reached
- */
-context(_: ServerRuntime)
-public suspend fun <Subject : HasId<*>> SystemChatEndpoints<Subject>.runLLMLoop(
-    llm: LLMClientAndModel,
-    tools: Map<String, ChatTool<Subject, *>>,
-    auth: AuthAccess<Subject>,
-    conversation: SystemChatConversation,
-    systemPrompt: String,
-    maxIterations: Int = 15,
-) {
-    val toolDescriptors = tools.values.map {
-        it.koogDescriptor(serverRuntime.externalSerialization.json.serializersModule)
-    }
-    val pendingToolResults = mutableListOf<PendingToolResult>()
-
-    suspend fun insertMessage(role: SystemChatMessage.Role, content: String) {
-        messageInfo.table().insertOne(SystemChatMessage(
-            conversationId = conversation._id,
-            subjectId = conversation.subjectId,
-            role = role,
-            content = content,
-            createdAt = now()
-        ))
-    }
-
-    repeat(maxIterations) {
-        val history = getConversationHistory(auth, conversation._id)
-        if (history.hasPendingApproval()) return
-
-        val responses = llm.execute(
-            prompt = history.toKoogPrompt(systemPrompt, pendingToolResults),
-            tools = toolDescriptors
-        )
-
-        if (responses.isEmpty()) {
-            insertMessage(SystemChatMessage.Role.Error, "LLM returned no response")
-            return
+            messages.info.table().insertOne(newMessage)
+            conversations.info.table().updateOneById(conversation._id, modification {
+                it.summaryUpTo assign newMessage.createdAt
+            })
         }
 
-        val textContent = responses
-            .filterIsInstance<Message.Assistant>()
-            .map { it.content }
-            .filter { it.isNotBlank() }
-            .joinToString("\n")
+    context(serverRuntime: ServerRuntime)
+    protected suspend fun List<Message.Response>.handle(
+        conversation: SystemChatConversation,
+        auth: AuthAccess<Subject>
+    ) {
+        if (this.isEmpty()) throw Exception("LLM returned no response")
 
-        if (textContent.isNotBlank()) {
-            insertMessage(SystemChatMessage.Role.Assistant, textContent)
-        }
+        // Get channel info from the conversation to propagate to response messages
+        val (channel, externalIdentifier) = findChannelInfo(conversation._id)
 
-        val toolCalls = responses.filterIsInstance<Message.Tool.Call>()
+        var needsToWait = false
+        var hasToolCalls = false
+        var hasFinalAssistantMessage = false
 
-        if (toolCalls.isEmpty()) {
-            return
-        }
-
-        // Process tool calls
-        pendingToolResults.clear()
-        for (tc in toolCalls) {
-            val result = processLLMToolCall(tools, auth, conversation, tc)
-            if (result == null) return  // Waiting for approval
-            pendingToolResults.add(result)
-        }
-    }
-
-    insertMessage(SystemChatMessage.Role.Error, "Response generation stopped: max iterations ($maxIterations) reached")
-}
-
-/**
- * Process a single tool call from the LLM response.
- * Returns null if waiting for approval, otherwise returns the tool result record.
- */
-context(_: ServerRuntime)
-private suspend fun <Subject : HasId<*>> SystemChatEndpoints<Subject>.processLLMToolCall(
-    tools: Map<String, ChatTool<Subject, *>>,
-    auth: AuthAccess<Subject>,
-    conversation: SystemChatConversation,
-    toolCall: Message.Tool.Call,
-): PendingToolResult? {
-    val toolCallId = toolCall.id ?: ""
-    val toolName = toolCall.tool
-    val arguments = toolCall.content
-
-    fun result(output: String) = PendingToolResult(toolCallId, toolName, arguments, output)
-
-    val tool = tools[toolName]
-        ?: return result("Error: Unknown tool '$toolName'")
-
-    @Suppress("UNCHECKED_CAST")
-    return when (val callResult = processToolCall(auth, conversation, tool as ChatTool<Subject, Any>, arguments)) {
-        is SystemChatEndpoints.ToolCallResult.WaitingForApproval -> null
-        is SystemChatEndpoints.ToolCallResult.Executed -> result(callResult.result)
-        is SystemChatEndpoints.ToolCallResult.Error -> result("Error: ${callResult.error}")
-    }
-}
-
-/**
- * Check if conversation history has a pending tool approval.
- */
-public fun List<SystemChatMessage>.hasPendingApproval(): Boolean = any { msg ->
-    msg.role == SystemChatMessage.Role.ToolRequest &&
-    msg.tool?.requiresApproval == true &&
-    msg.tool?.approval == null
-}
-
-/**
- * Convert conversation history to a Koog Prompt.
- */
-public fun List<SystemChatMessage>.toKoogPrompt(
-    systemPrompt: String,
-    pendingToolResults: List<PendingToolResult> = emptyList(),
-): Prompt = prompt(existing = Prompt.Empty) {
-    system(systemPrompt)
-
-    for (msg in this@toKoogPrompt) {
-        val msgContent = msg.content
-        when (msg.role) {
-            SystemChatMessage.Role.User -> user(msgContent)
-            SystemChatMessage.Role.Assistant -> assistant(msgContent)
-            SystemChatMessage.Role.System -> system(msgContent)
-            SystemChatMessage.Role.ToolRequest -> {
-                val toolData = msg.tool ?: continue
-                val toolName = toolData.toolName
-                val toolCallId = msg._id.toString()
-                val toolArgs = toolData.arguments
-                val toolResult = toolData.result
-                val toolError = toolData.error
-                val approval = toolData.approval
-
-                tool {
-                    call(toolCallId, toolName, toolArgs)
+        this.forEach {
+            when (it) {
+                is Message.Assistant -> {
+                    hasFinalAssistantMessage = true
+                    messageInfo.table().insertOne(
+                        SystemChatMessage(
+                            conversationId = conversation._id,
+                            subjectId = conversation.subjectId,
+                            role = SystemChatMessage.Role.Assistant,
+                            channel = channel,
+                            externalIdentifier = externalIdentifier,
+                            content = it.content,
+                            createdAt = now()
+                        )
+                    )
                 }
 
-                when {
-                    toolResult != null -> tool { result(toolCallId, toolName, toolResult) }
-                    toolError != null -> tool { result(toolCallId, toolName, "Error: $toolError") }
-                    approval != null && !approval.approved -> {
-                        tool { result(toolCallId, toolName, "Tool execution rejected: ${approval.reason ?: "User declined"}") }
+                is Message.Reasoning -> messageInfo.table().insertOne(
+                    SystemChatMessage(
+                        conversationId = conversation._id,
+                        subjectId = conversation.subjectId,
+                        role = SystemChatMessage.Role.Thinking,
+                        channel = channel,
+                        externalIdentifier = externalIdentifier,
+                        content = it.content,
+                        createdAt = now()
+                    )
+                )
+
+                is Message.Tool.Call -> {
+                    hasToolCalls = true
+                    val tool = findToolByName(auth, conversation, it.tool) ?: run {
+                        messageInfo.table().insertOne(
+                            SystemChatMessage(
+                                conversationId = conversation._id,
+                                subjectId = conversation.subjectId,
+                                role = SystemChatMessage.Role.ToolRequest,
+                                channel = channel,
+                                externalIdentifier = externalIdentifier,
+                                content = it.content,
+                                tool = ToolRequestData(
+                                    toolName = it.tool,
+                                    arguments = it.content,
+                                    requiresApproval = false,
+                                    error = "Tool '${it.tool}' not found."
+                                ),
+                                createdAt = now()
+                            )
+                        )
+                        return@forEach
+                    }
+                    when (val result = processToolCall(auth, conversation, tool, it.content)) {
+                        is ToolCallResult.Error -> messageInfo.table().insertOne(
+                            SystemChatMessage(
+                                conversationId = conversation._id,
+                                subjectId = conversation.subjectId,
+                                role = SystemChatMessage.Role.ToolRequest,
+                                channel = channel,
+                                externalIdentifier = externalIdentifier,
+                                content = it.content,
+                                tool = ToolRequestData(
+                                    toolName = it.tool,
+                                    arguments = it.content,
+                                    requiresApproval = false,
+                                    error = result.error
+                                ),
+                                createdAt = now()
+                            )
+                        )
+                        // This execution tree thing kinda sucks
+                        is ToolCallResult.Executed -> messageInfo.table().insertOne(
+                            SystemChatMessage(
+                                conversationId = conversation._id,
+                                subjectId = conversation.subjectId,
+                                role = SystemChatMessage.Role.ToolRequest,
+                                channel = channel,
+                                externalIdentifier = externalIdentifier,
+                                content = it.content,
+                                tool = ToolRequestData(
+                                    toolName = it.tool,
+                                    arguments = it.content,
+                                    requiresApproval = false,
+                                    result = result.result
+                                ),
+                                createdAt = now()
+                            )
+                        )
+
+                        ToolCallResult.WaitingForApproval -> {
+                            needsToWait = true
+                            messageInfo.table().insertOne(
+                                SystemChatMessage(
+                                    conversationId = conversation._id,
+                                    subjectId = conversation.subjectId,
+                                    role = SystemChatMessage.Role.ToolRequest,
+                                    channel = channel,
+                                    externalIdentifier = externalIdentifier,
+                                    content = it.content,
+                                    tool = ToolRequestData(
+                                        toolName = it.tool,
+                                        arguments = it.content,
+                                        requiresApproval = true,
+                                    ),
+                                    createdAt = now()
+                                )
+                            )
+                        }
                     }
                 }
             }
-            SystemChatMessage.Role.Thinking -> { /* skip */ }
-            SystemChatMessage.Role.Error -> system("Previous error: $msgContent")
         }
+        if (needsToWait) throw StopProcessing("Tool needs to be approved.")
+        if (hasFinalAssistantMessage && !hasToolCalls) throw StopProcessing("Response complete.")
     }
+}
 
-    for (record in pendingToolResults) {
-        tool {
-            call(record.toolCallId, record.toolName, record.arguments)
-            result(record.toolCallId, record.toolName, record.result)
-        }
-    }
+
+
+/**
+ * Estimate token count for a string.
+ * This is a rough approximation - actual tokenization varies by model.
+ * ~4 characters per token for English text.
+ */
+public fun String.estimateTokens(): Long {
+    return (length / 4).coerceAtLeast(1).toLong()
 }

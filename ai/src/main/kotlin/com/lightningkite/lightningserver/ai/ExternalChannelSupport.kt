@@ -5,6 +5,7 @@ import com.lightningkite.PhoneNumber
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.PrincipalType
+import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.ScheduledTask
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.StartupTask
@@ -21,6 +22,8 @@ import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.settings.invoke
 import com.lightningkite.lightningserver.typed.AuthAccess
 import com.lightningkite.lightningserver.typed.auth
+import com.lightningkite.lightningserver.typed.sdk.module
+import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.*
 import com.lightningkite.services.email.*
 import com.lightningkite.services.files.PublicFileSystem
@@ -31,9 +34,61 @@ import com.lightningkite.services.sms.SmsInboundService
 import com.lightningkite.toPhoneNumber
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.toList
+import kotlinx.html.*
+import kotlinx.html.stream.createHTML
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.Uuid
+
+/**
+ * Encoded email threading information stored in [SystemChatMessage.externalIdentifier].
+ *
+ * For email messages, the externalIdentifier contains a JSON-encoded [EmailExternalId]
+ * that includes the email address plus threading metadata (Message-ID, subject).
+ * This enables proper email threading when sending replies.
+ *
+ * @property email The email address
+ * @property messageId The email's Message-ID header (for threading)
+ * @property subject The original email subject (for Re: prefixing)
+ */
+@Serializable
+public data class EmailExternalId(
+    val email: String,
+    val messageId: String? = null,
+    val subject: String? = null,
+) {
+    public companion object {
+        private val json = Json { ignoreUnknownKeys = true }
+
+        /**
+         * Parse an externalIdentifier string into an [EmailExternalId].
+         * If the string is JSON (starts with '{'), parse it.
+         * Otherwise, treat it as a plain email address for backward compatibility.
+         */
+        public fun parse(externalIdentifier: String): EmailExternalId {
+            return if (externalIdentifier.startsWith("{")) {
+                try {
+                    json.decodeFromString<EmailExternalId>(externalIdentifier)
+                } catch (e: Exception) {
+                    // Fallback to plain email if JSON parsing fails
+                    EmailExternalId(email = externalIdentifier)
+                }
+            } else {
+                EmailExternalId(email = externalIdentifier)
+            }
+        }
+
+        /**
+         * Encode an [EmailExternalId] to a JSON string for storage in externalIdentifier.
+         */
+        public fun encode(emailExternalId: EmailExternalId): String {
+            return json.encodeToString(emailExternalId)
+        }
+    }
+}
 
 /**
  * Adds SMS and Email channel support to an existing [SystemChatEndpoints] instance.
@@ -51,6 +106,26 @@ import kotlin.uuid.Uuid
  * 1. Detects messages that should be sent externally
  * 2. Finds the reply destination from the conversation history
  * 3. Sends via SMS or Email as appropriate
+ *
+ * ## Security Considerations
+ *
+ * **Authentication is based solely on phone number or email address possession.**
+ *
+ * This class creates synthetic [Authentication] instances based on the sender's phone number
+ * or email address. This authentication model relies entirely on the security guarantees
+ * provided by your inbound SMS/email service provider (e.g., Twilio, Amazon SES).
+ *
+ * **Important security implications:**
+ * - SMS sender IDs can potentially be spoofed depending on carrier and region
+ * - Email sender addresses can be spoofed if your email provider doesn't enforce SPF/DKIM/DMARC
+ * - The synthetic authentication has no expiration
+ *
+ * **Recommendations:**
+ * - Use a reputable inbound service provider with sender verification
+ * - For SMS, prefer providers that validate sender identity (Twilio does this)
+ * - For email, ensure your inbound service validates SPF/DKIM/DMARC
+ * - Consider implementing additional verification for sensitive tool operations
+ * - Do not expose highly destructive tools through external channels without additional safeguards
  *
  * ## Usage
  *
@@ -115,91 +190,17 @@ public class ExternalChannelSupport<Subject : HasId<ID>, ID : Comparable<ID>>(
     // SMS Webhook Endpoints
     //
 
-    /**
-     * SMS webhook endpoint that receives incoming SMS/MMS messages.
-     * Configure your SMS provider to POST to this URL.
-     */
-    public val smsWebhook: HttpHandler<PathSpec0>? = smsInbound?.let { smsSettingRef ->
-        path.path("sms").path("webhook").post bind HttpHandler { request ->
-            val inboundSms = smsSettingRef().onReceived.parse(
-                queryParameters = request.queryParameters.entries,
-                headers = request.headers.normalizedEntries.mapValues { it.value.map { v -> v.toHttpString() } },
-                body = request.body ?: throw BadRequestException("Missing request body")
-            )
-
-            handleInboundSms(inboundSms)
-
-            // Return success response
-            HttpResponse(null, HttpStatus.NoContent)
+    public val sms: ServerBuilder? = smsInbound?.let { smsSettingRef ->
+        path.path("sms") module Runtime { smsSettingRef().onReceived }.invoke(webhookScheduleFrequency) {
+            handleInboundSms(it)
         }
     }
 
-    /**
-     * Startup task to configure the SMS webhook URL with the provider.
-     */
-    public val smsWebhookSetup: StartupTask? = smsInbound?.let { smsSettingRef ->
-        smsWebhook?.let { webhook ->
-            path.path("sms").path("webhook-setup") bind StartupTask {
-                smsSettingRef().onReceived.configureWebhook(webhook.location.path.resolved().fullUrl())
-            }
+    public val email: ServerBuilder? = emailInbound?.let { emailInbound ->
+        path.path("email") module Runtime { emailInbound().onReceived }.invoke(webhookScheduleFrequency) {
+            handleInboundEmail(it)
         }
     }
-
-    /**
-     * Scheduled task for SMS provider maintenance (polling, etc.).
-     */
-    public val smsSchedule: ScheduledTask? = smsInbound?.let { smsSettingRef ->
-        path.path("sms").path("schedule") bind ScheduledTask(webhookScheduleFrequency) {
-            smsSettingRef().onReceived.onSchedule()
-        }
-    }
-
-    //
-    // Email Webhook Endpoints
-    //
-
-    /**
-     * Email webhook endpoint that receives incoming emails.
-     * Configure your email provider to POST to this URL.
-     */
-    public val emailWebhook: HttpHandler<PathSpec0>? = emailInbound?.let { emailSettingRef ->
-        path.path("email").path("webhook").post bind HttpHandler { request ->
-            val receivedEmail = emailSettingRef().onReceived.parse(
-                queryParameters = request.queryParameters.entries,
-                headers = request.headers.normalizedEntries.mapValues { it.value.map { v -> v.toHttpString() } },
-                body = request.body ?: throw BadRequestException("Missing request body")
-            )
-
-            handleInboundEmail(receivedEmail)
-
-            // Return success response
-            HttpResponse(null, HttpStatus.NoContent)
-        }
-    }
-
-    /**
-     * Startup task to configure the email webhook URL with the provider.
-     */
-    public val emailWebhookSetup: StartupTask? = emailInbound?.let { emailSettingRef ->
-        emailWebhook?.let { webhook ->
-            path.path("email").path("webhook-setup") bind StartupTask {
-                emailSettingRef().onReceived.configureWebhook(webhook.location.path.resolved().fullUrl())
-            }
-        }
-    }
-
-    /**
-     * Scheduled task for email provider maintenance (polling IMAP, etc.).
-     */
-    public val emailSchedule: ScheduledTask? = emailInbound?.let { emailSettingRef ->
-        path.path("email").path("schedule") bind ScheduledTask(webhookScheduleFrequency) {
-            emailSettingRef().onReceived.onSchedule()
-        }
-    }
-
-    //
-    // Inbound SMS Handler
-    //
 
     context(runtime: ServerRuntime)
     private suspend fun handleInboundSms(sms: InboundSms) {
@@ -242,12 +243,10 @@ public class ExternalChannelSupport<Subject : HasId<ID>, ID : Comparable<ID>>(
         )
 
         chatEndpoints.messageInfo.table(access).insertOne(message)
-        // postCreate hook in messageInfo triggers response generation
-    }
 
-    //
-    // Inbound Email Handler
-    //
+        // Trigger LLM to respond to the user message
+        chatEndpoints.triggerAutoResponse(access, message)
+    }
 
     context(runtime: ServerRuntime)
     private suspend fun handleInboundEmail(email: ReceivedEmail) {
@@ -268,9 +267,13 @@ public class ExternalChannelSupport<Subject : HasId<ID>, ID : Comparable<ID>>(
         val conversation = findOrCreateConversation(access, subject)
 
         // 4. Check for tool approval
-        val bodyText = email.plainText
+        val rawBodyText = email.plainText
             ?: email.html?.emailApproximatePlainText()
             ?: ""
+
+        // Strip quoted reply content to avoid context bloat
+        val bodyText = stripQuotedReplies(rawBodyText)
+
         if (tryHandleToolApproval(access, conversation, bodyText.trim())) {
             return
         }
@@ -278,24 +281,71 @@ public class ExternalChannelSupport<Subject : HasId<ID>, ID : Comparable<ID>>(
         // 5. Convert email attachments to ServerFiles
         val attachments = downloadEmailAttachments(email)
 
-        // 6. Create and insert user message
+        // 6. Create external identifier with threading info
+        val emailExternalId = EmailExternalId(
+            email = email.from.value.raw,
+            messageId = email.messageId,
+            subject = email.subject,
+        )
+
+        // 7. Create and insert user message
         val message = SystemChatMessage(
             conversationId = conversation._id,
             subjectId = subject._id.toString(),
             role = SystemChatMessage.Role.User,
             channel = CHANNEL_EMAIL,
-            externalIdentifier = email.from.value.raw,
+            externalIdentifier = EmailExternalId.encode(emailExternalId),
             content = bodyText,
             attachments = attachments,
             createdAt = now(),
         )
 
         chatEndpoints.messageInfo.table(access).insertOne(message)
+
+        // Trigger LLM to respond to the user message
+        chatEndpoints.triggerAutoResponse(access, message)
     }
 
-    //
-    // Outbound Message Handling
-    //
+    /**
+     * Strip quoted reply content from email body to reduce context bloat.
+     *
+     * Detects and removes:
+     * - Lines starting with ">" (traditional quote markers)
+     * - "On [date], [person] wrote:" style headers and everything after
+     * - Outlook-style "From: ... Sent: ... To: ... Subject: ..." blocks
+     * - Gmail forwarded message markers
+     * - Common separator lines (dashes, underscores)
+     */
+    private fun stripQuotedReplies(text: String): String {
+        val lines = text.lines()
+        val result = mutableListOf<String>()
+
+        for (line in lines) {
+            val trimmed = line.trim()
+
+            // Stop at common reply headers
+            if (trimmed.matches(Regex("^On .+ wrote:$", RegexOption.IGNORE_CASE))) break
+            if (trimmed.matches(Regex("^On .+, .+ wrote:$", RegexOption.IGNORE_CASE))) break
+            if (trimmed.startsWith("---------- Forwarded message")) break
+            if (trimmed.startsWith("-----Original Message-----")) break
+            if (trimmed.matches(Regex("^-{5,}$"))) break  // Line of dashes
+            if (trimmed.matches(Regex("^_{5,}$"))) break  // Line of underscores
+
+            // Outlook-style header block detection
+            if (trimmed.startsWith("From:") && lines.indexOf(line).let { idx ->
+                    idx + 3 < lines.size &&
+                    lines.getOrNull(idx + 1)?.trim()?.startsWith("Sent:") == true &&
+                    lines.getOrNull(idx + 2)?.trim()?.startsWith("To:") == true
+                }) break
+
+            // Skip lines that start with quote markers (but don't stop entirely)
+            if (trimmed.startsWith(">")) continue
+
+            result.add(line)
+        }
+
+        return result.joinToString("\n").trim()
+    }
 
     init {
         chatEndpoints.messageInfo.registerChangeListener { changes ->
@@ -327,35 +377,14 @@ public class ExternalChannelSupport<Subject : HasId<ID>, ID : Comparable<ID>>(
 
     context(runtime: ServerRuntime)
     private suspend fun trySendExternalMessage(message: SystemChatMessage) {
-        // Find the reply destination from most recent inbound external message
-        val destination = findReplyDestination(message.conversationId)
-            ?: return  // No external channel for this conversation
-
-        val (channel, identifier) = destination
+        // Use the message's own channel and externalIdentifier (propagated from the original user message)
+        val channel = message.channel ?: return
+        val identifier = message.externalIdentifier ?: return
 
         when (channel) {
             CHANNEL_SMS -> trySendSms(identifier, message)
             CHANNEL_EMAIL -> trySendEmail(identifier, message)
         }
-    }
-
-    context(runtime: ServerRuntime)
-    private suspend fun findReplyDestination(conversationId: Uuid): Pair<String, String>? {
-        // Find most recent message with an external identifier
-        val recentExternal = chatEndpoints.messageInfo.table()
-            .find(
-                condition {
-                    (it.conversationId eq conversationId) and
-                            (it.externalIdentifier neq null)
-                },
-                orderBy = sort { it.createdAt.descending() }
-            )
-            .firstOrNull() ?: return null
-
-        val channel = recentExternal.channel ?: return null
-        val identifier = recentExternal.externalIdentifier ?: return null
-
-        return channel to identifier
     }
 
     //
@@ -404,19 +433,34 @@ public class ExternalChannelSupport<Subject : HasId<ID>, ID : Comparable<ID>>(
     //
 
     context(runtime: ServerRuntime)
-    private suspend fun trySendEmail(emailAddress: String, message: SystemChatMessage) {
+    private suspend fun trySendEmail(externalIdentifier: String, message: SystemChatMessage) {
         val emailService = emailOutbound?.invoke() ?: return
-        val fromAddr = emailFromAddress ?: return
+        val fromAddr = emailFromAddress
 
-        val (subject, htmlBody) = formatMessageForEmail(message) ?: return
+        // Parse threading info from externalIdentifier
+        val emailId = EmailExternalId.parse(externalIdentifier)
+
+        // Build threading headers
+        val threadingHeaders = buildEmailThreadingHeaders(message.conversationId, emailId)
+
+        // Determine subject with Re: prefix if replying
+        val baseSubject = emailId.subject
+        val subject = if (baseSubject != null && !baseSubject.startsWith("Re:", ignoreCase = true)) {
+            "Re: $baseSubject"
+        } else {
+            baseSubject ?: "Chat Response"
+        }
+
+        val htmlBody = formatMessageForEmail(message) ?: return
 
         try {
             emailService.send(
                 Email(
                     subject = subject,
                     from = fromAddr,
-                    to = listOf(EmailAddressWithName(emailAddress)),
+                    to = listOf(EmailAddressWithName(emailId.email)),
                     html = htmlBody,
+                    customHeaders = threadingHeaders,
                 )
             )
         } catch (e: Exception) {
@@ -424,15 +468,64 @@ public class ExternalChannelSupport<Subject : HasId<ID>, ID : Comparable<ID>>(
         }
     }
 
-    private fun formatMessageForEmail(message: SystemChatMessage): Pair<String, String>? {
-        val subject = "Chat Response"  // Could be smarter about threading
+    /**
+     * Build email threading headers (In-Reply-To, References) from conversation history.
+     */
+    context(runtime: ServerRuntime)
+    private suspend fun buildEmailThreadingHeaders(
+        conversationId: Uuid,
+        replyingTo: EmailExternalId
+    ): Map<String, List<String>> {
+        val headers = mutableMapOf<String, List<String>>()
 
-        val html = when (message.role) {
-            SystemChatMessage.Role.Assistant ->
-                "<p>${message.content.replace("\n", "<br>")}</p>"
+        // Set In-Reply-To if we have a messageId to reply to
+        val inReplyTo = replyingTo.messageId
+        if (inReplyTo != null) {
+            headers["In-Reply-To"] = listOf(inReplyTo)
+        }
 
-            SystemChatMessage.Role.Error ->
-                "<p style='color:red'><strong>Error:</strong> ${message.content}</p>"
+        // Build References header from conversation history
+        // Collect all Message-IDs from email messages in this conversation
+        val messageIds = mutableListOf<String>()
+
+        chatEndpoints.messageInfo.table()
+            .find(
+                condition {
+                    (it.conversationId eq conversationId) and
+                    (it.channel eq CHANNEL_EMAIL) and
+                    (it.externalIdentifier neq null)
+                },
+                orderBy = sort { it.createdAt.ascending() }
+            )
+            .toList()
+            .forEach { msg ->
+                val extId = msg.externalIdentifier ?: return@forEach
+                val parsed = EmailExternalId.parse(extId)
+                parsed.messageId?.let { messageIds.add(it) }
+            }
+
+        if (messageIds.isNotEmpty()) {
+            headers["References"] = listOf(messageIds.joinToString(" "))
+        }
+
+        return headers
+    }
+
+    private fun formatMessageForEmail(message: SystemChatMessage): String? {
+        return when (message.role) {
+            SystemChatMessage.Role.Assistant -> createHTML().div {
+                // Split content by newlines and render each line, properly escaped
+                message.content.lines().forEachIndexed { index, line ->
+                    if (index > 0) br()
+                    +line  // kotlinx.html automatically escapes this
+                }
+            }
+
+            SystemChatMessage.Role.Error -> createHTML().p {
+                style = "color:red"
+                strong { +"Error: " }
+                +message.content
+            }
 
             SystemChatMessage.Role.ToolRequest -> {
                 val tool = message.tool ?: return null
@@ -440,17 +533,24 @@ public class ExternalChannelSupport<Subject : HasId<ID>, ID : Comparable<ID>>(
                     val desc = message.content.ifBlank {
                         tool.approvalReason ?: "Execute ${tool.toolName}"
                     }
-                    """
-                    <p><strong>Tool Request:</strong> $desc</p>
-                    <p>Reply with <strong>YES</strong> to approve or <strong>NO</strong> to reject.</p>
-                    """.trimIndent()
-                } else return null
+                    createHTML().div {
+                        p {
+                            strong { +"Tool Request: " }
+                            +desc
+                        }
+                        p {
+                            +"Reply with "
+                            strong { +"YES" }
+                            +" to approve or "
+                            strong { +"NO" }
+                            +" to reject."
+                        }
+                    }
+                } else null
             }
 
-            else -> return null
+            else -> null
         }
-
-        return subject to html
     }
 
     //
@@ -524,13 +624,17 @@ public class ExternalChannelSupport<Subject : HasId<ID>, ID : Comparable<ID>>(
             reason = reason
         )
 
-        chatEndpoints.messageInfo.table().updateOneById(
+        val updated = chatEndpoints.messageInfo.table().updateOneById(
             pendingRequest._id,
             modification { it.tool.notNull.approval assign approval }
-        )
+        ).new ?: return false
 
-        // The message change listener will trigger tool execution or response continuation
-        // via the chatEndpoints' internal task system
+        // Trigger tool execution or response continuation
+        if (approved) {
+            chatEndpoints.triggerToolExecution(access, updated)
+        } else {
+            chatEndpoints.triggerContinueResponse(access, updated)
+        }
 
         return true
     }
@@ -573,7 +677,7 @@ public class ExternalChannelSupport<Subject : HasId<ID>, ID : Comparable<ID>>(
                 val destination = fileService.root.then("chat-attachments/$filename")
 
                 // Store the attachment
-                destination.put(com.lightningkite.services.data.TypedData(data, attachment.contentType))
+                destination.put(TypedData(data, attachment.contentType))
 
                 // Return as ServerFile
                 ServerFile(destination.signedUrl)

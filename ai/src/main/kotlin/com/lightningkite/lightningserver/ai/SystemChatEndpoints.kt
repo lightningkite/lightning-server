@@ -7,7 +7,6 @@ import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.UnauthorizedException
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.auth.options
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -28,6 +27,7 @@ import com.lightningkite.lightningserver.websockets.WebSocketTopic
 import com.lightningkite.lightningserver.websockets.subscribe
 import com.lightningkite.services.database.*
 import com.lightningkite.services.database.insertOne
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
@@ -86,8 +86,7 @@ public abstract class SystemChatEndpoints<Subject : HasId<*>>(
      * @param auth The authenticated user's access
      * @param conversation The conversation context (includes tool authorizations)
      */
-    protected abstract suspend fun respond(
-        serverRuntime: ServerRuntime,
+    context(serverRuntime: ServerRuntime) protected abstract suspend fun respond(
         auth: AuthAccess<Subject>,
         conversation: SystemChatConversation,
     )
@@ -96,8 +95,7 @@ public abstract class SystemChatEndpoints<Subject : HasId<*>>(
      * Find a tool by name for approved tool execution.
      * Subclasses must implement this to provide tools when executing approved requests.
      */
-    protected abstract fun findToolByName(
-        serverRuntime: ServerRuntime,
+    context(serverRuntime: ServerRuntime) protected abstract fun findToolByName(
         auth: AuthAccess<Subject>,
         conversation: SystemChatConversation,
         toolName: String,
@@ -124,8 +122,10 @@ public abstract class SystemChatEndpoints<Subject : HasId<*>>(
             it.postCreate { message ->
                 when (message.role) {
                     SystemChatMessage.Role.User -> {
-                        // User message triggers response generation
-                        triggerResponseTask(TaskInput(message, auth))
+                        // User message triggers response generation (unless explicitly skipped)
+                        if (!message.skipAutoResponse) {
+                            triggerResponseTask(TaskInput(message, auth))
+                        }
                     }
                     else -> { /* No action for other message types */ }
                 }
@@ -167,6 +167,25 @@ public abstract class SystemChatEndpoints<Subject : HasId<*>>(
                 orderBy = sort { it.createdAt.ascending() }
             )
             .toList()
+    }
+
+    /**
+     * Find the channel info (channel and externalIdentifier) from the most recent
+     * message in this conversation that has external channel info.
+     * This is used to propagate channel info to response messages.
+     */
+    context(_: ServerRuntime)
+    protected suspend fun findChannelInfo(conversationId: Uuid): Pair<String?, String?> {
+        val recentExternal = messageInfo.table()
+            .find(
+                condition {
+                    (it.conversationId eq conversationId) and
+                            (it.externalIdentifier neq null)
+                },
+                orderBy = sort { it.createdAt.descending() }
+            )
+            .firstOrNull()
+        return recentExternal?.channel to recentExternal?.externalIdentifier
     }
 
     /**
@@ -350,6 +369,8 @@ public abstract class SystemChatEndpoints<Subject : HasId<*>>(
         )
     }
 
+    public class StopProcessing(message: String): Throwable(message)
+
     context(_: ServerRuntime)
     private suspend fun runRespondWithLock(
         access: AuthAccess<Subject>,
@@ -360,14 +381,22 @@ public abstract class SystemChatEndpoints<Subject : HasId<*>>(
         val lockId = tryAcquireProcessingLock(conversation._id) ?: return
 
         try {
-            respond(serverRuntime, access, conversation)
+            with(serverRuntime) {
+                respond(access, conversation)
+            }
+        } catch(_: StopProcessing) {
+            // Cool.
         } catch (e: Exception) {
             e.printStackTrace()
+            // Get channel info to propagate to error message
+            val (channel, externalIdentifier) = findChannelInfo(conversation._id)
             val message = SystemChatMessage(
                 conversationId = conversation._id,
                 subjectId = conversation.subjectId,
                 role = SystemChatMessage.Role.Error,
-                content = "Response generation failed: ${e.message ?: "Unknown error"}",
+                channel = channel,
+                externalIdentifier = externalIdentifier,
+                content = e.message ?: "Unknown error",
                 createdAt = now()
             )
             messageInfo.table().insertOne(message)
@@ -377,7 +406,7 @@ public abstract class SystemChatEndpoints<Subject : HasId<*>>(
     }
 
     context(_: ServerRuntime)
-    private fun <T> parseToolArg(
+    public fun <T> parseToolArg(
         tool: ChatTool<Subject, T>,
         arguments: String,
     ): T {
@@ -451,6 +480,69 @@ public abstract class SystemChatEndpoints<Subject : HasId<*>>(
     }
 
     //
+    // Public API for external channels
+    //
+
+    /**
+     * Trigger automatic response generation for a user message.
+     *
+     * External channels (SMS, email, etc.) should call this after inserting a user message
+     * to trigger the LLM to generate a response. Voice/phone channels should NOT call this
+     * since they handle responses directly through the voice agent.
+     *
+     * This checks [SystemChatMessage.skipAutoResponse] - if true, no response is triggered.
+     *
+     * @param access The authenticated user's access
+     * @param message The user message to respond to (must have role == User)
+     */
+    context(_: ServerRuntime)
+    public suspend fun triggerAutoResponse(
+        access: AuthAccess<Subject>,
+        message: SystemChatMessage,
+    ) {
+        if (message.role != SystemChatMessage.Role.User) return
+        if (message.skipAutoResponse) return
+        triggerResponseTask(TaskInput(message, access.auth))
+    }
+
+    /**
+     * Trigger tool execution after a tool request has been approved.
+     *
+     * External channels should call this after recording a tool approval with approved=true.
+     *
+     * @param access The authenticated user's access
+     * @param message The tool request message (must have role == ToolRequest and approval.approved == true)
+     */
+    context(_: ServerRuntime)
+    public suspend fun triggerToolExecution(
+        access: AuthAccess<Subject>,
+        message: SystemChatMessage,
+    ) {
+        if (message.role != SystemChatMessage.Role.ToolRequest) return
+        if (message.tool?.approval?.approved != true) return
+        executeToolTask(TaskInput(message, access.auth))
+    }
+
+    /**
+     * Trigger response continuation after a tool request has been rejected.
+     *
+     * External channels should call this after recording a tool approval with approved=false.
+     * The LLM will continue generating a response, likely acknowledging the rejection.
+     *
+     * @param access The authenticated user's access
+     * @param message The tool request message (must have role == ToolRequest and approval.approved == false)
+     */
+    context(_: ServerRuntime)
+    public suspend fun triggerContinueResponse(
+        access: AuthAccess<Subject>,
+        message: SystemChatMessage,
+    ) {
+        if (message.role != SystemChatMessage.Role.ToolRequest) return
+        if (message.tool?.approval == null) return
+        continueResponseTask(TaskInput(message, access.auth))
+    }
+
+    //
     // Tasks
     //
 
@@ -486,7 +578,9 @@ public abstract class SystemChatEndpoints<Subject : HasId<*>>(
             val access = AuthAccess(input.auth as Authentication<Subject>)
             val conversation = conversationInfo.table(access).get(message.conversationId) ?: return@Task
 
-            val tool = findToolByName(serverRuntime, access, conversation, toolData.toolName)
+            val tool = with(serverRuntime) {
+                findToolByName(access, conversation, toolData.toolName)
+            }
             if (tool == null) {
                 messageInfo.table().updateOneById(
                     message._id,

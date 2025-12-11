@@ -85,8 +85,7 @@ class TestSystemChatEndpoints(
     // Available tools for testing
     val availableTools = mutableMapOf<String, ChatTool<TestSubject, *>>()
 
-    override suspend fun respond(
-        serverRuntime: ServerRuntime,
+    context(serverRuntime: ServerRuntime) override suspend fun respond(
         auth: AuthAccess<TestSubject>,
         conversation: SystemChatConversation,
     ) {
@@ -110,8 +109,7 @@ class TestSystemChatEndpoints(
         }
     }
 
-    override fun findToolByName(
-        serverRuntime: ServerRuntime,
+    context(serverRuntime: ServerRuntime) override fun findToolByName(
         auth: AuthAccess<TestSubject>,
         conversation: SystemChatConversation,
         toolName: String,
@@ -563,6 +561,428 @@ class SystemChatEndpointsTest {
 
             // respond() should NOT have been called because lock is held
             assertTrue(endpoints.respondCalls.isEmpty(), "respond() should not be called when lock is held")
+
+            TestChatServer.TestSubjectAuth.clearSubjects()
+        }
+    }
+
+    //
+    // Tests for skipAutoResponse field
+    //
+
+    @Test
+    fun testSkipAutoResponsePreventsAutoResponse() = runBlocking {
+        TestChatServer.test(settings = { TestChatServer.database set Database.Settings("ram") }) {
+            val subject = TestSubject(email = "test@example.com")
+            TestChatServer.TestSubjectAuth.addSubject(subject)
+            val auth = TestChatServer.TestSubjectAuth.testAuth(subject)
+            val access = AuthAccess(auth)
+            val endpoints = TestChatServer.chatEndpoints as TestSystemChatEndpoints
+            endpoints.respondCalls.clear()
+
+            // Create a conversation with autoProcess = true
+            val conversation = SystemChatConversation(
+                subjectId = auth.rawId.toString(),
+                autoProcess = true,
+                createdAt = now()
+            )
+            TestChatServer.chatEndpoints.conversationInfo.table(access).insertOne(conversation)
+
+            // Create a user message WITH skipAutoResponse = true (simulating voice/phone channel)
+            val message = SystemChatMessage(
+                conversationId = conversation._id,
+                subjectId = auth.rawId.toString(),
+                role = SystemChatMessage.Role.User,
+                channel = "voice",
+                content = "Test message from voice",
+                createdAt = now(),
+                skipAutoResponse = true  // Key: voice channel sets this
+            )
+
+            // Use direct table insert to simulate what VoiceChannelSupport does
+            TestChatServer.chatEndpoints.messageInfo.baseTable().insertOne(message)
+
+            // respond() should NOT have been called because skipAutoResponse = true
+            assertTrue(endpoints.respondCalls.isEmpty(),
+                "respond() should NOT be called when skipAutoResponse=true, even with autoProcess=true")
+
+            // Verify message was stored correctly
+            val storedMessage = TestChatServer.chatEndpoints.messageInfo.baseTable().get(message._id)
+            assertNotNull(storedMessage)
+            assertEquals(true, storedMessage.skipAutoResponse)
+            assertEquals("voice", storedMessage.channel)
+
+            TestChatServer.TestSubjectAuth.clearSubjects()
+        }
+    }
+
+    @Test
+    fun testTriggerAutoResponseWithSkipFlagDoesNothing() = runBlocking {
+        TestChatServer.test(settings = { TestChatServer.database set Database.Settings("ram") }) {
+            val subject = TestSubject(email = "test@example.com")
+            TestChatServer.TestSubjectAuth.addSubject(subject)
+            val auth = TestChatServer.TestSubjectAuth.testAuth(subject)
+            val access = AuthAccess(auth)
+            val endpoints = TestChatServer.chatEndpoints as TestSystemChatEndpoints
+            endpoints.respondCalls.clear()
+
+            // Create a conversation
+            val conversation = SystemChatConversation(
+                subjectId = auth.rawId.toString(),
+                autoProcess = true,
+                createdAt = now()
+            )
+            TestChatServer.chatEndpoints.conversationInfo.table(access).insertOne(conversation)
+
+            // Create a message with skipAutoResponse = true
+            val message = SystemChatMessage(
+                conversationId = conversation._id,
+                subjectId = auth.rawId.toString(),
+                role = SystemChatMessage.Role.User,
+                content = "Test message",
+                createdAt = now(),
+                skipAutoResponse = true
+            )
+            TestChatServer.chatEndpoints.messageInfo.baseTable().insertOne(message)
+
+            // Explicitly call triggerAutoResponse - should do nothing due to skipAutoResponse
+            TestChatServer.chatEndpoints.triggerAutoResponse(access, message)
+
+            assertTrue(endpoints.respondCalls.isEmpty(),
+                "triggerAutoResponse should do nothing when skipAutoResponse=true")
+
+            TestChatServer.TestSubjectAuth.clearSubjects()
+        }
+    }
+
+    @Test
+    fun testTriggerAutoResponseWithoutSkipFlagWorks() = runBlocking {
+        TestChatServer.test(settings = { TestChatServer.database set Database.Settings("ram") }) {
+            val subject = TestSubject(email = "test@example.com")
+            TestChatServer.TestSubjectAuth.addSubject(subject)
+            val auth = TestChatServer.TestSubjectAuth.testAuth(subject)
+            val access = AuthAccess(auth)
+            val endpoints = TestChatServer.chatEndpoints as TestSystemChatEndpoints
+            endpoints.respondCalls.clear()
+
+            // Create a conversation
+            val conversation = SystemChatConversation(
+                subjectId = auth.rawId.toString(),
+                autoProcess = true,
+                createdAt = now()
+            )
+            TestChatServer.chatEndpoints.conversationInfo.table(access).insertOne(conversation)
+
+            // Create a message WITHOUT skipAutoResponse (default = false)
+            val message = SystemChatMessage(
+                conversationId = conversation._id,
+                subjectId = auth.rawId.toString(),
+                role = SystemChatMessage.Role.User,
+                content = "Test message",
+                createdAt = now()
+                // skipAutoResponse defaults to false
+            )
+            TestChatServer.chatEndpoints.messageInfo.baseTable().insertOne(message)
+
+            // Explicitly call triggerAutoResponse - should trigger response
+            TestChatServer.chatEndpoints.triggerAutoResponse(access, message)
+
+            assertTrue(endpoints.respondCalls.isNotEmpty(),
+                "triggerAutoResponse should trigger respond() when skipAutoResponse=false")
+
+            TestChatServer.TestSubjectAuth.clearSubjects()
+        }
+    }
+
+    @Test
+    fun testTriggerAutoResponseIgnoresNonUserMessages() = runBlocking {
+        TestChatServer.test(settings = { TestChatServer.database set Database.Settings("ram") }) {
+            val subject = TestSubject(email = "test@example.com")
+            TestChatServer.TestSubjectAuth.addSubject(subject)
+            val auth = TestChatServer.TestSubjectAuth.testAuth(subject)
+            val access = AuthAccess(auth)
+            val endpoints = TestChatServer.chatEndpoints as TestSystemChatEndpoints
+            endpoints.respondCalls.clear()
+
+            // Create a conversation
+            val conversation = SystemChatConversation(
+                subjectId = auth.rawId.toString(),
+                autoProcess = true,
+                createdAt = now()
+            )
+            TestChatServer.chatEndpoints.conversationInfo.table(access).insertOne(conversation)
+
+            // Try to trigger on an Assistant message (should be ignored)
+            val assistantMessage = SystemChatMessage(
+                conversationId = conversation._id,
+                subjectId = auth.rawId.toString(),
+                role = SystemChatMessage.Role.Assistant,
+                content = "I am the assistant",
+                createdAt = now()
+            )
+            TestChatServer.chatEndpoints.messageInfo.baseTable().insertOne(assistantMessage)
+            TestChatServer.chatEndpoints.triggerAutoResponse(access, assistantMessage)
+
+            assertTrue(endpoints.respondCalls.isEmpty(),
+                "triggerAutoResponse should ignore non-User messages")
+
+            // Try to trigger on a ToolRequest message (should be ignored)
+            val toolMessage = SystemChatMessage(
+                conversationId = conversation._id,
+                subjectId = auth.rawId.toString(),
+                role = SystemChatMessage.Role.ToolRequest,
+                content = "Tool call",
+                tool = ToolRequestData(toolName = "test", arguments = "{}"),
+                createdAt = now()
+            )
+            TestChatServer.chatEndpoints.messageInfo.baseTable().insertOne(toolMessage)
+            TestChatServer.chatEndpoints.triggerAutoResponse(access, toolMessage)
+
+            assertTrue(endpoints.respondCalls.isEmpty(),
+                "triggerAutoResponse should ignore ToolRequest messages")
+
+            TestChatServer.TestSubjectAuth.clearSubjects()
+        }
+    }
+
+    @Test
+    fun testToolRequestMessageWithSkipAutoResponse() = runBlocking {
+        TestChatServer.test(settings = { TestChatServer.database set Database.Settings("ram") }) {
+            val subject = TestSubject(email = "test@example.com")
+            TestChatServer.TestSubjectAuth.addSubject(subject)
+            val auth = TestChatServer.TestSubjectAuth.testAuth(subject)
+            val access = AuthAccess(auth)
+            val endpoints = TestChatServer.chatEndpoints as TestSystemChatEndpoints
+            endpoints.respondCalls.clear()
+            endpoints.toolExecutions.clear()
+
+            // Create a conversation
+            val conversation = SystemChatConversation(
+                subjectId = auth.rawId.toString(),
+                autoProcess = true,
+                createdAt = now()
+            )
+            TestChatServer.chatEndpoints.conversationInfo.table(access).insertOne(conversation)
+
+            // Create a tool request message with skipAutoResponse = true
+            // This simulates a voice channel saving its tool calls
+            val toolMessage = SystemChatMessage(
+                conversationId = conversation._id,
+                subjectId = auth.rawId.toString(),
+                role = SystemChatMessage.Role.ToolRequest,
+                channel = "voice",
+                content = "Called testTool",
+                tool = ToolRequestData(
+                    toolName = "testTool",
+                    arguments = """{"arg": "value"}""",
+                    requiresApproval = false,
+                    result = "Tool executed successfully"
+                ),
+                createdAt = now(),
+                skipAutoResponse = true
+            )
+
+            // Direct insert (simulating VoiceChannelSupport)
+            TestChatServer.chatEndpoints.messageInfo.baseTable().insertOne(toolMessage)
+
+            // No auto-response should be triggered
+            assertTrue(endpoints.respondCalls.isEmpty(),
+                "Tool message with skipAutoResponse should not trigger respond()")
+
+            // Verify message was stored
+            val storedMessage = TestChatServer.chatEndpoints.messageInfo.baseTable().get(toolMessage._id)
+            assertNotNull(storedMessage)
+            assertEquals(SystemChatMessage.Role.ToolRequest, storedMessage.role)
+            assertEquals("voice", storedMessage.channel)
+            assertEquals(true, storedMessage.skipAutoResponse)
+            assertEquals("Tool executed successfully", storedMessage.tool?.result)
+
+            TestChatServer.TestSubjectAuth.clearSubjects()
+        }
+    }
+
+    @Test
+    fun testTriggerToolExecutionMethod() = runBlocking {
+        TestChatServer.test(settings = { TestChatServer.database set Database.Settings("ram") }) {
+            val subject = TestSubject(email = "test@example.com")
+            TestChatServer.TestSubjectAuth.addSubject(subject)
+            val auth = TestChatServer.TestSubjectAuth.testAuth(subject)
+            val access = AuthAccess(auth)
+            val endpoints = TestChatServer.chatEndpoints as TestSystemChatEndpoints
+            endpoints.toolExecutions.clear()
+
+            // Register a test tool
+            endpoints.availableTools["externalTool"] = TestChatTool("externalTool")
+
+            // Create a conversation
+            val conversation = SystemChatConversation(
+                subjectId = auth.rawId.toString(),
+                createdAt = now()
+            )
+            TestChatServer.chatEndpoints.conversationInfo.table(access).insertOne(conversation)
+
+            // Create an approved tool request message
+            val toolMessage = SystemChatMessage(
+                conversationId = conversation._id,
+                subjectId = auth.rawId.toString(),
+                role = SystemChatMessage.Role.ToolRequest,
+                content = "Execute external tool",
+                tool = ToolRequestData(
+                    toolName = "externalTool",
+                    arguments = """{"data": "test"}""",
+                    requiresApproval = true,
+                    approval = ToolApproval(
+                        approved = true,
+                        approvedBy = auth.rawId,
+                        approvedAt = now()
+                    )
+                ),
+                createdAt = now()
+            )
+            TestChatServer.chatEndpoints.messageInfo.baseTable().insertOne(toolMessage)
+
+            // Call triggerToolExecution (simulating what ExternalChannelSupport does after approval)
+            TestChatServer.chatEndpoints.triggerToolExecution(access, toolMessage)
+
+            // Verify findToolByName was called
+            assertTrue(endpoints.toolExecutions.contains("externalTool"),
+                "triggerToolExecution should trigger tool lookup and execution")
+
+            TestChatServer.TestSubjectAuth.clearSubjects()
+        }
+    }
+
+    @Test
+    fun testTriggerToolExecutionIgnoresRejectedRequests() = runBlocking {
+        TestChatServer.test(settings = { TestChatServer.database set Database.Settings("ram") }) {
+            val subject = TestSubject(email = "test@example.com")
+            TestChatServer.TestSubjectAuth.addSubject(subject)
+            val auth = TestChatServer.TestSubjectAuth.testAuth(subject)
+            val access = AuthAccess(auth)
+            val endpoints = TestChatServer.chatEndpoints as TestSystemChatEndpoints
+            endpoints.toolExecutions.clear()
+
+            // Register a test tool
+            endpoints.availableTools["externalTool"] = TestChatTool("externalTool")
+
+            // Create a conversation
+            val conversation = SystemChatConversation(
+                subjectId = auth.rawId.toString(),
+                createdAt = now()
+            )
+            TestChatServer.chatEndpoints.conversationInfo.table(access).insertOne(conversation)
+
+            // Create a REJECTED tool request message
+            val toolMessage = SystemChatMessage(
+                conversationId = conversation._id,
+                subjectId = auth.rawId.toString(),
+                role = SystemChatMessage.Role.ToolRequest,
+                content = "Execute external tool",
+                tool = ToolRequestData(
+                    toolName = "externalTool",
+                    arguments = """{"data": "test"}""",
+                    requiresApproval = true,
+                    approval = ToolApproval(
+                        approved = false,  // Rejected
+                        approvedBy = auth.rawId,
+                        approvedAt = now()
+                    )
+                ),
+                createdAt = now()
+            )
+            TestChatServer.chatEndpoints.messageInfo.baseTable().insertOne(toolMessage)
+
+            // Call triggerToolExecution - should do nothing for rejected request
+            TestChatServer.chatEndpoints.triggerToolExecution(access, toolMessage)
+
+            assertTrue(endpoints.toolExecutions.isEmpty(),
+                "triggerToolExecution should not execute rejected tool requests")
+
+            TestChatServer.TestSubjectAuth.clearSubjects()
+        }
+    }
+
+    @Test
+    fun testTriggerContinueResponseMethod() = runBlocking {
+        TestChatServer.test(settings = { TestChatServer.database set Database.Settings("ram") }) {
+            val subject = TestSubject(email = "test@example.com")
+            TestChatServer.TestSubjectAuth.addSubject(subject)
+            val auth = TestChatServer.TestSubjectAuth.testAuth(subject)
+            val access = AuthAccess(auth)
+            val endpoints = TestChatServer.chatEndpoints as TestSystemChatEndpoints
+            endpoints.respondCalls.clear()
+
+            // Create a conversation
+            val conversation = SystemChatConversation(
+                subjectId = auth.rawId.toString(),
+                autoProcess = true,
+                createdAt = now()
+            )
+            TestChatServer.chatEndpoints.conversationInfo.table(access).insertOne(conversation)
+
+            // Create a rejected tool request message
+            val toolMessage = SystemChatMessage(
+                conversationId = conversation._id,
+                subjectId = auth.rawId.toString(),
+                role = SystemChatMessage.Role.ToolRequest,
+                content = "Execute tool",
+                tool = ToolRequestData(
+                    toolName = "someTool",
+                    arguments = "{}",
+                    requiresApproval = true,
+                    approval = ToolApproval(
+                        approved = false,
+                        approvedBy = auth.rawId,
+                        approvedAt = now(),
+                        reason = "Too dangerous"
+                    )
+                ),
+                createdAt = now()
+            )
+            TestChatServer.chatEndpoints.messageInfo.baseTable().insertOne(toolMessage)
+
+            // Call triggerContinueResponse (simulating ExternalChannelSupport after rejection)
+            TestChatServer.chatEndpoints.triggerContinueResponse(access, toolMessage)
+
+            // respond() should be called to continue the conversation
+            assertTrue(endpoints.respondCalls.isNotEmpty(),
+                "triggerContinueResponse should trigger respond() for rejected tools")
+
+            TestChatServer.TestSubjectAuth.clearSubjects()
+        }
+    }
+
+    @Test
+    fun testChannelFieldStoredCorrectly() = runBlocking {
+        TestChatServer.test(settings = { TestChatServer.database set Database.Settings("ram") }) {
+            val subject = TestSubject(email = "test@example.com")
+            TestChatServer.TestSubjectAuth.addSubject(subject)
+            val auth = TestChatServer.TestSubjectAuth.testAuth(subject)
+            val access = AuthAccess(auth)
+
+            // Create a conversation
+            val conversation = SystemChatConversation(
+                subjectId = auth.rawId.toString(),
+                autoProcess = false,
+                createdAt = now()
+            )
+            TestChatServer.chatEndpoints.conversationInfo.table(access).insertOne(conversation)
+
+            // Test different channel types
+            val channels = listOf("sms", "email", "voice", "phone", null)
+
+            for (channel in channels) {
+                val message = SystemChatMessage(
+                    conversationId = conversation._id,
+                    subjectId = auth.rawId.toString(),
+                    role = SystemChatMessage.Role.User,
+                    channel = channel,
+                    content = "Test message via $channel",
+                    createdAt = now()
+                )
+                val created = TestChatServer.chatEndpoints.messageInfo.baseTable().insertOne(message)!!
+                assertEquals(channel, created.channel, "Channel should be stored correctly: $channel")
+            }
 
             TestChatServer.TestSubjectAuth.clearSubjects()
         }

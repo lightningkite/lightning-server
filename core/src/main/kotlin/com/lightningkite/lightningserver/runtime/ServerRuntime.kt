@@ -38,11 +38,18 @@ import kotlin.time.Clock
  * - Handling WebSocket connections and subscriptions
  *
  */
-public interface ServerRuntime: SettingContext {
+public interface ServerRuntime : SettingContext {
     /**
      * The server definition containing all routes, handlers, settings, and tasks.
      */
     public val server: ServerDefinition
+
+    /**
+     * Whether the different parts of the websocket handler (willConnect, didConnect, messageFromClient,
+     * messageFromSubscription, disconnect) all occur in the same process.  If they do, you can use RAM to store
+     * information between those events.
+     */
+    public val websocketHandlersRunOnSameMachine: Boolean get() = true
 
     /**
      * The public URL at which this server is accessible.

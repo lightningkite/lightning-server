@@ -1,6 +1,8 @@
 package com.lightningkite.lightningserver.cors
 
 import kotlinx.serialization.Serializable
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 
 /**
@@ -51,7 +53,7 @@ public data class CorsSettings(
     val limitToMethods: List<String> = emptyList(),
     val exposedHeaders: List<String> = emptyList(),
     val allowCredentials: Boolean = false,
-    val cacheLength: UInt? = null,
+    val cacheLength: Duration? = null,
     val forbidOnMatchFail: Boolean = true,
 ) {
     public companion object {
@@ -72,7 +74,7 @@ public data class CorsSettings(
             limitToHeaders = listOf("*"),
             limitToMethods = listOf("*"),
             allowCredentials = true,
-            cacheLength = 10u,
+            cacheLength = 10.seconds,
             forbidOnMatchFail = false,
         )
 
@@ -94,7 +96,7 @@ public data class CorsSettings(
             limitToHeaders = listOf("*"),
             limitToMethods = listOf("*"),
             allowCredentials = true,
-            cacheLength = 10u,
+            cacheLength = 10.seconds,
         )
     }
 }

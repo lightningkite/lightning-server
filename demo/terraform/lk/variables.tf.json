@@ -1,6 +1,12 @@
 {
     "variable": {
+        "sms": {
+            "type": "string"
+        },
         "someSecret": {
+            "type": "string"
+        },
+        "smsInbound": {
             "type": "string"
         }
     }
