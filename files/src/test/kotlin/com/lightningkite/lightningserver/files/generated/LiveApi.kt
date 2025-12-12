@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.files
 
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.typed.Fetcher
+import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.ListSerializer

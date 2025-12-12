@@ -1,5 +1,9 @@
+@file:OptIn(ExperimentalLightningServer::class)
+
 package com.lightningkite.lightningserver.typed
 
+import com.lightningkite.lightningserver.typed.sdk.Archive
+import com.lightningkite.services.data.ExperimentalLightningServer
 import kotlinx.io.writeString
 import java.io.FileOutputStream
 import java.util.zip.ZipException
@@ -22,7 +26,7 @@ class ZipArchiveTests {
                 val zipOut = ZipOutputStream(fos)
                 Archive.zip(zipOut).use { archive ->
                     archive.entry("test.txt") {
-                        writeString("Hello World")
+                        it.writeString("Hello World")
                     }
                 }
             }
@@ -56,7 +60,7 @@ class ZipArchiveTests {
                 val zipOut = ZipOutputStream(fos)
                 val archive = Archive.zip(zipOut)
                 archive.entry("test.txt") {
-                    writeString("Hello World")
+                    it.writeString("Hello World")
                 }
                 // NOT calling archive.close() or zipOut.close()
             }
