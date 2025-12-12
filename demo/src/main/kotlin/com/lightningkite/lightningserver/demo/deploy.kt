@@ -50,7 +50,7 @@ object LkEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
 
     override fun Server.settings() {
         database.mongodbAtlasFree(orgId = "6323a65c43d66b56a2ea5aea", zoneName = "Zone 1")
-        email.awsSesSmtp("joseph@lightningkite.com".toEmailAddress())
+        email.awsSesSmtp("lightningkite.com")
         sms.direct(SMS.Settings())
         files.awsS3Bucket(signedUrlDuration = 1.days)
         cache.awsDynamoDb()
@@ -96,7 +96,7 @@ object JosephPersonalEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
     override val region = Region.US_WEST_2!!
     override fun Server.settings() {
         database.mongodbAtlasFree(orgId = "6323a65c43d66b56a2ea5aea", zoneName = "Zone 1")
-        email.awsSesSmtp("josephivie@gmail.com".toEmailAddress())
+        email.awsSesSmtp("gmail.com")
         sms.direct(SMS.Settings())
         files.awsS3Bucket(signedUrlDuration = 1.days)
         cache.awsDynamoDb()

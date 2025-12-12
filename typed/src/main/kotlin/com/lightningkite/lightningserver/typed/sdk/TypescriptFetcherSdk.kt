@@ -135,29 +135,7 @@ public class TypescriptFetcherSdk(
      * @see MultipleFiles
      */
     public sealed interface Structure {
-        /**
-         * Generates all code in a single TypeScript file.
-         *
-         * This strategy combines type definitions, interface, and implementation
-         * into one file. Useful for smaller APIs or when you want a single
-         * distributable file.
-         *
-         * @property filename The name of the generated TypeScript file
-         */
         public data class SingleFile(val filename: String) : Structure
-
-        /**
-         * Generates code split across multiple TypeScript files.
-         *
-         * This strategy separates concerns into three files:
-         * - **Models file**: Type definitions (interfaces, enums, type aliases)
-         * - **Interface file**: API interface contract
-         * - **Live file**: Concrete implementation with Fetcher calls
-         *
-         * @property modelsFilename The filename for type definitions (default: "models.ts")
-         * @property interfaceFilename The filename for the API interface (default: "{ApiName}.ts")
-         * @property liveFilename The filename for the implementation (default: "Live{ApiName}.ts")
-         */
         public data class MultipleFiles(
             val modelsFilename: String,
             val interfaceFilename: String,
