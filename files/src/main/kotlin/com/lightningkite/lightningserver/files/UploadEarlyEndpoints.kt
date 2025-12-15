@@ -85,8 +85,7 @@ public val endpoint: ApiHttpHandler<PathSpec0, HasId<*>?, Unit, UploadInformatio
         description = "Upload a file to make a request later.  Times out in around 10 minutes.",
         errorCases = listOf(),
         implementation = { _: Unit ->
-            val id = Uuid.random()
-            val key = "$id.file"
+            val key = "${Uuid.random()}.file"
             if (fileScanner().isEmpty()) {
                 val newFile = serializer().ready.then(key)
                 val newItem = UploadForNextRequest(

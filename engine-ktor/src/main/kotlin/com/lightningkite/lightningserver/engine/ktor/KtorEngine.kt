@@ -123,11 +123,11 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
 
                         is Data.Text -> call.respondText(text = b.data, contentType = type, status = code)
                         is Data.Sink -> b.source().use {
-                            call.respondSource(source = it, contentType = type, status = code)
+                            call.respondSource(source = it, contentType = type, status = code, contentLength = b.size)
                         }
 
                         is Data.Source -> b.source.use {
-                            call.respondSource(source = it, contentType = type, status = code)
+                            call.respondSource(source = it, contentType = type, status = code, contentLength = b.size)
                         }
                     }
                 }
