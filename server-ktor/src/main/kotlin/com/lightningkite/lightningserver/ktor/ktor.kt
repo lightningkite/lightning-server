@@ -173,17 +173,24 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                         )
 
                         is HttpContent.Text -> call.respondText(b.string, ContentType.parse(b.type.toString()))
-                        is HttpContent.OutStream -> call.respondOutputStream(ContentType.parse(b.type.toString())) {
-                            b.write(
-                                this
-                            )
+                        is HttpContent.OutStream -> call.respondOutputStream(
+                            ContentType.parse(b.type.toString()),
+                            contentLength = b.length,
+                        ) {
+                            b.write(this)
                         }
 
-                        is HttpContent.LazyStream -> call.respondBytesWriter(ContentType.parse(b.type.toString())) {
+                        is HttpContent.LazyStream -> call.respondBytesWriter(
+                            ContentType.parse(b.type.toString()),
+                            contentLength = b.length,
+                        ) {
                             b.getStream().toByteReadChannel().copyTo(this)
                         }
 
-                        is HttpContent.Stream -> call.respondBytesWriter(ContentType.parse(b.type.toString())) {
+                        is HttpContent.Stream -> call.respondBytesWriter(
+                            ContentType.parse(b.type.toString()),
+                            contentLength = b.length,
+                        ) {
                             b.stream.toByteReadChannel().copyTo(this)
                         }
 

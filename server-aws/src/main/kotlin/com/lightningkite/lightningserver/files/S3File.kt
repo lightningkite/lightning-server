@@ -4,6 +4,7 @@ import com.lightningkite.atZone
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.now
+import io.ktor.http.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withContext
@@ -27,7 +28,8 @@ import kotlin.time.toJavaDuration
 data class S3File(val system: S3FileSystem, val path: File) : FileObject {
     override fun resolve(path: String): FileObject = S3File(
         system,
-        this.path.resolve(path.also { if (it.contains("+")) throw IllegalArgumentException("File Path cannot contain '+'") })
+        this.path.resolve(path.decodeURLPart()
+            .also { if (it.contains("+")) throw IllegalArgumentException("File Path cannot contain '+'") })
     )
 
     override val name: String
@@ -149,7 +151,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
                     )
                 }
                 val secretKey = system.credentialProvider.resolveCredentials().secretAccessKey()
-                val objectPath = path.unixPath
+                val objectPath = path.unixPath.encodeURLPathSafe()
                 val date = headers["X-Amz-Date"] ?: return false
                 val algorithm = headers["X-Amz-Algorithm"] ?: return false
                 val credential = headers["X-Amz-Credential"] ?: return false
@@ -191,6 +193,10 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
 
     override val url: String
         get() = "https://${system.bucket}.s3.${system.region.id()}.amazonaws.com/${path.unixPath}"
+
+
+    private val encodedUrl: String
+        get() = "https://${system.bucket}.s3.${system.region.id()}.amazonaws.com/${path.unixPath.encodeURLPathSafe()}"
 
     override val signedUrl: String
         get() = system.signedUrlDuration?.let { e ->
@@ -243,9 +249,9 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
             finalHasher.update(canonicalRequestHash.toByteArray())
             finalHasher.doFinal(hashHolder, 0)
             val regeneratedSig = hashHolder.toHex()
-            val result = "${url}?$preHeaders&X-Amz-Signature=$regeneratedSig"
+            val result = "${encodedUrl}?$preHeaders&X-Amz-Signature=$regeneratedSig"
             result
-        } ?: url
+        } ?: encodedUrl
 
     val officialSignedUrl: String
         get() = system.signedUrlDuration?.let { _ ->
