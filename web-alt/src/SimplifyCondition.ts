@@ -41,6 +41,14 @@ function stringIsField(c: string): boolean {
     "IntBitsAnySet",
     "Exists",
     "IfNotNull",
+    "FullTextSearch",
+    "StringContains",
+    "ListAllElements",
+    "ListAnyElements",
+    "ListSizesEquals",
+    "SetAllElements",
+    "SetAnyElements",
+    "SetSizesEquals",
   ].includes(c);
 }
 

@@ -42,6 +42,14 @@ function stringIsField(c) {
         "IntBitsAnySet",
         "Exists",
         "IfNotNull",
+        "FullTextSearch",
+        "StringContains",
+        "ListAllElements",
+        "ListAnyElements",
+        "ListSizesEquals",
+        "SetAllElements",
+        "SetAnyElements",
+        "SetSizesEquals",
     ].includes(c);
 }
 function getFieldKey(c) {

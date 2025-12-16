@@ -337,56 +337,72 @@ describe("Condition Simplify", () => {
       ],
     });
   });
+
+  test("SetAnyElements and SetSizesEquals", () => {
+    const condition = {
+      And: [
+        {
+          SetAnyElements: {
+            Equal: 3,
+          },
+        },
+
+        { SetSizesEquals: 3 },
+      ],
+    } as const;
+
+    expect(condition).toMatchObject(condition);
+  });
 });
 
 // Testing helper functions
 
-  // test("finalSimplify removes empty Inside", () => {
-  //   const cond: Condition<number> = { Inside: [] };
-  //   const result = finalSimplify(cond);
-  //   expect(result).toEqual({ Never: true });
-  // });
+// test("finalSimplify removes empty Inside", () => {
+//   const cond: Condition<number> = { Inside: [] };
+//   const result = finalSimplify(cond);
+//   expect(result).toEqual({ Never: true });
+// });
 
-  // test("finalSimplify removes empty NotInside", () => {
-  //   const cond: Condition<number> = { NotInside: [] };
-  //   const result = finalSimplify(cond);
-  //   expect(result).toEqual({ Always: true });
-  // });
+// test("finalSimplify removes empty NotInside", () => {
+//   const cond: Condition<number> = { NotInside: [] };
+//   const result = finalSimplify(cond);
+//   expect(result).toEqual({ Always: true });
+// });
 
-  // test("AND combining Always/Never behaves correctly", () => {
-  //   expect(reduceAnd({ Always: true }, { Never: true })).toEqual({
-  //     Never: true,
-  //   });
-  //   expect(reduceAnd({ Always: true }, { Always: true })).toEqual({
-  //     Always: true,
-  //   });
-  //   expect(reduceAnd({ Never: true }, { Always: true })).toEqual({
-  //     Never: true,
-  //   });
-  // });
+// test("AND combining Always/Never behaves correctly", () => {
+//   expect(reduceAnd({ Always: true }, { Never: true })).toEqual({
+//     Never: true,
+//   });
+//   expect(reduceAnd({ Always: true }, { Always: true })).toEqual({
+//     Always: true,
+//   });
+//   expect(reduceAnd({ Never: true }, { Always: true })).toEqual({
+//     Never: true,
+//   });
+// });
 
-  // test("OR combining Always/Never behaves correctly", () => {
-  //   expect(reduceOr({ Always: true }, { Never: true })).toEqual({
-  //     Always: true,
-  //   });
-  //   expect(reduceOr({ Never: true }, { Never: true })).toEqual({ Never: true });
-  //   expect(reduceOr({ Always: true }, { Always: true })).toEqual({
-  //     Always: true,
-  //   });
-  // });
+// test("OR combining Always/Never behaves correctly", () => {
+//   expect(reduceOr({ Always: true }, { Never: true })).toEqual({
+//     Always: true,
+//   });
+//   expect(reduceOr({ Never: true }, { Never: true })).toEqual({ Never: true });
+//   expect(reduceOr({ Always: true }, { Always: true })).toEqual({
+//     Always: true,
+//   });
+// });
 
-  // test("AND merges nested AND structures", () => {
-  //   const result = reduceAnd(
-  //     { And: [{ Always: true }] },
-  //     { And: [{ Never: true }] }
-  //   );
-  //   expect(result).toEqual({ And: [{ Always: true }, { Never: true }] });
-  // });
+// test("AND merges nested AND structures", () => {
+//   const result = reduceAnd(
+//     { And: [{ Always: true }] },
+//     { And: [{ Never: true }] }
+//   );
+//   expect(result).toEqual({ And: [{ Always: true }, { Never: true }] });
+// });
 
-  // test("OR merges nested OR structures", () => {
-  //   const result = reduceOr(
-  //     { Or: [{ Always: true }] },
-  //     { Or: [{ Never: true }] }
-  //   );
-  //   expect(result).toEqual({ Or: [{ Always: true }, { Never: true }] });
-  // });
+// test("OR merges nested OR structures", () => {
+//   const result = reduceOr(
+//     { Or: [{ Always: true }] },
+//     { Or: [{ Never: true }] }
+//   );
+//   expect(result).toEqual({ Or: [{ Always: true }, { Never: true }] });
+// });
