@@ -7,3 +7,4 @@ export * from "./mockRestEndpoints";
 export * from "./sessionRest";
 export * from "./annotateEndpoint";
 export * from "./fetching";
+export * from "./SimplifyCondition";
