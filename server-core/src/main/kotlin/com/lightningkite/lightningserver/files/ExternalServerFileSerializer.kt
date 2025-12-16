@@ -14,6 +14,7 @@ import kotlinx.serialization.encoding.Encoder
 import org.slf4j.LoggerFactory
 import java.util.*
 import com.lightningkite.UUID
+import io.ktor.http.URLDecodeException
 import kotlinx.serialization.SealedSerializationApi
 
 /**
@@ -61,9 +62,15 @@ object ExternalServerFileSerializer : KSerializer<ServerFile> {
                 uploadFile(HttpContent.Binary(data, type))
             }.serverFile
         } else {
-            val file = FileSystem.resolveWithSignature(raw)
-                ?: throw BadRequestException("The given url (${raw.substringBefore('?')}) does not start with any files root.  Known roots: ${FileSystem.urlRoots}")
-            return ServerFile(file.url)
+            try {
+                val file = FileSystem.resolveWithSignature(raw)
+                    ?: throw BadRequestException("The given url (${raw.substringBefore('?')}) does not start with any files root.  Known roots: ${FileSystem.urlRoots}")
+                return ServerFile(file.url)
+            } catch (_: URLDecodeException){
+                throw BadRequestException("File name/path contains unsupported characters")
+            } catch (e:IllegalArgumentException){
+                throw BadRequestException(e.message ?: "")
+            }
         }
     }
 }

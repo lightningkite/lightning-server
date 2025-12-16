@@ -50,6 +50,7 @@ object Authentication {
                 else -> null
             }
         }
+        fun normalizePropertyValue(property: String, value: String): String = value
         suspend fun permitMasquerade(
             other: SubjectHandler<*, *>,
             request: RequestAuth<SUBJECT>,
