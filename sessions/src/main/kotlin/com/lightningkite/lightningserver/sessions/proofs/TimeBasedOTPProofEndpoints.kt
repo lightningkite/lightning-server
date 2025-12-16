@@ -33,6 +33,8 @@ import kotlinx.serialization.builtins.serializer
 import java.security.SecureRandom
 import java.util.concurrent.TimeUnit
 import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.toJavaInstant
 import kotlin.uuid.Uuid
@@ -42,7 +44,8 @@ import kotlin.uuid.Uuid
 public class TimeBasedOTPProofEndpoints(
     database: Runtime<Database>,
     private val cache: Runtime<Cache>,
-    private val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
+    override val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
+    override val proofExpiration: Duration = 1.hours,
     private val config: TimeBasedOneTimePasswordConfig = TimeBasedOneTimePasswordConfig(
         timeStep = 30,
         timeStepUnit = TimeUnit.SECONDS,
@@ -50,7 +53,6 @@ public class TimeBasedOTPProofEndpoints(
         hmacAlgorithm = HmacAlgorithm.SHA1
     ),
 ) : ServerBuilder(), DirectProofMethod {
-
     init {
         proofMethods.register(this)
 
@@ -150,6 +152,7 @@ public class TimeBasedOTPProofEndpoints(
                         strength = info.strength,
                         value = "some-id",
                         at = Clock.System.now(),
+                        expiresAt = Clock.System.now() + proofExpiration,
                         signature = "opaquesignaturevalue"
                     )
                 )
@@ -186,10 +189,8 @@ public class TimeBasedOTPProofEndpoints(
                     })
 
                     proofSigner.await().makeProof(
-                        info = info,
                         property = input.property,
                         value = input.value,
-                        at = now()
                     )
                 }
             }

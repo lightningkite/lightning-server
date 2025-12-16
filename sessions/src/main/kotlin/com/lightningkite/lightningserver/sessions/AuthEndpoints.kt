@@ -24,6 +24,7 @@ import com.lightningkite.lightningserver.sessions.proofs.ProofOption
 import com.lightningkite.lightningserver.sessions.proofs.extensions.verify
 import com.lightningkite.lightningserver.sessions.proofs.proofMethods
 import com.lightningkite.lightningserver.sessions.proofs.ProofMethod
+import com.lightningkite.lightningserver.sessions.proofs.extensions.isValid
 import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.sessions.token.TokenFormat
 import com.lightningkite.lightningserver.toException
@@ -85,7 +86,6 @@ import kotlin.uuid.Uuid
 public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     principal: PrincipalType<SUBJECT, ID>,
     database: Runtime<Database>,
-    private val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
     tokenFormat: Runtime<TokenFormat> = Runtime { PrivateTinyTokenFormat() },
 ) : SessionManager<SUBJECT, ID>(principal, database, tokenFormat) {
     init {
@@ -109,16 +109,6 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
      */
     context(server: ServerRuntime)
     public abstract suspend fun requiredProofStrengthFor(subject: SUBJECT): Int
-
-    /**
-     * Duration for which a proof remains valid after being signed.
-     *
-     * This prevents replay attacks by ensuring proofs expire quickly. After this duration,
-     * the proof must be regenerated (e.g., request a new email code or re-enter password).
-     *
-     * Default is 1 hour.
-     */
-    public open val proofExpiration: Duration = 1.hours
 
     /**
      * Calculates the maximum possible proof strength a user can achieve with the given proof methods.
@@ -404,8 +394,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 //            belongsToInterface = belongsToInterface,
             implementation = { proofs: List<Proof> ->
                 proofs.forEach {
-                    if (!proofSigner.await().verify(it)) throw errorInvalidProof.toException(data = it.via)
-                    if (now() > it.at + proofExpiration) throw errorExpiredProof.toException(data = it.via)
+                    if (!it.isValid()) throw errorInvalidProof.toException(data = it.via)
                 }
                 val used = proofs.map { it.via }.toSet()
                 val subjects = proofs.mapNotNull { principal.fetchByProperty(it.property, it.value) }.distinctBy { it._id }
