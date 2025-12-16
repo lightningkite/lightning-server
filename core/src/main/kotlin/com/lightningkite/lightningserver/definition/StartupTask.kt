@@ -41,7 +41,7 @@ public interface StartupTask {
 public fun StartupTask(
     dependencies: Collection<StartupTask> = emptyList(),
     timeout: Duration = 5.minutes,
-    handler: suspend context(ServerRuntime) () -> Unit
+    handler: suspend context(ServerRuntime) StartupTask.() -> Unit
 ): StartupTask =
     object : StartupTask {
         override val timeout: Duration = timeout
@@ -49,7 +49,7 @@ public fun StartupTask(
 
         context(server: ServerRuntime)
         override suspend fun execute() {
-            return handler(server)
+            return handler()
         }
     }
 

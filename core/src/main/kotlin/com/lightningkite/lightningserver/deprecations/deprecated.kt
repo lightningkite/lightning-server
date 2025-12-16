@@ -88,14 +88,14 @@ public fun ServerBuilder.schedule(name: String, schedule: Schedule, action: susp
     "Use the standard syntax",
     ReplaceWith("path.path(name) bind ScheduledTask(frequency = frequency, handler = action)"),
 )
-public fun ServerBuilder.schedule(name: String, frequency: Duration, action: suspend context(ServerRuntime) () -> Unit): ScheduledTask =
+public fun ServerBuilder.schedule(name: String, frequency: Duration, action: suspend context(ServerRuntime) ScheduledTask.() -> Unit): ScheduledTask =
     path.path(name) bind ScheduledTask(frequency = frequency, handler = action)
 
 @Deprecated(
     "Use the standard syntax",
     ReplaceWith("path.path(name) bind ScheduledTask(timeOfDay, timezone, handler = action)")
 )
-public fun ServerBuilder.schedule(name: String, timeOfDay: LocalTime, timezone: TimeZone, action: suspend context(ServerRuntime) () -> Unit): ScheduledTask =
+public fun ServerBuilder.schedule(name: String, timeOfDay: LocalTime, timezone: TimeZone, action: suspend context(ServerRuntime) ScheduledTask.() -> Unit): ScheduledTask =
     path.path(name) bind ScheduledTask(timeOfDay, timezone, handler = action)
 
 @Deprecated("Use PathSpec instead", ReplaceWith("PathSpec"))
