@@ -60,7 +60,7 @@ class BlogAssistantChat(
             .associateBy { it.name }
 
     context(serverRuntime: ServerRuntime)
-    override suspend fun prompt(
+    override suspend fun promptPreMessages(
         builder: PromptBuilderAlt,
         auth: AuthAccess<User>,
         conversation: SystemChatConversation
@@ -76,7 +76,14 @@ class BlogAssistantChat(
             When creating or updating posts, be helpful and ask clarifying questions if needed.
             For destructive operations like delete, always explain what will happen first.
             """.trimIndent())
-        super.prompt(builder, auth, conversation)
+    }
+
+    context(serverRuntime: ServerRuntime)
+    override suspend fun promptPostMessages(
+        builder: PromptBuilderAlt,
+        auth: AuthAccess<User>,
+        conversation: SystemChatConversation
+    ) = with(builder) {
         system("You are working on behalf of this user: ${auth.auth.fetch()}")
     }
 }

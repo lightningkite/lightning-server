@@ -31,6 +31,7 @@ dependencies {
     api(project(":ai"))
     api(libs.serviceAbstractionsPubsub)
     api(libs.serviceAbstractionsPubsubRedis)
+    api(libs.serviceAbstractionsPubsubAws)
     api(libs.serviceAbstractionsPubsubTest)
     api(libs.serviceAbstractionsShouldBeStandardLibrary)
     api(libs.serviceAbstractionsSms)

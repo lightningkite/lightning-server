@@ -26,7 +26,7 @@ orgCrac = "0.1.3"
 proguard = "7.8.2"
 scrimage = "4.3.3"
 serializationLibs = "1.9.0"
-serviceAbstractions = "0.0.1-94"
+serviceAbstractions = "0.0.1-102-local"
 shadow = "8.1.1"
 vanniktechMavenPublish = "0.34.0"
 webauthn4jCore = "0.29.4.RELEASE"
@@ -111,6 +111,7 @@ serviceAbstractionsNotificationsTest = { module = "com.lightningkite.services:no
 serviceAbstractionsOtelJvm = { module = "com.lightningkite.services:otel-jvm", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsPubsub = { module = "com.lightningkite.services:pubsub", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsPubsubRedis = { module = "com.lightningkite.services:pubsub-redis", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsPubsubAws = { module = "com.lightningkite.services:pubsub-aws", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsPubsubTest = { module = "com.lightningkite.services:pubsub-test", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsShouldBeStandardLibrary = { module = "com.lightningkite.services:should-be-standard-library", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsSms = { module = "com.lightningkite.services:sms", version = { ref = "serviceAbstractions" } }

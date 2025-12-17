@@ -13,6 +13,14 @@
                 "name": "LightningServerDemo_uploadcleanupUploads",
                 "schedule_expression": "rate(1440 minutes)"
             },
+            "scheduled_task_assistantvoicephoneincomingschedule": {
+                "name": "LightningServerDemo_assistantvoicephoneincomingschedule",
+                "schedule_expression": "rate(1 minute)"
+            },
+            "scheduled_task_assistantvoicephonestatusschedule": {
+                "name": "LightningServerDemo_assistantvoicephonestatusschedule",
+                "schedule_expression": "rate(1 minute)"
+            },
             "scheduled_task_taskstasksscheduledcleanup": {
                 "name": "LightningServerDemo_taskstasksscheduledcleanup",
                 "schedule_expression": "rate(5 minutes)"
@@ -38,6 +46,18 @@
             "scheduled_task_uploadcleanupUploads": {
                 "input": "{\"scheduled\": \"/upload/cleanupUploads\"}",
                 "rule": "${aws_cloudwatch_event_rule.scheduled_task_uploadcleanupUploads.name}",
+                "target_id": "lambda",
+                "arn": "${aws_lambda_alias.main.arn}"
+            },
+            "scheduled_task_assistantvoicephoneincomingschedule": {
+                "input": "{\"scheduled\": \"/assistant-voice/phone/incoming/schedule\"}",
+                "rule": "${aws_cloudwatch_event_rule.scheduled_task_assistantvoicephoneincomingschedule.name}",
+                "target_id": "lambda",
+                "arn": "${aws_lambda_alias.main.arn}"
+            },
+            "scheduled_task_assistantvoicephonestatusschedule": {
+                "input": "{\"scheduled\": \"/assistant-voice/phone/status/schedule\"}",
+                "rule": "${aws_cloudwatch_event_rule.scheduled_task_assistantvoicephonestatusschedule.name}",
                 "target_id": "lambda",
                 "arn": "${aws_lambda_alias.main.arn}"
             },

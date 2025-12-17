@@ -1,0 +1,140 @@
+{
+    "data": {
+        "archive_file": {
+            "pubSub": {
+                "output_path": "${path.module}/.terraform/pubSub_lambda.zip",
+                "source": {
+                    "filename": "index.js",
+                    "content": "const {DynamoDBClient} = require(\"@aws-sdk/client-dynamodb\");\nconst {DynamoDBDocumentClient, PutCommand, DeleteCommand, QueryCommand, ScanCommand} = require(\"@aws-sdk/lib-dynamodb\");\nconst {ApiGatewayManagementApiClient, PostToConnectionCommand} = require(\"@aws-sdk/client-apigatewaymanagementapi\");\nconst ddb = DynamoDBDocumentClient.from(new DynamoDBClient({})), T = process.env.TABLE_NAME, SECRET = process.env.SECRET;\nexports.handler = async (e) => {\n    const {connectionId: c, routeKey: r, domainName: d, stage: s} = e.requestContext;\n    //console.log('Route:', r, 'ConnId:', c, 'Body:', e.body);\n    if (r === \"$connect\") {\n        const qs = e.queryStringParameters || {};\n        if (qs.secret !== SECRET) {\n            //console.log('Connect DENIED: invalid secret');\n            return {statusCode: 403, body: \"Forbidden: invalid secret\"};\n        }\n        //console.log('Connect OK');\n        return {statusCode: 200};\n    }\n    if (r === \"$disconnect\") {\n        const subs = (await ddb.send(new QueryCommand({\n            TableName: T,\n            KeyConditionExpression: \"connectionId=:c\",\n            ExpressionAttributeValues: {\":c\": c}\n        }))).Items || [];\n        //console.log('Disconnect, cleaning', subs.length, 'subs');\n        await Promise.all(subs.map(s => ddb.send(new DeleteCommand({\n            TableName: T,\n            Key: {connectionId: c, channel: s.channel}\n        }))));\n        return {statusCode: 200};\n    }\n    const b = JSON.parse(e.body || \"{}\"), api = new ApiGatewayManagementApiClient({endpoint: \"https://\" + d + \"/\" + s});\n    //console.log('Action:', b.action, 'Channel:', b.channel);\n    if (b.action === \"subscribe\") {\n        await ddb.send(new PutCommand({TableName: T, Item: {connectionId: c, channel: b.channel}}));\n        //console.log('Subscribed', c, 'to', b.channel);\n    } else if (b.action === \"publish\") {\n        const conns = (await ddb.send(new QueryCommand({\n            TableName: T,\n            IndexName: \"channel-index\",\n            KeyConditionExpression: \"channel=:c\",\n            ExpressionAttributeValues: {\":c\": b.channel}\n        }))).Items || [];\n        //console.log('Publishing to', conns.length, 'connections on', b.channel);\n        const msg = JSON.stringify({channel: b.channel, message: b.message});\n        await Promise.all(conns.map(async ({connectionId: x, channel: ch}) => {\n            try {\n                await api.send(new PostToConnectionCommand({ConnectionId: x, Data: msg}));\n                //console.log('Sent to', x);\n            } catch (err) {\n                //console.log('Failed to send to', x, ':', err.message);\n                if (err.statusCode === 410 || (err.$metadata && err.$metadata.httpStatusCode === 410)) await ddb.send(new DeleteCommand({\n                    TableName: T,\n                    Key: {connectionId: x, channel: ch}\n                }));\n            }\n        }));\n    }\n    return {statusCode: 200};\n};"
+                },
+                "type": "zip"
+            }
+        }
+    },
+    "resource": {
+        "aws_apigatewayv2_api": {
+            "pubSub": {
+                "protocol_type": "WEBSOCKET",
+                "route_selection_expression": "$request.body.action",
+                "name": "LightningServerDemo-pubSub"
+            }
+        },
+        "aws_apigatewayv2_integration": {
+            "pubSub": {
+                "api_id": "${aws_apigatewayv2_api.pubSub.id}",
+                "integration_uri": "${aws_lambda_function.pubSub.invoke_arn}",
+                "integration_method": "POST",
+                "integration_type": "AWS_PROXY"
+            }
+        },
+        "aws_cloudwatch_log_group": {
+            "pubSub": {
+                "retention_in_days": 14,
+                "name": "/aws/lambda/LightningServerDemo-pubSub"
+            }
+        },
+        "aws_lambda_permission": {
+            "pubSub": {
+                "principal": "apigateway.amazonaws.com",
+                "function_name": "${aws_lambda_function.pubSub.function_name}",
+                "action": "lambda:InvokeFunction",
+                "statement_id": "AllowAPIGateway",
+                "source_arn": "${\"${aws_apigatewayv2_api.pubSub.execution_arn}/*/*\"}"
+            }
+        },
+        "aws_iam_role": {
+            "pubSub": {
+                "name": "LightningServerDemo-pubSub-lambda",
+                "assume_role_policy": "{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [{\n    \"Action\": \"sts:AssumeRole\",\n    \"Effect\": \"Allow\",\n    \"Principal\": { \"Service\": \"lambda.amazonaws.com\" }\n  }]\n}"
+            }
+        },
+        "aws_apigatewayv2_route": {
+            "pubSub_connect": {
+                "api_id": "${aws_apigatewayv2_api.pubSub.id}",
+                "route_key": "$connect",
+                "target": "${\"integrations/${aws_apigatewayv2_integration.pubSub.id}\"}"
+            },
+            "pubSub_disconnect": {
+                "api_id": "${aws_apigatewayv2_api.pubSub.id}",
+                "route_key": "$disconnect",
+                "target": "${\"integrations/${aws_apigatewayv2_integration.pubSub.id}\"}"
+            },
+            "pubSub_default": {
+                "api_id": "${aws_apigatewayv2_api.pubSub.id}",
+                "route_key": "$default",
+                "target": "${\"integrations/${aws_apigatewayv2_integration.pubSub.id}\"}"
+            }
+        },
+        "random_password": {
+            "pubSub_secret": {
+                "special": false,
+                "length": 32
+            }
+        },
+        "aws_dynamodb_table": {
+            "pubSub": {
+                "billing_mode": "PAY_PER_REQUEST",
+                "hash_key": "connectionId",
+                "range_key": "channel",
+                "name": "LightningServerDemo-pubSub-connections",
+                "global_secondary_index": {
+                    "projection_type": "ALL",
+                    "hash_key": "channel",
+                    "name": "channel-index"
+                },
+                "attribute": [
+                    {
+                        "name": "connectionId",
+                        "type": "S"
+                    },
+                    {
+                        "name": "channel",
+                        "type": "S"
+                    }
+                ],
+                "tags": {
+                    "Name": "LightningServerDemo-pubSub-connections"
+                }
+            }
+        },
+        "aws_lambda_function": {
+            "pubSub": {
+                "handler": "index.handler",
+                "environment": {
+                    "variables": {
+                        "TABLE_NAME": "${aws_dynamodb_table.pubSub.name}",
+                        "SECRET": "${random_password.pubSub_secret.result}"
+                    }
+                },
+                "filename": "${data.archive_file.pubSub.output_path}",
+                "role": "${aws_iam_role.pubSub.arn}",
+                "function_name": "LightningServerDemo-pubSub",
+                "source_code_hash": "${data.archive_file.pubSub.output_base64sha256}",
+                "runtime": "nodejs20.x",
+                "timeout": 30,
+                "memory_size": 256
+            }
+        },
+        "aws_apigatewayv2_stage": {
+            "pubSub": {
+                "api_id": "${aws_apigatewayv2_api.pubSub.id}",
+                "auto_deploy": true,
+                "default_route_settings": {
+                    "throttling_rate_limit": 10000,
+                    "throttling_burst_limit": 5000
+                },
+                "name": "prod"
+            }
+        },
+        "aws_iam_role_policy": {
+            "pubSub": {
+                "role": "${aws_iam_role.pubSub.id}",
+                "name": "LightningServerDemo-pubSub-lambda",
+                "policy": "${jsonencode({\n  Version = \"2012-10-17\"\n  Statement = [\n    {\n      Effect = \"Allow\"\n      Action = [\"dynamodb:PutItem\", \"dynamodb:DeleteItem\", \"dynamodb:Query\"]\n      Resource = [\n        aws_dynamodb_table.pubSub.arn,\n        \"${aws_dynamodb_table.pubSub.arn}/index/*\"\n      ]\n    },\n    {\n      Effect = \"Allow\"\n      Action = [\"execute-api:ManageConnections\"]\n      Resource = \"${aws_apigatewayv2_api.pubSub.execution_arn}/*\"\n    },\n    {\n      Effect = \"Allow\"\n      Action = [\"logs:CreateLogGroup\", \"logs:CreateLogStream\", \"logs:PutLogEvents\"]\n      Resource = \"arn:aws:logs:*:*:*\"\n    }\n  ]\n})}"
+            }
+        }
+    },
+    "locals": {
+        "pubSub_ready": "${length([\n                aws_apigatewayv2_api.pubSub.id,\n                aws_apigatewayv2_stage.pubSub.id,\n                aws_apigatewayv2_integration.pubSub.id,\n                aws_apigatewayv2_route.pubSub_connect.id,\n                aws_apigatewayv2_route.pubSub_disconnect.id,\n                aws_apigatewayv2_route.pubSub_default.id,\n                aws_lambda_function.pubSub.arn,\n                aws_lambda_permission.pubSub.id,\n                random_password.pubSub_secret.result\n            ])}"
+    }
+}

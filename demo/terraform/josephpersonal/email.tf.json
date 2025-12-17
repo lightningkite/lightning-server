@@ -27,7 +27,7 @@
         },
         "aws_iam_policy": {
             "email": {
-                "name": "demo-example-email-policy",
+                "name": "josephpersonal-example-email-policy",
                 "description": "Allows sending of e-mails via Simple Email Service",
                 "policy": "${data.aws_iam_policy_document.email.json}"
             }
@@ -97,7 +97,7 @@
         },
         "aws_iam_user": {
             "email": {
-                "name": "demo-example-email-user"
+                "name": "josephpersonal-example-email-user"
             }
         },
         "aws_ses_domain_identity": {

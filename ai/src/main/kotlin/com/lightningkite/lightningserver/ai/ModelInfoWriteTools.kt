@@ -44,11 +44,15 @@ public class InsertTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>
     private val modelExamples: List<T>,
 ) : AlwaysRequiresApprovalTool<SUBJECT, List<T>>("This tool modifies the database."){
 
-    override val description: String = """
+    context(serverRuntime: ServerRuntime)
+    override suspend fun description(auth: AuthAccess<SUBJECT>): TotalExplanation = TotalExplanation(
+        unique = """
         Insert records into the ${modelInfo.tableName} table.
 
         Provide the list of records. The records will be validated and inserted. (Max size $limit)
-    """.trimIndent()
+        """.trimIndent(),
+        sharedExplanations = listOf(ModelStructure(serverRuntime, modelInfo))
+    )
 
     override val name: String = "insert_${modelInfo.tableName.lowercase()}"
 
@@ -82,27 +86,17 @@ public class UpdateTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>
     private val limit: Int,
 ) : AlwaysRequiresApprovalTool<SUBJECT, UpdateTool.Args<T, ID>>("This tool modifies your data."){
 
-    override val description: String = """
+    context(serverRuntime: ServerRuntime)
+    override suspend fun description(auth: AuthAccess<SUBJECT>): TotalExplanation = TotalExplanation(
+        unique = """
         Update records in the ${modelInfo.tableName} table that match a condition.
 
         The ids parameter is a Json List of data IDs (Max size $limit).
-        The modification parameter uses Lightning Server's Modification format.
-
-        Examples:
-
-        IDs (What records to update):
-        [10, 12, 132, 444]
-
-        Modification (what to change):
-        {
-            "Chain": [ 
-                {"status": { "Assign": "published" }}, 
-                { "publishedAt": { "Assign": "2024-01-15T10:30:00Z" }}
-            ]   
-        }
 
         This would update all records with ids inside the ids parameter to have a published status.
-    """.trimIndent()
+        """.trimIndent(),
+        sharedExplanations = listOf(ModelStructure(serverRuntime, modelInfo))
+    )
 
     override val name: String = "update_${modelInfo.tableName.lowercase()}"
 
@@ -150,22 +144,15 @@ public class DeleteTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>
 
     override val name: String = "delete_${modelInfo.tableName.lowercase()}"
 
-    override val description: String = """
+    context(serverRuntime: ServerRuntime)
+    override suspend fun description(auth: AuthAccess<SUBJECT>): TotalExplanation = TotalExplanation(
+        unique = """
         Delete records from the ${modelInfo.tableName} table that have the provided ids.
 
         **WARNING**: This permanently deletes data. Use with caution.
-
-        The ids parameter is a Json List of data IDs (Max size $limit).
-
-        Examples:
-
-        A List of UUIDs:
-        ["b06e0732-b3a9-492c-90c3-8e34ba568c73", "4ff3b348-a528-4a15-afcb-1325b3a4e1f1"]
-
-        A List of Integers:
-        [1, 12, 22, 25]
-
-    """.trimIndent()
+        """.trimIndent(),
+        sharedExplanations = listOf(ModelStructure(serverRuntime, modelInfo))
+    )
 
     override val argsSerializer: KSerializer<List<ID>> = ListSerializer(modelInfo.idSerializer)
 

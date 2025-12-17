@@ -52,22 +52,51 @@ public abstract class LLMChatEndpoints<Subject : HasId<*>>(
     public abstract val defaultLlm: Runtime<LLMClientAndModel>
 
     context(serverRuntime: ServerRuntime)
-    public open suspend fun prompt(
+    public open suspend fun promptPreMessages(
         builder: PromptBuilderAlt,
         auth: AuthAccess<Subject>,
         conversation: SystemChatConversation
     ) {
-        builder.append(
-            messages.info.table().find(
-                condition<SystemChatMessage> {
-                    val range = conversation.summaryUpTo?.let { s -> it.createdAt.gte(s) } ?: Condition.Always
-                    it.conversationId.eq(conversation._id) and range
-                },
-                orderBy = sort<SystemChatMessage> { it.createdAt.ascending() },
-                skip = 0,
-                limit = Int.MAX_VALUE
-            ).toList()
-        )
+    }
+
+    context(serverRuntime: ServerRuntime)
+    public open suspend fun promptToolInfoMessages(
+        builder: PromptBuilderAlt,
+        auth: AuthAccess<Subject>,
+        conversation: SystemChatConversation
+    ): Unit = with(builder) {
+        val total = HashSet<SharedExplanation>()
+        fun traverse(e: SharedExplanation) {
+            total.add(e)
+            e.includes.forEach { traverse(it) }
+        }
+        tools.values.forEach { it.description(auth).sharedExplanations.forEach { traverse(it) } }
+        for (item in total) {
+            system(item.render())
+        }
+    }
+
+    context(serverRuntime: ServerRuntime)
+    public suspend fun messagesForPrompt(
+        conversation: SystemChatConversation
+    ): List<SystemChatMessage> {
+        return messages.info.table().find(
+            condition<SystemChatMessage> {
+                val range = conversation.summaryUpTo?.let { s -> it.createdAt.gte(s) } ?: Condition.Always
+                it.conversationId.eq(conversation._id) and range
+            },
+            orderBy = sort<SystemChatMessage> { it.createdAt.ascending() },
+            skip = 0,
+            limit = Int.MAX_VALUE
+        ).toList()
+    }
+
+    context(serverRuntime: ServerRuntime)
+    public open suspend fun promptPostMessages(
+        builder: PromptBuilderAlt,
+        auth: AuthAccess<Subject>,
+        conversation: SystemChatConversation
+    ) {
     }
 
     public open val maxIterations: Int = 50
@@ -79,7 +108,7 @@ public abstract class LLMChatEndpoints<Subject : HasId<*>>(
     ) {
         with(serverRuntime) {
             val toolDescriptors = tools.values.map {
-                it.koogDescriptor(com.lightningkite.lightningserver.runtime.serverRuntime.externalSerialization.json.serializersModule)
+                it.koogDescriptor(auth)
             }
             try {
                 repeat(maxIterations) {
@@ -88,24 +117,26 @@ public abstract class LLMChatEndpoints<Subject : HasId<*>>(
                         .handle(conversation, auth)
                 }
             } finally {
-                if(getPrompt(conversation, auth).messages.sumOf { it.content.estimateTokens() } > compressAfter)
+                if (getPrompt(conversation, auth).messages.sumOf { it.content.estimateTokens() } > compressAfter)
                     compressTask.invoke(conversation)
             }
         }
     }
 
 
-
-
-
-
     context(serverRuntime: ServerRuntime)
     public suspend fun getPrompt(
         conversation: SystemChatConversation,
         auth: AuthAccess<Subject>,
-    ): Prompt = promptAlt(existing = Prompt.Empty) { prompt(this, auth, conversation) }
+    ): Prompt = promptAlt(existing = Prompt.Empty) {
+        promptPreMessages(this, auth, conversation)
+        promptToolInfoMessages(this, auth, conversation)
+        this.append(messagesForPrompt(conversation))
+        promptPostMessages(this, auth, conversation)
+    }
 
-    context(serverRuntime: ServerRuntime) override fun findToolByName(
+    context(serverRuntime: ServerRuntime)
+    override fun findToolByName(
         auth: AuthAccess<Subject>,
         conversation: SystemChatConversation,
         toolName: String
@@ -301,7 +332,6 @@ public abstract class LLMChatEndpoints<Subject : HasId<*>>(
         if (hasFinalAssistantMessage && !hasToolCalls) throw StopProcessing("Response complete.")
     }
 }
-
 
 
 /**

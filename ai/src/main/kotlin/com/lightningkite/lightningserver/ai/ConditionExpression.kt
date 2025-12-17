@@ -87,18 +87,6 @@ import kotlin.jvm.JvmInline
  * ```
  */
 @JvmInline
-@Description("""
-An SQL-style condition expression for querying a table.  Some examples:
-
-role = 'admin'
-age > 18
-name ICONTAINS 'john'
-status IN ('active', 'pending')
-role = 'admin' AND active = true
-status = 'active' OR status = 'pending'
-(role = 'admin' OR role = 'moderator') AND active = true
-true
-""")
 @Serializable(ConditionExpressionSerializer::class)
 public value class ConditionExpression<T>(public val condition: Condition<T>) {
     public companion object {
@@ -114,7 +102,20 @@ public value class ConditionExpression<T>(public val condition: Condition<T>) {
 public class ConditionExpressionSerializer<T>(public val inner: KSerializer<T>): KSerializer<ConditionExpression<T>> {
     @OptIn(InternalSerializationApi::class)
     override val descriptor: SerialDescriptor = buildSerialDescriptor("com.lightningkite.lightningserver.ai.ConditionExpression", PrimitiveKind.STRING) {
-        this.annotations = listOf(Description("An SQL-style condition expression for querying a table.  Some examples:\n\nrole = 'admin'\nage > 18\nname ICONTAINS 'john'\nstatus IN ('active', 'pending')\nrole = 'admin' AND active = true\nstatus = 'active' OR status = 'pending'\n(role = 'admin' OR role = 'moderator') AND active = true\ntrue"))
+        this.annotations = listOf(Description(
+            """
+                An SQL-style condition expression for querying a table.  Some examples:
+                
+                role = 'admin'
+                age > 18
+                name ICONTAINS 'john'
+                status IN ('active', 'pending')
+                role = 'admin' AND active = true
+                status = 'active' OR status = 'pending'
+                (role = 'admin' OR role = 'moderator') AND active = true
+                true
+            """.trimIndent()
+        ))
     }
 //    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.lightningserver.ai.ConditionExpression", PrimitiveKind.STRING)
 

@@ -46,6 +46,7 @@ import com.lightningkite.services.sms.twilio.TwilioSmsInboundService
 import com.lightningkite.services.phonecall.PhoneCallService
 import com.lightningkite.services.phonecall.twilio.TwilioPhoneCallService
 import com.lightningkite.services.pubsub.PubSub
+import com.lightningkite.services.pubsub.aws.AwsWebSocketPubSub
 import com.lightningkite.services.voiceagent.VoiceAgentService
 import com.lightningkite.services.voiceagent.openai.OpenAIVoiceAgentService
 import com.lightningkite.toPhoneNumber
@@ -95,6 +96,7 @@ object Server : ServerBuilder() {
         MemcachedCache
         S3PublicFileSystem
         OpenAIVoiceAgentService
+        AwsWebSocketPubSub
     }
 
     val setupAdmins = path.path("setup-admins2") bind startupOnce(database) {
@@ -107,7 +109,7 @@ object Server : ServerBuilder() {
         override val name: String get() = User.serializer().descriptor.serialName.substringAfterLast('.')
 
         context(server: ServerRuntime)
-        override suspend fun fetch(id: Uuid): User = userInfo.table().get(id) ?: throw NotFoundException()
+        override suspend fun fetch(id: Uuid): User = userInfo.table().get(id) ?: throw com.lightningkite.lightningserver.NotFoundException()
 
         context(server: ServerRuntime)
         override suspend fun fetchByProperty(property: String, value: String): User? {
@@ -227,30 +229,15 @@ object Server : ServerBuilder() {
     )
 
     val blogAssistVoice = path.path("assistant-voice") module VoiceChannelSupport(
-        chatEndpoints = blogAssist,
+        chatEndpoints = blogAssist, // Provides tools and voice instructions
         authRequirement = UserAuth.require(),
         principalType = UserAuth,
         voiceAgent = voiceAgent,
         pubsub = pubsub,
         phoneCall = phoneCall, // Enable phone call integration
-        voiceInstructions = """
-            You are a helpful blog management assistant. You can help users:
-            - Search and browse blog posts
-            - Create new blog posts
-            - Edit existing posts (title, content, excerpt, tags)
-            - Publish or archive posts
-            - Delete posts (requires user approval)
-
-            Be conversational and friendly. Ask clarifying questions when needed.
-            For destructive operations like delete, always explain what will happen first.
-        """.trimIndent(),
-        resolveTools = { auth, conversation ->
-            blogAssist.tools.values.toList()
-        },
         resolveSubjectByPhone = { phone ->
             userInfo.table().findOne(condition { it.phone eq phone })
         },
-        greeting = "Hello! I'm your blog assistant. How can I help you today?",
         historyMessageLimit = 10,
     )
 

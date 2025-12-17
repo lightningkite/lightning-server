@@ -189,7 +189,8 @@
                 "forbidOnMatchFail": true
             },
             "secretBasis": "${random_password.secretBasis.result}",
-            "llm": "bedrock://moonshot.kimi-k2-thinking?region=us-west-2",
+            "llm": "bedrock://us.anthropic.claude-haiku-4-5-20251001-v1:0?region=us-west-2",
+            "phoneCall": "${var.phoneCall}",
             "general": {
                 "projectName": "Lightning Server Demo",
                 "publicUrl": "https://lightningserver.cs.lightningkite.com",
@@ -212,8 +213,10 @@
             },
             "telemetry": null,
             "someSecret": "${var.someSecret}",
+            "voiceAgent": "${var.voiceAgent}",
             "smsInbound": "${var.smsInbound}",
-            "email": "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587?fromEmail=noreply@lightningserver.cs.lightningkite.com"
+            "email": "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587?fromEmail=noreply@lightningserver.cs.lightningkite.com",
+            "pubSub": "aws-wss://${aws_apigatewayv2_api.pubSub.id}.execute-api.us-west-2.amazonaws.com/prod?secret=${random_password.pubSub_secret.result}&ready=${local.pubSub_ready}"
         },
         "is_windows": "${substr(pathexpand(\"~\"), 0, 1) == \"/\" ? false : true}",
         "servicesAccessPolicy": {
@@ -236,7 +239,7 @@
                     ],
                     "Effect": "Allow",
                     "Resource": [
-                        "arn:aws:bedrock:us-west-2::foundation-model/moonshot.kimi-k2-thinking"
+                        "arn:aws:bedrock:us-west-2::foundation-model/us.anthropic.claude-haiku-4-5-20251001-v1:0"
                     ]
                 },
                 {

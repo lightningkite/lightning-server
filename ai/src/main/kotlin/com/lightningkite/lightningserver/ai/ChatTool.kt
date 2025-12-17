@@ -33,6 +33,20 @@ public sealed class ApprovalRequirement {
 }
 
 /**
+ * An object representing a lazily-evaluated explanation of something that is needed to know to use a set of tools.
+ * We share them to reduce the amount of context used.
+ */
+public interface SharedExplanation {
+    public val includes: Set<SharedExplanation> get() = setOf()
+    public fun render(): String
+}
+
+public data class TotalExplanation(
+    val unique: String,
+    val sharedExplanations: List<SharedExplanation> = listOf(),
+)
+
+/**
  * A tool that can be used in SystemChatEndpoints with dynamic approval workflow support.
  *
  * Tools can determine whether they require approval based on:
@@ -48,7 +62,9 @@ public abstract class ChatTool<Subject: HasId<*>?, T> {
     public abstract val name: String
 
     /** Description for the LLM to understand when to use this tool */
-    public abstract val description: String
+    context(serverRuntime: ServerRuntime) public abstract suspend fun description(
+        auth: AuthAccess<Subject>,
+    ): TotalExplanation
 
     /** Serializer for the arguments */
     public abstract val argsSerializer: KSerializer<T>
@@ -62,7 +78,9 @@ public abstract class ChatTool<Subject: HasId<*>?, T> {
     public fun koogSerializer(module: SerializersModule): KSerializer<*> = if(noWrappingNeeded) argsSerializer else Box.serializer(argsSerializer)
     @Suppress("UNCHECKED_CAST")
     public fun koogArgParse(fromKoog: Any?): T = if(noWrappingNeeded) fromKoog as T else (fromKoog as Box<T>).argument
-    public fun koogDescriptor(module: SerializersModule): ToolDescriptor = koogSerializer(module).asToolDescriptor(name, description, module, 6)
+
+    context(serverRuntime: ServerRuntime)
+    public suspend fun koogDescriptor(auth: AuthAccess<Subject>): ToolDescriptor = koogSerializer(serverRuntime.externalSerialization.json.serializersModule).asToolDescriptor(name, description(auth).unique, serverRuntime.externalSerialization.json.serializersModule, 6)
 
     /**
      * Check if this specific call requires approval.

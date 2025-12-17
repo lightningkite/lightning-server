@@ -4,11 +4,13 @@ import com.lightningkite.services.data.Description
 import com.lightningkite.services.database.Modification
 import com.lightningkite.services.database.SerializableProperty
 import com.lightningkite.services.database.serializableProperties
+import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.buildSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.serializer
@@ -69,17 +71,6 @@ import kotlin.jvm.JvmInline
  */
 @JvmInline
 @Serializable(ModificationExpressionSerializer::class)
-@Description("""
-An SQL-style modification expression for updating rows in a table.  Some examples:
-
-status = 'active'
-age += 1
-count -= 5
-score *= 2
-name += ' Jr.'
-age += 1; lastUpdated = '2024-01-15T10:30:00Z'
-status = 'published'; publishCount += 1; publishedAt = '2024-01-15T10:30:00Z'
-""")
 public value class ModificationExpression<T>(public val modification: Modification<T>) {
     public companion object {
         public inline fun <reified T> fromString(string: String): ModificationExpression<T> {
@@ -94,8 +85,22 @@ public value class ModificationExpression<T>(public val modification: Modificati
 
 public class ModificationExpressionSerializer<T>(public val inner: KSerializer<T>) :
     KSerializer<ModificationExpression<T>> {
-    override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("com.lightningkite.lightningserver.ai.ModificationExpression", PrimitiveKind.STRING)
+
+    @OptIn(InternalSerializationApi::class)
+    override val descriptor: SerialDescriptor = buildSerialDescriptor("com.lightningkite.lightningserver.ai.ModificationExpression", PrimitiveKind.STRING) {
+        this.annotations = listOf(Description(
+            """
+                An SQL-style modification expression for updating rows in a table.  Some examples:
+                status = 'active'
+                age += 1
+                count -= 5
+                score *= 2
+                name += ' Jr.'
+                age += 1; lastUpdated = '2024-01-15T10:30:00Z'
+                status = 'published'; publishCount += 1; publishedAt = '2024-01-15T10:30:00Z'
+            """.trimIndent()
+        ))
+    }
 
     override fun serialize(
         encoder: Encoder,

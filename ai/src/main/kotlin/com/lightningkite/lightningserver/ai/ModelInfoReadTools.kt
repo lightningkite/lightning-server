@@ -35,6 +35,12 @@ public fun <SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ModelInfo<S
     AggregateQueryTableTool(this),
 )
 
+public class ModelStructure<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> (private val runtime: ServerRuntime, public val info: ModelInfo<SUBJECT, T, ID>): SharedExplanation {
+    override fun render(): String = "Structure of the ${info.tableName} table in a syntax roughly similar to Typescript: ${info.serializer.explain(runtime.externalSerialization.serializersModule)}"
+    override fun hashCode(): Int = info.tableName.hashCode()
+    override fun equals(other: Any?): Boolean = this.info.tableName == (other as? ModelStructure<*, *, *>)?.info?.tableName
+}
+
 /**
  * Tool for counting records in a table.
  */
@@ -44,8 +50,11 @@ public class CountTableTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<
 
     override val name: String = "count_${modelInfo.tableName.lowercase()}"
 
-    override val description: String =
-        "Count the total number of records in the ${modelInfo.tableName} table that match the given condition"
+    context(serverRuntime: ServerRuntime)
+    override suspend fun description(auth: AuthAccess<SUBJECT>): TotalExplanation = TotalExplanation(
+        unique = "Count the total number of records in the ${modelInfo.tableName} table that match the given condition",
+        sharedExplanations = listOf(ModelStructure(serverRuntime, modelInfo))
+    )
 
     override val argsSerializer: KSerializer<ConditionExpression<T>> = ConditionExpressionSerializer(modelInfo.serializer)
 
@@ -67,7 +76,11 @@ public class GetByIdTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>
 
     override val name: String = "get_${modelInfo.tableName.lowercase()}_by_id"
 
-    override val description: String = "Get a single record from the ${modelInfo.tableName} table by its ID"
+    context(serverRuntime: ServerRuntime)
+    override suspend fun description(auth: AuthAccess<SUBJECT>): TotalExplanation = TotalExplanation(
+        unique = "Get a single record from the ${modelInfo.tableName} table by its ID",
+        sharedExplanations = listOf(ModelStructure(serverRuntime, modelInfo))
+    )
 
     override val argsSerializer: KSerializer<ID> = modelInfo.idSerializer
 
@@ -101,9 +114,11 @@ public class QueryTableTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<
 
     override val name: String = "query_${modelInfo.tableName.lowercase()}"
 
-    override val description: String = """
-        Query the ${modelInfo.tableName} table with advanced filters and optional sorting.
-    """.trimIndent()
+    context(serverRuntime: ServerRuntime)
+    override suspend fun description(auth: AuthAccess<SUBJECT>): TotalExplanation = TotalExplanation(
+        unique = "Query the ${modelInfo.tableName} table with advanced filters and optional sorting.",
+        sharedExplanations = listOf(ModelStructure(serverRuntime, modelInfo))
+    )
 
     @Serializable
     public data class Request<T>(
@@ -160,13 +175,17 @@ public class AggregateQueryTableTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Co
         val property: DataClassPathPartial<T>,
     )
 
-    override val description: String = """
-        Aggregate Query the ${modelInfo.tableName} table with advanced filters. It works on Number type fields only.
-
-        The aggregate parameter is an Aggregate enum with the values: Sum, Average, StandardDeviationSample, and StandardDeviationPopulation.
-        
-        The property parameter is the model field for which to run the aggregate on.
-    """.trimIndent()
+    context(serverRuntime: ServerRuntime)
+    override suspend fun description(auth: AuthAccess<SUBJECT>): TotalExplanation = TotalExplanation(
+        unique = """
+            Aggregate Query the ${modelInfo.tableName} table with advanced filters. It works on Number type fields only.
+    
+            The aggregate parameter is an Aggregate enum with the values: Sum, Average, StandardDeviationSample, and StandardDeviationPopulation.
+            
+            The property parameter is the model field for which to run the aggregate on.
+        """.trimIndent(),
+        sharedExplanations = listOf(ModelStructure(serverRuntime, modelInfo))
+    )
 
     override val name: String = "aggregate_${modelInfo.tableName.lowercase()}"
 
