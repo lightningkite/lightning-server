@@ -129,6 +129,19 @@ public interface PrincipalType<SUBJECT : HasId<ID>, ID : Comparable<ID>> {
         else server.internalSerialization.formDataFormat.encodeToMap(subjectSerializer, principal)[property]
 
     /**
+     * Normalizes a property value.
+     *
+     * End user provided values may not always be exactly what your server data expects, and this function is meant to
+     * normalize the value to be consistent with data requirements.
+     * (e.g., user provided emails may have capitalization in them. This will return the lowercased form of the email.).
+     *
+     * @param property The property name to normalize by
+     * @param value The property value to normalized
+     * @return The normalized form of the provided value
+     */
+    public fun normalizePropertyValue(property: String, value: String): String = value
+
+    /**
      * Fetches a subject by a property value.
      *
      * By default, only supports lookup by ID. Override to support additional properties

@@ -167,7 +167,8 @@ public class TimeBasedOTPProofEndpoints(
                     val subject = input.type
                     val handler = serverRuntime.server.principalTypes[subject]
                         ?: throw IllegalArgumentException("No subject $subject recognized")
-                    val subjectId = handler.fetchUserIdString(input.property, input.value)
+                    val normalizedValue = handler.normalizePropertyValue(input.property, input.value)
+                    val subjectId = handler.fetchUserIdString(input.property, normalizedValue)
                         ?: throw BadRequestException("User ID and code do not match")
 
                     val active = modelInfo.table().find(condition {
@@ -190,7 +191,7 @@ public class TimeBasedOTPProofEndpoints(
 
                     proofSigner.await().makeProof(
                         property = input.property,
-                        value = input.value,
+                        value = normalizedValue,
                     )
                 }
             }
