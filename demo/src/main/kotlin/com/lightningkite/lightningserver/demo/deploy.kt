@@ -99,7 +99,7 @@ object LkEnvDeploy {
     @JvmStatic
     fun main(vararg args: String) {
         ProcessBuilder("./gradlew", "demo:lambda").inheritIO().start().waitFor()
-        LkEnv.deploy(autoApprove = true)
+        LkEnv.deploy()
     }
 }
 

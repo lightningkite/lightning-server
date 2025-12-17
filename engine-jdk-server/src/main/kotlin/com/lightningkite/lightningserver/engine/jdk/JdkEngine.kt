@@ -165,17 +165,13 @@ private fun HttpExchange.write(response: HttpResponse) {
         }
         is Data.Sink -> {
             // Unknown length; use chunked
-            sendResponseHeaders(status, b.size.let {
-                if(it < 0) 0 else it
-            })
+            sendResponseHeaders(status, b.size ?: 0)
             this.responseBody.use { os ->
                 b.emit(os.asSink().buffered())
             }
         }
         is Data.Source -> {
-            sendResponseHeaders(status, b.size.let {
-                if(it < 0) 0 else it
-            })
+            sendResponseHeaders(status, b.size ?: 0)
             this.responseBody.use { os ->
                 b.source.transferTo(os.asSink().buffered())
             }

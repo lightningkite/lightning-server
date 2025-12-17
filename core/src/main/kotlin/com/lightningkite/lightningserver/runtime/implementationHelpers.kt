@@ -113,7 +113,7 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
             ) return@intercept result
 
             // Lower compress limit. Either not worth the effort, or likely will inflate a little.
-            if (result.body.data.size != -1L && result.body.data.size < 256 /*256 bytes*/) return@intercept result
+            if (result.body.data.size?.let { it < 256 } == true) return@intercept result
 
             val (newData, compressed) = when (val data = result.body.data) {
                 is Data.Sink -> {
@@ -132,10 +132,11 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
 
                 else -> {
                     // 1024 Grey area. It likely will compress fine, but if not send the original
-                    if (data.size <= 1024 /*1 kibibyte*/) {
+                    val s = data.size
+                    if (s?.let { it <= 1024 } == true) {
                         val og = data.bytes()
                         val gz = og.gzip()
-                        if (gz.size < data.size)
+                        if (gz.size < s)
                             Data.Bytes(gz) to true
                         else
                             Data.Bytes(og) to false
