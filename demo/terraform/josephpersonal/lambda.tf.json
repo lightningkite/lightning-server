@@ -80,7 +80,7 @@
         "aws_cloudwatch_log_group": {
             "main": {
                 "retention_in_days": 30,
-                "name": "demo-example-main-log"
+                "name": "josephpersonal-example-main-log"
             }
         },
         "aws_lambda_permission": {
@@ -92,14 +92,14 @@
                 "function_name": "${aws_lambda_alias.main.function_name}",
                 "qualifier": "${aws_lambda_alias.main.name}",
                 "action": "lambda:InvokeFunction",
-                "source_arn": "arn:aws:events:us-west-2:${data.aws_caller_identity.current.account_id}:rule/demo-example*"
+                "source_arn": "arn:aws:events:us-west-2:${data.aws_caller_identity.current.account_id}:rule/josephpersonal-example*"
             }
         },
         "aws_iam_policy": {
             "servicesAccess": {
-                "path": "/demo/example/servicesAccess/",
-                "name": "demo-example-servicesAccess",
-                "description": "Access to the demo-example services",
+                "path": "/josephpersonal/example/servicesAccess/",
+                "name": "josephpersonal-example-servicesAccess",
+                "description": "Access to the josephpersonal-example services",
                 "policy": "${jsonencode(local.servicesAccessPolicy)}"
             }
         },
@@ -113,7 +113,7 @@
         },
         "aws_iam_role": {
             "main_exec": {
-                "name": "demo-example-main-exec",
+                "name": "josephpersonal-example-main-exec",
                 "assume_role_policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Effect\":\"Allow\",\"Sid\":\"\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"}}]}"
             }
         },
@@ -144,14 +144,14 @@
                         "DD_VERSION": "1.0.0",
                         "DD_TRACE_OTEL_ENABLED": "true",
                         "DD_SERVICE": "com.lightningkite.lightningserver.demo.AwsHandler",
-                        "DD_ENV": "demo-example",
+                        "DD_ENV": "josephpersonal-example",
                         "LIGHTNING_SERVER_SETTINGS_DECRYPTION": "${random_password.settings.result}"
                     }
                 },
                 "snap_start": {
                     "apply_on": "PublishedVersions"
                 },
-                "function_name": "demo-example-main",
+                "function_name": "josephpersonal-example-main",
                 "publish": true,
                 "s3_key": "${aws_s3_object.app_storage.key}",
                 "layers": [
@@ -162,7 +162,7 @@
         "aws_s3_bucket": {
             "lambda_bucket": {
                 "force_destroy": true,
-                "bucket_prefix": "demo-example-lambda-bucket"
+                "bucket_prefix": "josephpersonal-example-lambda-bucket"
             }
         },
         "aws_s3_object": {
@@ -179,15 +179,7 @@
     },
     "locals": {
         "settings_raw": {
-            "general": {
-                "projectName": "Demo Example",
-                "publicUrl": "https://example.demo.ivieleague.com",
-                "wsUrl": "wss://ws.example.demo.ivieleague.com?path=",
-                "debug": true,
-                "emergencyContact": "josephivie@gmail.com"
-            },
-            "database": "mongodb+srv://demoexampledatabase-main:${random_password.database.result}@${replace(mongodbatlas_advanced_cluster.database.connection_strings[0].standard_srv, \"mongodb+srv://\", \"\")}/default?retryWrites=true&w=majority",
-            "cache": "dynamodb://us-west-2/demo_example",
+            "cache": "dynamodb://us-west-2/josephpersonal_example",
             "cors": {
                 "limitToDomains": [],
                 "limitToHeaders": [],
@@ -198,6 +190,17 @@
                 "forbidOnMatchFail": true
             },
             "secretBasis": "${random_password.secretBasis.result}",
+            "llm": "",
+            "phoneCall": "test",
+            "general": {
+                "projectName": "JosephPersonal Example",
+                "publicUrl": "https://example.demo.ivieleague.com",
+                "wsUrl": "wss://ws.example.demo.ivieleague.com?path=",
+                "debug": true,
+                "emergencyContact": "josephivie@gmail.com"
+            },
+            "database": "mongodb+srv://josephpersonalexampledatabase-main:${random_password.database.result}@${replace(mongodbatlas_advanced_cluster.database.connection_strings[0].standard_srv, \"mongodb+srv://\", \"\")}/default?retryWrites=true&w=majority",
+            "emailInbound": "console",
             "sms": "console",
             "files": "s3://${aws_s3_bucket.files.bucket}.s3-${aws_s3_bucket.files.region}.amazonaws.com/?signedUrlDuration=1d",
             "logging": {
@@ -216,7 +219,10 @@
                 }
             },
             "someSecret": "${var.someSecret}",
-            "email": "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587?fromEmail=noreply@example.demo.ivieleague.com"
+            "voiceAgent": "test",
+            "smsInbound": "console",
+            "email": "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587?fromEmail=noreply@example.demo.ivieleague.com",
+            "pubSub": "local"
         },
         "is_windows": "${substr(pathexpand(\"~\"), 0, 1) == \"/\" ? false : true}",
         "servicesAccessPolicy": {

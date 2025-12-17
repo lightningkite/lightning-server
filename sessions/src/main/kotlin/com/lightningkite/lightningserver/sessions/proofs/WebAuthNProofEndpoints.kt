@@ -179,7 +179,6 @@ public class WebAuthNProofEndpoints(
             successCode = HttpStatus.OK,
             implementation = { residentKeyPreference: WebAuthN.GeneralPreference ->
                 val options = registrationForUser(auth.fetch(), residentKeyPreference)
-
                 val challenge = generate()
                 val key = Uuid.random().toString()
                 cache().set(

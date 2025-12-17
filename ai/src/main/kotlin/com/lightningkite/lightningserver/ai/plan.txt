@@ -1,0 +1,414 @@
+# SystemChatEndpoints Implementation Plan
+
+## Overview
+
+SystemChatEndpoints is an abstract class that provides a drop-in chat endpoint module for users to communicate with the system/support/AI agent. It differs from the existing `AiChatEndpoints` in that it's more abstracted - the response generation is delegated to the implementor via an abstract method rather than being tied to a specific LLM implementation.
+
+## Key Design Decisions
+
+### 1. Abstract vs Concrete
+- `AiChatEndpoints` is concrete and wired to `Chatbot` with Koog agent
+- `SystemChatEndpoints` is abstract, allowing any response mechanism (AI, human operators, hybrid, rule-based, etc.)
+
+### 2. Message Types & Roles
+- **Role enum**: User, Assistant, System, ToolRequest, ToolResponse, Thinking, Error
+  - `User` - messages from the user
+  - `Assistant` - messages from the system/AI
+  - `System` - system prompts or context
+  - `ToolRequest` - tool/function call request (JSON content) - must be visible for manual approval workflows
+  - `ToolResponse` - tool/function call response (JSON content)
+  - `Thinking` - LLM reasoning/chain-of-thought (may be hidden by client)
+  - `Error` - error messages from the system
+- **Channel field** available for additional context/categorization as needed by implementors
+
+### 3. Attachments
+The plan mentions `attachments: List<ServerFile>`. This is a good addition for supporting file uploads.
+
+### 4. Locking System
+Use a proper distributed lock with:
+- Lock holder ID (identifies who/what holds the lock)
+- Lock acquisition timestamp (for timeout recovery)
+- Configurable timeout duration
+
+## Data Models
+
+### SystemChatConversation
+```kotlin
+@Serializable
+@GenerateDataClassPaths
+@IndexSet(["subjectId", "createdAt"])
+data class SystemChatConversation(
+    override val _id: Uuid = Uuid.random(),
+    val subjectId: String,                    // The authenticated user's ID
+    val name: String = "",                    // Optional conversation title
+    val autoProcess: Boolean = true,          // Whether to auto-trigger response generation
+    val processingLock: ProcessingLock? = null, // Distributed lock for processing
+    val createdAt: Instant,
+    val updatedAt: Instant = createdAt,
+) : HasId<Uuid>
+
+@Serializable
+data class ProcessingLock(
+    val holderId: String,       // Unique ID of the lock holder (e.g., task execution ID)
+    val acquiredAt: Instant,    // When the lock was acquired
+)
+```
+
+### SystemChatMessage
+```kotlin
+@Serializable
+@GenerateDataClassPaths
+@IndexSet(["conversationId", "createdAt"])
+@IndexSet(["subjectId", "createdAt"])
+data class SystemChatMessage(
+    override val _id: Uuid = Uuid.random(),
+    @References(SystemChatConversation::class)
+    val conversationId: Uuid,
+    val subjectId: String,
+    val role: Role,
+    val channel: String? = null,                      // Additional context/categorization as needed
+    val content: String,
+    val attachments: List<ServerFile> = emptyList(),  // File attachments
+    val createdAt: Instant,
+) : HasId<Uuid> {
+    @Serializable
+    enum class Role {
+        User,         // Messages from the user
+        Assistant,    // Messages from the system/AI
+        System,       // System prompts or context
+        ToolRequest,  // Tool/function call request (JSON content)
+        ToolResponse, // Tool/function call response (JSON content)
+        Thinking,     // LLM reasoning/chain-of-thought
+        Error         // Error messages from the system
+    }
+}
+```
+
+## Abstract Class Design
+
+```kotlin
+abstract class SystemChatEndpoints<Subject : HasId<*>>(
+    database: ServerSetting<Database.Settings, Database>,
+    authRequirement: AuthRequirement<Subject>,
+    conversationPermissions: suspend context(ServerRuntime) AuthAccess<Subject>.() -> ModelPermissions<SystemChatConversation>,
+    messagePermissions: suspend context(ServerRuntime) AuthAccess<Subject>.() -> ModelPermissions<SystemChatMessage>,
+    val lockTimeoutDuration: Duration = 5.minutes,  // How long before a lock is considered stale
+) : ServerBuilder() {
+
+    /**
+     * Abstract method to generate a response to a user message.
+     *
+     * Called when:
+     * 1. A user creates a message with role == User
+     * 2. conversation.autoProcess is true
+     * 3. Processing lock is successfully acquired
+     *
+     * Implementation is responsible for:
+     * - Reading conversation history from messageInfo.table() if needed
+     * - Generating one or more response messages
+     * - Inserting response messages into messageInfo.table()
+     * - The processing lock is managed by the framework (acquired before, released after)
+     *
+     * For tool calls or thinking, use the appropriate Role:
+     * - Role.ToolRequest for tool invocations (JSON content)
+     * - Role.ToolResponse for tool results (JSON content)
+     * - Role.Thinking for chain-of-thought reasoning
+     * - Role.Error for error messages
+     *
+     * @param auth The authenticated user's access
+     * @param conversation The conversation context
+     * @param message The user's message that triggered this response
+     */
+    abstract suspend context(ServerRuntime) fun respond(
+        auth: AuthAccess<Subject>,
+        conversation: SystemChatConversation,
+        message: SystemChatMessage
+    )
+
+    // Public access to tables for implementations
+    val conversationInfo: ModelInfo<Subject, SystemChatConversation, Uuid>
+    val messageInfo: ModelInfo<Subject, SystemChatMessage, Uuid>
+
+    // ... rest of implementation
+}
+```
+
+## Implementation Details
+
+### 1. ModelInfo Setup (2 tables)
+
+```kotlin
+val conversationInfo: ModelInfo<Subject, SystemChatConversation, Uuid> = database.explicitModelInfo(
+    auth = authRequirement,
+    serializer = SystemChatConversation.serializer(),
+    idSerializer = Uuid.serializer(),
+    permissions = conversationPermissions,
+)
+
+val messageInfo: ModelInfo<Subject, SystemChatMessage, Uuid> = database.explicitModelInfo(
+    auth = authRequirement,
+    serializer = SystemChatMessage.serializer(),
+    idSerializer = Uuid.serializer(),
+    permissions = messagePermissions,
+    postPermissionsForUser = {
+        it.postCreate { message ->
+            if (message.role == SystemChatMessage.Role.User) {
+                triggerResponseTask(MessageAndAuth(message, auth))
+            }
+        }
+        .interceptCreate { message ->
+            // Validate message belongs to user's conversation
+            val conversation = conversationInfo.table(this).get(message.conversationId)
+            if (conversation?.subjectId != auth.rawId || message.subjectId != auth.rawId)
+                throw BadRequestException("Message must belong to your conversation")
+            message
+        }
+    }
+)
+```
+
+### 2. Background Task with Proper Locking
+
+```kotlin
+@Serializable
+data class MessageAndAuth<Subject: HasId<*>>(
+    val message: SystemChatMessage,
+    val auth: Authentication<Subject>
+)
+
+val triggerResponseTask: Task<MessageAndAuth<Subject>> = path.path("trigger-response") bind Task<MessageAndAuth<Subject>> { input ->
+    val access = AuthAccess(input.auth)
+    val conversationTable = conversationInfo.table(access)
+    val conversation = conversationTable.get(input.message.conversationId) ?: return@Task
+
+    // Check if auto-processing is enabled
+    if (!conversation.autoProcess) return@Task
+
+    val lockId = Uuid.random().toString()  // Unique ID for this task execution
+    val now = now()
+
+    // Try to acquire lock using atomic compare-and-swap
+    // Condition: lock is null OR lock is stale (acquired more than lockTimeoutDuration ago)
+    val lockAcquired = conversationTable.updateOne(
+        condition {
+            (it._id eq conversation._id) and (
+                (it.processingLock eq null) or
+                (it.processingLock.notNull.acquiredAt lt (now - lockTimeoutDuration))
+            )
+        },
+        modification {
+            it.processingLock assign ProcessingLock(
+                holderId = lockId,
+                acquiredAt = now
+            )
+        }
+    ).new != null
+
+    if (!lockAcquired) return@Task
+
+    try {
+        respond(access, conversation, input.message)
+    } finally {
+        // Release lock only if we still hold it (prevents releasing if timeout caused reassignment)
+        conversationTable.updateOne(
+            condition {
+                (it._id eq conversation._id) and
+                (it.processingLock.notNull.holderId eq lockId)
+            },
+            modification {
+                it.processingLock assign null
+                it.updatedAt assign now()
+            }
+        )
+    }
+}
+```
+
+### 3. REST Endpoints via ModelRestEndpoints
+
+```kotlin
+private val conversationPath = path.path("conversations")
+private val messagePath = path.path("messages")
+
+val conversations: ModelRestEndpoints<Subject, SystemChatConversation, Uuid> =
+    conversationPath include ModelRestEndpoints(conversationInfo)
+
+val messages: ModelRestEndpoints<Subject, SystemChatMessage, Uuid> =
+    messagePath include ModelRestEndpoints(messageInfo)
+
+val messageUpdates: ModelRestUpdatesWebsocket<Subject, SystemChatMessage, Uuid> =
+    messagePath include ModelRestUpdatesWebsocket(messageInfo, key = SystemChatMessage::conversationId)
+```
+
+### 4. Simple Text Websocket for Direct Chat (Raw WebSocketHandler)
+
+A raw websocket endpoint that:
+- Creates a new conversation on connect
+- Accepts raw text messages and creates SystemChatMessage records
+- Streams new assistant message content back as raw text
+- Simple text-in, text-out interface for basic chat clients
+
+```kotlin
+@Serializable
+data class SimpleChatWebsocketStorage(
+    val conversationId: Uuid,
+    val subjectId: String,
+    val auth: Authentication<Nothing>?,  // Store auth for later use
+)
+
+// Message topic for streaming responses to connected clients
+val messageTopic: WebSocketTopic<PathSpec1<Uuid>, SystemChatMessage> =
+    path.path("simple-chat").arg<Uuid>("conversationId").topic(SystemChatMessage.serializer())
+
+val simpleChat: WebSocketHandler<PathSpec0, SimpleChatWebsocketStorage> = path.path("simple-chat") bind WebSocketHandler(
+    storageSerializer = SimpleChatWebsocketStorage.serializer(),
+
+    willConnect = { request ->
+        // Authenticate
+        val auth = request.auth(authRequirement)
+            ?: throw UnauthorizedException("Authentication required")
+
+        // Create a new conversation
+        val conversation = SystemChatConversation(
+            subjectId = auth.rawId.toString(),
+            createdAt = now()
+        )
+        conversationInfo.table(AuthAccess(auth)).insertOne(conversation)
+
+        SimpleChatWebsocketStorage(
+            conversationId = conversation._id,
+            subjectId = auth.rawId.toString(),
+            auth = auth as Authentication<Nothing>?
+        )
+    },
+
+    didConnect = {
+        // Subscribe to message topic for this conversation
+        subscribe(messageTopic.request(currentState.conversationId))
+    },
+
+    messageFromClient = { frame ->
+        val text = when (frame) {
+            is WebSocketFrame.Text -> frame.content
+            is WebSocketFrame.Binary -> return@WebSocketHandler  // Ignore binary frames
+        }
+
+        if (text.isBlank()) return@WebSocketHandler
+
+        // Create user message
+        val auth = currentState.auth?.let { AuthAccess(it as Authentication<Subject>) }
+            ?: return@WebSocketHandler
+
+        val message = SystemChatMessage(
+            conversationId = currentState.conversationId,
+            subjectId = currentState.subjectId,
+            role = SystemChatMessage.Role.User,
+            content = text,
+            createdAt = now()
+        )
+
+        // Insert triggers postCreate which triggers response task
+        messageInfo.table(auth).insertOne(message)
+    },
+
+    topicHandlers = {
+        messageTopic bind { subscriptionMessage ->
+            val message = subscriptionMessage.value
+            // Only send assistant messages as raw text to the client
+            if (message.role == SystemChatMessage.Role.Assistant && message.channel == null) {
+                send(WebSocketFrame.Text(message.content))
+            }
+        }
+    },
+
+    disconnect = { reason ->
+        // Cleanup if needed
+    }
+)
+
+// Register change listener to publish to topic
+init {
+    messageInfo.registerChangeListener { changes ->
+        changes.changes.forEach { change ->
+            change.new?.let { message ->
+                if (message.role == SystemChatMessage.Role.Assistant) {
+                    messageTopic.send(message.conversationId, message)
+                }
+            }
+        }
+    }
+}
+```
+
+## File Structure
+
+```
+ai/src/main/kotlin/com/lightningkite/lightningserver/ai/
+├── SystemChatEndpoints.kt      # Main abstract class
+├── SystemChatModels.kt         # SystemChatConversation, SystemChatMessage, ProcessingLock
+├── AiChatEndpoints.kt          # Existing (uses Chatbot/Koog - could extend SystemChatEndpoints)
+├── Chatbot.kt                  # Existing Koog-based chatbot
+├── models.kt                   # Existing Conversation, ConversationMessage
+└── ... other existing files
+```
+
+## Migration Considerations
+
+The existing `AiChatEndpoints` could potentially be refactored to extend `SystemChatEndpoints`, implementing `respond()` using the `Chatbot` class. However, this should be done carefully to maintain backward compatibility.
+
+Alternatively, keep both:
+- `SystemChatEndpoints` - generic abstract base for any chat implementation
+- `AiChatEndpoints` - specific AI/LLM implementation using Koog
+
+## Implementation Steps
+
+1. **Create SystemChatModels.kt**
+   - Define `ProcessingLock` data class
+   - Define `SystemChatConversation` data class with lock field
+   - Define `SystemChatMessage` data class with attachments and Hidden role
+
+2. **Create SystemChatEndpoints.kt**
+   - Abstract class with `respond()` method
+   - ModelInfo for both tables with proper signals
+   - Task for background response processing with distributed locking
+   - ModelRestEndpoints for both tables
+   - ModelRestUpdatesWebsocket for message streaming (keyed by conversationId)
+   - Raw WebSocketHandler for simple text chat
+   - Message topic for streaming responses
+
+3. **Add tests**
+   - Unit tests for the endpoints
+   - Test the locking mechanism (acquire, release, timeout recovery)
+   - Test the websocket flow
+   - Test concurrent request handling with locks
+
+4. **Documentation**
+   - Add usage examples
+   - Document the abstract method contract
+   - Document channel field conventions
+
+## Role Field Summary
+
+| Role           | Description                                         | Content Format |
+|----------------|-----------------------------------------------------|----------------|
+| `User`         | Messages from the user                              | Text           |
+| `Assistant`    | Messages from the system/AI                         | Text           |
+| `System`       | System prompts or context                           | Text           |
+| `ToolRequest`  | Tool/function call request (visible for approval)   | JSON           |
+| `ToolResponse` | Tool/function call response                         | JSON           |
+| `Thinking`     | LLM reasoning/chain-of-thought                      | Text           |
+| `Error`        | Error messages from the system                      | Text           |
+
+The `channel` field remains available for additional context/categorization as needed by implementors (e.g., distinguishing different tool types, error categories, etc.).
+
+## Questions for Clarification
+
+1. Should `SystemChatEndpoints` live in the `ai` module, or should it be moved to a more generic location (e.g., `typed` module) since it's not AI-specific?
+
+2. Should attachments support be required or optional? (Could be controlled via a flag)
+
+3. Should we support multiple response channels (email, SMS) in addition to the websocket, or keep it simple with just API/websocket?
+
+4. Should the simple websocket allow connecting to existing conversations via a query parameter, or always create new?
+
+5. Should there be a way to manually trigger response processing for conversations with `autoProcess = false`?

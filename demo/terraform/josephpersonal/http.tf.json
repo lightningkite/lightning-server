@@ -3,7 +3,7 @@
         "aws_apigatewayv2_api": {
             "http": {
                 "protocol_type": "HTTP",
-                "name": "demo-example-http"
+                "name": "josephpersonal-example-http"
             }
         },
         "aws_apigatewayv2_integration": {
@@ -17,7 +17,7 @@
         "aws_cloudwatch_log_group": {
             "http_api": {
                 "retention_in_days": 30,
-                "name": "demo-example-http-gateway-log"
+                "name": "josephpersonal-example-http-gateway-log"
             }
         },
         "aws_lambda_permission": {
@@ -96,7 +96,7 @@
                     "destination_arn": "${aws_cloudwatch_log_group.http_api.arn}"
                 },
                 "auto_deploy": true,
-                "name": "demo-example-gateway-stage"
+                "name": "josephpersonal-example-gateway-stage"
             }
         },
         "aws_acm_certificate": {

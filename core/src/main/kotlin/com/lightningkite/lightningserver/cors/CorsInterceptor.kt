@@ -133,6 +133,10 @@ public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpIn
                 // Always set the actual origin (not wildcard) for allowed requests
                 add(HttpHeader.AccessControlAllowOrigin, origin)
 
+                // Add Vary: Origin to prevent cache poisoning across different origins
+                // This tells caches that the response varies based on the Origin header
+                add(HttpHeader.Vary, "Origin")
+
                 if (config.allowCredentials) add(HttpHeader.AccessControlAllowCredentials, "true")
 
                 if (request.path.method == HttpMethod.OPTIONS) {
@@ -145,7 +149,7 @@ public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpIn
                                 .joinToString(",") { it.root }
                     )
                     config.cacheLength?.let {
-                        add(HttpHeader.AccessControlMaxAge, it.toString())
+                        add(HttpHeader.AccessControlMaxAge, it.inWholeSeconds.toString())
                     }
                 } else {
                     // Regular request - expose additional headers if configured
@@ -189,7 +193,5 @@ public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpIn
 // 3. The originMatches function could be optimized with compiled regex patterns for wildcard matching
 //    instead of string operations on every request
 // 4. Consider exposing originMatches as a public testing utility for users to validate their patterns
-// 5. Missing handling for the Vary header - should add "Vary: Origin" to cacheable responses
-//    to prevent cache poisoning across different origins
-// 6. The WebSocket origin checking could provide a more descriptive error message rather than
+// 5. The WebSocket origin checking could provide a more descriptive error message rather than
 //    just ForbiddenException to help developers debug CORS issues

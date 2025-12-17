@@ -170,6 +170,27 @@
     },
     "locals": {
         "settings_raw": {
+            "cache": "dynamodb://us-west-2/LightningServerDemo",
+            "cors": {
+                "limitToDomains": [
+                    "lightningserver.cs.lightningkite.com"
+                ],
+                "limitToHeaders": [
+                    "*"
+                ],
+                "limitToMethods": [
+                    "*"
+                ],
+                "exposedHeaders": [
+                    "*"
+                ],
+                "allowCredentials": true,
+                "cacheLength": "PT5S",
+                "forbidOnMatchFail": true
+            },
+            "secretBasis": "${random_password.secretBasis.result}",
+            "llm": "bedrock://us.anthropic.claude-haiku-4-5-20251001-v1:0?region=us-west-2",
+            "phoneCall": "${var.phoneCall}",
             "general": {
                 "projectName": "Lightning Server Demo",
                 "publicUrl": "https://lightningserver.cs.lightningkite.com",
@@ -178,18 +199,8 @@
                 "emergencyContact": "joseph@lightningkite.com"
             },
             "database": "mongodb+srv://LightningServerDemodatabase-main:${random_password.database.result}@${replace(mongodbatlas_advanced_cluster.database.connection_strings[0].standard_srv, \"mongodb+srv://\", \"\")}/default?retryWrites=true&w=majority",
-            "cache": "dynamodb://us-west-2/LightningServerDemo",
-            "cors": {
-                "limitToDomains": [],
-                "limitToHeaders": [],
-                "limitToMethods": [],
-                "exposedHeaders": [],
-                "allowCredentials": false,
-                "cacheLength": null,
-                "forbidOnMatchFail": true
-            },
-            "secretBasis": "${random_password.secretBasis.result}",
-            "sms": "console",
+            "emailInbound": "ses://",
+            "sms": "${var.sms}",
             "files": "s3://${aws_s3_bucket.files.bucket}.s3-${aws_s3_bucket.files.region}.amazonaws.com/?signedUrlDuration=1d",
             "logging": {
                 "default": {
@@ -202,7 +213,10 @@
             },
             "telemetry": null,
             "someSecret": "${var.someSecret}",
-            "email": "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587?fromEmail=noreply@lightningserver.cs.lightningkite.com"
+            "voiceAgent": "${var.voiceAgent}",
+            "smsInbound": "${var.smsInbound}",
+            "email": "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587?fromEmail=noreply@lightningserver.cs.lightningkite.com",
+            "pubSub": "aws-wss://${aws_apigatewayv2_api.pubSub.id}.execute-api.us-west-2.amazonaws.com/prod?secret=${random_password.pubSub_secret.result}&ready=${local.pubSub_ready}"
         },
         "is_windows": "${substr(pathexpand(\"~\"), 0, 1) == \"/\" ? false : true}",
         "servicesAccessPolicy": {
@@ -216,6 +230,16 @@
                     "Resource": [
                         "${aws_s3_bucket.files.arn}",
                         "${aws_s3_bucket.files.arn}/*"
+                    ]
+                },
+                {
+                    "Action": [
+                        "bedrock:InvokeModel",
+                        "bedrock:InvokeModelWithResponseStream"
+                    ],
+                    "Effect": "Allow",
+                    "Resource": [
+                        "arn:aws:bedrock:us-west-2::foundation-model/us.anthropic.claude-haiku-4-5-20251001-v1:0"
                     ]
                 },
                 {

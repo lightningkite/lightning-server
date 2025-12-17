@@ -16,9 +16,6 @@ The AI module for Lightning Server provides chatbot capabilities with intelligen
 
 ### 2. Advanced Query System
 
-**Files Created:**
-- `QueryTableTool.kt` - Advanced query tool using Lightning Server's Condition serialization
-
 **Implementation Approach:**
 Uses Lightning Server's built-in `Condition<T>` serialization format directly, avoiding custom query parsing. The Condition format is:
 - More concise (fewer tokens for LLMs)
@@ -67,10 +64,10 @@ All Lightning Server Condition operators are supported:
 
 When you add a ModelInfo to a chatbot, it gets **4 tools**:
 
-1. **`count_{table}()`** - Count total records
-2. **`get_{table}_by_id(id: String)`** - Get specific record
-3. **`list_{table}(limit: Int)`** - List recent records
-4. **`query_{table}(query: String)`** - Advanced JSON queries
+1. `get_{table}_by_id(id: ID)` - Get a single record by ID
+2. `count_{table}(condition: Condition)` - Count records in the table that match the condition
+3. `query_{table}(condition: Condition, orderBy: List<SortPart>, skip: Int, limit: Int)` - Advanced queries
+4. `aggregate_query_{table}(aggregate: Aggregate, condition: Condition, property: DataClassPathPartial)` - Aggregate Queries
 
 ### 4. How It Works
 
@@ -105,10 +102,10 @@ LLM formulates natural language response:
 - **Type-safe deserialization**: kotlinx.serialization validates Condition structure
 - **Field validation**: Field names validated via SerializableProperty lookup
 - **Injection prevention**: Typed Condition format prevents SQL/NoSQL injection
-- **Limit enforcement**: Query results capped at 100 records
+- **Limit enforcement**: Query results are capped at the provided query limit
 - **Error handling**: Invalid Conditions return clear error messages to LLM
 
-## 📝 Usage Examples
+## Usage Examples
 
 ### Basic Setup
 
@@ -162,17 +159,16 @@ Bot: "I found 3 active administrators:
 - Carol Williams (carol@example.com)"
 ```
 
-## 🏗️ Architecture
+## Architecture
 
 ### Query Flow
 
 1. **User Input** → Chatbot.chat()
 2. **LLM Analysis** → Determines which tool(s) to call
 3. **Tool Execution** → QueryTableTool.doExecute()
-4. **Condition Deserialization** → Json.decodeFromString<Condition<T>>()
-5. **Database Query** → Table.find(condition)
-6. **Result Formatting** → JSON serialization
-7. **LLM Response** → Natural language answer
+4. **Database Query** → Table.find(condition)
+5. **Result Formatting** → JSON serialization
+6. **LLM Response** → Natural language answer
 
 ### Type Safety
 
@@ -182,19 +178,7 @@ The system maintains type safety throughout:
 - Results → `T` (your model type)
 - `T` → JSON (for LLM)
 
-### Field Resolution
-
-Fields are resolved using `SerializableProperty`:
-```kotlin
-val property = serializer.serializableProperties
-    .find { it.name == fieldName }
-
-Condition.OnField(property, Condition.Equal(value))
-```
-
-This requires models to be annotated with `@GenerateDataClassPaths`.
-
-## 🧪 Testing
+##  Testing
 
 ### Integration Tests
 
@@ -213,55 +197,28 @@ echo "sk-..." > local/openaikey.txt
 
 Tests are skipped if no API key is found.
 
-## 📦 Dependencies
+##  Dependencies
 
 - `serviceAbstractionsAiKoog` - Koog AI framework
 - `serviceAbstractionsAiKoogAwsOpensearch` - AWS OpenSearch (future RAG)
 - `typed` - Lightning Server ModelInfo and typed endpoints
 - `database` - Database abstraction layer
 
-## 🔮 Future Enhancements
+##  Future Enhancements
 
 ### Planned Features
 
-1. **Aggregations**: sum, avg, min, max operations
-2. **Full-text search**: Integrate with database full-text search
-3. **RAG (Retrieval-Augmented Generation)**:
+1. **RAG (Retrieval-Augmented Generation)**:
    - Vector embeddings for semantic search
    - AWS OpenSearch integration
    - Document storage and retrieval
-4. **Streaming responses**: Real-time token streaming
-5. **Conversation memory**: Multi-turn conversations with context
-6. **Custom tools**: Allow users to define custom tools beyond database
-7. **Query optimization**: Automatic index suggestions
-8. **Audit logging**: Track what data the chatbot accessed
+2. **Streaming responses**: Real-time token streaming
+3. **Conversation memory**: Multi-turn conversations with context
+4. **Audit logging**: Track what data the chatbot accessed
 
 ### Possible Improvements
 
-- Nested field support (e.g., "user.address.city")
-- Computed fields (e.g., "age > 18" from birthdate)
-- Join-like operations across tables
 - Query result caching
 - Rate limiting per user/session
 - Custom system prompts per table
 
-## 📚 Key Learnings
-
-1. **Koog Integration**: Successfully integrated Koog's SimpleTool system
-2. **Type Safety**: Maintained type safety while allowing dynamic field access
-3. **Built-in Serialization**: Lightning Server's Condition format is LLM-friendly and requires no custom parsing
-4. **Simplicity Wins**: Using existing Condition serialization is simpler and more maintainable than custom formats
-5. **Security**: Read-only access with validation prevents abuse
-6. **Extensibility**: Tool-based architecture allows easy addition of new capabilities
-
-## 🎯 Success Criteria Met
-
-- ✅ Chatbots can query database tables
-- ✅ Type-safe field access via SerializableProperty
-- ✅ Complex queries with multiple conditions
-- ✅ Support for all major LLM providers
-- ✅ Production-ready error handling
-- ✅ Comprehensive documentation
-- ✅ Integration tests (basic)
-
-The AI module is **production-ready** for read-only database querying use cases!
