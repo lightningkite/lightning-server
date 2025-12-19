@@ -120,6 +120,7 @@ public data class Proof(
     val property: String,
     val value: String,
     val at: Instant,
+    val expiresAt: Instant,
     val signature: String,
 )
 

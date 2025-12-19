@@ -13,6 +13,8 @@ import com.lightningkite.lightningserver.typed.sdk.info
 import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.services.email.Email
 import com.lightningkite.services.email.EmailService
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
 
 /**
  * Email-based authentication proof endpoint.
@@ -42,11 +44,13 @@ public class EmailProofEndpoints(
     private val email: Runtime<EmailService>,
     private val emailTemplate: suspend context(ServerRuntime) (String, String) -> Email,
     proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
+    proofExpiration: Duration = 1.hours,
     private val verifyEmail: suspend context(ServerRuntime) (String) -> Boolean = { true },
 ) : PinBasedProofEndpoints(
     name = "email",
     property = "email",
     proofSigner = proofSigner,
+    proofExpiration = proofExpiration,
     pin = pin,
     exampleTarget = "test@test.com"
 ) {

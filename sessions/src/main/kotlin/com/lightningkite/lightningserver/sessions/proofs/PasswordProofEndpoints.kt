@@ -21,6 +21,7 @@ import com.lightningkite.lightningserver.encryption.checkAgainstHash
 import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
+import com.lightningkite.lightningserver.sessions.proofs.extensions.verify
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
@@ -33,13 +34,16 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.builtins.serializer
 import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
 
 @OptIn(InternalSerializationApi::class)
 public class PasswordProofEndpoints(
     database: Runtime<Database>,
     private val cache: Runtime<Cache>,
-    private val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
+    override val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
+    override val proofExpiration: Duration = 1.hours,
     private val evaluatePassword: (String) -> Unit = { },
 ) : ServerBuilder(), DirectProofMethod {
 
@@ -166,6 +170,7 @@ public class PasswordProofEndpoints(
                         strength = info.strength,
                         value = "test@test.com",
                         at = Clock.System.now(),
+                        expiresAt = Clock.System.now() + proofExpiration,
                         signature = "opaquesignaturevalue"
                     )
                 )
@@ -193,10 +198,8 @@ public class PasswordProofEndpoints(
                     })
 
                     proofSigner.await().makeProof(
-                        info = info,
                         property = input.property,
                         value = normalizedValue,
-                        at = now()
                     )
                 }
             }

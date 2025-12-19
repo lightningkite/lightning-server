@@ -11,6 +11,7 @@ import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.and
 import com.lightningkite.services.database.condition
+import com.lightningkite.services.database.deleteOneById
 import com.lightningkite.services.database.eq
 import com.lightningkite.services.database.get
 import com.lightningkite.services.database.insertOne
@@ -42,13 +43,13 @@ public suspend fun doOnce(
     timeout: Duration = 60.seconds,
     action: suspend context(ServerRuntime) () -> Unit,
 ) {
-    val a = database().table<ActionHasOccurred>()
+    val table = database().table<ActionHasOccurred>()
 
-    val existing = a.get(key)
+    val existing = table.get(key)
     if (existing == null) {
-        a.insertOne(ActionHasOccurred(_id = key, started = now()))
+        table.insertOne(ActionHasOccurred(_id = key, started = now()))
     } else {
-        val lock = a.updateOne(
+        val lock = table.updateOne(
             condition<ActionHasOccurred> {
                 (it._id eq key) and (it.completed eq null) and (it.started eq null or (it.started.notNull lt (now() - timeout)))
             },
@@ -59,7 +60,7 @@ public suspend fun doOnce(
 
     try {
         action(runtime)
-        a.updateOneById(
+        table.updateOneById(
             key,
             modification {
                 it.completed assign now()
@@ -68,7 +69,7 @@ public suspend fun doOnce(
         )
     } catch (e: Exception) {
         KotlinLogging.logger("com.lightningkite.lightningserver.typed.doOnce").error(e) { "doOnce($key) failed to complete" }
-        a.updateOneById(
+        table.updateOneById(
             key,
             modification {
                 (it.errorMessage assign e.message)
@@ -81,21 +82,31 @@ public suspend fun doOnce(
 /**
  * Creates a [StartupTask] that calls [doOnce] with its bound path as its key.
  * */
-@Suppress("FunctionName")
 public fun startupOnce(
     database: Runtime<Database>,
+    migrateKey: Boolean = false,
     dependencies: List<StartupTask> = emptyList(),
     timeout: Duration = 60.seconds,
     action: suspend context(ServerRuntime) () -> Unit
-): StartupTask {
-    var task: StartupTask? = null
-    task = StartupTask(dependencies, timeout) {
+): StartupTask =
+    StartupTask(dependencies, timeout) {
+        if (migrateKey) {
+            val oldKey = location.segments.lastOrNull()?.toString() ?: ""
+            val newKey = location.toString()
+
+            val table = database().table<ActionHasOccurred>()
+
+            table.get(oldKey)?.let { old ->
+                table.insertOne(
+                    old.copy(_id = newKey)
+                )
+            }
+        }
+
         doOnce(
-            key = task?.locationOrNull?.toString() ?: throw IllegalStateException("StartupOnce not bound to path"),
+            key = location.toString(),
             database = database,
             timeout = timeout,
             action = action
         )
     }
-    return task
-}

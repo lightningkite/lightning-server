@@ -9,16 +9,14 @@ import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.http.*
-import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.redirectToGet
 import com.lightningkite.services.database.HasId
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.runtime.serverRuntime
-import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
+import com.lightningkite.lightningserver.sessions.proofs.extensions.verify
 import com.lightningkite.lightningserver.sessions.proofs.oauth.OauthCallbackEndpoint
 import com.lightningkite.lightningserver.sessions.proofs.oauth.OauthProviderCredentials
 import com.lightningkite.lightningserver.sessions.proofs.oauth.OauthProviderInfo
@@ -26,10 +24,10 @@ import com.lightningkite.lightningserver.sessions.proofs.oauth.oauthCallback
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
-import com.lightningkite.lightningserver.typed.sdk.clientInterface
-import com.lightningkite.lightningserver.typed.sdk.info
 import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import io.ktor.http.*
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
 
 /**
@@ -68,8 +66,9 @@ import kotlin.uuid.Uuid
  * @see ExternalProofMethod
  */
 public class OauthProofEndpoints(
-    private val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
     private val provider: OauthProviderInfo,
+    override val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
+    override val proofExpiration: Duration = 1.hours,
     private val credentials: () -> OauthProviderCredentials,
     private val continueUiAuthUrl: ()->String
 ) : ServerBuilder(), ExternalProofMethod {
@@ -90,9 +89,6 @@ public class OauthProofEndpoints(
         strength = 10
     )
 
-    context(_: ServerRuntime)
-    private suspend fun proofHasher(): Signer = proofSigner.await()
-
     public val callback: OauthCallbackEndpoint<Uuid> = path.path("callback").post.oauthCallback<Uuid>(
         oauthProviderInfo = provider,
         credentials = credentials
@@ -100,12 +96,14 @@ public class OauthProofEndpoints(
         val profile = provider.getProfile(response, credentials())
         val email = profile.email ?: throw BadRequestException("No email was found for this profile.")
         HttpResponse.redirectToGet(continueUiAuthUrl() + "?proof=${
-            serverRuntime.externalSerialization.json.encodeToString(Proof.serializer(), proofHasher().makeProof(
-            info = info,
-            property = "email",
-            value = email,
-            at = now()
-        )).encodeURLQueryComponent()}&backend=${generalSettings().publicUrl.encodeURLQueryComponent()}")
+            serverRuntime.externalSerialization.json.encodeToString(
+                Proof.serializer(), 
+                proofSigner.await().makeProof(
+                    property = "email",
+                    value = email,
+                )
+            ).encodeURLQueryComponent()
+        }&backend=${generalSettings().publicUrl.encodeURLQueryComponent()}")
     }
 
     public val openEndpoint: HttpHandler<*> = path.path("open").get bind HttpHandler {
