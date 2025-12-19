@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.runtime
 
+import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.RouteNotFoundException
 import com.lightningkite.lightningserver.definition.ScheduledTask
