@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.demo
 
+import ai.koog.prompt.executor.clients.bedrock.BedrockModels
 import com.lightningkite.lightningserver.cors.CorsSettings
 import com.lightningkite.lightningserver.definition.loggingSettings
 import com.lightningkite.lightningserver.definition.secretBasis
@@ -20,10 +21,23 @@ import com.lightningkite.services.terraform.direct
 import com.lightningkite.toEmailAddress
 import com.lightningkite.EmailAddress
 import com.lightningkite.lightningserver.terraform.*
+import com.lightningkite.services.ai.koog.LLMClientAndModel
+import com.lightningkite.services.ai.koog.awsBedrock
+import com.lightningkite.services.email.EmailInboundService
+import com.lightningkite.services.email.javasmtp.awsSesDomain
+import com.lightningkite.services.email.javasmtp.awsSesSmtpLegacy
+import com.lightningkite.services.email.ses.awsSesInbound
+import com.lightningkite.services.phonecall.PhoneCallService
+import com.lightningkite.services.pubsub.PubSub
+import com.lightningkite.services.pubsub.aws.awsApiGatewayWebSocket
+import com.lightningkite.services.pubsub.redis.awsElasticacheRedisServerless
+import com.lightningkite.services.sms.SmsInboundService
+import com.lightningkite.services.voiceagent.VoiceAgentService
 import software.amazon.awssdk.regions.Region
 import java.io.File
 import kotlin.reflect.KClass
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.seconds
 
 
 object LkEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
@@ -50,21 +64,43 @@ object LkEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
 
     override fun Server.settings() {
         database.mongodbAtlasFree(orgId = "6323a65c43d66b56a2ea5aea", zoneName = "Zone 1")
-        email.awsSesSmtp("lightningkite.com")
-        sms.direct(SMS.Settings())
         files.awsS3Bucket(signedUrlDuration = 1.days)
         cache.awsDynamoDb()
         secretBasis.generated()
         loggingSettings.direct(LoggingSettings())
         telemetrySettings.direct(null)
-        cors.direct(CorsSettings())
+        cors.direct(CorsSettings(
+            limitToDomains = listOf("lightningserver.cs.lightningkite.com"),
+            limitToHeaders = listOf("*"),
+            limitToMethods = listOf("*"),
+            exposedHeaders = listOf("*"),
+            allowCredentials = true,
+            cacheLength = 5.seconds,
+            forbidOnMatchFail = true
+        ))
         newSecret.byVariable()
+        llm.awsBedrock(BedrockModels.AnthropicClaude4_5Haiku.id, region.id())
+//        llm.awsBedrock(BedrockModels.MoonshotKimiK2Thinking.id, region.id())
+        awsSesDomain("email", "joseph@lightningkite.com".toEmailAddress())
+        email.awsSesSmtp("email")
+        emailInbound.awsSesInbound("email", "https://lightningserver.cs.lightningkite.com/assistant-channels/email/webhook")
+        sms.byVariable()
+        smsInbound.byVariable()
+        pubsub.awsApiGatewayWebSocket()
+//        pubsub.direct(PubSub.Settings())
+        phoneCall.byVariable()
+//        phoneCall.direct(PhoneCallService.Settings())
+        voiceAgent.byVariable()
+//        voiceAgent.direct(VoiceAgentService.Settings())
     }
 }
 
 object LkEnvDeploy {
     @JvmStatic
-    fun main(vararg args: String) = LkEnv.deploy(autoApprove = true)
+    fun main(vararg args: String) {
+        ProcessBuilder("./gradlew", "demo:lambda").inheritIO().start().waitFor()
+        LkEnv.deploy()
+    }
 }
 
 object LkEnvEdit {
@@ -75,50 +111,4 @@ object LkEnvEdit {
 object LkEnvDestroy {
     @JvmStatic
     fun main(vararg args: String) = LkEnv.terraform("destroy", "--auto-approve")
-}
-
-
-
-object JosephPersonalEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
-    override val domain = "example.demo.ivieleague.com"
-    override val domainZone = "ivieleague.com"
-    override val terraformRoot: File = File("demo/terraform/josephpersonal")
-
-    override val handler: KClass<out AwsAdapter> = AwsHandler::class
-
-    override val storageBucket = "ivieleague-deployment-states"
-    override val storageBucketPath = "demo/example"
-    override val displayName = "JosephPersonal Example"
-    override val debug = true
-    override val emergencyContact = "josephivie@gmail.com".toEmailAddress()
-    override val storageEncryptionEnabled: Boolean get() = false
-
-    override val region = Region.US_WEST_2!!
-    override fun Server.settings() {
-        database.mongodbAtlasFree(orgId = "6323a65c43d66b56a2ea5aea", zoneName = "Zone 1")
-        email.awsSesSmtp("gmail.com")
-        sms.direct(SMS.Settings())
-        files.awsS3Bucket(signedUrlDuration = 1.days)
-        cache.awsDynamoDb()
-        secretBasis.generated()
-        loggingSettings.direct(LoggingSettings())
-        telemetrySettings.otelDatadog()
-        cors.direct(CorsSettings())
-        newSecret.byVariable()
-    }
-}
-
-object JosephPersonalEnvDeploy {
-    @JvmStatic
-    fun main(vararg args: String) = JosephPersonalEnv.deploy(autoApprove = true)
-}
-
-object JosephPersonalEnvEdit {
-    @JvmStatic
-    fun main(vararg args: String) = JosephPersonalEnv.editVars()
-}
-
-object JosephPersonalEnvDestroy {
-    @JvmStatic
-    fun main(vararg args: String) = JosephPersonalEnv.terraform("destroy", "--auto-approve")
 }

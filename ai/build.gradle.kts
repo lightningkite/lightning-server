@@ -12,16 +12,30 @@ plugins {
 dependencies {
     api(project(":typed"))
     api(libs.serviceAbstractionsDatabase)
+    api(libs.serviceAbstractionsFiles)
     api(libs.serviceAbstractionsAiKoog)
-    api(libs.serviceAbstractionsAiKoogAwsOpensearch)
     api(libs.kotlinReflect)
 
+    // SMS and Email support for external channels
+    api(libs.serviceAbstractionsSms)
+    api(libs.serviceAbstractionsSmsInbound)
+    api(libs.serviceAbstractionsEmail)
+    api(libs.serviceAbstractionsEmailInbound)
+
+    // Voice agent support
+    api(libs.serviceAbstractionsVoiceagent)
+    api(libs.serviceAbstractionsVoiceagentOpenai)
+    api(libs.serviceAbstractionsVoiceagentPhonecall)
+    api(libs.serviceAbstractionsPhonecall)
+    api(libs.serviceAbstractionsPubsub)
+
     // Direct Koog dependency for session management API
-    api("ai.koog:koog-agents:0.5.3")
+    api("ai.koog:koog-agents:0.5.4-SNAPSHOT")
 
     testImplementation(libs.kotlinTest)
     testImplementation(libs.kotlinTestJunit)
     testImplementation(libs.serviceAbstractionsDatabaseTest)
+    testImplementation(libs.serviceAbstractionsDatabaseJsonfile)
     testImplementation(project(":engine-local"))
 
     configurations.filter { it.name.startsWith("ksp") }.forEach {

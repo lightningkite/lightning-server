@@ -38,7 +38,7 @@
         "aws_s3_bucket": {
             "files": {
                 "force_destroy": true,
-                "bucket_prefix": "demo-example-files"
+                "bucket_prefix": "josephpersonal-example-files"
             }
         }
     }

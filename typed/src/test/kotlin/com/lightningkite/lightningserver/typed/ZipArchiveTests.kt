@@ -1,6 +1,9 @@
+@file:OptIn(ExperimentalLightningServer::class)
+
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.typed.sdk.Archive
+import com.lightningkite.services.data.ExperimentalLightningServer
 import kotlinx.io.writeString
 import java.io.FileOutputStream
 import java.util.zip.ZipException

@@ -61,6 +61,8 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
 //    override val settings: ServerSettings = ServerSettings(super.settings.settings.plus(awsLambdaRuntimeSettings).toSet())
     override val settings: ServerSettings = ServerSettings(super.settings.settings.toSet())
 
+    override val websocketHandlersRunOnSameMachine: Boolean get() = false
+
     init {
         logger.info { "Initializing AwsAdapter..." }
     }

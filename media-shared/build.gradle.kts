@@ -49,6 +49,10 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 api(project(":files-shared"))
+                api(libs.serviceAbstractionsShouldBeStandardLibrary)
+                api(libs.serviceAbstractionsData)
+                api(libs.serviceAbstractionsDatabaseShared)
+                api(libs.serviceAbstractionsFiles)
             }
             kotlin {
                 srcDir(file("build/generated/ksp/common/commonMain/kotlin"))

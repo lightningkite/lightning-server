@@ -18,6 +18,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Integration tests for CorsInterceptor.
@@ -33,7 +34,7 @@ class CorsInterceptorTest {
             limitToMethods = listOf("GET", "POST", "PUT", "DELETE"),
             exposedHeaders = listOf("X-Custom-Header"),
             allowCredentials = true,
-            cacheLength = 3600u,
+            cacheLength = 3600.seconds,
             forbidOnMatchFail = true
         ))
 
@@ -105,6 +106,8 @@ class CorsInterceptorTest {
                 assertEquals("https://example.com", response.headers[HttpHeader.AccessControlAllowOrigin]?.root)
                 assertEquals("true", response.headers[HttpHeader.AccessControlAllowCredentials]?.root)
                 assertEquals("X-Custom-Header", response.headers[HttpHeader.AccessControlExposeHeaders]?.root)
+                // Vary: Origin header should be present to prevent cache poisoning
+                assertEquals("Origin", response.headers[HttpHeader.Vary]?.root)
             }
         }
     }

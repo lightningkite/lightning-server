@@ -51,6 +51,7 @@ import java.util.zip.GZIPOutputStream
  * @return The HTTP response, potentially compressed
  */
 public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpResponse {
+    val startTime = System.currentTimeMillis()
     return try {
         server.compiledHttpInterceptors.intercept(request) { req ->
             this.logger.info { "${request.path} accessed by ${request.sourceIp}" }
@@ -112,7 +113,7 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
             ) return@intercept result
 
             // Lower compress limit. Either not worth the effort, or likely will inflate a little.
-            if (result.body.data.size != -1L && result.body.data.size < 256 /*256 bytes*/) return@intercept result
+            if (result.body.data.size?.let { it < 256 } == true) return@intercept result
 
             val (newData, compressed) = when (val data = result.body.data) {
                 is Data.Sink -> {
@@ -131,10 +132,11 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
 
                 else -> {
                     // 1024 Grey area. It likely will compress fine, but if not send the original
-                    if (data.size <= 1024 /*1 kibibyte*/) {
+                    val s = data.size
+                    if (s?.let { it <= 1024 } == true) {
                         val og = data.bytes()
                         val gz = og.gzip()
-                        if (gz.size < data.size)
+                        if (gz.size < s)
                             Data.Bytes(gz) to true
                         else
                             Data.Bytes(og) to false
@@ -152,13 +154,39 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
     } catch (e: Exception) {
         try {
             this.logger.error(e) { "Exception in HTTP" }
-            instrument("exceptionHandler") {
+            val response = instrument("exceptionHandler") {
                 server.exceptionHandler.handle(
                     request,
                     e
                 )
             }
-        } catch (e: Exception) {
+
+            // Record metrics for exception path
+            val durationMs = System.currentTimeMillis() - startTime
+            val route = try {
+                request.path.match.path.pathSpec.toString()
+            } catch (_: Exception) {
+                "unknown"
+            }
+            (this as? ServerRuntimeBase)?.httpMetrics?.record(
+                method = request.path.method.toString(),
+                route = route,
+                statusCode = response.status.code,
+                durationMs = durationMs,
+                errorType = e::class.simpleName
+            )
+
+            response
+        } catch (e2: Exception) {
+            // Record metrics for catastrophic failure
+            val durationMs = System.currentTimeMillis() - startTime
+            (this as? ServerRuntimeBase)?.httpMetrics?.record(
+                method = request.path.method.toString(),
+                route = "unknown",
+                statusCode = 500,
+                durationMs = durationMs,
+                errorType = "unhandled_exception"
+            )
             HttpResponse(status = HttpStatus.InternalServerError)
         }
     }
@@ -168,6 +196,7 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
  * Wraps an HTTP handler invocation with telemetry metrics.
  *
  * Adds standard HTTP attributes to the telemetry span including method, route, status code, etc.
+ * Also records OpenTelemetry metrics for request duration, count, and status categories.
  *
  * @param request The HTTP request to handle
  * @return The HTTP response from the handler
@@ -175,16 +204,32 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
 context(serverRuntime: ServerRuntime) private suspend inline fun <PATH : PathSpec> HttpHandler<PATH>.handleWithMetrics(
     request: HttpRequest<PATH>,
 ): HttpResponse {
-    return instrument(location.toString()) { span ->
+    val startTime = System.currentTimeMillis()
+    val method = request.path.method.toString()
+    val route = location.toString()
+
+    return instrument(route) { span ->
         // Add useful HTTP attributes to the current span
-        span?.setAttribute("http.method", request.path.method.toString())
-        span?.setAttribute("http.route", location.toString())
+        span?.setAttribute("http.method", method)
+        span?.setAttribute("http.route", route)
         span?.setAttribute("http.target", "/" + request.path.pathSegments.toString())
         span?.setAttribute("http.scheme", request.protocol)
         span?.setAttribute("http.host", request.domain)
         span?.setAttribute("net.peer.ip", request.sourceIp)
+
         val response = this@handleWithMetrics.handle(request)
+
         span?.setAttribute("http.status_code", response.status.code.toLong())
+
+        // Record metrics
+        val durationMs = System.currentTimeMillis() - startTime
+        (serverRuntime as? ServerRuntimeBase)?.httpMetrics?.record(
+            method = method,
+            route = route,
+            statusCode = response.status.code,
+            durationMs = durationMs
+        )
+
         response
     }
 }

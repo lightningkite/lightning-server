@@ -19,6 +19,10 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.sessions.proofs.extensions.constrainAttemptRate
+import com.lightningkite.lightningserver.auth.idString
+import com.lightningkite.lightningserver.encryption.checkAgainstHash
+import com.lightningkite.lightningserver.encryption.fastHash
+import com.lightningkite.lightningserver.encryption.isSlowHash
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.sessions.proofs.extensions.verify
 import com.lightningkite.lightningserver.typed.*
@@ -70,7 +74,7 @@ public class KnownDeviceProofEndpoints(
         auth = proofMethodAuth or AuthRequirement.IsAdmin,
         signals = {
             it.interceptCreate {
-                it.copy(hash = it.hash.secureHash(), expiresAt = now() + expires())
+                it.copy(hash = it.hash.fastHash(), expiresAt = now() + expires())
             }
         },
         permissions = {
@@ -113,7 +117,7 @@ public class KnownDeviceProofEndpoints(
 
         val secret = KnownDeviceSecret(
             _id = secretId,
-            hash = secretValue.secureHash(),
+            hash = secretValue.fastHash(),
             subjectId = principal.idString(id),
             subjectType = principal.name,
             deviceInfo = deviceInfo,
@@ -186,8 +190,14 @@ public class KnownDeviceProofEndpoints(
                     if (!secret.checkAgainstHash(active.hash))
                         throw BadRequestException("User ID and code do not match")
 
+                    // Lazy migration: if using old slow PBKDF2 hash, upgrade to fast SHA-256 hash
+                    val shouldMigrate = active.hash.isSlowHash()
+
                     modelInfo.table().updateOneById(id, modification {
                         it.lastUsedAt assign now
+                        if (shouldMigrate) {
+                            it.hash assign secret.fastHash()
+                        }
                     })
 
                     proofSigner.await().makeProof(

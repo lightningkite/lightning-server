@@ -26,7 +26,7 @@ orgCrac = "0.1.3"
 proguard = "7.8.2"
 scrimage = "4.3.3"
 serializationLibs = "1.9.0"
-serviceAbstractions = "0.0.1-94"
+serviceAbstractions = "0.0.1-106"
 shadow = "8.1.1"
 vanniktechMavenPublish = "0.34.0"
 webauthn4jCore = "0.29.4.RELEASE"
@@ -111,12 +111,26 @@ serviceAbstractionsNotificationsTest = { module = "com.lightningkite.services:no
 serviceAbstractionsOtelJvm = { module = "com.lightningkite.services:otel-jvm", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsPubsub = { module = "com.lightningkite.services:pubsub", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsPubsubRedis = { module = "com.lightningkite.services:pubsub-redis", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsPubsubAws = { module = "com.lightningkite.services:pubsub-aws", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsPubsubTest = { module = "com.lightningkite.services:pubsub-test", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsShouldBeStandardLibrary = { module = "com.lightningkite.services:should-be-standard-library", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsSms = { module = "com.lightningkite.services:sms", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsSmsTest = { module = "com.lightningkite.services:sms-test", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsSmsTwilio = { module = "com.lightningkite.services:sms-twilio", version = { ref = "serviceAbstractions" } }
 serviceAbstractionsTest = { module = "com.lightningkite.services:test", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsEmailInbound = { module = "com.lightningkite.services:email-inbound", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsEmailInboundSendgrid = { module = "com.lightningkite.services:email-inbound-sendgrid", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsEmailInboundMailgun = { module = "com.lightningkite.services:email-inbound-mailgun", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsEmailInboundSes = { module = "com.lightningkite.services:email-inbound-ses", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsEmailInboundImap = { module = "com.lightningkite.services:email-inbound-imap", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsSmsInbound = { module = "com.lightningkite.services:sms-inbound", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsSmsInboundTwilio = { module = "com.lightningkite.services:sms-inbound-twilio", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsPhonecall = { module = "com.lightningkite.services:phonecall", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsPhonecallTwilio = { module = "com.lightningkite.services:phonecall-twilio", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsPhonecallTest = { module = "com.lightningkite.services:phonecall-test", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsVoiceagent = { module = "com.lightningkite.services:voiceagent", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsVoiceagentOpenai = { module = "com.lightningkite.services:voiceagent-openai", version = { ref = "serviceAbstractions" } }
+serviceAbstractionsVoiceagentPhonecall = { module = "com.lightningkite.services:voiceagent-phonecall", version = { ref = "serviceAbstractions" } }
 webauthn4jCore = { module = "com.webauthn4j:webauthn4j-core", version = { ref = "webauthn4jCore" } }
 
 [plugins]

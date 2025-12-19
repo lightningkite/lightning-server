@@ -4,7 +4,7 @@
             "ws": {
                 "protocol_type": "WEBSOCKET",
                 "route_selection_expression": "constant",
-                "name": "demo-example-gateway"
+                "name": "josephpersonal-example-gateway"
             }
         },
         "aws_apigatewayv2_integration": {
@@ -18,7 +18,7 @@
         "aws_cloudwatch_log_group": {
             "ws_api": {
                 "retention_in_days": 30,
-                "name": "demo-example-ws-gateway-log"
+                "name": "josephpersonal-example-ws-gateway-log"
             }
         },
         "aws_lambda_permission": {
@@ -107,7 +107,7 @@
                     "destination_arn": "${aws_cloudwatch_log_group.ws_api.arn}"
                 },
                 "auto_deploy": true,
-                "name": "demo-example-gateway-stage"
+                "name": "josephpersonal-example-gateway-stage"
             }
         },
         "aws_acm_certificate": {

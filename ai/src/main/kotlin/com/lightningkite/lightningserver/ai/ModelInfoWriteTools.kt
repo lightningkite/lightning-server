@@ -1,256 +1,178 @@
 package com.lightningkite.lightningserver.ai
 
 import ai.koog.agents.core.tools.SimpleTool
-import ai.koog.agents.core.tools.Tool
-import ai.koog.agents.core.tools.ToolDescriptor
-import ai.koog.agents.core.tools.ToolParameterDescriptor
-import ai.koog.agents.core.tools.ToolParameterType
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.typed.AuthAccess
 import com.lightningkite.lightningserver.typed.ModelInfo
 import com.lightningkite.services.database.*
-import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.json.*
+import kotlinx.serialization.builtins.ListSerializer
 
 /**
- * Creates tools for querying AND modifying a database table through ModelInfo.
+ * Creates tools for modifying a database table through ModelInfo.
  *
  * **WARNING**: These tools can INSERT, UPDATE, and DELETE data. Only use with trusted LLMs
  * and appropriate safeguards.
  *
  * This creates four minimal but powerful tools:
- * - query_{table}(condition, limit, sortBy, descending) - Read records
- * - insert_{table}(record_json) - Insert a single record
- * - update_{table}(condition, modifications_json) - Update matching records
- * - delete_{table}(condition) - Delete matching records
+ * - insert_{table}(records) - Insert a set of records
+ * - update_{table}(ids, modification) - Update a set of records by _id
+ * - delete_{table}(ids) - Delete a set of records by _id
  *
- * @param modelInfo The model info to create tools for
+ * @param this@createModelInfoToolsWithWrites The model info to create tools for
+ * @param authAccess The auth for the client making the request
+ * @param writeLimit The hard limit for how many items can be inserted or modified at once.
  * @param runtime The server runtime context
  * @return List of tools for this table (4 total)
  */
-public fun <SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> createModelInfoToolsWithWrites(
-    modelInfo: ModelInfo<SUBJECT, T, ID>,
-    runtime: ServerRuntime
-): List<SimpleTool<*>> {
-    val tableName = modelInfo.tableName
-
-    return listOf(
-        QueryTableTool(tableName, modelInfo, runtime),
-        InsertTool(tableName, modelInfo, runtime),
-        UpdateTool(tableName, modelInfo, runtime),
-        DeleteTool(tableName, modelInfo, runtime)
-    )
-}
+public fun <SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ModelInfo<SUBJECT, T, ID>.writeTools(
+    writeLimit: Int,
+    modelExamples: List<T>,
+): List<ChatTool<SUBJECT, *>> = listOf(
+    InsertTool(this, writeLimit, modelExamples),
+    UpdateTool(this, writeLimit),
+    DeleteTool(this, writeLimit)
+)
 
 /**
  * Tool for inserting a record into a table.
  */
-private class InsertTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
-    private val tableName: String,
+public class InsertTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     private val modelInfo: ModelInfo<SUBJECT, T, ID>,
-    private val runtime: ServerRuntime
-) : SimpleTool<InsertTool.Args>() {
+    private val limit: Int,
+    private val modelExamples: List<T>,
+) : AlwaysRequiresApprovalTool<SUBJECT, List<T>>("This tool modifies the database."){
 
-    private val table: Table<T>
-        get() = with(runtime) { modelInfo.table() }
+    context(serverRuntime: ServerRuntime)
+    override suspend fun description(auth: AuthAccess<SUBJECT>): TotalExplanation = TotalExplanation(
+        unique = """
+        Insert records into the ${modelInfo.tableName} table.
 
-    override val description: String = """
-        Insert a new record into the $tableName table.
-
-        Provide the record as JSON. The record will be validated and inserted.
-
-        Example:
-        {"name": "John Doe", "email": "john@example.com", "role": "user"}
-    """.trimIndent()
-
-    override val descriptor: ToolDescriptor = ToolDescriptor(
-        name = "insert_${tableName.lowercase()}",
-        description = description,
-        requiredParameters = listOf(
-            ToolParameterDescriptor(
-                name = "record_json",
-                description = "JSON representation of the record to insert",
-                type = ToolParameterType.String
-            )
-        )
+        Provide the list of records. The records will be validated and inserted. (Max size $limit)
+        """.trimIndent(),
+        sharedExplanations = listOf(ModelStructure(serverRuntime, modelInfo))
     )
 
-    override val argsSerializer: KSerializer<Args>
-        get() = Args.serializer()
+    override val name: String = "insert_${modelInfo.tableName.lowercase()}"
 
-    override suspend fun doExecute(args: Args): String {
+    override val argsSerializer: KSerializer<List<T>> = ListSerializer(modelInfo.serializer)
+
+    context(serverRuntime: ServerRuntime)
+    override suspend fun execute(auth: AuthAccess<SUBJECT>, args: List<T>): String {
         return try {
-            val jsonElement = Json.parseToJsonElement(args.record_json)
-            val record = Json.decodeFromJsonElement(modelInfo.serializer, jsonElement)
+            if (args.size > limit) return "Error inserting records. Records list is too large. Max $limit records allowed"
 
-            table.insertOne(record)
+            val results = modelInfo.table(auth).insertMany(args)
 
-            val json = Json.encodeToJsonElement(modelInfo.serializer, record).toString()
-            "Successfully inserted record into $tableName:\n$json"
+            if (results.isEmpty())
+                "Failed to insert any records"
+            else {
+                val json = serverRuntime.externalSerialization.json.encodeToString(ListSerializer(modelInfo.serializer), results)
+                "Successfully inserted records into ${modelInfo.tableName}: $json"
+            }
         } catch (e: Exception) {
-            "Error inserting record: ${e.message}"
+            "Error inserting records: ${e.message}"
         }
     }
 
-    @Serializable
-    data class Args(val record_json: String) : Tool.Args
 }
 
 /**
  * Tool for updating records in a table.
  */
-private class UpdateTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
-    private val tableName: String,
+public class UpdateTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     private val modelInfo: ModelInfo<SUBJECT, T, ID>,
-    private val runtime: ServerRuntime
-) : SimpleTool<UpdateTool.Args>() {
+    private val limit: Int,
+) : AlwaysRequiresApprovalTool<SUBJECT, UpdateTool.Args<T, ID>>("This tool modifies your data."){
 
-    private val table: Table<T>
-        get() = with(runtime) { modelInfo.table() }
+    context(serverRuntime: ServerRuntime)
+    override suspend fun description(auth: AuthAccess<SUBJECT>): TotalExplanation = TotalExplanation(
+        unique = """
+        Update records in the ${modelInfo.tableName} table that match a condition.
 
-    private val serializer: KSerializer<T>
-        get() = modelInfo.serializer
+        The ids parameter is a Json List of data IDs (Max size $limit).
 
-    override val description: String = """
-        Update records in the $tableName table that match a condition.
-
-        The condition parameter uses Lightning Server's Condition format.
-        The modifications parameter is a JSON object with field updates.
-
-        Examples:
-
-        Condition (find records to update):
-        {"status": {"Equal": "draft"}}
-
-        Modifications (what to change):
-        {"status": "published", "publishedAt": "2024-01-15T10:30:00Z"}
-
-        This would update all draft records to published status.
-    """.trimIndent()
-
-    override val descriptor: ToolDescriptor = ToolDescriptor(
-        name = "update_${tableName.lowercase()}",
-        description = description,
-        requiredParameters = listOf(
-            ToolParameterDescriptor(
-                name = "condition",
-                description = "JSON Condition to find records to update",
-                type = ToolParameterType.String
-            ),
-            ToolParameterDescriptor(
-                name = "modifications_json",
-                description = "JSON object with fields to update",
-                type = ToolParameterType.String
-            )
-        )
+        This would update all records with ids inside the ids parameter to have a published status.
+        """.trimIndent(),
+        sharedExplanations = listOf(ModelStructure(serverRuntime, modelInfo))
     )
 
-    override val argsSerializer: KSerializer<Args>
-        get() = Args.serializer()
+    override val name: String = "update_${modelInfo.tableName.lowercase()}"
 
-    override suspend fun doExecute(args: Args): String {
+    override val argsSerializer: KSerializer<Args<T, ID>> = Args.serializer(modelInfo.serializer, modelInfo.idSerializer)
+    context(serverRuntime: ServerRuntime)
+    override suspend fun execute(auth: AuthAccess<SUBJECT>, args: Args<T, ID>): String {
         return try {
-            val condition = Json.decodeFromString<Condition<T>>(args.condition)
-            val modificationsJson = Json.parseToJsonElement(args.modifications_json)
 
-            // Build modification from JSON
-            val modification = parseModification(modificationsJson)
+            if (args.ids.size > limit) return "Error Updating Records. ids list is too large. Max $limit ids allowed"
 
-            val count = table.updateMany(condition, modification)
-            "Successfully updated $count records in $tableName"
+            val updateResults = modelInfo.table(auth)
+                .updateMany(
+                    Condition.OnField(modelInfo.serializer._id(), Condition.Inside(args.ids)),
+                    args.modification.modification
+                )
+                .changes
+                .mapNotNull { it.new }
+
+            if (updateResults.isEmpty())
+                "Failed to update any records"
+            else {
+                val json = serverRuntime.externalSerialization.json.encodeToString(ListSerializer(modelInfo.serializer), updateResults)
+                "Successfully updated records from ${modelInfo.tableName}: $json"
+            }
         } catch (e: Exception) {
             "Error updating records: ${e.message}"
         }
     }
 
-    @Suppress("UNCHECKED_CAST")
-    private fun parseModification(json: JsonElement): Modification<T> {
-        val properties = serializer.serializableProperties
-            ?: throw IllegalStateException("Model must be annotated with @GenerateDataClassPaths")
-
-        val jsonObject = json as? JsonObject
-            ?: throw IllegalArgumentException("Modifications must be a JSON object")
-
-        val modifications = jsonObject.entries.map { (fieldName, value) ->
-            val property = properties.find { it.name == fieldName }
-                ?: throw IllegalArgumentException("Field '$fieldName' not found")
-
-            val parsedValue = Json.decodeFromJsonElement(property.serializer as KSerializer<Any?>, value)
-            Modification.OnField(property as SerializableProperty<T, Any?>, Modification.Assign(parsedValue))
-        }
-
-        return if (modifications.size == 1) {
-            modifications.first()
-        } else {
-            Modification.Chain(modifications)
-        }
-    }
 
     @Serializable
-    data class Args(
-        val condition: String,
-        val modifications_json: String
-    ) : Tool.Args
+    public data class Args<T, ID>(
+        val ids: List<ID>,
+        val modification: ModificationExpression<T>,
+    )
 }
 
 /**
  * Tool for deleting records from a table.
  */
-private class DeleteTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
-    private val tableName: String,
+public class DeleteTool<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     private val modelInfo: ModelInfo<SUBJECT, T, ID>,
-    private val runtime: ServerRuntime
-) : SimpleTool<DeleteTool.Args>() {
+    private val limit: Int,
+) : AlwaysRequiresApprovalTool<SUBJECT, List<ID>>("This tool permanently deletes some data."){
 
-    private val table: Table<T>
-        get() = with(runtime) { modelInfo.table() }
+    override val name: String = "delete_${modelInfo.tableName.lowercase()}"
 
-    override val description: String = """
-        Delete records from the $tableName table that match a condition.
+    context(serverRuntime: ServerRuntime)
+    override suspend fun description(auth: AuthAccess<SUBJECT>): TotalExplanation = TotalExplanation(
+        unique = """
+        Delete records from the ${modelInfo.tableName} table that have the provided ids.
 
         **WARNING**: This permanently deletes data. Use with caution.
-
-        The condition parameter uses Lightning Server's Condition format.
-
-        Examples:
-
-        Delete all inactive users:
-        {"active": {"Equal": false}}
-
-        Delete specific record by ID:
-        {"_id": {"Equal": "uuid-here"}}
-
-        Delete old records:
-        {"createdAt": {"LessThan": "2023-01-01T00:00:00Z"}}
-    """.trimIndent()
-
-    override val descriptor: ToolDescriptor = ToolDescriptor(
-        name = "delete_from_${tableName.lowercase()}",
-        description = description,
-        requiredParameters = listOf(
-            ToolParameterDescriptor(
-                name = "condition",
-                description = "JSON Condition to find records to delete",
-                type = ToolParameterType.String
-            )
-        )
+        """.trimIndent(),
+        sharedExplanations = listOf(ModelStructure(serverRuntime, modelInfo))
     )
 
-    override val argsSerializer: KSerializer<Args>
-        get() = Args.serializer()
+    override val argsSerializer: KSerializer<List<ID>> = ListSerializer(modelInfo.idSerializer)
 
-    override suspend fun doExecute(args: Args): String {
+    context(serverRuntime: ServerRuntime)
+    override suspend fun execute(auth: AuthAccess<SUBJECT>, args: List<ID>): String {
         return try {
-            val condition = Json.decodeFromString<Condition<T>>(args.condition)
-            val count = table.deleteMany(condition)
-            "Successfully deleted $count records from $tableName"
+
+            if (args.size > limit) return "Error Updating Records. ids list is too large. Max $limit ids allowed"
+
+            val deletedResults =  modelInfo.table(auth)
+                .deleteMany(Condition.OnField(modelInfo.serializer._id(), Condition.Inside(args)))
+            if (deletedResults.isEmpty())
+                "Failed to delete any records"
+            else {
+                val json = serverRuntime.externalSerialization.json.encodeToString(ListSerializer(modelInfo.serializer), deletedResults)
+                "Successfully deleted records from ${modelInfo.tableName}: $json"
+            }
         } catch (e: Exception) {
             "Error deleting records: ${e.message}"
         }
     }
 
-    @Serializable
-    data class Args(val condition: String) : Tool.Args
 }
