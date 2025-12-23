@@ -23,6 +23,7 @@ private fun signingInfo(
     value: String,
     strength: Int = 1,
     at: Instant,
+    expiresAt: Instant,
 ): ByteArray = Buffer()
     .apply {
         writeString(via)
@@ -30,6 +31,7 @@ private fun signingInfo(
         writeString(value)
         writeInt(strength)
         writeLong(at.toEpochMilliseconds())
+        writeLong(expiresAt.toEpochMilliseconds())
     }
     .readByteArray()
 
@@ -47,7 +49,7 @@ public suspend fun Signer.makeProof(
     at = at,
     expiresAt = at + expireAfter,
     signature = Base64.encode(
-        sign(signingInfo(info.via, property, value, info.strength, at))
+        sign(signingInfo(info.via, property, value, info.strength, at, at + expireAfter))
     )
 )
 
@@ -65,7 +67,7 @@ public fun Signer.makeProofBlocking(
     at = at,
     expiresAt = at + expireAfter,
     signature = Base64.encode(
-        signBlocking(signingInfo(info.via, property, value, info.strength, at))
+        signBlocking(signingInfo(info.via, property, value, info.strength, at, at + expireAfter))
     )
 )
 
@@ -85,12 +87,12 @@ public suspend fun Signer.makeProof(
 
 public suspend fun Signer.verify(proof: Proof): Boolean =
     verify(
-        proof.run { signingInfo(via, property, value, strength, at) },
+        proof.run { signingInfo(via, property, value, strength, at, expiresAt) },
         Base64.decode(proof.signature)
     )
 
 public fun Signer.verifyBlocking(proof: Proof): Boolean =
     verifyBlocking(
-        proof.run { signingInfo(via, property, value, strength, at) },
+        proof.run { signingInfo(via, property, value, strength, at, expiresAt) },
         Base64.decode(proof.signature)
     )

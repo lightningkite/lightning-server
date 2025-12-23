@@ -109,7 +109,8 @@ public data class AuthRequirements(
  * @property strength The security strength value of this proof method.
  * @property property The property that was verified (e.g., "email", "phoneNumber", "password").
  * @property value The actual value that was verified (e.g., "user@example.com").
- * @property at The timestamp when this proof was completed. Used for proof expiration and freshness validation.
+ * @property at The timestamp when this proof was completed.
+ * @property expiresAt The timestamp when this proof is no longer valid.
  * @property signature A cryptographic signature that validates this proof's authenticity.
  *           **Security Note**: This prevents tampering and ensures the proof was issued by the server.
  */
