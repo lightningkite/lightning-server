@@ -40,10 +40,14 @@ data class TestSubject(
  */
 class TestChatTool(
     override val name: String,
-    override val description: String = "Test tool",
+    private val descriptionText: String = "Test tool",
     private val onExecute: (String) -> String = { args -> "Executed $name with args: $args" }
 ) : AutoApprovedTool<TestSubject, String>() {
     override val argsSerializer: KSerializer<String> = String.serializer()
+
+    context(serverRuntime: ServerRuntime) override suspend fun description(
+        auth: AuthAccess<TestSubject>,
+    ): TotalExplanation = TotalExplanation(unique = descriptionText)
 
     context(serverRuntime: ServerRuntime) override suspend fun execute(
         auth: AuthAccess<TestSubject>,

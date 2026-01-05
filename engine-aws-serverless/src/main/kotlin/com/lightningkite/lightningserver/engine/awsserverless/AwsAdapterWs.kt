@@ -218,14 +218,25 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
         val fullValue = event.data.value(root.internalSerialization.kotlinBytesFormat, fullTopicMatch.value!!.type)
         webSocketDynamo.forSubscribers(event.topic) { path, ids ->
             try {
-                val match = root.server.endpoints.match(root.externalSerialization.stringArrayFormat, path) { it.websocket } ?: run {
-                    root.logger.warn("No handler found for $path")
-                    return@forSubscribers
+                // AWS Lambda WebSockets all go through root path "/" with query param routing.
+                // When the subscription was stored with path "/", use rootWs (QueryParamWebSocketHandler)
+                // directly instead of trying to match from endpoints.
+                val p: ResolvedPath<PathSpec>
+                val h: WebSocketHandler<PathSpec, Any?>
+                if (path == "/" || path.isEmpty()) {
+                    @Suppress("UNCHECKED_CAST")
+                    p = ResolvedPath(rootPath) as ResolvedPath<PathSpec>
+                    @Suppress("UNCHECKED_CAST")
+                    h = rootWs as WebSocketHandler<PathSpec, Any?>
+                } else {
+                    val match = root.server.endpoints.match(root.externalSerialization.stringArrayFormat, path) { it.websocket } ?: run {
+                        root.logger.warn("No handler found for $path")
+                        return@forSubscribers
+                    }
+                    p = match.path
+                    @Suppress("UNCHECKED_CAST")
+                    h = root.server.compiledWebsocketInterceptors.intercept(match.value) as WebSocketHandler<PathSpec, Any?>
                 }
-                val p = match.path
-                val h = root.server.compiledWebsocketInterceptors.intercept(match.value)
-                @Suppress("UNCHECKED_CAST")
-                h as WebSocketHandler<PathSpec, Any?>
                 // TODO: could retrieve more states at once?
                 val states = webSocketDynamo.states(ids)
                 for (socketId in ids) {
@@ -237,7 +248,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         }
                     } catch (e: Exception) {
                         // Suppress, already reported inside *Tracked
-                        root.logger.error(e) { "Closing socket $socketId because subscription message from topic '${match.path.pathSpec}' failed to process." }
+                        root.logger.error(e) { "Closing socket $socketId because subscription message from topic '${p.pathSpec}' failed to process." }
                         webSocketClose(socketId, WebSocketClose.INTERNAL_ERROR)
                     }
                 }
@@ -304,9 +315,13 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
             else
                 WebSocketFrame.Text(raw)
         }
-        var queryParams =
-            (event.multiValueQueryStringParameters
-                ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to URLDecoder.decode(v, Charsets.UTF_8) } }
+
+        // Try multiValueQueryStringParameters first, then fall back to queryStringParameters
+        var queryParams = event.multiValueQueryStringParameters
+            ?.entries?.flatMap { it.value.map { v -> it.key to URLDecoder.decode(v, Charsets.UTF_8) } }
+            ?: event.queryStringParameters
+                ?.entries?.map { it.key to URLDecoder.decode(it.value, Charsets.UTF_8) }
+            ?: listOf()
 
         return when (event.requestContext.routeKey) {
             "\$connect" -> {

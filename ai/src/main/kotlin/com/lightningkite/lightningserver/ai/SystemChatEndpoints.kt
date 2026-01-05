@@ -21,6 +21,8 @@ import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.runtime.send
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.withSdkInfo
+import com.lightningkite.lightningserver.typed.sdk.module
 import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
@@ -599,13 +601,21 @@ public abstract class SystemChatEndpoints<Subject : HasId<*>>(
     //
 
     public val conversations: ModelRestEndpoints<Subject, SystemChatConversation, Uuid> =
-        conversationPath include ModelRestEndpoints(conversationInfo)
+        conversationPath module ModelRestEndpoints(conversationInfo).withSdkInfo("SystemChatConversationsApi", "conversations")
 
-    public val messages: ModelRestEndpoints<Subject, SystemChatMessage, Uuid> =
-        messagePath include ModelRestEndpoints(messageInfo)
+    public inner class MessagesEndpoints: ServerBuilder() {
+        public val info: ModelInfo<Subject, SystemChatMessage, Uuid> get() = messageInfo
 
-    public val messageUpdates: ModelRestUpdatesWebsocket<Subject, SystemChatMessage, Uuid> =
-        messagePath include ModelRestUpdatesWebsocket(messageInfo)
+        public val messages: ModelRestEndpoints<Subject, SystemChatMessage, Uuid> =
+            path include ModelRestEndpoints(messageInfo)
+
+        public val messageUpdates: ModelRestUpdatesWebsocket<Subject, SystemChatMessage, Uuid> =
+            path include ModelRestUpdatesWebsocket(messageInfo)
+
+    }
+
+    public val messages: MessagesEndpoints =
+        messagePath module MessagesEndpoints().withSdkInfo("SystemChatMessagesApi", "messages")
 
     public val approveToolRequest: ApiHttpHandler<PathSpec1<Uuid>, Subject, ToolApprovalRequest, SystemChatMessage> =
         messagePath.arg<Uuid>("id").path("approve").post bind ApiHttpHandler(

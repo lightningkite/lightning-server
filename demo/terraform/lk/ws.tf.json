@@ -1,4 +1,11 @@
 {
+    "data": {
+        "aws_cloudfront_cache_policy": {
+            "caching_disabled": {
+                "name": "Managed-CachingDisabled"
+            }
+        }
+    },
     "resource": {
         "aws_apigatewayv2_api": {
             "ws": {
@@ -36,11 +43,11 @@
         "aws_route53_record": {
             "wsAccess": {
                 "zone_id": "${data.aws_route53_zone.main.zone_id}",
-                "name": "${aws_apigatewayv2_domain_name.ws.domain_name}",
+                "name": "ws.lightningserver.cs.lightningkite.com",
                 "alias": {
-                    "zone_id": "${aws_apigatewayv2_domain_name.ws.domain_name_configuration[0].hosted_zone_id}",
+                    "zone_id": "${aws_cloudfront_distribution.ws.hosted_zone_id}",
                     "evaluate_target_health": false,
-                    "name": "${aws_apigatewayv2_domain_name.ws.domain_name_configuration[0].target_domain_name}"
+                    "name": "${aws_cloudfront_distribution.ws.domain_name}"
                 },
                 "type": "A"
             },
@@ -56,6 +63,7 @@
         },
         "aws_acm_certificate_validation": {
             "ws": {
+                "provider": "aws.acm",
                 "certificate_arn": "${aws_acm_certificate.ws.arn}",
                 "validation_record_fqdns": [
                     "${aws_route53_record.ws.fqdn}"
@@ -79,24 +87,88 @@
                 "target": "integrations/${aws_apigatewayv2_integration.ws.id}"
             }
         },
-        "aws_apigatewayv2_domain_name": {
+        "aws_cloudfront_distribution": {
             "ws": {
-                "domain_name": "ws.lightningserver.cs.lightningkite.com",
+                "viewer_certificate": {
+                    "acm_certificate_arn": "${aws_acm_certificate.ws.arn}",
+                    "ssl_support_method": "sni-only",
+                    "minimum_protocol_version": "TLSv1.2_2021"
+                },
+                "aliases": [
+                    "ws.lightningserver.cs.lightningkite.com"
+                ],
+                "default_cache_behavior": {
+                    "viewer_protocol_policy": "https-only",
+                    "allowed_methods": [
+                        "GET",
+                        "HEAD",
+                        "OPTIONS",
+                        "PUT",
+                        "POST",
+                        "PATCH",
+                        "DELETE"
+                    ],
+                    "function_association": {
+                        "event_type": "viewer-request",
+                        "function_arn": "${aws_cloudfront_function.ws_path_transform.arn}"
+                    },
+                    "target_origin_id": "wsApiGateway",
+                    "origin_request_policy_id": "${aws_cloudfront_origin_request_policy.ws.id}",
+                    "cache_policy_id": "${data.aws_cloudfront_cache_policy.caching_disabled.id}",
+                    "cached_methods": [
+                        "GET",
+                        "HEAD"
+                    ]
+                },
                 "depends_on": [
+                    "aws_apigatewayv2_stage.ws",
                     "aws_acm_certificate_validation.ws"
                 ],
-                "domain_name_configuration": {
-                    "endpoint_type": "REGIONAL",
-                    "security_policy": "TLS_1_2",
-                    "certificate_arn": "${aws_acm_certificate.ws.arn}"
-                }
+                "origin": {
+                    "domain_name": "${replace(aws_apigatewayv2_api.ws.api_endpoint, \"wss://\", \"\")}",
+                    "origin_path": "/LightningServerDemo-gateway-stage",
+                    "origin_id": "wsApiGateway",
+                    "custom_origin_config": {
+                        "origin_ssl_protocols": [
+                            "TLSv1.2"
+                        ],
+                        "https_port": 443,
+                        "origin_protocol_policy": "https-only",
+                        "http_port": 80
+                    }
+                },
+                "restrictions": {
+                    "geo_restriction": {
+                        "restriction_type": "none"
+                    }
+                },
+                "comment": "WebSocket distribution for ws.lightningserver.cs.lightningkite.com with path routing",
+                "price_class": "PriceClass_100",
+                "enabled": true
             }
         },
-        "aws_apigatewayv2_api_mapping": {
+        "aws_cloudfront_origin_request_policy": {
             "ws": {
-                "api_id": "${aws_apigatewayv2_stage.ws.api_id}",
-                "domain_name": "${aws_apigatewayv2_domain_name.ws.domain_name}",
-                "stage": "${aws_apigatewayv2_stage.ws.id}"
+                "headers_config": {
+                    "headers": {
+                        "items": [
+                            "Sec-WebSocket-Key",
+                            "Sec-WebSocket-Version",
+                            "Sec-WebSocket-Protocol",
+                            "Sec-WebSocket-Accept",
+                            "Sec-WebSocket-Extensions"
+                        ]
+                    },
+                    "header_behavior": "whitelist"
+                },
+                "query_strings_config": {
+                    "query_string_behavior": "all"
+                },
+                "name": "ws-origin-lightningserver-cs-lightningkite-com",
+                "comment": "Origin request policy for WebSocket API Gateway",
+                "cookies_config": {
+                    "cookie_behavior": "none"
+                }
             }
         },
         "aws_apigatewayv2_stage": {
@@ -113,7 +185,17 @@
         "aws_acm_certificate": {
             "ws": {
                 "domain_name": "ws.lightningserver.cs.lightningkite.com",
+                "provider": "aws.acm",
                 "validation_method": "DNS"
+            }
+        },
+        "aws_cloudfront_function": {
+            "ws_path_transform": {
+                "code": "\nfunction handler(event) {\n    var request = event.request;\n    var uri = request.uri;\n\n    // Skip if already at root or if path query param exists\n    if (uri === '/' || uri === '') {\n        return request;\n    }\n\n    // Build the path query parameter value\n    // Include the original path and any existing query string\n    var pathValue = uri;\n    if (request.querystring && Object.keys(request.querystring).length > 0) {\n        var qs = [];\n        for (var key in request.querystring) {\n            var param = request.querystring[key];\n            if (param.multiValue) {\n                param.multiValue.forEach(function(v) {\n                    qs.push(encodeURIComponent(key) + '=' + encodeURIComponent(v.value));\n                });\n            } else {\n                qs.push(encodeURIComponent(key) + '=' + encodeURIComponent(param.value));\n            }\n        }\n        pathValue += '?' + qs.join('&');\n    }\n\n    // Set the path query parameter and reset URI to root\n    request.querystring['path'] = { value: pathValue };\n    request.uri = '/';\n\n    return request;\n}\n",
+                "publish": true,
+                "name": "ws-path-transform-lightningserver-cs-lightningkite-com",
+                "runtime": "cloudfront-js-2.0",
+                "comment": "Transforms WebSocket URI paths to path query parameter"
             }
         }
     }

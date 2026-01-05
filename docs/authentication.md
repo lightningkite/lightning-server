@@ -286,4 +286,85 @@ override suspend fun requiredProofStrengthFor(subject: User): Int {
 }
 ```
 
+## Testing Authentication
+
+When writing tests, you often need to create an `AuthAccess` to simulate an authenticated user without going through the full authentication flow. Use the `testAuth` extension function on your `PrincipalType`:
+
+```kotlin
+import com.lightningkite.lightningserver.auth.testAuth
+import com.lightningkite.lightningserver.typed.AuthAccess
+
+// Inside your test (within a ServerRuntime context):
+@Test
+fun testProtectedEndpoint() {
+    TestHelper.testServer {
+        runBlocking {
+            // Create and insert a test user
+            val user = User(
+                email = "test@example.com",
+                hashedPassword = "hashed_password",
+                isSuperUser = false
+            )
+            userInfo.table().insertOne(user)
+
+            // Create AuthAccess for testing
+            val auth = UserAuth.testAuth(user)
+            val access = AuthAccess(auth)
+
+            // Use 'access' wherever AuthAccess is required
+            // e.g., for AI tools, model permissions, etc.
+        }
+    }
+}
+```
+
+### testAuth Parameters
+
+The `testAuth` function accepts optional parameters:
+
+```kotlin
+context(server: ServerRuntime)
+fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.testAuth(
+    subject: SUBJECT,
+    issuedAt: Instant = server.clock.now(),
+    scopes: Set<GrantedScope> = setOf(GrantedScope.root)
+): Authentication<SUBJECT>
+```
+
+- **subject**: The user object to authenticate as
+- **issuedAt**: When the authentication was issued (defaults to now)
+- **scopes**: The granted scopes (defaults to root/full access)
+
+### Testing with Limited Scopes
+
+To test with restricted permissions:
+
+```kotlin
+val auth = UserAuth.testAuth(
+    subject = user,
+    scopes = setOf(GrantedScope("read"), GrantedScope("posts:write"))
+)
+val access = AuthAccess(auth)
+```
+
+### Testing Endpoints Directly
+
+For testing typed endpoints with authentication:
+
+```kotlin
+@Test
+fun testEndpoint() = runBlocking {
+    with(TestHelper.testRunner) {
+        val user = User(email = "test@example.com", hashedPassword = "...")
+        Server.userInfo.table().insertOne(user)
+
+        // Test with authentication header
+        val response = Server.protectedEndpoint.test(
+            headers = mapOf("Authorization" to "Bearer ${createTestToken(user)}")
+        )
+        assertEquals(HttpStatus.OK, response.status)
+    }
+}
+```
+
 NEXT: [Typed Endpoints](typed-endpoints.md)

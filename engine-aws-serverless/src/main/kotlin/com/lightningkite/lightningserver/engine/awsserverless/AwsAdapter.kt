@@ -29,6 +29,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.encodeToStream
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.builtins.serializer
 import org.crac.Core
 import org.crac.Resource
 import org.slf4j.Logger
@@ -52,14 +53,14 @@ import java.io.OutputStream
 import java.net.URI
 import kotlin.system.exitProcess
 
+private val awsApiGatewayWsEndpointSetting = ServerSetting("awsApiGatewayWsEndpointSetting", "", String.serializer())
 
 public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(server), RequestStreamHandler, Resource {
 
     internal val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.engine.awsserverless")
     internal var preventLambdaTimeoutReuse: Boolean = false
 
-//    override val settings: ServerSettings = ServerSettings(super.settings.settings.plus(awsLambdaRuntimeSettings).toSet())
-    override val settings: ServerSettings = ServerSettings(super.settings.settings.toSet())
+    override val settings: ServerSettings = ServerSettings(super.settings.settings.plus(awsApiGatewayWsEndpointSetting).toSet())
 
     override val websocketHandlersRunOnSameMachine: Boolean get() = false
 
@@ -123,12 +124,11 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
         return lambdaClient.invoke(invokeRequest).await()
     }
     private val apiGatewayManagement by lazy {
-        println("apiGatewayManagement: generalSettings = ${generalSettings()}")
         ApiGatewayManagementApiAsyncClient.builder()
             .region(region)
             .httpClient(get(AwsConnections).asyncClient)
             .overrideConfiguration(get(AwsConnections).clientOverrideConfiguration)
-            .endpointOverride(URI.create("https://".plus(generalSettings().wsUrl.removePrefix("wss://")).also {
+            .endpointOverride(URI.create(awsApiGatewayWsEndpointSetting().removePrefix("wss://").let { "https://$it" }.also {
                 logger.info { "Connecting to WebSocket at '$it'" }
             }))
             .build()

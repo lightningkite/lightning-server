@@ -28,10 +28,13 @@ public enum class OtlpProtocol(
 }
 
 /**
- * Configures OpenTelemetry for AWS Lambda using the AWS Distro for OpenTelemetry (ADOT) Lambda layer.
+ * Configures OpenTelemetry for AWS Lambda using the AWS Distro for OpenTelemetry (ADOT) Collector layer.
  *
  * This sets up the ADOT Collector Lambda extension which runs as a sidecar process in your Lambda
  * function, collecting traces, metrics, and logs and forwarding them to an OTLP-compatible backend.
+ *
+ * **Note:** This uses the collector-only layer (no auto-instrumentation). Your application must
+ * manually instrument with the OpenTelemetry SDK. Lightning Server provides built-in instrumentation.
  *
  * ## Architecture
  *
@@ -40,7 +43,7 @@ public enum class OtlpProtocol(
  * ```
  *
  * The ADOT collector runs as a Lambda extension and receives telemetry via gRPC on localhost:4317.
- * It then exports to your configured backend (Honeycomb, Grafana Cloud, Datadog, etc.).
+ * It then exports to your configured backend (Honeycomb, Grafana Cloud, X-Ray, etc.).
  *
  * ## Tail-Based Sampling for Errors
  *
@@ -57,11 +60,12 @@ public enum class OtlpProtocol(
  * 3. **Head-based with high error bias**: Use ADOT's built-in sampling but set a higher ratio,
  *    accepting the cost trade-off.
  *
- * @param version The ADOT collector layer version. Check https://aws-otel.github.io/docs/getting-started/lambda
- *                for the latest version.
+ * @param collectorLayerVersion The ADOT collector layer version string (e.g., "0-117-0" for v0.117.0).
+ *                              Check https://github.com/aws-observability/aws-otel-lambda for the latest.
+ * @param layerVersion The layer version number (typically 1 for new versions).
  * @param otlpEndpoint The OTLP endpoint to send telemetry to (e.g., "api.honeycomb.io:443").
  *                     If null, uses the default X-Ray exporter.
- * @param otlpProtocol The OTLP protocol to use: "grpc" (default) or "http/protobuf". Use HTTP when
+ * @param otlpProtocol The OTLP protocol to use: GRPC (default) or HTTP. Use HTTP when
  *                     your backend doesn't support gRPC or when going through HTTP-only proxies.
  * @param otlpHeaders Additional headers for OTLP export (e.g., API keys). Format: "key=value,key2=value2"
  * @param serviceName The service name to use in telemetry. Defaults to the handler class name.
@@ -70,13 +74,16 @@ public enum class OtlpProtocol(
  *                      external collector.
  * @param enableMetrics Whether to export metrics (default true).
  * @param enableTraces Whether to export traces (default true).
+ * @param enableLambdaTracing Whether to enable Lambda's built-in X-Ray tracing (tracing_config).
+ *                            null = auto (true for X-Ray backend, false for OTLP endpoints).
+ *                            Set to true for X-Ray integration, false to avoid duplicate traces with external backends.
  * @param customCollectorConfig Optional custom collector configuration YAML. If provided, this will
  *                              be written to a file and OPENTELEMETRY_COLLECTOR_CONFIG_FILE will point to it.
  */
 context(emitter: TerraformAwsServerlessBuilder<*>)
 public fun TerraformNeed<OpenTelemetrySettings?>.otelCollector(
-    version: Int = 6,
     collectorLayerVersion: String = "0-117-0",
+    layerVersion: Int = 1,
     otlpEndpoint: String? = null,
     otlpProtocol: OtlpProtocol = OtlpProtocol.GRPC,
     otlpHeaders: String? = null,
@@ -84,26 +91,23 @@ public fun TerraformNeed<OpenTelemetrySettings?>.otelCollector(
     samplingRatio: Double? = null,
     enableMetrics: Boolean = true,
     enableTraces: Boolean = true,
+    enableLambdaTracing: Boolean? = null,
     customCollectorConfig: String? = null,
 ): Unit {
-    // The ADOT Java agent layer includes both auto-instrumentation and the collector
-    // For Java 17 Lambda (which Lightning Server uses), we use the Java agent layer
     val arch = if (emitter.architecture == Architecture.ARM64) "arm64" else "amd64"
 
-    // Add the ADOT Java agent layer (includes collector)
-    // ARN format: arn:aws:lambda:<region>:901920570463:layer:aws-otel-java-agent-<arch>-ver-1-32-0:<version>
-    emitter.lambdaLayers += "arn:aws:lambda:${emitter.region.id()}:901920570463:layer:aws-otel-java-agent-$arch-ver-1-32-0:$version"
-
-    // If user wants collector-only (no auto-instrumentation), they can add this instead:
-    // emitter.lambdaLayers += "arn:aws:lambda:${emitter.region.id()}:901920570463:layer:aws-otel-collector-$arch-ver-$collectorLayerVersion:1"
-
-    // Configure the ADOT collector via environment variables
-    // See: https://aws-otel.github.io/docs/getting-started/lambda
+    // Add the ADOT collector-only layer (NO auto-instrumentation)
+    // ARN format: arn:aws:lambda:<region>:901920570463:layer:aws-otel-collector-<arch>-ver-<version>:<layer-version>
+    // See: https://github.com/aws-observability/aws-otel-lambda
+    emitter.lambdaLayers += "arn:aws:lambda:${emitter.region.id()}:901920570463:layer:aws-otel-collector-$arch-ver-$collectorLayerVersion:$layerVersion"
 
     // Service identification
     val effectiveServiceName = serviceName ?: emitter.handler.qualifiedName ?: emitter.projectPrefix
     emitter.lambdaEnvironment["OTEL_SERVICE_NAME"] = effectiveServiceName
     emitter.lambdaEnvironment["OTEL_RESOURCE_ATTRIBUTES"] = "service.name=$effectiveServiceName,deployment.environment=${emitter.projectPrefix}"
+
+    // Determine if using X-Ray (no custom endpoint)
+    val usingXRay = otlpEndpoint == null
 
     // Configure OTLP exporter endpoint
     if (otlpEndpoint != null) {
@@ -116,22 +120,17 @@ public fun TerraformNeed<OpenTelemetrySettings?>.otelCollector(
             emitter.lambdaEnvironment["OTEL_EXPORTER_OTLP_HEADERS"] = otlpHeaders
         }
 
-        // Disable X-Ray since we're using OTLP
-        emitter.lambdaEnvironment["OTEL_TRACES_EXPORTER"] = "otlp"
+        // Export to OTLP endpoint
+        emitter.lambdaEnvironment["OTEL_TRACES_EXPORTER"] = if (enableTraces) "otlp" else "none"
         emitter.lambdaEnvironment["OTEL_METRICS_EXPORTER"] = if (enableMetrics) "otlp" else "none"
         emitter.lambdaEnvironment["OTEL_LOGS_EXPORTER"] = "otlp"
     } else {
         // Default: export to X-Ray
-        emitter.lambdaEnvironment["OTEL_TRACES_EXPORTER"] = "xray"
+        emitter.lambdaEnvironment["OTEL_TRACES_EXPORTER"] = if (enableTraces) "xray" else "none"
         emitter.lambdaEnvironment["OTEL_METRICS_EXPORTER"] = if (enableMetrics) "otlp" else "none"
-    }
 
-    // Enable/disable signal types
-    if (!enableTraces) {
-        emitter.lambdaEnvironment["OTEL_TRACES_EXPORTER"] = "none"
-    }
-    if (!enableMetrics) {
-        emitter.lambdaEnvironment["OTEL_METRICS_EXPORTER"] = "none"
+        // Attach X-Ray write policy for the Lambda execution role
+        emitter.attachXRayPolicy = true
     }
 
     // Sampling configuration (head-based only - for tail-based, use external collector)
@@ -140,14 +139,21 @@ public fun TerraformNeed<OpenTelemetrySettings?>.otelCollector(
         emitter.lambdaEnvironment["OTEL_TRACES_SAMPLER_ARG"] = samplingRatio.toString()
     }
 
-    // Lambda-specific optimizations
-    // Disable default auto-instrumentation to reduce cold start, enable only what we need
-    emitter.lambdaEnvironment["OTEL_INSTRUMENTATION_COMMON_DEFAULT_ENABLED"] = "false"
-    emitter.lambdaEnvironment["OTEL_INSTRUMENTATION_AWS_LAMBDA_ENABLED"] = "true"
-    emitter.lambdaEnvironment["OTEL_INSTRUMENTATION_AWS_SDK_ENABLED"] = "true"
-
-    // Propagation format (W3C Trace Context is standard)
+    // Propagation format (W3C Trace Context + X-Ray for AWS compatibility)
     emitter.lambdaEnvironment["OTEL_PROPAGATORS"] = "tracecontext,baggage,xray"
+
+    // Lambda tracing config (Active mode enables X-Ray integration at infrastructure level)
+    // Enable by default for X-Ray, disable for external OTLP endpoints to avoid duplicate traces
+    val effectiveLambdaTracing = enableLambdaTracing ?: usingXRay
+    if (effectiveLambdaTracing) {
+        emitter.lambdaTracingMode = TerraformAwsServerlessBuilder.LambdaTracingMode.Active
+    }
+
+    // Custom collector configuration
+    if (customCollectorConfig != null) {
+        emitter.lambdaFiles["collector.yaml"] = customCollectorConfig
+        emitter.lambdaEnvironment["OPENTELEMETRY_COLLECTOR_CONFIG_FILE"] = "/var/task/collector.yaml"
+    }
 
     // Configure the app's OpenTelemetry settings to use the local collector
     // Use HTTP on port 4318 or gRPC on port 4317 depending on protocol
@@ -165,84 +171,20 @@ public fun TerraformNeed<OpenTelemetrySettings?>.otelCollector(
 }
 
 /**
- * Configures OpenTelemetry with the collector-only layer (no auto-instrumentation).
- *
- * Use this when you want manual instrumentation control or are using a runtime/language
- * not supported by the auto-instrumentation layers. The collector will still run as a
- * Lambda extension and export telemetry to your backend.
- *
- * @see otelCollector for full documentation of parameters
- */
-context(emitter: TerraformAwsServerlessBuilder<*>)
-public fun TerraformNeed<OpenTelemetrySettings?>.otelCollectorOnly(
-    collectorLayerVersion: String = "0-117-0",
-    layerVersion: Int = 1,
-    otlpEndpoint: String? = null,
-    otlpProtocol: OtlpProtocol = OtlpProtocol.GRPC,
-    otlpHeaders: String? = null,
-    serviceName: String? = null,
-    samplingRatio: Double? = null,
-    enableMetrics: Boolean = true,
-    enableTraces: Boolean = true,
-): Unit {
-    val arch = if (emitter.architecture == Architecture.ARM64) "arm64" else "amd64"
-
-    // Collector-only layer (no auto-instrumentation)
-    emitter.lambdaLayers += "arn:aws:lambda:${emitter.region.id()}:901920570463:layer:aws-otel-collector-$arch-ver-$collectorLayerVersion:$layerVersion"
-
-    // Service identification
-    val effectiveServiceName = serviceName ?: emitter.handler.qualifiedName ?: emitter.projectPrefix
-    emitter.lambdaEnvironment["OTEL_SERVICE_NAME"] = effectiveServiceName
-    emitter.lambdaEnvironment["OTEL_RESOURCE_ATTRIBUTES"] = "service.name=$effectiveServiceName,deployment.environment=${emitter.projectPrefix}"
-
-    // Configure OTLP exporter
-    if (otlpEndpoint != null) {
-        emitter.lambdaEnvironment["OTEL_EXPORTER_OTLP_ENDPOINT"] = if (otlpEndpoint.startsWith("http")) otlpEndpoint else "https://$otlpEndpoint"
-        emitter.lambdaEnvironment["OTEL_EXPORTER_OTLP_PROTOCOL"] = otlpProtocol.envValue
-        if (otlpHeaders != null) {
-            emitter.lambdaEnvironment["OTEL_EXPORTER_OTLP_HEADERS"] = otlpHeaders
-        }
-        emitter.lambdaEnvironment["OTEL_TRACES_EXPORTER"] = if (enableTraces) "otlp" else "none"
-        emitter.lambdaEnvironment["OTEL_METRICS_EXPORTER"] = if (enableMetrics) "otlp" else "none"
-        emitter.lambdaEnvironment["OTEL_LOGS_EXPORTER"] = "otlp"
-    }
-
-    // Sampling
-    if (samplingRatio != null) {
-        emitter.lambdaEnvironment["OTEL_TRACES_SAMPLER"] = "parentbased_traceidratio"
-        emitter.lambdaEnvironment["OTEL_TRACES_SAMPLER_ARG"] = samplingRatio.toString()
-    }
-
-    emitter.lambdaEnvironment["OTEL_PROPAGATORS"] = "tracecontext,baggage,xray"
-
-    // Configure the app's OpenTelemetry settings
-    // Use HTTP on port 4318 or gRPC on port 4317 depending on protocol
-    val localCollectorUrl = "${otlpProtocol.urlScheme}://localhost:${otlpProtocol.defaultPort}"
-    emitter.fulfillSetting(name, Json.encodeToJsonElement(OpenTelemetrySettings(
-        url = localCollectorUrl,
-        batching = OpenTelemetrySettings.BatchingRules(
-            frequency = 10.seconds,
-            maxQueueSize = 512,
-            maxSize = 128,
-            exportTimeout = 5.seconds
-        ),
-        sampling = samplingRatio?.let { OpenTelemetrySettings.Sampling(ratio = it, parentBased = true) }
-    )))
-}
-
-/**
  * Configures OpenTelemetry to export to Honeycomb via the ADOT Lambda layer.
  *
  * Honeycomb supports tail-based sampling via their Refinery product, which can be configured
  * to always keep traces with errors while sampling successful traces at a lower rate.
  *
- * @param apiKey The Honeycomb API key. Will be stored as a Terraform variable.
+ * @param collectorLayerVersion The ADOT collector layer version string.
+ * @param layerVersion The layer version number.
  * @param dataset The Honeycomb dataset name (optional, defaults to service name).
  * @param samplingRatio Client-side sampling ratio (Honeycomb also supports server-side via Refinery).
  */
 context(emitter: TerraformAwsServerlessBuilder<*>)
 public fun TerraformNeed<OpenTelemetrySettings?>.otelHoneycomb(
-    version: Int = 6,
+    collectorLayerVersion: String = "0-117-0",
+    layerVersion: Int = 1,
     dataset: String? = null,
     samplingRatio: Double? = null,
     otlpProtocol: OtlpProtocol = OtlpProtocol.GRPC,
@@ -266,23 +208,29 @@ public fun TerraformNeed<OpenTelemetrySettings?>.otelHoneycomb(
     }
 
     otelCollector(
-        version = version,
+        collectorLayerVersion = collectorLayerVersion,
+        layerVersion = layerVersion,
         otlpEndpoint = "https://api.honeycomb.io:443",
         otlpProtocol = otlpProtocol,
         otlpHeaders = headers,
         samplingRatio = samplingRatio,
+        enableLambdaTracing = false,  // Don't enable X-Ray tracing for external backends
     )
 }
 
 /**
  * Configures OpenTelemetry to export to Grafana Cloud via the ADOT Lambda layer.
  *
+ * @param collectorLayerVersion The ADOT collector layer version string.
+ * @param layerVersion The layer version number.
  * @param instanceId Your Grafana Cloud instance ID.
  * @param zone The Grafana Cloud zone (e.g., "prod-us-east-0").
+ * @param samplingRatio Client-side sampling ratio.
  */
 context(emitter: TerraformAwsServerlessBuilder<*>)
 public fun TerraformNeed<OpenTelemetrySettings?>.otelGrafanaCloud(
-    version: Int = 6,
+    collectorLayerVersion: String = "0-117-0",
+    layerVersion: Int = 1,
     instanceId: String,
     zone: String = "prod-us-east-0",
     samplingRatio: Double? = null,
@@ -299,11 +247,13 @@ public fun TerraformNeed<OpenTelemetrySettings?>.otelGrafanaCloud(
     }
 
     otelCollector(
-        version = version,
+        collectorLayerVersion = collectorLayerVersion,
+        layerVersion = layerVersion,
         otlpEndpoint = "https://otlp-gateway-$zone.grafana.net/otlp",
         otlpProtocol = otlpProtocol,
         otlpHeaders = "Authorization=Basic \${base64encode(\"$instanceId:\${var.grafana_cloud_api_key}\")}",
         samplingRatio = samplingRatio,
+        enableLambdaTracing = false,  // Don't enable X-Ray tracing for external backends
     )
 }
 
@@ -312,15 +262,26 @@ public fun TerraformNeed<OpenTelemetrySettings?>.otelGrafanaCloud(
  *
  * X-Ray is the simplest option as it requires no additional infrastructure or API keys.
  * However, X-Ray has limited tail-based sampling support compared to dedicated observability platforms.
+ *
+ * This automatically:
+ * - Attaches the X-Ray write access IAM policy to the Lambda role
+ * - Enables Lambda's tracing_config with mode "Active"
+ *
+ * @param collectorLayerVersion The ADOT collector layer version string.
+ * @param layerVersion The layer version number.
+ * @param samplingRatio Client-side sampling ratio (0.0 to 1.0).
  */
 context(emitter: TerraformAwsServerlessBuilder<*>)
 public fun TerraformNeed<OpenTelemetrySettings?>.otelXRay(
-    version: Int = 6,
+    collectorLayerVersion: String = "0-117-0",
+    layerVersion: Int = 1,
     samplingRatio: Double? = null,
 ): Unit {
     otelCollector(
-        version = version,
+        collectorLayerVersion = collectorLayerVersion,
+        layerVersion = layerVersion,
         otlpEndpoint = null,  // null means use X-Ray
         samplingRatio = samplingRatio,
+        enableLambdaTracing = true,  // Enable X-Ray tracing at Lambda level
     )
 }

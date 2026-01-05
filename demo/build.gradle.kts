@@ -99,6 +99,10 @@ application {
     this.applicationName = "server"
 }
 
+tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
+    isZip64 = true
+}
+
 tasks.create("serve", JavaExec::class.java) {
     group = "application"
     classpath(sourceSets.main.get().runtimeClasspath)
@@ -147,39 +151,13 @@ tasks.create("sdk", JavaExec::class.java) {
     args("sdk")
     workingDir(project.rootDir)
 }
-
-fun env(name: String, profile: String) {
-    val mongoProfile = file("${System.getProperty("user.home")}/.mongo/profiles/$profile.env")
-
-    if(mongoProfile.exists()) {
-        tasks.create("deployServer${name}Init", Exec::class.java) {
-            group = "deploy"
-            this.dependsOn("lambda", "rebuildTerraform")
-            this.environment("AWS_PROFILE", "$profile")
-            val props = Properties()
-            mongoProfile.reader().use { props.load(it) }
-            props.entries.forEach {
-                environment(it.key.toString().trim('"', ' '), it.value.toString().trim('"', ' '))
-            }
-            this.executable = "terraform"
-            this.args("init")
-            this.workingDir = file("terraform/$name")
-        }
-        tasks.create("deployServer${name}", Exec::class.java) {
-            group = "deploy"
-            this.dependsOn("deployServer${name}Init")
-            this.environment("AWS_PROFILE", "$profile")
-            val props = Properties()
-            mongoProfile.reader().use { props.load(it) }
-            props.entries.forEach { environment(it.key.toString().trim('"', ' '), it.value.toString().trim('"', ' ')) }
-            this.executable = "terraform"
-            this.args("apply", "-auto-approve")
-            this.workingDir = file("terraform/$name")
-        }
-    }
+tasks.create("deploy", JavaExec::class.java) {
+    group = "deploy"
+    dependsOn("lambda")
+    classpath(sourceSets.main.get().runtimeClasspath)
+    mainClass.set("com.lightningkite.lightningserver.demo.LkEnvDeploy")
+    workingDir(project.rootDir)
 }
-env("example", "default")
-env("lkec2", "lk")
 
 tasks.create("proguardTest", ProGuardTask::class) {
     this.injars(tasks.getByName("shadowJar"))

@@ -65,10 +65,10 @@ val getUserPost = path.path("users").arg<String>("userId")
 Use typed endpoints for auto-documentation and SDK generation:
 
 ```kotlin
-val createPost = path.path("posts").post.api(
+val createPost = path.path("posts").post bind ApiHttpHandler(
     summary = "Create a blog post",
     description = "Creates a new blog post with the provided data",
-    auth = noAuth,  // or auth<User>()
+    auth = noAuth,  // or UserAuth.require() for authenticated endpoints
     errorCases = listOf(
         LSError(http = 400, detail = "invalid-input", message = "Title required")
     ),
@@ -205,8 +205,13 @@ object UserAuth: PrincipalType<User, Uuid> {
 
     context(server: ServerRuntime)
     override suspend fun fetch(id: Uuid): User =
-        database().table<User>().get(id) ?: throw NotFoundException()
+        userInfo.table().get(id) ?: throw NotFoundException()
 }
+
+// Using auth requirements:
+// - noAuth: No authentication required
+// - UserAuth.require(): Requires authenticated user
+// - UserAuth.require() or AuthRequirement.None: Optional authentication
 ```
 
 Set up ModelInfo with permissions:
@@ -352,25 +357,27 @@ suspend fun getExpensiveData(id: String): Data {
 
 ### 10. Testing
 
-**⚠️ CRITICAL: Build Server Once Per Test Suite**
+**⚠️ CRITICAL: Use Modern Server.test() Pattern**
 
-When writing tests, ensure `Server.build()` is only called once across all tests to avoid `DuplicateRegistrationError`. Create a shared `TestHelper`:
+When writing tests, use the `Server.test()` extension function which handles server building and settings configuration automatically:
 
 ```kotlin
 // TestHelper.kt - shared across all test files
 object TestHelper {
-    val testRunner by lazy { TestRunner(Server.build()) }
-}
-
-// In your test file
-class ServerTest {
     init {
         JsonFileDatabase  // Ensure mock implementations are loaded
     }
 
+    inline fun testServer(action: context(TestRunner<Server>) Server.() -> Unit) {
+        Server.test(settings = { database set Database.Settings("ram") }, action)
+    }
+}
+
+// In your test file
+class ServerTest {
     @Test
     fun testEndpoint() = runBlocking {
-        with(TestHelper.testRunner) {
+        TestHelper.testServer {
             val response = Server.someEndpoint.test()
             assertEquals("expected", response.body!!.text())
         }
@@ -398,11 +405,19 @@ Server.endpoint.test(
 
 For `ApiHttpHandler` endpoints:
 ```kotlin
-// No path args
+// Create test authentication using PrincipalType.testAuth()
+val user = User(email = "test@example.com", ...)
+userInfo.table().insertOne(user)
+val auth = UserAuth.testAuth(user)
+
+// No path args - authenticated
+Server.typedEndpoint.test(auth = auth, input = RequestData(...))
+
+// No path args - unauthenticated (for endpoints with nullable auth)
 Server.typedEndpoint.test(auth = null, input = RequestData(...))
 
 // With path args
-Server.typedEndpoint.test("pathArg", auth = null, input = RequestData(...))
+Server.typedEndpoint.test("pathArg", auth = auth, input = RequestData(...))
 ```
 
 **Common Testing Pitfalls**
@@ -476,8 +491,16 @@ Always store endpoint references for testing and internal calls:
 
 ```kotlin
 object Server : ServerBuilder() {
-    val createPost = path.path("posts").post bind ApiHttpHandler { ... }
-    val getPost = path.path("posts").arg<Uuid>("id").get bind ApiHttpHandler { ... }
+    val createPost = path.path("posts").post bind ApiHttpHandler(
+        summary = "Create post",
+        auth = noAuth,
+        implementation = { input: CreatePostRequest -> ... }
+    )
+    val getPost = path.path("posts").arg<Uuid>("id").get bind ApiHttpHandler(
+        summary = "Get post",
+        auth = noAuth,
+        implementation = { postId -> ... }
+    )
 
     // Can reference: Server.createPost, Server.getPost
 }
@@ -568,12 +591,12 @@ First run generates `settings.json`:
 
 ❌ **Don't manually create CRUD endpoints** - Use ModelRestEndpoints instead
 ❌ **Don't create multiple UploadEarlyEndpoint instances** - Causes ServerFile serialization conflicts
-❌ **Don't call Server.build() multiple times in tests** - Use shared TestHelper with lazy initialization
+❌ **Don't use deprecated TestRunner pattern** - Use modern `Server.test(settings = {...}) { ... }` approach
 ❌ Don't access database implementations directly
 ❌ Don't hardcode configuration
 ❌ Don't skip endpoint reference storage
 ❌ Don't forget @GenerateDataClassPaths
-❌ Don't use plain HttpHandler for APIs (use typed endpoints)
+❌ Don't use plain HttpHandler for APIs (use `bind ApiHttpHandler(...)` for typed endpoints)
 ❌ Don't test against real services
 ❌ Don't write manual list/get/create/update/delete endpoints when ModelRestEndpoints can do it
 

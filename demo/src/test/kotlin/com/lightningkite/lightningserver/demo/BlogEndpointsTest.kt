@@ -45,7 +45,7 @@ class BlogEndpointsTest {
                 println(blogAssist.getPrompt(
                     SystemChatConversation(subjectId = user._id.toString(), createdAt = now()),
                     auth = a
-                )
+                ))
             }
         }
     }

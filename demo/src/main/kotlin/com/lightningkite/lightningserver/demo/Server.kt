@@ -25,6 +25,8 @@ import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.typed.route
 import com.lightningkite.lightningserver.typed.sdk.module
 import com.lightningkite.lightningserver.websockets.*
+import kotlinx.coroutines.flow.Flow
+import com.lightningkite.services.ai.koog.LLMClientAndModel
 import com.lightningkite.services.ai.koog.LLMClientAndModelSettings
 import com.lightningkite.services.cache.*
 import com.lightningkite.services.cache.dynamodb.*
@@ -47,6 +49,7 @@ import com.lightningkite.services.phonecall.PhoneCallService
 import com.lightningkite.services.phonecall.twilio.TwilioPhoneCallService
 import com.lightningkite.services.pubsub.PubSub
 import com.lightningkite.services.pubsub.aws.AwsWebSocketPubSub
+import com.lightningkite.services.pubsub.aws.DynamoDbPubSub
 import com.lightningkite.services.voiceagent.VoiceAgentService
 import com.lightningkite.services.voiceagent.openai.OpenAIVoiceAgentService
 import com.lightningkite.toPhoneNumber
@@ -69,7 +72,7 @@ import kotlin.uuid.*
 object Server : ServerBuilder() {
 
     val database = setting("database", Database.Settings())
-    val llm = setting("llm", LLMClientAndModelSettings(""))
+    val llm = setting("llm", LLMClientAndModel.Settings(""))
     val email = setting("email", EmailService.Settings())
     val emailInbound = setting("emailInbound", EmailInboundService.Settings())
     val sms = setting("sms", SMS.Settings())
@@ -97,6 +100,7 @@ object Server : ServerBuilder() {
         S3PublicFileSystem
         OpenAIVoiceAgentService
         AwsWebSocketPubSub
+        DynamoDbPubSub
     }
 
     val setupAdmins = path.path("setup-admins2") bind startupOnce(database) {
@@ -182,6 +186,37 @@ object Server : ServerBuilder() {
 
     val multiplex = path.path("multiplex") bind MultiplexWebSocketHandler()
 
+    // Simple test WebSocket using CoroutineWebsocketHandler for isolated testing
+    val testCoroutineWs = path.path("test-coroutine-ws") include object : CoroutineWebsocketHandler() {
+        override val pubSub = this@Server.pubsub
+
+        context(serverRuntime: ServerRuntime)
+        override suspend fun handle(
+            request: WebSocketConnectRequest<com.lightningkite.lightningserver.pathing.PathSpec0>,
+            waitForFullConnect: suspend () -> Unit,
+            incoming: Flow<WebSocketFrame>,
+            send: suspend (WebSocketFrame) -> Unit
+        ) {
+            // Signal ready immediately
+            waitForFullConnect()
+
+            // Send a greeting to confirm connection worked
+            send(WebSocketFrame.Text("""{"type":"connected","message":"CoroutineWebsocketHandler ready"}"""))
+
+            // Echo all incoming messages with a prefix
+            incoming.collect { frame ->
+                when (frame) {
+                    is WebSocketFrame.Text -> {
+                        send(WebSocketFrame.Text("""{"type":"echo","original":"${frame.content}"}"""))
+                    }
+                    is WebSocketFrame.Binary -> {
+                        send(WebSocketFrame.Text("""{"type":"echo","binary":true,"size":${frame.content.size}}"""))
+                    }
+                }
+            }
+        }
+    }
+
     val meta = path.path("meta") module MetaEndpoints("com.lightningkite.lightningserver.demo", database, cache)
 
     val pins = PinHandler(cache, "pins")
@@ -239,6 +274,12 @@ object Server : ServerBuilder() {
             userInfo.table().findOne(condition { it.phone eq phone })
         },
         historyMessageLimit = 10,
+        voiceInstructions = """
+            You are having a voice conversation. Always respond in English, regardless of how the user speaks.
+            Be brief but clear in your responses since this is a voice call.
+            Greet the user naturally when the conversation starts and ask how you can help.
+        """.trimIndent(),
+        basePath = "/assistant-voice", // Required for phone call WebSocket URL
     )
 
     init { registerBasicMediaTypeCoders() }

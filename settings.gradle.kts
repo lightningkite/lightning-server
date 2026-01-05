@@ -46,6 +46,10 @@ include(":engine-aws-serverless")
 include(":engine-netty")
 include(":engine-jdk-server")
 
+include(":deploy-aws-ec2")
+
 include(":secret-source-aws")
+
+include(":coroutine-websockets")
 
 include(":demo")

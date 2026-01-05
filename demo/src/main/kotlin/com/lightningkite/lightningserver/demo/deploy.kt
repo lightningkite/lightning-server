@@ -30,19 +30,26 @@ import com.lightningkite.services.email.ses.awsSesInbound
 import com.lightningkite.services.phonecall.PhoneCallService
 import com.lightningkite.services.pubsub.PubSub
 import com.lightningkite.services.pubsub.aws.awsApiGatewayWebSocket
+import com.lightningkite.services.pubsub.aws.dynamoDb
 import com.lightningkite.services.pubsub.redis.awsElasticacheRedisServerless
 import com.lightningkite.services.sms.SmsInboundService
 import com.lightningkite.services.voiceagent.VoiceAgentService
+import io.github.oshai.kotlinlogging.Level
 import software.amazon.awssdk.regions.Region
 import java.io.File
 import kotlin.reflect.KClass
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 
 object LkEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
     override val handler: KClass<out AwsAdapter> = AwsHandler::class
 
+    override val useCloudFrontForWebSocket: Boolean get() = true
+
+    // Extended timeout for voice calls - max Lambda timeout is 15 minutes
+    override val timeout = 15.minutes
 
     override val projectPrefix: String = "LightningServerDemo"
     override val terraformRoot: File = File("demo/terraform/lk")
@@ -67,16 +74,28 @@ object LkEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
         files.awsS3Bucket(signedUrlDuration = 1.days)
         cache.awsDynamoDb()
         secretBasis.generated()
-        loggingSettings.direct(LoggingSettings())
+        loggingSettings.direct(LoggingSettings(default = LoggingSettings.ContextSettings(
+            level = Level.INFO,
+            filePattern = null,
+            toConsole = true,
+            additive = false,
+        ), logger = mapOf(
+            "org.mongodb" to LoggingSettings.ContextSettings(
+                level = Level.WARN,
+                filePattern = null,
+                toConsole = true,
+                additive = false,
+            )
+        )))
         telemetrySettings.direct(null)
         cors.direct(CorsSettings(
-            limitToDomains = listOf("lightningserver.cs.lightningkite.com"),
+            limitToDomains = listOf("*"),
             limitToHeaders = listOf("*"),
             limitToMethods = listOf("*"),
             exposedHeaders = listOf("*"),
             allowCredentials = true,
             cacheLength = 5.seconds,
-            forbidOnMatchFail = true
+            forbidOnMatchFail = false
         ))
         newSecret.byVariable()
         llm.awsBedrock(BedrockModels.AnthropicClaude4_5Haiku.id, region.id())
@@ -86,7 +105,8 @@ object LkEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
         emailInbound.awsSesInbound("email", "https://lightningserver.cs.lightningkite.com/assistant-channels/email/webhook")
         sms.byVariable()
         smsInbound.byVariable()
-        pubsub.awsApiGatewayWebSocket()
+        pubsub.dynamoDb()  // Using DynamoDB for lower Lambda latency
+//        pubsub.awsApiGatewayWebSocket()  // WebSocket-based PubSub (higher latency in Lambda)
 //        pubsub.direct(PubSub.Settings())
         phoneCall.byVariable()
 //        phoneCall.direct(PhoneCallService.Settings())
@@ -99,7 +119,7 @@ object LkEnvDeploy {
     @JvmStatic
     fun main(vararg args: String) {
         ProcessBuilder("./gradlew", "demo:lambda").inheritIO().start().waitFor()
-        LkEnv.deploy()
+        LkEnv.deploy(autoApprove = true)
     }
 }
 

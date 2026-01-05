@@ -10,22 +10,10 @@ plugins {
 }
 
 dependencies {
-    api(libs.kotlinXIO)
-    api(libs.kotlinXJson)
-    api(libs.kotlinXJsonIO)
-    api(libs.serializationProperties)
-    api(libs.serviceAbstractionsData)
-    api(libs.serviceAbstractionsBasis)
-    api(libs.serviceAbstractionsOtelJvm)
+    api(project(":core"))
+    api(libs.serviceAbstractionsDatabase)
     api(libs.serviceAbstractionsPubsub)
-    api(libs.serviceAbstractionsShouldBeStandardLibrary)
-    api(libs.kotlinHtmlJvm)
-    api(project(":core-shared"))
-
-    // Multiplatform cryptography libraries
-    api(libs.kotlinxCryptoCore)
-    api(libs.kotlinxCryptoOptimal)
-
+    api(libs.kotlinReflect)
     testImplementation(libs.kotlinTest)
     testImplementation(libs.kotlinTestJunit)
 }
