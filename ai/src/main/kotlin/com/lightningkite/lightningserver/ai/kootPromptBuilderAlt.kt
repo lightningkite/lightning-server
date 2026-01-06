@@ -12,6 +12,7 @@ import ai.koog.prompt.params.LLMParams
 import ai.koog.prompt.text.TextContentBuilder
 import java.lang.IllegalStateException
 import kotlin.time.Clock
+import com.lightningkite.lightningserver.ai.models.*
 
 /**
  * A builder class for creating prompts using a DSL approach.

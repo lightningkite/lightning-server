@@ -1,4 +1,4 @@
-package com.lightningkite.lightningserver.ai
+package com.lightningkite.lightningserver.ai.models
 
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.data.IndexSet

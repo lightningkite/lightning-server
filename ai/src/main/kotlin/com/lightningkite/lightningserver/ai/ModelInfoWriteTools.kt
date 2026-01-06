@@ -8,6 +8,7 @@ import com.lightningkite.services.database.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
+import com.lightningkite.lightningserver.ai.models.*
 
 /**
  * Creates tools for modifying a database table through ModelInfo.

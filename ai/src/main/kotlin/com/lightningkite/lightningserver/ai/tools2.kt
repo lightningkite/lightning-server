@@ -29,6 +29,7 @@ import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
 import kotlin.math.max
 import kotlin.reflect.KClass
+import com.lightningkite.lightningserver.ai.models.*
 
 internal fun KSerializer<*>.asToolDescriptor(
     name: String,

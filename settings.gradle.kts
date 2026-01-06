@@ -39,6 +39,7 @@ include(":notifications")
 include(":notifications-shared")
 
 include(":ai")
+include(":ai-shared")
 
 include(":engine-local")
 include(":engine-ktor")

@@ -15,6 +15,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.serializer
 import kotlin.jvm.JvmInline
+import com.lightningkite.lightningserver.ai.models.*
 
 /**
  * A value class that wraps an SQL-like expression string that can be parsed into a Condition<T>.

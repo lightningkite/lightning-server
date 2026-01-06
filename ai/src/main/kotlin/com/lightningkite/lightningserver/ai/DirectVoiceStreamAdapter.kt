@@ -9,6 +9,7 @@ import com.lightningkite.services.phonecall.AudioStreamStart
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.Json
+import com.lightningkite.lightningserver.ai.models.*
 
 /**
  * Client → Server message types for direct voice WebSocket.

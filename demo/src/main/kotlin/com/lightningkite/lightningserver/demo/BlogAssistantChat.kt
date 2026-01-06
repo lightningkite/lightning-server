@@ -15,6 +15,7 @@ import com.lightningkite.services.ai.koog.LLMClientAndModelSettings
 import com.lightningkite.services.database.*
 import kotlinx.serialization.KSerializer
 import kotlin.uuid.Uuid
+import com.lightningkite.lightningserver.ai.models.*
 
 /**
  * A practical implementation of LLMChatEndpoints for blog management.

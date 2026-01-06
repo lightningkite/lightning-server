@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.ai
 
 import ai.koog.prompt.dsl.PromptBuilder
+import com.lightningkite.lightningserver.ai.models.*
 
 
 public fun PromptBuilderAlt.append(

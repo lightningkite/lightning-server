@@ -10,6 +10,7 @@ import com.lightningkite.PhoneNumber
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.UnauthorizedException
+import com.lightningkite.lightningserver.ai.models.*
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.PrincipalType
@@ -87,6 +88,13 @@ public class VoiceChannelSupport<Subject : HasId<ID>, ID : Comparable<ID>>(
      * Required for phone call support to construct WebSocket URLs.
      */
     private val basePath: String = "",
+    /**
+     * Size of the jitter buffer in milliseconds for phone audio.
+     * Higher values add latency but smooth out irregular audio delivery
+     * (e.g., from DynamoDB PubSub polling). Set to 0 to disable.
+     * Default is 150ms.
+     */
+    private val jitterBufferMs: Long = 150L,
 ) : ServerBuilder() {
 
     private val tracer = try {
@@ -148,6 +156,7 @@ public class VoiceChannelSupport<Subject : HasId<ID>, ID : Comparable<ID>>(
                         val json = Json.parseToJsonElement(frame.content)
                         json.jsonObject["audio"]?.jsonPrimitive?.content ?: ""
                     }
+
                     is WebSocketFrame.Binary -> Base64.encode(frame.content)
                 }
             }
@@ -182,6 +191,7 @@ public class VoiceChannelSupport<Subject : HasId<ID>, ID : Comparable<ID>>(
     }
 
     private val directVoiceHandler = DirectVoiceWebSocketHandler()
+
     init {
         path.path("voice").include(directVoiceHandler)
     }
@@ -192,127 +202,125 @@ public class VoiceChannelSupport<Subject : HasId<ID>, ID : Comparable<ID>>(
     //
     // Phone Call Integration (optional)
     //
+    /** Phone audio WebSocket handler (null if phone support not configured) */
+    public val phoneAudioWebSocket: CoroutineWebsocketHandler? = phoneCall?.let { phoneCall ->
+        path.path("phone").path("audio").include(object : CoroutineWebsocketHandler() {
+            override val pubSub: Runtime<PubSub> = this@VoiceChannelSupport.pubsub
 
-    private inner class PhoneAudioWebSocketHandler : CoroutineWebsocketHandler() {
-        override val pubSub: Runtime<PubSub> = this@VoiceChannelSupport.pubsub
+            @OptIn(ExperimentalEncodingApi::class)
+            context(serverRuntime: ServerRuntime)
+            override suspend fun handle(
+                request: WebSocketConnectRequest<PathSpec0>,
+                waitForFullConnect: suspend () -> Unit,
+                incoming: Flow<WebSocketFrame>,
+                send: suspend (WebSocketFrame) -> Unit
+            ) {
+                // Wait for WebSocket to be fully connected
+                logger.info { "Phone audio WebSocket connected, setting up..." }
 
-        @OptIn(ExperimentalEncodingApi::class)
-        context(serverRuntime: ServerRuntime)
-        override suspend fun handle(
-            request: WebSocketConnectRequest<PathSpec0>,
-            waitForFullConnect: suspend () -> Unit,
-            incoming: Flow<WebSocketFrame>,
-            send: suspend (WebSocketFrame) -> Unit
-        ) {
-            // Wait for WebSocket to be fully connected
-            waitForFullConnect()
-            logger.info { "Phone audio WebSocket connected, waiting for stream start..." }
+                // Get audio stream adapter from phone service
+                val phoneService = phoneCall()
+                val audioStreamAdapter = phoneService.audioStream
+                    ?: throw BadRequestException("Phone service doesn't support audio streaming")
 
-            // Get audio stream adapter from phone service
-            val phoneService = phoneCall!!()
-            val audioStreamAdapter = phoneService.audioStream
-                ?: throw BadRequestException("Phone service doesn't support audio streaming")
+                // Parse incoming frames as Twilio events and buffer them
+                val eventBuffer = MutableSharedFlow<AudioStreamEvent>(replay = 100, extraBufferCapacity = 1000)
 
-            // Parse incoming frames as Twilio events and buffer them
-            val eventBuffer = MutableSharedFlow<AudioStreamEvent>(replay = 100, extraBufferCapacity = 1000)
+                // Parse frames and collect into buffer
+                val phoneEvents = incoming.map { frame ->
+                    when (frame) {
+                        is WebSocketFrame.Text -> audioStreamAdapter.parse(
+                            com.lightningkite.services.data.WebsocketAdapter.Frame.Text(frame.content)
+                        )
 
-            // Parse frames and collect into buffer
-            val phoneEvents = incoming.map { frame ->
-                when (frame) {
-                    is WebSocketFrame.Text -> audioStreamAdapter.parse(
-                        com.lightningkite.services.data.WebsocketAdapter.Frame.Text(frame.content)
+                        is WebSocketFrame.Binary -> throw BadRequestException("Binary frames not supported for phone")
+                    }
+                }
+
+                // Launch buffer collector in background
+                val bufferJob = CoroutineScope(currentCoroutineContext()).launch {
+                    phoneEvents.collect { eventBuffer.emit(it) }
+                }
+
+                logger.info { "Phone audio WebSocket connected, waiting for stream start..." }
+                waitForFullConnect()
+
+                try {
+                    // Wait for Connected event which contains our custom parameters
+                    val connectedEvent = eventBuffer
+                        .filterIsInstance<AudioStreamEvent.Connected>()
+                        .filter { it.streamId.isNotEmpty() }
+                        .first()
+
+                    // Extract conversation and subject from custom parameters
+                    val conversationIdStr = connectedEvent.customParameters["conversationId"]
+                        ?: throw BadRequestException("conversationId not found in stream parameters")
+                    val subjectIdStr = connectedEvent.customParameters["subjectId"]
+                        ?: throw BadRequestException("subjectId not found in stream parameters")
+
+                    val conversationId = Uuid.parse(conversationIdStr)
+                    val subjectId = parseSubjectId(subjectIdStr)
+
+                    logger.info { "Phone stream connected for conversation $conversationId" }
+
+                    val auth = Authentication(
+                        principalType = principalType,
+                        id = subjectId,
+                        sessionId = null,
                     )
-                    is WebSocketFrame.Binary -> throw BadRequestException("Binary frames not supported for phone")
+                    val access = AuthAccess(auth)
+
+                    val conversation = chatEndpoints.conversationInfo.table().get(conversationId)
+                        ?: throw NotFoundException("Conversation not found")
+
+                    // Build session config (without tool schemas - OpenAI Realtime gets tools directly)
+                    val sessionConfig =
+                        buildSessionConfig(access, conversation, CHANNEL_PHONE, includeToolSchemas = false)
+
+                    val meta = MutableStateFlow<Flow<AudioStreamEvent>>(emptyFlow())
+
+                    // Run phone voice session using fresh events only
+                    handlePhoneVoiceSession(
+                        voiceAgentService = voiceAgent(),
+                        sessionConfig = sessionConfig,
+                        streamId = connectedEvent.streamId,
+                        callId = connectedEvent.callId,
+                        phoneAudioEvents = meta.flatMapLatest { it },
+                        sendToPhone = { cmd ->
+                            val frame = audioStreamAdapter.render(cmd)
+                            when (frame) {
+                                is com.lightningkite.services.data.WebsocketAdapter.Frame.Text ->
+                                    send(WebSocketFrame.Text(frame.text))
+
+                                is com.lightningkite.services.data.WebsocketAdapter.Frame.Binary ->
+                                    send(WebSocketFrame.Binary(frame.bytes))
+                            }
+                        },
+                        toolHandler = { toolName, arguments ->
+                            executeVoiceTool(access, conversation, toolName, arguments)
+                        },
+                        onTranscript = { entry ->
+                            saveTranscript(conversation, entry, CHANNEL_PHONE)
+                        },
+                        onStreamConnected = { session ->
+                            // We don't start shipping off audio events until the voice agent is fully connected.
+                            // Otherwise, the agent gets overloaded with back-work.
+                            meta.value = eventBuffer
+                            logger.info { "Voice agent session ready, triggering greeting" }
+                            session.addMessage(VoiceAgentSession.MessageRole.User, voiceInstructions)
+                            session.createResponse()
+                        },
+                        jitterBufferMs = jitterBufferMs,
+                        tracer = tracer,
+                    )
+
+                    logger.info { "Phone voice session ended for conversation $conversationId" }
+                } finally {
+                    bufferJob.cancel()
                 }
             }
-
-            // Launch buffer collector in background
-            val bufferJob = CoroutineScope(currentCoroutineContext()).launch {
-                phoneEvents.collect { eventBuffer.emit(it) }
-            }
-
-            try {
-                // Wait for Connected event which contains our custom parameters
-                val connectedEvent = eventBuffer
-                    .filterIsInstance<AudioStreamEvent.Connected>()
-                    .filter { it.streamId.isNotEmpty() }
-                    .first()
-
-                // Extract conversation and subject from custom parameters
-                val conversationIdStr = connectedEvent.customParameters["conversationId"]
-                    ?: throw BadRequestException("conversationId not found in stream parameters")
-                val subjectIdStr = connectedEvent.customParameters["subjectId"]
-                    ?: throw BadRequestException("subjectId not found in stream parameters")
-
-                val conversationId = Uuid.parse(conversationIdStr)
-                val subjectId = parseSubjectId(subjectIdStr)
-
-                logger.info { "Phone stream connected for conversation $conversationId" }
-
-                val auth = Authentication(
-                    principalType = principalType,
-                    id = subjectId,
-                    sessionId = null,
-                )
-                val access = AuthAccess(auth)
-
-                val conversation = chatEndpoints.conversationInfo.table().get(conversationId)
-                    ?: throw NotFoundException("Conversation not found")
-
-                // Build session config (without tool schemas - OpenAI Realtime gets tools directly)
-                val sessionConfig = buildSessionConfig(access, conversation, CHANNEL_PHONE, includeToolSchemas = false)
-
-                // Skip any buffered/replayed events - only forward NEW audio from this point on.
-                // During session setup, Twilio continuously sends audio frames that get buffered.
-                // If we replay those old frames, they flood OpenAI and trigger VAD immediately,
-                // cancelling the greeting before any audio is generated.
-                val currentReplaySize = eventBuffer.replayCache.size
-                val freshAudioEvents = eventBuffer.drop(currentReplaySize)
-
-                // Run phone voice session using fresh events only
-                handlePhoneVoiceSession(
-                    voiceAgentService = voiceAgent(),
-                    sessionConfig = sessionConfig,
-                    streamId = connectedEvent.streamId,
-                    callId = connectedEvent.callId,
-                    phoneAudioEvents = freshAudioEvents,
-                    sendToPhone = { cmd ->
-                        val frame = audioStreamAdapter.render(cmd)
-                        when (frame) {
-                            is com.lightningkite.services.data.WebsocketAdapter.Frame.Text ->
-                                send(WebSocketFrame.Text(frame.text))
-                            is com.lightningkite.services.data.WebsocketAdapter.Frame.Binary ->
-                                send(WebSocketFrame.Binary(frame.bytes))
-                        }
-                    },
-                    toolHandler = { toolName, arguments ->
-                        executeVoiceTool(access, conversation, toolName, arguments)
-                    },
-                    onTranscript = { entry ->
-                        saveTranscript(conversation, entry, CHANNEL_PHONE)
-                    },
-                    onStreamConnected = { session ->
-                        logger.info { "Voice agent session ready, triggering greeting" }
-                        session.addMessage(VoiceAgentSession.MessageRole.User, voiceInstructions)
-                        session.createResponse()
-                    },
-                    tracer = tracer,
-                )
-
-                logger.info { "Phone voice session ended for conversation $conversationId" }
-            } finally {
-                bufferJob.cancel()
-            }
-        }
+        })
     }
-
-    private val phoneAudioHandler: PhoneAudioWebSocketHandler? = phoneCall?.let { PhoneAudioWebSocketHandler() }
-    init {
-        phoneAudioHandler?.let { path.path("phone").path("audio").include(it) }
-    }
-
-    /** Phone audio WebSocket handler (null if phone support not configured) */
-    public val phoneAudioWebSocket: CoroutineWebsocketHandler? get() = phoneAudioHandler
 
     /**
      * Incoming call webhook - returns instructions to connect to voice agent.
@@ -421,16 +429,19 @@ public class VoiceChannelSupport<Subject : HasId<ID>, ID : Comparable<ID>>(
                     append(message.content)
                     append("\n\n")
                 }
+
                 is Message.User -> {
                     append("## Previous User Message\n")
                     append(message.content)
                     append("\n\n")
                 }
+
                 is Message.Assistant -> {
                     append("## Previous Assistant Message\n")
                     append(message.content)
                     append("\n\n")
                 }
+
                 else -> {}
             }
         }
@@ -719,9 +730,11 @@ public class VoiceChannelSupport<Subject : HasId<ID>, ID : Comparable<ID>>(
                 serializer.descriptor.serialName.contains("Uuid", ignoreCase = true) ||
                         serializer.descriptor.serialName.contains("String", ignoreCase = true) ->
                     "\"$idString\""
+
                 serializer.descriptor.serialName.contains("Int", ignoreCase = true) ||
                         serializer.descriptor.serialName.contains("Long", ignoreCase = true) ->
                     idString
+
                 else -> "\"$idString\""
             }
             Json.decodeFromString(serializer, jsonValue)
@@ -729,7 +742,10 @@ public class VoiceChannelSupport<Subject : HasId<ID>, ID : Comparable<ID>>(
             try {
                 Json.decodeFromString(serializer, idString)
             } catch (e2: Exception) {
-                throw IllegalArgumentException("Cannot parse ID '$idString' for type ${serializer.descriptor.serialName}", e)
+                throw IllegalArgumentException(
+                    "Cannot parse ID '$idString' for type ${serializer.descriptor.serialName}",
+                    e
+                )
             }
         }
     }
@@ -783,6 +799,7 @@ public fun ToolParameterType.toSerializable(): SerializableToolParameterType {
             requiredProperties = requiredProperties?.toList() ?: emptyList(),
             additionalProperties = additionalProperties ?: false,
         )
+
         is ToolParameterType.AnyOf -> SerializableToolParameterType.AnyOf(
             types.map { it.toSerializable() }
         )

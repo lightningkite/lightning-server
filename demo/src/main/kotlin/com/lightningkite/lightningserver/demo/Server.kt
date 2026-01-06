@@ -48,7 +48,6 @@ import com.lightningkite.services.sms.twilio.TwilioSmsInboundService
 import com.lightningkite.services.phonecall.PhoneCallService
 import com.lightningkite.services.phonecall.twilio.TwilioPhoneCallService
 import com.lightningkite.services.pubsub.PubSub
-import com.lightningkite.services.pubsub.aws.AwsWebSocketPubSub
 import com.lightningkite.services.pubsub.aws.DynamoDbPubSub
 import com.lightningkite.services.voiceagent.VoiceAgentService
 import com.lightningkite.services.voiceagent.openai.OpenAIVoiceAgentService
@@ -99,7 +98,6 @@ object Server : ServerBuilder() {
         MemcachedCache
         S3PublicFileSystem
         OpenAIVoiceAgentService
-        AwsWebSocketPubSub
         DynamoDbPubSub
     }
 

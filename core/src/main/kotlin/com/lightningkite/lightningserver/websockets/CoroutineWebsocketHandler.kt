@@ -43,20 +43,20 @@ public abstract class CoroutineWebsocketHandler : ServerBuilder() {
         val request: WebSocketConnectRequest<@Contextual PathSpec0>
     )
 
-    // Cache channels to ensure same instance used for same connection ID
-    private val channelCache = mutableMapOf<Uuid, PubSubChannel<SerializableWebSocketFrame>>()
-
     // Scope for background task execution (in tests, tasks need to run asynchronously)
     private val taskScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
+    /**
+     * Gets the inbound PubSub channel for this connection.
+     *
+     * Note: We intentionally do NOT cache channels at the handler level to support
+     * stateless serverless environments (e.g., AWS Lambda) where each WebSocket message
+     * may be handled by a different instance. The PubSub implementation handles any
+     * necessary channel deduplication internally.
+     */
     context(runtime: ServerRuntime)
-    private val Storage.inbound: PubSubChannel<SerializableWebSocketFrame>
-        get() = channelCache.getOrPut(id) {
-            pubSub().get(
-                "ws-in-${id}",
-                SerializableWebSocketFrame.serializer()
-            )
-        }
+    private fun Storage.inbound(): PubSubChannel<SerializableWebSocketFrame> =
+        pubSub().get("ws-in-${id}", SerializableWebSocketFrame.serializer())
 
     @Serializable
     public data class SerializableWebSocketFrame(
@@ -101,10 +101,10 @@ public abstract class CoroutineWebsocketHandler : ServerBuilder() {
                 waitForFullConnect = {
                     // Send empty frame to indicate connection is ready
                     logger.info { "Task ${storage.id}: emitting ready signal to inbound channel" }
-                    storage.inbound.emit(SerializableWebSocketFrame())
+                    storage.inbound().emit(SerializableWebSocketFrame())
                     logger.info { "Task ${storage.id}: ready signal emitted" }
                 },
-                incoming = storage.inbound.map {
+                incoming = storage.inbound().map {
                     if (it.close) throw CancellationException("Client closed connection.")
                     it.standard()
                 },
@@ -113,11 +113,11 @@ public abstract class CoroutineWebsocketHandler : ServerBuilder() {
                 }
             )
         } catch (e: CancellationException) {
-            storage.inbound.emit(SerializableWebSocketFrame(close = true, failure = null))
+            storage.inbound().emit(SerializableWebSocketFrame(close = true, failure = null))
         } catch (e: HttpStatusException) {
-            storage.inbound.emit(SerializableWebSocketFrame(close = true, failure = e.message, status = e.status))
+            storage.inbound().emit(SerializableWebSocketFrame(close = true, failure = e.message, status = e.status))
         } catch (e: Exception) {
-            storage.inbound.emit(SerializableWebSocketFrame(close = true, failure = e.message ?: e::class.simpleName))
+            storage.inbound().emit(SerializableWebSocketFrame(close = true, failure = e.message ?: e::class.simpleName))
         }
     }
 
@@ -142,7 +142,7 @@ public abstract class CoroutineWebsocketHandler : ServerBuilder() {
                     logger.info { "willConnect ${s.id}: waiting for first message with 25s timeout" }
                     // Increased timeout to handle Lambda cold starts + DynamoDB Task scheduling + PubSub latency
                     withTimeout(25_000) {
-                        s.inbound.first()
+                        s.inbound().first()
                     }
                 }
 
@@ -178,7 +178,7 @@ public abstract class CoroutineWebsocketHandler : ServerBuilder() {
 
             context(connection: WebSocketConnection<PathSpec0, Storage>)
             override suspend fun messageFromClient(frame: WebSocketFrame) {
-                connection.currentState.inbound.emit(frame.serializable())
+                connection.currentState.inbound().emit(frame.serializable())
             }
 
             context(connection: WebSocketConnection<PathSpec0, Storage>)
@@ -190,7 +190,7 @@ public abstract class CoroutineWebsocketHandler : ServerBuilder() {
 
             context(connection: WebSocketConnection<PathSpec0, Storage>)
             override suspend fun disconnect(reason: WebSocketClose) {
-                connection.currentState.inbound.emit(SerializableWebSocketFrame(close = true))
+                connection.currentState.inbound().emit(SerializableWebSocketFrame(close = true))
             }
         })
 

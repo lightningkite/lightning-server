@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.demo
 
-import com.lightningkite.lightningserver.ai.SystemChatConversation
+import com.lightningkite.lightningserver.ai.models.SystemChatConversation
 import com.lightningkite.lightningserver.auth.testAuth
 import com.lightningkite.lightningserver.demo.Server.UserAuth
 import com.lightningkite.lightningserver.runtime.now

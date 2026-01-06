@@ -12,6 +12,7 @@ import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
 import kotlin.time.Instant
+import com.lightningkite.lightningserver.ai.models.*
 
 /**
  * Result of checking whether a tool call requires approval.
@@ -140,7 +141,7 @@ public fun <Subject: HasId<*>?> ChatTool<Subject, *>.isAuthorizedIn(
     currentTime: Instant,
 ): Boolean = authorizations.any { auth ->
     (auth.toolName == name || auth.toolName == "*") &&
-    (auth.expiresAt == null || auth.expiresAt > currentTime)
+    (auth.expiresAt == null || auth.expiresAt!! > currentTime)
 }
 
 /**

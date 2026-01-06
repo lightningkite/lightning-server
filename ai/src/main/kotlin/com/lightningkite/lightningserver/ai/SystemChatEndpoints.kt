@@ -38,6 +38,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
+import com.lightningkite.lightningserver.ai.models.*
 
 /**
  * Abstract base class for system chat endpoints with tool approval workflow.

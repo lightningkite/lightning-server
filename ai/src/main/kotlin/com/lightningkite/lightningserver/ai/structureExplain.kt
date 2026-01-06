@@ -15,6 +15,7 @@ import kotlinx.serialization.descriptors.capturedKClass
 import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.modules.SerializersModule
 import kotlin.reflect.KClass
+import com.lightningkite.lightningserver.ai.models.*
 
 public fun KSerializer<*>.explain(module: SerializersModule): String = buildString {
     // We explain it in Typescript syntax since there's tons of training data for that in these LLMs.

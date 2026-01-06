@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
+import com.lightningkite.lightningserver.ai.models.*
 
 /**
  * Creates tools for querying a database table through ModelInfo.

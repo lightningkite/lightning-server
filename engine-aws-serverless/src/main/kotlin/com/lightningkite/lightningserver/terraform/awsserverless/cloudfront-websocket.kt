@@ -17,7 +17,7 @@ function handler(event) {
     var request = event.request;
     var uri = request.uri;
 
-    // Skip if already at root or if path query param exists
+    // Skip if already at root
     if (uri === '/' || uri === '') {
         return request;
     }

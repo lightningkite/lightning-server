@@ -1,4 +1,5 @@
 import com.lightningkite.deployhelpers.*
+import org.gradle.kotlin.dsl.api
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -50,6 +51,8 @@ kotlin {
             dependencies {
                 api(libs.kotlinXDatetime)
                 api(project(":core-shared"))
+                api(libs.serviceAbstractionsDatabaseShared)
+                api(libs.serviceAbstractionsFilesClient)
             }
             kotlin {
                 srcDir(file("build/generated/ksp/common/commonMain/kotlin"))

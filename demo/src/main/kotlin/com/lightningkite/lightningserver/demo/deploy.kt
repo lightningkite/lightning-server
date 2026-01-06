@@ -29,7 +29,6 @@ import com.lightningkite.services.email.javasmtp.awsSesSmtpLegacy
 import com.lightningkite.services.email.ses.awsSesInbound
 import com.lightningkite.services.phonecall.PhoneCallService
 import com.lightningkite.services.pubsub.PubSub
-import com.lightningkite.services.pubsub.aws.awsApiGatewayWebSocket
 import com.lightningkite.services.pubsub.aws.dynamoDb
 import com.lightningkite.services.pubsub.redis.awsElasticacheRedisServerless
 import com.lightningkite.services.sms.SmsInboundService

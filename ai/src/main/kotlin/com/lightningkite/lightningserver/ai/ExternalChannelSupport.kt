@@ -1,8 +1,10 @@
 package com.lightningkite.lightningserver.ai
 
 import com.lightningkite.EmailAddress
+import com.lightningkite.lightningserver.ai.models.*
 import com.lightningkite.PhoneNumber
 import com.lightningkite.lightningserver.BadRequestException
+import com.lightningkite.lightningserver.ai.*
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.definition.Runtime
