@@ -287,6 +287,28 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
             }
         }
     }
+
+    /**
+     * Sends a frame directly to a specific WebSocket connection, bypassing pub/sub.
+     *
+     * @param socketId The AWS API Gateway connection ID
+     * @param frame The frame to send
+     * @return true if sent successfully, false if the connection is gone
+     */
+    suspend fun sendDirect(socketId: String, frame: WebSocketFrame): Boolean {
+        return try {
+            val result = root.apiGatewayWsPostToConnection(PostToConnectionRequest.builder().also {
+                it.connectionId(socketId)
+                it.data(SdkBytes.fromUtf8String(frame.text))
+            }.build())
+            result.sdkHttpResponse().isSuccessful
+        } catch (e: GoneException) {
+            root.logger.warn("Socket $socketId is gone during direct send.")
+            webSocketDynamo.clean(socketId)
+            false
+        }
+    }
+
     suspend fun handleWebsocketDidConnect(event: WebSocketDidConnect): APIGatewayV2HTTPResponse {
         try {
             @Suppress("UNCHECKED_CAST")
@@ -336,7 +358,8 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     headers = headers,
                     domain = event.requestContext.domainName,
                     protocol = "https",
-                    sourceIp = event.requestContext.identity.sourceIp ?: "0.0.0.0"
+                    sourceIp = event.requestContext.identity.sourceIp ?: "0.0.0.0",
+                    engineSocketId = event.requestContext.connectionId
                 )
                 try {
                     val storage = rootWs.willConnectWithMetrics(rootPath, root, lkEvent)

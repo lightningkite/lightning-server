@@ -138,7 +138,16 @@
                 "memory_size": 1024,
                 "environment": {
                     "variables": {
-                        "LIGHTNING_SERVER_SETTINGS_DECRYPTION": "${random_password.settings.result}"
+                        "OTEL_SERVICE_NAME": "Lightning Server Demo",
+                        "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+                        "OTEL_RESOURCE_ATTRIBUTES": "service.name=Lightning Server Demo,deployment.environment=LightningServerDemo",
+                        "OTEL_METRICS_EXPORTER": "otlp",
+                        "OTEL_TRACES_EXPORTER": "otlp",
+                        "OTEL_LOGS_EXPORTER": "otlp",
+                        "OTEL_EXPORTER_OTLP_HEADERS": "",
+                        "LIGHTNING_SERVER_SETTINGS_DECRYPTION": "${random_password.settings.result}",
+                        "OTEL_EXPORTER_OTLP_ENDPOINT": "https://signoz.lightningkite.com",
+                        "OTEL_PROPAGATORS": "tracecontext,baggage,xray"
                     }
                 },
                 "snap_start": {
@@ -147,7 +156,9 @@
                 "function_name": "LightningServerDemo-main",
                 "publish": true,
                 "s3_key": "${aws_s3_object.app_storage.key}",
-                "layers": []
+                "layers": [
+                    "arn:aws:lambda:us-west-2:901920570463:layer:aws-otel-collector-amd64-ver-0-117-0:1"
+                ]
             }
         },
         "aws_s3_bucket": {
@@ -219,7 +230,15 @@
                 }
             },
             "awsApiGatewayWsEndpointSetting": "${aws_apigatewayv2_stage.ws.invoke_url}",
-            "telemetry": null,
+            "telemetry": {
+                "url": "otlp-http://localhost:4318",
+                "batching": {
+                    "frequency": "PT10S",
+                    "maxQueueSize": 512,
+                    "maxSize": 128,
+                    "exportTimeout": "PT5S"
+                }
+            },
             "someSecret": "${var.someSecret}",
             "voiceAgent": "${var.voiceAgent}",
             "smsInbound": "${var.smsInbound}",

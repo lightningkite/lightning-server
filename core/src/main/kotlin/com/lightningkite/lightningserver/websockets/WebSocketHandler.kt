@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.serialization.serializerOrContextual
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.serialization.KSerializer
 
 public interface WebSocketHandler<PATH: PathSpec, STORAGE> {
@@ -15,6 +16,40 @@ public interface WebSocketHandler<PATH: PathSpec, STORAGE> {
     public context(connection: WebSocketConnection<PATH, STORAGE>) suspend fun messageFromClient(frame: WebSocketFrame)
     public context(connection: WebSocketConnection<PATH, STORAGE>) suspend fun messageFromSubscription(topic: WebSocketSubscriptionMessage<*, *>)
     public context(connection: WebSocketConnection<PATH, STORAGE>) suspend fun disconnect(reason: WebSocketClose)
+}
+
+/**
+ * Marker interface for WebSocket handlers that can be executed directly
+ * without pub/sub overhead in local (single-process) engines.
+ *
+ * When a handler implements this interface, local engines (Ktor, Netty, JDK)
+ * can call [handleDirect] instead of going through the standard lifecycle
+ * (willConnect → task → pub/sub → messageFromClient).
+ *
+ * This is particularly useful for [CoroutineWebsocketHandler] which normally
+ * uses pub/sub channels to communicate between the connection and background task.
+ * In local engines, this overhead is unnecessary since everything runs in-process.
+ */
+public interface DirectExecutableWebSocketHandler<PATH: PathSpec> {
+    /**
+     * Handle the WebSocket connection directly without pub/sub.
+     *
+     * Local engines should call this instead of the standard lifecycle when available.
+     * The implementation should run the entire WebSocket session in this coroutine.
+     *
+     * @param serverRuntime The server runtime context
+     * @param request The initial connection request
+     * @param incoming Receive channel of frames from the client (closes when client disconnects)
+     * @param send Function to send frames to the client
+     * @param close Function to close the connection with a reason
+     */
+    public suspend fun handleDirect(
+        serverRuntime: ServerRuntime,
+        request: WebSocketConnectRequest<PATH>,
+        incoming: ReceiveChannel<WebSocketFrame>,
+        send: suspend (WebSocketFrame) -> Unit,
+        close: suspend (WebSocketClose) -> Unit
+    )
 }
 
 // BUILDER

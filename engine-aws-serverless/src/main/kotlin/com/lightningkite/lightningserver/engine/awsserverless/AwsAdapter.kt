@@ -12,6 +12,8 @@ import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
 import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.settings.SettingsSerializer
+import com.lightningkite.lightningserver.websockets.DirectWebSocketSender
+import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.services.Service
 import com.lightningkite.services.aws.AwsConnections
@@ -166,6 +168,12 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
 
     override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>) {
         ws.publish(event.path(), event.topic.type, event.value)
+    }
+
+    override val directWebSocketSender: DirectWebSocketSender = object : DirectWebSocketSender {
+        override suspend fun sendDirect(socketId: String, frame: WebSocketFrame): Boolean {
+            return ws.sendDirect(socketId, frame)
+        }
     }
 
     override fun beforeCheckpoint(context: org.crac.Context<out Resource>?) {

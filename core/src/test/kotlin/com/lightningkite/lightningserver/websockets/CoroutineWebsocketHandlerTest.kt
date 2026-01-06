@@ -119,6 +119,9 @@ class CoroutineWebsocketHandlerTest {
         TestServer.test(settings = { }) {
             val ws = TestServer.echoHandler.websocketHandler.test()
 
+            // TEST: Add delay after test() to allow didConnect() subscription to complete
+            delay(50)
+
             var receivedMessage: WebSocketFrame? = null
             ws.onMessageSent = { receivedMessage = it }
 
@@ -139,6 +142,9 @@ class CoroutineWebsocketHandlerTest {
     fun binary_message_echo_works(): Unit = runBlocking {
         TestServer.test(settings = { }) {
             val ws = TestServer.echoHandler.websocketHandler.test()
+
+            // TEST: Add delay after test() to allow didConnect() subscription to complete
+            delay(50)
 
             var receivedMessage: WebSocketFrame? = null
             ws.onMessageSent = { receivedMessage = it }
@@ -227,6 +233,9 @@ class CoroutineWebsocketHandlerTest {
         TestServer.test(settings = { }) {
             val ws = TestServer.echoHandler.websocketHandler.test()
 
+            // TEST: Add delay after test() to allow didConnect() subscription to complete
+            delay(50)
+
             val receivedMessages = mutableListOf<WebSocketFrame>()
             ws.onMessageSent = { receivedMessages.add(it) }
 
@@ -252,6 +261,9 @@ class CoroutineWebsocketHandlerTest {
     fun disconnect_stops_handler(): Unit = runBlocking {
         TestServer.test(settings = { }) {
             val ws = TestServer.echoHandler.websocketHandler.test()
+
+            // TEST: Add delay after test() to allow didConnect() subscription to complete
+            delay(50)
 
             var receivedMessage: WebSocketFrame? = null
             ws.onMessageSent = { receivedMessage = it }

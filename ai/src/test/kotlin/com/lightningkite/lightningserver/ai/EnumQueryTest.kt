@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.ai
 
+import com.lightningkite.lightningserver.ai.models.*
 import com.lightningkite.lightningserver.auth.testAuth
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.runtime.test.test

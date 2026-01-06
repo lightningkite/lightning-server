@@ -20,11 +20,15 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.Contextual
@@ -57,6 +61,12 @@ public abstract class CoroutineWebsocketHandler : ServerBuilder() {
     context(runtime: ServerRuntime)
     private fun Storage.inbound(): PubSubChannel<SerializableWebSocketFrame> =
         pubSub().get("ws-in-${id}", SerializableWebSocketFrame.serializer())
+
+    /**
+     * Gets the direct WebSocket sender from the runtime, if available.
+     */
+    context(runtime: ServerRuntime)
+    private fun getDirectSender(): DirectWebSocketSender? = runtime.directWebSocketSender
 
     @Serializable
     public data class SerializableWebSocketFrame(
@@ -94,7 +104,10 @@ public abstract class CoroutineWebsocketHandler : ServerBuilder() {
         path.path("ws-out").arg<Uuid>("connectionId").topic(SerializableWebSocketFrame.serializer())
 
     public val task: Task<Storage> = path.path("ws-controller") bind Task(Storage.serializer()) { storage ->
-        logger.info { "Task started for connection ${storage.id}" }
+        logger.info { "Task STARTING for connection ${storage.id}" }
+        // Capture direct send capability from context before creating lambdas
+        val directSender = getDirectSender()
+        val socketId = storage.request.engineSocketId
         try {
             handle(
                 request = storage.request,
@@ -104,32 +117,89 @@ public abstract class CoroutineWebsocketHandler : ServerBuilder() {
                     storage.inbound().emit(SerializableWebSocketFrame())
                     logger.info { "Task ${storage.id}: ready signal emitted" }
                 },
-                incoming = storage.inbound().map {
+                incoming = storage.inbound().mapNotNull {
                     if (it.close) throw CancellationException("Client closed connection.")
+                    // Skip empty ready signal frames (both string and data are null)
+                    if (it.string == null && it.data == null) return@mapNotNull null
                     it.standard()
                 },
                 send = { frame ->
-                    outboundTopic.send(storage.id, frame.serializable())
+                    if (directSender != null && socketId != null) {
+                        // Direct send - bypasses Lambda/DynamoDB pub/sub overhead
+                        if (!directSender.sendDirect(socketId, frame)) {
+                            // Connection gone, signal close
+                            storage.inbound().emit(SerializableWebSocketFrame(close = true))
+                        }
+                    } else {
+                        // Fallback to topic-based send (for non-AWS engines or missing engineSocketId)
+                        outboundTopic.send(storage.id, frame.serializable())
+                    }
                 }
             )
+            logger.info { "Task COMPLETED normally for connection ${storage.id}" }
         } catch (e: CancellationException) {
+            logger.info { "Task COMPLETED via cancellation for connection ${storage.id}" }
             storage.inbound().emit(SerializableWebSocketFrame(close = true, failure = null))
         } catch (e: HttpStatusException) {
+            logger.info { "Task COMPLETED via HttpStatusException for connection ${storage.id}: ${e.message}" }
             storage.inbound().emit(SerializableWebSocketFrame(close = true, failure = e.message, status = e.status))
         } catch (e: Exception) {
+            logger.info { "Task COMPLETED via Exception for connection ${storage.id}: ${e.message}" }
             storage.inbound().emit(SerializableWebSocketFrame(close = true, failure = e.message ?: e::class.simpleName))
         }
     }
 
     public val websocketHandler: WebSocketHandler<PathSpec0, Storage> =
-        path bind (object : WebSocketHandler<PathSpec0, Storage> {
+        path bind (object : WebSocketHandler<PathSpec0, Storage>, DirectExecutableWebSocketHandler<PathSpec0> {
 
             override val storageSerializer: KSerializer<Storage> = Storage.serializer()
 
+            // --- DirectExecutableWebSocketHandler implementation ---
+            // Used by local engines (Ktor, Netty) to bypass pub/sub overhead
+
+            override suspend fun handleDirect(
+                serverRuntime: ServerRuntime,
+                request: WebSocketConnectRequest<PathSpec0>,
+                incoming: ReceiveChannel<WebSocketFrame>,
+                send: suspend (WebSocketFrame) -> Unit,
+                close: suspend (WebSocketClose) -> Unit
+            ) {
+                logger.info { "handleDirect: starting direct execution (bypassing pub/sub)" }
+                try {
+                    with(serverRuntime) {
+                        handle(
+                            request = request,
+                            waitForFullConnect = { /* Already connected in direct mode */ },
+                            incoming = flow {
+                                incoming.consumeEach { emit(it) }
+                            },
+                            send = send
+                        )
+                    }
+                    logger.info { "handleDirect: handler completed normally" }
+                    close(WebSocketClose.NORMAL)
+                } catch (e: CancellationException) {
+                    logger.info { "handleDirect: cancelled" }
+                    close(WebSocketClose.GOING_AWAY)
+                } catch (e: HttpStatusException) {
+                    logger.warn(e) { "handleDirect: HTTP exception" }
+                    close(e.status.bestWebsocketCloseCode)
+                } catch (e: Exception) {
+                    logger.error(e) { "handleDirect: unexpected exception" }
+                    close(WebSocketClose.INTERNAL_ERROR)
+                }
+            }
+
+            // --- Standard WebSocketHandler implementation ---
+            // Used by distributed engines (AWS Lambda) that need pub/sub
+
             context(connection: WebSocketConnection<PathSpec0, Storage>)
             override suspend fun didConnect() {
-                // Subscribe to outbound topic to receive messages from the background task
-                connection.subscribe(outboundTopic.request(connection.currentState.id))
+                // Only subscribe to outbound topic if direct send is not available
+                // This avoids unnecessary DynamoDB subscription when using direct API Gateway
+                if (connection.currentState.request.engineSocketId == null) {
+                    connection.subscribe(outboundTopic.request(connection.currentState.id))
+                }
             }
 
             context(serverRuntime: ServerRuntime)

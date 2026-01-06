@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.engine.local.LocalEngine
+import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
@@ -44,6 +45,8 @@ import io.netty.handler.timeout.IdleStateEvent
 import io.netty.handler.timeout.IdleStateHandler
 import io.netty.util.AttributeKey
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.SendChannel
 import kotlinx.serialization.KSerializer
 import java.net.InetSocketAddress
 import java.net.URI
@@ -118,6 +121,7 @@ public class NettyEngine(
     private lateinit var MID_KEY: AttributeKey<WebSocketConnection<PathSpec, Any?>>
     private lateinit var PATHSPEC_KEY: AttributeKey<PathSpec>
     private lateinit var HANDLER_KEY: AttributeKey<WebSocketHandler<PathSpec, Any?>>
+    private lateinit var DIRECT_CHANNEL_KEY: AttributeKey<SendChannel<LkWebSocketFrame>>
 
     /**
      * Starts the Netty HTTP server.
@@ -180,6 +184,7 @@ public class NettyEngine(
         MID_KEY = AttributeKey.valueOf("MID")
         PATHSPEC_KEY = AttributeKey.valueOf("PATHSPEC")
         HANDLER_KEY = AttributeKey.valueOf("SOCKET_HANDLER")
+        DIRECT_CHANNEL_KEY = AttributeKey.valueOf("DIRECT_CHANNEL")
 
         runBlocking { runStartupTasks() }
         startSchedules()
@@ -301,53 +306,86 @@ public class NettyEngine(
                 }
 
                 is TextWebSocketFrame -> {
-                    val mid = ctx.channel().attr(MID_KEY).get() ?: return
-                    val handler = ctx.channel().attr(HANDLER_KEY).get() ?: return
-                    val pathspec = ctx.channel().attr(PATHSPEC_KEY).get() ?: return
+                    val directChannel = ctx.channel().attr(DIRECT_CHANNEL_KEY).get()
                     val m = LkWebSocketFrame(msg.text())
-                    scope.launch(ctx.executor().asCoroutineDispatcher()) {
-                        try {
-                            handler.messageFromClientWithMetrics(pathspec, mid, m)
-                        } catch (e: Exception) {
-                            mid.close(
-                                ((e as? HttpStatusException)?.status
-                                    ?: HttpStatus.InternalServerError).bestWebsocketCloseCode
-                            )
-                        }
-                    }
-                }
-
-                is BinaryWebSocketFrame -> {
-                    val mid = ctx.channel().attr(MID_KEY).get() ?: return
-                    val handler = ctx.channel().attr(HANDLER_KEY).get() ?: return
-                    val pathspec = ctx.channel().attr(PATHSPEC_KEY).get() ?: return
-                    val bytes = ByteBufUtil.getBytes(msg.content())
-                    val m = LkWebSocketFrame(bytes)
-                    scope.launch(ctx.executor().asCoroutineDispatcher()) {
-                        try {
-                            handler.messageFromClientWithMetrics(pathspec, mid, m)
-                        } catch (e: Exception) {
-                            mid.close(
-                                ((e as? HttpStatusException)?.status
-                                    ?: HttpStatus.InternalServerError).bestWebsocketCloseCode
-                            )
-                        }
-                    }
-                }
-
-                is CloseWebSocketFrame -> {
-                    val mid = ctx.channel().attr(MID_KEY).get()
-                    val handler = ctx.channel().attr(HANDLER_KEY).get()
-                    val pathspec = ctx.channel().attr(PATHSPEC_KEY).get()
-                    if (mid != null && handler != null && pathspec != null) {
+                    if (directChannel != null) {
+                        // Direct mode - send to channel
                         scope.launch(ctx.executor().asCoroutineDispatcher()) {
                             try {
-                                handler.disconnectWithMetrics(pathspec, mid, WebSocketClose.NORMAL)
+                                directChannel.send(m)
+                            } catch (_: Exception) {
+                                // Channel closed
+                            }
+                        }
+                    } else {
+                        // Standard pub/sub mode
+                        val mid = ctx.channel().attr(MID_KEY).get() ?: return
+                        val handler = ctx.channel().attr(HANDLER_KEY).get() ?: return
+                        val pathspec = ctx.channel().attr(PATHSPEC_KEY).get() ?: return
+                        scope.launch(ctx.executor().asCoroutineDispatcher()) {
+                            try {
+                                handler.messageFromClientWithMetrics(pathspec, mid, m)
                             } catch (e: Exception) {
                                 mid.close(
                                     ((e as? HttpStatusException)?.status
                                         ?: HttpStatus.InternalServerError).bestWebsocketCloseCode
                                 )
+                            }
+                        }
+                    }
+                }
+
+                is BinaryWebSocketFrame -> {
+                    val directChannel = ctx.channel().attr(DIRECT_CHANNEL_KEY).get()
+                    val bytes = ByteBufUtil.getBytes(msg.content())
+                    val m = LkWebSocketFrame(bytes)
+                    if (directChannel != null) {
+                        // Direct mode - send to channel
+                        scope.launch(ctx.executor().asCoroutineDispatcher()) {
+                            try {
+                                directChannel.send(m)
+                            } catch (_: Exception) {
+                                // Channel closed
+                            }
+                        }
+                    } else {
+                        // Standard pub/sub mode
+                        val mid = ctx.channel().attr(MID_KEY).get() ?: return
+                        val handler = ctx.channel().attr(HANDLER_KEY).get() ?: return
+                        val pathspec = ctx.channel().attr(PATHSPEC_KEY).get() ?: return
+                        scope.launch(ctx.executor().asCoroutineDispatcher()) {
+                            try {
+                                handler.messageFromClientWithMetrics(pathspec, mid, m)
+                            } catch (e: Exception) {
+                                mid.close(
+                                    ((e as? HttpStatusException)?.status
+                                        ?: HttpStatus.InternalServerError).bestWebsocketCloseCode
+                                )
+                            }
+                        }
+                    }
+                }
+
+                is CloseWebSocketFrame -> {
+                    val directChannel = ctx.channel().attr(DIRECT_CHANNEL_KEY).get()
+                    if (directChannel != null) {
+                        // Direct mode - close the channel
+                        directChannel.close()
+                    } else {
+                        // Standard pub/sub mode
+                        val mid = ctx.channel().attr(MID_KEY).get()
+                        val handler = ctx.channel().attr(HANDLER_KEY).get()
+                        val pathspec = ctx.channel().attr(PATHSPEC_KEY).get()
+                        if (mid != null && handler != null && pathspec != null) {
+                            scope.launch(ctx.executor().asCoroutineDispatcher()) {
+                                try {
+                                    handler.disconnectWithMetrics(pathspec, mid, WebSocketClose.NORMAL)
+                                } catch (e: Exception) {
+                                    mid.close(
+                                        ((e as? HttpStatusException)?.status
+                                            ?: HttpStatus.InternalServerError).bestWebsocketCloseCode
+                                    )
+                                }
                             }
                         }
                     }
@@ -384,24 +422,7 @@ public class NettyEngine(
                     return
                 }
 
-            @Suppress("UNCHECKED_CAST")
-            val socketHandler =
-                this@NettyEngine.server.compiledWebsocketInterceptors.intercept(match.value) as WebSocketHandler<PathSpec, Any?>
-
-            val startingState = try {
-                socketHandler.willConnectWithMetrics(match.pathSpec, this@NettyEngine, wsRequest)
-            } catch (e: HttpStatusException) {
-//                val code = when (e.status.code / 100) { 1,2,3 -> WebSocketClose.NORMAL; 4 -> WebSocketClose.CLOSED_ABNORMALLY; else -> WebSocketClose.INTERNAL_ERROR }
-                logger.error(e) { "" }
-                val res = DefaultFullHttpResponse(req.protocolVersion(), HttpResponseStatus.valueOf(e.status.code))
-                ctx.writeAndFlush(res).addListener(ChannelFutureListener.CLOSE)
-                return
-            } catch (e: Throwable) {
-                logger.error(e) { "" }
-                val res = DefaultFullHttpResponse(req.protocolVersion(), HttpResponseStatus.INTERNAL_SERVER_ERROR)
-                ctx.writeAndFlush(res).addListener(ChannelFutureListener.CLOSE)
-                return
-            }
+            val socketHandler = this@NettyEngine.server.compiledWebsocketInterceptors.intercept(match.value)
 
             val host = req.headers()[HOST] ?: "localhost"
             val wsFactory = WebSocketServerHandshakerFactory("ws://$host${URI(req.uri()).path}", null, true)
@@ -412,48 +433,104 @@ public class NettyEngine(
             }
             ctx.channel().attr(HANDSHAKER_KEY).set(handshaker)
 
-            val mid = object : LocalWebSocketConnection<PathSpec, Any?>(
-                startingState = startingState,
-                request = wsRequest,
-                handler = socketHandler,
-                scope = CoroutineScope(Dispatchers.IO),
-                server = this@NettyEngine,
-                pubSub = { this@NettyEngine.pubSubChannel(it) }
-            ) {
-                override suspend fun send(frame: LkWebSocketFrame) {
-                    when (frame) {
-                        is LkWebSocketFrame.Binary -> ctx.writeAndFlush(
-                            BinaryWebSocketFrame(
-                                Unpooled.wrappedBuffer(
-                                    frame.content
+            // Check for direct execution capability - bypasses pub/sub overhead
+            if (socketHandler is DirectExecutableWebSocketHandler<*> && !forceWebSocketPubSub()) {
+                @Suppress("UNCHECKED_CAST")
+                val directHandler = socketHandler as DirectExecutableWebSocketHandler<PathSpec>
+
+                // Create channel for incoming frames
+                val incomingChannel = Channel<LkWebSocketFrame>(Channel.UNLIMITED)
+                ctx.channel().attr(DIRECT_CHANNEL_KEY).set(incomingChannel)
+
+                // Complete handshake and then run direct handler
+                handshaker.handshake(ctx.channel(), req).addListener {
+                    scope.launch {
+                        try {
+                            directHandler.handleDirect(
+                                serverRuntime = this@NettyEngine,
+                                request = wsRequest,
+                                incoming = incomingChannel,
+                                send = { frame ->
+                                    when (frame) {
+                                        is LkWebSocketFrame.Binary -> ctx.writeAndFlush(
+                                            BinaryWebSocketFrame(Unpooled.wrappedBuffer(frame.content))
+                                        )
+                                        is LkWebSocketFrame.Text -> ctx.writeAndFlush(TextWebSocketFrame(frame.content))
+                                    }
+                                },
+                                close = { reason ->
+                                    ctx.writeAndFlush(CloseWebSocketFrame(reason.code.toInt(), reason.name))
+                                        .addListener(ChannelFutureListener.CLOSE)
+                                }
+                            )
+                        } catch (e: Throwable) {
+                            logger.error(e) { "Direct WebSocket handler failed" }
+                            ctx.close()
+                        }
+                    }
+                }
+            } else {
+                // Standard pub/sub-based implementation
+                @Suppress("UNCHECKED_CAST")
+                socketHandler as WebSocketHandler<PathSpec, Any?>
+
+                val startingState = try {
+                    socketHandler.willConnectWithMetrics(match.pathSpec, this@NettyEngine, wsRequest)
+                } catch (e: HttpStatusException) {
+                    logger.error(e) { "" }
+                    val res = DefaultFullHttpResponse(req.protocolVersion(), HttpResponseStatus.valueOf(e.status.code))
+                    ctx.writeAndFlush(res).addListener(ChannelFutureListener.CLOSE)
+                    return
+                } catch (e: Throwable) {
+                    logger.error(e) { "" }
+                    val res = DefaultFullHttpResponse(req.protocolVersion(), HttpResponseStatus.INTERNAL_SERVER_ERROR)
+                    ctx.writeAndFlush(res).addListener(ChannelFutureListener.CLOSE)
+                    return
+                }
+
+                val mid = object : LocalWebSocketConnection<PathSpec, Any?>(
+                    startingState = startingState,
+                    request = wsRequest,
+                    handler = socketHandler,
+                    scope = CoroutineScope(Dispatchers.IO),
+                    server = this@NettyEngine,
+                    pubSub = { this@NettyEngine.pubSubChannel(it) }
+                ) {
+                    override suspend fun send(frame: LkWebSocketFrame) {
+                        when (frame) {
+                            is LkWebSocketFrame.Binary -> ctx.writeAndFlush(
+                                BinaryWebSocketFrame(
+                                    Unpooled.wrappedBuffer(
+                                        frame.content
+                                    )
                                 )
                             )
-                        )
 
-                        is LkWebSocketFrame.Text -> ctx.writeAndFlush(TextWebSocketFrame(frame.content))
+                            is LkWebSocketFrame.Text -> ctx.writeAndFlush(TextWebSocketFrame(frame.content))
+                        }
+                    }
+
+                    override suspend fun close(reason: WebSocketClose) {
+                        val hs = ctx.channel().attr(HANDSHAKER_KEY).get()
+                        if (hs != null) {
+                            ctx.writeAndFlush(CloseWebSocketFrame(reason.code.toInt(), reason.name))
+                                .addListener(ChannelFutureListener.CLOSE)
+                        } else {
+                            ctx.close()
+                        }
                     }
                 }
 
-                override suspend fun close(reason: WebSocketClose) {
-                    val hs = ctx.channel().attr(HANDSHAKER_KEY).get()
-                    if (hs != null) {
-                        ctx.writeAndFlush(CloseWebSocketFrame(reason.code.toInt(), reason.name))
-                            .addListener(ChannelFutureListener.CLOSE)
-                    } else {
-                        ctx.close()
-                    }
-                }
-            }
+                ctx.channel().attr(MID_KEY).set(mid)
+                ctx.channel().attr(HANDLER_KEY).set(socketHandler)
+                ctx.channel().attr(PATHSPEC_KEY).set(match.pathSpec)
 
-            ctx.channel().attr(MID_KEY).set(mid)
-            ctx.channel().attr(HANDLER_KEY).set(socketHandler)
-            ctx.channel().attr(PATHSPEC_KEY).set(match.pathSpec)
-
-            handshaker.handshake(ctx.channel(), req).addListener {
-                scope.launch {
-                    try {
-                        socketHandler.didConnectWithMetrics(match.pathSpec, mid)
-                    } catch (_: Throwable) {
+                handshaker.handshake(ctx.channel(), req).addListener {
+                    scope.launch {
+                        try {
+                            socketHandler.didConnectWithMetrics(match.pathSpec, mid)
+                        } catch (_: Throwable) {
+                        }
                     }
                 }
             }
@@ -469,17 +546,24 @@ public class NettyEngine(
         }
 
         override fun channelInactive(ctx: ChannelHandlerContext) {
-            val mid = ctx.channel().attr(MID_KEY).get()
-            val handler = ctx.channel().attr(HANDLER_KEY).get()
-            if (mid != null && handler != null) {
-                try {
-                    context(mid) {
-                        scope.launch {
-                            logger.error { "Disconnected because channel is inactive " }
-                            handler.disconnect(WebSocketClose.GOING_AWAY)
+            val directChannel = ctx.channel().attr(DIRECT_CHANNEL_KEY).get()
+            if (directChannel != null) {
+                // Direct mode - close the channel
+                directChannel.close()
+            } else {
+                // Standard pub/sub mode
+                val mid = ctx.channel().attr(MID_KEY).get()
+                val handler = ctx.channel().attr(HANDLER_KEY).get()
+                if (mid != null && handler != null) {
+                    try {
+                        context(mid) {
+                            scope.launch {
+                                logger.error { "Disconnected because channel is inactive " }
+                                handler.disconnect(WebSocketClose.GOING_AWAY)
+                            }
                         }
+                    } catch (_: Throwable) {
                     }
-                } catch (_: Throwable) {
                 }
             }
             super.channelInactive(ctx)

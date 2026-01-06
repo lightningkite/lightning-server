@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.engine.local.LocalEngine
+import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.PathSegments
@@ -28,6 +29,7 @@ import io.ktor.server.websocket.*
 import io.ktor.util.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlin.time.Clock
@@ -160,59 +162,100 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
                 }
                 val socketHandler = server.compiledWebsocketInterceptors.intercept(match.value)
 
-                @Suppress("UNCHECKED_CAST")
-                socketHandler as WebSocketHandler<PathSpec, Any?>
+                // Check for direct execution capability - bypasses pub/sub overhead
+                if (socketHandler is DirectExecutableWebSocketHandler<*> && !forceWebSocketPubSub()) {
+                    @Suppress("UNCHECKED_CAST")
+                    val directHandler = socketHandler as DirectExecutableWebSocketHandler<PathSpec>
 
-                val startingState = socketHandler.willConnect(request)
-                var closingMid: WebSocketConnection<PathSpec, Any?>? = null
-                try {
+                    // Create channel for incoming frames
+                    val incomingChannel = Channel<WebSocketFrame>(Channel.UNLIMITED)
 
-                    val mid = object : LocalWebSocketConnection<PathSpec, Any?>(
-                        startingState = startingState,
-                        request = request,
-                        handler = socketHandler,
-                        scope = this@webSocket,
-                        server = this@KtorEngine,
-                        pubSub = { pubSubChannel(it) }
-                    ) {
-                        override suspend fun send(frame: WebSocketFrame) {
-                            this@webSocket.send(
+                    // Launch coroutine to pipe Ktor frames to our channel
+                    launch {
+                        try {
+                            for (frame in incoming) {
                                 when (frame) {
-                                    is WebSocketFrame.Binary -> Frame.Binary(true, frame.content)
-                                    is WebSocketFrame.Text -> Frame.Text(frame.content)
+                                    is Frame.Binary -> incomingChannel.send(WebSocketFrame(frame.data))
+                                    is Frame.Text -> incomingChannel.send(WebSocketFrame(frame.readText()))
+                                    else -> { /* ignore ping/pong/close */ }
                                 }
-                            )
-                        }
-
-                        override suspend fun close(reason: WebSocketClose) {
-                            this@webSocket.close(CloseReason(reason.code, reason.name))
+                            }
+                        } finally {
+                            incomingChannel.close()
                         }
                     }
-                    closingMid = mid
 
-                    context(mid) { socketHandler.didConnect() }
-
-                    for (incoming in this.incoming) {
-                        val m = when (incoming) {
-                            is Frame.Binary -> WebSocketFrame(incoming.data)
-                            is Frame.Text -> WebSocketFrame(incoming.readText())
-                            is Frame.Close -> continue
-                            is Frame.Ping -> continue
-                            is Frame.Pong -> continue
+                    // Run handler directly - no pub/sub, no task indirection
+                    directHandler.handleDirect(
+                        serverRuntime = this@KtorEngine,
+                        request = request,
+                        incoming = incomingChannel,
+                        send = { frame ->
+                            when (frame) {
+                                is WebSocketFrame.Binary -> send(Frame.Binary(true, frame.content))
+                                is WebSocketFrame.Text -> send(Frame.Text(frame.content))
+                            }
+                        },
+                        close = { reason ->
+                            close(CloseReason(reason.code, reason.name))
                         }
-                        context(mid) { socketHandler.messageFromClient(m) }
-                    }
+                    )
+                } else {
+                    // Standard pub/sub-based implementation (for non-direct handlers or when forced)
+                    @Suppress("UNCHECKED_CAST")
+                    socketHandler as WebSocketHandler<PathSpec, Any?>
 
-                    closingMid.let { mid ->
-                        context(mid) { socketHandler.disconnect(WebSocketClose.NORMAL) }
-                    }
-                } catch (e: Throwable) {
-                    closingMid?.let { mid ->
-                        with(mid) {
-                            socketHandler.disconnect(
-                                ((e as? HttpStatusException)?.status
-                                    ?: HttpStatus.InternalServerError).bestWebsocketCloseCode
-                            )
+                    val startingState = socketHandler.willConnect(request)
+                    var closingMid: WebSocketConnection<PathSpec, Any?>? = null
+                    try {
+
+                        val mid = object : LocalWebSocketConnection<PathSpec, Any?>(
+                            startingState = startingState,
+                            request = request,
+                            handler = socketHandler,
+                            scope = this@webSocket,
+                            server = this@KtorEngine,
+                            pubSub = { pubSubChannel(it) }
+                        ) {
+                            override suspend fun send(frame: WebSocketFrame) {
+                                this@webSocket.send(
+                                    when (frame) {
+                                        is WebSocketFrame.Binary -> Frame.Binary(true, frame.content)
+                                        is WebSocketFrame.Text -> Frame.Text(frame.content)
+                                    }
+                                )
+                            }
+
+                            override suspend fun close(reason: WebSocketClose) {
+                                this@webSocket.close(CloseReason(reason.code, reason.name))
+                            }
+                        }
+                        closingMid = mid
+
+                        context(mid) { socketHandler.didConnect() }
+
+                        for (incoming in this.incoming) {
+                            val m = when (incoming) {
+                                is Frame.Binary -> WebSocketFrame(incoming.data)
+                                is Frame.Text -> WebSocketFrame(incoming.readText())
+                                is Frame.Close -> continue
+                                is Frame.Ping -> continue
+                                is Frame.Pong -> continue
+                            }
+                            context(mid) { socketHandler.messageFromClient(m) }
+                        }
+
+                        closingMid.let { mid ->
+                            context(mid) { socketHandler.disconnect(WebSocketClose.NORMAL) }
+                        }
+                    } catch (e: Throwable) {
+                        closingMid?.let { mid ->
+                            with(mid) {
+                                socketHandler.disconnect(
+                                    ((e as? HttpStatusException)?.status
+                                        ?: HttpStatus.InternalServerError).bestWebsocketCloseCode
+                                )
+                            }
                         }
                     }
                 }

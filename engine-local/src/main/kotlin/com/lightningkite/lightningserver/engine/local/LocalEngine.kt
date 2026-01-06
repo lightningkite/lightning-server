@@ -43,6 +43,23 @@ public val engineCache: ServerSetting<Cache.Settings, Cache> =
     ServerSetting("cache", Cache.Settings(), Cache.Settings.serializer())
 
 /**
+ * When true, local engines will use pub/sub for WebSocket handlers even when
+ * direct execution is available (i.e., when the handler implements [DirectExecutableWebSocketHandler]).
+ *
+ * This is useful for testing distributed behavior locally, as it forces the same
+ * code path that would be used in serverless environments like AWS Lambda.
+ *
+ * Default is false, meaning local engines will automatically use direct execution
+ * when available for better performance.
+ */
+public val forceWebSocketPubSub: ServerSetting.Direct<Boolean> = ServerSetting(
+    "forceWebSocketPubSub",
+    false,
+    kotlinx.serialization.serializer(),
+    optional = true
+)
+
+/**
  * Base class for local server engines that run within a single JVM process.
  *
  * This engine is primarily used for:
@@ -86,6 +103,7 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
             listOf(
                 enginePubSub,
                 engineCache,
+                forceWebSocketPubSub,
             )
         ).distinctBy { it.name }.toSet()
     )

@@ -88,6 +88,12 @@ public data class WebSocketConnectRequest<PATH: PathSpec>(
     override val protocol: String = "",
     override val sourceIp: String = "",
     override val cache: SerializableCache = SerializableCache(),
+    /**
+     * Engine-specific socket identifier for direct message sending.
+     * For AWS API Gateway, this is the connection ID.
+     * Used by CoroutineWebsocketHandler to bypass pub/sub for direct sends.
+     */
+    val engineSocketId: String? = null,
 ) : Request<PATH>()
 
 /**

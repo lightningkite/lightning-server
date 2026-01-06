@@ -21,6 +21,8 @@ import com.lightningkite.services.terraform.direct
 import com.lightningkite.toEmailAddress
 import com.lightningkite.EmailAddress
 import com.lightningkite.lightningserver.terraform.*
+import com.lightningkite.lightningserver.terraform.awsserverless.OtlpProtocol
+import com.lightningkite.lightningserver.terraform.awsserverless.otelCollector
 import com.lightningkite.services.ai.koog.LLMClientAndModel
 import com.lightningkite.services.ai.koog.awsBedrock
 import com.lightningkite.services.email.EmailInboundService
@@ -86,7 +88,47 @@ object LkEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
                 additive = false,
             )
         )))
-        telemetrySettings.direct(null)
+        telemetrySettings.otelCollector(
+            otlpEndpoint = "https://signoz.lightningkite.com",
+            otlpProtocol = OtlpProtocol.HTTP,
+            serviceName = displayName,
+//            samplingRatio = 0.1,
+            customCollectorConfig = """
+                receivers:
+                  otlp:
+                    protocols:
+                      grpc:
+                        endpoint: 0.0.0.0:4317
+                      http:
+                        endpoint: 0.0.0.0:4318
+
+                processors:
+                  batch:
+                    timeout: 5s
+                    send_batch_size: 256
+
+                exporters:
+                  otlphttp:
+                    endpoint: https://signoz.lightningkite.com
+                    tls:
+                      insecure: false
+
+                service:
+                  pipelines:
+                    traces:
+                      receivers: [otlp]
+                      processors: [batch]
+                      exporters: [otlphttp]
+                    metrics:
+                      receivers: [otlp]
+                      processors: [batch]
+                      exporters: [otlphttp]
+                    logs:
+                      receivers: [otlp]
+                      processors: [batch]
+                      exporters: [otlphttp]
+            """.trimIndent()
+        )
         cors.direct(CorsSettings(
             limitToDomains = listOf("*"),
             limitToHeaders = listOf("*"),

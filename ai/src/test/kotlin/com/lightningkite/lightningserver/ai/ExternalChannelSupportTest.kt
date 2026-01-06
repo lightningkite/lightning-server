@@ -27,6 +27,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
+import com.lightningkite.lightningserver.ai.models.*
 
 /**
  * Test user model with phone and email for external channel testing

@@ -26,6 +26,7 @@ import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
+import com.lightningkite.lightningserver.ai.models.*
 
 /**
  * Test user model for LLMChatEndpoints testing
