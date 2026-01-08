@@ -14,6 +14,8 @@ import com.lightningkite.lightningserver.typed.sdk.info
 import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.services.sms.SMS
 import com.lightningkite.toPhoneNumber
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
 
 /**
  * SMS-based authentication proof endpoint.
@@ -50,11 +52,13 @@ public class SmsProofEndpoints(
     private val sms: Runtime<SMS>,
     private val smsTemplate: suspend context(ServerRuntime) (pin: String) -> String = { code -> "Your ${generalSettings().projectName} code is ${code}. Don't share this with anyone." },
     proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
+    proofExpiration: Duration = 1.hours,
     private val verifyPhone: suspend context(ServerRuntime) (String) -> Boolean = { true },
 ) : PinBasedProofEndpoints(
     name = "sms",
     property = "phone",
     proofSigner = proofSigner,
+    proofExpiration = proofExpiration,
     pin = pin,
     exampleTarget = "800-1000-100",
     strength = 5,

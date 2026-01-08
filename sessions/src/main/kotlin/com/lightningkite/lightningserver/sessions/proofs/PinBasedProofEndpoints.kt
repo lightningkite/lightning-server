@@ -14,13 +14,16 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.sessions.proofs.extensions.constrainAttemptRate
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
+import com.lightningkite.lightningserver.sessions.proofs.extensions.verify
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.services.database.HasId
+import kotlin.time.Duration
 
 public abstract class PinBasedProofEndpoints(
     public val name: String,
     public val property: String,
-    public val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
+    override val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
+    override val proofExpiration: Duration,
     public val pin: PinHandler,
     public val exampleTarget: String,
     public val strength: Int = 10,
@@ -45,7 +48,7 @@ public abstract class PinBasedProofEndpoints(
         path.path("start").post bind ApiHttpHandler(
             auth = noAuth,
             summary = "Begin $name Ownership Proof",
-            description = "Sends a login code to the given ${name.lowercase()}.  The message will contain both a PIN that can be combined with the returned key to log in.",
+            description = "Sends a login code to the given ${name.lowercase()}. The message will contain both a PIN that can be combined with the returned key to log in.",
             errorCases = emptyList(),
             successCode = HttpStatus.OK,
             implementation = { valueUnsafe: String ->
@@ -64,10 +67,8 @@ public abstract class PinBasedProofEndpoints(
     context(_: ServerRuntime)
     protected suspend fun issueProof(destination: String): Proof {
         return proofSigner.await().makeProof(
-            info = info,
-            property = info.property!!,
+            property = property,
             value = destination,
-            at = now()
         )
     }
 
@@ -75,15 +76,13 @@ public abstract class PinBasedProofEndpoints(
         path.path("prove").post bind ApiHttpHandler(
             auth = noAuth,
             summary = "Prove ${info.property} ownership",
-            description = "Logs in to the given account with a PIN that was sent earlier and the key from that request.  Note that the PIN expires in ${pin.expiration.inWholeMinutes} minutes, and you are only permitted ${pin.maxAttempts} attempts.",
+            description = "Logs in to the given account with a PIN that was sent earlier and the key from that request. Note that the PIN expires in ${pin.expiration.inWholeMinutes} minutes, and you are only permitted ${pin.maxAttempts} attempts.",
             errorCases = emptyList(),
             successCode = HttpStatus.OK,
             implementation = { input: FinishProof ->
                 proofSigner.await().makeProof(
-                    info = info,
-                    property = info.property!!,
+                    property = property,
                     value = pin.assert(input.key, input.password),
-                    at = now()
                 )
             }
         )

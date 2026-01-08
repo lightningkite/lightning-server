@@ -41,14 +41,14 @@ public interface ScheduledTask {
 public fun ScheduledTask(
     schedule: Schedule,
     timeout: Duration = 5.minutes,
-    handler: suspend context(ServerRuntime) () -> Unit
+    handler: suspend context(ServerRuntime) ScheduledTask.() -> Unit
 ): ScheduledTask =
     object : ScheduledTask {
         override val schedule: Schedule = schedule
         override val timeout: Duration = timeout
         context(server: ServerRuntime)
         override suspend fun execute() {
-            handler(server)
+            handler()
         }
     }
 
@@ -65,14 +65,14 @@ public fun ScheduledTask(
 public fun ScheduledTask(
     frequency: Duration,
     timeout: Duration = 5.minutes,
-    handler: suspend context(ServerRuntime) () -> Unit
+    handler: suspend context(ServerRuntime) ScheduledTask.() -> Unit
 ): ScheduledTask =
     object : ScheduledTask {
         override val schedule: Schedule = Schedule.Frequency(frequency)
         override val timeout: Duration = timeout
         context(server: ServerRuntime)
         override suspend fun execute() {
-            handler(server)
+            handler()
         }
     }
 
@@ -91,14 +91,14 @@ public fun ScheduledTask(
     timeOfDay: LocalTime,
     timeZone: TimeZone,
     timeout: Duration = 5.minutes,
-    handler: suspend context(ServerRuntime) () -> Unit
+    handler: suspend context(ServerRuntime) ScheduledTask.() -> Unit
 ): ScheduledTask =
     object : ScheduledTask {
         override val schedule: Schedule = Schedule.Daily(timeOfDay, timeZone)
         override val timeout: Duration = timeout
         context(server: ServerRuntime)
         override suspend fun execute() {
-            handler(server)
+            handler()
         }
     }
 
@@ -118,14 +118,14 @@ public fun ScheduledTask(
     cron: CronPattern,
     timeZone: TimeZone,
     timeout: Duration = 5.minutes,
-    handler: suspend context(ServerRuntime) () -> Unit
+    handler: suspend context(ServerRuntime) ScheduledTask.() -> Unit
 ): ScheduledTask =
     object : ScheduledTask {
         override val schedule: Schedule = Schedule.Cron(cron, timeZone)
         override val timeout: Duration = timeout
         context(server: ServerRuntime)
         override suspend fun execute() {
-            handler(server)
+            handler()
         }
     }
 

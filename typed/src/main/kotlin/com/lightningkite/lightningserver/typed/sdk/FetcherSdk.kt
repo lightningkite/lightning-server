@@ -221,7 +221,7 @@ public class FetcherSdk(
         fun PathSpec.toCodeString() = segments.joinToString("/", prefix = "\"", postfix = "\"") {
             when (it) {
                 is PathSpec.Segment.Constant -> it.value
-                is PathSpec.Segment.Wildcard<*> -> $$"${fetcher.url($${it.name}, $${it.serializer.kotlinSerializer()})}"
+                is PathSpec.Segment.Wildcard<*> -> $$"${fetcher.url($${it.name.functionCase()}, $${it.serializer.kotlinSerializer()})}"
             }
         }
 
@@ -293,7 +293,7 @@ public class FetcherSdk(
     }
 
     private fun SDK.Function.kotlinString(): String {
-        val argString = arguments.joinToString { "${it.name}: ${it.type.kotlinTypeString()}" }
+        val argString = arguments.joinToString { "${it.name.functionCase()}: ${it.type.kotlinTypeString()}" }
         return when (this) {
             is SDK.Function.Endpoint ->
                 "suspend fun $functionName($argString)" + if (outputType.isUnit()) "" else ": ${outputType.kotlinTypeString()}"

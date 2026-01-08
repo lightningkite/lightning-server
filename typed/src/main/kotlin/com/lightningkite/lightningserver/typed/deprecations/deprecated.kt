@@ -23,7 +23,7 @@ import com.lightningkite.services.database.Table
 
 @Deprecated(
     "Use the standard syntax",
-    ReplaceWith("path.path(key) bind startupOnce(database, action = action)")
+    ReplaceWith("path.path(key) bind startupOnce(database, migrateKey = true, action = action)")
 )
 context(builder: ServerBuilder)
 public fun startupOnce(
@@ -31,7 +31,7 @@ public fun startupOnce(
     database: Runtime<Database>,
     action: suspend context(ServerRuntime) () -> Unit
 ): Unit = with(builder) {
-    path.path(key) bind startupOnce(database, action = action)
+    path.path(key) bind startupOnce(database, migrateKey = true, action = action)
 }
 
 @Deprecated("Use fetch instead", ReplaceWith("fetch"))
