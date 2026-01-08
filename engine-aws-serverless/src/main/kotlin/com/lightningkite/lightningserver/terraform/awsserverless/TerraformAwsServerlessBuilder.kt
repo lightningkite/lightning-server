@@ -78,6 +78,10 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
     public val lambdaEnvironment: MutableMap<String, String> = HashMap()
 
     override fun finalize() {
+
+        if(projectPrefix.any { !it.isLetterOrDigit() && !(it == '-' || it == '_') })
+            throw IllegalArgumentException("The projectPrefix has illegal characters in it. It can only contain: Letters, Digits, '-', and '_'.")
+
         super.finalize()
         require(TerraformProviderImport.aws)
         require(
@@ -357,7 +361,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 "cloudwatch_role_arn" - expression("aws_iam_role.cloudwatch.arn")
             }
             "resource.aws_iam_role.cloudwatch" {
-                "name" - emitter.projectPrefix.filter { it.isLetterOrDigit() }
+                "name" - emitter.projectPrefix
 
                 "assume_role_policy" - Json.encodeToString(terraformJsonObject {
                     "Version" - "2012-10-17"
@@ -374,7 +378,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 })
             }
             "resource.aws_iam_role_policy.cloudwatch" {
-                "name" - "${emitter.projectPrefix.filter { it.isLetterOrDigit() }}_policy"
+                "name" - "${emitter.projectPrefix}_policy"
                 "role" - expression("aws_iam_role.cloudwatch.id")
 
                 "policy" - Json.encodeToString(terraformJsonObject {
