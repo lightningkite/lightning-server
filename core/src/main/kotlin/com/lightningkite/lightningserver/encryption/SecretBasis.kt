@@ -7,6 +7,8 @@ import dev.whyoleg.cryptography.algorithms.SHA512
 import dev.whyoleg.cryptography.materials.key.Key
 import dev.whyoleg.cryptography.materials.key.KeyDecoder
 import dev.whyoleg.cryptography.materials.key.KeyFormat
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -82,6 +84,7 @@ public data class SecretBasis(public val string: String) {
     private var hmac: HMAC.Key? = null
 
     private val hmacLock = Any()
+    private val hmacMutex = Mutex() // I'm not sure if this mutex is necessary, but I'm including it because I do not want to deal with a subtle concurrency bug in the future.
 
     /**
      * Lazily initializes and returns the HMAC-SHA512 key for this [SecretBasis].
@@ -94,12 +97,11 @@ public data class SecretBasis(public val string: String) {
      *
      * @return The HMAC-SHA512 cryptographic key
      */
-    public suspend fun key(): HMAC.Key = hmac ?: synchronized(hmacLock) {
-        hmac ?: kotlinx.coroutines.runBlocking {
-            CryptographyProvider.Default.get(HMAC)
-                .keyDecoder(SHA512)
-                .decodeFromByteArray(HMAC.Key.Format.RAW, bytes)
-        }.also { hmac = it }
+    public suspend fun key(): HMAC.Key = hmac ?: hmacMutex.withLock {
+        hmac ?: CryptographyProvider.Default.get(HMAC)
+            .keyDecoder(SHA512)
+            .decodeFromByteArray(HMAC.Key.Format.RAW, bytes)
+            .also { hmac = it }
     }
 
     /**
