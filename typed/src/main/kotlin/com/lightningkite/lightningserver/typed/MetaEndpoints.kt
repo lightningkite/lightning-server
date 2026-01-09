@@ -135,8 +135,9 @@ public class MetaEndpoints(
 
     context(runtime: ServerRuntime)
     private suspend fun openAdmin2(): HttpResponse {
+        val publicUrl = generalSettings().publicUrl
         val inject = buildJsonObject {
-            put("url", generalSettings().publicUrl)
+            put("url", publicUrl)
         }
         val page = client.get("https://ls5admin.cs.lightningkite.com").bodyAsText()
             .let { original ->
@@ -148,13 +149,13 @@ public class MetaEndpoints(
             .let { original ->
                 (original.substringBeforeLast("<head>") + """
                     <head>
-                    <base href="${admin2.location.path.resolved().toString(runtime.externalSerialization.stringArrayFormat)}">
+                    <base href="${publicUrl}${admin2.location.path.resolved().toString(runtime.externalSerialization.stringArrayFormat)}">
                 """.trimIndent() + original.substringAfterLast("<head>"))
             }
         return HttpResponse.html(content = page, headers = HttpHeaders {
             add(
                 "Content-Security-Policy",
-                "script-src 'unsafe-eval' ${generalSettings().publicUrl}/ https://ls5admin.cs.lightningkite.com/"
+                "script-src 'unsafe-eval' ${publicUrl}/ https://ls5admin.cs.lightningkite.com/"
             )
         })
     }
