@@ -22,8 +22,6 @@ import com.lightningkite.lightningserver.typed.sdk.clientInterface
 import com.lightningkite.lightningserver.typed.sdk.info
 import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.services.cache.Cache
-import com.lightningkite.services.cache.get
-import com.lightningkite.services.cache.set
 import com.lightningkite.services.database.*
 import dev.turingcomplete.kotlinonetimepassword.HmacAlgorithm
 import dev.turingcomplete.kotlinonetimepassword.TimeBasedOneTimePasswordConfig
@@ -54,7 +52,7 @@ public class TimeBasedOTPProofEndpoints(
     ),
 ) : ServerBuilder(), DirectProofMethod {
     init {
-        proofMethods.register(this)
+        proofMethodsRegistry.register(this)
 
         sdkSettings.defaultInfo = SdkModule.Info("TimeBasedOTPProof", "totp")
         sdkSettings.clientInterface = ProofClientEndpoints.TimeBasedOTP::class.info()

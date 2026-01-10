@@ -7,10 +7,6 @@ import com.lightningkite.lightningserver.auth.require
 import com.lightningkite.lightningserver.auth.fetch
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.Runtime
-import com.lightningkite.lightningserver.definition.RuntimeDeferred
-import com.lightningkite.lightningserver.definition.secretBasis
-import com.lightningkite.lightningserver.encryption.Signer
-import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
@@ -21,10 +17,9 @@ import com.lightningkite.lightningserver.sessions.proofs.AuthClientEndpoints
 import com.lightningkite.lightningserver.sessions.proofs.AuthRequirements
 import com.lightningkite.lightningserver.sessions.proofs.Proof
 import com.lightningkite.lightningserver.sessions.proofs.ProofOption
-import com.lightningkite.lightningserver.sessions.proofs.extensions.verify
-import com.lightningkite.lightningserver.sessions.proofs.proofMethods
 import com.lightningkite.lightningserver.sessions.proofs.ProofMethod
 import com.lightningkite.lightningserver.sessions.proofs.extensions.isValid
+import com.lightningkite.lightningserver.sessions.proofs.proofMethods
 import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.sessions.token.TokenFormat
 import com.lightningkite.lightningserver.toException
@@ -43,8 +38,6 @@ import com.lightningkite.services.database.HasId
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlin.math.min
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
 
 /**
@@ -441,7 +434,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                     readyToLogIn = strength >= requiredStrength,
                     maxExpiration = sessionExpiration(subject),
                     id = subject._id,
-                    options = proofMethods
+                    options = methods.values
                         .filter { it.info.via !in used }
                         .map {
                             ProofOption(

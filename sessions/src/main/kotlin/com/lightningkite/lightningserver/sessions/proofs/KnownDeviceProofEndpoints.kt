@@ -8,7 +8,6 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.checkAgainstHash
-import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpStatus
@@ -20,11 +19,9 @@ import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.sessions.proofs.extensions.constrainAttemptRate
 import com.lightningkite.lightningserver.auth.idString
-import com.lightningkite.lightningserver.encryption.checkAgainstHash
 import com.lightningkite.lightningserver.encryption.fastHash
 import com.lightningkite.lightningserver.encryption.isSlowHash
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
-import com.lightningkite.lightningserver.sessions.proofs.extensions.verify
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
@@ -50,7 +47,7 @@ public class KnownDeviceProofEndpoints(
     private val expires: Runtime<Duration> = Runtime.Constant(30.days),
 ) : ServerBuilder(), StringProofMethod {
     init {
-        proofMethods.register(this)
+        proofMethodsRegistry.register(this)
 
         sdkSettings.defaultInfo = SdkModule.Info(
             interfaceName = "KnownDeviceProof",
