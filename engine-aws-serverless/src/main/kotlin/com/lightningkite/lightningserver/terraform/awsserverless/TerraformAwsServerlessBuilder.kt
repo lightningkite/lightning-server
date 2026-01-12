@@ -90,7 +90,6 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 null,
                 buildJsonObject { put("region", region.id()) })
         )
-        require(TerraformProvider(TerraformProviderImport.mongodbAtlas, null, JsonObject(emptyMap())))
         val emitter = this@TerraformAwsServerlessBuilder
 
         fulfillSetting(generalSettings.name, buildJsonObject {
