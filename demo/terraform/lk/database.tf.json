@@ -34,18 +34,22 @@
         },
         "mongodbatlas_advanced_cluster": {
             "database": {
-                "replication_specs": {
-                    "zone_name": "Zone 1",
-                    "region_configs": {
-                        "backing_provider_name": "AWS",
-                        "electable_specs": {
-                            "instance_size": "M0"
-                        },
-                        "region_name": "US_WEST_2",
-                        "priority": 7,
-                        "provider_name": "TENANT"
+                "replication_specs": [
+                    {
+                        "zone_name": "Zone 1",
+                        "region_configs": [
+                            {
+                                "backing_provider_name": "AWS",
+                                "electable_specs": {
+                                    "instance_size": "M0"
+                                },
+                                "region_name": "US_WEST_2",
+                                "priority": 7,
+                                "provider_name": "TENANT"
+                            }
+                        ]
                     }
-                },
+                ],
                 "project_id": "${mongodbatlas_project.database.id}",
                 "name": "LightningServerDemodatabase",
                 "cluster_type": "REPLICASET"

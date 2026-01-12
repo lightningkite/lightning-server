@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.demo
 
-import ai.koog.prompt.executor.clients.bedrock.BedrockModels
 import com.lightningkite.lightningserver.cors.CorsSettings
 import com.lightningkite.lightningserver.definition.loggingSettings
 import com.lightningkite.lightningserver.definition.secretBasis
@@ -23,8 +22,6 @@ import com.lightningkite.EmailAddress
 import com.lightningkite.lightningserver.terraform.*
 import com.lightningkite.lightningserver.terraform.awsserverless.OtlpProtocol
 import com.lightningkite.lightningserver.terraform.awsserverless.otelCollector
-import com.lightningkite.services.ai.koog.LLMClientAndModel
-import com.lightningkite.services.ai.koog.awsBedrock
 import com.lightningkite.services.email.EmailInboundService
 import com.lightningkite.services.email.javasmtp.awsSesDomain
 import com.lightningkite.services.email.javasmtp.awsSesSmtpLegacy
@@ -88,46 +85,12 @@ object LkEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
                 additive = false,
             )
         )))
+        // by Claude - Use ADOT layer's default config with env vars (custom config not supported)
         telemetrySettings.otelCollector(
             otlpEndpoint = "https://signoz.lightningkite.com",
             otlpProtocol = OtlpProtocol.HTTP,
             serviceName = displayName,
 //            samplingRatio = 0.1,
-            customCollectorConfig = """
-                receivers:
-                  otlp:
-                    protocols:
-                      grpc:
-                        endpoint: 0.0.0.0:4317
-                      http:
-                        endpoint: 0.0.0.0:4318
-
-                processors:
-                  batch:
-                    timeout: 5s
-                    send_batch_size: 256
-
-                exporters:
-                  otlphttp:
-                    endpoint: https://signoz.lightningkite.com
-                    tls:
-                      insecure: false
-
-                service:
-                  pipelines:
-                    traces:
-                      receivers: [otlp]
-                      processors: [batch]
-                      exporters: [otlphttp]
-                    metrics:
-                      receivers: [otlp]
-                      processors: [batch]
-                      exporters: [otlphttp]
-                    logs:
-                      receivers: [otlp]
-                      processors: [batch]
-                      exporters: [otlphttp]
-            """.trimIndent()
         )
         cors.direct(CorsSettings(
             limitToDomains = listOf("*"),
@@ -139,8 +102,6 @@ object LkEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
             forbidOnMatchFail = false
         ))
         newSecret.byVariable()
-        llm.awsBedrock(BedrockModels.AnthropicClaude4_5Haiku.id, region.id())
-//        llm.awsBedrock(BedrockModels.MoonshotKimiK2Thinking.id, region.id())
         awsSesDomain("email", "joseph@lightningkite.com".toEmailAddress())
         email.awsSesSmtp("email")
         emailInbound.awsSesInbound("email", "https://lightningserver.cs.lightningkite.com/assistant-channels/email/webhook")
@@ -172,4 +133,9 @@ object LkEnvEdit {
 object LkEnvDestroy {
     @JvmStatic
     fun main(vararg args: String) = LkEnv.terraform("destroy", "--auto-approve")
+}
+
+object LkEnvWrite {
+    @JvmStatic
+    fun main(vararg args: String) = LkEnv.write()
 }

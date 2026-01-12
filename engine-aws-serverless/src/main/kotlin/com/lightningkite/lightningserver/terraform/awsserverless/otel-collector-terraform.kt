@@ -160,6 +160,7 @@ public fun TerraformNeed<OpenTelemetrySettings?>.otelCollector(
     val localCollectorUrl = "${otlpProtocol.urlScheme}://localhost:${otlpProtocol.defaultPort}"
     emitter.fulfillSetting(name, Json.encodeToJsonElement(OpenTelemetrySettings(
         url = localCollectorUrl,
+        serviceName = effectiveServiceName,
         batching = OpenTelemetrySettings.BatchingRules(
             frequency = 10.seconds,  // Shorter batching for Lambda (limited execution time)
             maxQueueSize = 512,

@@ -329,10 +329,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 )
                 val domainName = emitter.domain
                 val zone = emitter.domainZoneId
-
-                // ACM certificate for ws.{domain} - needs to be in us-east-1 for CloudFront compatibility
                 "resource.aws_acm_certificate.ws" {
-                    "provider" - "aws.acm" // us-east-1 provider alias (not an expression)
                     "domain_name" - "ws.${domainName}"
                     "validation_method" - "DNS"
                 }
@@ -344,7 +341,6 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                     "ttl" - "300"
                 }
                 "resource.aws_acm_certificate_validation.ws" {
-                    "provider" - "aws.acm" // us-east-1 provider alias (not an expression)
                     "certificate_arn" - expression("aws_acm_certificate.ws.arn")
                     "validation_record_fqdns" - listOf(expression("aws_route53_record.ws.fqdn"))
                 }
@@ -610,7 +606,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 val resourceName = "lambda_" + filename.replace(".", "_").replace("/", "_")
                 "resource.local_file.$resourceName" {
                     "content" - content
-                    "filename" - $$"${path.module}/build/$filename"
+                    "filename" - "\${path.module}/build/$filename"
                 }
             }
             "resource.null_resource.lambda_jar_source" {
@@ -639,11 +635,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 ) + lambdaFiles.map { (filename, _) ->
                     val resourceName = "lambda_" + filename.replace(".", "_").replace("/", "_")
                     terraformJsonObject {
-                        "command" - this@emit.expression(
-                            $$"""
-                                local.is_windows ? "cp \"${local_file.${resourceName}.filename}\" \"${path.module}/build/lambda/${filename}\"" : "cp \"${local_file.${resourceName}.filename}\" \"${path.module}/build/lambda/${filename}\""
-                            """.trimIndent()
-                        )
+                        "command" - $$"""cp "${local_file.$$resourceName.filename}" "${path.module}/build/lambda/$$filename""""
                         "interpreter" - this@emit.expression("local.is_windows ? [\"PowerShell\", \"-Command\"] : []")
                     }
                 })

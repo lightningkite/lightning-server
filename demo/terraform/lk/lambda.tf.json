@@ -144,7 +144,6 @@
                         "OTEL_METRICS_EXPORTER": "otlp",
                         "OTEL_TRACES_EXPORTER": "otlp",
                         "OTEL_LOGS_EXPORTER": "otlp",
-                        "OTEL_EXPORTER_OTLP_HEADERS": "",
                         "LIGHTNING_SERVER_SETTINGS_DECRYPTION": "${random_password.settings.result}",
                         "OTEL_EXPORTER_OTLP_ENDPOINT": "https://signoz.lightningkite.com",
                         "OTEL_PROPAGATORS": "tracecontext,baggage,xray"
@@ -209,7 +208,7 @@
                 "debug": true,
                 "emergencyContact": "joseph@lightningkite.com"
             },
-            "database": "mongodb+srv://LightningServerDemodatabase-main:${random_password.database.result}@${replace(mongodbatlas_advanced_cluster.database.connection_strings[0].standard_srv, \"mongodb+srv://\", \"\")}/default?retryWrites=true&w=majority",
+            "database": "mongodb+srv://LightningServerDemodatabase-main:${random_password.database.result}@${replace(mongodbatlas_advanced_cluster.database.connection_strings.standard_srv, \"mongodb+srv://\", \"\")}/default?retryWrites=true&w=majority",
             "emailInbound": "ses://",
             "sms": "${var.sms}",
             "files": "s3://${aws_s3_bucket.files.bucket}.s3-${aws_s3_bucket.files.region}.amazonaws.com/?signedUrlDuration=1d",
@@ -232,6 +231,7 @@
             "awsApiGatewayWsEndpointSetting": "${aws_apigatewayv2_stage.ws.invoke_url}",
             "telemetry": {
                 "url": "otlp-http://localhost:4318",
+                "serviceName": "Lightning Server Demo",
                 "batching": {
                     "frequency": "PT10S",
                     "maxQueueSize": 512,

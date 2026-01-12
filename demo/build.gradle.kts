@@ -28,7 +28,6 @@ dependencies {
     api(project(":secret-source-aws"))
     api(project(":sessions-sms"))
     api(project(":files"))
-    api(project(":ai"))
     api(libs.serviceAbstractionsPubsub)
     api(libs.serviceAbstractionsPubsubRedis)
     api(libs.serviceAbstractionsPubsubAws)

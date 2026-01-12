@@ -3,8 +3,6 @@
 package com.lightningkite.lightningserver.demo
 
 import com.lightningkite.DataSize.Companion.bytes
-import com.lightningkite.lightningserver.ai.ExternalChannelSupport
-import com.lightningkite.lightningserver.ai.VoiceChannelSupport
 import com.lightningkite.lightningserver.demo.endpoints.*
 import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
@@ -26,8 +24,6 @@ import com.lightningkite.lightningserver.typed.route
 import com.lightningkite.lightningserver.typed.sdk.module
 import com.lightningkite.lightningserver.websockets.*
 import kotlinx.coroutines.flow.Flow
-import com.lightningkite.services.ai.koog.LLMClientAndModel
-import com.lightningkite.services.ai.koog.LLMClientAndModelSettings
 import com.lightningkite.services.cache.*
 import com.lightningkite.services.cache.dynamodb.*
 import com.lightningkite.services.cache.memcached.*
@@ -71,7 +67,6 @@ import kotlin.uuid.*
 object Server : ServerBuilder() {
 
     val database = setting("database", Database.Settings())
-    val llm = setting("llm", LLMClientAndModel.Settings(""))
     val email = setting("email", EmailService.Settings())
     val emailInbound = setting("emailInbound", EmailInboundService.Settings())
     val sms = setting("sms", SMS.Settings())
@@ -242,43 +237,6 @@ object Server : ServerBuilder() {
         context(server: ServerRuntime)
         override suspend fun sessionStaleAfter(subject: User): Duration? = null
     }
-
-    val blogAssist = BlogAssistantChat(database, llm, blogPostInfo = blog.info)
-    val blogAssistEndpoints = path.path("assistant") module blogAssist
-    val blogAssistChannels = path.path("assistant-channels") module ExternalChannelSupport(
-        chatEndpoints = blogAssist,
-        principalType = UserAuth,
-        smsInbound = smsInbound,
-        smsOutbound = sms,
-        emailInbound = emailInbound,
-        emailOutbound = email,
-        files = files,
-        resolveSubjectByEmail = { emailAddr ->
-            userInfo.table().findOne(condition { it.email eq emailAddr.raw })
-        },
-        resolveSubjectByPhone = {  phone ->
-            userInfo.table().findOne(condition { it.phone eq phone })
-        },
-    )
-
-    val blogAssistVoice = path.path("assistant-voice") module VoiceChannelSupport(
-        chatEndpoints = blogAssist, // Provides tools and voice instructions
-        authRequirement = UserAuth.require(),
-        principalType = UserAuth,
-        voiceAgent = voiceAgent,
-        pubsub = pubsub,
-        phoneCall = phoneCall, // Enable phone call integration
-        resolveSubjectByPhone = { phone ->
-            userInfo.table().findOne(condition { it.phone eq phone })
-        },
-        historyMessageLimit = 10,
-        voiceInstructions = """
-            You are having a voice conversation. Always respond in English, regardless of how the user speaks.
-            Be brief but clear in your responses since this is a voice call.
-            Greet the user naturally when the conversation starts and ask how you can help.
-        """.trimIndent(),
-        basePath = "/assistant-voice", // Required for phone call WebSocket URL
-    )
 
     init { registerBasicMediaTypeCoders() }
 }
