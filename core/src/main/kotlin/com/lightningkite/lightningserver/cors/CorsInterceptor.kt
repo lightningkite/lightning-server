@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.ForbiddenException
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.definition.Runtime
+import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -33,7 +34,10 @@ internal fun originMatches(allowed: List<String>, origin: String): Boolean {
             (allowedSchema.isBlank() || originSchema.equals(allowedSchema, ignoreCase = true)) &&
                     (allowedTrimmed.equals("*", ignoreCase = true) ||
                             allowedTrimmed.equals(originTrimmed, ignoreCase = true) ||
-                            (allowedTrimmed.startsWith('*', ignoreCase = true) && originTrimmed.endsWith(allowedTrimmed.removePrefix("*"), ignoreCase = true)))
+                            (allowedTrimmed.startsWith(
+                                '*',
+                                ignoreCase = true
+                            ) && originTrimmed.endsWith(allowedTrimmed.removePrefix("*"), ignoreCase = true)))
         }
 }
 
@@ -61,6 +65,7 @@ internal fun originMatches(allowed: List<String>, origin: String): Boolean {
  **/
 public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpInterceptor, WebSocketHandlerInterceptor {
     override val name: String = "CORS"
+
     public companion object {
         private val allowAll = listOf("*")
     }
@@ -76,10 +81,18 @@ public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpIn
 
         // Check if origin matches allowed patterns
         // null limitToDomains = allow all, non-null = check against patterns
-        val originAllowed = config.limitToDomains.takeUnless { it == allowAll }?.let { originMatches(it, origin) } ?: true
+        val originAllowed =
+            config.limitToDomains.takeUnless { it == allowAll }?.let { originMatches(it, origin) } ?: true
 
         // Reject requests with disallowed origins if forbidOnMatchFail is true
-        if (config.forbidOnMatchFail && !originAllowed) throw ForbiddenException()
+        if (config.forbidOnMatchFail && !originAllowed)
+            throw ForbiddenException(
+                message = "Origin '$origin' is not allowed",
+                detail = if (origin.substringAfter("://") == generalSettings().publicUrl.substringAfter("://").substringBefore('/'))
+                    "This server's public url is not an allowed domain. Add this server's public url to limitToDomains in the Cors settings to make these requests."
+                else
+                    "",
+            )
 
         // Handle preflight OPTIONS requests
         val baseResponse = if (request.path.method == HttpMethod.OPTIONS) {
@@ -115,7 +128,8 @@ public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpIn
                     add(
                         HttpHeader.AccessControlAllowMethods,
                         // Filter methods by limitToMethods if configured
-                        (config.limitToMethods.takeUnless { it == allowAll }?.let { limit -> existingMethods.filter { limit.contains(it.toString()) } }
+                        (config.limitToMethods.takeUnless { it == allowAll }
+                            ?.let { limit -> existingMethods.filter { limit.contains(it.toString()) } }
                             ?: existingMethods).joinToString(",")
                     )
                 }
@@ -178,7 +192,8 @@ public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpIn
             override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
                 val origin = request.headers[HttpHeader.Origin]?.root ?: return handler.willConnect(request)
                 // WebSocket connections always enforce origin checking (ignore forbidOnMatchFail)
-                if (config().limitToDomains.takeUnless { it == allowAll }?.let { originMatches(it, origin) } == false) throw ForbiddenException()
+                if (config().limitToDomains.takeUnless { it == allowAll }
+                        ?.let { originMatches(it, origin) } == false) throw ForbiddenException()
                 return handler.willConnect(request)
             }
         }
