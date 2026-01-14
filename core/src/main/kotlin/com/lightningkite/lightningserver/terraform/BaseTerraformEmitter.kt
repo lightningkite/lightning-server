@@ -104,6 +104,7 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
 
     /** Map of context names to Terraform JSON objects. Each will become a separate .tf.json file. */
     protected val files: MutableMap<String, TerraformJsonObject> = mutableMapOf()
+    protected val extraFiles: MutableMap<String, String> = mutableMapOf()
 
     /**
      * Emit Terraform configuration into a specific context (file).
@@ -117,6 +118,20 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
         action: TerraformJsonObject.() -> Unit,
     ) {
         files.getOrPut(context ?: "unclassified") { TerraformJsonObject() }.action()
+    }
+
+    /**
+     * Emit Terraform configuration into a specific context (file).
+     * If context is null, configuration goes into "unclassified.tf.json".
+     *
+     * @param context Optional name for the terraform file (without .tf.json extension)
+     * @param action Builder lambda to construct Terraform JSON objects
+     */
+    public fun emitExtra(
+        context: String,
+        content: String,
+    ) {
+        extraFiles.getOrPut(context) { content }
     }
 
     /**
@@ -154,6 +169,9 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
         terraformRoot.listFiles()?.filter { it.name.endsWith(".tf.json") }?.forEach { it.delete() }
         for ((name, content) in files.entries) {
             terraformRoot.resolve("$name.tf.json").writeText(prettyJson.encodeToString(content.toJsonObject()))
+        }
+        for((name, content) in extraFiles){
+            terraformRoot.resolve(name).writeText(content)
         }
     }
 

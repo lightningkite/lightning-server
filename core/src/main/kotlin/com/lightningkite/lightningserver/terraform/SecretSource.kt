@@ -401,7 +401,7 @@ private fun <T> KSerializer<T>.emit(value: T): String =
  */
 internal fun <T> readInput(process: (String) -> T): T {
     while (true) {
-        val input = readlnOrNull()
+        val input = readln()
         try {
             return process(input ?: "")
         } catch (e: IllegalArgumentException) {

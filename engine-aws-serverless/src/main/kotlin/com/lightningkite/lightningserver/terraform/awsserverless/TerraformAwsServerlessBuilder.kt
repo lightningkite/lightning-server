@@ -559,9 +559,10 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                     "apply_on" - "PublishedVersions"
                 }
 
-                if (emitter is TerraformEmitterAwsVpc) {
+                val vpcInfo = emitter.applicationVpc as? AwsVpc.VpcInfo
+                if (vpcInfo != null) {
                     "vpc_config" {
-                        "subnet_ids" - expression("module.vpc.private_subnets")
+                        "subnet_ids" - vpcInfo.privateSubnets
                         "security_group_ids" - listOf(
                             expression("aws_security_group.internal.id"),
                             expression("aws_security_group.access_outside.id")
@@ -648,7 +649,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
             }
             "resource.null_resource.settings_reread" {
                 "triggers" {
-                    "settingsRawHash" - expression("local_sensitive_file.settings_raw.content")
+                    "settingsRawHash" - expression("local_sensitive_file.settings_raw.content_sha256")
                 }
                 "depends_on" - listOf("null_resource.lambda_jar_source")
                 "provisioner.local-exec" {
