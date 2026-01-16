@@ -1,33 +1,34 @@
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.*
 import com.lightningkite.DataSize.Companion.bytes
+import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.*
-import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
-import com.lightningkite.lightningserver.definition.builder.*
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.*
-import com.lightningkite.lightningserver.runtime.instrument
-import com.lightningkite.lightningserver.typed.jsonschema.*
-import com.lightningkite.lightningserver.typed.kschema.*
-import com.lightningkite.services.*
-import com.lightningkite.services.cache.*
-import com.lightningkite.services.data.*
-import com.lightningkite.services.database.*
+import com.lightningkite.lightningserver.typed.jsonschema.openApiDescription
+import com.lightningkite.lightningserver.typed.kschema.lightningServerKSchema
+import com.lightningkite.services.HealthStatus
+import com.lightningkite.services.Service
+import com.lightningkite.services.cache.Cache
+import com.lightningkite.services.data.TypedData
+import com.lightningkite.services.database.Database
+import com.lightningkite.services.database.HasId
 import com.lightningkite.services.http.client
-import io.ktor.client.request.get
-import io.ktor.client.statement.bodyAsText
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import kotlinx.coroutines.*
 import kotlinx.html.*
-import kotlinx.serialization.builtins.*
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import java.lang.Runtime
-import java.lang.management.*
-import kotlin.text.contains
+import java.lang.management.ManagementFactory
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 
 
@@ -105,14 +106,15 @@ public class MetaEndpoints(
                         .mapValues { (key, checkable) ->
                             cache.await().get(key, HealthStatus.serializer())
                                 ?.takeIf { now() - it.checkedAt < checkable.healthCheckFrequency }
-                                ?: withTimeoutOrNull(10_000L) { checkable.healthCheck() }?.also {
-                                    cache.await().set(
-                                        key,
-                                        it,
-                                        HealthStatus.serializer(),
-                                        timeToLive = checkable.healthCheckFrequency
-                                    )
-                                }
+                                ?: withTimeoutOrNull(10_000L) { checkable.healthCheck() }
+                                    ?.also {
+                                        cache.await().set(
+                                            key = key,
+                                            value = it,
+                                            serializer = HealthStatus.serializer(),
+                                            timeToLive = if (it.level == HealthStatus.Level.OK) checkable.healthCheckFrequency else minOf(checkable.healthCheckFrequency, 10.seconds)
+                                        )
+                                    }
                                 ?: HealthStatus(
                                     HealthStatus.Level.ERROR,
                                     additionalMessage = "Timed out after 10 seconds."
@@ -149,7 +151,9 @@ public class MetaEndpoints(
             .let { original ->
                 (original.substringBeforeLast("<head>") + """
                     <head>
-                    <base href="${publicUrl}${admin2.location.path.resolved().toString(runtime.externalSerialization.stringArrayFormat)}">
+                    <base href="${publicUrl}${
+                    admin2.location.path.resolved().toString(runtime.externalSerialization.stringArrayFormat)
+                }">
                 """.trimIndent() + original.substringAfterLast("<head>"))
             }
         return HttpResponse.html(content = page, headers = HttpHeaders {
@@ -159,6 +163,7 @@ public class MetaEndpoints(
             )
         })
     }
+
     public val admin2: HttpHandler<PathSpec0> = path.path("admin2").slash.get bind HttpHandler {
         openAdmin2()
     }
@@ -199,7 +204,11 @@ public class MetaEndpoints(
                         <script>
                           window.onload = function() {
                             const ui = SwaggerUIBundle({
-                              spec: ${serverRuntime.externalSerialization.jsonWithoutDefaults.encodeToString(openApiDescription)},
+                              spec: ${
+                        serverRuntime.externalSerialization.jsonWithoutDefaults.encodeToString(
+                            openApiDescription
+                        )
+                    },
                               dom_id: '#swagger-ui',
                               deepLinking: true,
                               presets: [
@@ -353,49 +362,56 @@ public class MetaEndpoints(
             )
         }
 
-    public val bulk: ApiHttpHandler<PathSpec0, HasId<*>?, Map<String, BulkRequest>, Map<String, BulkResponse>> = path.path("bulk").post bind ApiHttpHandler(
-        summary = "Bulk Request",
-        description = "Performs multiple requests at once, returning the results in the same order.",
-        auth = noAuth,
-        implementation = { requests: Map<String, BulkRequest> ->
-            val originalRequest = request
-            coroutineScope {
-                requests.entries.map { entry ->
-                    async {
-                        val start = TimeSource.Monotonic.markNow()
-                        val request = entry.value
-                        val pathAndParams = PathAndParams.parse(request.path)
-                        val properRequest = originalRequest.copyWithNewPathType(
-                            path = RawHttpEndpoint(pathAndParams.pathSegments, method = HttpMethod(request.method)),
-                            queryParameters = pathAndParams.queryParameters,
-                            body = request.body?.let { TypedData.text(it, MediaType.Application.Json) }
-                        )
-                        try {
-                            entry.key to instrument(properRequest.path.toString()) {
-                                (@Suppress("UNCHECKED_CAST")
-                                (properRequest.path.match.value as HttpHandler<PathSpec>).handle(properRequest))
-                            }.let {
-                                BulkResponse(
+    public val bulk: ApiHttpHandler<PathSpec0, HasId<*>?, Map<String, BulkRequest>, Map<String, BulkResponse>> =
+        path.path("bulk").post bind ApiHttpHandler(
+            summary = "Bulk Request",
+            description = "Performs multiple requests at once, returning the results in the same order.",
+            auth = noAuth,
+            implementation = { requests: Map<String, BulkRequest> ->
+                val originalRequest = request
+                coroutineScope {
+                    requests.entries.map { entry ->
+                        async {
+                            val start = TimeSource.Monotonic.markNow()
+                            val request = entry.value
+                            val pathAndParams = PathAndParams.parse(request.path)
+                            val properRequest = originalRequest.copyWithNewPathType(
+                                path = RawHttpEndpoint(pathAndParams.pathSegments, method = HttpMethod(request.method)),
+                                queryParameters = pathAndParams.queryParameters,
+                                body = request.body?.let { TypedData.text(it, MediaType.Application.Json) }
+                            )
+                            try {
+                                entry.key to instrument(properRequest.path.toString()) {
+                                    (@Suppress("UNCHECKED_CAST")
+                                    (properRequest.path.match.value as HttpHandler<PathSpec>).handle(properRequest))
+                                }.let {
+                                    BulkResponse(
+                                        durationMs = start.elapsedNow().inWholeMilliseconds,
+                                        result = it.body?.text()
+                                    )
+                                }
+                            } catch (e: Exception) {
+                                entry.key to BulkResponse(
                                     durationMs = start.elapsedNow().inWholeMilliseconds,
-                                    result = it.body?.text()
+                                    error = when (e) {
+                                        is HttpStatusException -> e.toLSError()
+                                        else -> LSError(
+                                            500,
+                                            "unknown",
+                                            if (generalSettings().debug) e.message
+                                                ?: "An unknown server error occurred." else "An unknown server error occurred.",
+                                            if (generalSettings().debug) e.stackTraceToString() else ""
+                                        )
+                                    }.let {
+                                        if (generalSettings().debug) it.copy(stackTrace = e.stackTraceToString()) else it
+                                    }
                                 )
                             }
-                        } catch (e: Exception) {
-                            entry.key to BulkResponse(
-                                durationMs = start.elapsedNow().inWholeMilliseconds,
-                                error = when (e) {
-                                    is HttpStatusException -> e.toLSError()
-                                    else -> LSError(500, "unknown", if(generalSettings().debug) e.message ?: "An unknown server error occurred." else "An unknown server error occurred.", if(generalSettings().debug) e.stackTraceToString() else "")
-                                }.let {
-                                    if(generalSettings().debug) it.copy(stackTrace = e.stackTraceToString()) else it
-                                }
-                            )
                         }
-                    }
-                }.awaitAll().associate { it }
+                    }.awaitAll().associate { it }
+                }
             }
-        }
-    )
+        )
 
     private val endpoints: List<HttpHandler<PathSpec0>> = listOf(
         docs.index,
