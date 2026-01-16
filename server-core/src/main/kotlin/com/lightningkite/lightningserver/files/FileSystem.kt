@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.files
 
+import com.lightningkite.UUID
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.Disconnectable
 import com.lightningkite.lightningserver.exceptions.BadRequestException
@@ -54,7 +55,7 @@ interface FileSystem : HealthCheckable, Disconnectable {
 
     override suspend fun healthCheck(): HealthStatus {
         try {
-            val testFile = root.resolve("health-check/test-file.txt")
+            val testFile = root.resolve("health-check/test-file${UUID.random()}.txt")
             val testContent = "Test Content"
             testFile.put(HttpContent.Text(testContent, ContentType.Text.Plain))
             if (testFile.head()?.type != ContentType.Text.Plain) return HealthStatus(
@@ -65,6 +66,7 @@ interface FileSystem : HealthCheckable, Disconnectable {
                 HealthStatus.Level.ERROR,
                 additionalMessage = "Test content did not match"
             )
+            testFile.delete()
             return HealthStatus(HealthStatus.Level.OK)
         } catch (e: Exception) {
             return HealthStatus(HealthStatus.Level.ERROR, additionalMessage = e.message)

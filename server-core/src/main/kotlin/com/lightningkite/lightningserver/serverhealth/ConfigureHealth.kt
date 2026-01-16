@@ -14,13 +14,15 @@ import com.lightningkite.now
 import kotlinx.serialization.builtins.serializer
 import java.lang.management.ManagementFactory
 import java.net.NetworkInterface
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * A route for accessing status of features, external service connections, and general server information.
  * Examples of features that can be checked on are Email, Database, and Exception Reporting.
  */
 fun ServerPath.healthCheck(
-    cache: () -> Cache = Settings.requirements["cache"]?.let { { it.invoke() as? Cache ?: LocalCache } } ?: { LocalCache },
+    cache: () -> Cache = Settings.requirements["cache"]?.let { { it.invoke() as? Cache ?: LocalCache } }
+        ?: { LocalCache },
 ) = get.api(
     authOptions = noAuth,
     inputType = Unit.serializer(),
@@ -29,21 +31,28 @@ fun ServerPath.healthCheck(
     description = "Gets the current status of the server",
     errorCases = listOf(),
     implementation = { _: Unit ->
-        val now = now()
         serverHealth(
-            features = Settings.requirements.mapValues { it.value() }.entries.mapNotNull {
-                val checkable =
-                    it.value as? HealthCheckable ?: return@mapNotNull null
-                it.key to checkable
-            }.associate { it }.mapValues { (key, checkable) ->
-                cache().get(key, HealthStatus.serializer())
-                    ?.takeIf { now() - it.checkedAt < checkable.healthCheckFrequency }
-                    ?: withTimeoutOrNull(10_000L) { checkable.healthCheck() }?.also {
-                        cache().set(key, it, HealthStatus.serializer(), timeToLive = checkable.healthCheckFrequency)
-                    }
-                    ?: HealthStatus(HealthStatus.Level.ERROR, additionalMessage = "Timed out after 10 seconds.")
-
-            }
+            features = Settings.requirements
+                .mapValues { it.value() }.entries
+                .mapNotNull {
+                    val checkable = it.value as? HealthCheckable ?: return@mapNotNull null
+                    it.key to checkable
+                }
+                .associate { it }
+                .mapValues { (key, checkable) ->
+                    cache().get(key, HealthStatus.serializer())
+                        ?.takeIf { now() - it.checkedAt < checkable.healthCheckFrequency }
+                        ?: withTimeoutOrNull(10_000L) { checkable.healthCheck() }
+                            ?.also {
+                                cache().set(
+                                    key = key,
+                                    value = it,
+                                    serializer = HealthStatus.serializer(),
+                                    timeToLive = if (it.level == HealthStatus.Level.OK) checkable.healthCheckFrequency else 10.seconds
+                                )
+                            }
+                        ?: HealthStatus(HealthStatus.Level.ERROR, additionalMessage = "Timed out after 10 seconds.")
+                }
         )
     }
 )
