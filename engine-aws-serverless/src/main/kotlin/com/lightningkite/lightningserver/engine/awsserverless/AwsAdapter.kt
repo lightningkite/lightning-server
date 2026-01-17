@@ -88,7 +88,6 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
                 )
             )
             this.settings.ready()
-            runBlocking { runStartupTasks() }
             Core.getGlobalContext().register(this)
         }
         logger.info { "Loading settings..." }
@@ -169,10 +168,6 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
     }
 
     override fun beforeCheckpoint(context: org.crac.Context<out Resource>?) {
-        logger.info { "beforeCheckpoint() - Preparing DynamoDB..." }
-        runBlocking {
-            ws.webSocketDynamo.ensureTables()
-        }
         logger.info { "beforeCheckpoint() - Preparing all connections..." }
         runBlocking {
             settings.allGoals().entries.forEachConcurrent {
@@ -208,6 +203,19 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
             val asJson = internalSerialization.json.parseToJsonElement(input.reader().readText()) as JsonObject
             val response: APIGatewayV2HTTPResponse = withTimeout(context.remainingTimeInMillis - 5_000L) {
                 when {
+                    asJson.containsKey("startupTasks") -> {
+                        logger.info { "Invoke Startup Tasks" }
+                        logger.info { "- Preparing DynamoDB..." }
+                        ws.webSocketDynamo.ensureTables()
+                        logger.info { "- Running Startup Tasks..." }
+                        runStartupTasks()
+                        logger.info { "Startup Tasks Complete" }
+                        APIGatewayV2HTTPResponse(
+                            statusCode = 200,
+                            body = null
+                        )
+                    }
+
                     asJson.containsKey("taskName") -> tasks.handleTask(
                         internalSerialization.json.decodeFromJsonElement(
                             AwsAdapterTask.TaskInvoke.serializer(),

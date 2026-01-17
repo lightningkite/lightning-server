@@ -518,11 +518,19 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
 
                 "depends_on" - listOf("aws_s3_object.app_storage")
             }
+            "resource.aws_lambda_invocation.startup_tasks" {
+                "function_name" - expression("aws_lambda_function.main.arn")
+                "input" - expression("jsonencode({startupTasks: true})")
+                "triggers" {
+                    "function_version" - expression("aws_lambda_function.main.version")
+                }
+            }
             "resource.aws_lambda_alias.main" {
                 "name" - "prod"
                 "description" - "The current production version of the lambda."
                 "function_name" - expression("aws_lambda_function.main.arn")
                 "function_version" - (if (snapStart) expression("aws_lambda_function.main.version") else "\$LATEST")
+                "depends_on" - listOf("aws_lambda_invocation.startup_tasks")
             }
             "resource.aws_cloudwatch_log_group.main" {
                 "name" - "${emitter.projectPrefix}-main-log"
