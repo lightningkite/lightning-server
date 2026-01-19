@@ -11,7 +11,6 @@ import com.lightningkite.lightningserver.definition.builder.ListRegistry
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.getValue
 import com.lightningkite.lightningserver.encryption.Signer
-import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.sessions.proofs.ProofMethod.Companion.baseScope
@@ -25,7 +24,7 @@ import kotlin.time.Duration.Companion.minutes
 
 private object ProofMethods : ListRegistryExtension<ProofMethod>
 
-public val ServerBuilder.proofMethods: ListRegistry<ProofMethod> by ProofMethods
+public val ServerBuilder.proofMethodsRegistry: ListRegistry<ProofMethod> by ProofMethods
 public val ServerDefinition.proofMethods: List<ProofMethod> by ProofMethods
 public val ServerRuntime.proofMethods: List<ProofMethod> get() = server.proofMethods
 

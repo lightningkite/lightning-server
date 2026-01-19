@@ -13,14 +13,11 @@ import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.sessions.proofs.extensions.constrainAttemptRate
 import com.lightningkite.lightningserver.auth.fetchUserIdString
 import com.lightningkite.lightningserver.auth.idString
-import com.lightningkite.lightningserver.encryption.verify
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
-import com.lightningkite.lightningserver.sessions.proofs.extensions.verify
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.explicitApiHttpHandler
 import com.lightningkite.lightningserver.typed.ModelInfo
@@ -67,7 +64,7 @@ public class BackupCodeEndpoints(
 ) : ServerBuilder(), DirectProofMethod {
 
     init {
-        proofMethods.register(this)
+        proofMethodsRegistry.register(this)
 
         sdkSettings.defaultInfo = SdkModule.Info("BackupCodeProof", "backupCode")
         sdkSettings.clientInterface = ProofClientEndpoints.BackupCode::class.info()

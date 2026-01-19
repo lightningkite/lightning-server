@@ -35,9 +35,9 @@ internal class AwsWebSocketDynamoDb(
     class StateAndConnectRequest(val state: ByteArray, val connectRequest: WebSocketConnectRequest<*>)
 
     private val socketExpiration = 8.hours
-    private val tableSubs = "$baseTableName-subs"
-    private val tableSubsReverse = "$baseTableName-subs-reverse"
-    private val tableStates = "$baseTableName-state"
+    private val tableSubs = "$baseTableName-ws-subs"
+    private val tableSubsReverse = "$baseTableName-ws-subs-reverse"
+    private val tableStates = "$baseTableName-ws-state"
 
     companion object {
         internal val logger = KotlinLogging.logger("com.lightningkite.lightningserver.engine.awsserverless.AwsWebSocketDynamoDb")

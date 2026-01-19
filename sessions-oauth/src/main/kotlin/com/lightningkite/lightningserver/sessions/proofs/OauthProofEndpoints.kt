@@ -13,10 +13,8 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.redirectToGet
 import com.lightningkite.services.database.HasId
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
-import com.lightningkite.lightningserver.sessions.proofs.extensions.verify
 import com.lightningkite.lightningserver.sessions.proofs.oauth.OauthCallbackEndpoint
 import com.lightningkite.lightningserver.sessions.proofs.oauth.OauthProviderCredentials
 import com.lightningkite.lightningserver.sessions.proofs.oauth.OauthProviderInfo
@@ -74,7 +72,7 @@ public class OauthProofEndpoints(
 ) : ServerBuilder(), ExternalProofMethod {
 
     init {
-        proofMethods.register(this)
+        proofMethodsRegistry.register(this)
         sdkSettings.defaultInfo = SdkModule.Info(
             interfaceName = "${provider.niceName}OAuth",
             valueName = provider.identifierName

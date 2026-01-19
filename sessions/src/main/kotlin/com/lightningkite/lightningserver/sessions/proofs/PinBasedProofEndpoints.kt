@@ -11,10 +11,8 @@ import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.sessions.proofs.extensions.constrainAttemptRate
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
-import com.lightningkite.lightningserver.sessions.proofs.extensions.verify
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.services.database.HasId
 import kotlin.time.Duration
@@ -30,7 +28,7 @@ public abstract class PinBasedProofEndpoints(
 ) : ServerBuilder(), StartedProofMethod {
 
     init {
-        proofMethods.register(this)
+        proofMethodsRegistry.register(this)
     }
 
     public open fun normalize(to: String): String = to.lowercase().trim()
