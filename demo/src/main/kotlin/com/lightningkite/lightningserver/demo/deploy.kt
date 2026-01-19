@@ -22,7 +22,7 @@ import com.lightningkite.EmailAddress
 import com.lightningkite.lightningserver.terraform.*
 import com.lightningkite.lightningserver.terraform.awsserverless.OtlpProtocol
 import com.lightningkite.lightningserver.terraform.awsserverless.otelCollector
-import com.lightningkite.services.database.cassandra.awsKeyspaces
+//import com.lightningkite.services.database.cassandra.awsKeyspaces
 import com.lightningkite.services.email.EmailInboundService
 import com.lightningkite.services.email.javasmtp.awsSesDomain
 import com.lightningkite.services.email.javasmtp.awsSesSmtpLegacy
@@ -76,8 +76,8 @@ object LkEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
 //        require(TerraformProviderImport.mongodbAtlas)
 //        require(TerraformProvider(TerraformProviderImport.mongodbAtlas, null, JsonObject(emptyMap())))
 
-        database.awsKeyspaces(pointInTimeRecovery = true)
-//        database.mongodbAtlasFree(orgId = "6323a65c43d66b56a2ea5aea", zoneName = "Zone 1")
+//        database.awsKeyspaces(pointInTimeRecovery = true)
+        database.mongodbAtlasFree(orgId = "6323a65c43d66b56a2ea5aea", zoneName = "Zone 1")
 
         files.awsS3Bucket(signedUrlDuration = 1.days)
         cache.awsDynamoDb()
