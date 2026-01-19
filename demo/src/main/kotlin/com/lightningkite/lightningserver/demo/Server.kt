@@ -32,7 +32,7 @@ import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.*
 import com.lightningkite.services.database.jsonfile.JsonFileDatabase
 import com.lightningkite.services.database.mongodb.*
-import com.lightningkite.services.database.cassandra.*
+//import com.lightningkite.services.database.cassandra.*
 import com.lightningkite.services.email.*
 import com.lightningkite.services.email.javasmtp.JavaSmtpEmailService
 import com.lightningkite.services.email.ses.SesEmailInboundService
@@ -84,7 +84,7 @@ object Server : ServerBuilder() {
     val corsInterceptor = install(CorsInterceptor(cors))
 
     init {
-        CassandraDatabase
+//        CassandraDatabase
         JavaSmtpEmailService
         SesEmailInboundService
         TwilioSmsInboundService
