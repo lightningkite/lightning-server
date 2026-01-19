@@ -199,7 +199,6 @@
                 "forbidOnMatchFail": false
             },
             "secretBasis": "${random_password.secretBasis.result}",
-            "llm": "bedrock://us.anthropic.claude-haiku-4-5-20251001-v1:0?region=us-west-2",
             "phoneCall": "${var.phoneCall}",
             "general": {
                 "projectName": "Lightning Server Demo",
@@ -208,7 +207,7 @@
                 "debug": true,
                 "emergencyContact": "joseph@lightningkite.com"
             },
-            "database": "mongodb+srv://LightningServerDemodatabase-main:${random_password.database.result}@${replace(mongodbatlas_advanced_cluster.database.connection_strings.standard_srv, \"mongodb+srv://\", \"\")}/default?retryWrites=true&w=majority",
+            "database": "keyspaces://us-west-2/lightningserverdemo_database",
             "emailInbound": "ses://",
             "sms": "${var.sms}",
             "files": "s3://${aws_s3_bucket.files.bucket}.s3-${aws_s3_bucket.files.region}.amazonaws.com/?signedUrlDuration=1d",
@@ -251,23 +250,29 @@
             "Statement": [
                 {
                     "Action": [
+                        "cassandra:Select",
+                        "cassandra:Modify",
+                        "cassandra:Create",
+                        "cassandra:Alter",
+                        "cassandra:Drop",
+                        "cassandra:TagResource",
+                        "cassandra:UntagResource"
+                    ],
+                    "Effect": "Allow",
+                    "Resource": [
+                        "arn:aws:cassandra:us-west-2:${data.aws_caller_identity.database.account_id}:/keyspace/lightningserverdemo_database/",
+                        "arn:aws:cassandra:us-west-2:${data.aws_caller_identity.database.account_id}:/keyspace/lightningserverdemo_database/table/*",
+                        "arn:aws:cassandra:us-west-2:${data.aws_caller_identity.database.account_id}:/keyspace/system*"
+                    ]
+                },
+                {
+                    "Action": [
                         "s3:*"
                     ],
                     "Effect": "Allow",
                     "Resource": [
                         "${aws_s3_bucket.files.arn}",
                         "${aws_s3_bucket.files.arn}/*"
-                    ]
-                },
-                {
-                    "Action": [
-                        "bedrock:InvokeModel",
-                        "bedrock:InvokeModelWithResponseStream"
-                    ],
-                    "Effect": "Allow",
-                    "Resource": [
-                        "arn:aws:bedrock:us-west-2:*:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0",
-                        "arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0"
                     ]
                 },
                 {

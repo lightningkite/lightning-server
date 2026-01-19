@@ -54,6 +54,7 @@ dependencies {
     api(libs.serviceAbstractionsDatabaseMongodb)
     api(libs.serviceAbstractionsDatabasePostgres)
     api(libs.serviceAbstractionsDatabaseJsonfile)
+    api(libs.serviceAbstractionsDatabaseCassandra)
     api(libs.serviceAbstractionsDatabase)
     api(libs.serviceAbstractionsData)
     api(libs.serviceAbstractionsCacheTest)

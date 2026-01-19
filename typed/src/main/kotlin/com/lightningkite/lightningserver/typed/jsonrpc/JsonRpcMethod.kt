@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.typed.jsonrpc
 
 import com.lightningkite.lightningserver.auth.AuthRequirement
+import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.HttpAccess
@@ -54,6 +55,16 @@ public interface JsonRpcMethod<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT>
      */
     context(server: ServerRuntime)
     public suspend fun handle(access: HttpAccess<PATH, USER>, input: INPUT): OUTPUT
+
+    /**
+     * Handles the method invocation with typed input and output.
+     *
+     * @param access Authenticated access object with request context and user
+     * @param input Parsed and validated input parameters
+     * @return Method result to be serialized
+     */
+    context(server: ServerRuntime)
+    public suspend fun handleWithCustomHeaders(access: HttpAccess<PATH, USER>, input: INPUT): Pair<OUTPUT, HttpHeaders> = handle(access, input) to HttpHeaders.EMPTY
 }
 
 /**

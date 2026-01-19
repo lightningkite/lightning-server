@@ -22,6 +22,7 @@ import com.lightningkite.EmailAddress
 import com.lightningkite.lightningserver.terraform.*
 import com.lightningkite.lightningserver.terraform.awsserverless.OtlpProtocol
 import com.lightningkite.lightningserver.terraform.awsserverless.otelCollector
+import com.lightningkite.services.database.cassandra.awsKeyspaces
 import com.lightningkite.services.email.EmailInboundService
 import com.lightningkite.services.email.javasmtp.awsSesDomain
 import com.lightningkite.services.email.javasmtp.awsSesSmtpLegacy
@@ -31,8 +32,12 @@ import com.lightningkite.services.pubsub.PubSub
 import com.lightningkite.services.pubsub.aws.dynamoDb
 import com.lightningkite.services.pubsub.redis.awsElasticacheRedisServerless
 import com.lightningkite.services.sms.SmsInboundService
+import com.lightningkite.services.terraform.TerraformProvider
+import com.lightningkite.services.terraform.TerraformProviderImport
+import com.lightningkite.services.terraform.TerraformProviderImport.Companion
 import com.lightningkite.services.voiceagent.VoiceAgentService
 import io.github.oshai.kotlinlogging.Level
+import kotlinx.serialization.json.JsonObject
 import software.amazon.awssdk.regions.Region
 import java.io.File
 import kotlin.reflect.KClass
@@ -68,7 +73,12 @@ object LkEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
     override val secretsSource: SecretSource = AwsSecretSource("lightning-server-demo", Region.US_WEST_2)
 
     override fun Server.settings() {
-        database.mongodbAtlasFree(orgId = "6323a65c43d66b56a2ea5aea", zoneName = "Zone 1")
+//        require(TerraformProviderImport.mongodbAtlas)
+//        require(TerraformProvider(TerraformProviderImport.mongodbAtlas, null, JsonObject(emptyMap())))
+
+        database.awsKeyspaces(pointInTimeRecovery = true)
+//        database.mongodbAtlasFree(orgId = "6323a65c43d66b56a2ea5aea", zoneName = "Zone 1")
+
         files.awsS3Bucket(signedUrlDuration = 1.days)
         cache.awsDynamoDb()
         secretBasis.generated()
@@ -85,7 +95,6 @@ object LkEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
                 additive = false,
             )
         )))
-        // by Claude - Use ADOT layer's default config with env vars (custom config not supported)
         telemetrySettings.otelCollector(
             otlpEndpoint = "https://signoz.lightningkite.com",
             otlpProtocol = OtlpProtocol.HTTP,
@@ -107,13 +116,9 @@ object LkEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
         emailInbound.awsSesInbound("email", "https://lightningserver.cs.lightningkite.com/assistant-channels/email/webhook")
         sms.byVariable()
         smsInbound.byVariable()
-        pubsub.dynamoDb()  // Using DynamoDB for lower Lambda latency
-//        pubsub.awsApiGatewayWebSocket()  // WebSocket-based PubSub (higher latency in Lambda)
-//        pubsub.direct(PubSub.Settings())
+        pubsub.dynamoDb()
         phoneCall.byVariable()
-//        phoneCall.direct(PhoneCallService.Settings())
         voiceAgent.byVariable()
-//        voiceAgent.direct(VoiceAgentService.Settings())
     }
 }
 

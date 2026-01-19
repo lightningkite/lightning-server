@@ -1,3 +1,4 @@
+// Fixed by Claude - added delay(50) after test() to allow didConnect() subscription to complete
 package com.lightningkite.lightningserver.websockets
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -64,6 +65,9 @@ class DirectWebSocketSenderTest {
         // When engineSocketId is null, the fallback topic-based send should work
         TestServer.test(settings = { }) {
             val ws = TestServer.echoHandler.websocketHandler.test()
+
+            // Allow didConnect() subscription to complete before sending
+            delay(50)
 
             var receivedMessage: WebSocketFrame? = null
             ws.onMessageSent = { receivedMessage = it }

@@ -51,6 +51,4 @@ include(":deploy-aws-ec2")
 
 include(":secret-source-aws")
 
-include(":coroutine-websockets")
-
 include(":demo")

@@ -71,7 +71,7 @@ public class JsonRpcHandler<PATH : PathSpec>(
             // Parse parameters
             val params = try {
                 val paramsJson = rpcRequest.params ?: JsonNull
-                Json.decodeFromJsonElement(typedMethod.inputType, paramsJson)
+                server.externalSerialization.json.decodeFromJsonElement(typedMethod.inputType, paramsJson)
             } catch (e: Exception) {
                 return errorResponse(
                     rpcRequest.id,
@@ -79,20 +79,17 @@ public class JsonRpcHandler<PATH : PathSpec>(
                 )
             }
 
-            // Validate parameters using the validators framework
-            server.validators.validateOrThrow(typedMethod.inputType, params)
-
             // Get authenticated access
             val access = request.access(typedMethod.auth)
 
             // Execute the method
-            val result = typedMethod.handle(access, params)
+            val (result, customHeaders) = typedMethod.handleWithCustomHeaders(access, params)
 
             // Serialize result
-            val resultJson = Json.encodeToJsonElement(typedMethod.outputType, result)
+            val resultJson = server.externalSerialization.json.encodeToJsonElement(typedMethod.outputType, result)
 
             // Return success response
-            successResponse(rpcRequest.id, resultJson)
+            successResponse(rpcRequest.id, resultJson, customHeaders)
 
         } catch (e: HttpStatusException) {
             // Map HTTP exceptions to JSON-RPC errors
@@ -113,7 +110,8 @@ public class JsonRpcHandler<PATH : PathSpec>(
         }
     }
 
-    private fun successResponse(id: JsonElement?, result: JsonElement): HttpResponse {
+    context(server: ServerRuntime)
+    private fun successResponse(id: JsonElement?, result: JsonElement, customHeaders: HttpHeaders = HttpHeaders.EMPTY): HttpResponse {
         val response = JsonRpcResponse(
             jsonrpc = "2.0",
             result = result,
@@ -121,13 +119,15 @@ public class JsonRpcHandler<PATH : PathSpec>(
         )
         return HttpResponse(
             status = HttpStatus.OK,
+            headers = customHeaders,
             body = TypedData.text(
-                Json.encodeToString(response),
+                server.externalSerialization.json.encodeToString(response),
                 MediaType.Application.Json
             )
         )
     }
 
+    context(server: ServerRuntime)
     private fun errorResponse(id: JsonElement?, error: JsonRpcError): HttpResponse {
         val response = JsonRpcErrorResponse(
             jsonrpc = "2.0",
@@ -137,7 +137,7 @@ public class JsonRpcHandler<PATH : PathSpec>(
         return HttpResponse(
             status = HttpStatus.OK, // JSON-RPC errors are still HTTP 200
             body = TypedData.text(
-                Json.encodeToString(response),
+                server.externalSerialization.json.encodeToString(response),
                 MediaType.Application.Json
             )
         )

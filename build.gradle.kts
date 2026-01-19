@@ -31,4 +31,8 @@ plugins {
     alias(libs.plugins.graalVmNative) apply false
     alias(libs.plugins.shadow) apply false
     alias(libs.plugins.vanniktechMavenPublish) apply false
+    alias(libs.plugins.kover)
 }
+
+// by Claude - Kover configured in individual JVM modules (core, auth, typed, sessions, sessions-email, sessions-sms)
+// Run ./gradlew :core:koverHtmlReport :auth:koverHtmlReport :typed:koverHtmlReport :sessions:koverHtmlReport for coverage

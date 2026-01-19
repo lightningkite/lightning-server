@@ -3,6 +3,7 @@
 package com.lightningkite.lightningserver.demo
 
 import com.lightningkite.DataSize.Companion.bytes
+import com.lightningkite.PhoneNumber
 import com.lightningkite.lightningserver.demo.endpoints.*
 import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
@@ -31,6 +32,7 @@ import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.*
 import com.lightningkite.services.database.jsonfile.JsonFileDatabase
 import com.lightningkite.services.database.mongodb.*
+import com.lightningkite.services.database.cassandra.*
 import com.lightningkite.services.email.*
 import com.lightningkite.services.email.javasmtp.JavaSmtpEmailService
 import com.lightningkite.services.email.ses.SesEmailInboundService
@@ -82,6 +84,7 @@ object Server : ServerBuilder() {
     val corsInterceptor = install(CorsInterceptor(cors))
 
     init {
+        CassandraDatabase
         JavaSmtpEmailService
         SesEmailInboundService
         TwilioSmsInboundService
@@ -127,7 +130,11 @@ object Server : ServerBuilder() {
             ModelPermissions(
                 create = Condition.Never,
                 read = everyone,
-//                read = self or admin,
+                readMask = mask {
+                    it.hashedPassword.mask(value = "", unless = self or admin)
+                    it.phone.mask(value = null, unless = self or admin)
+                    it.isSuperUser.mask(value = false, unless = self or admin)
+                },
                 update = self or admin,
                 delete = self or admin
             )

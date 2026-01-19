@@ -63,7 +63,6 @@
         },
         "aws_acm_certificate_validation": {
             "ws": {
-                "provider": "aws.acm",
                 "certificate_arn": "${aws_acm_certificate.ws.arn}",
                 "validation_record_fqdns": [
                     "${aws_route53_record.ws.fqdn}"
@@ -185,7 +184,6 @@
         "aws_acm_certificate": {
             "ws": {
                 "domain_name": "ws.lightningserver.cs.lightningkite.com",
-                "provider": "aws.acm",
                 "validation_method": "DNS"
             }
         },

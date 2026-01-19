@@ -1,8 +1,5 @@
 {
     "provider": {
-        "mongodbatlas": [
-            {}
-        ],
         "aws": [
             {
                 "region": "us-west-2"
@@ -15,10 +12,6 @@
     },
     "terraform": {
         "required_providers": {
-            "mongodbatlas": {
-                "source": "mongodb/mongodbatlas",
-                "version": "~> 2.4.0"
-            },
             "aws": {
                 "source": "hashicorp/aws",
                 "version": "~> 6.28.0"
