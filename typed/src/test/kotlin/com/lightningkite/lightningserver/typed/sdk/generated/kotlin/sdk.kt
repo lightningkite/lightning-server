@@ -1,0 +1,246 @@
+package com.lightningkite.lightningserver.typed.singlesdk
+
+import com.lightningkite.lightningserver.HttpMethod
+import com.lightningkite.lightningserver.typed.Fetcher
+import kotlinx.serialization.ContextualSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.nullable
+
+interface Api {
+	fun withHeaderCalculator(calculator: suspend () -> List<Pair<String, String>>): Api
+	/**
+	 * Index
+	 * 
+	 * **Auth Requirements:** No Requirements
+	 * */
+	suspend fun index(): kotlin.Int
+	/**
+	 * Action
+	 * 
+	 * Does something really really cool...
+	 * 
+	 * **Auth Requirements:** User *or* No Requirements
+	 * */
+	suspend fun improperSDKFunctionName(): kotlin.Int
+	/**
+	 * Inlined Endpoint
+	 * 
+	 * This endpoint is sometimes inlined, sometimes not.
+	 * 
+	 * **Auth Requirements:** IsAdmin *or* IsSuperUser (User with root access and an additional requirement)
+	 * */
+	suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int
+
+	interface PredefinedEndpoints {
+		/**
+		 * Pre-Defined Endpoint
+		 * 
+		 * This is an endpoint included through a pre-build definition
+		 * 
+		 * **Auth Requirements:** User with scope pre:defined *or* User with scope foo *or* IsSuperUser (User with root access and an additional requirement)
+		 * */
+		suspend fun preDefinedEndpoint(input: kotlin.Int): kotlin.Int
+	}
+	val predefinedEndpoints: PredefinedEndpoints
+
+	interface ModuleApi : com.lightningkite.lightningserver.typed.ClientModelRestEndpoints<com.lightningkite.lightningserver.typed.sdk.TestModel, kotlin.uuid.Uuid> {
+		/**
+		 * Test Endpoint
+		 * 
+		 * This is a test endpoint for the sdk
+		 * 
+		 * **Auth Requirements:** Authenticated with scopes [[sdk:test, sdk:other]] and max age of 8h *or* IsSuperUser (User with root access and an additional requirement)
+		 * */
+		suspend fun testSdkEndpoint(first: kotlin.String, input: com.lightningkite.lightningserver.typed.sdk.TestInput): kotlin.String
+		/**
+		 * Inlined Endpoint
+		 * 
+		 * This endpoint is sometimes inlined, sometimes not.
+		 * 
+		 * **Auth Requirements:** IsAdmin *or* IsSuperUser (User with root access and an additional requirement)
+		 * */
+		suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int
+		/**
+		 * Inlined Endpoint
+		 * 
+		 * This endpoint is sometimes inlined, sometimes not.
+		 * 
+		 * **Auth Requirements:** IsAdmin *or* IsSuperUser (User with root access and an additional requirement)
+		 * */
+		suspend fun inlinedEndpoint2(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int
+
+		interface DefaultEndpoints : com.lightningkite.lightningserver.typed.ClientModelRestEndpointsAndUpdatesWebsocket<com.lightningkite.lightningserver.typed.sdk.TestModel, kotlin.uuid.Uuid> {
+			/**
+			 * Test Endpoint
+			 * 
+			 * This is a test endpoint for the sdk
+			 * 
+			 * **Auth Requirements:** Authenticated with scopes [[sdk:test, sdk:other]] and max age of 8h *or* IsSuperUser (User with root access and an additional requirement)
+			 * */
+			suspend fun testSdkEndpoint(second: kotlin.String, input: com.lightningkite.lightningserver.typed.sdk.TestInput): kotlin.String
+
+			interface NotInlinedApi {
+				/**
+				 * Inlined Endpoint
+				 * 
+				 * This endpoint is sometimes inlined, sometimes not.
+				 * 
+				 * **Auth Requirements:** IsAdmin *or* IsSuperUser (User with root access and an additional requirement)
+				 * */
+				suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int
+			}
+			val notInlined: NotInlinedApi
+		}
+		val default: DefaultEndpoints
+
+		interface DefaultEndpoints2 : com.lightningkite.lightningserver.typed.ClientModelRestEndpointsAndUpdatesWebsocket<com.lightningkite.lightningserver.typed.sdk.TestModel, kotlin.uuid.Uuid> {
+			/**
+			 * Test Endpoint
+			 * 
+			 * This is a test endpoint for the sdk
+			 * 
+			 * **Auth Requirements:** Authenticated with scopes [[sdk:test, sdk:other]] and max age of 8h *or* IsSuperUser (User with root access and an additional requirement)
+			 * */
+			suspend fun testSdkEndpoint(second: kotlin.String, input: com.lightningkite.lightningserver.typed.sdk.TestInput): kotlin.String
+
+			interface NotInlinedApi {
+				/**
+				 * Inlined Endpoint
+				 * 
+				 * This endpoint is sometimes inlined, sometimes not.
+				 * 
+				 * **Auth Requirements:** IsAdmin *or* IsSuperUser (User with root access and an additional requirement)
+				 * */
+				suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int
+			}
+			val notInlined: NotInlinedApi
+		}
+		val default2: DefaultEndpoints2
+	}
+	val module: ModuleApi
+
+	interface CustomEndpoints : com.lightningkite.lightningserver.typed.ClientModelRestEndpointsAndUpdatesWebsocket<com.lightningkite.lightningserver.typed.sdk.TestModel, kotlin.uuid.Uuid> {
+		/**
+		 * Test Endpoint
+		 * 
+		 * This is a test endpoint for the sdk
+		 * 
+		 * **Auth Requirements:** Authenticated with scopes [[sdk:test, sdk:other]] and max age of 8h *or* IsSuperUser (User with root access and an additional requirement)
+		 * */
+		suspend fun testSdkEndpoint(second: kotlin.String, input: com.lightningkite.lightningserver.typed.sdk.TestInput): kotlin.String
+
+		interface NotInlinedApi {
+			/**
+			 * Inlined Endpoint
+			 * 
+			 * This endpoint is sometimes inlined, sometimes not.
+			 * 
+			 * **Auth Requirements:** IsAdmin *or* IsSuperUser (User with root access and an additional requirement)
+			 * */
+			suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int
+		}
+		val notInlined: NotInlinedApi
+	}
+	val custom: CustomEndpoints
+
+	interface OtherEndpoints {
+		/**
+		 * Test Endpoint
+		 * 
+		 * This is a test endpoint for the sdk
+		 * 
+		 * **Auth Requirements:** Authenticated with scopes [[sdk:test, sdk:other]] and max age of 8h *or* IsSuperUser (User with root access and an additional requirement)
+		 * */
+		suspend fun testSdkEndpoint(third: kotlin.String, input: com.lightningkite.lightningserver.typed.sdk.TestInput): kotlin.String
+		/**
+		 * Inlined Endpoint
+		 * 
+		 * This endpoint is sometimes inlined, sometimes not.
+		 * 
+		 * **Auth Requirements:** IsAdmin *or* IsSuperUser (User with root access and an additional requirement)
+		 * */
+		suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int
+
+		val rest: com.lightningkite.lightningserver.typed.ClientModelRestEndpoints<com.lightningkite.lightningserver.typed.sdk.TestModel, kotlin.uuid.Uuid>
+
+		val rest2: com.lightningkite.lightningserver.typed.ClientModelRestEndpoints<com.lightningkite.lightningserver.typed.sdk.TestModel, kotlin.uuid.Uuid>
+	}
+	val other: OtherEndpoints
+}
+
+class LiveApi(val fetcher: Fetcher) : Api {
+	override fun withHeaderCalculator(calculator: suspend () -> List<Pair<String, String>>): LiveApi = 
+		LiveApi(fetcher.withHeaderCalculator(calculator))
+	override suspend fun index(): kotlin.Int =
+		fetcher("", HttpMethod.GET, kotlin.Unit.serializer(), kotlin.Unit, kotlin.Int.serializer())
+	override suspend fun improperSDKFunctionName(): kotlin.Int =
+		fetcher("", HttpMethod.POST, kotlin.Unit.serializer(), kotlin.Unit, kotlin.Int.serializer())
+	override suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int =
+		fetcher("inline/action/${fetcher.url(id, kotlin.uuid.Uuid.serializer())}/${fetcher.url(category, kotlin.uuid.Uuid.serializer())}", HttpMethod.POST, kotlin.Unit.serializer(), kotlin.Unit, kotlin.Int.serializer())
+
+	inner class LivePredefinedEndpoints : Api.PredefinedEndpoints {
+		override suspend fun preDefinedEndpoint(input: kotlin.Int): kotlin.Int =
+			fetcher("predefined/foo", HttpMethod.POST, kotlin.Int.serializer(), input, kotlin.Int.serializer())
+	}
+	override val predefinedEndpoints = LivePredefinedEndpoints()
+
+	inner class LiveModuleApi : Api.ModuleApi, com.lightningkite.lightningserver.typed.ClientModelRestEndpoints<com.lightningkite.lightningserver.typed.sdk.TestModel, kotlin.uuid.Uuid> by com.lightningkite.lightningserver.typed.LiveClientModelRestEndpoints(fetcher, "m1/rest", com.lightningkite.lightningserver.typed.sdk.TestModel.serializer(), kotlin.uuid.Uuid.serializer()) {
+		override suspend fun testSdkEndpoint(first: kotlin.String, input: com.lightningkite.lightningserver.typed.sdk.TestInput): kotlin.String =
+			fetcher("m1/endpoint/${fetcher.url(first, kotlin.String.serializer())}", HttpMethod.POST, com.lightningkite.lightningserver.typed.sdk.TestInput.serializer(), input, kotlin.String.serializer())
+		override suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int =
+			fetcher("m1/inline/again/action/${fetcher.url(id, kotlin.uuid.Uuid.serializer())}/${fetcher.url(category, kotlin.uuid.Uuid.serializer())}", HttpMethod.POST, kotlin.Unit.serializer(), kotlin.Unit, kotlin.Int.serializer())
+		override suspend fun inlinedEndpoint2(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int =
+			fetcher("m1/inline/action/${fetcher.url(id, kotlin.uuid.Uuid.serializer())}/${fetcher.url(category, kotlin.uuid.Uuid.serializer())}", HttpMethod.POST, kotlin.Unit.serializer(), kotlin.Unit, kotlin.Int.serializer())
+
+		inner class LiveDefaultEndpoints : Api.ModuleApi.DefaultEndpoints, com.lightningkite.lightningserver.typed.ClientModelRestEndpointsAndUpdatesWebsocket<com.lightningkite.lightningserver.typed.sdk.TestModel, kotlin.uuid.Uuid> by com.lightningkite.lightningserver.typed.LiveClientModelRestEndpointsAndUpdatesWebsocket(fetcher, "m1/second/rest", com.lightningkite.lightningserver.typed.sdk.TestModel.serializer(), kotlin.uuid.Uuid.serializer()) {
+			override suspend fun testSdkEndpoint(second: kotlin.String, input: com.lightningkite.lightningserver.typed.sdk.TestInput): kotlin.String =
+				fetcher("m1/second/endpoint/${fetcher.url(second, kotlin.String.serializer())}", HttpMethod.POST, com.lightningkite.lightningserver.typed.sdk.TestInput.serializer(), input, kotlin.String.serializer())
+
+			inner class LiveNotInlinedApi : Api.ModuleApi.DefaultEndpoints.NotInlinedApi {
+				override suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int =
+					fetcher("m1/second/noinline/action/${fetcher.url(id, kotlin.uuid.Uuid.serializer())}/${fetcher.url(category, kotlin.uuid.Uuid.serializer())}", HttpMethod.POST, kotlin.Unit.serializer(), kotlin.Unit, kotlin.Int.serializer())
+			}
+			override val notInlined = LiveNotInlinedApi()
+		}
+		override val default = LiveDefaultEndpoints()
+
+		inner class LiveDefaultEndpoints2 : Api.ModuleApi.DefaultEndpoints2, com.lightningkite.lightningserver.typed.ClientModelRestEndpointsAndUpdatesWebsocket<com.lightningkite.lightningserver.typed.sdk.TestModel, kotlin.uuid.Uuid> by com.lightningkite.lightningserver.typed.LiveClientModelRestEndpointsAndUpdatesWebsocket(fetcher, "m1/duplicate/rest", com.lightningkite.lightningserver.typed.sdk.TestModel.serializer(), kotlin.uuid.Uuid.serializer()) {
+			override suspend fun testSdkEndpoint(second: kotlin.String, input: com.lightningkite.lightningserver.typed.sdk.TestInput): kotlin.String =
+				fetcher("m1/duplicate/endpoint/${fetcher.url(second, kotlin.String.serializer())}", HttpMethod.POST, com.lightningkite.lightningserver.typed.sdk.TestInput.serializer(), input, kotlin.String.serializer())
+
+			inner class LiveNotInlinedApi : Api.ModuleApi.DefaultEndpoints2.NotInlinedApi {
+				override suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int =
+					fetcher("m1/duplicate/noinline/action/${fetcher.url(id, kotlin.uuid.Uuid.serializer())}/${fetcher.url(category, kotlin.uuid.Uuid.serializer())}", HttpMethod.POST, kotlin.Unit.serializer(), kotlin.Unit, kotlin.Int.serializer())
+			}
+			override val notInlined = LiveNotInlinedApi()
+		}
+		override val default2 = LiveDefaultEndpoints2()
+	}
+	override val module = LiveModuleApi()
+
+	inner class LiveCustomEndpoints : Api.CustomEndpoints, com.lightningkite.lightningserver.typed.ClientModelRestEndpointsAndUpdatesWebsocket<com.lightningkite.lightningserver.typed.sdk.TestModel, kotlin.uuid.Uuid> by com.lightningkite.lightningserver.typed.LiveClientModelRestEndpointsAndUpdatesWebsocket(fetcher, "m2/rest", com.lightningkite.lightningserver.typed.sdk.TestModel.serializer(), kotlin.uuid.Uuid.serializer()) {
+		override suspend fun testSdkEndpoint(second: kotlin.String, input: com.lightningkite.lightningserver.typed.sdk.TestInput): kotlin.String =
+			fetcher("m2/endpoint/${fetcher.url(second, kotlin.String.serializer())}", HttpMethod.POST, com.lightningkite.lightningserver.typed.sdk.TestInput.serializer(), input, kotlin.String.serializer())
+
+		inner class LiveNotInlinedApi : Api.CustomEndpoints.NotInlinedApi {
+			override suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int =
+				fetcher("m2/noinline/action/${fetcher.url(id, kotlin.uuid.Uuid.serializer())}/${fetcher.url(category, kotlin.uuid.Uuid.serializer())}", HttpMethod.POST, kotlin.Unit.serializer(), kotlin.Unit, kotlin.Int.serializer())
+		}
+		override val notInlined = LiveNotInlinedApi()
+	}
+	override val custom = LiveCustomEndpoints()
+
+	inner class LiveOtherEndpoints : Api.OtherEndpoints {
+		override suspend fun testSdkEndpoint(third: kotlin.String, input: com.lightningkite.lightningserver.typed.sdk.TestInput): kotlin.String =
+			fetcher("third/endpoint/${fetcher.url(third, kotlin.String.serializer())}", HttpMethod.POST, com.lightningkite.lightningserver.typed.sdk.TestInput.serializer(), input, kotlin.String.serializer())
+		override suspend fun inlinedEndpoint(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int =
+			fetcher("third/inline/action/${fetcher.url(id, kotlin.uuid.Uuid.serializer())}/${fetcher.url(category, kotlin.uuid.Uuid.serializer())}", HttpMethod.POST, kotlin.Unit.serializer(), kotlin.Unit, kotlin.Int.serializer())
+
+		override val rest = com.lightningkite.lightningserver.typed.LiveClientModelRestEndpoints(fetcher, "third/rest", com.lightningkite.lightningserver.typed.sdk.TestModel.serializer(), kotlin.uuid.Uuid.serializer())
+
+		override val rest2 = com.lightningkite.lightningserver.typed.LiveClientModelRestEndpoints(fetcher, "third/rest2", com.lightningkite.lightningserver.typed.sdk.TestModel.serializer(), kotlin.uuid.Uuid.serializer())
+	}
+	override val other = LiveOtherEndpoints()
+}

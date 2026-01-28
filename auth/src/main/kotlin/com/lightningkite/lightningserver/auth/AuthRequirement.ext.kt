@@ -37,6 +37,7 @@ public suspend fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.assert(
 
 
 public fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.subscope(subscope: Subscope): AuthRequirement<SUBJECT> = subscope(listOf(subscope))
+public fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.subscope(subscope: String): AuthRequirement<SUBJECT> = subscope(listOf(Subscope(subscope)))
 
 
 public val noAuth: AuthRequirement.None get() = AuthRequirement.None

@@ -19,7 +19,7 @@ import kotlin.time.Instant
 public typealias AuthCacheKey<SUBJECT, T> = SerializableCache.CalculatingKey<Authentication<SUBJECT>, T>
 
 context(_: ServerRuntime)
-public suspend operator fun <SUBJECT : HasId<ID>, ID : Comparable<ID>, T> Authentication<SUBJECT>.get(
+public suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>, T> Authentication<SUBJECT>.get(
     key: AuthCacheKey<SUBJECT, T>
 ): T = cache.get(key, this)
 

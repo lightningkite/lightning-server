@@ -31,7 +31,7 @@ public class ImmutablePathSpecMap<V>(start: MutablePathSpecMap<V>) : PathSpecMap
 
         override fun toString(): String {
             return """
-                MutablePathSpecMap.Node(
+                ImmutablePathSpecMap.Node(
                     path = $path, 
                     pathValue = $pathValue, 
                     chainedWildcard = $chainedWildcard, 
@@ -92,7 +92,7 @@ public class ImmutablePathSpecMap<V>(start: MutablePathSpecMap<V>) : PathSpecMap
         var current = root
         val soFar = ArrayList<Node>()
         var beyond = false
-        for (part in pathParts) {
+        for ((idx, part) in pathParts.withIndex()) {
             soFar.add(current)
 //            println("Current is $current, looking for $part")
             val c = current.thenConstant[part]
@@ -102,6 +102,7 @@ public class ImmutablePathSpecMap<V>(start: MutablePathSpecMap<V>) : PathSpecMap
             }
             val w = current.thenWildcard
             if (w != null) {
+                if (idx == pathParts.lastIndex && part == "") continue  // empty trailing segments are not arguments
                 current = w
                 wildcards.add(part)
                 continue

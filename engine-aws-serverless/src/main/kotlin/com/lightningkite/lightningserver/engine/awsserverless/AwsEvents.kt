@@ -57,7 +57,9 @@ internal data class APIGatewayV2HTTPResponse(
 
 @Serializable
 internal data class APIGatewayV2WebsocketRequest(
+    val headers: Map<String, String>? = null,
     val multiValueHeaders: Map<String, List<String>>? = null,
+    val queryStringParameters: Map<String, String>? = null,
     val multiValueQueryStringParameters: Map<String, List<String>>? = null,
     val requestContext: RequestContext,
     val isBase64Encoded: Boolean,

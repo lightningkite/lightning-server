@@ -44,22 +44,23 @@ import java.security.SecureRandom
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.Uuid
 
 public class WebAuthNProofEndpoints(
     database: Runtime<Database>,
     private val cache: Runtime<Cache>,
-    private val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
+    override val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
+    override val proofExpiration: Duration = 1.hours,
     private val challengeLength: Int = 64,
     private val expiration: Duration = 5.minutes,
     private val rpId: () -> String,
     private val registrationForUser: (HasId<*>, WebAuthN.GeneralPreference) -> WebAuthN.Registration.RegistrationOptions,
     private val proveOptions: (String?) -> WebAuthN.Authentication.ProveOptions = { WebAuthN.Authentication.ProveOptions() },
 ) : ServerBuilder(), ProofMethod {
-
     init {
-        proofMethods.register(this)
+        proofMethodsRegistry.register(this)
 
         sdkSettings.defaultInfo = SdkModule.Info("WebAuthNProof", "webAuthN")
         sdkSettings.clientInterface = ProofClientEndpoints.WebAuthN::class.info()
@@ -179,7 +180,6 @@ public class WebAuthNProofEndpoints(
             successCode = HttpStatus.OK,
             implementation = { residentKeyPreference: WebAuthN.GeneralPreference ->
                 val options = registrationForUser(auth.fetch(), residentKeyPreference)
-
                 val challenge = generate()
                 val key = Uuid.random().toString()
                 cache().set(
@@ -325,7 +325,8 @@ public class WebAuthNProofEndpoints(
 
                 val subjectId = subjectProperty?.let { property ->
                     value?.let { value ->
-                        val id = handler.fetchUserIdString(property, value)
+                        val normalizedValue = handler.normalizePropertyValue(property, value)
+                        val id = handler.fetchUserIdString(property, normalizedValue)
                         if (id == null || authOrNull != null && id != authOrNull?.rawId)
                         // Something didn't add up properly. Return a valid looking useless response
                             return@ApiHttpHandler WebAuthN.Authentication.StartResponse(
@@ -456,7 +457,6 @@ public class WebAuthNProofEndpoints(
                     info = if (authData.authenticatorData?.isFlagUV == true) info.copy(strength = 20) else info,
                     property = "${fromCache.subjectType}/_id",
                     value = publicKeyCredential.subjectId,
-                    at = now()
                 )
             }
         )

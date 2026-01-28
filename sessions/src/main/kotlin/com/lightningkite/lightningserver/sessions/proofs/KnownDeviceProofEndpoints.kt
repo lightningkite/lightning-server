@@ -7,16 +7,20 @@ import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.encryption.Signer
+import com.lightningkite.lightningserver.encryption.checkAgainstHash
 import com.lightningkite.lightningserver.encryption.signer
-import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.http.HttpHeader
+import com.lightningkite.lightningserver.http.HttpStatus
+import com.lightningkite.lightningserver.http.get
+import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.sessions.proofs.extensions.constrainAttemptRate
 import com.lightningkite.lightningserver.auth.idString
-import com.lightningkite.lightningserver.encryption.checkAgainstHash
-import com.lightningkite.lightningserver.encryption.secureHash
+import com.lightningkite.lightningserver.encryption.fastHash
+import com.lightningkite.lightningserver.encryption.isSlowHash
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule
@@ -31,17 +35,19 @@ import kotlinx.serialization.builtins.serializer
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
 
 @OptIn(InternalSerializationApi::class)
 public class KnownDeviceProofEndpoints(
     database: Runtime<Database>,
     private val cache: Runtime<Cache>,
-    private val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
+    override val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
+    override val proofExpiration: Duration = 1.hours,
     private val expires: Runtime<Duration> = Runtime.Constant(30.days),
 ) : ServerBuilder(), StringProofMethod {
     init {
-        proofMethods.register(this)
+        proofMethodsRegistry.register(this)
 
         sdkSettings.defaultInfo = SdkModule.Info(
             interfaceName = "KnownDeviceProof",
@@ -65,7 +71,7 @@ public class KnownDeviceProofEndpoints(
         auth = proofMethodAuth or AuthRequirement.IsAdmin,
         signals = {
             it.interceptCreate {
-                it.copy(hash = it.hash.secureHash(), expiresAt = now() + expires())
+                it.copy(hash = it.hash.fastHash(), expiresAt = now() + expires())
             }
         },
         permissions = {
@@ -108,7 +114,7 @@ public class KnownDeviceProofEndpoints(
 
         val secret = KnownDeviceSecret(
             _id = secretId,
-            hash = secretValue.secureHash(),
+            hash = secretValue.fastHash(),
             subjectId = principal.idString(id),
             subjectType = principal.name,
             deviceInfo = deviceInfo,
@@ -161,6 +167,7 @@ public class KnownDeviceProofEndpoints(
                         strength = info.strength,
                         value = "some-id",
                         at = Clock.System.now(),
+                        expiresAt = Clock.System.now() + proofExpiration,
                         signature = "opaquesignaturevalue"
                     )
                 )
@@ -180,15 +187,19 @@ public class KnownDeviceProofEndpoints(
                     if (!secret.checkAgainstHash(active.hash))
                         throw BadRequestException("User ID and code do not match")
 
+                    // Lazy migration: if using old slow PBKDF2 hash, upgrade to fast SHA-256 hash
+                    val shouldMigrate = active.hash.isSlowHash()
+
                     modelInfo.table().updateOneById(id, modification {
                         it.lastUsedAt assign now
+                        if (shouldMigrate) {
+                            it.hash assign secret.fastHash()
+                        }
                     })
 
                     proofSigner.await().makeProof(
-                        info = info,
                         property = "${active.subjectType}/_id",
                         value = active.subjectId,
-                        at = now()
                     )
                 }
             }

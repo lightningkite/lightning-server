@@ -28,7 +28,8 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.encryption.checkAgainstHash
-import com.lightningkite.lightningserver.encryption.secureHash
+import com.lightningkite.lightningserver.encryption.fastHash
+import com.lightningkite.lightningserver.encryption.isSlowHash
 import com.lightningkite.lightningserver.pathing.PathSpec1
 import com.lightningkite.lightningserver.pathing.arg1
 import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
@@ -297,7 +298,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
      * @return Pair of the created Session and its RefreshToken (containing plaintext secret)
      */
     context(_: ServerRuntime)
-    protected suspend fun newSession(
+    public suspend fun newSession(
         subjectId: ID,
         label: String? = null,
         expires: Instant? = null,
@@ -310,7 +311,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         val secret = Base64.encode(CryptographyRandom.nextBytes(24))
 
         return Session<SUBJECT, ID>(
-            secretHash = secret.secureHash(),  // SECURITY: Only the hash is stored, never the plaintext
+            secretHash = secret.fastHash(),  // SECURITY: Only the hash is stored, never the plaintext. Using fast hash since session tokens are high-entropy.
             subjectId = subjectId,
             label = label,
             expires = expires,
@@ -402,6 +403,10 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             if (generalSettings().debug) println("Auth failed because session.terminated != null")
             throw UnauthorizedException("Session has been terminated.")
         }
+
+        // Lazy migration: if using old slow PBKDF2 hash, upgrade to fast SHA-256 hash
+        val shouldMigrate = session.secretHash.isSlowHash()
+
         // Update session metadata on each use for audit trail and sliding expiration
         sessionInfo.table().updateOneById(_id, modification(spath) {
             it.lastUsed assign now()
@@ -411,6 +416,11 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             // Reset staleness window on each use (sliding expiration)
             sessionStaleAfter(principal.fetch(session.subjectId))?.let { length ->
                 it.stale assign now() + length
+            }
+
+            // Migrate from slow PBKDF2 hash to fast SHA-256 hash
+            if (shouldMigrate) {
+                it.secretHash assign plainTextSecret.fastHash()
             }
         })
         return session

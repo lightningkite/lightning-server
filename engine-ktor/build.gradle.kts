@@ -30,6 +30,8 @@ dependencies {
     testImplementation(libs.kotlinTest)
     testImplementation(libs.kotlinTestJunit)
     testImplementation(libs.ktorTestHost)
+    testImplementation("io.ktor:ktor-client-cio-jvm:${libs.versions.ktor.get()}")
+    testImplementation("io.ktor:ktor-client-websockets-jvm:${libs.versions.ktor.get()}")
 }
 
 ksp {

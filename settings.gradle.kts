@@ -38,11 +38,16 @@ include(":sessions-sms")
 include(":notifications")
 include(":notifications-shared")
 
+include(":ai")
+include(":ai-shared")
+
 include(":engine-local")
 include(":engine-ktor")
 include(":engine-aws-serverless")
 include(":engine-netty")
 include(":engine-jdk-server")
+
+include(":deploy-aws-ec2")
 
 include(":secret-source-aws")
 

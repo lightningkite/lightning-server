@@ -66,7 +66,7 @@ private fun TerraformEmitterAws.vpc(
     emit("cloud") {
         "module.vpc" {
             "source" - "terraform-aws-modules/vpc/aws"
-            "version" - "4.0.2"
+            "version" - "6.6.0"
 
             "name" - projectPrefix
             "cidr" - cidr

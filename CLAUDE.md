@@ -76,6 +76,30 @@ class ServerTest {
 }
 ```
 
+#### Common Testing Pitfalls
+
+**Duplicate UploadEarlyEndpoint declarations**: If you create multiple instances of `UploadEarlyEndpoint` (e.g., in different modules or test files), they will have conflicting declarations for how `ServerFile` is serialized. This causes runtime serialization errors that manifest as `500 Internal Server Error` responses in tests, even though the code compiles successfully.
+
+**Solution**: Only instantiate `UploadEarlyEndpoint` once in your server definition and reference it from tests. Do not create separate instances for testing.
+
+**Avoiding DuplicateRegistrationError**: When writing tests that use `Server.build()`, ensure the server is only built once across all tests. Create a shared `TestHelper` object with a lazy-initialized `TestRunner` instance:
+
+```kotlin
+object TestHelper {
+    val testRunner by lazy { TestRunner(Server.build()) }
+}
+
+class MyTest {
+    @Test
+    fun testSomething() = runBlocking {
+        with(TestHelper.testRunner) {
+            val response = Server.someEndpoint.test()
+            assertEquals(expectedValue, response.body!!.text())
+        }
+    }
+}
+```
+
 ## Architecture
 
 ### Module Structure

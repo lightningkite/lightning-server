@@ -7,11 +7,16 @@ plugins {
     alias(libs.plugins.dokka)
     id("signing")
     alias(libs.plugins.vanniktechMavenPublish)
+    alias(libs.plugins.kover)  // by Claude - coverage reporting
 }
 
 dependencies {
     api(project(":sessions"))
     api(libs.serviceAbstractionsEmail)
+
+    testImplementation(libs.kotlinTest)
+    testImplementation(libs.kotlinTestJunit)
+    testImplementation(libs.serviceAbstractionsCache)
 
     ksp(libs.serviceAbstractionsDatabaseProcessor)
 }

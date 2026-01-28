@@ -22,8 +22,6 @@ import com.lightningkite.lightningserver.typed.sdk.clientInterface
 import com.lightningkite.lightningserver.typed.sdk.info
 import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.services.cache.Cache
-import com.lightningkite.services.cache.get
-import com.lightningkite.services.cache.set
 import com.lightningkite.services.database.*
 import dev.turingcomplete.kotlinonetimepassword.HmacAlgorithm
 import dev.turingcomplete.kotlinonetimepassword.TimeBasedOneTimePasswordConfig
@@ -33,6 +31,8 @@ import kotlinx.serialization.builtins.serializer
 import java.security.SecureRandom
 import java.util.concurrent.TimeUnit
 import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.toJavaInstant
 import kotlin.uuid.Uuid
@@ -42,7 +42,8 @@ import kotlin.uuid.Uuid
 public class TimeBasedOTPProofEndpoints(
     database: Runtime<Database>,
     private val cache: Runtime<Cache>,
-    private val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
+    override val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
+    override val proofExpiration: Duration = 1.hours,
     private val config: TimeBasedOneTimePasswordConfig = TimeBasedOneTimePasswordConfig(
         timeStep = 30,
         timeStepUnit = TimeUnit.SECONDS,
@@ -50,9 +51,8 @@ public class TimeBasedOTPProofEndpoints(
         hmacAlgorithm = HmacAlgorithm.SHA1
     ),
 ) : ServerBuilder(), DirectProofMethod {
-
     init {
-        proofMethods.register(this)
+        proofMethodsRegistry.register(this)
 
         sdkSettings.defaultInfo = SdkModule.Info("TimeBasedOTPProof", "totp")
         sdkSettings.clientInterface = ProofClientEndpoints.TimeBasedOTP::class.info()
@@ -150,6 +150,7 @@ public class TimeBasedOTPProofEndpoints(
                         strength = info.strength,
                         value = "some-id",
                         at = Clock.System.now(),
+                        expiresAt = Clock.System.now() + proofExpiration,
                         signature = "opaquesignaturevalue"
                     )
                 )
@@ -157,20 +158,25 @@ public class TimeBasedOTPProofEndpoints(
             successCode = HttpStatus.OK,
             implementation = { input: IdentificationAndPassword ->
                 val now = now()
+                val gracePeriod = now().minus(5.seconds)
                 cache().constrainAttemptRate(
                     cacheKey = "totp-count-${input.property}-${input.value}"
                 ) {
                     val subject = input.type
                     val handler = serverRuntime.server.principalTypes[subject]
                         ?: throw IllegalArgumentException("No subject $subject recognized")
-                    val subjectId = handler.fetchUserIdString(input.property, input.value)
+                    val normalizedValue = handler.normalizePropertyValue(input.property, input.value)
+                    val subjectId = handler.fetchUserIdString(input.property, normalizedValue)
                         ?: throw BadRequestException("User ID and code do not match")
 
                     val active = modelInfo.table().find(condition {
                         it.subjectId.eq(subjectId) and it.subjectType.eq(subject) and active
                     }).toList()
 
-                    val matching = active.find { it.generator.isValid(input.password, now.toJavaInstant()) }
+                    val matching = active.find {
+                        it.generator.isValid(input.password, now.toJavaInstant()) ||
+                                it.generator.isValid(input.password, gracePeriod.toJavaInstant())
+                    }
                         ?: throw BadRequestException("User ID and code do not match")
 
                     // It's OK to reuse TOTPs.  That's inherently part of how they work - they're time based hashes.
@@ -182,10 +188,8 @@ public class TimeBasedOTPProofEndpoints(
                     })
 
                     proofSigner.await().makeProof(
-                        info = info,
                         property = input.property,
-                        value = input.value,
-                        at = now()
+                        value = normalizedValue,
                     )
                 }
             }

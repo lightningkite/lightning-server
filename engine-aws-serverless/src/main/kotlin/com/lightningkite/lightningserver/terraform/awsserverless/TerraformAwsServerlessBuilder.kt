@@ -77,7 +77,48 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
 
     public val lambdaEnvironment: MutableMap<String, String> = HashMap()
 
+    /**
+     * Files to add to the Lambda zip package.
+     * Key = filename (relative to Lambda root, e.g., "collector.yaml")
+     * Value = file content
+     */
+    public val lambdaFiles: MutableMap<String, String> = HashMap()
+
+    /**
+     * Lambda tracing mode for X-Ray integration.
+     * - "Active": Lambda creates trace segment, propagates context
+     * - "PassThrough": Lambda passes incoming trace context but doesn't create segment
+     * - null: No tracing_config block (default)
+     */
+    public var lambdaTracingMode: LambdaTracingMode? = null
+    public enum class LambdaTracingMode { Active, PassThrough }
+
+    /**
+     * Whether to attach X-Ray write access policy to Lambda role.
+     * Set automatically by OTEL functions when using X-Ray exporter.
+     */
+    public var attachXRayPolicy: Boolean = false
+
+    /**
+     * Whether to use CloudFront in front of the WebSocket API Gateway for path-based routing.
+     *
+     * When enabled, the `ws.{domain}` endpoint will be served by CloudFront, which transforms
+     * URI paths into the `path` query parameter before forwarding to API Gateway.
+     *
+     * This is required for services like Twilio that connect via path-based WebSocket URLs
+     * (e.g., `wss://ws.domain.com/voice/call`) because AWS API Gateway WebSocket API
+     * doesn't support path-based routing natively.
+     *
+     * When disabled (default), `ws.{domain}` points directly to API Gateway and clients
+     * must pass the path as a query parameter (e.g., `wss://ws.domain.com?path=/voice/call`).
+     */
+    public open val useCloudFrontForWebSocket: Boolean get() = false
+
     override fun finalize() {
+
+        if(projectPrefix.any { !it.isLetterOrDigit() && !(it == '-' || it == '_') })
+            throw IllegalArgumentException("The projectPrefix has illegal characters in it. It can only contain: Letters, Digits, '-', and '_'.")
+
         super.finalize()
         require(TerraformProviderImport.aws)
         require(
@@ -86,7 +127,6 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 null,
                 buildJsonObject { put("region", region.id()) })
         )
-        require(TerraformProvider(TerraformProviderImport.mongodbAtlas, null, JsonObject(emptyMap())))
         val emitter = this@TerraformAwsServerlessBuilder
 
         fulfillSetting(generalSettings.name, buildJsonObject {
@@ -97,11 +137,16 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                     ?: $$"${aws_apigatewayv2_stage.http.invoke_url}")
             put(
                 "wsUrl",
-                (emitter as? TerraformEmitterAwsDomain)?.domain?.let { "wss://ws.$it?path=" }
+                (emitter as? TerraformEmitterAwsDomain)?.domain?.let {
+                    if(useCloudFrontForWebSocket) "wss://ws.$it"
+                    else "wss://ws.$it?path="
+                }
                     ?: $$"${aws_apigatewayv2_stage.ws.invoke_url}")
             put("debug", debug)
             put("emergencyContact", emergencyContact.raw)
         })
+
+        fulfillSetting("awsApiGatewayWsEndpointSetting", JsonPrimitive($$"${aws_apigatewayv2_stage.ws.invoke_url}"))
 
         val accessLogFormat = Json.encodeToString(terraformJsonObject {
             "requestId" - $$"$context.requestId"
@@ -298,28 +343,35 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                     "certificate_arn" - expression("aws_acm_certificate.ws.arn")
                     "validation_record_fqdns" - listOf(expression("aws_route53_record.ws.fqdn"))
                 }
-                "resource.aws_apigatewayv2_domain_name.ws" {
-                    "domain_name" - "ws.${domainName}"
-                    "domain_name_configuration" {
-                        "certificate_arn" - expression("aws_acm_certificate.ws.arn")
-                        "endpoint_type" - "REGIONAL"
-                        "security_policy" - "TLS_1_2"
+
+                if (useCloudFrontForWebSocket) {
+                    // CloudFront distribution for path-based WebSocket routing
+                    emitCloudFrontWebSocket(domainName, zone, "${emitter.projectPrefix}-gateway-stage")
+                } else {
+                    // Direct API Gateway custom domain (default)
+                    "resource.aws_apigatewayv2_domain_name.ws" {
+                        "domain_name" - "ws.${domainName}"
+                        "domain_name_configuration" {
+                            "certificate_arn" - expression("aws_acm_certificate.ws.arn")
+                            "endpoint_type" - "REGIONAL"
+                            "security_policy" - "TLS_1_2"
+                        }
+                        "depends_on" - listOf("aws_acm_certificate_validation.ws")
                     }
-                    "depends_on" - listOf("aws_acm_certificate_validation.ws")
-                }
-                "resource.aws_apigatewayv2_api_mapping.ws" {
-                    "stage" - expression("aws_apigatewayv2_stage.ws.id")
-                    "api_id" - expression("aws_apigatewayv2_stage.ws.api_id")
-                    "domain_name" - expression("aws_apigatewayv2_domain_name.ws.domain_name")
-                }
-                "resource.aws_route53_record.wsAccess" {
-                    "type" - "A"
-                    "name" - expression("aws_apigatewayv2_domain_name.ws.domain_name")
-                    "zone_id" - zone
-                    "alias" {
-                        "evaluate_target_health" - false
-                        "name" - expression("aws_apigatewayv2_domain_name.ws.domain_name_configuration[0].target_domain_name")
-                        "zone_id" - expression("aws_apigatewayv2_domain_name.ws.domain_name_configuration[0].hosted_zone_id")
+                    "resource.aws_apigatewayv2_api_mapping.ws" {
+                        "stage" - expression("aws_apigatewayv2_stage.ws.id")
+                        "api_id" - expression("aws_apigatewayv2_stage.ws.api_id")
+                        "domain_name" - expression("aws_apigatewayv2_domain_name.ws.domain_name")
+                    }
+                    "resource.aws_route53_record.wsAccess" {
+                        "type" - "A"
+                        "name" - expression("aws_apigatewayv2_domain_name.ws.domain_name")
+                        "zone_id" - zone
+                        "alias" {
+                            "evaluate_target_health" - false
+                            "name" - expression("aws_apigatewayv2_domain_name.ws.domain_name_configuration[0].target_domain_name")
+                            "zone_id" - expression("aws_apigatewayv2_domain_name.ws.domain_name_configuration[0].hosted_zone_id")
+                        }
                     }
                 }
             }
@@ -357,7 +409,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 "cloudwatch_role_arn" - expression("aws_iam_role.cloudwatch.arn")
             }
             "resource.aws_iam_role.cloudwatch" {
-                "name" - emitter.projectPrefix.filter { it.isLetterOrDigit() }
+                "name" - emitter.projectPrefix
 
                 "assume_role_policy" - Json.encodeToString(terraformJsonObject {
                     "Version" - "2012-10-17"
@@ -374,7 +426,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 })
             }
             "resource.aws_iam_role_policy.cloudwatch" {
-                "name" - "${emitter.projectPrefix.filter { it.isLetterOrDigit() }}_policy"
+                "name" - "${emitter.projectPrefix}_policy"
                 "role" - expression("aws_iam_role.cloudwatch.id")
 
                 "policy" - Json.encodeToString(terraformJsonObject {
@@ -473,6 +525,12 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 "role" - expression("aws_iam_role.main_exec.id")
                 "policy_arn" - "arn:aws:iam::aws:policy/CloudWatchLambdaInsightsExecutionRolePolicy"
             }
+            if (emitter.attachXRayPolicy) {
+                "resource.aws_iam_role_policy_attachment.xray_write_access" {
+                    "role" - expression("aws_iam_role.main_exec.name")
+                    "policy_arn" - "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
+                }
+            }
             "resource.aws_s3_object.app_storage" {
                 "bucket" - expression("aws_s3_bucket.lambda_bucket.id")
 
@@ -502,6 +560,12 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
 
                 "snap_start" {
                     "apply_on" - "PublishedVersions"
+                }
+
+                emitter.lambdaTracingMode?.let { mode ->
+                    "tracing_config" {
+                        "mode" - mode.name
+                    }
                 }
 
                 "environment" {
@@ -536,11 +600,19 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 // Directories start with "C:..." on Windows; All other OSs use "/" for root.
                 "is_windows" - expression("substr(pathexpand(\"~\"), 0, 1) == \"/\" ? false : true")
             }
+            // Lambda files (e.g., custom collector config)
+            lambdaFiles.forEach { (filename, content) ->
+                val resourceName = "lambda_" + filename.replace(".", "_").replace("/", "_")
+                "resource.local_file.$resourceName" {
+                    "content" - content
+                    "filename" - "\${path.module}/build/$filename"
+                }
+            }
             "resource.null_resource.lambda_jar_source" {
                 "triggers" {
                     "always" - expression("timestamp()")
                 }
-                "provisioner.local-exec" - listOf(
+                "provisioner.local-exec" - (listOf(
                     terraformJsonObject {
                         "command" - this@emit.expression(
                             $$"""
@@ -559,7 +631,13 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                         "command" - $$"openssl enc -aes-256-cbc -md sha256 -in \"${local_sensitive_file.settings_raw.filename}\" -out \"${path.module}/build/lambda/settings.enc\" -pass pass:${random_password.settings.result}"
                         "interpreter" - this@emit.expression("local.is_windows ? [\"PowerShell\", \"-Command\"] : []")
                     }
-                )
+                ) + lambdaFiles.map { (filename, _) ->
+                    val resourceName = "lambda_" + filename.replace(".", "_").replace("/", "_")
+                    terraformJsonObject {
+                        "command" - $$"""cp "${local_file.$$resourceName.filename}" "${path.module}/build/lambda/$$filename""""
+                        "interpreter" - this@emit.expression("local.is_windows ? [\"PowerShell\", \"-Command\"] : []")
+                    }
+                })
             }
             "resource.null_resource.settings_reread" {
                 "triggers" {
@@ -577,10 +655,12 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 "override_special" - "-_"
             }
             "data.archive_file.lambda" {
-                "depends_on" - listOf(
+                "depends_on" - (listOf(
                     "null_resource.lambda_jar_source",
                     "null_resource.settings_reread"
-                )
+                ) + lambdaFiles.keys.map { filename ->
+                    "local_file.lambda_" + filename.replace(".", "_").replace("/", "_")
+                })
                 "type" - "zip"
                 "source_dir" - $$"${path.module}/build/lambda"
                 "output_path" - $$"${path.module}/build/lambda.jar"

@@ -90,6 +90,8 @@ context(serverRuntime: ServerRuntime)
 public fun ResolvedPath<*>.path(): String = path(serverRuntime.externalSerialization.stringArrayFormat)
 context(serverRuntime: ServerRuntime)
 public fun ResolvedPath<*>.fullUrl(): String = generalSettings().publicUrl + path()
+context(serverRuntime: ServerRuntime)
+public fun ResolvedPath<*>.wsFullUrl(): String = generalSettings().wsUrl + path()
 
 /**
  * Interface for objects that can provide a [ResolvedPath] when given a [ServerRuntime] context.
@@ -133,6 +135,8 @@ context(serverRuntime: ServerRuntime)
 public fun HasResolvedPath<*>.path(): String = path.path(serverRuntime.externalSerialization.stringArrayFormat)
 context(serverRuntime: ServerRuntime)
 public fun HasResolvedPath<*>.fullUrl(): String = generalSettings().publicUrl + path()
+context(serverRuntime: ServerRuntime)
+public fun HasResolvedPath<*>.wsFullUrl(): String = generalSettings().wsUrl + path()
 
 @get:JvmName("arg1_1")
 public val <A> ResolvedPath<PathSpec1<A>>.arg1: A get() = rawPathArguments[0] as A
@@ -208,3 +212,5 @@ context(serverRuntime: ServerRuntime)
 public fun HasContextualPath<*>.path(): String = pathInContext.path(serverRuntime.externalSerialization.stringArrayFormat)
 context(serverRuntime: ServerRuntime)
 public fun HasContextualPath<*>.fullUrl(): String = generalSettings().publicUrl + path()
+context(serverRuntime: ServerRuntime)
+public fun HasContextualPath<*>.wsFullUrl(): String = generalSettings().wsUrl + path()

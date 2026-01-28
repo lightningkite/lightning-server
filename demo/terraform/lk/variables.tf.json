@@ -1,0 +1,19 @@
+{
+    "variable": {
+        "sms": {
+            "type": "string"
+        },
+        "someSecret": {
+            "type": "string"
+        },
+        "voiceAgent": {
+            "type": "string"
+        },
+        "smsInbound": {
+            "type": "string"
+        },
+        "phoneCall": {
+            "type": "string"
+        }
+    }
+}

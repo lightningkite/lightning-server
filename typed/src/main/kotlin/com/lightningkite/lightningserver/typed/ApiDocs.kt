@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.typed
 
+import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.auth.options
 import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.ServerDefinition
@@ -12,31 +13,30 @@ import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.pathing.path
+import com.lightningkite.lightningserver.redirectToGet
+import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.typed.sdk.Archive
+import com.lightningkite.lightningserver.typed.sdk.FetcherSdk
+import com.lightningkite.lightningserver.typed.sdk.TypescriptFetcherSdk
 import com.lightningkite.services.data.Description
+import com.lightningkite.services.data.ExperimentalLightningServer
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.childSerializersOrNull
 import com.lightningkite.services.database.nullElement
 import com.lightningkite.services.database.serializableProperties
 import com.lightningkite.services.database.typeParametersSerializersOrNull
 import kotlinx.html.*
+import kotlinx.io.asOutputStream
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.*
+import java.util.zip.ZipOutputStream
 
-
+@OptIn(ExperimentalLightningServer::class)
 public class ApiDocs(private val packageName: String) : ServerBuilder() {
-
-//    public val typeScript: Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>> =
-//        path.path("sdk.ts").get bind HttpHandler {
-//            HttpResponse(
-//                TypedData.text(
-//                    text = buildString { /*Documentable.typescriptSdk2(this)*/ },
-//                    mediaType = MediaType.Text.Plain
-//                )
-//            )
-//        }
-//
+//    TODO: Dart SDK
 //    public val dart: Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>> =
 //        path.path("sdk.dart").get bind HttpHandler {
 //            HttpResponse(
@@ -46,16 +46,73 @@ public class ApiDocs(private val packageName: String) : ServerBuilder() {
 //                )
 //            )
 //        }
-//
-//    public val kotlin: Locationed<HttpEndpoint<PathSpec0>, HttpHandler<PathSpec0>> =
-//        path.path("sdk.zip").get bind HttpHandler {
-//            HttpResponse(
-//                TypedData.sink(
-//                    mediaType = MediaType.Application.Zip,
-//                    emit = { /*Documentable.kotlinSdk(packageName, it)*/ },
-//                )
-//            )
-//        }
+
+    public val typescript: HttpHandler<PathSpec0> =
+        path.path("sdk.ts").get bind HttpHandler {
+            HttpResponse(
+                TypedData.sink(
+                    mediaType = MediaType.Text.Plain,
+                    emit = { sink ->
+                        Archive.singleStream(sink).use {
+                            TypescriptFetcherSdk(
+                                fileStructure = TypescriptFetcherSdk.Structure.SingleFile("sdk.kt")
+                            ).write(it)
+                        }
+                    },
+                )
+            )
+        }
+
+    public val typescriptZip: HttpHandler<PathSpec0> =
+        path.path("sdk.ts.zip").get bind HttpHandler {
+            HttpResponse(
+                TypedData.sink(
+                    mediaType = MediaType.Application.Zip,
+                    emit = { sink ->
+                        Archive.zip(
+                            ZipOutputStream(sink.asOutputStream())
+                        ).use { zip ->
+                            TypescriptFetcherSdk().write(zip.sub("sdk"))
+                        }
+                    },
+                )
+            )
+        }
+
+    public val kotlin: HttpHandler<PathSpec0> =
+        path.path("sdk.kt").get bind HttpHandler {
+            HttpResponse(
+                TypedData.sink(
+                    mediaType = MediaType.Text.Plain,
+                    emit = { sink ->
+                        Archive.singleStream(sink).use {
+                            FetcherSdk(
+                                packageName,
+                                fileStructure = FetcherSdk.Structure.SingleFile("sdk.kt")
+                            ).write(it)
+                        }
+                    },
+                )
+            )
+        }
+
+    public val kotlinZip: HttpHandler<PathSpec0> =
+        path.path("sdk.kt.zip").get bind HttpHandler {
+            HttpResponse(
+                TypedData.sink(
+                    mediaType = MediaType.Application.Zip,
+                    emit = { sink ->
+                        Archive.zip(
+                            ZipOutputStream(sink.asOutputStream())
+                        ).use { zip ->
+                            FetcherSdk(packageName).write(zip.sub("sdk"))
+                        }
+                    },
+                )
+            )
+        }
+
+    private val oldPath = path.path("sdk.zip").get bind kotlinZip
 
     public val index: HttpHandler<PathSpec0> = path.slash.get bind HttpHandler { _ ->
 
@@ -125,8 +182,8 @@ public class ApiDocs(private val packageName: String) : ServerBuilder() {
                 div {
                     h2 { +"Links" }
                     ol {
-//                        li { a(href = "sdk.ts") { +"Typescript SDK" } }
-//                        li { a(href = "sdk.zip") { +"Kotlin SDK" } }
+                        li { a(href = "sdk.ts") { +"Typescript SDK" } }
+                        li { a(href = "sdk.kt") { +"Kotlin SDK" } }
 //                        li { a(href = "sdk.protobuf") { +"Protobuf Types" } }
 //                        li { a(href = "sdk.dart") { +"Dart SDK" } }
                         li { a(href = "#types") { +"Types" } }

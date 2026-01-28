@@ -92,13 +92,15 @@ public value class PathSegments(public val segments: List<String>): List<String>
          * Parses a URL path into segments, URL-decoding each segment.
          *
          * Leading slashes are stripped before splitting.
+         * Trailing slashes are preserved as an empty string segment to support
+         * correct trailing slash redirect logic.
          *
          * @param path The URL path (e.g., "/api/users/123")
          * @return The parsed PathSegments with decoded segment values
          */
-        public fun parse(path: String): PathSegments = PathSegments(path.removePrefix("/").split("/").let {
-            if(it.last().isEmpty()) it.dropLast(1) else it
-        }.map { URLDecoder.decode(it, Charsets.UTF_8) })
+        public fun parse(path: String): PathSegments = PathSegments(
+            path.removePrefix("/").split("/").map { URLDecoder.decode(it, Charsets.UTF_8) }
+        )
     }
 
     private object Serializer: kotlinx.serialization.KSerializer<PathSegments> {

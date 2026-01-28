@@ -33,18 +33,21 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.builtins.serializer
 import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
 
 @OptIn(InternalSerializationApi::class)
 public class PasswordProofEndpoints(
     database: Runtime<Database>,
     private val cache: Runtime<Cache>,
-    private val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
+    override val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
+    override val proofExpiration: Duration = 1.hours,
     private val evaluatePassword: (String) -> Unit = { },
 ) : ServerBuilder(), DirectProofMethod {
 
     init {
-        proofMethods.register(this)
+        proofMethodsRegistry.register(this)
 
         sdkSettings.defaultInfo = SdkModule.Info("PasswordProof", "password")
         sdkSettings.clientInterface = ProofClientEndpoints.Password::class.info()
@@ -166,6 +169,7 @@ public class PasswordProofEndpoints(
                         strength = info.strength,
                         value = "test@test.com",
                         at = Clock.System.now(),
+                        expiresAt = Clock.System.now() + proofExpiration,
                         signature = "opaquesignaturevalue"
                     )
                 )
@@ -177,7 +181,8 @@ public class PasswordProofEndpoints(
                     val subject = input.type
                     val handler = serverRuntime.server.principalTypes.values.find { it.name == subject }
                         ?: throw IllegalArgumentException("No subject $subject recognized")
-                    val subjectId = handler.fetchUserIdString(input.property, input.value)
+                    val normalizedValue = handler.normalizePropertyValue(input.property, input.value)
+                    val subjectId = handler.fetchUserIdString(input.property, normalizedValue)
                         ?: throw BadRequestException("User ID and code do not match")
 
                     val active = modelInfo.table().find(condition {
@@ -192,10 +197,8 @@ public class PasswordProofEndpoints(
                     })
 
                     proofSigner.await().makeProof(
-                        info = info,
                         property = input.property,
-                        value = input.value,
-                        at = now()
+                        value = normalizedValue,
                     )
                 }
             }

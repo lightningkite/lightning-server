@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.dokka)
     id("signing")
     alias(libs.plugins.vanniktechMavenPublish)
+    alias(libs.plugins.kover)  // by Claude - coverage reporting
 }
 
 dependencies {
@@ -17,6 +18,7 @@ dependencies {
     api(libs.serviceAbstractionsData)
     api(libs.serviceAbstractionsBasis)
     api(libs.serviceAbstractionsOtelJvm)
+    api(libs.serviceAbstractionsPubsub)
     api(libs.serviceAbstractionsShouldBeStandardLibrary)
     api(libs.kotlinHtmlJvm)
     api(project(":core-shared"))

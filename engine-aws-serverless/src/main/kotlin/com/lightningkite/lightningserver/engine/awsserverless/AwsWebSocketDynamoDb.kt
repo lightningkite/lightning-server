@@ -35,9 +35,9 @@ internal class AwsWebSocketDynamoDb(
     class StateAndConnectRequest(val state: ByteArray, val connectRequest: WebSocketConnectRequest<*>)
 
     private val socketExpiration = 8.hours
-    private val tableSubs = "$baseTableName-subs"
-    private val tableSubsReverse = "$baseTableName-subs-reverse"
-    private val tableStates = "$baseTableName-state"
+    private val tableSubs = "$baseTableName-ws-subs"
+    private val tableSubsReverse = "$baseTableName-ws-subs-reverse"
+    private val tableStates = "$baseTableName-ws-state"
 
     companion object {
         internal val logger = KotlinLogging.logger("com.lightningkite.lightningserver.engine.awsserverless.AwsWebSocketDynamoDb")
@@ -77,7 +77,7 @@ internal class AwsWebSocketDynamoDb(
                                     { it.attributeName(socketIdKey).keyType(KeyType.HASH) },
                                     { it.attributeName(topicKey).keyType(KeyType.RANGE) })
                                 it.projection {
-                                    it.projectionType(ProjectionType.INCLUDE).nonKeyAttributes(pathKey, expireKey)
+                                    it.projectionType(ProjectionType.INCLUDE).nonKeyAttributes(expireKey, pathKey)
                                 }
                                 it.indexName(tableSubsReverse)
                             }
@@ -329,7 +329,8 @@ internal class AwsWebSocketDynamoDb(
             }.also { logger.debug { "AwsWebSocketDynamoDb.updateState($socketId) took $it" } }
             true
         } catch (e: ConditionalCheckFailedException) {
-            logger.error { e.stackTraceToString() }
+            // This is expected during optimistic locking retries, logged at debug level in commit()
+            logger.debug { "Optimistic lock failed for $socketId (expected during concurrent updates)" }
             false
         }
     }

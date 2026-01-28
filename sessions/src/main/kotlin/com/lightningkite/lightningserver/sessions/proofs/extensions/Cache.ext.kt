@@ -60,5 +60,4 @@ public suspend inline fun <R> Cache.constrainAttemptRate(
         this.add(cacheKey, 1, blocked.coerceAtLeast(expires))
         throw e
     }
-
 }

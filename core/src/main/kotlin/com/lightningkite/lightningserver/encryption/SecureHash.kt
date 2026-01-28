@@ -7,28 +7,13 @@
  */
 package com.lightningkite.lightningserver.encryption
 
-import dev.whyoleg.cryptography.BinarySize
 import dev.whyoleg.cryptography.BinarySize.Companion.bits
-import dev.whyoleg.cryptography.BinarySize.Companion.bytes
-import dev.whyoleg.cryptography.CryptographyAlgorithmId
 import dev.whyoleg.cryptography.CryptographyProvider
-import dev.whyoleg.cryptography.CryptographyProviderApi
-import dev.whyoleg.cryptography.DelicateCryptographyApi
-import dev.whyoleg.cryptography.algorithms.Digest
 import dev.whyoleg.cryptography.algorithms.PBKDF2
-import dev.whyoleg.cryptography.algorithms.SHA1
-import dev.whyoleg.cryptography.algorithms.SHA224
-import dev.whyoleg.cryptography.algorithms.SHA256
-import dev.whyoleg.cryptography.algorithms.SHA384
-import dev.whyoleg.cryptography.algorithms.SHA3_224
-import dev.whyoleg.cryptography.algorithms.SHA3_256
-import dev.whyoleg.cryptography.algorithms.SHA3_384
-import dev.whyoleg.cryptography.algorithms.SHA3_512
 import dev.whyoleg.cryptography.algorithms.SHA512
-import dev.whyoleg.cryptography.operations.SecretDerivation
 import dev.whyoleg.cryptography.random.CryptographyRandom
 import kotlinx.io.bytestring.encodeToByteString
-import java.lang.IllegalStateException
+import java.security.MessageDigest
 import java.security.SecureRandom
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
@@ -36,24 +21,9 @@ import kotlin.io.encoding.Base64
 
 
 /** Prefix identifying the hash format and algorithm */
-private const val prefix = "PBKDF2WithHmacSHA512."
+private const val pbkdf2Prefix = "PBKDF2WithHmacSHA512."
+private const val sha256Prefix = "SHA256."
 
-/**
- * Internal hash function using PBKDF2-HMAC-SHA512.
- *
- * Uses 100,000 iterations and produces a 512-bit (64-byte) output.
- * The high iteration count makes brute-force attacks computationally expensive.
- */
-private suspend fun String.hash(salt: ByteArray): ByteArray =
-    CryptographyProvider.Default
-        .get(PBKDF2)
-        .secretDerivation(
-            SHA512,
-            iterations = 100_000,
-            outputSize = 512.bits,
-            salt = salt
-        )
-    .deriveSecretToByteArray(this.encodeToByteString())
 
 /**
  * Securely hashes a password using PBKDF2-HMAC-SHA512 with random salt.
@@ -61,8 +31,14 @@ private suspend fun String.hash(salt: ByteArray): ByteArray =
  * This function generates a cryptographically secure hash suitable for password storage.
  * Each call generates a unique random salt, so the same password will produce different hashes.
  *
+ * Uses 100,000 iterations and produces a 512-bit (64-byte) output.
+ * The high iteration count makes brute-force attacks computationally expensive.
+ *
  * **Performance Warning**: This is an intentionally slow operation (takes ~100-200ms)
  * and should only be called once during user registration or password changes.
+ *
+ * This is appropriate for password storage where the input may be low-entropy.
+ * For high-entropy random secrets (like session tokens), use [fastHash] instead.
  *
  * **Format**: The returned string has the format:
  * `PBKDF2WithHmacSHA512.<base64-salt>.<base64-hash>`
@@ -71,13 +47,39 @@ private suspend fun String.hash(salt: ByteArray): ByteArray =
  * @return A Base64-encoded hash string that can be stored in a database
  */
 public suspend fun String.secureHash(): String {
-    if (this.startsWith(prefix)) return this
+    if (this.startsWith(pbkdf2Prefix)) return this
     if (this.isEmpty()) return ""
 
     val salt = CryptographyRandom.nextBytes(16)
-    val secret = this.hash(salt)
+    val secret = CryptographyProvider.Default
+        .get(PBKDF2)
+        .secretDerivation(
+            SHA512,
+            iterations = 100_000,
+            outputSize = 512.bits,
+            salt = salt
+        )
+        .deriveSecretToByteArray(this.encodeToByteString())
 
-    return prefix + Base64.encode(salt) + '.' + Base64.encode(secret)
+    return pbkdf2Prefix + Base64.encode(salt) + '.' + Base64.encode(secret)
+}
+
+/**
+ * Fast hash using SHA-256 with a random salt.
+ * This is appropriate for high-entropy random secrets (like session tokens)
+ * where the slow iterations of PBKDF2 provide no additional security benefit.
+ *
+ * DO NOT use this for password hashing - use [secureHash] instead.
+ */
+public fun String.fastHash(): String {
+    if (this.startsWith(sha256Prefix)) return this
+    if (this.isEmpty()) return ""
+    val salt = ByteArray(16)
+    SecureRandom().nextBytes(salt)
+    val digest = MessageDigest.getInstance("SHA-256")
+    digest.update(salt)
+    digest.update(this.toByteArray(Charsets.UTF_8))
+    return sha256Prefix + Base64.encode(salt) + "." + Base64.encode(digest.digest())
 }
 
 /**
@@ -94,15 +96,41 @@ public suspend fun String.secureHash(): String {
  * @return `true` if the password matches the hash, `false` otherwise
  */
 public suspend fun String.checkAgainstHash(hash: String): Boolean {
-    if (!hash.startsWith(prefix)) return false
     if (hash.isEmpty()) return false
-
-    val data = hash.removePrefix(prefix)
-    val salt = Base64.decode(data.substringBefore('.'))
-    val secret = Base64.decode(data.substringAfter('.'))
-
-    return this.hash(salt) contentEquals secret
+    return when {
+        hash.startsWith(sha256Prefix) -> checkAgainstFastHash(hash)
+        hash.startsWith(pbkdf2Prefix) -> checkAgainstPbkdf2Hash(hash)
+        else -> false
+    }
 }
+
+private fun String.checkAgainstFastHash(againstHash: String): Boolean {
+    val against = againstHash.removePrefix(sha256Prefix)
+    val salt = Base64.decode(against.substringBefore('.'))
+    val expectedHash = against.substringAfter('.')
+    val digest = MessageDigest.getInstance("SHA-256")
+    digest.update(salt)
+    digest.update(this.toByteArray(Charsets.UTF_8))
+    return Base64.encode(digest.digest()) == expectedHash
+}
+
+private fun String.checkAgainstPbkdf2Hash(againstHash: String): Boolean {
+    val against = againstHash.removePrefix(pbkdf2Prefix)
+    val start = System.nanoTime()
+    val salt = Base64.decode(against.substringBefore('.'))
+    val rest = against.substringAfter('.')
+    val skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA512")
+    val spec = PBEKeySpec(this.toCharArray(), salt, 100000, 512)
+    val key = skf.generateSecret(spec)
+    val tookNs = System.nanoTime() - start
+    return Base64.encode(key.encoded) == rest
+}
+
+/**
+ * Returns true if this hash string uses the slow PBKDF2 format.
+ * Useful for determining if a hash should be migrated to the faster format.
+ */
+public fun String.isSlowHash(): Boolean = this.startsWith(pbkdf2Prefix)
 
 
 /**
@@ -115,8 +143,8 @@ public suspend fun String.checkAgainstHash(hash: String): Boolean {
  *
  * **This is a very expensive operation and should only be called once**
  */
-internal suspend fun String.secureHashJava(): String {
-    if (this.startsWith(prefix)) return this
+internal fun String.secureHashJava(): String {
+    if (this.startsWith(pbkdf2Prefix)) return this
     if (this.isEmpty()) return ""
     val start = System.nanoTime()
     val salt = ByteArray(16)
@@ -125,7 +153,7 @@ internal suspend fun String.secureHashJava(): String {
     val spec = PBEKeySpec(this.toCharArray(), salt, 100_000, 512)
     val key = skf.generateSecret(spec)
     val tookNs = System.nanoTime() - start
-    return prefix + Base64.encode(salt) + "." + Base64.encode(key.encoded)
+    return pbkdf2Prefix + Base64.encode(salt) + "." + Base64.encode(key.encoded)
 }
 
 /**
@@ -138,9 +166,9 @@ internal suspend fun String.secureHashJava(): String {
  *
  * **This is a very expensive operation and should only be called once**
  */
-internal suspend fun String.checkAgainstHashJava(againstHash: String): Boolean {
+internal fun String.checkAgainstHashJava(againstHash: String): Boolean {
     if (againstHash.isEmpty()) return false
-    val against = againstHash.removePrefix(prefix)
+    val against = againstHash.removePrefix(pbkdf2Prefix)
     val start = System.nanoTime()
     val salt = Base64.decode(against.substringBefore('.'))
     val rest = against.substringAfter('.')

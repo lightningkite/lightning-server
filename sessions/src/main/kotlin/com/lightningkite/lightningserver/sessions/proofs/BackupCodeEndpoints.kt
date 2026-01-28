@@ -13,7 +13,6 @@ import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.sessions.proofs.extensions.constrainAttemptRate
 import com.lightningkite.lightningserver.auth.fetchUserIdString
 import com.lightningkite.lightningserver.auth.idString
@@ -40,6 +39,8 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import java.security.SecureRandom
 import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
 
 @Serializable
@@ -56,13 +57,14 @@ public data class BackupCodeSecret(
 public class BackupCodeEndpoints(
     database: Runtime<Database>,
     private val cache: Runtime<Cache>,
-    private val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
+    override val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
+    override val proofExpiration: Duration = 1.hours,
     private val codeLength: Int = 20,
     private val generateCount: Int = 10, // The number of codes to generate
 ) : ServerBuilder(), DirectProofMethod {
 
     init {
-        proofMethods.register(this)
+        proofMethodsRegistry.register(this)
 
         sdkSettings.defaultInfo = SdkModule.Info("BackupCodeProof", "backupCode")
         sdkSettings.clientInterface = ProofClientEndpoints.BackupCode::class.info()
@@ -174,6 +176,7 @@ public class BackupCodeEndpoints(
                         strength = info.strength,
                         value = "test@test.com",
                         at = Clock.System.now(),
+                        expiresAt = Clock.System.now() + proofExpiration,
                         signature = "opaquesignaturevalue"
                     )
                 )
@@ -207,7 +210,6 @@ public class BackupCodeEndpoints(
                         info = info.copy(strength = 10),
                         property = input.property,
                         value = input.value,
-                        at = now()
                     )
                 }
             }
@@ -217,9 +219,11 @@ public class BackupCodeEndpoints(
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> established(
         principal: PrincipalType<SUBJECT, ID>,
         subject: SUBJECT,
-    ): Boolean = modelInfo.table()
-        .findOne(condition {
-            it.subjectId.eq(principal.idString(subject._id)) and
-                    it.subjectType.eq(principal.name)
-        }) != null
+    ): Boolean =
+        modelInfo.table().findOne(
+            condition {
+                it.subjectId.eq(principal.idString(subject._id)) and
+                        it.subjectType.eq(principal.name)
+            }
+        ) != null
 }

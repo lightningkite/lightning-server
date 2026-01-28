@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.demo
 
+import com.lightningkite.PhoneNumber
 import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 import com.lightningkite.services.data.*
@@ -40,6 +41,7 @@ data class User(
     override val _id: Uuid = Uuid.random(),
     override val email: String,
     override val hashedPassword: String = "",
+    val phone: PhoneNumber? = null,
     val isSuperUser: Boolean = false,
 ) : HasId<Uuid>, HasEmail, HasPassword
 

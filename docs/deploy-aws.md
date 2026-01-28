@@ -321,4 +321,8 @@ For critical endpoints, consider:
 - Provisioned concurrency
 - Keeping Lambdas warm with scheduled pings
 
-NEXT: [Deploy to VM](deploy-vm.md)
+## Alternative: EC2 Deployment
+
+If Lambda cold starts are unacceptable, you need long-running processes, or have predictable high traffic, consider [Deploy to AWS EC2](deploy-aws-ec2.md) which provides traditional VM-based deployment with Auto Scaling.
+
+NEXT: [Deploy to AWS EC2](deploy-aws-ec2.md) | [Deploy to VM](deploy-vm.md)

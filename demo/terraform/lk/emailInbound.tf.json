@@ -1,0 +1,88 @@
+{
+    "output": {
+        "emailInbound_sns_topic_arn": {
+            "description": "SNS topic ARN for subscribing to inbound emails",
+            "value": "${aws_sns_topic.emailInbound.arn}"
+        },
+        "emailInbound_sns_topic_name": {
+            "description": "SNS topic name for inbound emails",
+            "value": "${aws_sns_topic.emailInbound.name}"
+        }
+    },
+    "data": {
+        "aws_caller_identity": {
+            "emailInbound": {}
+        }
+    },
+    "resource": {
+        "aws_sns_topic": {
+            "emailInbound": {
+                "name": "LightningServerDemo-emailInbound-email-inbound"
+            }
+        },
+        "null_resource": {
+            "emailInbound_depends_on_domain": {
+                "depends_on": [
+                    "aws_ses_domain_identity.email",
+                    "aws_ses_domain_dkim.email_dkim"
+                ]
+            }
+        },
+        "aws_ses_receipt_rule_set": {
+            "emailInbound": {
+                "rule_set_name": "LightningServerDemo-emailInbound-rules"
+            }
+        },
+        "aws_ses_active_receipt_rule_set": {
+            "emailInbound": {
+                "rule_set_name": "${aws_ses_receipt_rule_set.emailInbound.rule_set_name}"
+            }
+        },
+        "aws_ses_receipt_rule": {
+            "emailInbound": {
+                "sns_action": {
+                    "topic_arn": "${aws_sns_topic.emailInbound.arn}",
+                    "position": 1,
+                    "encoding": "UTF-8"
+                },
+                "depends_on": [
+                    "aws_ses_active_receipt_rule_set.emailInbound"
+                ],
+                "recipients": [
+                    "lightningserver.cs.lightningkite.com"
+                ],
+                "scan_enabled": true,
+                "name": "LightningServerDemo-emailInbound-receive",
+                "rule_set_name": "${aws_ses_receipt_rule_set.emailInbound.rule_set_name}",
+                "tls_policy": "Optional",
+                "enabled": true
+            }
+        },
+        "aws_route53_record": {
+            "emailInbound_inbound_mx": {
+                "zone_id": "${data.aws_route53_zone.main.zone_id}",
+                "records": [
+                    "10 inbound-smtp.us-west-2.amazonaws.com"
+                ],
+                "name": "lightningserver.cs.lightningkite.com",
+                "type": "MX",
+                "ttl": "600"
+            }
+        },
+        "aws_sns_topic_subscription": {
+            "emailInbound_webhook": {
+                "protocol": "https",
+                "endpoint": "https://lightningserver.cs.lightningkite.com/assistant-channels/email/webhook",
+                "topic_arn": "${aws_sns_topic.emailInbound.arn}",
+                "raw_message_delivery": false,
+                "endpoint_auto_confirms": false
+            }
+        },
+        "aws_sns_topic_policy": {
+            "emailInbound": {
+                "arn": "${aws_sns_topic.emailInbound.arn}",
+                "policy": "\n            {\n                \"Version\": \"2012-10-17\",\n                \"Statement\": [\n                    {\n                        \"Sid\": \"AllowSESPublish\",\n                        \"Effect\": \"Allow\",\n                        \"Principal\": {\n                            \"Service\": \"ses.amazonaws.com\"\n                        },\n                        \"Action\": \"sns:Publish\",\n                        \"Resource\": \"${aws_sns_topic.emailInbound.arn}\",\n                        \"Condition\": {\n                            \"StringEquals\": {\n                                \"AWS:SourceAccount\": \"${data.aws_caller_identity.emailInbound.account_id}\"\n                            }\n                        }\n                    }\n                ]\n            }\n            "
+            }
+        }
+    }
+}

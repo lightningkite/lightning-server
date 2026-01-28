@@ -1,6 +1,0 @@
-{
-    "variable": {
-        "someSecret": {},
-        "datadog_api_key": {}
-    }
-}

@@ -1,0 +1,122 @@
+{
+    "data": {
+        "aws_iam_policy_document": {
+            "email": {
+                "statement": {
+                    "resources": [
+                        "*"
+                    ],
+                    "actions": [
+                        "ses:SendRawEmail"
+                    ]
+                }
+            }
+        }
+    },
+    "resource": {
+        "aws_ses_domain_mail_from": {
+            "email": {
+                "domain": "${aws_ses_domain_identity.email.domain}",
+                "mail_from_domain": "mail.lightningserver.cs.lightningkite.com"
+            }
+        },
+        "aws_iam_access_key": {
+            "email": {
+                "user": "${aws_iam_user.email.name}"
+            }
+        },
+        "null_resource": {
+            "email_depends_on_domain": {
+                "depends_on": [
+                    "aws_ses_domain_identity.email",
+                    "aws_ses_domain_dkim.email_dkim"
+                ]
+            }
+        },
+        "aws_iam_policy": {
+            "email": {
+                "name": "LightningServerDemo-email-policy",
+                "description": "Allows sending of e-mails via Simple Email Service",
+                "policy": "${data.aws_iam_policy_document.email.json}"
+            }
+        },
+        "aws_route53_record": {
+            "email_verification": {
+                "zone_id": "${data.aws_route53_zone.main.zone_id}",
+                "records": [
+                    "${aws_ses_domain_identity.email.verification_token}"
+                ],
+                "name": "_amazonses.lightningserver.cs.lightningkite.com",
+                "type": "TXT",
+                "ttl": "600"
+            },
+            "email_mail_from_mx": {
+                "zone_id": "${data.aws_route53_zone.main.zone_id}",
+                "records": [
+                    "10 feedback-smtp.us-west-2.amazonses.com"
+                ],
+                "name": "${aws_ses_domain_mail_from.email.mail_from_domain}",
+                "type": "MX",
+                "ttl": "600"
+            },
+            "email_mail_from_spf": {
+                "zone_id": "${data.aws_route53_zone.main.zone_id}",
+                "records": [
+                    "v=spf1 include:amazonses.com -all"
+                ],
+                "name": "${aws_ses_domain_mail_from.email.mail_from_domain}",
+                "type": "TXT",
+                "ttl": "300"
+            },
+            "email_dkim": {
+                "zone_id": "${data.aws_route53_zone.main.zone_id}",
+                "records": [
+                    "${element(aws_ses_domain_dkim.email_dkim.dkim_tokens, count.index)}.dkim.amazonses.com"
+                ],
+                "count": 3,
+                "name": "${element(aws_ses_domain_dkim.email_dkim.dkim_tokens, count.index)}._domainkey.lightningserver.cs.lightningkite.com",
+                "type": "CNAME",
+                "ttl": "600"
+            },
+            "email_dmarc": {
+                "zone_id": "${data.aws_route53_zone.main.zone_id}",
+                "records": [
+                    "v=DMARC1;p=quarantine;pct=75;rua=mailto:joseph@lightningkite.com"
+                ],
+                "name": "_dmarc.lightningserver.cs.lightningkite.com",
+                "type": "TXT",
+                "ttl": "300"
+            },
+            "email_spf": {
+                "zone_id": "${data.aws_route53_zone.main.zone_id}",
+                "records": [
+                    "v=spf1 include:amazonses.com -all"
+                ],
+                "name": "lightningserver.cs.lightningkite.com",
+                "type": "TXT",
+                "ttl": "300"
+            }
+        },
+        "aws_iam_user_policy_attachment": {
+            "email": {
+                "policy_arn": "${aws_iam_policy.email.arn}",
+                "user": "${aws_iam_user.email.name}"
+            }
+        },
+        "aws_iam_user": {
+            "email": {
+                "name": "LightningServerDemo-email-user"
+            }
+        },
+        "aws_ses_domain_identity": {
+            "email": {
+                "domain": "lightningserver.cs.lightningkite.com"
+            }
+        },
+        "aws_ses_domain_dkim": {
+            "email_dkim": {
+                "domain": "${aws_ses_domain_identity.email.domain}"
+            }
+        }
+    }
+}

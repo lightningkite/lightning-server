@@ -94,12 +94,44 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
         suspend fun commit(): T {
             if (queue.isEmpty()) return currentState
             var newState = currentState
+            // Track original bytes from DB to avoid serialization round-trip issues
+            var currentStateBytes: ByteArray = stateAnonType.serializedBytes()
+            var attempts = 0
+            val maxAttempts = 50 // Safety limit to prevent infinite loops
+
             while (true) {
-                val stateString = encoding.encodeToByteArray(handler.storageSerializer, currentState)
+                attempts++
+                if (attempts > maxAttempts) {
+                    root.logger.error {
+                        "Failed to commit WebSocket state for $socketId after $maxAttempts attempts. " +
+                        "This indicates either extreme contention or a serialization issue. Queue size: ${queue.size}"
+                    }
+                    throw IllegalStateException(
+                        "Failed to commit WebSocket state for $socketId after $maxAttempts attempts"
+                    )
+                }
+
+                // Use cached bytes if available (from DB), otherwise serialize current state
+                // This prevents infinite loops caused by non-deterministic serialization
+                val stateString = currentStateBytes
+
                 newState = queue.fold(currentState) { item, apply -> apply(item) }
                 val newStateString = encoding.encodeToByteArray(handler.storageSerializer, newState)
-                if (webSocketDynamo.updateState(socketId, stateString, newStateString)) break
-                currentState = repullState()
+
+                if (webSocketDynamo.updateState(socketId, stateString, newStateString)) {
+                    if (attempts > 1) {
+                        root.logger.debug { "WebSocket state committed for $socketId after $attempts attempts" }
+                    }
+                    break
+                }
+
+                // Pull fresh state from DB and cache the original bytes
+                // Critical: we must use the exact bytes from DB for the next optimistic lock check,
+                // not re-serialized bytes which may differ due to serialization non-determinism
+                root.logger.debug { "WebSocket state update retry $attempts for $socketId" }
+                val freshBytes = webSocketDynamo.statesAlone(listOf(socketId))[socketId]!!
+                currentState = encoding.decodeFromByteArray(handler.storageSerializer, freshBytes)
+                currentStateBytes = freshBytes
             }
             queue.clear()
             currentState = newState
@@ -186,14 +218,25 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
         val fullValue = event.data.value(root.internalSerialization.kotlinBytesFormat, fullTopicMatch.value!!.type)
         webSocketDynamo.forSubscribers(event.topic) { path, ids ->
             try {
-                val match = root.server.endpoints.match(root.externalSerialization.stringArrayFormat, path) { it.websocket } ?: run {
-                    root.logger.warn("No handler found for $path")
-                    return@forSubscribers
+                // AWS Lambda WebSockets all go through root path "/" with query param routing.
+                // When the subscription was stored with path "/", use rootWs (QueryParamWebSocketHandler)
+                // directly instead of trying to match from endpoints.
+                val p: ResolvedPath<PathSpec>
+                val h: WebSocketHandler<PathSpec, Any?>
+                if (path == "/" || path.isEmpty()) {
+                    @Suppress("UNCHECKED_CAST")
+                    p = ResolvedPath(rootPath) as ResolvedPath<PathSpec>
+                    @Suppress("UNCHECKED_CAST")
+                    h = rootWs as WebSocketHandler<PathSpec, Any?>
+                } else {
+                    val match = root.server.endpoints.match(root.externalSerialization.stringArrayFormat, path) { it.websocket } ?: run {
+                        root.logger.warn("No handler found for $path")
+                        return@forSubscribers
+                    }
+                    p = match.path
+                    @Suppress("UNCHECKED_CAST")
+                    h = root.server.compiledWebsocketInterceptors.intercept(match.value) as WebSocketHandler<PathSpec, Any?>
                 }
-                val p = match.path
-                val h = root.server.compiledWebsocketInterceptors.intercept(match.value)
-                @Suppress("UNCHECKED_CAST")
-                h as WebSocketHandler<PathSpec, Any?>
                 // TODO: could retrieve more states at once?
                 val states = webSocketDynamo.states(ids)
                 for (socketId in ids) {
@@ -205,7 +248,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         }
                     } catch (e: Exception) {
                         // Suppress, already reported inside *Tracked
-                        root.logger.error(e) { "Closing socket $socketId because subscription message from topic '${match.path.pathSpec}' failed to process." }
+                        root.logger.error(e) { "Closing socket $socketId because subscription message from topic '${p.pathSpec}' failed to process." }
                         webSocketClose(socketId, WebSocketClose.INTERNAL_ERROR)
                     }
                 }
@@ -244,6 +287,28 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
             }
         }
     }
+
+    /**
+     * Sends a frame directly to a specific WebSocket connection, bypassing pub/sub.
+     *
+     * @param socketId The AWS API Gateway connection ID
+     * @param frame The frame to send
+     * @return true if sent successfully, false if the connection is gone
+     */
+    suspend fun sendDirect(socketId: String, frame: WebSocketFrame): Boolean {
+        return try {
+            val result = root.apiGatewayWsPostToConnection(PostToConnectionRequest.builder().also {
+                it.connectionId(socketId)
+                it.data(SdkBytes.fromUtf8String(frame.text))
+            }.build())
+            result.sdkHttpResponse().isSuccessful
+        } catch (e: GoneException) {
+            root.logger.warn("Socket $socketId is gone during direct send.")
+            webSocketDynamo.clean(socketId)
+            false
+        }
+    }
+
     suspend fun handleWebsocketDidConnect(event: WebSocketDidConnect): APIGatewayV2HTTPResponse {
         try {
             @Suppress("UNCHECKED_CAST")
@@ -272,9 +337,13 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
             else
                 WebSocketFrame.Text(raw)
         }
-        var queryParams =
-            (event.multiValueQueryStringParameters
-                ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to URLDecoder.decode(v, Charsets.UTF_8) } }
+
+        // Try multiValueQueryStringParameters first, then fall back to queryStringParameters
+        var queryParams = event.multiValueQueryStringParameters
+            ?.entries?.flatMap { it.value.map { v -> it.key to URLDecoder.decode(v, Charsets.UTF_8) } }
+            ?: event.queryStringParameters
+                ?.entries?.map { it.key to URLDecoder.decode(it.value, Charsets.UTF_8) }
+            ?: listOf()
 
         return when (event.requestContext.routeKey) {
             "\$connect" -> {
@@ -289,7 +358,8 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     headers = headers,
                     domain = event.requestContext.domainName,
                     protocol = "https",
-                    sourceIp = event.requestContext.identity.sourceIp ?: "0.0.0.0"
+                    sourceIp = event.requestContext.identity.sourceIp ?: "0.0.0.0",
+                    engineSocketId = event.requestContext.connectionId
                 )
                 try {
                     val storage = rootWs.willConnectWithMetrics(rootPath, root, lkEvent)

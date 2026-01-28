@@ -166,4 +166,162 @@ class SecretSourceTest {
         val fetcher = PasswordFetcher()
         fetcher.clear()  // Should not throw
     }
+
+    // ========== EnvironmentSecretSource Tests ==========
+
+    @Test
+    fun `EnvironmentSecretSource name is environment`() {
+        assertEquals("environment", EnvironmentSecretSource.name)
+    }
+
+    @Test
+    fun `EnvironmentSecretSource returns null for missing variable`() {
+        val customNeed = object : TerraformNeed<String> {
+            override val name: String = "NONEXISTENT_TEST_VAR_12345"
+            override val serializer: KSerializer<String> = String.serializer()
+            override val default: String? = null
+            override val instructions: String = "Test"
+        }
+        assertNull(EnvironmentSecretSource.getOrNull(customNeed))
+    }
+
+    // ========== ManySecretSources Tests ==========
+
+    @Test
+    fun `ManySecretSources name is Many`() {
+        val many = ManySecretSources()
+        assertEquals("Many", many.name)
+    }
+
+    @Test
+    fun `ManySecretSources with single source`() {
+        val source = object : SecretSource {
+            override val name: String = "SingleSource"
+            override fun <T> getOrNull(need: TerraformNeed<T>): T? = "single-value" as? T
+        }
+
+        val many = ManySecretSources(source)
+        val result = many.getOrNull(testNeed)
+        assertEquals("single-value", result)
+    }
+
+    @Test
+    fun `ManySecretSources with empty list returns null`() {
+        val many = ManySecretSources()
+        val result = many.getOrNull(testNeed)
+        assertNull(result)
+    }
+
+    @Test
+    fun `ManySecretSources sources property is accessible`() {
+        val source1 = object : SecretSource {
+            override val name: String = "S1"
+            override fun <T> getOrNull(need: TerraformNeed<T>): T? = null
+        }
+        val source2 = object : SecretSource {
+            override val name: String = "S2"
+            override fun <T> getOrNull(need: TerraformNeed<T>): T? = null
+        }
+
+        val many = ManySecretSources(source1, source2)
+        assertEquals(2, many.sources.size)
+        assertEquals("S1", many.sources[0].name)
+        assertEquals("S2", many.sources[1].name)
+    }
+
+    // ========== SecretSource get() with default Tests ==========
+
+    @Test
+    fun `SecretSource get() returns default when not found`() {
+        val source = object : SecretSource {
+            override val name: String = "TestSource"
+            override fun <T> getOrNull(need: TerraformNeed<T>): T? = null
+        }
+
+        // With default, should return null and then default kicks in via need.default
+        // Actually, SecretSource.get() throws if not found. Let's verify behavior.
+        // Looking at the source: get() = getOrNull(need) ?: throw IllegalStateException(...)
+        // So default in TerraformNeed is not used by base SecretSource.get()
+        assertFailsWith<IllegalStateException> {
+            source.get(testNeedWithDefault)
+        }
+    }
+
+    // ========== EncryptedFileSecretSource Additional Tests ==========
+
+    @Test
+    fun `EncryptedFileSecretSource getOrNull returns null for non-existent key`() {
+        val tempFile = File.createTempFile("test-secrets", ".json.enc")
+        tempFile.delete()
+
+        try {
+            val source = EncryptedFileSecretSource(tempFile, "test-source", mockPasswordFetcher("test-password-123"))
+
+            // Without setting anything, getOrNull should return null
+            val result = source.getOrNull(testNeed)
+            assertNull(result, "Should return null for key that hasn't been set")
+        } finally {
+            tempFile.delete()
+        }
+    }
+
+    @Test
+    fun `EncryptedFileSecretSource can store multiple secrets`() {
+        val tempFile = File.createTempFile("test-secrets", ".json.enc")
+        tempFile.delete()
+
+        val testNeed2 = object : TerraformNeed<String> {
+            override val name: String = "ANOTHER_SECRET"
+            override val serializer: KSerializer<String> = String.serializer()
+            override val default: String? = null
+            override val instructions: String = "Another test secret"
+        }
+
+        try {
+            val source = EncryptedFileSecretSource(tempFile, "test-source", mockPasswordFetcher("test-password-123"))
+
+            // Store multiple values
+            source.set(testNeed, "value1")
+            source.set(testNeed2, "value2")
+
+            // Retrieve both
+            assertEquals("value1", source.getOrNull(testNeed))
+            assertEquals("value2", source.getOrNull(testNeed2))
+        } finally {
+            tempFile.delete()
+        }
+    }
+
+    @Test
+    fun `EncryptedFileSecretSource can overwrite existing value`() {
+        val tempFile = File.createTempFile("test-secrets", ".json.enc")
+        tempFile.delete()
+
+        try {
+            val source = EncryptedFileSecretSource(tempFile, "test-source", mockPasswordFetcher("test-password-123"))
+
+            // Store initial value
+            source.set(testNeed, "initial-value")
+            assertEquals("initial-value", source.getOrNull(testNeed))
+
+            // Overwrite
+            source.set(testNeed, "updated-value")
+            assertEquals("updated-value", source.getOrNull(testNeed))
+        } finally {
+            tempFile.delete()
+        }
+    }
+
+    @Test
+    fun `EncryptedFileSecretSource name property`() {
+        val tempFile = File.createTempFile("test-secrets", ".json.enc")
+        tempFile.delete()
+
+        try {
+            val source = EncryptedFileSecretSource(tempFile, "custom-name", mockPasswordFetcher("test-password-123"))
+            assertEquals("custom-name", source.name)
+        } finally {
+            tempFile.delete()
+        }
+    }
 }

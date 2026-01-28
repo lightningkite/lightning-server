@@ -11,6 +11,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.ServerSettings
+import com.lightningkite.lightningserver.websockets.DirectWebSocketSender
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
@@ -38,11 +39,18 @@ import kotlin.time.Clock
  * - Handling WebSocket connections and subscriptions
  *
  */
-public interface ServerRuntime: SettingContext {
+public interface ServerRuntime : SettingContext {
     /**
      * The server definition containing all routes, handlers, settings, and tasks.
      */
     public val server: ServerDefinition
+
+    /**
+     * Whether the different parts of the websocket handler (willConnect, didConnect, messageFromClient,
+     * messageFromSubscription, disconnect) all occur in the same process.  If they do, you can use RAM to store
+     * information between those events.
+     */
+    public val websocketHandlersRunOnSameMachine: Boolean get() = true
 
     /**
      * The public URL at which this server is accessible.
@@ -92,6 +100,17 @@ public interface ServerRuntime: SettingContext {
      * @param event The subscription message to send, including topic, path args, and value
      */
     public suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>)
+
+    /**
+     * Optional direct WebSocket sender for engines that support it (e.g., AWS).
+     *
+     * When available, allows bypassing the pub/sub mechanism for direct message sending
+     * to specific sockets. Used by [com.lightningkite.lightningserver.websockets.CoroutineWebsocketHandler]
+     * to optimize message delivery.
+     *
+     * @return DirectWebSocketSender implementation if supported, null otherwise
+     */
+    public val directWebSocketSender: DirectWebSocketSender? get() = null
 
     /**
      * Invokes a task for asynchronous execution.

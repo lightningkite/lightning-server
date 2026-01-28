@@ -184,13 +184,41 @@ This automatically creates endpoints for:
 
 ## Real-time Model Updates
 
-Add WebSocket support for real-time updates:
+Add WebSocket support for real-time updates to your REST endpoints. This allows clients to receive real-time notifications when models are created, updated, or deleted.
+
+### Using ModelRestEndpointsAndUpdatesWebsocket
 
 ```kotlin
+import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebsocket
+
 val postsWithUpdates = path.path("posts") include ModelRestEndpointsAndUpdatesWebsocket(postsInfo)
 ```
 
-Clients can subscribe to collection changes via WebSocket.
+### Using the Plus Operator
+
+Alternatively, combine endpoints and websocket separately using the `+` operator:
+
+```kotlin
+import com.lightningkite.lightningserver.typed.ModelRestEndpoints
+import com.lightningkite.lightningserver.typed.ModelRestUpdatesWebsocket
+import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebsocket.Companion.plus
+
+val rest = path.path("rest") module (
+    ModelRestEndpoints(postsInfo) + ModelRestUpdatesWebsocket(postsInfo)
+)
+```
+
+Both patterns create the same endpoints, including a WebSocket endpoint at `/posts/rest/updates` (or `/posts/updates` depending on your path structure) that sends real-time notifications.
+
+### What Gets Generated
+
+The WebSocket endpoint provides:
+- Real-time notifications for create, update, and delete operations
+- Automatic filtering based on user permissions
+- Initial snapshot of existing data matching the query
+- Incremental updates as changes occur
+
+Clients can subscribe to collection changes via WebSocket and receive live updates.
 
 ## SDK Generation
 

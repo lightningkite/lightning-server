@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.http
 
+import kotlinx.serialization.Serializable
+
 /**
  * Represents an HTTP status code.
  *
@@ -15,6 +17,7 @@ package com.lightningkite.lightningserver.http
  *
  * @property code The numeric HTTP status code (100-599)
  */
+@Serializable
 @JvmInline
 public value class HttpStatus(public val code: Int) {
     /**

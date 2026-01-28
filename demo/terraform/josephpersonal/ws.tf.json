@@ -1,0 +1,120 @@
+{
+    "resource": {
+        "aws_apigatewayv2_api": {
+            "ws": {
+                "protocol_type": "WEBSOCKET",
+                "route_selection_expression": "constant",
+                "name": "josephpersonal-example-gateway"
+            }
+        },
+        "aws_apigatewayv2_integration": {
+            "ws": {
+                "api_id": "${aws_apigatewayv2_api.ws.id}",
+                "integration_uri": "${aws_lambda_alias.main.invoke_arn}",
+                "integration_method": "POST",
+                "integration_type": "AWS_PROXY"
+            }
+        },
+        "aws_cloudwatch_log_group": {
+            "ws_api": {
+                "retention_in_days": 30,
+                "name": "josephpersonal-example-ws-gateway-log"
+            }
+        },
+        "aws_lambda_permission": {
+            "api_gateway_ws": {
+                "principal": "apigateway.amazonaws.com",
+                "lifecycle": {
+                    "create_before_destroy": true
+                },
+                "function_name": "${aws_lambda_alias.main.function_name}",
+                "qualifier": "${aws_lambda_alias.main.name}",
+                "action": "lambda:InvokeFunction",
+                "source_arn": "${aws_apigatewayv2_api.ws.execution_arn}/*/*"
+            }
+        },
+        "aws_route53_record": {
+            "wsAccess": {
+                "zone_id": "${data.aws_route53_zone.main.zone_id}",
+                "name": "${aws_apigatewayv2_domain_name.ws.domain_name}",
+                "alias": {
+                    "zone_id": "${aws_apigatewayv2_domain_name.ws.domain_name_configuration[0].hosted_zone_id}",
+                    "evaluate_target_health": false,
+                    "name": "${aws_apigatewayv2_domain_name.ws.domain_name_configuration[0].target_domain_name}"
+                },
+                "type": "A"
+            },
+            "ws": {
+                "zone_id": "${data.aws_route53_zone.main.zone_id}",
+                "records": [
+                    "${tolist(aws_acm_certificate.ws.domain_validation_options)[0].resource_record_value}"
+                ],
+                "name": "${tolist(aws_acm_certificate.ws.domain_validation_options)[0].resource_record_name}",
+                "type": "${tolist(aws_acm_certificate.ws.domain_validation_options)[0].resource_record_type}",
+                "ttl": "300"
+            }
+        },
+        "aws_acm_certificate_validation": {
+            "ws": {
+                "certificate_arn": "${aws_acm_certificate.ws.arn}",
+                "validation_record_fqdns": [
+                    "${aws_route53_record.ws.fqdn}"
+                ]
+            }
+        },
+        "aws_apigatewayv2_route": {
+            "ws_connect": {
+                "api_id": "${aws_apigatewayv2_api.ws.id}",
+                "route_key": "$connect",
+                "target": "integrations/${aws_apigatewayv2_integration.ws.id}"
+            },
+            "ws_default": {
+                "api_id": "${aws_apigatewayv2_api.ws.id}",
+                "route_key": "$default",
+                "target": "integrations/${aws_apigatewayv2_integration.ws.id}"
+            },
+            "ws_disconnect": {
+                "api_id": "${aws_apigatewayv2_api.ws.id}",
+                "route_key": "$disconnect",
+                "target": "integrations/${aws_apigatewayv2_integration.ws.id}"
+            }
+        },
+        "aws_apigatewayv2_domain_name": {
+            "ws": {
+                "domain_name": "ws.example.demo.ivieleague.com",
+                "depends_on": [
+                    "aws_acm_certificate_validation.ws"
+                ],
+                "domain_name_configuration": {
+                    "endpoint_type": "REGIONAL",
+                    "security_policy": "TLS_1_2",
+                    "certificate_arn": "${aws_acm_certificate.ws.arn}"
+                }
+            }
+        },
+        "aws_apigatewayv2_api_mapping": {
+            "ws": {
+                "api_id": "${aws_apigatewayv2_stage.ws.api_id}",
+                "domain_name": "${aws_apigatewayv2_domain_name.ws.domain_name}",
+                "stage": "${aws_apigatewayv2_stage.ws.id}"
+            }
+        },
+        "aws_apigatewayv2_stage": {
+            "ws": {
+                "api_id": "${aws_apigatewayv2_api.ws.id}",
+                "access_log_settings": {
+                    "format": "{\"requestTime\":\"$context.requestTime\",\"protocol\":\"$context.protocol\",\"sourceIp\":\"$context.identity.sourceIp\",\"routeKey\":\"$context.routeKey\",\"requestId\":\"$context.requestId\",\"resourcePath\":\"$context.resourcePath\",\"responseLength\":\"$context.responseLength\",\"integrationErrorMessage\":\"$context.integrationErrorMessage\",\"httpMethod\":\"$context.httpMethod\",\"status\":\"$context.status\"}",
+                    "destination_arn": "${aws_cloudwatch_log_group.ws_api.arn}"
+                },
+                "auto_deploy": true,
+                "name": "josephpersonal-example-gateway-stage"
+            }
+        },
+        "aws_acm_certificate": {
+            "ws": {
+                "domain_name": "ws.example.demo.ivieleague.com",
+                "validation_method": "DNS"
+            }
+        }
+    }
+}

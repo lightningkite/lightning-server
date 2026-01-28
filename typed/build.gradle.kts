@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.dokka)
     id("signing")
     alias(libs.plugins.vanniktechMavenPublish)
+    alias(libs.plugins.kover)  // by Claude - coverage reporting
 }
 
 dependencies {
