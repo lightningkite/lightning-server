@@ -42,8 +42,12 @@ import kotlinx.serialization.modules.SerializersModule
  *     override val internalSerialization: SerializersModule = EmptySerializersModule()
  *     override val externalSerialization: SerializersModule = EmptySerializersModule()
  *
- *     // index handler (just returns OK)
- *     val root = path.get bind HttpHandler { HttpResponse(status = HttpStatus.OK) }
+ *     val serverName = setting("name", "MyServer")
+ *
+ *     // index handler
+ *     val root = path.get bind HttpHandler {
+ *        HttpResponse.plainText("Hello from ${serverName()}")
+ *     }
  *
  *     // The "bind" infix fun you see above is provided by the dsl. It "binds" the
  *     // path on the left to the handler on the right.

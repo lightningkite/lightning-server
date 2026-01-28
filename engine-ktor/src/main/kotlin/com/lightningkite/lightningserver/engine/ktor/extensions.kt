@@ -26,18 +26,8 @@ internal fun ContentType.adapt(): MediaType =
 
 /**
  * Converts Ktor Headers to Lightning Server HttpHeaders.
- * Handles comma-separated header values by splitting them into separate entries.
  */
-internal fun Headers.adapt(): HttpHeaders = HttpHeaders(
-    entry = flattenEntries()
-        .flatMap { (key, value) ->
-            value
-                .split(',')
-                .map { it.trim() }
-                .map { s -> key to s }
-        }
-        .toTypedArray()
-)
+internal fun Headers.adapt(): HttpHeaders = HttpHeaders(flattenEntries())
 
 /**
  * Converts a Ktor ApplicationCall to a Lightning Server HttpRequest.

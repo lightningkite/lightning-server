@@ -146,7 +146,8 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
                     throw BadRequestException(
                         detail = "unique",
                         message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists",
-                        cause = e)
+                        cause = e
+                    )
                 }
             }
         )

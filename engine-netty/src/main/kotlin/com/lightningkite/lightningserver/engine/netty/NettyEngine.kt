@@ -102,7 +102,7 @@ public class NettyEngine(
         internal val logger = KotlinLogging.logger("com.lightningkite.lightningserver.engine.netty.NettyEngine")
     }
 
-    override val settings: ServerSettings = ServerSettings(super.settings.settings.plus(nettyRunConfig).toSet())
+    override val settings: ServerSettings = super.settings + nettyRunConfig
 
     private lateinit var bossGroup: EventLoopGroup
     private lateinit var workerGroup: EventLoopGroup
@@ -661,10 +661,7 @@ public class NettyEngine(
         }
 
         private fun NettyHttpHeaders.toLightningHeaders(): LsHttpHeaders =
-            HttpHeaders(this@toLightningHeaders.entries().flatMap { (key, raw) ->
-                raw.split(',')
-                    .map { key to it.trim() }
-            })
+            HttpHeaders(this@toLightningHeaders.entries().map { Pair(it.key, it.value) })
 
     }
 

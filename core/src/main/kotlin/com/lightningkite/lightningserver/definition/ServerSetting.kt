@@ -7,6 +7,7 @@ import com.lightningkite.services.terraform.TerraformNeed
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.KSerializer
@@ -36,21 +37,21 @@ public fun interface RuntimeDeferred<out T> {
      * Subsequent calls to [await] return the cached value without re-executing.
      *
      * **Thread Safety**: The cache is thread-safe. Concurrent calls will only execute
-     * the computation once, with other threads waiting for the result.
+     * the computation once, with other threads waiting for the result. If the first
+     * call is cancelled before the computation is finished it will be recalculated.
      */
     @OptIn(ExperimentalAtomicApi::class)
     public data class Cached<out T>(private val wraps: RuntimeDeferred<T>) : RuntimeDeferred<T> {
-        @kotlin.concurrent.Volatile private var deferred: Deferred<T>? = null
+        @kotlin.concurrent.Volatile private var cache: NullWrapper<T>? = null
         private val mutex = Mutex()
         context(server: ServerRuntime)
-        override suspend fun await(): T {
-            return mutex.withLock {
-                deferred?.let { return@withLock it }
-                val n = GlobalScope.async { wraps.await() }
-                deferred = n
+        override suspend fun await(): T =
+            cache?.value ?: mutex.withLock {
+                cache?.value?.let { return@withLock it }
+                val n = wraps.await()
+                cache = NullWrapper(n)
                 n
-            }.await()
-        }
+            }
     }
 }
 
@@ -333,10 +334,6 @@ public fun <SETTING> ServerSetting(
 
 /*
  * TODO: API Recommendations for ServerSetting.kt
- *
- * 1. **THREAD SAFETY**: The Cached implementations use mutable var without synchronization.
- *    Document that these are not thread-safe, or add synchronization for concurrent access.
- *    In a typical server, settings are initialized once during startup, but this should be documented.
  *
  * 2. The default instructions "No instructions" is not helpful. Consider making instructions
  *    a required parameter or using a more descriptive default like "No configuration instructions provided".

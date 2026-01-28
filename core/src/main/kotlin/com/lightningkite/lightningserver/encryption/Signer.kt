@@ -195,7 +195,7 @@ public fun Signer.verifyBlocking(string: String, signature: String): Boolean = v
  * @param format The signature format (defaults to RAW)
  * @return A Signer configured for ES256
  */
-public fun dev.whyoleg.cryptography.algorithms.ECDSA.KeyPair.ES256(format: dev.whyoleg.cryptography.algorithms.ECDSA.SignatureFormat = dev.whyoleg.cryptography.algorithms.ECDSA.SignatureFormat.RAW): Signer = Signer.ECDSA(this, SHA256, format, "ES256")
+public fun ECDSA.KeyPair.ES256(format: ECDSA.SignatureFormat = ECDSA.SignatureFormat.RAW): Signer = Signer.ECDSA(this, SHA256, format, "ES256")
 
 /**
  * Creates an ES384 (ECDSA with SHA-384) signer from this key pair.
@@ -203,7 +203,7 @@ public fun dev.whyoleg.cryptography.algorithms.ECDSA.KeyPair.ES256(format: dev.w
  * @param format The signature format (defaults to RAW)
  * @return A Signer configured for ES384
  */
-public fun dev.whyoleg.cryptography.algorithms.ECDSA.KeyPair.ES384(format: dev.whyoleg.cryptography.algorithms.ECDSA.SignatureFormat = dev.whyoleg.cryptography.algorithms.ECDSA.SignatureFormat.RAW): Signer = Signer.ECDSA(this, SHA384, format, "ES384")
+public fun ECDSA.KeyPair.ES384(format: ECDSA.SignatureFormat = ECDSA.SignatureFormat.RAW): Signer = Signer.ECDSA(this, SHA384, format, "ES384")
 
 /**
  * Creates an ES512 (ECDSA with SHA-512) signer from this key pair.
@@ -211,7 +211,7 @@ public fun dev.whyoleg.cryptography.algorithms.ECDSA.KeyPair.ES384(format: dev.w
  * @param format The signature format (defaults to RAW)
  * @return A Signer configured for ES512
  */
-public fun dev.whyoleg.cryptography.algorithms.ECDSA.KeyPair.ES512(format: dev.whyoleg.cryptography.algorithms.ECDSA.SignatureFormat = dev.whyoleg.cryptography.algorithms.ECDSA.SignatureFormat.RAW): Signer = Signer.ECDSA(this, SHA512, format, "ES512")
+public fun ECDSA.KeyPair.ES512(format: ECDSA.SignatureFormat = ECDSA.SignatureFormat.RAW): Signer = Signer.ECDSA(this, SHA512, format, "ES512")
 
 /*
  * TODO: API Recommendations

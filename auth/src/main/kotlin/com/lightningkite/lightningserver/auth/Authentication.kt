@@ -194,7 +194,8 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
     context(server: ServerRuntime)
     public val untypedId: Comparable<*>
         get() = cachedId
-            ?: server.internalSerialization.stringArrayFormat.decodeFromString(untypedPrincipal.idSerializer, rawId)
+            ?: server.internalSerialization.stringArrayFormat
+                .decodeFromString(untypedPrincipal.idSerializer, rawId)
                 .also { cachedId = it }
 
     /**
@@ -238,8 +239,8 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
         override val id: String = "authentication"
 
         @OptIn(ExperimentalSerializationApi::class)
-        override val serializer: KSerializer<Authentication<*>?>
-            get() = serializer(NothingSerializer()).nullable as KSerializer<Authentication<*>?>
+        override val serializer: KSerializer<Authentication<*>?> =
+            serializer(NothingSerializer()).nullable as KSerializer<Authentication<*>?>
 
         context(server: ServerRuntime)
         override suspend fun calculate(input: Request<*>): Authentication<*>? {
@@ -319,7 +320,7 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
      * ```kotlin
      * object Server : ServerBuilder() {
      *     init {
-     *         authReaders.add(BearerTokenReader)
+     *         authReaders.register(BearerTokenReader)
      *     }
      * }
      * ```

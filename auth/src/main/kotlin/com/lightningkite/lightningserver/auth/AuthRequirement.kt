@@ -63,6 +63,7 @@ import kotlin.time.Duration
  */
 @SubclassOptInRequired(DelicateLightningServerApi::class)
 public interface AuthRequirement<out SUBJECT : HasId<*>?> {
+    public companion object;
 
     /**
      * Result of checking an [Authentication] against this requirement.
@@ -121,8 +122,8 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
      *
      * Example:
      * ```kotlin
-     * val publicEndpoint = path.get.api(
-     *     authOptions = noAuth,
+     * val publicEndpoint = path.get bind ApiHttpHandler(
+     *     auth = noAuth,
      *     implementation = { /* ... */ }
      * )
      * ```
@@ -164,8 +165,8 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
      *
      * 3. Use it in endpoint definitions:
      * ```kotlin
-     * val deletePost = path.delete.api(
-     *     authOptions = IsContentModerator,
+     * val deletePost = path.delete bind ApiHttpHandler(
+     *     auth = IsContentModerator,
      *     implementation = { /* ... */ }
      * )
      * ```
@@ -202,7 +203,9 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
 
             context(runtime: ServerRuntime)
             override suspend fun check(auth: Authentication<*>?): Result<HasId<*>> =
-                wraps.setting()?.subscope(subscopes)?.check(auth) ?: wraps.check(auth)
+                wraps.setting()?.subscope(subscopes)?.check(auth) ?:
+                    wraps.default?.subscope(subscopes)?.check(auth) ?:
+                        Result.Rejected("AuthSetting $wraps has no set value or default")
         }
     }
 
@@ -270,8 +273,8 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
         context(server: ServerRuntime)
         override suspend fun check(auth: Authentication<*>?): Result<HasId<*>> {
             if (auth == null) return Result.Rejected("Auth required")
-            if (!auth.meetsRequirements(scopes)) return Result.Rejected("Auth does not have required scopes $scopes")
             if (maxAge != null && now() - auth.issuedAt > maxAge) return Result.Rejected("Auth is older than max age $maxAge")
+            if (!auth.meetsRequirements(scopes)) return Result.Rejected("Auth does not have required scopes $scopes")
             if (requirement?.invoke(server, auth) == false) return Result.Rejected("Auth does not meet additional requirement")
             return Result.Accepted(auth)
         }
@@ -328,9 +331,9 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
         context(server: ServerRuntime)
         override suspend fun check(auth: Authentication<*>?): Result<SUBJECT> {
             if (auth == null) return Result.Rejected("Auth required")
-            if (principalType != auth.untypedPrincipal) return Result.Rejected("Auth is not of type ${principalType.name}")
-            if (!auth.meetsRequirements(scopes)) return Result.Rejected("Auth does not have required scopes $scopes")
+            if (principalType !== auth.untypedPrincipal) return Result.Rejected("Auth is not of type ${principalType.name}")
             if (maxAge != null && now() - auth.issuedAt > maxAge) return Result.Rejected("Auth is older than max age $maxAge")
+            if (!auth.meetsRequirements(scopes)) return Result.Rejected("Auth does not have required scopes $scopes")
 
             @Suppress("UNCHECKED_CAST") // typecheck done when principal type was checked
             auth as Authentication<SUBJECT>
@@ -403,42 +406,5 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
 
         override fun toString(): String = options.joinToString(" or ")
     }
-
-    public companion object;
 }
 
-/*
- * TODO: API Recommendations
- *
- * 1. Consider adding a convenience method for checking if a requirement would accept a given auth
- *    without throwing exceptions: `fun wouldAccept(auth: Authentication<*>?): Boolean`
- *
- * 2. The maxAge check uses `now() - issuedAt` which could overflow for very old tokens.
- *    Consider adding a guard or using a safer comparison method.
- *
- * 3. The custom `requirement` lambda in Authenticated and AuthenticatedAs lacks documentation
- *    about exception handling. Should exceptions be caught and converted to Rejected results?
- *    Current behavior may surprise users.
- *
- * 4. AuthSetting.Scoped seems to have a potential issue at line 205:
- *    `wraps.setting()?.subscope(subscopes)?.check(auth) ?: wraps.check(auth)`
- *    If setting() returns null but wraps.default exists, this falls back to wraps.check(auth),
- *    which would check the default without the subscope applied. Consider whether this is intended.
- *
- * 5. Options.check() collects all rejection reasons but only returns them if all fail.
- *    Consider logging these internally for debugging, as they may help diagnose auth issues.
- *
- * 6. Consider adding a builder pattern for complex requirements:
- *    ```kotlin
- *    AuthRequirement.build<User> {
- *        principalType(UserPrincipal)
- *        scope(RequiredScope("admin"))
- *        maxAge(10.minutes)
- *        require { it.fetch().emailVerified }
- *    }
- *    ```
- *
- * 7. The Result sealed interface could benefit from additional information in Rejected,
- *    such as which specific check failed (scope, maxAge, custom requirement, etc.) for
- *    better error messages and debugging.
- */

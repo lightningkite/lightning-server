@@ -2,11 +2,15 @@ package com.lightningkite.lightningserver.encryption
 
 import dev.whyoleg.cryptography.BinarySize
 import dev.whyoleg.cryptography.CryptographyProvider
+import dev.whyoleg.cryptography.algorithms.HKDF
 import dev.whyoleg.cryptography.algorithms.HMAC
 import dev.whyoleg.cryptography.algorithms.SHA512
 import dev.whyoleg.cryptography.materials.key.Key
 import dev.whyoleg.cryptography.materials.key.KeyDecoder
 import dev.whyoleg.cryptography.materials.key.KeyFormat
+import dev.whyoleg.cryptography.operations.SecretDerivation
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.KSerializer
@@ -83,7 +87,9 @@ public data class SecretBasis(public val string: String) {
     @Volatile
     private var hmac: HMAC.Key? = null
 
+    @Transient
     private val hmacLock = Any()
+    @Transient
     private val hmacMutex = Mutex() // I'm not sure if this mutex is necessary, but I'm including it because I do not want to deal with a subtle concurrency bug in the future.
 
     /**
@@ -122,35 +128,15 @@ public data class SecretBasis(public val string: String) {
             .also { hmac = it }
     }
 
-    /**
-     * Resizes this byte array to match the specified [size].
-     *
-     * **Warning**: The behavior differs based on array size:
-     * - If `this.size <= size.inBytes`: Returns the first `size.inBytes` bytes (truncates or zero-pads)
-     * - If `this.size > size.inBytes`: Returns `(this.size - size.inBytes)` bytes by repeating the source
-     *
-     * @param size The target binary size
-     * @return A byte array adjusted to the specified size
-     */
-    private fun ByteArray.resizeKey(size: BinarySize): ByteArray {
-        if (this.size <= size.inBytes) return sliceArray(0 until size.inBytes)
-
-        var remaining = this.size - size.inBytes
-        val padded = ByteArray(remaining)
-
-        var offset = 0
-        while (remaining > 0) {
-            val copy =
-                if (remaining < this.size) sliceArray(0 until remaining)
-                else this
-
-            copy.copyInto(padded, offset)
-
-            remaining -= copy.size
-            offset += copy.size
-        }
-
-        return padded
+    private fun expand(size: BinarySize): SecretDerivation {
+        return CryptographyProvider.Default
+            .get(HKDF)
+            .secretDerivation(
+                SHA512,
+                size,
+                salt = null as ByteArray?,
+                info = null
+            )
     }
 
     /**
@@ -169,7 +155,10 @@ public data class SecretBasis(public val string: String) {
     ): ByteArray = key()
         .signatureGenerator()
         .generateSignature(key)
-        .let { if (size == null) it else it.resizeKey(size) }
+        .let {
+            if (size == null) it
+            else expand(size).deriveSecretToByteArray(it)
+        }
 
     /**
      * Derives a cryptographic key from this [SecretBasis] using HMAC-SHA512 (blocking version).
@@ -187,7 +176,10 @@ public data class SecretBasis(public val string: String) {
     ): ByteArray = keyBlocking()
         .signatureGenerator()
         .generateSignatureBlocking(key)
-        .let { if (size == null) it else it.resizeKey(size) }
+        .let {
+            if (size == null) it
+            else expand(size).deriveSecretToByteArrayBlocking(it)
+        }
 
     /**
      * Derives a cryptographic key from this [SecretBasis] using a string variant identifier.

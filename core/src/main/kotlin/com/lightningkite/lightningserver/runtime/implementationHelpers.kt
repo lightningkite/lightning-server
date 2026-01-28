@@ -56,7 +56,7 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
     return try {
         server.compiledHttpInterceptors.intercept(request) { req ->
             this.logger.info { "${request.path} accessed by ${request.sourceIp}" }
-            var result = try {
+            val result = try {
                 @Suppress("UNCHECKED_CAST")
                 (req.path.match.value as HttpHandler<PathSpec>).handleWithMetrics(req as HttpRequest<PathSpec>)
             } catch (notFound: RouteNotFoundException) {
