@@ -113,7 +113,7 @@ public fun ServerSettings.loadFromFile(
 ) {
     val format: StringFormat = settingsFormat(file.extension, module)
 
-    val serializer = SettingsSerializer(settings.sortedBy { it.name }, module, file.toJavaFile().parentFile)
+    val serializer = SettingsSerializer((settings - overrides.keys).sortedBy { it.name }, module, file.toJavaFile().parentFile)
 
     if (!file.exists()) {
         file.writeString(format.encodeToString(serializer, settings.associateWith { it.default }))

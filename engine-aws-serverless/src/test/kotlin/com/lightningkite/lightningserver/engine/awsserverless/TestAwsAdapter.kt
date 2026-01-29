@@ -32,7 +32,10 @@ class TestAwsAdapter(server: ServerDefinition): AwsAdapter(server) {
 
     override fun loadSettings() {
         with(settings) {
-            settings.forEach { it.useDefault() }
+            settings.forEach {
+                println("Using default for ${it.name}")
+                it.useDefault()
+            }
             ready()
         }
     }
