@@ -6,7 +6,6 @@ import com.lightningkite.lightningserver.definition.builder.DuplicateRegistratio
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpInterceptor
-import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.get
@@ -14,9 +13,9 @@ import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.http.put
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.plainText
-import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
+import com.lightningkite.lightningserver.settings.ConflictingSettingsException
+import com.lightningkite.lightningserver.settings.ServerSettings
 import kotlinx.serialization.builtins.serializer
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -518,26 +517,24 @@ class ServerDefinitionTest {
     }
 
     @Test
-    fun `duplicate setting names are deduplicated by distinctBy`() {
+    fun `duplicate setting names are only allowed for identical instances`() {
         // Both modules define a setting with the same name
-        val moduleA = object : ServerBuilder() {
-            val shared = setting("shared-name", "valueA", String.serializer())
+        val settingA = ServerSetting("A", "", String.serializer())
+        val identicalToSettingA = ServerSetting("A", "", String.serializer())
+        val sameNameDifferentType = ServerSetting("A", 0, Int.serializer())
+        val settingB = ServerSetting("B", "", String.serializer())
+
+        val settings = ServerSettings(setOf(settingA, settingB))
+
+        assertEquals(settings.settings.size, 2)
+
+        assertEquals((settings + settingA).settings.size, 2)    // duplicates are ignored
+
+        assertEquals((settings + identicalToSettingA).settings.size, 2)     // equivalent settings are also allowed
+
+        assertFailsWith<ConflictingSettingsException> {
+            settings + sameNameDifferentType
         }
-
-        val moduleB = object : ServerBuilder() {
-            val shared = setting("shared-name", "valueB", String.serializer())
-        }
-
-        val server = object : ServerBuilder() {
-            val a = path include moduleA
-            val b = path include moduleB
-        }
-
-        val definition = server.build()
-
-        // Should only have one setting with that name (first one wins due to distinctBy)
-        val sharedSettings = definition.settings.filter { it.name == "shared-name" }
-        assertEquals(1, sharedSettings.size, "Duplicate setting names should be deduplicated")
     }
 
     // ==================== MediaType Coder Tests ====================

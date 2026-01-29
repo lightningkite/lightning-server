@@ -339,14 +339,14 @@ class SerializableCacheTest {
                 val key = SerializableCache.Key(
                     "expiring",
                     String.serializer(),
-                    expireAfter = 10.milliseconds
+                    expireAfter = 100.milliseconds
                 )
 
                 cache.set(key, "test")
                 assertTrue(cache.containsKey(key))
 
                 // Wait for expiration
-                kotlinx.coroutines.delay(20)
+                kotlinx.coroutines.delay(200)
 
                 // Accessing expired key should return null and clean up
                 assertNull(cache.get(key))
