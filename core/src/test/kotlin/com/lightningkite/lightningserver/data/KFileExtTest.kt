@@ -7,13 +7,15 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class KFileExtTest {
+    private val String.unix get() = replace('\\', '/')
+
     @Test
     fun testKFileToJavaFile() {
         val path = Path("/tmp/test.txt")
         val kFile = com.lightningkite.services.data.KFile(SystemFileSystem, path)
         val javaFile = kFile.toJavaFile()
 
-        assertEquals("/tmp/test.txt", javaFile.path)
+        assertEquals("/tmp/test.txt", javaFile.path.unix)
     }
 
     @Test
@@ -21,7 +23,7 @@ class KFileExtTest {
         val javaFile = File("/tmp/test.txt")
         val kFile = javaFile.toKFile()
 
-        assertEquals("/tmp/test.txt", kFile.path.toString())
+        assertEquals("/tmp/test.txt", kFile.path.toString().unix)
     }
 
     @Test
@@ -30,7 +32,7 @@ class KFileExtTest {
         val kFile = originalJavaFile.toKFile()
         val backToJavaFile = kFile.toJavaFile()
 
-        assertEquals(originalJavaFile.path, backToJavaFile.path)
+        assertEquals(originalJavaFile.path.unix, backToJavaFile.path.unix)
     }
 
     @Test
@@ -38,7 +40,7 @@ class KFileExtTest {
         val javaFile = File("/tmp/test file.txt")
         val kFile = javaFile.toKFile()
 
-        assertEquals("/tmp/test file.txt", kFile.path.toString())
+        assertEquals("/tmp/test file.txt", kFile.path.toString().unix)
     }
 
     @Test
@@ -46,6 +48,6 @@ class KFileExtTest {
         val javaFile = File("relative/path/test.txt")
         val kFile = javaFile.toKFile()
 
-        assertEquals("relative/path/test.txt", kFile.path.toString())
+        assertEquals("relative/path/test.txt", kFile.path.toString().unix)
     }
 }

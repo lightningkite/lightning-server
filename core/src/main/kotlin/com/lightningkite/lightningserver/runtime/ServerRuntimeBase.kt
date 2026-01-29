@@ -45,12 +45,12 @@ public abstract class ServerRuntimeBase(override val server: ServerDefinition): 
      * Adds generalSettings, secretBasis, telemetrySettings, and loggingSettings
      * to the server's defined settings.
      */
-    override val settings: ServerSettings = ServerSettings(server.settings.plus(listOf(
+    override val settings: ServerSettings = ServerSettings(server.settings.toSet() + setOf(
         generalSettings,
         secretBasis,
         telemetrySettings,
         loggingSettings,
-    )).toSet())
+    ))
 
     /**
      * Serialization for internal use (database, caching, etc.).

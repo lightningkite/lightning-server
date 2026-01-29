@@ -224,6 +224,8 @@ private data class BasicServerSetting<SETTING, RESULT>(
         cached?.value ?: synchronized(lock) {
             cached?.value ?: server.settings.get(this)
         }
+
+    override fun toString(): String = "ServerSetting<${serializer.descriptor.serialName}>($name)"
 }
 
 /**
@@ -299,6 +301,8 @@ private data class BasicDirectServerSetting<SETTING>(
         cached?.value ?: synchronized(lock) {
             cached?.value ?: server.settings.get(this).also { cached = NullWrapper(it) }
         }
+
+    override fun toString(): String = "DirectServerSetting<${serializer.descriptor.serialName}>($name)"
 }
 
 /**

@@ -62,7 +62,7 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
     internal val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.engine.awsserverless")
     internal var preventLambdaTimeoutReuse: Boolean = false
 
-    override val settings: ServerSettings = ServerSettings(super.settings.settings.plus(awsApiGatewayWsEndpointSetting).toSet())
+    override val settings: ServerSettings = super.settings + awsApiGatewayWsEndpointSetting
 
     override val websocketHandlersRunOnSameMachine: Boolean get() = false
 

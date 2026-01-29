@@ -38,9 +38,8 @@ public class MissingSettingFile(suggestedFile: KFile) :
  * Exception thrown when multiple [ServerSetting] instances are registered with the same name.
  *
  * This exception is thrown during [ServerSettings] initialization when the validation check
- * detects that different setting instances share the same name. While duplicate instances
- * (same object reference) are allowed, different instances with the same name create ambiguity
- * and potential type conflicts.
+ * detects that different settings share the same name. While duplicate settings
+ * are allowed, different settings with the same name create ambiguity and potential type conflicts.
  *
  * **Why this check exists:**
  * - Prevents type conflicts (e.g., one setting expects `Int`, another expects `String`)
