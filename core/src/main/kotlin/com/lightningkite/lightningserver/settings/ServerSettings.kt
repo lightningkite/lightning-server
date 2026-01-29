@@ -11,7 +11,9 @@ import com.lightningkite.lightningserver.definition.loggingSettings
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.otel.applyToLogback
-import org.jetbrains.annotations.TestOnly
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.InvocationKind
+import kotlin.contracts.contract
 
 /**
  * Manages server configuration settings with a two-phase lifecycle (configuration → ready).
@@ -260,7 +262,7 @@ public class ServerSettings private constructor( // duplicate settings can be ig
                                 currentlyResolving
                                     ?.takeIf { it.minus(key).isNotEmpty() }
                                     ?.let {
-                                        append("Occurred while resolving ${it.joinToString(" -> ") { it.name } }.")
+                                        append("Occurred while resolving ${it.joinToString(" -> ") { it.name }}.")
                                     }
                             }
                         )
@@ -271,6 +273,20 @@ public class ServerSettings private constructor( // duplicate settings can be ig
             }
         } as RESULT
     }
+
+    // For some dumb fucking reason kotlin made this internal, and it's what getOrElse should do in the first place!
+    @OptIn(ExperimentalContracts::class)
+    private inline fun <K, V> Map<K, V>.getOrElse(key: K, defaultValue: () -> V): V {
+        contract { callsInPlace(defaultValue, InvocationKind.AT_MOST_ONCE) }
+        val value = get(key)
+        if (value == null && !containsKey(key)) {
+            return defaultValue()
+        } else {
+            @Suppress("UNCHECKED_CAST")
+            return value as V
+        }
+    }
+
 
     /**
      * Returns all settings with their serializable values.
@@ -295,8 +311,16 @@ public class ServerSettings private constructor( // duplicate settings can be ig
     context(_: ServerRuntime)
     public fun allGoals(): Map<ServerSetting<*, *>, Any?> = settings.associateWith { get(it) }
 
-    public operator fun plus(requirement: ServerSetting<*, *>): ServerSettings = ServerSettings(settings + requirement, overrides)
-    public operator fun plus(requirements: Collection<ServerSetting<*, *>>): ServerSettings = ServerSettings(settings + requirements, overrides)
+    private fun copy(
+        settings: Set<ServerSetting<*, *>> = this.settings,
+        overrides: Map<ServerSetting<*, *>, Runtime<*>> = this.overrides
+    ) = ServerSettings(settings, overrides).also {
+        it.serializable.include(this.serializable)
+        it.goal.include(this.goal)
+    }
+
+    public operator fun plus(requirement: ServerSetting<*, *>): ServerSettings = copy(settings + requirement)
+    public operator fun plus(requirements: Collection<ServerSetting<*, *>>): ServerSettings = copy(settings + requirements)
 
     public data class Override<S, R>(val override: ServerSetting<S, R>, val deferTo: Runtime<R>)
 }
