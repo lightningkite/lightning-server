@@ -81,7 +81,7 @@ public class UploadEarlyEndpoint(
         path.get bind ApiHttpHandler(
         auth = authOptions,
         summary = "Upload File for Request",
-        description = "Upload a file to make a request later.  Times out in around 10 minutes.",
+        description = "Upload a file to make a request later. Times out in $expiration.",
         errorCases = listOf(),
         implementation = { _: Unit ->
             val key = "${Uuid.random()}.file"

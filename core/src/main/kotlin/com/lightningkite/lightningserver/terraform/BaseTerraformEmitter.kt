@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.terraform
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.encryption.SecretBasis
+import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.services.terraform.TerraformEmitter
 import com.lightningkite.services.terraform.TerraformEmitterAws
 import com.lightningkite.services.terraform.TerraformJsonObject
@@ -134,10 +135,12 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
      *
      * @throws IllegalStateException if any required settings are missing
      */
-    protected open fun finalize(): Unit {
+    protected open fun finalize() {
         builder.settings()
-        val required = builder.build().settings.map { it.name }.toSet() + additionalSettings.map { it.name }
-        val missing = required - settings.keys
+        val built = builder.build()
+        ServerSettings(built)   // run checks for conflicts & circular references
+        val required = built.settings.map { it.name }.toSet() + additionalSettings.map { it.name }
+        val missing = required - settings.keys - built.settingOverrides.keys.map { it.name }.toSet()
         if (missing.isNotEmpty()) throw IllegalStateException("Missing settings for deployment ${projectPrefix}: $missing")
     }
 

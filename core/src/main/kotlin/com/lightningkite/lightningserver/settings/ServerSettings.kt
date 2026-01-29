@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.settings
 
+import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.builder.MapRegistry
@@ -44,13 +45,13 @@ import org.jetbrains.annotations.TestOnly
  */
 public class ServerSettings private constructor( // duplicate settings can be ignored
     public val settings: Set<ServerSetting<*, *>>,
-    public val overrides: Map<ServerSetting<*, *>, ServerSetting<*, *>>
+    public val overrides: Map<ServerSetting<*, *>, Runtime<*>>
 ) {
     public constructor(
         settings: Collection<ServerSetting<*, *>>,
         vararg overrides: Override<*, *>    // ensure override type safety
     ) : this(
-        (settings + overrides.map { it.deferTo }).toSet(),
+        (settings + overrides.map { it.deferTo }.filterIsInstance<ServerSetting<*, *>>()).toSet(),
         buildMapRegistry {
             overrides.forEach { register(it.override, it.deferTo) }
         }
@@ -69,13 +70,32 @@ public class ServerSettings private constructor( // duplicate settings can be ig
             ?.let { conflicts ->
                 throw ConflictingSettingsException(conflicts)
             }
+
+        // Check for circular references in overrides
+        fun findCycle(start: ServerSetting<*, *>, visited: Set<ServerSetting<*, *>> = emptySet()): List<ServerSetting<*, *>>? {
+            if (start in visited) return listOf(start)
+            val target = overrides[start] as? ServerSetting<*, *> ?: return null
+            val cycle = findCycle(target, visited + start)
+            return cycle?.let { listOf(start) + it }
+        }
+        overrides.keys.forEach { setting ->
+            findCycle(setting)?.let { cycle ->
+                throw CircularOverrideException(cycle)
+            }
+        }
     }
 
     public var ready: Boolean = false
         private set
 
+    private var usingDefaults: Boolean = false
+
     private val serializable: MapRegistry<ServerSetting<*, *>, Any?> = MapRegistry()
     private val goal: MapRegistry<ServerSetting<*, *>, Any?> = MapRegistry()
+
+    // Track settings currently being resolved to detect circular dependencies at runtime
+    private val resolving: ThreadLocal<MutableSet<ServerSetting<*, *>>>? =
+        if (overrides.isNotEmpty()) ThreadLocal.withInitial { mutableSetOf() } else null
 
 
     /**
@@ -145,6 +165,7 @@ public class ServerSettings private constructor( // duplicate settings can be ig
      */
     public fun readyUsingDefaults() {
         ready = true
+        usingDefaults = true
     }
 
     /**
@@ -200,21 +221,54 @@ public class ServerSettings private constructor( // duplicate settings can be ig
      *
      * The getter function is only called once per setting; subsequent calls return the cached value.
      *
+     * **Circular Dependency Detection**: This function tracks settings being resolved on the current
+     * thread and will throw [CircularOverrideException] if a circular dependency is detected at runtime.
+     * This catches cases where a setting's getter function calls `get()` for another setting that
+     * eventually calls back to the original setting.
+     *
      * @param key The setting to retrieve
      * @return The transformed result value for this setting
      * @receiver A [ServerRuntime] context required for the setting's transformation
      * @throws IllegalStateException if settings are not ready yet (call [ready] first)
+     * @throws CircularOverrideException if a circular dependency is detected during resolution
      */
     @Suppress("UNCHECKED_CAST")
     context(_: ServerRuntime)
     public fun <SERIALIZABLE, RESULT> get(key: ServerSetting<SERIALIZABLE, RESULT>): RESULT {
         if (!ready) throw IllegalStateException("Settings not ready yet.")
+
         return goal.getOrRegister(key) {
-            overrides[key]?.let {   // defer to override if it exists
-                get(it as ServerSetting<SERIALIZABLE, RESULT>)
-            } ?: key.get(
-                serializable.getOrElse(key) { key.default } as SERIALIZABLE
-            )
+            // Check for circular dependency during resolution
+            val currentlyResolving = resolving?.get()
+            if (currentlyResolving != null && key in currentlyResolving) {
+                throw CircularOverrideException(currentlyResolving.toList() + key)
+            }
+
+            currentlyResolving?.add(key)
+            try {
+                overrides[key]?.let { defer ->
+                    serializable[key]
+                        ?.let { key.get(it as SERIALIZABLE) } // specified in settings file
+                        ?: defer.invoke() // use defer if unspecified
+                } ?: key.get(
+                    serializable.getOrElse(key) {
+                        if (usingDefaults) key.default
+                        else throw IllegalStateException(
+                            buildString {
+                                append("Setting ${key.name} was not registered. ")
+                                append("This is likely because you used it in a Runtime calculation without registering it as a dependency. ")
+                                currentlyResolving
+                                    ?.takeIf { it.minus(key).isNotEmpty() }
+                                    ?.let {
+                                        append("Occurred while resolving ${it.joinToString(" -> ") { it.name } }.")
+                                    }
+                            }
+                        )
+                    } as SERIALIZABLE
+                )
+            } finally {
+                currentlyResolving?.remove(key)
+            }
         } as RESULT
     }
 
@@ -244,7 +298,7 @@ public class ServerSettings private constructor( // duplicate settings can be ig
     public operator fun plus(requirement: ServerSetting<*, *>): ServerSettings = ServerSettings(settings + requirement, overrides)
     public operator fun plus(requirements: Collection<ServerSetting<*, *>>): ServerSettings = ServerSettings(settings + requirements, overrides)
 
-    public data class Override<S, R>(val override: ServerSetting<S, R>, val deferTo: ServerSetting<S, R>)
+    public data class Override<S, R>(val override: ServerSetting<S, R>, val deferTo: Runtime<R>)
 }
 
 /*
