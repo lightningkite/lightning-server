@@ -98,14 +98,10 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
      */
     public override val serverVersion: String = "Unknown"
 
-    override val settings: ServerSettings = ServerSettings(
-        super.settings.settings.plus(
-            listOf(
-                enginePubSub,
-                engineCache,
-                forceWebSocketPubSub,
-            )
-        ).distinctBy { it.name }.toSet()
+    override val settings: ServerSettings = super.settings + listOf(
+        enginePubSub,
+        engineCache,
+        forceWebSocketPubSub,
     )
 
     /**
