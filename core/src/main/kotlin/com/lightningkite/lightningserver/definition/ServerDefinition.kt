@@ -4,6 +4,7 @@ import com.lightningkite.MediaType
 import com.lightningkite.buildSealedList
 import com.lightningkite.buildSealedMap
 import com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationError
+import com.lightningkite.lightningserver.definition.builder.MapRegistry
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.builder.buildListRegistry
 import com.lightningkite.lightningserver.definition.builder.buildMapRegistry
@@ -55,6 +56,8 @@ public data class ServerDefinition(
 
         public val webSocketTopics: PathSpecMap<WebSocketTopic<*, *>>,
         public val settings: List<ServerSetting<*, *>>,
+        public val settingOverrides: Map<ServerSetting<*, *>, ServerSetting<*, *>>,
+
         override val extensions: Extensions,
     ) : Extended
 
@@ -79,6 +82,8 @@ public data class ServerDefinition(
 
     public val webSocketTopics: PathSpecMap<WebSocketTopic<*, *>> get() = flattened.webSocketTopics
     public val settings: List<ServerSetting<*, *>> get() = flattened.settings
+    public val settingOverrides: Map<ServerSetting<*, *>, ServerSetting<*, *>> get() = flattened.settingOverrides
+
     override val extensions: Extensions get() = flattened.extensions
 
 
@@ -133,6 +138,10 @@ public data class ServerDefinition(
                         register(modPath + relPath, topic)
             },
             settings = thisLayer.settings + flattenedModules.flatMap { it.item.settings },
+            settingOverrides = buildMapRegistry {
+                include(thisLayer.settingOverrides)
+                for ((_, mod) in flattenedModules) include(mod.settingOverrides)
+            },
             extensions = thisLayer.extensions.toMutableExtensions().apply {
                 flattenedModules.forEach { include(it.item.extensions, it.location) }
             },

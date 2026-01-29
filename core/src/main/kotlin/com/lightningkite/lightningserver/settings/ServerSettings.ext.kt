@@ -132,7 +132,7 @@ public fun ServerSettings.loadFromFile(
     val loaded: MutableMap<ServerSetting<*, *>, Any?> = format.decodeFromString(serializer, text).toMutableMap()
     val missingKeys = HashSet<ServerSetting<*, *>>()
     for (key in settings) {
-        if (key !in loaded) {
+        if (key !in loaded && !overrides.containsKey(key)) {
             loaded[key] = key.default
             if (!key.optional) {
                 missingKeys += key

@@ -17,6 +17,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
+import kotlin.collections.setOf
 
 /**
  * Base implementation of [ServerRuntime] providing common functionality.
@@ -45,12 +46,12 @@ public abstract class ServerRuntimeBase(override val server: ServerDefinition): 
      * Adds generalSettings, secretBasis, telemetrySettings, and loggingSettings
      * to the server's defined settings.
      */
-    override val settings: ServerSettings = ServerSettings(server.settings.toSet() + setOf(
+    override val settings: ServerSettings = ServerSettings(server) + setOf(
         generalSettings,
         secretBasis,
         telemetrySettings,
         loggingSettings,
-    ))
+    )
 
     /**
      * Serialization for internal use (database, caching, etc.).

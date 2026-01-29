@@ -1,13 +1,16 @@
 package com.lightningkite.lightningserver.settings
 
+import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.builder.MapRegistry
+import com.lightningkite.lightningserver.definition.builder.buildMapRegistry
 import com.lightningkite.lightningserver.definition.builder.getOrRegister
 import com.lightningkite.lightningserver.definition.builder.include
 import com.lightningkite.lightningserver.definition.loggingSettings
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.otel.applyToLogback
+import org.jetbrains.annotations.TestOnly
 
 /**
  * Manages server configuration settings with a two-phase lifecycle (configuration → ready).
@@ -39,7 +42,24 @@ import com.lightningkite.services.otel.applyToLogback
  * @property settings The complete set of [ServerSetting] instances to manage
  * @property ready Indicates whether settings have been validated and are ready for use
  */
-public class ServerSettings(public val settings: Set<ServerSetting<*, *>>) {    // duplicate settings can be ignored
+public class ServerSettings private constructor( // duplicate settings can be ignored
+    public val settings: Set<ServerSetting<*, *>>,
+    public val overrides: Map<ServerSetting<*, *>, ServerSetting<*, *>>
+) {
+    public constructor(
+        settings: Collection<ServerSetting<*, *>>,
+        vararg overrides: Override<*, *>    // ensure override type safety
+    ) : this(
+        (settings + overrides.map { it.deferTo }).toSet(),
+        buildMapRegistry {
+            overrides.forEach { register(it.override, it.deferTo) }
+        }
+    )
+
+    public constructor(definition: ServerDefinition) : this(
+        definition.settings.toSet(),
+        definition.settingOverrides
+    )   // We can trust internal definitions to be safe, as they are registered through controlled dsl
 
     init {
         this.settings
@@ -146,7 +166,7 @@ public class ServerSettings(public val settings: Set<ServerSetting<*, *>>) {    
      */
     context(server: ServerRuntime)
     public fun ready() {
-        val missing = settings.minus(serializable.keys + goal.keys)
+        val missing = settings.minus(serializable.keys + goal.keys + overrides.keys)
         if (missing.isNotEmpty()) throw IllegalStateException("Settings ${missing.joinToString { it.name }} are missing.")
         ready = true
 
@@ -190,7 +210,9 @@ public class ServerSettings(public val settings: Set<ServerSetting<*, *>>) {    
     public fun <SERIALIZABLE, RESULT> get(key: ServerSetting<SERIALIZABLE, RESULT>): RESULT {
         if (!ready) throw IllegalStateException("Settings not ready yet.")
         return goal.getOrRegister(key) {
-            key.get(
+            overrides[key]?.let {   // defer to override if it exists
+                get(it as ServerSetting<SERIALIZABLE, RESULT>)
+            } ?: key.get(
                 serializable.getOrElse(key) { key.default } as SERIALIZABLE
             )
         } as RESULT
@@ -219,8 +241,10 @@ public class ServerSettings(public val settings: Set<ServerSetting<*, *>>) {    
     context(_: ServerRuntime)
     public fun allGoals(): Map<ServerSetting<*, *>, Any?> = settings.associateWith { get(it) }
 
-    public operator fun plus(requirement: ServerSetting<*, *>): ServerSettings = ServerSettings(settings + requirement)
-    public operator fun plus(requirements: Collection<ServerSetting<*, *>>): ServerSettings = ServerSettings(settings + requirements)
+    public operator fun plus(requirement: ServerSetting<*, *>): ServerSettings = ServerSettings(settings + requirement, overrides)
+    public operator fun plus(requirements: Collection<ServerSetting<*, *>>): ServerSettings = ServerSettings(settings + requirements, overrides)
+
+    public data class Override<S, R>(val override: ServerSetting<S, R>, val deferTo: ServerSetting<S, R>)
 }
 
 /*

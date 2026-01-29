@@ -81,6 +81,7 @@ public abstract class ServerBuilder : Extendable {
     public val path: PathSpec0 get() = PathSpec.root // just for convenience
 
     private val settings: ListRegistry<ServerSetting<*, *>> = ListRegistry()
+    private val settingOverrides: MapRegistry<ServerSetting<*, *>, ServerSetting<*, *>> = MapRegistry()
 
     private val httpInterceptors: ListRegistry<HttpInterceptor> = ListRegistry()
     private val httpHandlers: PathSpecRegistry<MapRegistry<HttpMethod, HttpHandler<*>>> = PathSpecRegistry()
@@ -266,6 +267,13 @@ public abstract class ServerBuilder : Extendable {
         )
 
     @LightningServerDsl
+    public infix fun <S, R> ServerSetting<S, R>.bind(deferTo: ServerSetting<S, R>): ServerSetting<S, R> {
+        settingOverrides.register(this, deferTo)
+        settings.register(deferTo)  // make sure this is a dependency
+        return deferTo
+    }
+
+    @LightningServerDsl
     public infix fun <T : ServerBuilder> PathSpec0.include(module: T): T {
         modules.register(Locationed(this, module))
         return module
@@ -324,6 +332,7 @@ public abstract class ServerBuilder : Extendable {
             startupTasks = startupTasks.toSealedMap(),
             mediaTypeDecoders = mediaTypeDecoders.toSealedMap(),
             mediaTypeEncoders = mediaTypeEncoders.toSealedMap(),
+            settingOverrides = settingOverrides.toSealedMap()
         ),
         modules = (imports + modules.mapItems { it.build() }).toSealedList()
     )

@@ -1,7 +1,11 @@
 package com.lightningkite.lightningserver.settings
 
+import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.test.test
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.serializer
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -24,6 +28,13 @@ class ServerSettingsTest {
         val requiredSetting = setting("required", "default", optional = false)
         val optionalSetting = setting("optional", "default", optional = true)
         val transformedSetting = setting("transformed", "x", getter = { it.repeat(3) })
+
+        val a = setting("A", "A")
+        val b = setting("B", "B")
+
+        init {
+            b bind a
+        }
     }
 
     @Test
@@ -155,6 +166,15 @@ class ServerSettingsTest {
             assertFailsWith<com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationError> {
                 TestServer.requiredSetting set "second"
             }
+        }
+    }
+
+    @Test
+    fun testSettingOverrides() {
+        TestServer.test({}) {
+            println("Got ${serverRuntime.settings.overrides.size} overrides")
+            assertEquals("A", a())
+            assertEquals("A", b()) // should defer to 'a' as configured in the server
         }
     }
 }
