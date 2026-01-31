@@ -13,9 +13,6 @@ import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.pathing.path
-import com.lightningkite.lightningserver.redirectToGet
-import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.typed.sdk.Archive
 import com.lightningkite.lightningserver.typed.sdk.FetcherSdk
@@ -49,13 +46,17 @@ public class ApiDocs(private val packageName: String) : ServerBuilder() {
 
     public val typescript: HttpHandler<PathSpec0> =
         path.path("sdk.ts").get bind HttpHandler {
+            val includeDocComments = it.queryParameters.none { it.first == "comments" && it.second == "false" }
+            val erasableTypes =  it.queryParameters.any { it.first == "erasable" && it.second == "true" }
             HttpResponse(
                 TypedData.sink(
                     mediaType = MediaType.Text.Plain,
                     emit = { sink ->
                         Archive.singleStream(sink).use {
                             TypescriptFetcherSdk(
-                                fileStructure = TypescriptFetcherSdk.Structure.SingleFile("sdk.kt")
+                                fileStructure = TypescriptFetcherSdk.Structure.SingleFile("sdk.kt"),
+                                includeDocComments = includeDocComments,
+                                erasableTypes = erasableTypes,
                             ).write(it)
                         }
                     },
