@@ -75,6 +75,8 @@ private class BasicMapRegistry<L, V>(
         }
         registry[location] = value
     }
+
+    override fun toString(): String = "MapRegistry(${registry.entries.joinToString { "${it.key} to ${it.value}" }})"
 }
 
 /**

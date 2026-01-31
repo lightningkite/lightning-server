@@ -81,7 +81,7 @@ public abstract class ServerBuilder : Extendable {
     public val path: PathSpec0 get() = PathSpec.root // just for convenience
 
     private val settings: ListRegistry<ServerSetting<*, *>> = ListRegistry()
-    private val settingOverrides: MapRegistry<ServerSetting<*, *>, ServerSetting<*, *>> = MapRegistry()
+    private val settingOverrides: MapRegistry<ServerSetting<*, *>, Runtime<*>> = MapRegistry()
 
     private val httpInterceptors: ListRegistry<HttpInterceptor> = ListRegistry()
     private val httpHandlers: PathSpecRegistry<MapRegistry<HttpMethod, HttpHandler<*>>> = PathSpecRegistry()
@@ -267,9 +267,9 @@ public abstract class ServerBuilder : Extendable {
         )
 
     @LightningServerDsl
-    public infix fun <S, R> ServerSetting<S, R>.bind(deferTo: ServerSetting<S, R>): ServerSetting<S, R> {
+    public infix fun <S, R> ServerSetting<S, R>.bind(deferTo: Runtime<R>): Runtime<R> {
         settingOverrides.register(this, deferTo)
-        settings.register(deferTo)  // make sure this is a dependency
+        if (deferTo is ServerSetting<*, *>) settings.register(deferTo)
         return deferTo
     }
 

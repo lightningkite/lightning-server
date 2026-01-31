@@ -56,7 +56,7 @@ public data class ServerDefinition(
 
         public val webSocketTopics: PathSpecMap<WebSocketTopic<*, *>>,
         public val settings: List<ServerSetting<*, *>>,
-        public val settingOverrides: Map<ServerSetting<*, *>, ServerSetting<*, *>>,
+        public val settingOverrides: Map<ServerSetting<*, *>, Runtime<*>>,
 
         override val extensions: Extensions,
     ) : Extended
@@ -82,7 +82,7 @@ public data class ServerDefinition(
 
     public val webSocketTopics: PathSpecMap<WebSocketTopic<*, *>> get() = flattened.webSocketTopics
     public val settings: List<ServerSetting<*, *>> get() = flattened.settings
-    public val settingOverrides: Map<ServerSetting<*, *>, ServerSetting<*, *>> get() = flattened.settingOverrides
+    public val settingOverrides: Map<ServerSetting<*, *>, Runtime<*>> get() = flattened.settingOverrides
 
     override val extensions: Extensions get() = flattened.extensions
 

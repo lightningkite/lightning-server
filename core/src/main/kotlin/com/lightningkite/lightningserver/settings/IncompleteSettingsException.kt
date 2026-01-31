@@ -54,3 +54,29 @@ public class MissingSettingFile(suggestedFile: KFile) :
  * */
 public class ConflictingSettingsException(conflicting: Map<String, Collection<ServerSetting<*, *>>>) :
     IllegalStateException("Settings found with conflicting names. All server settings must have unique names. Conflicts: ${conflicting.keys}")
+
+/**
+ * Exception thrown when circular references are detected in setting overrides.
+ *
+ * This exception is thrown during [ServerSettings] initialization when the validation check
+ * detects that setting overrides form a cycle (e.g., A overrides B, B overrides C, C overrides A).
+ *
+ * **Why this check exists:**
+ * - Prevents infinite loops when resolving setting values
+ * - Catches configuration errors early during application startup
+ *
+ * **Example of circular override:**
+ * ```kotlin
+ * val settingA = ServerSetting<Int>("a", 1)
+ * val settingB = ServerSetting<Int>("b", 2)
+ * ServerSettings(
+ *     listOf(settingA, settingB),
+ *     Override(settingA, settingB),
+ *     Override(settingB, settingA)  // Creates a cycle!
+ * ) // Throws CircularOverrideException
+ * ```
+ *
+ * @param cycle The list of [ServerSetting] instances that form the circular reference chain
+ */
+public class CircularOverrideException(cycle: List<ServerSetting<*, *>>) :
+    IllegalStateException("Circular reference detected in setting overrides: ${cycle.joinToString(" -> ") { it.name }}")
