@@ -3,7 +3,10 @@ import type { CollectionUpdates, Mask, ModelPermissions, Pair, TestInput, TestMo
 import type { Api } from './Api.ts'
 
 export class LiveApi implements Api {
-	public constructor(public fetcher: Fetcher) {}
+	public fetcher: Fetcher
+	public constructor(fetcher: Fetcher) {
+		this.fetcher = fetcher
+	}
 
 	index: Api["index"] = () => this.fetcher(`/`, "GET", undefined)
 	improperSDKFunctionName: Api["improperSDKFunctionName"] = () => this.fetcher(`/`, "POST", undefined)

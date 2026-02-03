@@ -13,9 +13,6 @@ import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.pathing.path
-import com.lightningkite.lightningserver.redirectToGet
-import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.typed.sdk.Archive
 import com.lightningkite.lightningserver.typed.sdk.FetcherSdk
@@ -48,14 +45,16 @@ public class ApiDocs(private val packageName: String) : ServerBuilder() {
 //        }
 
     public val typescript: HttpHandler<PathSpec0> =
-        path.path("sdk.ts").get bind HttpHandler {
+        path.path("sdk.ts").get bind HttpHandler { request ->
             HttpResponse(
                 TypedData.sink(
                     mediaType = MediaType.Text.Plain,
                     emit = { sink ->
                         Archive.singleStream(sink).use {
                             TypescriptFetcherSdk(
-                                fileStructure = TypescriptFetcherSdk.Structure.SingleFile("sdk.kt")
+                                fileStructure = TypescriptFetcherSdk.Structure.SingleFile("sdk.kt"),
+                                includeDocComments = request.queryParameters["comments"] != "false",
+                                erasableTypes = request.queryParameters["erasable"] == "true",
                             ).write(it)
                         }
                     },
@@ -64,7 +63,7 @@ public class ApiDocs(private val packageName: String) : ServerBuilder() {
         }
 
     public val typescriptZip: HttpHandler<PathSpec0> =
-        path.path("sdk.ts.zip").get bind HttpHandler {
+        path.path("sdk.ts.zip").get bind HttpHandler { request ->
             HttpResponse(
                 TypedData.sink(
                     mediaType = MediaType.Application.Zip,
@@ -72,7 +71,10 @@ public class ApiDocs(private val packageName: String) : ServerBuilder() {
                         Archive.zip(
                             ZipOutputStream(sink.asOutputStream())
                         ).use { zip ->
-                            TypescriptFetcherSdk().write(zip.sub("sdk"))
+                            TypescriptFetcherSdk(
+                                includeDocComments = request.queryParameters["comments"] != "false",
+                                erasableTypes = request.queryParameters["erasable"] == "true"
+                            ).write(zip.sub("sdk"))
                         }
                     },
                 )

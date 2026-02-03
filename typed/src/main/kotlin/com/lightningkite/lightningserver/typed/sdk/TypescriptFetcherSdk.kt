@@ -124,7 +124,8 @@ public class TypescriptFetcherSdk(
         interfaceFilename = "${rootInfo.interfaceName}.ts",
         liveFilename = "Live${rootInfo.interfaceName}.ts"
     ),
-    public val includeDocComments: Boolean = true
+    public val includeDocComments: Boolean = true,
+    public val erasableTypes: Boolean = false
 ) : SDK.Format {
     /**
      * File organization strategies for generated TypeScript code.
@@ -237,20 +238,30 @@ public class TypescriptFetcherSdk(
                 }
 
                 SerialKind.ENUM -> {
-                    appendLine("export enum ${type.tsType()} {")
-                    for (index in 0 until type.descriptor.elementsCount) {
-                        append('\t')
-                        val name = type.descriptor.getElementName(index)
-                        name.forEachIndexed { idx, it ->
-                            if ((idx == 0 && it.isJavaIdentifierStart()) || (idx != 0 && it.isJavaIdentifierPart()))
-                                append(it)
-                            else
-                                append('_')
+                    if (erasableTypes) {
+                        append("export type ${type.tsType()} = ")
+                        for (index in 0 until type.descriptor.elementsCount) {
+                            val name = type.descriptor.getElementName(index)
+                            append(if (index == 0) "\"$name\"" else "| \"$name\"")
                         }
-                        append(" = \"$name\",")
                         appendLine()
+                    } else {
+                        appendLine("export enum ${type.tsType()} {")
+                        for (index in 0 until type.descriptor.elementsCount) {
+                            append('\t')
+                            val name = type.descriptor.getElementName(index)
+                            name.forEachIndexed { idx, it ->
+                                if ((idx == 0 && it.isJavaIdentifierStart()) || (idx != 0 && it.isJavaIdentifierPart()))
+                                    append(it)
+                                else
+                                    append('_')
+                            }
+                            append(" = \"$name\",")
+                            appendLine()
+                        }
+
+                        appendLine('}')
                     }
-                    appendLine('}')
                 }
 
                 PrimitiveKind.STRING -> {
@@ -343,7 +354,11 @@ public class TypescriptFetcherSdk(
 
             if (depth == 0) {
                 appendLine("export class Live${module.info.interfaceName} implements ${module.info.interfaceName} {")
-                appendIdt(1).appendLine("public constructor(public fetcher: Fetcher) {}")
+                appendIdt(1).appendLine("public fetcher: Fetcher")
+                appendIdt(1).appendLine("public constructor(fetcher: Fetcher) {")
+                appendIdt(2).appendLine("this.fetcher = fetcher")
+                appendIdt(1).appendLine("}")
+
                 appendLine()
             }
             else {
@@ -404,7 +419,7 @@ public class TypescriptFetcherSdk(
     private fun ServerRuntime.models() = usedTypes()
         .filter { it.descriptor.simpleSerialName !in skipFromLsPackage }
         .sortedBy { it.descriptor.simpleSerialName }
-        .distinctBy { it.tsType() }
+        .distinctBy { it.tsType().substringBefore("<") } // Distinct by generics
         .filter {
             when (it.descriptor.kind) {
                 SerialKind.ENUM -> true
