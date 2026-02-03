@@ -45,9 +45,7 @@ public class ApiDocs(private val packageName: String) : ServerBuilder() {
 //        }
 
     public val typescript: HttpHandler<PathSpec0> =
-        path.path("sdk.ts").get bind HttpHandler {
-            val includeDocComments = it.queryParameters.none { it.first == "comments" && it.second == "false" }
-            val erasableTypes =  it.queryParameters.any { it.first == "erasable" && it.second == "true" }
+        path.path("sdk.ts").get bind HttpHandler { request ->
             HttpResponse(
                 TypedData.sink(
                     mediaType = MediaType.Text.Plain,
@@ -55,8 +53,8 @@ public class ApiDocs(private val packageName: String) : ServerBuilder() {
                         Archive.singleStream(sink).use {
                             TypescriptFetcherSdk(
                                 fileStructure = TypescriptFetcherSdk.Structure.SingleFile("sdk.kt"),
-                                includeDocComments = includeDocComments,
-                                erasableTypes = erasableTypes,
+                                includeDocComments = request.queryParameters["comments"] != "false",
+                                erasableTypes = request.queryParameters["erasable"] == "true",
                             ).write(it)
                         }
                     },
@@ -65,7 +63,7 @@ public class ApiDocs(private val packageName: String) : ServerBuilder() {
         }
 
     public val typescriptZip: HttpHandler<PathSpec0> =
-        path.path("sdk.ts.zip").get bind HttpHandler {
+        path.path("sdk.ts.zip").get bind HttpHandler { request ->
             HttpResponse(
                 TypedData.sink(
                     mediaType = MediaType.Application.Zip,
@@ -73,7 +71,10 @@ public class ApiDocs(private val packageName: String) : ServerBuilder() {
                         Archive.zip(
                             ZipOutputStream(sink.asOutputStream())
                         ).use { zip ->
-                            TypescriptFetcherSdk().write(zip.sub("sdk"))
+                            TypescriptFetcherSdk(
+                                includeDocComments = request.queryParameters["comments"] != "false",
+                                erasableTypes = request.queryParameters["erasable"] == "true"
+                            ).write(zip.sub("sdk"))
                         }
                     },
                 )
