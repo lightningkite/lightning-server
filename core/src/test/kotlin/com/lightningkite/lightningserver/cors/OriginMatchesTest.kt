@@ -104,4 +104,65 @@ class OriginMatchesTest {
         assertFalse(originMatches(allowed, "https://sub.example.com")) // No port
         assertFalse(originMatches(allowed, "https://sub.example.com:9000")) // Different port
     }
+
+    // Tests added by Claude for edge cases
+    @Test
+    fun `case insensitive scheme matching`() {
+        val allowed = listOf("HTTPS://example.com")
+        assertTrue(originMatches(allowed, "https://example.com"))
+        assertTrue(originMatches(allowed, "HTTPS://example.com"))
+        assertFalse(originMatches(allowed, "http://example.com"))
+    }
+
+    @Test
+    fun `case insensitive domain matching`() {
+        val allowed = listOf("https://EXAMPLE.COM")
+        assertTrue(originMatches(allowed, "https://example.com"))
+        assertTrue(originMatches(allowed, "https://EXAMPLE.COM"))
+        assertTrue(originMatches(allowed, "https://Example.Com"))
+    }
+
+    @Test
+    fun `wildcard subdomain with case insensitive matching`() {
+        val allowed = listOf("https://*.EXAMPLE.COM")
+        assertTrue(originMatches(allowed, "https://sub.example.com"))
+        assertTrue(originMatches(allowed, "https://SUB.EXAMPLE.COM"))
+    }
+
+    @Test
+    fun `origin without scheme when allowed has scheme - edge case by Claude`() {
+        // This tests the edge case behavior when origin is passed without ://
+        // In practice, browsers always send origins with schemes, but this documents
+        // the current behavior if such an origin were encountered
+        val allowed = listOf("https://example.com")
+        // When origin has no "://", substringBefore returns the whole string as "scheme"
+        // and substringAfter returns the whole string as "domain"
+        // So "example.com" origin would have scheme="example.com" and domain="example.com"
+        // This would NOT match "https://example.com" because schemes differ
+        assertFalse(originMatches(allowed, "example.com"))
+    }
+
+    @Test
+    fun `origin without scheme when allowed has no scheme - edge case by Claude`() {
+        // When both allowed and origin have no scheme, they can still match
+        // Allowed: scheme="", domain="example.com"
+        // Origin: scheme="example.com", domain="example.com"
+        // Since allowed scheme is blank, it allows any scheme
+        val allowed = listOf("example.com")
+        assertTrue(originMatches(allowed, "example.com"))
+    }
+
+    @Test
+    fun `wildcard star matches empty origin - edge case by Claude`() {
+        // Edge case: what if origin is empty string?
+        val allowed = listOf("*")
+        assertTrue(originMatches(allowed, ""))
+    }
+
+    @Test
+    fun `specific wildcard does not match malformed origins - edge case by Claude`() {
+        val allowed = listOf("https://*.example.com")
+        // Empty origin with scheme would have empty domain
+        assertFalse(originMatches(allowed, "https://"))
+    }
 }

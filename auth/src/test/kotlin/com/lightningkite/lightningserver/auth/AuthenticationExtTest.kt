@@ -502,6 +502,69 @@ class AuthenticationExtTest {
         }
     }
 
+    // ========== AuthCacheKey get() Extension Tests ========== (by Claude)
+
+    @Test
+    fun `get with AuthCacheKey calculates and caches value`() = runBlocking {
+        var calculateCount = 0
+
+        // Define a custom AuthCacheKey for testing
+        val customKey = object : AuthCacheKey<AuthUser, String> {
+            override val id: String = "custom-computed-value"
+            override val serializer = String.serializer()
+
+            context(server: ServerRuntime)
+            override suspend fun calculate(input: Authentication<AuthUser>): String {
+                calculateCount++
+                return "computed-for-${input.id}"
+            }
+        }
+
+        TestServer.test({}) {
+            val user = AuthUser(email = "test@example.com")
+            val auth = AuthUser.testAuth(user)
+
+            // First call should calculate
+            val result1 = auth.get(customKey)
+            assertEquals("computed-for-${user._id}", result1)
+            assertEquals(1, calculateCount)
+
+            // Second call should use cached value
+            val result2 = auth.get(customKey)
+            assertEquals("computed-for-${user._id}", result2)
+            assertEquals(1, calculateCount) // Still 1, not recalculated
+        }
+    }
+
+    @Test
+    fun `get with AuthCacheKey uses input authentication`() = runBlocking {
+        val capturedIds = mutableListOf<String>()
+
+        val idCapturingKey = object : AuthCacheKey<AuthUser, String> {
+            override val id: String = "id-capturing-key"
+            override val serializer = String.serializer()
+
+            context(server: ServerRuntime)
+            override suspend fun calculate(input: Authentication<AuthUser>): String {
+                capturedIds.add(input.rawId)
+                return "captured"
+            }
+        }
+
+        TestServer.test({}) {
+            val user1 = AuthUser(email = "user1@example.com")
+            val auth1 = AuthUser.testAuth(user1)
+            auth1.get(idCapturingKey)
+
+            val user2 = AuthUser(email = "user2@example.com")
+            val auth2 = AuthUser.testAuth(user2)
+            auth2.get(idCapturingKey)
+
+            assertEquals(2, capturedIds.size)
+            assertTrue(capturedIds[0] != capturedIds[1])
+        }
+    }
+
     // ========== Edge Cases ==========
 
     @Test

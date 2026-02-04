@@ -184,4 +184,103 @@ class CronTest {
         val next = start + pattern
         assertEquals(LocalDateTime(2024, 1, 15, 17, 0), next)
     }
+
+    // ========== Additional validation tests (by Claude) ==========
+
+    @Test
+    fun `testValidationNoMonths`() {
+        // by Claude
+        assertFailsWith<IllegalArgumentException> {
+            CronPattern(
+                minutes = listOf(0),
+                hours = listOf(0),
+                days = CronDays.All,
+                months = emptyList()
+            )
+        }
+    }
+
+    @Test
+    fun `testValidationNoDaysOfWeek`() {
+        // by Claude
+        assertFailsWith<IllegalArgumentException> {
+            CronPattern(
+                minutes = listOf(0),
+                hours = listOf(0),
+                days = CronDays.DaysOfWeek(emptyList<DayOfWeek>()),
+                months = Month.entries
+            )
+        }
+    }
+
+    @Test
+    fun `testCurrentTimeAlreadyMatches`() {
+        // by Claude - test that already matching time stays the same
+        val pattern = CronPattern(
+            minutes = listOf(0, 30),
+            hours = listOf(9),
+            days = CronDays.All,
+            months = Month.entries
+        )
+
+        val start = LocalDateTime(2024, 1, 15, 9, 0)
+        val next = start + pattern
+        assertEquals(LocalDateTime(2024, 1, 15, 9, 0), next)
+    }
+
+    @Test
+    fun `testCronDayOfMonthToString`() {
+        // by Claude
+        val day = CronDayOfMonth.Day(15)
+        assertEquals("15", day.toString())
+    }
+
+    @Test
+    fun `testCronDayOfWeekToString`() {
+        // by Claude
+        val dow = CronDayOfWeek(DayOfWeek.MONDAY)
+        assertEquals("1", dow.toString())  // ISO day number: Monday = 1
+    }
+
+    @Test
+    fun `testDaysOfMonthFromIntRange`() {
+        // by Claude
+        val days = CronDays.DaysOfMonth(listOf(1, 15, 28))
+        assertEquals(3, days.days.size)
+    }
+
+    @Test
+    fun `testFebruaryBoundary`() {
+        // by Claude - test for day 31 in pattern when Feb only has 28/29 days
+        val pattern = CronPattern(
+            minutes = listOf(0),
+            hours = listOf(9),
+            days = CronDays.DaysOfMonth(31),
+            months = Month.entries
+        )
+
+        // Start in February, which doesn't have 31 days
+        val start = LocalDateTime(2024, 2, 1, 10, 0)
+        val next = start + pattern
+        // Should advance to March 31
+        assertEquals(LocalDateTime(2024, 3, 31, 9, 0), next)
+    }
+
+    @Test
+    fun `testWeekdayPatternWrapToNextWeek`() {
+        // by Claude - test weekday wrapping to next week
+        val pattern = CronPattern(
+            minutes = listOf(0),
+            hours = listOf(9),
+            days = CronDays.DaysOfWeek(DayOfWeek.MONDAY),
+            months = Month.entries
+        )
+
+        // January 17, 2024 is a Wednesday
+        val start = LocalDateTime(2024, 1, 17, 10, 0)
+        val next = start + pattern
+        // Should go to next Monday, January 22
+        assertEquals(LocalDateTime(2024, 1, 22, 9, 0), next)
+    }
+
 }
