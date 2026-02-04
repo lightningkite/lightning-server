@@ -612,4 +612,144 @@ class AuthRequirementTest {
             assertEquals(AuthRequirement.IsDeveloper, req)
         }
     }
+
+    // ========== ServerBuilder Context Setter Tests ==========
+    // by Claude
+
+    @Test
+    fun `isSuperUser setter in ServerBuilder context`() = runBlocking {
+        // Create a custom server builder and set a custom isSuperUser
+        val customRequirement = TestUser.require(scope = RequiredScope("super"))
+
+        object : ServerBuilder() {
+            init {
+                register(TestUser)
+                AuthRequirement.isSuperUser = customRequirement
+            }
+        }.test({}) {
+            // Verify the setting was applied through the AuthSetting mechanism
+            val settingValue = AuthRequirement.IsSuperUser.setting()
+            assertEquals(customRequirement, settingValue)
+        }
+    }
+
+    @Test
+    fun `isAdmin setter in ServerBuilder context`() = runBlocking {
+        val customRequirement = TestUser.require(scope = RequiredScope("admin-custom"))
+
+        object : ServerBuilder() {
+            init {
+                register(TestUser)
+                AuthRequirement.isAdmin = customRequirement
+            }
+        }.test({}) {
+            val settingValue = AuthRequirement.IsAdmin.setting()
+            assertEquals(customRequirement, settingValue)
+        }
+    }
+
+    @Test
+    fun `isDeveloper setter in ServerBuilder context`() = runBlocking {
+        val customRequirement = TestUser.require(scope = RequiredScope("dev-custom"))
+
+        object : ServerBuilder() {
+            init {
+                register(TestUser)
+                AuthRequirement.isDeveloper = customRequirement
+            }
+        }.test({}) {
+            val settingValue = AuthRequirement.IsDeveloper.setting()
+            assertEquals(customRequirement, settingValue)
+        }
+    }
+
+    @Test
+    fun `configured isSuperUser is used in check`() = runBlocking {
+        val user = TestUser(isVerified = true)
+        TestUser.store[user._id] = user
+
+        val customRequirement = TestUser.require()
+
+        object : ServerBuilder() {
+            init {
+                register(TestUser)
+                AuthRequirement.isSuperUser = customRequirement
+            }
+        }.test({}) {
+            val auth = TestUser.testAuth(user)
+            val result = AuthRequirement.IsSuperUser.check(auth)
+            assertTrue(result is AuthRequirement.Result.Accepted)
+        }
+
+        TestUser.store.clear()
+    }
+
+    @Test
+    fun `configured isAdmin is used in check`() = runBlocking {
+        val user = TestUser(isVerified = true)
+        TestUser.store[user._id] = user
+
+        val customRequirement = TestUser.require()
+
+        object : ServerBuilder() {
+            init {
+                register(TestUser)
+                AuthRequirement.isAdmin = customRequirement
+            }
+        }.test({}) {
+            val auth = TestUser.testAuth(user)
+            val result = AuthRequirement.IsAdmin.check(auth)
+            assertTrue(result is AuthRequirement.Result.Accepted)
+        }
+
+        TestUser.store.clear()
+    }
+
+    @Test
+    fun `configured isDeveloper is used in check`() = runBlocking {
+        val user = TestUser(isVerified = true)
+        TestUser.store[user._id] = user
+
+        val customRequirement = TestUser.require()
+
+        object : ServerBuilder() {
+            init {
+                register(TestUser)
+                AuthRequirement.isDeveloper = customRequirement
+            }
+        }.test({}) {
+            val auth = TestUser.testAuth(user)
+            val result = AuthRequirement.IsDeveloper.check(auth)
+            assertTrue(result is AuthRequirement.Result.Accepted)
+        }
+
+        TestUser.store.clear()
+    }
+
+    // ========== naturalLanguage for AuthSetting Tests ==========
+    // by Claude
+
+    @Test
+    fun `naturalLanguage for AuthSetting shows resolved value`() = runBlocking {
+        val customRequirement = TestUser.require(scope = RequiredScope("custom"))
+
+        object : ServerBuilder() {
+            init {
+                register(TestUser)
+                AuthRequirement.isSuperUser = customRequirement
+            }
+        }.test({}) {
+            val lang = AuthRequirement.IsSuperUser.naturalLanguage()
+            assertTrue(lang.contains("IsSuperUser"))
+        }
+    }
+
+    @Test
+    fun `naturalLanguage for unconfigured AuthSetting`() = runBlocking {
+        TestServer.test({}) {
+            // IsSuperUser is not configured in TestServer
+            val lang = AuthRequirement.IsSuperUser.naturalLanguage()
+            assertTrue(lang.contains("IsSuperUser"))
+        }
+    }
 }

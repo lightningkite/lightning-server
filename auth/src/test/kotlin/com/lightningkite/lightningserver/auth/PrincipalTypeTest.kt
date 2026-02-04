@@ -4,6 +4,7 @@ package com.lightningkite.lightningserver.auth
 import com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationError
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.services.database.HasId
 import kotlinx.coroutines.runBlocking
@@ -549,6 +550,204 @@ class PrincipalTypeTest {
             val fetched = TestPrincipal.fetchByProperty("TestPrincipal/_id", idString)
             assertNotNull(fetched)
             assertEquals(principal, fetched)
+        }
+    }
+
+    // ========== fetchUserIdString Tests (by Claude) ==========
+
+    @Test
+    fun `fetchUserIdString returns serialized ID when subject found`() = runBlocking {
+        TestPrincipal.store.clear()
+        val id = Uuid.random()
+        val principal = TestPrincipal(id, "user@example.com", "555-1234", "User")
+        TestPrincipal.store[id] = principal
+
+        object : ServerBuilder() {
+            init {
+                register(TestPrincipal)
+            }
+        }.test({}) {
+            val result = TestPrincipal.fetchUserIdString("email", "user@example.com")
+            assertNotNull(result)
+            // The result should be the serialized ID, which matches idString output
+            assertEquals(TestPrincipal.idString(id), result)
+        }
+    }
+
+    @Test
+    fun `fetchUserIdString returns null when subject not found`() = runBlocking {
+        TestPrincipal.store.clear()
+        val id = Uuid.random()
+        val principal = TestPrincipal(id, "existing@example.com", "555-1234", "User")
+        TestPrincipal.store[id] = principal
+
+        object : ServerBuilder() {
+            init {
+                register(TestPrincipal)
+            }
+        }.test({}) {
+            val result = TestPrincipal.fetchUserIdString("email", "nonexistent@example.com")
+            assertNull(result)
+        }
+    }
+
+    @Test
+    fun `fetchUserIdString works with Int ID type`() = runBlocking {
+        IntIdPrincipal.store.clear()
+        val id = 42
+        val principal = IntIdPrincipal(id, "Test Entity")
+        IntIdPrincipal.store[id] = principal
+
+        object : ServerBuilder() {
+            init {
+                register(IntIdPrincipal)
+            }
+        }.test({}) {
+            // IntIdPrincipal only supports ID lookup via "IntIdPrincipal/_id"
+            val idString = IntIdPrincipal.idString(id)
+            val result = IntIdPrincipal.fetchUserIdString("IntIdPrincipal/_id", idString)
+            assertNotNull(result)
+            assertEquals(idString, result)
+        }
+    }
+
+    @Test
+    fun `fetchUserIdString returns null for unsupported properties`() = runBlocking {
+        IntIdPrincipal.store.clear()
+        val id = 42
+        val principal = IntIdPrincipal(id, "Test Entity")
+        IntIdPrincipal.store[id] = principal
+
+        object : ServerBuilder() {
+            init {
+                register(IntIdPrincipal)
+            }
+        }.test({}) {
+            // IntIdPrincipal uses default fetchByProperty which only supports "IntIdPrincipal/_id"
+            val result = IntIdPrincipal.fetchUserIdString("name", "Test Entity")
+            assertNull(result, "fetchUserIdString should return null for unsupported property lookups")
+        }
+    }
+
+    @Test
+    fun `fetchUserIdString uses normalized property value for lookup`() = runBlocking {
+        TestPrincipal.store.clear()
+        val id = Uuid.random()
+        // Store with lowercase email
+        val principal = TestPrincipal(id, "user@example.com", "5551234", "User")
+        TestPrincipal.store[id] = principal
+
+        object : ServerBuilder() {
+            init {
+                register(TestPrincipal)
+            }
+        }.test({}) {
+            // TestPrincipal.fetchByProperty normalizes email to lowercase
+            // So this should find the user even with uppercase input
+            val result = TestPrincipal.fetchUserIdString("email", "USER@EXAMPLE.COM")
+            assertNotNull(result, "Should find user even with different case email")
+            assertEquals(TestPrincipal.idString(id), result)
+        }
+    }
+
+    @Test
+    fun `fetchUserIdString works with String ID type`() = runBlocking {
+        StringIdPrincipal.store.clear()
+        val id = "custom-string-id"
+        val principal = StringIdPrincipal(id, "Label")
+        StringIdPrincipal.store[id] = principal
+
+        object : ServerBuilder() {
+            init {
+                register(StringIdPrincipal)
+            }
+        }.test({}) {
+            val idString = StringIdPrincipal.idString(id)
+            val result = StringIdPrincipal.fetchUserIdString("StringIdPrincipal/_id", idString)
+            assertNotNull(result)
+            assertEquals(idString, result)
+        }
+    }
+
+    // ========== principalTypes Extension Tests (by Claude) ==========
+
+    @Test
+    fun `principalTypes contains registered types`() = runBlocking {
+        object : ServerBuilder() {
+            init {
+                register(TestPrincipal)
+                register(IntIdPrincipal)
+            }
+        }.test({}) {
+            val types = serverRuntime.server.principalTypes
+            assertNotNull(types)
+            assertTrue(types.containsKey("TestPrincipal"))
+            assertTrue(types.containsKey("IntIdPrincipal"))
+            assertEquals(TestPrincipal, types["TestPrincipal"])
+            assertEquals(IntIdPrincipal, types["IntIdPrincipal"])
+        }
+    }
+
+    @Test
+    fun `principalTypes is empty when no types registered`() = runBlocking {
+        object : ServerBuilder() {}.test({}) {
+            val types = serverRuntime.server.principalTypes
+            assertNotNull(types)
+            assertTrue(types.isEmpty())
+        }
+    }
+
+    // ========== principalTypeFor Tests (by Claude) ==========
+
+    @Test
+    fun `principalTypeFor returns correct type`() = runBlocking {
+        object : ServerBuilder() {
+            init {
+                register(TestPrincipal)
+            }
+        }.test({}) {
+            val type = principalTypeFor<TestPrincipal, Uuid>()
+            assertEquals(TestPrincipal, type)
+        }
+    }
+
+    @Test
+    fun `principalTypeFor returns correct type for Int ID`() = runBlocking {
+        object : ServerBuilder() {
+            init {
+                register(IntIdPrincipal)
+            }
+        }.test({}) {
+            val type = principalTypeFor<IntIdPrincipal, Int>()
+            assertEquals(IntIdPrincipal, type)
+        }
+    }
+
+    @Test
+    fun `principalTypeFor throws for unregistered type`() = runBlocking {
+        object : ServerBuilder() {
+            init {
+                register(TestPrincipal) // Only register TestPrincipal
+            }
+        }.test({}) {
+            assertFailsWith<IllegalArgumentException> {
+                principalTypeFor<IntIdPrincipal, Int>() // Not registered
+            }
+        }
+    }
+
+    @Test
+    fun `principalTypeFor works with multiple registered types`() = runBlocking {
+        object : ServerBuilder() {
+            init {
+                register(TestPrincipal)
+                register(IntIdPrincipal)
+                register(StringIdPrincipal)
+            }
+        }.test({}) {
+            assertEquals(TestPrincipal, principalTypeFor<TestPrincipal, Uuid>())
+            assertEquals(IntIdPrincipal, principalTypeFor<IntIdPrincipal, Int>())
+            assertEquals(StringIdPrincipal, principalTypeFor<StringIdPrincipal, String>())
         }
     }
 }

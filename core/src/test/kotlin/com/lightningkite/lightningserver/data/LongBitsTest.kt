@@ -119,4 +119,99 @@ class LongBitsTest {
         assertEquals(0, bits.lowestIncluding(0))
         assertEquals(62, bits.lowestIncluding(62))
     }
+
+    // ========== Additional tests (by Claude) ==========
+
+    @Test
+    fun `testSize returns number of set bits`() {
+        // by Claude
+        val bits = LongBits(listOf(0, 5, 10, 15))
+        assertEquals(4, bits.size)
+    }
+
+    @Test
+    fun `testSize returns 0 for empty bits`() {
+        // by Claude
+        val bits = LongBits(emptyList())
+        assertEquals(0, bits.size)
+    }
+
+    @Test
+    fun `testSize returns 64 for all bits set`() {
+        // by Claude
+        val bits = LongBits((0..63))
+        assertEquals(64, bits.size)
+    }
+
+    @Test
+    fun `testMinus removes bits`() {
+        // by Claude
+        val bits1 = LongBits(listOf(0, 5, 10, 15))
+        val bits2 = LongBits(listOf(5, 10))
+        val result = bits1.minus(bits2)
+
+        assertTrue(0 in result)
+        assertFalse(5 in result)
+        assertFalse(10 in result)
+        assertTrue(15 in result)
+        assertEquals(2, result.size)
+    }
+
+    @Test
+    fun `testMinus with no overlap`() {
+        // by Claude
+        val bits1 = LongBits(listOf(0, 5))
+        val bits2 = LongBits(listOf(10, 15))
+        val result = bits1.minus(bits2)
+
+        assertEquals(listOf(0, 5), result.toList())
+    }
+
+    @Test
+    fun `testIntersect returns common bits`() {
+        // by Claude
+        val bits1 = LongBits(listOf(0, 5, 10, 15))
+        val bits2 = LongBits(listOf(5, 10, 20))
+        val result = bits1.intersect(bits2)
+
+        assertFalse(0 in result)
+        assertTrue(5 in result)
+        assertTrue(10 in result)
+        assertFalse(15 in result)
+        assertFalse(20 in result)
+        assertEquals(2, result.size)
+    }
+
+    @Test
+    fun `testIntersect with no overlap returns empty`() {
+        // by Claude
+        val bits1 = LongBits(listOf(0, 5))
+        val bits2 = LongBits(listOf(10, 15))
+        val result = bits1.intersect(bits2)
+
+        assertTrue(result.isEmpty())
+        assertEquals(0, result.size)
+    }
+
+    @Test
+    fun `testIsEmpty returns true for empty bits`() {
+        // by Claude
+        val bits = LongBits(emptyList())
+        assertTrue(bits.isEmpty())
+    }
+
+    @Test
+    fun `testIsEmpty returns false for non-empty bits`() {
+        // by Claude
+        val bits = LongBits(listOf(5))
+        assertFalse(bits.isEmpty())
+    }
+
+    @Test
+    fun `testToString returns empty string for empty bits`() {
+        // by Claude
+        val bits = LongBits(emptyList())
+        assertEquals("", bits.toString())
+    }
+
 }

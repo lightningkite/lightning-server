@@ -11,6 +11,9 @@ import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
+import com.lightningkite.lightningserver.typed.sdk.clientInterface
+import com.lightningkite.lightningserver.typed.sdk.info
+import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.services.database.*
 import com.lightningkite.services.files.*
 import kotlinx.coroutines.runBlocking
@@ -41,6 +44,9 @@ public class UploadEarlyEndpoint(
     public val expiration: Duration = 1.days,
     public val authOptions: AuthRequirement<*> = noAuth,
 ) : ServerBuilder() {
+    init {
+        sdkSettings.clientInterface = ClientUploadEarlyEndpoints::class.info()
+    }
 
     /**
      * Contextual serializer used for ServerFile values that integrates with the configured PublicFileSystem
