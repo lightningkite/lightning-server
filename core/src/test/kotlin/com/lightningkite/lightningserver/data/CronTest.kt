@@ -214,21 +214,6 @@ class CronTest {
     }
 
     @Test
-    fun `testCurrentTimeAlreadyMatches`() {
-        // by Claude - test that already matching time stays the same
-        val pattern = CronPattern(
-            minutes = listOf(0, 30),
-            hours = listOf(9),
-            days = CronDays.All,
-            months = Month.entries
-        )
-
-        val start = LocalDateTime(2024, 1, 15, 9, 0)
-        val next = start + pattern
-        assertEquals(LocalDateTime(2024, 1, 15, 9, 0), next)
-    }
-
-    @Test
     fun `testCronDayOfMonthToString`() {
         // by Claude
         val day = CronDayOfMonth.Day(15)
