@@ -59,24 +59,33 @@ public class JsonRpcHandler<PATH : PathSpec>(
             )
         }
 
+        // by Claude - JSON-RPC notifications have no id; per MCP spec they get 202 Accepted
+        val isNotification = rpcRequest.id == null || rpcRequest.id is JsonNull
+
         // Find the method
         val method = methodMap[rpcRequest.method]
-            ?: return errorResponse(rpcRequest.id, JsonRpcError.methodNotFound(rpcRequest.method))
+            ?: return if (isNotification) HttpResponse(status = HttpStatus.Accepted)
+                else errorResponse(rpcRequest.id, JsonRpcError.methodNotFound(rpcRequest.method))
 
         // Process the method invocation
         return try {
             @Suppress("UNCHECKED_CAST")
             val typedMethod = method as JsonRpcMethod<PATH, HasId<*>?, Any?, Any?>
 
-            // Parse parameters
+            // Parse parameters; treat null/missing params as empty object for compatibility
+            // by Claude - MCP notifications like notifications/initialized send no params
             val params = try {
-                val paramsJson = rpcRequest.params ?: JsonNull
-                server.externalSerialization.json.decodeFromJsonElement(typedMethod.inputType, paramsJson)
+                val paramsJson = when (rpcRequest.params) {
+                    null, is JsonNull -> JsonObject(emptyMap())
+                    else -> rpcRequest.params
+                }
+                server.externalSerialization.jsonWithoutExplicitNulls.decodeFromJsonElement(typedMethod.inputType, paramsJson)
             } catch (e: Exception) {
-                return errorResponse(
-                    rpcRequest.id,
-                    JsonRpcError.invalidParams(e.message ?: "Failed to parse params")
-                )
+                return if (isNotification) HttpResponse(status = HttpStatus.Accepted)
+                    else errorResponse(
+                        rpcRequest.id,
+                        JsonRpcError.invalidParams(e.message ?: "Failed to parse params")
+                    )
             }
 
             // Get authenticated access
@@ -85,13 +94,17 @@ public class JsonRpcHandler<PATH : PathSpec>(
             // Execute the method
             val (result, customHeaders) = typedMethod.handleWithCustomHeaders(access, params)
 
-            // Serialize result
-            val resultJson = server.externalSerialization.json.encodeToJsonElement(typedMethod.outputType, result)
+            // Notifications get 202 Accepted with no body per JSON-RPC/MCP spec
+            if (isNotification) return HttpResponse(status = HttpStatus.Accepted)
+
+            // Serialize result, stripping nulls for MCP/JSON-RPC compatibility
+            val resultJson = server.externalSerialization.jsonWithoutExplicitNulls.encodeToJsonElement(typedMethod.outputType, result)
 
             // Return success response
             successResponse(rpcRequest.id, resultJson, customHeaders)
 
         } catch (e: HttpStatusException) {
+            if (isNotification) return HttpResponse(status = HttpStatus.Accepted)
             // Map HTTP exceptions to JSON-RPC errors
             errorResponse(
                 rpcRequest.id,
@@ -102,6 +115,7 @@ public class JsonRpcHandler<PATH : PathSpec>(
                 )
             )
         } catch (e: Exception) {
+            if (isNotification) return HttpResponse(status = HttpStatus.Accepted)
             // Generic internal error
             errorResponse(
                 rpcRequest.id,
@@ -121,7 +135,7 @@ public class JsonRpcHandler<PATH : PathSpec>(
             status = HttpStatus.OK,
             headers = customHeaders,
             body = TypedData.text(
-                server.externalSerialization.json.encodeToString(response),
+                server.externalSerialization.jsonWithoutExplicitNulls.encodeToString(response),
                 MediaType.Application.Json
             )
         )
@@ -137,7 +151,7 @@ public class JsonRpcHandler<PATH : PathSpec>(
         return HttpResponse(
             status = HttpStatus.OK, // JSON-RPC errors are still HTTP 200
             body = TypedData.text(
-                server.externalSerialization.json.encodeToString(response),
+                server.externalSerialization.jsonWithoutExplicitNulls.encodeToString(response),
                 MediaType.Application.Json
             )
         )

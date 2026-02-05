@@ -64,6 +64,20 @@ public open class Serialization(public val serializersModule: SerializersModule 
         isLenient = true
         encodeDefaults = false
     }
+
+    /**
+     * JSON format that omits properties with default values.
+     *
+     * Useful for reducing payload size when default values can be inferred on the receiving end.
+     * Otherwise identical to [json].
+     */
+    public open val jsonWithoutExplicitNulls: Json = Json {
+        this.serializersModule = this@Serialization.serializersModule
+        ignoreUnknownKeys = true
+        isLenient = true
+        encodeDefaults = true // by Claude - required so fields like jsonrpc="2.0" are included
+        explicitNulls = false
+    }
 }
 
 /*
