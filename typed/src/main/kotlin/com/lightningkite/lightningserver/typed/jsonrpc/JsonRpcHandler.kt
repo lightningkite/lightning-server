@@ -12,6 +12,7 @@ import com.lightningkite.lightningserver.typed.validateOrThrow
 import com.lightningkite.lightningserver.typed.validators
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.HasId
+import com.lightningkite.services.database.default
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 
@@ -75,11 +76,10 @@ public class JsonRpcHandler<PATH : PathSpec>(
             // Parse parameters; treat null/missing params as empty object for compatibility
             // by Claude - MCP notifications like notifications/initialized send no params
             val params = try {
-                val paramsJson = when (rpcRequest.params) {
-                    null, is JsonNull -> JsonObject(emptyMap())
-                    else -> rpcRequest.params
+                when (rpcRequest.params) {
+                    null, is JsonNull -> if(typedMethod.inputType.descriptor.isNullable) null else typedMethod.inputType.default()
+                    else -> server.externalSerialization.jsonWithoutExplicitNulls.decodeFromJsonElement(typedMethod.inputType, rpcRequest.params)
                 }
-                server.externalSerialization.jsonWithoutExplicitNulls.decodeFromJsonElement(typedMethod.inputType, paramsJson)
             } catch (e: Exception) {
                 return if (isNotification) HttpResponse(status = HttpStatus.Accepted)
                     else errorResponse(

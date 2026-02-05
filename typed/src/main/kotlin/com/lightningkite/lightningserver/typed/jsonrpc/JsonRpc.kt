@@ -31,7 +31,7 @@ public data class JsonRpcRequest(
 public data class JsonRpcResponse(
     val jsonrpc: String = "2.0",
     val result: JsonElement,
-    val id: JsonElement?
+    val id: JsonElement? = null
 )
 
 /**
@@ -45,7 +45,7 @@ public data class JsonRpcResponse(
 public data class JsonRpcErrorResponse(
     val jsonrpc: String = "2.0",
     val error: JsonRpcError,
-    val id: JsonElement?
+    val id: JsonElement? = null
 )
 
 /**

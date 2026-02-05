@@ -201,6 +201,7 @@ class JsonRpcHandlerTest {
                 """.trimIndent(), MediaType.Application.Json)
             )
 
+            println("response: ${response.body?.text()}")
             assertEquals(HttpStatus.OK, response.status)
             val jsonResponse = Json.decodeFromString<JsonRpcResponse>(response.body!!.text())
             assertEquals(JsonNull, jsonResponse.result)
@@ -327,8 +328,7 @@ class JsonRpcHandlerTest {
                 """.trimIndent(), MediaType.Application.Json)
             )
 
-            val jsonResponse2 = Json.decodeFromString<JsonRpcResponse>(response2.body!!.text())
-            assertTrue(jsonResponse2.id == null || jsonResponse2.id == JsonNull)
+            assertNull(response2.body)
         }
     }
 }
