@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.engine.local
 import com.lightningkite.lightningserver.data.Schedule
 import com.lightningkite.lightningserver.data.plus
 import com.lightningkite.lightningserver.definition.*
+import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.path
@@ -155,6 +156,7 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
     override suspend fun <T> Task<T>.invoke(input: T) {
         scope.launch {
             try {
+                logger.debug { "Handling task: $location" }
                 executeWithMetrics(location, input)
             } catch (e: Exception) {
                 /*squish; already reported*/
@@ -215,6 +217,7 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
                     if (cache.setIfNotExists("$name-lock", true)) {
                         cache.set("$name-lock", true, 1.hours)
                         try {
+                            logger.debug { "Running Schedule: $name" }
                             it.executeWithMetrics(location)
                         } catch (e: Exception) {
                             /*squish; already reported*/

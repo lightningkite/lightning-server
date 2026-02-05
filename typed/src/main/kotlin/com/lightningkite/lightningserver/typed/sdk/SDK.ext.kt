@@ -11,6 +11,8 @@ import com.lightningkite.services.database.nullElement
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 
+public class SDKException(message: String? = null, cause: Throwable? = null): Exception(message, cause)
+
 internal val SDK.Data.Node.docGroup: String?
     get() = (ancestors + layer).drop(1).takeUnless { it.isEmpty() }?.joinToString(".") { it.info.interfaceName }
 
@@ -33,6 +35,7 @@ public fun SDK.Module.ensureUniqueNames(): SDK.Module = copy(
         .values
         .flatMap { similar ->
             similar.mapIndexed { idx, it ->
+                if(it.functionName.isBlank()) throw SDKException("Endpoint at path ${it.path} has an empty name.")
                 if (idx == 0) it
                 else when (it) {
                     is SDK.Function.Endpoint -> it.copy(functionName = it.functionName + (idx + 1))
