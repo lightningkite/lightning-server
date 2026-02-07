@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package com.lightningkite.lightningserver.settings
 
 import com.lightningkite.lightningserver.data.toJavaFile
