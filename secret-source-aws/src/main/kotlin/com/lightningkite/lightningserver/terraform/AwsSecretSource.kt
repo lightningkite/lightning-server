@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.terraform
 
 import com.lightningkite.services.terraform.TerraformNeed
 import kotlinx.serialization.json.Json
+import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient
 import software.amazon.awssdk.services.secretsmanager.model.CreateSecretRequest
@@ -50,10 +51,11 @@ public class AwsSecretException(message: String?, cause: Throwable?): Exception(
  * @see PopulatableSecretSource
  * @see TerraformNeed
  */
-public class AwsSecretSource(private val idPrefix: String, region: Region): PopulatableSecretSource {
+public class AwsSecretSource(public val profile: String, private val idPrefix: String, region: Region): PopulatableSecretSource {
 
     private val json = Json
     private val client = SecretsManagerClient.builder()
+        .credentialsProvider(ProfileCredentialsProvider.create(profile))
         .region(region)
         .build()
 
