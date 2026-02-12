@@ -70,7 +70,7 @@ object LkEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
     override val displayName: String = "Lightning Server Demo"
     override val debug: Boolean = true
 
-    override val secretsSource: SecretSource = AwsSecretSource("lightning-server-demo", Region.US_WEST_2)
+    override val secretsSource: SecretSource = AwsSecretSource(profile = "lk", idPrefix = "lightning-server-demo", region = Region.US_WEST_2)
 
     override fun Server.settings() {
 //        require(TerraformProviderImport.mongodbAtlas)
