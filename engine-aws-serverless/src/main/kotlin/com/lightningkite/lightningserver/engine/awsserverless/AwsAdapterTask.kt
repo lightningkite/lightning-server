@@ -4,7 +4,6 @@ import com.lightningkite.lightningserver.AnonType
 import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.executeWithMetrics
-import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.services.data.KotlinBytesFormat
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.Serializable
@@ -18,7 +17,7 @@ internal class AwsAdapterTask(val root: AwsAdapter) {
     val format: KotlinBytesFormat get() = root.internalSerialization.kotlinBytesFormat
 
     @Serializable
-    data class TaskInvoke(val taskName: String, val input: AnonType): AwsLambdaInput
+    data class TaskInvoke(val taskName: String, val input: AnonType) : AwsLambdaInput
 
     suspend fun <T> launchTask(location: PathSpec0, task: Task<T>, input: T) {
         try {
@@ -39,12 +38,13 @@ internal class AwsAdapterTask(val root: AwsAdapter) {
             throw Exception("Failed to call ${task}", e)
         }
     }
+
     suspend fun handleTask(event: TaskInvoke): APIGatewayV2HTTPResponse {
         return coroutineScope {
             val p = PathSpec0.fromString(event.taskName)
             val task = root.server.tasks[p]
             if (task == null) {
-                root.logger.error("Task ${event.taskName} not found")
+                root.logger.error { "Task ${event.taskName} not found" }
                 APIGatewayV2HTTPResponse(statusCode = 404, body = "Task ${event.taskName} not found")
             } else try {
                 @Suppress("UNCHECKED_CAST")
@@ -61,5 +61,6 @@ internal class AwsAdapterTask(val root: AwsAdapter) {
             }
         }
     }
+
     private class AwsTaskInvokeException(message: String? = null, cause: Exception? = null) : Exception(message, cause)
 }

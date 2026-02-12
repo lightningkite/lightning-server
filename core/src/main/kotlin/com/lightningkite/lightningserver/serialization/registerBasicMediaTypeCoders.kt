@@ -213,6 +213,7 @@ public fun ServerBuilder.registerBasicMediaTypeCoders(serializersModule: Runtime
  *
  * @return A comma-separated string of module contents
  */
+@OptIn(ExperimentalSerializationApi::class)
 @InternalLightningServerApi
 public fun SerializersModule.debugString(): String = buildString {
     dumpTo(object: SerializersModuleCollector {

@@ -1,31 +1,22 @@
 package com.lightningkite.lightningserver.engine.awsserverless
 
-import com.lightningkite.lightningserver.*
+import com.lightningkite.lightningserver.AnonType
+import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.definition.generalSettings
-import com.lightningkite.lightningserver.http.HttpHeaders
-import com.lightningkite.lightningserver.http.PathSegments
-import com.lightningkite.lightningserver.http.QueryParameters
+import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
-import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.websockets.*
-import com.lightningkite.services.aws.AwsConnections
 import com.lightningkite.services.data.KotlinBytesFormat
-import com.lightningkite.services.get
-import kotlinx.coroutines.future.await
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import software.amazon.awssdk.core.SdkBytes
 import software.amazon.awssdk.http.SdkHttpFullResponse
-import software.amazon.awssdk.services.apigatewaymanagementapi.model.DeleteConnectionRequest
-import software.amazon.awssdk.services.apigatewaymanagementapi.model.GoneException
-import software.amazon.awssdk.services.apigatewaymanagementapi.model.PostToConnectionRequest
-import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
+import software.amazon.awssdk.services.apigatewaymanagementapi.model.*
 import software.amazon.awssdk.services.lambda.model.InvocationType
 import software.amazon.awssdk.services.lambda.model.InvokeRequest
 import java.net.URLDecoder
-import java.util.Base64
+import java.util.*
 
 internal class AwsAdapterWs(val root: AwsAdapter) {
     val wsUrl: String get() = with(root) { generalSettings.invoke().wsUrl }
@@ -44,22 +35,22 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
     data class WebSocketDidConnect(
         val socketId: String,
         val connection: WebSocketConnectRequest<Nothing>,
-        val storage: AnonType
-    ): AwsLambdaInput
+        val storage: AnonType,
+    ) : AwsLambdaInput
 
     @Serializable
     data class WebSocketPublish(
         val topic: String,
         val data: AnonType,
-    ): AwsLambdaInput
+    ) : AwsLambdaInput
 
-    private suspend inline fun <P: PathSpec, T, R> withMid(
+    private suspend inline fun <P : PathSpec, T, R> withMid(
         path: P,
         request: WebSocketConnectRequest<P>,
         handler: WebSocketHandler<P, T>,
         socketId: String,
         stateString: AnonType,
-        action: (WsMid<P, T>) -> R
+        action: (WsMid<P, T>) -> R,
     ): R {
         val mid: WsMid<P, T> = WsMid<P, T>(
             request = request,
@@ -73,12 +64,12 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
         return r
     }
 
-    private inner class WsMid<P: PathSpec, T> constructor(
+    private inner class WsMid<P : PathSpec, T> constructor(
         override val request: WebSocketConnectRequest<P>,
         val path: P,
         val handler: WebSocketHandler<P, T>,
         val socketId: String,
-        val stateAnonType: AnonType
+        val stateAnonType: AnonType,
     ) : WebSocketConnection<P, T>, ServerRuntime by root {
         override var currentState: T = stateAnonType.value(encoding, handler.storageSerializer)
 
@@ -104,7 +95,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                 if (attempts > maxAttempts) {
                     root.logger.error {
                         "Failed to commit WebSocket state for $socketId after $maxAttempts attempts. " +
-                        "This indicates either extreme contention or a serialization issue. Queue size: ${queue.size}"
+                                "This indicates either extreme contention or a serialization issue. Queue size: ${queue.size}"
                     }
                     throw IllegalStateException(
                         "Failed to commit WebSocket state for $socketId after $maxAttempts attempts"
@@ -159,7 +150,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                 }.build())
                 val r = result.sdkHttpResponse()
                 if (!r.isSuccessful) {
-                    root.logger.warn("Socket ${socketId} had a send failure.")
+                    root.logger.warn { "Socket $socketId had a send failure." }
                     throw Exception(
                         "Failed to send socket message to $socketId ${r.statusCode()} - ${
                             try {
@@ -170,11 +161,9 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         } - ${(r as? SdkHttpFullResponse)?.content()?.get()?.use { it.reader().readText() }}"
                     )
                 }
-                true
             } catch (e: GoneException) {
-                root.logger.warn("Socket ${socketId} is gone, but a send was attempted.")
+                root.logger.warn { "Socket $socketId is gone, but a send was attempted." }
                 webSocketDynamo.clean(socketId)
-                false
             }
         }
 
@@ -202,20 +191,21 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     } - ${(r as? SdkHttpFullResponse)?.content()?.get()?.use { it.reader().readText() }}"
                 )
             }
-            true
         } catch (e: GoneException) {
-            false
         }
     }
 
 
     suspend fun publishHandler(event: WebSocketPublish): APIGatewayV2HTTPResponse {
         @Suppress("UNCHECKED_CAST")
-        val fullTopicMatch = root.server.webSocketTopics.match(root.internalSerialization.stringArrayFormat, event.topic) as? PathSpecMap.Match<WebSocketTopic<PathSpec, Any?>> ?: run {
-            root.logger.warn("No topic found for ${event.topic}")
+        val fullTopicMatch = root.server.webSocketTopics.match(
+            root.internalSerialization.stringArrayFormat,
+            event.topic
+        ) as? PathSpecMap.Match<WebSocketTopic<PathSpec, Any?>> ?: run {
+            root.logger.warn { "No topic found for ${event.topic}" }
             return APIGatewayV2HTTPResponse(500, body = "No topic found for ${event.topic}")
         }
-        val fullValue = event.data.value(root.internalSerialization.kotlinBytesFormat, fullTopicMatch.value!!.type)
+        val fullValue = event.data.value(root.internalSerialization.kotlinBytesFormat, fullTopicMatch.value.type)
         webSocketDynamo.forSubscribers(event.topic) { path, ids ->
             try {
                 // AWS Lambda WebSockets all go through root path "/" with query param routing.
@@ -229,13 +219,16 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     @Suppress("UNCHECKED_CAST")
                     h = rootWs as WebSocketHandler<PathSpec, Any?>
                 } else {
-                    val match = root.server.endpoints.match(root.externalSerialization.stringArrayFormat, path) { it.websocket } ?: run {
-                        root.logger.warn("No handler found for $path")
-                        return@forSubscribers
-                    }
+                    val match =
+                        root.server.endpoints.match(root.externalSerialization.stringArrayFormat, path) { it.websocket }
+                            ?: run {
+                                root.logger.warn { "No handler found for $path" }
+                                return@forSubscribers
+                            }
                     p = match.path
                     @Suppress("UNCHECKED_CAST")
-                    h = root.server.compiledWebsocketInterceptors.intercept(match.value) as WebSocketHandler<PathSpec, Any?>
+                    h =
+                        root.server.compiledWebsocketInterceptors.intercept(match.value) as WebSocketHandler<PathSpec, Any?>
                 }
                 // TODO: could retrieve more states at once?
                 val states = webSocketDynamo.states(ids)
@@ -243,8 +236,22 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     val s = states[socketId] ?: continue
                     try {
                         @Suppress("UNCHECKED_CAST")
-                        withMid<PathSpec, Any?, Unit>(p.pathSpec, s.connectRequest as WebSocketConnectRequest<PathSpec>, h, socketId, AnonType(s.state)) { mid ->
-                            h.messageFromSubscriptionWithMetrics(p.pathSpec, mid, WebSocketSubscriptionMessage(fullTopicMatch.value!!, fullTopicMatch.path.rawPathArguments, fullValue))
+                        withMid<PathSpec, Any?, Unit>(
+                            p.pathSpec,
+                            s.connectRequest as WebSocketConnectRequest<PathSpec>,
+                            h,
+                            socketId,
+                            AnonType(s.state)
+                        ) { mid ->
+                            h.messageFromSubscriptionWithMetrics(
+                                p.pathSpec,
+                                mid,
+                                WebSocketSubscriptionMessage(
+                                    fullTopicMatch.value,
+                                    fullTopicMatch.path.rawPathArguments,
+                                    fullValue
+                                )
+                            )
                         }
                     } catch (e: Exception) {
                         // Suppress, already reported inside *Tracked
@@ -253,7 +260,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     }
                 }
             } catch (e: Exception) {
-                root.logger.warn("WebSocket subs fail $path: ${e.message}")
+                root.logger.warn { "WebSocket subs fail $path: ${e.message}" }
             }
         }
 
@@ -283,7 +290,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
             }.build())
         } catch (e: Exception) {
             with(root) {
-                logger.error("Publish failed for $topic", e)
+                logger.error(e) { "Publish failed for $topic" }
             }
         }
     }
@@ -303,7 +310,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
             }.build())
             result.sdkHttpResponse().isSuccessful
         } catch (e: GoneException) {
-            root.logger.warn("Socket $socketId is gone during direct send.")
+            root.logger.warn { "Socket $socketId is gone during direct send." }
             webSocketDynamo.clean(socketId)
             false
         }
@@ -312,7 +319,13 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
     suspend fun handleWebsocketDidConnect(event: WebSocketDidConnect): APIGatewayV2HTTPResponse {
         try {
             @Suppress("UNCHECKED_CAST")
-            withMid(rootPath, event.connection as WebSocketConnectRequest<PathSpec0>, rootWs, event.socketId, event.storage) { mid ->
+            withMid(
+                rootPath,
+                event.connection as WebSocketConnectRequest<PathSpec0>,
+                rootWs,
+                event.socketId,
+                event.storage
+            ) { mid ->
                 rootWs.didConnectWithMetrics(
                     rootPath,
                     mid
@@ -387,7 +400,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         }.build())
                     } catch (e: Exception) {
                         with(root) {
-                            logger.error("Error invoking didConnect", e)
+                            logger.error(e) { "Error invoking didConnect" }
                         }
                     }
                     root.logger.info { "WebSocket ${event.requestContext.connectionId} connected successfully." }
@@ -452,7 +465,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                                 )
                             }
                         } catch (e: Exception) {
-                            root.logger.error("Failed to run debug websocket processing", e)
+                            root.logger.error(e) { "Failed to run debug websocket processing" }
                         }
                         rootWs.messageFromClientWithMetrics(
                             rootPath,

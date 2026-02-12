@@ -22,6 +22,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 
 /**
  * Verifies Apple ID tokens (JWTs) with proper signature validation.
@@ -44,7 +45,7 @@ public object AppleJwtVerifier {
     private const val APPLE_ISSUER = "https://appleid.apple.com"
 
     private var cachedKeys: Map<String, Signer>? = null
-    private var cacheTime: kotlinx.datetime.Instant? = null
+    private var cacheTime: Instant? = null
     private val cacheExpiration = 24.hours
 
     private val json = Json {
@@ -158,8 +159,8 @@ public object AppleJwtVerifier {
 
         // Find the key that matches the kid in the header
         // Note: JWT kid is in the header, not typ
-        val kid = (json.parseToJsonElement(headerJson) as? kotlinx.serialization.json.JsonObject)
-            ?.get("kid")?.let { (it as kotlinx.serialization.json.JsonPrimitive).content }
+        val kid = (json.parseToJsonElement(headerJson) as? JsonObject)
+            ?.get("kid")?.let { (it as JsonPrimitive).content }
             ?: throw BadRequestException("Missing 'kid' in JWT header")
 
         val signer = appleKeys[kid]
