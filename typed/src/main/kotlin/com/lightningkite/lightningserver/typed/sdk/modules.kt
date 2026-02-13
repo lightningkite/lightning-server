@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.withSdkInfo
+import com.lightningkite.toSealedMap
 import kotlin.uuid.Uuid
 
 /**
@@ -298,11 +299,12 @@ private fun ServerDefinition.withSdkId(): Pair<ServerDefinition, Uuid> {
  * This registry is intentionally non-cascading - each module maintains
  * its own list of child module metadata without inheriting parent registries.
  */
-private object ModuleRegistry : MutableExtensions.DegradingKey<MutableMap<Uuid, SdkModule.Info>, Map<Uuid, SdkModule.Info>> {
+private object ModuleRegistry : MutableExtensions.WritableKey<MutableMap<Uuid, SdkModule.Info>, Map<Uuid, SdkModule.Info>> {
     override fun default(): MutableMap<Uuid, SdkModule.Info> = HashMap()
-    override fun MutableMap<Uuid, SdkModule.Info>.include(other: Map<Uuid, SdkModule.Info>, pathSpec: PathSpec0) {
+    override fun MutableMap<Uuid, SdkModule.Info>.include(other: Map<Uuid, SdkModule.Info>) {
         /*No-op, we want to keep registered modules specific per-module, not cascading.*/
     }
+    override fun seal(data: Map<Uuid, SdkModule.Info>): Map<Uuid, SdkModule.Info> = data.toSealedMap()
 }
 
 /**

@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpecRegistry
 import com.lightningkite.lightningserver.pathing.buildPathSpecMap
+import com.lightningkite.lightningserver.pathing.buildSealedPathSpecMap
 import com.lightningkite.lightningserver.pathing.toSealedPathSpecMap
 import com.lightningkite.lightningserver.serialization.MediaTypeCoder
 import com.lightningkite.lightningserver.serialization.MediaTypeDecoder
@@ -315,7 +316,7 @@ public abstract class ServerBuilder : Extendable {
             externalSerializersModule = externalSerialization,
             httpInterceptors = httpInterceptors.toSealedList(),
             websocketInterceptors = websocketInterceptors.toSealedList(),
-            endpoints = buildPathSpecMap {
+            endpoints = buildSealedPathSpecMap {
                 for (path in httpHandlers.keys + websocketHandlers.keys) {
                     put(path, ServerPathEndpoints(
                         http = httpHandlers[path] ?: emptyMap(),
@@ -327,7 +328,7 @@ public abstract class ServerBuilder : Extendable {
             tasks = tasks.toSealedMap(),
             webSocketTopics = websocketTopics.toSealedPathSpecMap(),
             settings = settings.toSealedList(),
-            extensions = extensions.toSealedExtensions(),
+            extensions = extensions.sealed(),
             exceptionHandler = exceptionHandler,
             startupTasks = startupTasks.toSealedMap(),
             mediaTypeDecoders = mediaTypeDecoders.toSealedMap(),

@@ -1,12 +1,8 @@
 package com.lightningkite.lightningserver.definition
 
 import com.lightningkite.MediaType
-import com.lightningkite.buildSealedList
-import com.lightningkite.buildSealedMap
 import com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationError
-import com.lightningkite.lightningserver.definition.builder.MapRegistry
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.buildListRegistry
 import com.lightningkite.lightningserver.definition.builder.buildMapRegistry
 import com.lightningkite.lightningserver.definition.builder.include
 import com.lightningkite.lightningserver.http.*
@@ -19,6 +15,8 @@ import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketHandlerInterceptor
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
 import com.lightningkite.lightningserver.websockets.compileAndInstrument
+import com.lightningkite.toSealedList
+import com.lightningkite.toSealedMap
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.plus
 
@@ -61,7 +59,7 @@ public data class ServerDefinition(
         override val extensions: Extensions,
     ) : Extended
 
-    private val flattened by lazy { this.flatten() }
+    internal val flattened by lazy { this.flatten().finalize() }
 
     public val internalSerializersModule: Runtime<SerializersModule> get() = flattened.internalSerializersModule
     public val externalSerializersModule: Runtime<SerializersModule> get() = flattened.externalSerializersModule
@@ -86,29 +84,67 @@ public data class ServerDefinition(
 
     override val extensions: Extensions get() = flattened.extensions
 
+    /**
+     * Seals all registries, caches calculations, and performs final validation checks.
+     * */
+    private fun Module.finalize(): Module = Module(
+        internalSerializersModule = Runtime.Cached(internalSerializersModule),
+        externalSerializersModule = Runtime.Cached(externalSerializersModule),
+        httpInterceptors = httpInterceptors.toSealedList(),
+        websocketInterceptors = websocketInterceptors.toSealedList(),
+        endpoints = endpoints.toSealedPathSpecMap(),
+        schedules = schedules.toSealedMap(),
+        tasks = tasks.toSealedMap(),
+        webSocketTopics = webSocketTopics.toSealedPathSpecMap(),
+        settings = settings.toSealedList(),
+        settingOverrides = settingOverrides.toSealedMap(),
+        extensions = extensions.sealed(),
+        mediaTypeDecoders = mediaTypeDecoders.toSealedMap(),
+        mediaTypeEncoders = mediaTypeEncoders.toSealedMap(),
+        exceptionHandler = exceptionHandler,
+        startupTasks = startupTasks.toSealedMap().also {
+            // Validate startup task dependencies for circular references
+            validateStartupTaskDependencies(it.values)
+        },
+    )
 
+    /**
+     * Flattens this definition into a single module recursively.
+     * Flattening is **not** sealed or cached to prevent unnecessary intermediate allocations.
+     * */
     private fun flatten(): Module {
         if (modules.isEmpty()) return thisLayer
 
         val flattenedModules = modules.mapItems { it.flatten() }
+        // Cache this to avoid repeated list creation in serializers module lambdas
+        val flattenedModuleItems = flattenedModules.map { it.item }
 
-        fun <T> flattenList(registry: (Module) -> List<T>): List<T> = buildSealedList {
-            addAll(registry(thisLayer))
-            for ((modPath, module) in flattenedModules) {
-                addAll(registry(module))
+        fun <T> flattenList(registry: (Module) -> List<T>): List<T> {
+            // list reallocation is pretty inexpensive, getting the size of this top layer is 0-cost.
+            // Finding the cost of all layers is O(m) where m is # of modules, cost of iteration is unneeded, just estimate.
+            val thisLayer = registry(thisLayer)
+            return buildList(thisLayer.size + flattenedModules.size) {
+                addAll(thisLayer)
+                for ((_, module) in flattenedModules) {
+                    addAll(registry(module))
+                }
             }
         }
 
-        fun <T> flattenMap(registry: (Module) -> Map<PathSpec0, T>): Map<PathSpec0, T> = buildMapRegistry {
-            include(registry(thisLayer))
-            for ((modPath, module) in flattenedModules) {
-                include(registry(module).mapKeys { (path, _) -> modPath + path })
+        fun <T> flattenMap(registry: (Module) -> Map<PathSpec0, T>): Map<PathSpec0, T> {
+            // Map reallocation is more expensive, recalculating all hash buckets. Worth the cost of iteration.
+            val thisLayerMap = registry(thisLayer)
+            return buildMap(thisLayerMap.size + flattenedModules.sumOf { registry(it.value).size }) {
+                putAll(thisLayerMap)
+                for ((modPath, module) in flattenedModules) {
+                    for ((path, value) in registry(module)) put(modPath + path, value)
+                }
             }
         }
 
         return Module(
-            internalSerializersModule = Runtime.Cached { flattenedModules.map { it.item }.fold(thisLayer.internalSerializersModule()) { acc, module -> acc + module.internalSerializersModule() } },
-            externalSerializersModule = Runtime.Cached { flattenedModules.map { it.item }.fold(thisLayer.externalSerializersModule()) { acc, module -> acc + module.externalSerializersModule() } },
+            internalSerializersModule = { flattenedModuleItems.fold(thisLayer.internalSerializersModule()) { acc, module -> acc + module.internalSerializersModule() } },
+            externalSerializersModule = { flattenedModuleItems.fold(thisLayer.externalSerializersModule()) { acc, module -> acc + module.externalSerializersModule() } },
             httpInterceptors = flattenList { it.httpInterceptors },
             websocketInterceptors = flattenList { it.websocketInterceptors },
             endpoints = buildPathSpecMap { // We want to be able to override existing entries here, but we'll have to check for duplicate registration manually.
@@ -137,13 +173,17 @@ public data class ServerDefinition(
                     for ((relPath, topic) in module.webSocketTopics)
                         register(modPath + relPath, topic)
             },
-            settings = thisLayer.settings + flattenedModules.flatMap { it.item.settings },
+            // Preallocate settings list to avoid intermediate allocations
+            settings = buildList(thisLayer.settings.size + flattenedModules.sumOf { it.item.settings.size }) {
+                addAll(thisLayer.settings)
+                for ((_, mod) in flattenedModules) addAll(mod.settings)
+            },
             settingOverrides = buildMapRegistry {
                 include(thisLayer.settingOverrides)
                 for ((_, mod) in flattenedModules) include(mod.settingOverrides)
             },
             extensions = thisLayer.extensions.toMutableExtensions().apply {
-                flattenedModules.forEach { include(it.item.extensions, it.location) }
+                flattenedModules.forEach { include(it.item.extensions) }
             },
             mediaTypeDecoders = MediaTypeDecoderRegistry().apply {
                 include(thisLayer.mediaTypeDecoders)
@@ -154,12 +194,10 @@ public data class ServerDefinition(
                 for ((_, mod) in flattenedModules) include(mod.mediaTypeEncoders)
             },
             exceptionHandler = thisLayer.exceptionHandler,
-            startupTasks = flattenMap { it.startupTasks }.also { tasks ->
-                // Validate startup task dependencies for circular references
-                validateStartupTaskDependencies(tasks.values)
-            },
+            startupTasks = flattenMap { it.startupTasks },
         )
     }
+
 
     private val reverseLookupHttpHandler: Map<HttpHandler<*>, HttpEndpoint<*>> by lazy {
         endpoints.entries.flatMap { (path, group) ->
