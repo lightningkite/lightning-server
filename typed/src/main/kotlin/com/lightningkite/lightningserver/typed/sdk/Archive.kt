@@ -233,7 +233,7 @@ public class SingleStreamArchive(
         override fun sub(name: String): Sub = Sub("$path/$name")
 
         override fun entry(name: String, write: (Sink) -> Unit) {
-            entry("/$path/$name")
+            entry("/$path/$name").use(write)
         }
 
         override fun close() {}
