@@ -3,8 +3,8 @@ package com.lightningkite.lightningserver.cache
 import com.lightningkite.now
 import kotlinx.datetime.Instant
 import kotlinx.serialization.KSerializer
-import kotlin.time.Duration
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Duration
 
 /**
  * A Cache implementation that exists entirely in the applications Heap. There are no external connections.
@@ -12,7 +12,7 @@ import java.util.concurrent.ConcurrentHashMap
  * This is useful in places that persistent data is not needed and speed is desired such as Unit Tests
  */
 open class LocalCache(val entries: ConcurrentHashMap<String, Entry> = ConcurrentHashMap()) : Cache {
-    companion object: LocalCache()
+    companion object : LocalCache()
     data class Entry(val value: Any?, val expires: Instant? = null)
 
     @Suppress("UNCHECKED_CAST")
@@ -31,13 +31,9 @@ open class LocalCache(val entries: ConcurrentHashMap<String, Entry> = Concurrent
         key: String,
         value: T,
         serializer: KSerializer<T>,
-        timeToLive: Duration?
+        timeToLive: Duration?,
     ): Boolean {
-        if (entries[key] == null) {
-            entries[key] = Entry(value, timeToLive?.let { now() + it })
-            return true
-        }
-        return false
+        return entries.putIfAbsent(key, Entry(value, timeToLive?.let { now() + it })) == null
     }
 
     override suspend fun add(key: String, value: Int, timeToLive: Duration?) {
