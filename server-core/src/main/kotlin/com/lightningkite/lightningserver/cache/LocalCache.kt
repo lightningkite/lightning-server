@@ -45,18 +45,19 @@ open class LocalCache(val entries: ConcurrentHashMap<String, Entry> = Concurrent
     }
 
     override suspend fun add(key: String, value: Int, timeToLive: Duration?) {
-        val entry = entries[key]?.takeIf { it.expires == null || it.expires > now() }
-        val current = entry?.value
-        val new = when (current) {
-            is Byte -> (current + value).toByte()
-            is Short -> (current + value).toShort()
-            is Int -> (current + value)
-            is Long -> (current + value)
-            is Float -> (current + value)
-            is Double -> (current + value)
-            else -> value
+        entries.compute(key) { _, existing ->
+            val entry = existing?.takeIf { it.expires == null || it.expires > now() }
+            val new = when (val current = entry?.value) {
+                is Byte -> (current + value).toByte()
+                is Short -> (current + value).toShort()
+                is Int -> (current + value)
+                is Long -> (current + value)
+                is Float -> (current + value)
+                is Double -> (current + value)
+                else -> value
+            }
+            Entry(new, timeToLive?.let { now() + it })
         }
-        entries[key] = Entry(new, timeToLive?.let { now() + it })
     }
 
     override suspend fun remove(key: String) {
