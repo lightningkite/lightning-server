@@ -87,7 +87,7 @@ public data class NotificationSendMethods<UID : Comparable<UID>>(
  * @property inApp In-app notification delivery frequency, defaults to immediate
  */
 @Serializable
-public data class Subscription<T>(
+public data class FullEventSubscription<T>(
     val filter: Condition<T>,
     val email: Frequency?,
     val push: Frequency?,

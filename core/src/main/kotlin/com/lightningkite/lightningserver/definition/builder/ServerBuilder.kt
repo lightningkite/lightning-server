@@ -1,13 +1,13 @@
 package com.lightningkite.lightningserver.definition.builder
 
 import com.lightningkite.lightningserver.HttpMethod
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.LightningServerDsl
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpecRegistry
-import com.lightningkite.lightningserver.pathing.buildPathSpecMap
 import com.lightningkite.lightningserver.pathing.buildSealedPathSpecMap
 import com.lightningkite.lightningserver.pathing.toSealedPathSpecMap
 import com.lightningkite.lightningserver.serialization.MediaTypeCoder
@@ -26,6 +26,7 @@ import com.lightningkite.toSealedMap
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
+import kotlin.uuid.Uuid
 
 /**
  * The primary entrypoint for creating and defining servers.
@@ -76,6 +77,9 @@ import kotlinx.serialization.modules.SerializersModule
  * ```
  * */
 public abstract class ServerBuilder : Extendable {
+    @InternalLightningServerApi
+    public val moduleId: Uuid = Uuid.random()
+
     protected open val internalSerialization: Runtime<SerializersModule> get() = Runtime.Constant(EmptySerializersModule())
     protected open val externalSerialization: Runtime<SerializersModule> get() = Runtime.Constant(EmptySerializersModule())
 
@@ -310,8 +314,10 @@ public abstract class ServerBuilder : Extendable {
      *
      * @return A complete [ServerDefinition] with all modules flattened and ready for deployment
      */
+    @OptIn(InternalLightningServerApi::class)
     public fun build(): ServerDefinition = ServerDefinition(
         thisLayer = ServerDefinition.Module(
+            moduleId = moduleId,
             internalSerializersModule = internalSerialization,
             externalSerializersModule = externalSerialization,
             httpInterceptors = httpInterceptors.toSealedList(),

@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.definition
 
 import com.lightningkite.MediaType
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationError
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.builder.buildMapRegistry
@@ -19,6 +20,7 @@ import com.lightningkite.toSealedList
 import com.lightningkite.toSealedMap
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.plus
+import kotlin.uuid.Uuid
 
 
 /**
@@ -37,6 +39,8 @@ public data class ServerDefinition(
     val modules: List<Locationed<PathSpec0, ServerDefinition>> = emptyList(),
 ) : Extended {
     public data class Module(
+        @InternalLightningServerApi public val moduleId: Uuid,
+
         public val internalSerializersModule: Runtime<SerializersModule>,
         public val externalSerializersModule: Runtime<SerializersModule>,
 
@@ -87,7 +91,9 @@ public data class ServerDefinition(
     /**
      * Seals all registries, caches calculations, and performs final validation checks.
      * */
+    @OptIn(InternalLightningServerApi::class)
     private fun Module.finalize(): Module = Module(
+        moduleId = moduleId,
         internalSerializersModule = Runtime.Cached(internalSerializersModule),
         externalSerializersModule = Runtime.Cached(externalSerializersModule),
         httpInterceptors = httpInterceptors.toSealedList(),
@@ -143,6 +149,7 @@ public data class ServerDefinition(
         }
 
         return Module(
+            moduleId = Uuid.NIL,    // When flattening module identification loses meaning
             internalSerializersModule = { flattenedModuleItems.fold(thisLayer.internalSerializersModule()) { acc, module -> acc + module.internalSerializersModule() } },
             externalSerializersModule = { flattenedModuleItems.fold(thisLayer.externalSerializersModule()) { acc, module -> acc + module.externalSerializersModule() } },
             httpInterceptors = flattenList { it.httpInterceptors },
@@ -237,4 +244,17 @@ public data class ServerDefinition(
         schedules.entries.associate { it.value to it.key }
     }
     public fun location(handler: ScheduledTask): PathSpec0? = reverseLookupScheduledTask[handler]
+
+    @OptIn(InternalLightningServerApi::class)
+    private val reverseLookupServerModule: Map<Uuid, PathSpec0> by lazy {
+        buildMap {
+            fun put(path: PathSpec0, def: ServerDefinition) {
+                put(def.thisLayer.moduleId, path)
+                for ((modPath, mod) in def.modules) put(path + modPath, mod)
+            }
+            put(PathSpec.root, this@ServerDefinition)
+        }
+    }
+    @OptIn(InternalLightningServerApi::class) public fun location(module: ServerDefinition): PathSpec0? = reverseLookupServerModule[module.thisLayer.moduleId]
+    @OptIn(InternalLightningServerApi::class) public fun location(module: ServerBuilder): PathSpec0? = reverseLookupServerModule[module.moduleId]
 }

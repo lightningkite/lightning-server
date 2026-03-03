@@ -24,7 +24,7 @@ import kotlin.uuid.Uuid
  * @property info Model information for the subject entity
  * @property conditionSerializer Serializer for type-safe conditions on the subject entity
  */
-public class TypedEventType<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
+public class EventDefinition<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     public val untyped: EventType,
     public val info: ModelInfo<USER, T, ID>,
     registry: EventRegistry<USER>
@@ -52,9 +52,9 @@ public class TypedEventType<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>
 /**
  * Represents a type-safe event occurrence.
  *
- * Unlike [Event], this maintains full type information for the subject entity,
+ * Unlike [EventData], this maintains full type information for the subject entity,
  * enabling type-safe operations in application code. Can be converted to an
- * untyped [Event] for database storage.
+ * untyped [EventData] for database storage.
  *
  * @param USER The user type (nullable for public events)
  * @param T The subject entity type
@@ -64,31 +64,31 @@ public class TypedEventType<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>
  * @property type The event type definition
  * @property subject The actual subject entity (not just its ID)
  */
-public data class TypedEvent<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
+public data class Event<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     override val _id: Uuid,
     val time: Instant,
-    val type: TypedEventType<USER, T, ID>,
+    val type: EventDefinition<USER, T, ID>,
     val subject: T
 ): HasId<Uuid> {
     /**
-     * Converts this typed event to an untyped [Event] for storage.
+     * Converts this typed event to an untyped [EventData] for storage.
      *
      * The subject entity is reduced to just its ID, which is serialized to JSON.
      *
      * @param json The JSON serializer to use for the subject ID
      */
-    public fun toEvent(json: Json): Event = Event(
+    public fun data(json: Json): EventData = EventData(
         _id = _id,
         timestamp = time,
         type = type.untyped,
-        subject = json.encodeToString(type.info.idSerializer, subject._id)
+        subject = EventData.IdJsonEncoded.encode(json, type.info.idSerializer, subject._id)
     )
 
     context(server: ServerRuntime)
-    public fun toExternalEvent(): Event = toEvent(server.externalSerialization.json)
+    public fun toExternalEventData(): EventData = data(server.externalSerialization.json)
 
     context(server: ServerRuntime)
-    public fun toInternalEvent(): Event = toEvent(server.internalSerialization.json)
+    public fun toInternalEventData(): EventData = data(server.internalSerialization.json)
 }
 
 /**
@@ -98,7 +98,7 @@ public data class TypedEvent<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID
  * @param subject The subject entity that this event relates to
  */
 context(server: ServerRuntime)
-public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> TypedEvent(
-    type: TypedEventType<USER, T, ID>,
+public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> Event(
+    type: EventDefinition<USER, T, ID>,
     subject: T
-): TypedEvent<USER, T, ID> = TypedEvent(Uuid.random(), now(), type, subject)
+): Event<USER, T, ID> = Event(Uuid.random(), now(), type, subject)

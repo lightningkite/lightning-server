@@ -8,8 +8,9 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.notifications.NotificationEndpoints
 import com.lightningkite.lightningserver.notifications.ScheduledSendMethods
 import com.lightningkite.lightningserver.notifications.events.EventType
-import com.lightningkite.lightningserver.notifications.events.TypedEvent
-import com.lightningkite.lightningserver.notifications.events.TypedEventType
+import com.lightningkite.lightningserver.notifications.events.Event
+import com.lightningkite.lightningserver.notifications.events.EventDefinition
+import com.lightningkite.lightningserver.notifications.events.EventRegistry
 import com.lightningkite.lightningserver.notifications.events.UserEventType
 import com.lightningkite.lightningserver.notifications.events.type
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -63,7 +64,7 @@ public class FullyCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<
     info: ModelInfo<USER, NotificationEventSubscription<UID>, UserEventType<UID>>,
     users: ModelInfo<USER, USER, UID>,
     private val principal: PrincipalType<USER, UID>,
-    private val events: Map<String, TypedEventType<USER, *, *>>
+    private val events: EventRegistry<USER>
 ) : NotificationEndpoints.Subscriptions<USER, UID>, ServerBuilder() {
     public val info: ModelInfo<USER, NotificationEventSubscription<UID>, UserEventType<UID>> =
         object : ModelInfo<USER, NotificationEventSubscription<UID>, UserEventType<UID>> by info {
@@ -97,9 +98,9 @@ public class FullyCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<
     private val self = DataClassPathSelf(info.serializer)
 
     public data class DefaultSubscription<USER : HasId<UID>, UID : Comparable<UID>, T : HasId<*>>(
-        val eventType: TypedEventType<USER, T, *>,
+        val eventType: EventDefinition<USER, T, *>,
         val behavior: DefaultSubscriptionUpdateBehavior = DefaultSubscriptionUpdateBehavior.UpdateReadPermissions,
-        val subscription: suspend (USER) -> Subscription<T>?,
+        val subscription: suspend context(ServerRuntime) (USER) -> FullEventSubscription<T>?,
     ) {
         context(server: ServerRuntime)
         internal suspend fun readPermissions(
@@ -140,20 +141,20 @@ public class FullyCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<
 
     @Suppress("UNCHECKED_CAST")
     public fun <T : HasId<*>> getDefaultSubscription(
-        type: TypedEventType<USER, T, *>
-    ): (suspend (USER) -> Subscription<T>?)? =
+        type: EventDefinition<USER, T, *>
+    ): (suspend context(ServerRuntime) (USER) -> FullEventSubscription<T>?)? =
         defaultSubscriptions[type.name]?.let { (it as DefaultSubscription<USER, UID, T>).subscription }
 
     public fun <T : HasId<*>> setDefaultSubscription(
-        type: TypedEventType<USER, T, *>,
+        type: EventDefinition<USER, T, *>,
         behavior: DefaultSubscriptionUpdateBehavior = DefaultSubscriptionUpdateBehavior.UpdateReadPermissions,
-        subscription: suspend (USER) -> Subscription<T>?
+        subscription: suspend context(ServerRuntime) (USER) -> FullEventSubscription<T>?
     ) {
         defaultSubscriptions.register(type.name, DefaultSubscription(type, behavior, subscription))
     }
 
     context(server: ServerRuntime)
-    override suspend fun <T : HasId<ID>, ID : Comparable<ID>> subscribed(event: TypedEvent<USER, T, ID>): List<ScheduledSendMethods<UID>> =
+    override suspend fun <T : HasId<ID>, ID : Comparable<ID>> subscribed(event: Event<USER, T, ID>): List<ScheduledSendMethods<UID>> =
         info
             .table()
             .find(self._id.type eq event.type.untyped)
@@ -295,6 +296,23 @@ public class FullyCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<
     }
 
     context(server: ServerRuntime)
-    private suspend fun <T : HasId<*>> TypedEventType<USER, T, *>.serializedReadPermissions(auth: AuthAccess<USER>) =
+    private suspend fun <T : HasId<*>> EventDefinition<USER, T, *>.serializedReadPermissions(auth: AuthAccess<USER>) =
         server.internalSerialization.json.encodeToString(conditionSerializer, info.permissions(auth).read)
+
+    context(runtime: ServerRuntime)
+    override suspend fun verifyAllDependencies(registry: EventRegistry<*>) {
+        require(defaultSubscriptions.keys.containsAll(registry.keys)) {
+            val missing = registry.keys - defaultSubscriptions.keys
+            "Default subscriptions are missing for (${missing.size}) event definitions: $missing"
+        }
+    }
+}
+
+
+context(handler: NotificationEndpoints<USER, UID, *, *, FullyCustomizableSubscriptions<USER, UID>>)
+public fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>> EventDefinition<USER, T, ID>.defaultSubscription(
+    behavior: DefaultSubscriptionUpdateBehavior = DefaultSubscriptionUpdateBehavior.UpdateReadPermissions,
+    subscription: suspend context(ServerRuntime) (USER) -> FullEventSubscription<T>?
+) {
+    handler.subscriptions.setDefaultSubscription(this, behavior, subscription)
 }

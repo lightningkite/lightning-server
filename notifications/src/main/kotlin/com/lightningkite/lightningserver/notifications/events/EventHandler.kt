@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.invoke
 import com.lightningkite.lightningserver.typed.ModelInfo
+import com.lightningkite.lightningserver.typed.sdk.kabobCase
 import com.lightningkite.services.database.HasId
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -22,7 +23,7 @@ public interface EventHandler<USER : HasId<*>?> {
     public val registry: EventRegistry<USER>
 
     context(runtime: ServerRuntime)
-    public suspend fun <T : HasId<ID>, ID : Comparable<ID>> handle(event: TypedEvent<USER, T, ID>)
+    public suspend fun <T : HasId<ID>, ID : Comparable<ID>> handle(event: Event<USER, T, ID>)
 }
 
 /**
@@ -43,7 +44,7 @@ public interface EventHandler<USER : HasId<*>?> {
  * @property task The task endpoint for asynchronous event processing
  */
 public class EventLauncher<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> internal constructor(
-    public val type: TypedEventType<USER, T, ID>,
+    public val type: EventDefinition<USER, T, ID>,
     public val handler: EventHandler<USER>,
     timeout: Duration = 5.minutes,
 ) : ServerBuilder() {
@@ -55,7 +56,7 @@ public class EventLauncher<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>
      */
     context(_: ServerRuntime)
     public suspend fun handleInline(subject: T) {
-        handler.handle(TypedEvent(type, subject))
+        handler.handle(Event(type, subject))
     }
 
     public val task: Task<T> = path bind Task(type.info.serializer, timeout) { handleInline(it) }
@@ -70,8 +71,8 @@ public class EventLauncher<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>
 /**
  * DSL function to define and register an event type with its handler.
  *
- * This function creates a [TypedEventType], registers it with the handler's registry,
- * and creates an [EventLauncher] with a task endpoint at `/events/{name}`.
+ * This function creates a [EventDefinition], registers it with the handler's registry,
+ * and creates an [EventLauncher] with a task endpoint at `/events/{name.kabobCase()}`.
  *
  * @param name The unique name for this event type
  * @param info Model information for the subject entity type
@@ -87,16 +88,16 @@ public fun <HANDLER : EventHandler<USER>, USER : HasId<*>?, T : HasId<ID>, ID : 
     info: ModelInfo<USER, T, ID>,
     tags: Set<String> = emptySet(),
     timeout: Duration = 5.minutes,
-    additionalSetup: HANDLER.(TypedEventType<USER, T, ID>) -> Unit = {}
+    additionalSetup: HANDLER.(EventDefinition<USER, T, ID>) -> Unit
 ): EventLauncher<USER, T, ID> {
-    val type = TypedEventType(name, tags, info, registry)
+    val type = EventDefinition(name, tags, info, registry)
 
     additionalSetup(type)
 
     val launcher = EventLauncher(type, this, timeout)
 
     with(builder) {
-        path.path("events").path(type.name) include launcher
+        path.path("events").path(type.name.kabobCase()) include launcher
     }
 
     return launcher

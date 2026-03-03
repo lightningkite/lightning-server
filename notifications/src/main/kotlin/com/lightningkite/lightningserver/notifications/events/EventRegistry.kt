@@ -20,19 +20,19 @@ import kotlinx.serialization.builtins.ListSerializer
  *
  * This is a lightweight wrapper around a [MapRegistry] that ensures type-safe storage
  * and retrieval of event types. Event types are automatically registered during construction
- * of [TypedEventType] instances.
+ * of [EventDefinition] instances.
  *
  * @param USER The user type (nullable for public events)
  */
 public class EventRegistry<USER : HasId<*>?>(
-    private val registry: MapRegistry<String, TypedEventType<USER, *, *>> = MapRegistry()
-) : Map<String, TypedEventType<USER, *, *>> by registry {
+    private val registry: MapRegistry<String, EventDefinition<USER, *, *>> = MapRegistry()
+) : Map<String, EventDefinition<USER, *, *>> by registry {
     /**
      * Registers an event type with this registry.
      *
-     * Called automatically by [TypedEventType] constructor.
+     * Called automatically by [EventDefinition] constructor.
      */
-    public fun register(eventType: TypedEventType<USER, *, *>) {
+    public fun register(eventType: EventDefinition<USER, *, *>) {
         registry.register(eventType.name, eventType)
     }
 }

@@ -2,6 +2,7 @@
 
 package com.lightningkite.lightningserver.settings
 
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.data.toJavaFile
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.services.data.KFile
@@ -108,7 +109,7 @@ public infix fun <RESULT> ServerSetting<*, RESULT>.setStatic(value: RESULT) {
  * @throws MissingSettingFile if the file doesn't exist (after creating it with defaults)
  * @throws IncompleteSettingsException if required settings are missing (after creating suggested file)
  */
-@OptIn(ExperimentalSerializationApi::class)
+@OptIn(ExperimentalSerializationApi::class, InternalLightningServerApi::class)
 public fun ServerSettings.loadFromFile(
     file: KFile,
     module: SerializersModule,

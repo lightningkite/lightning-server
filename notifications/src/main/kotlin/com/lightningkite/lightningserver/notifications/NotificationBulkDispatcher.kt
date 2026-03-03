@@ -4,11 +4,13 @@ import com.lightningkite.EmailAddress
 import com.lightningkite.PhoneNumber
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.auth.noAuth
+import com.lightningkite.lightningserver.data.Schedule
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.ScheduledTask
 import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.launch
+import com.lightningkite.lightningserver.notifications.events.EventRegistry
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.invoke
 import com.lightningkite.lightningserver.runtime.location
@@ -30,6 +32,7 @@ import com.lightningkite.services.database.DataClassPathSelf
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.ModelPermissions
+import com.lightningkite.services.database.SerializableProperty
 import com.lightningkite.services.database.SortBuilder
 import com.lightningkite.services.database.SortPart
 import com.lightningkite.services.database.andNotNull
@@ -96,7 +99,9 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
     public val email: (Runtime<EmailService>)? = null,
     public val sms: (Runtime<SMS>)? = null,
     public val push: (Runtime<NotificationService>)? = null,
+    public val refreshSchedule: Schedule = Schedule.Frequency(1.minutes),
     public val timeout: Duration = 5.minutes,
+    websocketKey: SerializableProperty<Notification<UID, CONTENT>, *>? = info.serializer.fieldInApp
 ): ServerBuilder(), NotificationEndpoints.Dispatcher<UID, CONTENT> {
     init {
         sdkSettings.defaultInfo = SdkModule.Info("NotificationsApi")
@@ -108,9 +113,6 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
     context(server: ServerRuntime) public abstract suspend fun onFcmTokensDead(user: USER, deadTokens: Set<String>)
 
     internal val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.notifications.NotificationBulkDispatcher")
-
-    public val rest: ModelRestEndpointsAndUpdatesWebsocket<USER, Notification<UID, CONTENT>, Uuid> =
-        path.path("rest") include ModelRestEndpoints(info) + ModelRestUpdatesWebsocket(info)
 
     protected open val additionalSendCondition: Condition<Notification<UID, CONTENT>>? = null
 
@@ -167,6 +169,9 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
             .takeIf { it.isNotEmpty() }
             ?.let { sendNotifications(it) }
     }
+
+    public val rest: ModelRestEndpointsAndUpdatesWebsocket<USER, Notification<UID, CONTENT>, Uuid> =
+        path.path("rest") include ModelRestEndpoints(info) + ModelRestUpdatesWebsocket(info, websocketKey)
 
     //_____Refreshing and sending notifications_____
     // Notifications are created with a 'sendAt' time, this specifies when the notification should be sent
@@ -446,7 +451,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
     public suspend fun refreshNotifications(): Unit = refreshNotifications(BasicPager(0, 200))
 
     public val autoRefreshNotifications: ScheduledTask =
-        path.path("refresh-notifs") bind ScheduledTask(1.minutes) {
+        path.path("refresh-notifs") bind ScheduledTask(refreshSchedule, timeout) {
             val acquiredLock = cache().setIfNotExists(scheduleLockKey, "lock", String.serializer(), timeout*16)
             if (acquiredLock) refreshNotifications()
         }
