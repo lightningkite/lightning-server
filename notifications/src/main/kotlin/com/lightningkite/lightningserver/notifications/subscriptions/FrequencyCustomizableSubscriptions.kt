@@ -5,7 +5,7 @@ import com.lightningkite.lightningserver.definition.builder.MapRegistry
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.builder.getOrRegister
 import com.lightningkite.lightningserver.notifications.Frequency
-import com.lightningkite.lightningserver.notifications.NotificationEventHandler
+import com.lightningkite.lightningserver.notifications.NotificationEndpoints
 import com.lightningkite.lightningserver.notifications.ScheduledSendMethods
 import com.lightningkite.lightningserver.notifications.events.TypedEvent
 import com.lightningkite.lightningserver.notifications.events.TypedEventType
@@ -20,7 +20,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 
 public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UID>>(
     public val info: ModelInfo<USER, NotificationSendMethods<UID>, UserEventType<UID>>
-) : ServerBuilder(), NotificationEventHandler.SubscriptionProvider<USER, UID> {
+) : ServerBuilder(), NotificationEndpoints.Subscriptions<USER, UID> {
     private val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.notifications.subscriptions.FrequencyCustomizableSubscriptions")
 
     private data class EventListener<USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>>(
@@ -55,7 +55,7 @@ public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Compara
 
         val userSpecifiedMethods = info
             .table()
-            .getMany(interested.map { UserEventType(it, event.type.type) })
+            .getMany(interested.map { UserEventType(it, event.type.untyped) })
             .associateBy { it._id.user }
 
         val now = now()
@@ -70,7 +70,7 @@ public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Compara
                     .takeUnless { it.isEmpty() }
                     ?.let { eventListeners ->
                         NotificationSendMethods(
-                            UserEventType(user, event.type.type),
+                            UserEventType(user, event.type.untyped),
                             eventListeners.mapNotNull { it.defaultEmail }.minByOrNull { it.schedule(now) },
                             eventListeners.mapNotNull { it.defaultSms }.minByOrNull { it.schedule(now) },
                             eventListeners.mapNotNull { it.defaultPush }.minByOrNull { it.schedule(now) }
@@ -81,4 +81,16 @@ public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Compara
         logger.error(e) { "Getting event listeners for notification subscriptions" }
         emptyList()
     }
+}
+
+
+context(handler: NotificationEndpoints<USER, UID, *, FrequencyCustomizableSubscriptions<USER, UID>, *>)
+public fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>> TypedEventType<USER, T, ID>.subscribed(
+    defaultEmail: Frequency? = Frequency.immediately(),
+    defaultSms: Frequency? = Frequency.immediately(),
+    defaultPush: Frequency? = Frequency.immediately(),
+    defaultInApp: Frequency? = Frequency.immediately(),
+    generator: suspend context(ServerRuntime) (TypedEvent<USER, T, ID>) -> Set<UID>
+) {
+    handler.subscriptions.addEventListener(this, defaultEmail, defaultSms, defaultPush, defaultInApp, generator)
 }

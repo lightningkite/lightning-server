@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.notifications
 
 import com.lightningkite.lightningserver.notifications.events.Event
 import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.Index
 import com.lightningkite.services.data.IndexSet
 import com.lightningkite.services.database.HasId
 import kotlinx.datetime.DateTimeUnit
@@ -166,11 +167,10 @@ public data class SendInfo(
  */
 @Serializable
 @GenerateDataClassPaths
-@IndexSet(["user", "sendAt",])
 public data class Notification<UID, CONTENT>(
     override val _id: Uuid = Uuid.random(),
     val event: Event,
-    val user: UID,
+    @Index val user: UID,
     val content: CONTENT,
     val createdAt: Instant,
     val read: Instant? = null,

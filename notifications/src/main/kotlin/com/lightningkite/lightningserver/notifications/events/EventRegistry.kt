@@ -72,7 +72,7 @@ public class EventEndpoints<AUTH : HasId<*>?>(
                 val permissions = permissions(this)
 
                 registry.values
-                    .map { it.type }
+                    .map { it.untyped }
                     .filter { permissions.read(it) && query.condition(it) }
                     .map(permissions::mask)
                     .sortedWithNullable(query.orderBy.comparator)

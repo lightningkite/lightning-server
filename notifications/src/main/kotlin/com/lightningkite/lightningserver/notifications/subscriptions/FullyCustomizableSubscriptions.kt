@@ -5,7 +5,7 @@ import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.definition.builder.MapRegistry
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.notifications.NotificationEventHandler
+import com.lightningkite.lightningserver.notifications.NotificationEndpoints
 import com.lightningkite.lightningserver.notifications.ScheduledSendMethods
 import com.lightningkite.lightningserver.notifications.events.EventType
 import com.lightningkite.lightningserver.notifications.events.TypedEvent
@@ -64,7 +64,7 @@ public class FullyCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<
     users: ModelInfo<USER, USER, UID>,
     private val principal: PrincipalType<USER, UID>,
     private val events: Map<String, TypedEventType<USER, *, *>>
-) : NotificationEventHandler.SubscriptionProvider<USER, UID>, ServerBuilder() {
+) : NotificationEndpoints.Subscriptions<USER, UID>, ServerBuilder() {
     public val info: ModelInfo<USER, NotificationEventSubscription<UID>, UserEventType<UID>> =
         object : ModelInfo<USER, NotificationEventSubscription<UID>, UserEventType<UID>> by info {
             context(server: ServerRuntime)
@@ -123,7 +123,7 @@ public class FullyCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<
         ): NotificationEventSubscription<UID>? =
             subscription(user)?.let {
                 NotificationEventSubscription(
-                    UserEventType(user._id, eventType.type),
+                    UserEventType(user._id, eventType.untyped),
                     requestedFilter = server.internalSerialization.json.encodeToString(
                         eventType.conditionSerializer,
                         it.filter
@@ -156,7 +156,7 @@ public class FullyCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<
     override suspend fun <T : HasId<ID>, ID : Comparable<ID>> subscribed(event: TypedEvent<USER, T, ID>): List<ScheduledSendMethods<UID>> =
         info
             .table()
-            .find(self._id.type eq event.type.type)
+            .find(self._id.type eq event.type.untyped)
             .filter {
                 try {
                     val subscribedCondition = Condition.And(
@@ -199,7 +199,7 @@ public class FullyCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<
 
         val toRemove = defaults.flatMapTo(ArrayList()) { subscription ->
             deleted.map {
-                UserEventType(it._id, subscription.eventType.type)
+                UserEventType(it._id, subscription.eventType.untyped)
             }
         }
 
@@ -208,7 +208,7 @@ public class FullyCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<
                 for (default in defaults.filter { it.behavior == DefaultSubscriptionUpdateBehavior.UpdateRetainingUserChanges }) {
                     for (change in changed) {
                         val user = change.new ?: continue
-                        put(UserEventType(user._id, default.eventType.type), change.map { default(principal, it) })
+                        put(UserEventType(user._id, default.eventType.untyped), change.map { default(principal, it) })
                     }
                 }
             }
@@ -260,7 +260,7 @@ public class FullyCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<
                 for (default in defaults.filter { it.behavior == DefaultSubscriptionUpdateBehavior.UpdateReadPermissions }) {
                     for ((_, new) in changed) {
                         if (new == null) continue
-                        put(UserEventType(new._id, default.eventType.type), default.readPermissions(principal, new))
+                        put(UserEventType(new._id, default.eventType.untyped), default.readPermissions(principal, new))
                     }
                 }
             }
@@ -276,7 +276,7 @@ public class FullyCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<
             for (default in defaults.filter { it.behavior == DefaultSubscriptionUpdateBehavior.ReplaceExistingWithDefault }) {
                 for ((_, new) in changed) {
                     if (new == null) continue
-                    put(UserEventType(new._id, default.eventType.type), default(principal, new))
+                    put(UserEventType(new._id, default.eventType.untyped), default(principal, new))
                 }
             }
         }

@@ -4,16 +4,13 @@ import com.lightningkite.lightningserver.definition.builder.ListRegistry
 import com.lightningkite.lightningserver.definition.builder.MapRegistry
 import com.lightningkite.lightningserver.definition.builder.getOrRegister
 import com.lightningkite.lightningserver.notifications.Frequency
-import com.lightningkite.lightningserver.notifications.NotificationEventHandler
+import com.lightningkite.lightningserver.notifications.NotificationEndpoints
 import com.lightningkite.lightningserver.notifications.ScheduledSendMethods
 import com.lightningkite.lightningserver.notifications.events.TypedEvent
 import com.lightningkite.lightningserver.notifications.events.TypedEventType
-import com.lightningkite.lightningserver.notifications.events.UserEventType
-import com.lightningkite.lightningserver.notifications.subscriptions.FrequencyCustomizableSubscriptions.EventListener
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.getMany
 import io.github.oshai.kotlinlogging.KLogger
 import io.github.oshai.kotlinlogging.KotlinLogging
 
@@ -34,7 +31,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
  * @param USER The user type
  * @param UID The user ID type
  */
-public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UID>> : NotificationEventHandler.SubscriptionProvider<USER, UID> {
+public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UID>> : NotificationEndpoints.Subscriptions<USER, UID> {
     private val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.notifications.subscriptions.NonCustomizableSubscriptions")
 
     private class SendMethodsGenerator<USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>>(

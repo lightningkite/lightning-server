@@ -20,12 +20,12 @@ import kotlin.uuid.Uuid
  * @param USER The user type (nullable for public events)
  * @param T The subject entity type
  * @param ID The ID type of the subject entity
- * @property type The untyped event type (name and tags)
+ * @property untyped The untyped event type (name and tags)
  * @property info Model information for the subject entity
  * @property conditionSerializer Serializer for type-safe conditions on the subject entity
  */
 public class TypedEventType<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
-    public val type: EventType,
+    public val untyped: EventType,
     public val info: ModelInfo<USER, T, ID>,
     registry: EventRegistry<USER>
 ) {
@@ -36,8 +36,8 @@ public class TypedEventType<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>
         registry: EventRegistry<USER>
     ) : this(EventType(name, tags), info, registry)
 
-    public val name: String get() = type.name
-    public val tags: Set<String> get() = type.tags
+    public val name: String get() = untyped.name
+    public val tags: Set<String> get() = untyped.tags
 
     override fun toString(): String = name
 
@@ -80,7 +80,7 @@ public data class TypedEvent<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID
     public fun toEvent(json: Json): Event = Event(
         _id = _id,
         timestamp = time,
-        type = type.type,
+        type = type.untyped,
         subject = json.encodeToString(type.info.idSerializer, subject._id)
     )
 

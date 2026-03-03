@@ -19,6 +19,9 @@ import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebso
 import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebsocket.Companion.plus
 import com.lightningkite.lightningserver.typed.ModelRestUpdatesWebsocket
 import com.lightningkite.lightningserver.typed.explicitModelInfo
+import com.lightningkite.lightningserver.typed.sdk.SdkModule
+import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
+import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.database.Condition
@@ -88,13 +91,17 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
     public val info: ModelInfo<USER, Notification<UID, CONTENT>, Uuid>,
     public val cache: Runtime<Cache>,
     database: Runtime<Database>,
-    public val users: ModelInfo<USER, USER, UID>,
+    public val users: ModelInfo<*, USER, UID>,
     public val contentSerializer: KSerializer<CONTENT>,
     public val email: (Runtime<EmailService>)? = null,
     public val sms: (Runtime<SMS>)? = null,
     public val push: (Runtime<NotificationService>)? = null,
     public val timeout: Duration = 5.minutes,
-): ServerBuilder(), NotificationEventHandler.Dispatcher<UID, CONTENT> {
+): ServerBuilder(), NotificationEndpoints.Dispatcher<UID, CONTENT> {
+    init {
+        sdkSettings.defaultInfo = SdkModule.Info("NotificationsApi")
+    }
+
     context(server: ServerRuntime) public abstract suspend fun email(user: USER): EmailAddress?
     context(server: ServerRuntime) public abstract suspend fun phone(user: USER): PhoneNumber?
     context(server: ServerRuntime) public abstract suspend fun fcmTokens(user: USER): Set<String>

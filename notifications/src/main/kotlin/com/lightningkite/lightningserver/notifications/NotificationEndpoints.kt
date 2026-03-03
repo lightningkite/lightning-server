@@ -1,6 +1,8 @@
 package com.lightningkite.lightningserver.notifications
 
 import com.lightningkite.lightningserver.definition.builder.MapRegistry
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.notifications.events.EventEndpoints
 import com.lightningkite.lightningserver.notifications.events.EventHandler
 import com.lightningkite.lightningserver.notifications.events.EventRegistry
 import com.lightningkite.lightningserver.notifications.events.TypedEvent
@@ -13,17 +15,18 @@ import com.lightningkite.services.database.getMany
 import io.github.oshai.kotlinlogging.KLogger
 import io.github.oshai.kotlinlogging.KotlinLogging
 
-internal typealias ContentGenerator<T, USER, CONTENT> = suspend context(ServerRuntime) (T) -> (USER) -> CONTENT
-
-public open class NotificationEventHandler<USER : HasId<UID>, UID : Comparable<UID>, CONTENT>(
-    private val users: ModelInfo<*, USER, UID>,
-    public val dispatcher: Dispatcher<UID, CONTENT>,
-    public val subscriptions: SubscriptionProvider<USER, UID>,
+public abstract class NotificationEndpoints<
+        USER : HasId<UID>,
+        UID : Comparable<UID>,
+        CONTENT,
+        SUBS : NotificationEndpoints.Subscriptions<USER, UID>,
+        DISPATCH : NotificationEndpoints.Dispatcher<UID, CONTENT>
+>(
     override val registry: EventRegistry<USER> = EventRegistry(),
-) : EventHandler<USER> {
+) : EventHandler<USER>, ServerBuilder() {
     internal val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.notifications.NotificationEventHandler")
 
-    public interface SubscriptionProvider<USER : HasId<UID>, UID : Comparable<UID>> {
+    public interface Subscriptions<USER : HasId<UID>, UID : Comparable<UID>> {
         context(runtime: ServerRuntime)
         public suspend fun <T : HasId<ID>, ID : Comparable<ID>> subscribed(event: TypedEvent<USER, T, ID>): List<ScheduledSendMethods<UID>>
     }
@@ -33,23 +36,29 @@ public open class NotificationEventHandler<USER : HasId<UID>, UID : Comparable<U
         public suspend fun dispatch(notifications: List<Notification<UID, CONTENT>>)
     }
 
+    public abstract val users: ModelInfo<*, USER, UID>
+
+    public abstract val dispatcher: DISPATCH
+    public abstract val subscriptions: SUBS
+
     // _____Content Generators_____
     // These translate events into CONTENT
 
-    private val contentGenerators = MapRegistry<String, ContentGenerator<*, USER, CONTENT>>()
+    private val contentGenerators = MapRegistry<String, suspend context(ServerRuntime) (TypedEvent<USER, *, *>) -> (USER) -> CONTENT>()
 
     @Suppress("UNCHECKED_CAST")
     context(_: ServerRuntime)
-    private suspend fun <T : HasId<*>> TypedEvent<USER, T, *>.content() =
+    private suspend fun <T : HasId<ID>, ID : Comparable<ID>> TypedEvent<USER, T, ID>.content() =
         contentGenerators[type.name]
-            ?.let { (it as ContentGenerator<T, USER, CONTENT>)(subject) }
+            ?.let { (it as suspend context(ServerRuntime) (TypedEvent<USER, T, ID>) -> (USER) -> CONTENT)(this) }
             ?: throw NoSuchElementException("Event ${type.name} has no content generator")
 
-    public fun <T : HasId<*>> setContent(
-        event: TypedEventType<USER, T, *>,
-        generator: suspend context(ServerRuntime) (T) -> (USER) -> CONTENT
+    public fun <T : HasId<ID>, ID : Comparable<ID>> setContent(
+        event: TypedEventType<USER, T, ID>,
+        generator: suspend context(ServerRuntime) (TypedEvent<USER, T, ID>) -> (USER) -> CONTENT
     ) {
-        contentGenerators.register(event.name, generator)
+        @Suppress("UNCHECKED_CAST")
+        contentGenerators.register(event.name, generator as suspend context(ServerRuntime) (TypedEvent<USER, *, *>) -> (USER) -> CONTENT)
     }
 
     context(runtime: ServerRuntime)
@@ -97,9 +106,9 @@ public open class NotificationEventHandler<USER : HasId<UID>, UID : Comparable<U
     }
 }
 
-context(handler: NotificationEventHandler<USER, UID, CONTENT>)
-public fun <USER : HasId<UID>, UID : Comparable<UID>, CONTENT, T : HasId<*>> TypedEventType<USER, T, *>.content(
-    generator: suspend context(ServerRuntime) (T) -> (USER) -> CONTENT
+context(handler: NotificationEndpoints<USER, UID, CONTENT, *, *>)
+public fun <USER : HasId<UID>, UID : Comparable<UID>, CONTENT, T : HasId<ID>, ID : Comparable<ID>> TypedEventType<USER, T, ID>.content(
+    generator: suspend context(ServerRuntime) (TypedEvent<USER, T, ID>) -> (USER) -> CONTENT
 ) {
     handler.setContent(this, generator)
 }
