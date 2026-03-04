@@ -187,10 +187,16 @@ class SyntaxTest {
             runBlocking {
                 User.info.table().insertOne(User(Uuid.random()))
 
+                // Count all users - the subscriber notifies ALL users in the shared in-memory DB,
+                // which may include users from other tests sharing this Server singleton.
+                val userCount = User.info.table().count(Condition.Always)
+                val smsCountBefore = testSms.messageHistory.size
+                val emailCountBefore = testEmail.sentEmails.size
+
                 modelEndpoints.info.table().insertOne(Model())
 
-                assertEquals(1, testSms.messageHistory.size, "Failed at sms")
-                assertEquals(1, testEmail.sentEmails.size, "Failed at email")
+                assertEquals(userCount, testSms.messageHistory.size - smsCountBefore, "Failed at sms")
+                assertEquals(userCount, testEmail.sentEmails.size - emailCountBefore, "Failed at email")
             }
         }
     }
@@ -213,11 +219,14 @@ class SyntaxTest {
             runBlocking {
                 User.info.table().insertOne(User(Uuid.random()))
 
+                val userCount = User.info.table().count(Condition.Always)
+                val smsCountBefore = testSms.messageHistory.size
+                val emailCountBefore = testEmail.sentEmails.size
+
                 modelEndpoints.info.table().insertOne(Model())
 
-
-                assertEquals(1, testSms.messageHistory.size, "Failed at sms")
-                assertEquals(1, testEmail.sentEmails.size, "Failed at email")
+                assertEquals(userCount, testSms.messageHistory.size - smsCountBefore, "Failed at sms")
+                assertEquals(userCount, testEmail.sentEmails.size - emailCountBefore, "Failed at email")
             }
         }
     }
