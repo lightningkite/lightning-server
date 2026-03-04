@@ -36,6 +36,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Clock
+import kotlin.time.Instant
+import kotlin.time.TimeSource
 import kotlin.uuid.Uuid
 
 class SyntaxTest {
@@ -68,18 +71,7 @@ class SyntaxTest {
         }
     }
 
-    private object Notifications : NotificationEndpoints<
-            User, Uuid,
-            String,
-            NotificationBulkDispatcher<User, Uuid, String>,
-            FrequencyCustomizableSubscriptions<User, Uuid>,
-    >(
-        users = User.info,
-        dispatcher = Dispatcher,
-        subscriptions = FrequencyCustomizableSubscriptions(
-            info = Server.database.testModelInfo()
-        )
-    ) {
+    private object Notifications : ServerBuilder() {
         object Dispatcher : NotificationBulkDispatcher<User, Uuid, String>(
             info = Server.database.testModelInfo(),
             cache = Server.cache,
@@ -118,6 +110,14 @@ class SyntaxTest {
                 notifications: List<Notification<Uuid, String>>
             ): List<NotificationData> = emptyList()
         }
+
+        val handler = path include NotificationEndpoints(
+            User.info,
+            Dispatcher,
+            FrequencyCustomizableSubscriptions(
+                info = Server.database.testModelInfo()
+            )
+        )
     }
 
     @Serializable
@@ -139,7 +139,7 @@ class SyntaxTest {
             }
         )
 
-        val somethingCreated = Notifications.event("Model Created", info) { notif ->
+        val somethingCreated = Notifications.handler.event("Model Created", info) { notif ->
             notif.subscribed {
                 users.table().all().map { it._id }.toSet()
             }
@@ -150,7 +150,7 @@ class SyntaxTest {
             }
         }
 
-        val somethingDeleted = Notifications.event("Model Deleted", info) { notif ->
+        val somethingDeleted = Notifications.handler.event("Model Deleted", info) { notif ->
             notif.subscribed {
                 users.table().all().map { it._id }.toSet()
             }
@@ -162,15 +162,25 @@ class SyntaxTest {
         }
     }
 
+    object TestClock : Clock {
+        var measuredFrom: Instant = Clock.System.now()
+        var mark = TimeSource.Monotonic.markNow()
+
+        override fun now(): Instant = measuredFrom + mark.elapsedNow()
+    }
+
     @Test
     fun testCompiles() {
         var testSms: TestSMS? = null
         var testEmail: TestEmailService? = null
 
-        Server.test({ context ->
-            sms setStatic TestSMS("sms", context).also { testSms = it }
-            email setStatic TestEmailService("email", context).also { testEmail = it }
-        }) {
+        Server.test(
+            settings = { context ->
+                sms setStatic TestSMS("sms", context).also { testSms = it }
+                email setStatic TestEmailService("email", context).also { testEmail = it }
+            },
+            clock = { TestClock }
+        ) {
             testSms!!
             testEmail!!
 
@@ -178,6 +188,33 @@ class SyntaxTest {
                 User.info.table().insertOne(User(Uuid.random()))
 
                 modelEndpoints.info.table().insertOne(Model())
+
+                assertEquals(1, testSms.messageHistory.size, "Failed at sms")
+                assertEquals(1, testEmail.sentEmails.size, "Failed at email")
+            }
+        }
+    }
+
+    @Test
+    fun testTimeTravel() {
+        var testSms: TestSMS? = null
+        var testEmail: TestEmailService? = null
+
+        Server.test(
+            settings = { context ->
+                sms setStatic TestSMS("sms", context).also { testSms = it }
+                email setStatic TestEmailService("email", context).also { testEmail = it }
+            },
+            clock = { TestClock }
+        ) {
+            testSms!!
+            testEmail!!
+
+            runBlocking {
+                User.info.table().insertOne(User(Uuid.random()))
+
+                modelEndpoints.info.table().insertOne(Model())
+
 
                 assertEquals(1, testSms.messageHistory.size, "Failed at sms")
                 assertEquals(1, testEmail.sentEmails.size, "Failed at email")

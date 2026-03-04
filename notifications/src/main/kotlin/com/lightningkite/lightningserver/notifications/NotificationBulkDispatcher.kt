@@ -93,7 +93,7 @@ import kotlin.uuid.Uuid
  *   scheduled notifications, and returns the formatted and bulked list of method-specific send formats.
  */
 public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Comparable<UID>, CONTENT>(
-    public val info: ModelInfo<USER, Notification<UID, CONTENT>, Uuid>,
+    public val info: ModelInfo<*, Notification<UID, CONTENT>, Uuid>,
     public val cache: Runtime<Cache>,
     database: Runtime<Database>,
     public val users: ModelInfo<*, USER, UID>,
@@ -202,8 +202,8 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
      * REST and WebSocket endpoints for managing notifications.
      * Mounted at `/rest`. Provides CRUD operations and real-time updates for notifications.
      */
-    public val rest: ModelRestEndpointsAndUpdatesWebsocket<USER, Notification<UID, CONTENT>, Uuid> =
-        path.path("rest") include ModelRestEndpoints(info) + ModelRestUpdatesWebsocket(info, websocketKey)
+    public val rest: ModelRestEndpointsAndUpdatesWebsocket<*, Notification<UID, CONTENT>, Uuid> =
+        path.path("rest") include ModelRestEndpointsAndUpdatesWebsocket(info, websocketKey)
 
     //_____Refreshing and sending notifications_____
     // Notifications are created with a 'sendAt' time, this specifies when the notification should be sent

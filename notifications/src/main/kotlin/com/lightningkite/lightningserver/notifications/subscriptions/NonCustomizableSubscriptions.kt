@@ -15,7 +15,7 @@ import com.lightningkite.services.database.HasId
 import io.github.oshai.kotlinlogging.KLogger
 import io.github.oshai.kotlinlogging.KotlinLogging
 
-private typealias SendMethodsGenerator<USER, UID, T, ID> = suspend context(ServerRuntime) (Event<USER, T, ID>) -> List<ScheduledSendMethods<UID>>
+private typealias SendMethodsGenerator<UID, T, ID> = suspend context(ServerRuntime) (Event<T, ID>) -> List<ScheduledSendMethods<UID>>
 
 /**
  * Subscription provider where all subscription logic is defined programmatically.
@@ -35,9 +35,9 @@ private typealias SendMethodsGenerator<USER, UID, T, ID> = suspend context(Serve
  * @param UID The user ID type
  */
 public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UID>> : NotificationEndpoints.Subscriptions<USER, UID> {
-    private val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.notifications.subscriptions.NonCustomizableSubscriptions")
+//    private val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.notifications.subscriptions.NonCustomizableSubscriptions")
 
-    private val eventListeners = MapRegistry<String, ListRegistry<SendMethodsGenerator<USER, UID, *, *>>>()
+    private val eventListeners = MapRegistry<String, SendMethodsGenerator<UID, *, *>>()
 
     /**
      * Registers an event listener with full control over subscription configuration.
@@ -49,11 +49,11 @@ public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UI
      * @param interested Function that determines interested users and their notification preferences
      */
     public fun <T : HasId<ID>, ID : Comparable<ID>> setSubscribedDirect(
-        type: EventDefinition<USER, T, ID>,
-        interested: suspend context(ServerRuntime) (Event<USER, T, ID>) -> List<ScheduledSendMethods<UID>>
+        type: EventDefinition<T, ID>,
+        interested: suspend context(ServerRuntime) (Event<T, ID>) -> List<ScheduledSendMethods<UID>>
     ) {
         @Suppress("UNCHECKED_CAST")
-        eventListeners.getOrRegister(type.name, ::ListRegistry).register(interested as SendMethodsGenerator<USER, UID, *, *>)
+        eventListeners.register(type.name, interested as SendMethodsGenerator<UID, *, *>)
     }
 
     /**
@@ -70,12 +70,12 @@ public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UI
      * @param interested Function that determines which user IDs should be notified
      */
     public inline fun <T : HasId<ID>, ID : Comparable<ID>> setSubscribed(
-        type: EventDefinition<USER, T, ID>,
+        type: EventDefinition<T, ID>,
         email: Frequency? = Frequency.immediately(),
         sms: Frequency? = Frequency.immediately(),
         push: Frequency? = Frequency.immediately(),
         inApp: Frequency? = Frequency.immediately(),
-        crossinline interested: suspend context(ServerRuntime) (Event<USER, T, ID>) -> Set<UID>
+        crossinline interested: suspend context(ServerRuntime) (Event<T, ID>) -> Set<UID>
     ) {
         setSubscribedDirect(type) { event ->
             interested(event).map {
@@ -96,8 +96,8 @@ public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UI
      */
     @Suppress("UNCHECKED_CAST")
     context(runtime: ServerRuntime)
-    override suspend fun <T : HasId<ID>, ID : Comparable<ID>> subscribed(event: Event<USER, T, ID>): List<ScheduledSendMethods<UID>> {
-        val listeners = eventListeners[event.type.name]?.let { it as List<SendMethodsGenerator<USER, UID, T, ID>> } ?: return emptyList()
+    override suspend fun <T : HasId<ID>, ID : Comparable<ID>> subscribed(event: Event<T, ID>): List<ScheduledSendMethods<UID>> {
+        val listeners = eventListeners[event.type.name]?.let { it as List<SendMethodsGenerator<UID, T, ID>> } ?: return emptyList()
 
         val interested = listeners.flatMap { it(event) }.groupBy { it.user }
 
@@ -115,7 +115,7 @@ public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UI
     }
 
     context(runtime: ServerRuntime)
-    override suspend fun verifyAllDependencies(registry: EventRegistry<*>) {
+    override suspend fun verifyAllDependencies(registry: EventRegistry) {
         require(eventListeners.keys.containsAll(registry.keys)) {
             val missing = registry.keys - eventListeners.keys
             "Subscriptions are missing for (${missing.size}) event definitions: $missing"
@@ -149,8 +149,8 @@ public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UI
  * @param interested Function that returns the list of users and their notification preferences
  */
 context(handler: NotificationEndpoints<USER, UID, *, *, NonCustomizableSubscriptions<USER, UID>>)
-public fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>> EventDefinition<USER, T, ID>.subscribedDirect(
-    interested: suspend context(ServerRuntime) (Event<USER, T, ID>) -> List<ScheduledSendMethods<UID>>
+public fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>> EventDefinition<T, ID>.subscribedDirect(
+    interested: suspend context(ServerRuntime) (Event<T, ID>) -> List<ScheduledSendMethods<UID>>
 ) {
     handler.subscriptions.setSubscribedDirect(this, interested)
 }
@@ -179,12 +179,12 @@ public fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Compar
  * @param interested Function that returns the set of user IDs to notify
  */
 context(handler: NotificationEndpoints<USER, UID, *, *, NonCustomizableSubscriptions<USER, UID>>)
-public inline fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>> EventDefinition<USER, T, ID>.subscribed(
+public inline fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>> EventDefinition<T, ID>.subscribed(
     email: Frequency? = Frequency.immediately(),
     sms: Frequency? = Frequency.immediately(),
     push: Frequency? = Frequency.immediately(),
     inApp: Frequency? = Frequency.immediately(),
-    crossinline interested: suspend context(ServerRuntime) (Event<USER, T, ID>) -> Set<UID>
+    crossinline interested: suspend context(ServerRuntime) (Event<T, ID>) -> Set<UID>
 ) {
     handler.subscriptions.setSubscribed(this, email, sms, push, inApp, interested)
 }

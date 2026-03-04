@@ -17,23 +17,22 @@ import kotlin.uuid.Uuid
  * with the provided registry during construction. Each event type has associated model
  * information that enables type-safe filtering and serialization.
  *
- * @param USER The user type (nullable for public events)
  * @param T The subject entity type
  * @param ID The ID type of the subject entity
  * @property untyped The untyped event type (name and tags)
  * @property info Model information for the subject entity
  * @property conditionSerializer Serializer for type-safe conditions on the subject entity
  */
-public class EventDefinition<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
+public class EventDefinition<T : HasId<ID>, ID : Comparable<ID>>(
     public val untyped: EventType,
-    public val info: ModelInfo<USER, T, ID>,
-    registry: EventRegistry<USER>
+    public val info: ModelInfo<*, T, ID>,
+    registry: EventRegistry
 ) {
     public constructor(
         name: String,
         tags: Set<String>,
-        info: ModelInfo<USER, T, ID>,
-        registry: EventRegistry<USER>
+        info: ModelInfo<*, T, ID>,
+        registry: EventRegistry
     ) : this(EventType(name, tags), info, registry)
 
     public val name: String get() = untyped.name
@@ -56,7 +55,6 @@ public class EventDefinition<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID
  * enabling type-safe operations in application code. Can be converted to an
  * untyped [EventData] for database storage.
  *
- * @param USER The user type (nullable for public events)
  * @param T The subject entity type
  * @param ID The ID type of the subject entity
  * @property _id Unique identifier for this event occurrence
@@ -64,10 +62,10 @@ public class EventDefinition<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID
  * @property type The event type definition
  * @property subject The actual subject entity (not just its ID)
  */
-public data class Event<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
+public data class Event<T : HasId<ID>, ID : Comparable<ID>>(
     override val _id: Uuid,
     val time: Instant,
-    val type: EventDefinition<USER, T, ID>,
+    val type: EventDefinition<T, ID>,
     val subject: T
 ): HasId<Uuid> {
     /**
@@ -98,7 +96,7 @@ public data class Event<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
  * @param subject The subject entity that this event relates to
  */
 context(server: ServerRuntime)
-public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> Event(
-    type: EventDefinition<USER, T, ID>,
+public fun <T : HasId<ID>, ID : Comparable<ID>> Event(
+    type: EventDefinition<T, ID>,
     subject: T
-): Event<USER, T, ID> = Event(Uuid.random(), now(), type, subject)
+): Event<T, ID> = Event(Uuid.random(), now(), type, subject)

@@ -4,7 +4,6 @@ import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
 import com.lightningkite.lightningserver.settings.ServerSettings
@@ -211,9 +210,10 @@ public class TestRunner<SERVER: ServerBuilder> @Deprecated("Please use SERVER.te
  */
 public inline fun <SERVER: ServerBuilder> SERVER.test(
     settings: context(ServerSettings) SERVER.(SettingContext) -> Unit,
+    noinline clock: () -> Clock = { Clock.System },
     action: context(TestRunner<SERVER>) SERVER.()->Unit
 ) {
-    @Suppress("DEPRECATION") val runner = TestRunner(this)
+    @Suppress("DEPRECATION") val runner = TestRunner(this, clock)
     with(runner) {
         context(this.settings) { settings(this@test, runner) }
         this.settings.readyUsingDefaults()

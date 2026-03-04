@@ -11,6 +11,7 @@ import com.lightningkite.lightningserver.notifications.events.Event
 import com.lightningkite.lightningserver.notifications.events.EventDefinition
 import com.lightningkite.lightningserver.notifications.events.EventEndpoints
 import com.lightningkite.lightningserver.notifications.events.EventHandler
+import com.lightningkite.lightningserver.notifications.events.EventLauncher
 import com.lightningkite.lightningserver.notifications.events.EventRegistry
 import com.lightningkite.lightningserver.notifications.events.EventType
 import com.lightningkite.lightningserver.notifications.subscriptions.FrequencyCustomizableSubscriptions
@@ -110,8 +111,8 @@ public open class NotificationEndpoints<
     public val users: ModelInfo<*, USER, UID>,
     public val dispatcher: DISPATCH,
     public val subscriptions: SUBS,
-    override val registry: EventRegistry<USER> = EventRegistry()
-) : EventHandler<USER>, ServerBuilder() {
+    override val registry: EventRegistry = EventRegistry()
+) : EventHandler, ServerBuilder() {
     internal val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.notifications.NotificationEndpoints")
 
     /**
@@ -126,11 +127,11 @@ public open class NotificationEndpoints<
     }
 
     context(runtime: ServerRuntime)
-    override suspend fun <T : HasId<ID>, ID : Comparable<ID>> handle(event: Event<USER, T, ID>) {
+    override suspend fun <T : HasId<ID>, ID : Comparable<ID>> handle(event: Event<T, ID>) {
         try {
             logger.debug { "Event Occurred: $event" }
 
-            val content = content.getContent(event)
+            val content = content.getContent(event.type)(event)
 
             val now = now()
 
@@ -163,7 +164,6 @@ public open class NotificationEndpoints<
             }
 
             dispatcher.dispatch(notifications)
-
         } catch (e: Exception) {
             logger.error(e) { "Exception occurred when handling event $event" }
         }
@@ -214,7 +214,7 @@ public open class NotificationEndpoints<
          * @throws IllegalArgumentException if any required configuration is missing
          */
         context(runtime: ServerRuntime)
-        public suspend fun verifyAllDependencies(registry: EventRegistry<*>) {}
+        public suspend fun verifyAllDependencies(registry: EventRegistry) {}
     }
 
     /**
@@ -243,7 +243,7 @@ public open class NotificationEndpoints<
          * @return List of user IDs with their preferred delivery frequencies per channel
          */
         context(runtime: ServerRuntime)
-        public suspend fun <T : HasId<ID>, ID : Comparable<ID>> subscribed(event: Event<USER, T, ID>): List<ScheduledSendMethods<UID>>
+        public suspend fun <T : HasId<ID>, ID : Comparable<ID>> subscribed(event: Event<T, ID>): List<ScheduledSendMethods<UID>>
     }
 
     /**
@@ -286,7 +286,7 @@ public open class NotificationEndpoints<
      * @param CONTENT The notification content type (application-specific)
      */
     public class ContentRegistry<USER : HasId<UID>, UID : Comparable<UID>, CONTENT> : ServerBuilder(), DefinitionDependency {
-        private val contentGenerators = MapRegistry<String, suspend context(ServerRuntime) (Event<USER, *, *>) -> (USER) -> CONTENT>()
+        private val contentGenerators = MapRegistry<String, suspend context(ServerRuntime) (Event<*, *>) -> (USER) -> CONTENT>()
 
         /**
          * Retrieves the content generator for an event and produces user-specific content.
@@ -297,10 +297,10 @@ public open class NotificationEndpoints<
          */
         @Suppress("UNCHECKED_CAST")
         context(_: ServerRuntime)
-        public suspend fun <T : HasId<ID>, ID : Comparable<ID>> getContent(event: Event<USER, T, ID>): (USER) -> CONTENT =
-            contentGenerators[event.type.name]
-                ?.let { (it as suspend context(ServerRuntime) (Event<USER, T, ID>) -> (USER) -> CONTENT)(event) }
-                ?: throw NoSuchElementException("Event ${event.type.name} has no content generator")
+        public fun <T : HasId<ID>, ID : Comparable<ID>> getContent(event: EventDefinition<T, ID>): suspend context(ServerRuntime) (Event<T, ID>) -> (USER) -> CONTENT =
+            contentGenerators[event.name]
+                ?.let { (it as suspend context(ServerRuntime) (Event<T, ID>) -> (USER) -> CONTENT) }
+                ?: throw NoSuchElementException("Event ${event.name} has no content generator")
 
         /**
          * Registers a content generator for an event type.
@@ -313,15 +313,15 @@ public open class NotificationEndpoints<
          * @param generator Function that takes an event and returns a user-to-content function
          */
         public fun <T : HasId<ID>, ID : Comparable<ID>> setContent(
-            event: EventDefinition<USER, T, ID>,
-            generator: suspend context(ServerRuntime) (Event<USER, T, ID>) -> (USER) -> CONTENT
+            event: EventDefinition<T, ID>,
+            generator: suspend context(ServerRuntime) (Event<T, ID>) -> (USER) -> CONTENT
         ) {
             @Suppress("UNCHECKED_CAST")
-            contentGenerators.register(event.name, generator as suspend context(ServerRuntime) (Event<USER, *, *>) -> (USER) -> CONTENT)
+            contentGenerators.register(event.name, generator as suspend context(ServerRuntime) (Event<*, *>) -> (USER) -> CONTENT)
         }
 
         context(runtime: ServerRuntime)
-        override suspend fun verifyAllDependencies(registry: EventRegistry<*>) {
+        override suspend fun verifyAllDependencies(registry: EventRegistry) {
             require(contentGenerators.keys.containsAll(registry.keys)) {
                 val missing = registry.keys - contentGenerators.keys
                 "Content is missing for (${missing.size}) event definitions: $missing"
@@ -351,8 +351,15 @@ public open class NotificationEndpoints<
  * @param generator Function that takes an event and returns a user-to-content function
  */
 context(handler: NotificationEndpoints<USER, UID, CONTENT, *, *>)
-public fun <USER : HasId<UID>, UID : Comparable<UID>, CONTENT, T : HasId<ID>, ID : Comparable<ID>> EventDefinition<USER, T, ID>.content(
-    generator: suspend context(ServerRuntime) (Event<USER, T, ID>) -> (USER) -> CONTENT
+public fun <USER : HasId<UID>, UID : Comparable<UID>, CONTENT, T : HasId<ID>, ID : Comparable<ID>> EventDefinition<T, ID>.content(
+    generator: suspend context(ServerRuntime) (Event<T, ID>) -> (USER) -> CONTENT
 ) {
     handler.content.setContent(this, generator)
 }
+
+context(_: ServerRuntime)
+public inline val <USER, UID, T, ID, CONTENT, H> EventLauncher<H, T, ID>.content: suspend context(ServerRuntime) (Event<T, ID>) -> (USER) -> CONTENT
+where USER : HasId<UID>, UID : Comparable<UID>,
+      T : HasId<ID>, ID : Comparable<ID>,
+      H : NotificationEndpoints<USER, UID, CONTENT, *, *>
+    get() = handler.content.getContent(this.event)
