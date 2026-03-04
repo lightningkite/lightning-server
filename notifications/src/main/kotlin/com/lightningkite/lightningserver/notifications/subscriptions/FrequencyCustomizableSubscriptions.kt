@@ -24,6 +24,31 @@ import com.lightningkite.services.database.getMany
 import io.github.oshai.kotlinlogging.KLogger
 import io.github.oshai.kotlinlogging.KotlinLogging
 
+/**
+ * Subscription provider allowing users to customize delivery frequencies only.
+ *
+ * This is a middle-ground subscription model where:
+ * - The application determines which users are interested in each event (via [setSubscribers])
+ * - Users can customize when they receive notifications (immediately, daily digest, weekly, etc.)
+ * - Users cannot customize filter conditions
+ *
+ * This is useful when the business logic for determining interested users is complex and
+ * should be controlled by the application, but users should still be able to control
+ * notification frequency.
+ *
+ * ## How It Works
+ * 1. Register event listeners with [setSubscribers] that determine interested users and default frequencies
+ * 2. Users can override frequencies via the REST API
+ * 3. When an event occurs, the system queries listeners for interested users, then applies user preferences
+ *
+ * ## Endpoints
+ * - REST API at `/rest` for managing delivery frequencies
+ * - WebSocket for real-time subscription updates
+ *
+ * @param USER The user type
+ * @param UID The user ID type
+ * @property info Model information for subscription storage and permissions
+ */
 public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UID>>(
     public val info: ModelInfo<USER, NotificationSendMethods<UID>, UserEventType<UID>>,
     websocketKey: SerializableProperty<NotificationSendMethods<UID>, *>? = info.serializer.fieldInApp
@@ -41,6 +66,21 @@ public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Compara
 
     private val eventListeners = MapRegistry<String, ListRegistry<EventListener<USER, UID, *, *>>>()
 
+    /**
+     * Registers an event listener that determines interested users and default frequencies.
+     *
+     * Multiple listeners can be registered for the same event type. When an event occurs,
+     * all listeners are invoked and their interested users are merged. If multiple listeners
+     * specify different frequencies for the same user and channel, the earliest scheduled
+     * time is used.
+     *
+     * @param type The event type to listen for
+     * @param defaultEmail Default email delivery frequency (null to disable)
+     * @param defaultSms Default SMS delivery frequency (null to disable)
+     * @param defaultPush Default push notification delivery frequency (null to disable)
+     * @param defaultInApp Default in-app notification delivery frequency (null to disable)
+     * @param interested Function that returns the set of user IDs interested in the event
+     */
     public fun <T : HasId<ID>, ID : Comparable<ID>> setSubscribers(
         type: EventDefinition<USER, T, ID>,
         defaultEmail: Frequency? = Frequency.immediately(),
@@ -97,10 +137,38 @@ public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Compara
         }
     }
 
+    /**
+     * REST and WebSocket endpoints for managing delivery frequency preferences.
+     * Mounted at `/rest`. Provides CRUD operations and real-time updates for preferences.
+     */
     public val rest: ModelRestEndpointsAndUpdatesWebsocket<USER, NotificationSendMethods<UID>, UserEventType<UID>> =
         path.path("rest") include ModelRestEndpoints(info) + ModelRestUpdatesWebsocket(info, websocketKey)
 }
 
+/**
+ * DSL function to register a subscriber generator for this event type.
+ *
+ * The generator function determines which users should be notified when this event occurs.
+ * All matched users receive notifications with the specified default frequencies unless
+ * they have customized their preferences.
+ *
+ * ## Example
+ * ```kotlin
+ * orderShipped.subscribed(
+ *     defaultEmail = Frequency.immediately(),
+ *     defaultSms = null,  // disabled by default
+ *     defaultPush = Frequency.immediately()
+ * ) { event ->
+ *     setOf(event.subject.customerId)  // notify the customer
+ * }
+ * ```
+ *
+ * @param defaultEmail Default email delivery frequency (null to disable)
+ * @param defaultSms Default SMS delivery frequency (null to disable)
+ * @param defaultPush Default push notification delivery frequency (null to disable)
+ * @param defaultInApp Default in-app notification delivery frequency
+ * @param generator Function that returns the set of user IDs to notify
+ */
 context(handler: NotificationEndpoints<USER, UID, *, *, FrequencyCustomizableSubscriptions<USER, UID>>)
 public fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>> EventDefinition<USER, T, ID>.subscribed(
     defaultEmail: Frequency? = Frequency.immediately(),

@@ -35,9 +35,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UID>> : NotificationEndpoints.Subscriptions<USER, UID> {
     private val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.notifications.subscriptions.NonCustomizableSubscriptions")
 
-    private class SendMethodsGenerator<USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>>(
-        val generator: suspend context(ServerRuntime) (Event<USER, T, ID>) -> List<ScheduledSendMethods<UID>>
-    )
+    private typealias SendMethodsGenerator<USER, UID, T, ID> = suspend context(ServerRuntime) (Event<USER, T, ID>) -> List<ScheduledSendMethods<UID>>
 
     private val eventListeners = MapRegistry<String, ListRegistry<SendMethodsGenerator<USER, UID, *, *>>>()
 
@@ -50,11 +48,12 @@ public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UI
      * @param type The event type to listen for
      * @param interested Function that determines interested users and their notification preferences
      */
-    public fun <T : HasId<ID>, ID : Comparable<ID>> setSubscribed(
+    public fun <T : HasId<ID>, ID : Comparable<ID>> setSubscribedDirect(
         type: EventDefinition<USER, T, ID>,
         interested: suspend context(ServerRuntime) (Event<USER, T, ID>) -> List<ScheduledSendMethods<UID>>
     ) {
-        eventListeners.getOrRegister(type.name, ::ListRegistry).register(SendMethodsGenerator(interested))
+        @Suppress("UNCHECKED_CAST")
+        eventListeners.getOrRegister(type.name, ::ListRegistry).register(interested as SendMethodsGenerator<USER, UID, *, *>)
     }
 
     /**
@@ -70,21 +69,19 @@ public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UI
      * @param inApp In-app notification delivery frequency for all interested users (defaults to immediate)
      * @param interested Function that determines which user IDs should be notified
      */
-    public fun <T : HasId<ID>, ID : Comparable<ID>> setSubscribed(
+    public inline fun <T : HasId<ID>, ID : Comparable<ID>> setSubscribed(
         type: EventDefinition<USER, T, ID>,
         email: Frequency? = Frequency.immediately(),
         sms: Frequency? = Frequency.immediately(),
         push: Frequency? = Frequency.immediately(),
         inApp: Frequency? = Frequency.immediately(),
-        interested: suspend context(ServerRuntime) (Event<USER, T, ID>) -> Set<UID>
+        crossinline interested: suspend context(ServerRuntime) (Event<USER, T, ID>) -> Set<UID>
     ) {
-        eventListeners.getOrRegister(type.name, ::ListRegistry).register(
-            SendMethodsGenerator { event ->
-                interested(event).map {
-                    ScheduledSendMethods(it, email, sms, push, inApp)
-                }
+        setSubscribedDirect(type) { event ->
+            interested(event).map {
+                ScheduledSendMethods(it, email, sms, push, inApp)
             }
-        )
+        }
     }
 
     /**
@@ -102,7 +99,7 @@ public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UI
     override suspend fun <T : HasId<ID>, ID : Comparable<ID>> subscribed(event: Event<USER, T, ID>): List<ScheduledSendMethods<UID>> {
         val listeners = eventListeners[event.type.name]?.let { it as List<SendMethodsGenerator<USER, UID, T, ID>> } ?: return emptyList()
 
-        val interested = listeners.flatMap { it.generator(event) }.groupBy { it.user }
+        val interested = listeners.flatMap { it(event) }.groupBy { it.user }
 
         val now = now()
 
@@ -126,21 +123,68 @@ public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UI
     }
 }
 
+/**
+ * DSL function to register a subscriber generator with full control over notification configuration.
+ *
+ * The generator receives an event and returns a list of [ScheduledSendMethods], allowing
+ * different users to receive different frequency settings for the same event.
+ *
+ * ## Example
+ * ```kotlin
+ * orderShipped.subscribedDirect { event ->
+ *     val customer = ScheduledSendMethods(
+ *         user = event.subject.customerId,
+ *         email = Frequency.immediately(),
+ *         push = Frequency.immediately()
+ *     )
+ *     val seller = ScheduledSendMethods(
+ *         user = event.subject.sellerId,
+ *         email = Frequency.daily(9, 0),  // daily digest
+ *         push = null  // no push for sellers
+ *     )
+ *     listOf(customer, seller)
+ * }
+ * ```
+ *
+ * @param interested Function that returns the list of users and their notification preferences
+ */
 context(handler: NotificationEndpoints<USER, UID, *, *, NonCustomizableSubscriptions<USER, UID>>)
-public fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>> EventDefinition<USER, T, ID>.subscribed(
+public fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>> EventDefinition<USER, T, ID>.subscribedDirect(
     interested: suspend context(ServerRuntime) (Event<USER, T, ID>) -> List<ScheduledSendMethods<UID>>
 ) {
-    handler.subscriptions.setSubscribed(this, interested)
+    handler.subscriptions.setSubscribedDirect(this, interested)
 }
 
-
+/**
+ * DSL function to register a subscriber generator with fixed delivery frequencies.
+ *
+ * The generator determines which users should be notified, and all matched users
+ * receive notifications with the same frequency settings.
+ *
+ * ## Example
+ * ```kotlin
+ * orderShipped.subscribed(
+ *     email = Frequency.immediately(),
+ *     sms = null,  // disabled
+ *     push = Frequency.immediately()
+ * ) { event ->
+ *     setOf(event.subject.customerId)
+ * }
+ * ```
+ *
+ * @param email Email delivery frequency for all interested users (null to disable)
+ * @param sms SMS delivery frequency for all interested users (null to disable)
+ * @param push Push notification delivery frequency for all interested users (null to disable)
+ * @param inApp In-app notification delivery frequency for all interested users
+ * @param interested Function that returns the set of user IDs to notify
+ */
 context(handler: NotificationEndpoints<USER, UID, *, *, NonCustomizableSubscriptions<USER, UID>>)
-public fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>> EventDefinition<USER, T, ID>.subscribed(
+public inline fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>> EventDefinition<USER, T, ID>.subscribed(
     email: Frequency? = Frequency.immediately(),
     sms: Frequency? = Frequency.immediately(),
     push: Frequency? = Frequency.immediately(),
     inApp: Frequency? = Frequency.immediately(),
-    interested: suspend context(ServerRuntime) (Event<USER, T, ID>) -> Set<UID>
+    crossinline interested: suspend context(ServerRuntime) (Event<USER, T, ID>) -> Set<UID>
 ) {
     handler.subscriptions.setSubscribed(this, email, sms, push, inApp, interested)
 }

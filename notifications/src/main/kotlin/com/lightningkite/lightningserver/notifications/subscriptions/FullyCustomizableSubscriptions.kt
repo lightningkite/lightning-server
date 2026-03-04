@@ -60,6 +60,30 @@ public enum class DefaultSubscriptionUpdateBehavior {
     UpdateRetainingUserChanges,
 }
 
+/**
+ * Subscription provider allowing users to fully customize their notification preferences.
+ *
+ * This is the most flexible subscription model, allowing users to:
+ * - Specify custom filter conditions (e.g., "only notify me about orders over $100")
+ * - Choose delivery frequencies per channel (email, SMS, push, in-app)
+ * - Enable or disable specific event types entirely
+ *
+ * Subscriptions are stored in the database and can be managed through the included REST endpoints.
+ * System-calculated read permissions are automatically applied to ensure users only receive
+ * notifications for events they have permission to see.
+ *
+ * ## Default Subscriptions
+ * Applications can define default subscriptions for new users using [setDefaultSubscription].
+ * When a user is created, these defaults are automatically inserted. The behavior when users
+ * change is controlled by [DefaultSubscriptionUpdateBehavior].
+ *
+ * ## Endpoints
+ * - REST API at `/rest` for subscription CRUD operations
+ *
+ * @param USER The user type
+ * @param UID The user ID type
+ * @property info Model information for subscription storage and permissions
+ */
 public class FullyCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UID>>(
     info: ModelInfo<USER, NotificationEventSubscription<UID>, UserEventType<UID>>,
     users: ModelInfo<USER, USER, UID>,
@@ -91,12 +115,23 @@ public class FullyCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<
 
     private val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.notifications.subscriptions.FullyCustomizableSubscriptions")
 
+    /**
+     * REST endpoints for managing user notification subscriptions.
+     * Mounted at `/rest`. Provides CRUD operations for subscriptions.
+     */
     public val rest: ModelRestEndpoints<USER, NotificationEventSubscription<UID>, UserEventType<UID>> =
         path.path("rest") include ModelRestEndpoints(info)
 
 
     private val self = DataClassPathSelf(info.serializer)
 
+    /**
+     * Configuration for a default subscription that is automatically created for new users.
+     *
+     * @property eventType The event type this default applies to
+     * @property behavior How to handle updates when user permissions change
+     * @property subscription Function that generates the default subscription for a user (or null to skip)
+     */
     public data class DefaultSubscription<USER : HasId<UID>, UID : Comparable<UID>, T : HasId<*>>(
         val eventType: EventDefinition<USER, T, *>,
         val behavior: DefaultSubscriptionUpdateBehavior = DefaultSubscriptionUpdateBehavior.UpdateReadPermissions,
@@ -139,12 +174,29 @@ public class FullyCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<
 
     private val defaultSubscriptions = MapRegistry<String, DefaultSubscription<USER, UID, *>>()
 
+    /**
+     * Retrieves the default subscription generator for an event type.
+     *
+     * @param type The event type to get the default subscription for
+     * @return The subscription generator function, or null if no default is configured
+     */
     @Suppress("UNCHECKED_CAST")
     public fun <T : HasId<*>> getDefaultSubscription(
         type: EventDefinition<USER, T, *>
     ): (suspend context(ServerRuntime) (USER) -> FullEventSubscription<T>?)? =
         defaultSubscriptions[type.name]?.let { (it as DefaultSubscription<USER, UID, T>).subscription }
 
+    /**
+     * Registers a default subscription for an event type.
+     *
+     * The subscription function is called for each new user to generate their initial
+     * subscription settings. Returning null from the function means no subscription
+     * is created for that user.
+     *
+     * @param type The event type to configure
+     * @param behavior How to handle updates when user permissions change
+     * @param subscription Function that generates the subscription for a user
+     */
     public fun <T : HasId<*>> setDefaultSubscription(
         type: EventDefinition<USER, T, *>,
         behavior: DefaultSubscriptionUpdateBehavior = DefaultSubscriptionUpdateBehavior.UpdateReadPermissions,
@@ -309,6 +361,28 @@ public class FullyCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<
 }
 
 
+/**
+ * DSL function to register a default subscription for this event type.
+ *
+ * The subscription function is called for each new user to generate their initial
+ * subscription settings. Returning null means no subscription is created for that user.
+ *
+ * ## Example
+ * ```kotlin
+ * orderShipped.defaultSubscription { user ->
+ *     FullEventSubscription(
+ *         filter = Condition.Always,
+ *         email = Frequency.immediately(),
+ *         sms = null,  // disabled
+ *         push = Frequency.immediately(),
+ *         inApp = Frequency.immediately()
+ *     )
+ * }
+ * ```
+ *
+ * @param behavior How to handle updates when user permissions change
+ * @param subscription Function that generates the subscription for a user (or null to skip)
+ */
 context(handler: NotificationEndpoints<USER, UID, *, *, FullyCustomizableSubscriptions<USER, UID>>)
 public fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>> EventDefinition<USER, T, ID>.defaultSubscription(
     behavior: DefaultSubscriptionUpdateBehavior = DefaultSubscriptionUpdateBehavior.UpdateReadPermissions,

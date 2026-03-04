@@ -107,13 +107,39 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
         sdkSettings.defaultInfo = SdkModule.Info("NotificationsApi")
     }
 
+    /**
+     * Returns the email address for a user, or null if email notifications are not enabled for this user.
+     * @param user The user to get the email address for
+     */
     context(server: ServerRuntime) public abstract suspend fun email(user: USER): EmailAddress?
+
+    /**
+     * Returns the phone number for a user, or null if SMS notifications are not enabled for this user.
+     * @param user The user to get the phone number for
+     */
     context(server: ServerRuntime) public abstract suspend fun phone(user: USER): PhoneNumber?
+
+    /**
+     * Returns the set of FCM (Firebase Cloud Messaging) tokens for a user's devices.
+     * @param user The user to get FCM tokens for
+     * @return Set of FCM tokens, or empty set if push notifications are not enabled
+     */
     context(server: ServerRuntime) public abstract suspend fun fcmTokens(user: USER): Set<String>
+
+    /**
+     * Called when FCM tokens are detected as invalid or expired.
+     * Implementations should remove these tokens from the user's profile.
+     * @param user The user whose tokens are dead
+     * @param deadTokens The set of tokens that are no longer valid
+     */
     context(server: ServerRuntime) public abstract suspend fun onFcmTokensDead(user: USER, deadTokens: Set<String>)
 
     internal val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.notifications.NotificationBulkDispatcher")
 
+    /**
+     * Additional condition to apply when querying for notifications to send.
+     * Override this to add custom filtering logic (e.g., only send notifications for active users).
+     */
     protected open val additionalSendCondition: Condition<Notification<UID, CONTENT>>? = null
 
     /**
@@ -170,6 +196,10 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
             ?.let { sendNotifications(it) }
     }
 
+    /**
+     * REST and WebSocket endpoints for managing notifications.
+     * Mounted at `/rest`. Provides CRUD operations and real-time updates for notifications.
+     */
     public val rest: ModelRestEndpointsAndUpdatesWebsocket<USER, Notification<UID, CONTENT>, Uuid> =
         path.path("rest") include ModelRestEndpoints(info) + ModelRestUpdatesWebsocket(info, websocketKey)
 
@@ -229,19 +259,36 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
         if (deadTokens.isNotEmpty()) onFcmTokensDead(user, deadTokens)
     }
 
+    /**
+     * Pagination parameters for querying notifications.
+     * @property page The current page number (0-indexed)
+     * @property pageLimit The number of notifications per page
+     */
     @Serializable
     public data class BasicPager(
         val page: Int,
         val pageLimit: Int,
     )
 
+    /**
+     * Payload for the send notifications task, including pre-fetched user data.
+     * @property users Map of user IDs to user objects for efficient lookup
+     * @property notifications The notifications to send
+     */
     @Serializable
     public data class NotificationPager<USER:HasId<UID>, UID:Comparable<UID>, CONTENT>(
         val users: Map<UID, USER>,
         val notifications: List<Notification<UID, CONTENT>>
     )
 
-    // Task to a send list of notifications, pages to make sure all notifications are sent
+    /**
+     * Task that sends a batch of notifications to users.
+     *
+     * Processes notifications in parallel per user, sending email, SMS, push, and in-app
+     * notifications as configured. Marks each channel as sent after successful delivery.
+     * If the task times out before all notifications are sent, it automatically relaunches
+     * with the remaining notifications.
+     */
     public val sendNotifications: Task<NotificationPager<USER, UID, CONTENT>> =
         path.path("send-notifs") bind Task(NotificationPager.serializer(users.serializer, users.idSerializer, contentSerializer)) { startInfo ->
             val byUser = startInfo.notifications.groupBy { it.user }
@@ -321,7 +368,14 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
             if (unsent.isNotEmpty()) launch(NotificationPager(startInfo.users, unsent.flatMap { it.value }))
         }
 
-    /**Gets the users of the notifications and launches a `sendNotifications` task*/
+    /**
+     * Fetches users for the given notifications and launches the [sendNotifications] task.
+     *
+     * This is the main entry point for sending a batch of notifications. It automatically
+     * fetches user data required for delivery and invokes the task.
+     *
+     * @param notifications The notifications to send
+     */
     context(_: ServerRuntime)
     public suspend fun sendNotifications(notifications: List<Notification<UID, CONTENT>>) {
         val users = users.table()
@@ -331,10 +385,16 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
         sendNotifications(NotificationPager(users, notifications))
     }
 
+    /**
+     * Singleton record tracking the last time notifications were refreshed.
+     * Used to avoid re-sending notifications that have already been processed.
+     * @property instant The timestamp of the last refresh
+     */
     @Serializable
     @GenerateDataClassPaths
     public data class RunInstant(val instant: Instant) : HasId<String> {
         public companion object{
+            /** The singleton ID for this record */
             public const val ID: String = "SINGLETON"
         }
 
@@ -388,6 +448,13 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
     private fun <T> sort(path: DataClassPath<T, T>, setup: SortBuilder<T>.(DataClassPath<T, T>) -> Unit): List<SortPart<T>> =
         SortBuilder<T>().apply { setup(path) }.build()
     
+    /**
+     * Task that queries for pending notifications and dispatches them.
+     *
+     * Finds notifications whose `sendAt` time is between the last refresh and now,
+     * preventing duplicate sends. Paginates through results and automatically
+     * relaunches if there are more notifications to process.
+     */
     public val refreshNotifications: Task<BasicPager> = path.path("refresh-notifs") bind Task<BasicPager> { startInfo ->
         try {
             val now = now()
@@ -447,9 +514,19 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
         }
     }
 
+    /**
+     * Manually triggers a refresh of pending notifications.
+     * Starts from page 0 with a default page size of 200.
+     */
     context(_: ServerRuntime)
     public suspend fun refreshNotifications(): Unit = refreshNotifications(BasicPager(0, 200))
 
+    /**
+     * Scheduled task that automatically refreshes and sends pending notifications.
+     *
+     * Runs on the configured [refreshSchedule] (default: every minute). Uses a distributed
+     * lock via cache to prevent multiple instances from processing simultaneously.
+     */
     public val autoRefreshNotifications: ScheduledTask =
         path.path("refresh-notifs") bind ScheduledTask(refreshSchedule, timeout) {
             val acquiredLock = cache().setIfNotExists(scheduleLockKey, "lock", String.serializer(), timeout*16)
