@@ -97,7 +97,8 @@ public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UI
     @Suppress("UNCHECKED_CAST")
     context(runtime: ServerRuntime)
     override suspend fun <T : HasId<ID>, ID : Comparable<ID>> subscribed(event: Event<T, ID>): List<ScheduledSendMethods<UID>> {
-        val listeners = eventListeners[event.type.name]?.let { it as List<SendMethodsGenerator<UID, T, ID>> } ?: return emptyList()
+        val listener = eventListeners[event.type.name]?.let { it as SendMethodsGenerator<UID, T, ID> } ?: return emptyList()
+        val listeners = listOf(listener)
 
         val interested = listeners.flatMap { it(event) }.groupBy { it.user }
 
