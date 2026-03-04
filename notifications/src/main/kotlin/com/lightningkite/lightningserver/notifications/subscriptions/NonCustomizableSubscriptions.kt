@@ -34,7 +34,12 @@ private typealias SendMethodsGenerator<UID, T, ID> = suspend context(ServerRunti
  * @param USER The user type
  * @param UID The user ID type
  */
-public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UID>> : NotificationEndpoints.Subscriptions<USER, UID> {
+public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UID>>(
+    public val defaultEmail: Frequency? = Frequency.immediately(),
+    public val defaultSms: Frequency? = Frequency.immediately(),
+    public val defaultPush: Frequency? = Frequency.immediately(),
+    public val defaultInApp: Frequency? = Frequency.immediately(),
+) : NotificationEndpoints.Subscriptions<USER, UID> {
 //    private val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.notifications.subscriptions.NonCustomizableSubscriptions")
 
     private val eventListeners = MapRegistry<String, SendMethodsGenerator<UID, *, *>>()
@@ -71,10 +76,10 @@ public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UI
      */
     public inline fun <T : HasId<ID>, ID : Comparable<ID>> setSubscribed(
         type: EventDefinition<T, ID>,
-        email: Frequency? = Frequency.immediately(),
-        sms: Frequency? = Frequency.immediately(),
-        push: Frequency? = Frequency.immediately(),
-        inApp: Frequency? = Frequency.immediately(),
+        email: Frequency? = this.defaultEmail,
+        sms: Frequency? = this.defaultSms,
+        push: Frequency? = this.defaultPush,
+        inApp: Frequency? = this.defaultInApp,
         crossinline interested: suspend context(ServerRuntime) (Event<T, ID>) -> Set<UID>
     ) {
         setSubscribedDirect(type) { event ->
@@ -181,10 +186,10 @@ public fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Compar
  */
 context(handler: NotificationEndpoints<USER, UID, *, *, NonCustomizableSubscriptions<USER, UID>>)
 public inline fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>> EventDefinition<T, ID>.subscribed(
-    email: Frequency? = Frequency.immediately(),
-    sms: Frequency? = Frequency.immediately(),
-    push: Frequency? = Frequency.immediately(),
-    inApp: Frequency? = Frequency.immediately(),
+    email: Frequency? = handler.subscriptions.defaultEmail,
+    sms: Frequency? = handler.subscriptions.defaultSms,
+    push: Frequency? = handler.subscriptions.defaultPush,
+    inApp: Frequency? = handler.subscriptions.defaultInApp,
     crossinline interested: suspend context(ServerRuntime) (Event<T, ID>) -> Set<UID>
 ) {
     handler.subscriptions.setSubscribed(this, email, sms, push, inApp, interested)
