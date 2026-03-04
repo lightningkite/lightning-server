@@ -8,6 +8,8 @@ import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
+import com.lightningkite.lightningserver.data.Request
+import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.services.cache.Cache
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -15,6 +17,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 class RateLimitInterceptorTest {
 
@@ -396,4 +399,226 @@ class RateLimitInterceptorTest {
             }
         }
     }
+
+    @Test
+    fun `ignore predicate bypasses rate limiting`() {
+        val rateLimitSettings = RateLimitSettings()
+        val server = object : ServerBuilder() {
+            val cache = setting("cache", Cache.Settings())
+            val rateLimiter = install(RateLimitInterceptor(
+                cache = cache,
+                settings = Runtime.Constant(rateLimitSettings),
+                ignore = { request -> request.sourceIp == "trusted" },
+            ))
+
+            init { registerBasicMediaTypeCoders() }
+
+            val endpoint = path.path("test").get bind rateLimiter.limit(
+                HttpHandler { HttpResponse.plainText("OK") },
+                requests = 1,
+                window = 1.minutes,
+            )
+        }
+
+        server.test(
+            settings = { generalSettings set GeneralServerSettings() }
+        ) {
+            runBlocking {
+                // Non-trusted IP gets rate limited after 1 request
+                server.endpoint.test(sourceIp = "untrusted")
+                val rejected = server.endpoint.test(sourceIp = "untrusted")
+                assertEquals(HttpStatus.TooManyRequests, rejected.status)
+
+                // Trusted IP bypasses rate limiting entirely
+                repeat(10) {
+                    val response = server.endpoint.test(sourceIp = "trusted")
+                    assertEquals(HttpStatus.OK, response.status)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `rate multiplier increases effective limit`() {
+        val rateLimitSettings = RateLimitSettings()
+        val server = object : ServerBuilder() {
+            val cache = setting("cache", Cache.Settings())
+            val rateLimiter = install(RateLimitInterceptor(
+                cache = cache,
+                settings = Runtime.Constant(rateLimitSettings),
+                rateMultiplier = { _ -> 3.0f },
+            ))
+
+            init { registerBasicMediaTypeCoders() }
+
+            val endpoint = path.path("test").get bind rateLimiter.limit(
+                HttpHandler { HttpResponse.plainText("OK") },
+                requests = 2,
+                window = 1.minutes,
+            )
+        }
+
+        server.test(
+            settings = { generalSettings set GeneralServerSettings() }
+        ) {
+            runBlocking {
+                // With multiplier 3.0, effective limit = 2 * 3 = 6
+                repeat(6) {
+                    val response = server.endpoint.test()
+                    assertEquals(HttpStatus.OK, response.status)
+                }
+                val rejected = server.endpoint.test()
+                assertEquals(HttpStatus.TooManyRequests, rejected.status)
+            }
+        }
+    }
+
+    @Test
+    fun `rate multiplier below 1 reduces effective limit`() {
+        val rateLimitSettings = RateLimitSettings()
+        val server = object : ServerBuilder() {
+            val cache = setting("cache", Cache.Settings())
+            val rateLimiter = install(RateLimitInterceptor(
+                cache = cache,
+                settings = Runtime.Constant(rateLimitSettings),
+                rateMultiplier = { _ -> 0.5f },
+            ))
+
+            init { registerBasicMediaTypeCoders() }
+
+            val endpoint = path.path("test").get bind rateLimiter.limit(
+                HttpHandler { HttpResponse.plainText("OK") },
+                requests = 4,
+                window = 1.minutes,
+            )
+        }
+
+        server.test(
+            settings = { generalSettings set GeneralServerSettings() }
+        ) {
+            runBlocking {
+                // With multiplier 0.5, effective limit = 4 * 0.5 = 2
+                repeat(2) {
+                    val response = server.endpoint.test()
+                    assertEquals(HttpStatus.OK, response.status)
+                }
+                val rejected = server.endpoint.test()
+                assertEquals(HttpStatus.TooManyRequests, rejected.status)
+            }
+        }
+    }
+
+    @Test
+    fun `token bucket allows requests within leeway`() {
+        val rateLimitSettings = RateLimitSettings()
+        val server = object : ServerBuilder() {
+            val cache = setting("cache", Cache.Settings())
+            val rateLimiter = install(RateLimitInterceptor(
+                cache = cache,
+                settings = Runtime.Constant(rateLimitSettings),
+            ))
+
+            init { registerBasicMediaTypeCoders() }
+
+            val endpoint = path.path("test").get bind rateLimiter.limit(
+                HttpHandler { HttpResponse.plainText("OK") },
+                config = RateLimitConfig(
+                    borrowTime = 1.seconds,
+                    leeway = 5.seconds,
+                ),
+            )
+        }
+
+        server.test(
+            settings = { generalSettings set GeneralServerSettings() }
+        ) {
+            runBlocking {
+                // Each request borrows 1s, leeway is 5s, so we can make ~6 requests
+                // (first request: 0 debt, then 1s, 2s, 3s, 4s, 5s debt = all within leeway)
+                repeat(6) {
+                    val response = server.endpoint.test()
+                    assertEquals(HttpStatus.OK, response.status, "Request ${it + 1} should be allowed")
+                }
+                // Next request would push debt beyond leeway
+                val rejected = server.endpoint.test()
+                assertEquals(HttpStatus.TooManyRequests, rejected.status)
+            }
+        }
+    }
+
+    @Test
+    fun `token bucket with multiplier allows more requests`() {
+        val rateLimitSettings = RateLimitSettings()
+        val server = object : ServerBuilder() {
+            val cache = setting("cache", Cache.Settings())
+            val rateLimiter = install(RateLimitInterceptor(
+                cache = cache,
+                settings = Runtime.Constant(rateLimitSettings),
+                rateMultiplier = { _ -> 2.0f },
+            ))
+
+            init { registerBasicMediaTypeCoders() }
+
+            val endpoint = path.path("test").get bind rateLimiter.limit(
+                HttpHandler { HttpResponse.plainText("OK") },
+                config = RateLimitConfig(
+                    borrowTime = 2.seconds,
+                    leeway = 5.seconds,
+                ),
+            )
+        }
+
+        server.test(
+            settings = { generalSettings set GeneralServerSettings() }
+        ) {
+            runBlocking {
+                // borrowTime=2s, multiplier=2.0 -> effectiveBorrow=1s, leeway=5s
+                // So we can make ~6 requests (0, 1s, 2s, 3s, 4s, 5s debt)
+                repeat(6) {
+                    val response = server.endpoint.test()
+                    assertEquals(HttpStatus.OK, response.status, "Request ${it + 1} should be allowed")
+                }
+                val rejected = server.endpoint.test()
+                assertEquals(HttpStatus.TooManyRequests, rejected.status)
+            }
+        }
+    }
+
+    @Test
+    fun `token bucket rejected response includes retry-after`() {
+        val rateLimitSettings = RateLimitSettings()
+        val server = object : ServerBuilder() {
+            val cache = setting("cache", Cache.Settings())
+            val rateLimiter = install(RateLimitInterceptor(
+                cache = cache,
+                settings = Runtime.Constant(rateLimitSettings),
+            ))
+
+            init { registerBasicMediaTypeCoders() }
+
+            val endpoint = path.path("test").get bind rateLimiter.limit(
+                HttpHandler { HttpResponse.plainText("OK") },
+                config = RateLimitConfig(
+                    borrowTime = 1.seconds,
+                    leeway = 1.seconds,
+                ),
+            )
+        }
+
+        server.test(
+            settings = { generalSettings set GeneralServerSettings() }
+        ) {
+            runBlocking {
+                // leeway=1s, borrow=1s -> allow 2 requests (0 debt, then 1s debt)
+                repeat(2) { server.endpoint.test() }
+                // Third request should be rejected
+                val rejected = server.endpoint.test()
+                assertEquals(HttpStatus.TooManyRequests, rejected.status)
+                assertNotNull(rejected.headers[HttpHeader.RetryAfter.lowercase()])
+                assertTrue(rejected.body!!.text().contains("Rate limit exceeded"))
+            }
+        }
+    }
 }
+
+
