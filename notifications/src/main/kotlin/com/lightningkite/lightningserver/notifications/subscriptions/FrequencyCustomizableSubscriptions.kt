@@ -109,7 +109,7 @@ public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Compara
 
         interested.mapNotNull { user ->
             userSpecifiedMethods[user]
-                ?.let { NotificationSendMethods(it._id, it.email, it.sms, it.push, it.inApp) }
+                ?.let { NotificationSendMethods(_id = it._id, email = it.email, push = it.push, sms = it.sms, inApp = it.inApp) }
                 ?: grouped
                     .mapNotNull { pair ->
                         pair.second.takeIf { pair.first.contains(user) }
@@ -117,10 +117,11 @@ public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Compara
                     .takeUnless { it.isEmpty() }
                     ?.let { eventListeners ->
                         NotificationSendMethods(
-                            UserEventType(user, event.type.untyped),
-                            eventListeners.mapNotNull { it.defaultEmail }.minByOrNull { it.schedule(now) },
-                            eventListeners.mapNotNull { it.defaultSms }.minByOrNull { it.schedule(now) },
-                            eventListeners.mapNotNull { it.defaultPush }.minByOrNull { it.schedule(now) }
+                            _id = UserEventType(user, event.type.untyped),
+                            email = eventListeners.mapNotNull { it.defaultEmail }.minByOrNull { it.schedule(now) },
+                            push = eventListeners.mapNotNull { it.defaultPush }.minByOrNull { it.schedule(now) },
+                            sms = eventListeners.mapNotNull { it.defaultSms }.minByOrNull { it.schedule(now) },
+                            inApp = eventListeners.mapNotNull { it.defaultInApp }.minByOrNull { it.schedule(now) }
                         )
                     }
         }

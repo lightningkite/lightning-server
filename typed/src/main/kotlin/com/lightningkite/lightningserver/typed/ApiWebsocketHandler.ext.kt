@@ -1,3 +1,5 @@
+@file:OptIn(InternalLightningServerApi::class)
+
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.*

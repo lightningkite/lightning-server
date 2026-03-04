@@ -15,6 +15,7 @@ import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
+import com.lightningkite.services.SettingContext
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Clock
@@ -72,7 +73,7 @@ public class TestRunner<SERVER: ServerBuilder> @Deprecated("Please use SERVER.te
     private val subscriptions = ConcurrentHashMap<WebSocketSubscriptionRequest<*, *>, ArrayList<suspend (WebSocketSubscriptionMessage<*, *>)->Unit>>()
     override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>) {
         val subscribers = subscriptions[WebSocketSubscriptionRequest(topic = event.topic, rawPathArguments = event.rawPathArguments)]
-        /*logger.debug*/run { "'${event.path()}': ${event.value} (${subscribers?.size ?: 0} subscribers)" }.let(::println)
+//        /*logger.debug*/run { "'${event.path()}': ${event.value} (${subscribers?.size ?: 0} subscribers)" }.let(::println)
         subscribers?.forEach {
             it(event)
         }
@@ -209,12 +210,12 @@ public class TestRunner<SERVER: ServerBuilder> @Deprecated("Please use SERVER.te
  * @param action Test code to execute with the test runner as context
  */
 public inline fun <SERVER: ServerBuilder> SERVER.test(
-    settings: context(ServerSettings) SERVER.() -> Unit,
+    settings: context(ServerSettings) SERVER.(SettingContext) -> Unit,
     action: context(TestRunner<SERVER>) SERVER.()->Unit
 ) {
     @Suppress("DEPRECATION") val runner = TestRunner(this)
     with(runner) {
-        context(this.settings) { settings(this@test) }
+        context(this.settings) { settings(this@test, runner) }
         this.settings.readyUsingDefaults()
     }
     action(runner, this)

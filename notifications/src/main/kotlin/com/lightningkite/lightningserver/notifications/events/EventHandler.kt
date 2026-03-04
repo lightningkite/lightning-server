@@ -38,17 +38,17 @@ public interface EventHandler<USER : HasId<*>?> {
  * @param USER The user type (nullable for public events)
  * @param T The subject entity type
  * @param ID The ID type of the subject entity
- * @property type The event type definition
+ * @property event The event type definition
  * @property handler The event handler that processes this event type
  * @property name Convenience accessor for the event type name
  * @property task The task endpoint for asynchronous event processing
  */
 public class EventLauncher<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> internal constructor(
-    public val type: EventDefinition<USER, T, ID>,
-    public val handler: EventHandler<USER>,
+    public val event: EventDefinition<USER, T, ID>,
+    private val handler: EventHandler<USER>,
     timeout: Duration = 5.minutes,
 ) : ServerBuilder() {
-    public val name: String get() = type.name
+    public val name: String get() = event.name
 
     /**
      * Handles the event inline without going through the task system.
@@ -56,10 +56,10 @@ public class EventLauncher<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>
      */
     context(_: ServerRuntime)
     public suspend fun handleInline(subject: T) {
-        handler.handle(Event(type, subject))
+        handler.handle(Event(event, subject))
     }
 
-    public val task: Task<T> = path bind Task(type.info.serializer, timeout) { handleInline(it) }
+    public val task: Task<T> = path bind Task(event.info.serializer, timeout) { handleInline(it) }
 
     /**
      * Launches the event asynchronously through the task system.

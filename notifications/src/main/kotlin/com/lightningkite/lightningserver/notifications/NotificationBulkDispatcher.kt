@@ -54,6 +54,7 @@ import com.lightningkite.services.notifications.NotificationService
 import com.lightningkite.services.sms.SMS
 import io.github.oshai.kotlinlogging.KLogger
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.github.oshai.kotlinlogging.slf4j.logger
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
@@ -61,6 +62,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.builtins.serializer
+import kotlin.math.log
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -215,10 +217,18 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
 
     private val self = DataClassPathSelf(info.serializer)
 
+    private val sendLogger = KotlinLogging.logger("${logger.name}.send")
+
     context(runtime: ServerRuntime)
     private suspend fun sendEmailNotifications(user: USER, notifications: List<Notification<UID, CONTENT>>) {
-        if (email == null) return
-        if (email(user) == null) return
+        if (email == null) {
+            sendLogger.debug { "No EmailService settings provided, skipping emails" }
+            return
+        }
+        if (email(user) == null) {
+            sendLogger.debug { "No email found for user ${user._id}" }
+            return
+        }
 
         val emails = makeEmailNotifications(user, notifications)
         if (emails.isNotEmpty()) email().sendBulk(emails)
@@ -226,8 +236,14 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
 
     context(runtime: ServerRuntime)
     private suspend fun sendSmsNotifications(user: USER, notifications: List<Notification<UID, CONTENT>>) {
-        if (sms == null) return
-        val phoneNumber = phone(user) ?: return
+        if (sms == null) {
+            sendLogger.debug { "No SMS settings provided, skipping SMS" }
+            return
+        }
+        val phoneNumber = phone(user) ?: run {
+            sendLogger.debug { "No phone number found for user ${user._id}, skipping SMS" }
+            return
+        }
 
         val messages = makeSmsNotifications(user, notifications)
         if (messages.isEmpty()) return
@@ -237,9 +253,15 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
 
     context(runtime: ServerRuntime)
     private suspend fun sendPushNotifications(user: USER, notifications: List<Notification<UID, CONTENT>>) {
-        if (push == null) return
+        if (push == null) {
+            sendLogger.debug { "No NotificationService settings provided, skipping push notifications" }
+            return
+        }
         val allTokens = fcmTokens(user).toMutableSet()
-        if (allTokens.isEmpty()) return
+        if (allTokens.isEmpty()) {
+            sendLogger.debug { "No fcm tokens found for user ${user._id}, skipping push notifications" }
+            return
+        }
 
         val notificationData = makePushNotifications(user, notifications)
         if (notificationData.isEmpty()) return

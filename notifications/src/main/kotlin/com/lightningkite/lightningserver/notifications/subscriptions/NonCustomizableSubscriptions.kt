@@ -15,6 +15,8 @@ import com.lightningkite.services.database.HasId
 import io.github.oshai.kotlinlogging.KLogger
 import io.github.oshai.kotlinlogging.KotlinLogging
 
+private typealias SendMethodsGenerator<USER, UID, T, ID> = suspend context(ServerRuntime) (Event<USER, T, ID>) -> List<ScheduledSendMethods<UID>>
+
 /**
  * Subscription provider where all subscription logic is defined programmatically.
  *
@@ -34,8 +36,6 @@ import io.github.oshai.kotlinlogging.KotlinLogging
  */
 public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UID>> : NotificationEndpoints.Subscriptions<USER, UID> {
     private val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.notifications.subscriptions.NonCustomizableSubscriptions")
-
-    private typealias SendMethodsGenerator<USER, UID, T, ID> = suspend context(ServerRuntime) (Event<USER, T, ID>) -> List<ScheduledSendMethods<UID>>
 
     private val eventListeners = MapRegistry<String, ListRegistry<SendMethodsGenerator<USER, UID, *, *>>>()
 
