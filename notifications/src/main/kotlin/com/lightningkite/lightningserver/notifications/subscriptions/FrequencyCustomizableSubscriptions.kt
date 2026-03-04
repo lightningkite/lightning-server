@@ -45,6 +45,10 @@ import io.github.oshai.kotlinlogging.KotlinLogging
  */
 public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UID>>(
     public val info: ModelInfo<*, NotificationSendMethods<UID>, UserEventType<UID>>,
+    public val defaultEmail: Frequency? = Frequency.immediately(),
+    public val defaultSms: Frequency? = Frequency.immediately(),
+    public val defaultPush: Frequency? = Frequency.immediately(),
+    public val defaultInApp: Frequency? = Frequency.immediately(),
     websocketKey: SerializableProperty<NotificationSendMethods<UID>, *>? = info.serializer.fieldInApp
 ) : ServerBuilder(), NotificationEndpoints.Subscriptions<USER, UID> {
     private val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.notifications.subscriptions.FrequencyCustomizableSubscriptions")
@@ -77,10 +81,10 @@ public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Compara
      */
     public fun <T : HasId<ID>, ID : Comparable<ID>> setSubscribers(
         type: EventDefinition<T, ID>,
-        defaultEmail: Frequency? = Frequency.immediately(),
-        defaultSms: Frequency? = Frequency.immediately(),
-        defaultPush: Frequency? = Frequency.immediately(),
-        defaultInApp: Frequency? = Frequency.immediately(),
+        defaultEmail: Frequency? = this.defaultEmail,
+        defaultSms: Frequency? = this.defaultSms,
+        defaultPush: Frequency? = this.defaultPush,
+        defaultInApp: Frequency? = this.defaultInApp,
         interested: suspend context(ServerRuntime) (Event<T, ID>) -> Set<UID>
     ) {
         eventListeners.register(type.name, Subscriptions(type, defaultEmail, defaultSms, defaultPush, defaultInApp, interested))
@@ -156,10 +160,10 @@ public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Compara
  */
 context(handler: NotificationEndpoints<USER, UID, *, *, FrequencyCustomizableSubscriptions<USER, UID>>)
 public fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>> EventDefinition<T, ID>.subscribed(
-    defaultEmail: Frequency? = Frequency.immediately(),
-    defaultSms: Frequency? = Frequency.immediately(),
-    defaultPush: Frequency? = Frequency.immediately(),
-    defaultInApp: Frequency? = Frequency.immediately(),
+    defaultEmail: Frequency? = handler.subscriptions.defaultEmail,
+    defaultSms: Frequency? = handler.subscriptions.defaultSms,
+    defaultPush: Frequency? = handler.subscriptions.defaultPush,
+    defaultInApp: Frequency? = handler.subscriptions.defaultInApp,
     generator: suspend context(ServerRuntime) (Event<T, ID>) -> Set<UID>
 ) {
     handler.subscriptions.setSubscribers(this, defaultEmail, defaultSms, defaultPush, defaultInApp, generator)
