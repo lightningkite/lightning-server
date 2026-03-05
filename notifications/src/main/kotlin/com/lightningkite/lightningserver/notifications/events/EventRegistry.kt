@@ -20,19 +20,17 @@ import kotlinx.serialization.builtins.ListSerializer
  *
  * This is a lightweight wrapper around a [MapRegistry] that ensures type-safe storage
  * and retrieval of event types. Event types are automatically registered during construction
- * of [TypedEventType] instances.
- *
- * @param USER The user type (nullable for public events)
+ * of [EventDefinition] instances.
  */
-public class EventRegistry<USER : HasId<*>?>(
-    private val registry: MapRegistry<String, TypedEventType<USER, *, *>> = MapRegistry()
-) : Map<String, TypedEventType<USER, *, *>> by registry {
+public class EventRegistry(
+    private val registry: MapRegistry<String, EventDefinition<*, *>> = MapRegistry()
+) : Map<String, EventDefinition<*, *>> by registry {
     /**
      * Registers an event type with this registry.
      *
-     * Called automatically by [TypedEventType] constructor.
+     * Called automatically by [EventDefinition] constructor.
      */
-    public fun register(eventType: TypedEventType<USER, *, *>) {
+    public fun register(eventType: EventDefinition<*, *>) {
         registry.register(eventType.name, eventType)
     }
 }
@@ -49,7 +47,7 @@ public class EventRegistry<USER : HasId<*>?>(
  * @property permissions Function to determine read permissions for event types
  */
 public class EventEndpoints<AUTH : HasId<*>?>(
-    private val registry: EventRegistry<*>,
+    private val registry: EventRegistry,
     public val auth: AuthRequirement<AUTH>,
     public val permissions: suspend context(ServerRuntime) AuthAccess<AUTH>.() -> ModelPermissions<EventType>
 ) : ServerBuilder() {
@@ -72,7 +70,7 @@ public class EventEndpoints<AUTH : HasId<*>?>(
                 val permissions = permissions(this)
 
                 registry.values
-                    .map { it.type }
+                    .map { it.untyped }
                     .filter { permissions.read(it) && query.condition(it) }
                     .map(permissions::mask)
                     .sortedWithNullable(query.orderBy.comparator)

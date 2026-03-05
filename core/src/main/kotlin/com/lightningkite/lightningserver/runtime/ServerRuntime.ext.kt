@@ -2,9 +2,11 @@ package com.lightningkite.lightningserver.runtime
 
 import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.definition.ScheduledTask
+import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.definition.Task
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.pathing.PathSpec
@@ -157,6 +159,16 @@ public context(runner: ServerRuntime) val StartupTask.locationOrNull: PathSpec0?
 public context(runner: ServerRuntime) val ScheduledTask.locationOrNull: PathSpec0? get() = runner.server.location(this)
 
 /**
+ * Gets the location of a server module, or null if it's not registered.
+ */
+public context(runner: ServerRuntime) val ServerDefinition.locationOrNull: PathSpec0? get() = runner.server.location(this)
+
+/**
+ * Gets the location of a server module, or null if it's not registered.
+ */
+public context(runner: ServerRuntime) val ServerBuilder.locationOrNull: PathSpec0? get() = runner.server.location(this)
+
+/**
  * Exception thrown when attempting to get the location of an unregistered item.
  *
  * This indicates that a handler, task, or topic was not included in the server definition
@@ -205,3 +217,18 @@ public context(runner: ServerRuntime) val StartupTask.location: PathSpec0 get() 
  * @throws UnregisteredException if the task is not registered with the server
  */
 public context(runner: ServerRuntime) val ScheduledTask.location: PathSpec0 get() = runner.server.location(this) ?: throw UnregisteredException(this)
+
+/**
+ * Gets the location of a server module.
+ *
+ * @throws UnregisteredException if the module is not registered with the server
+ */
+public context(runner: ServerRuntime) val ServerDefinition.location: PathSpec0 get() = runner.server.location(this) ?: throw UnregisteredException(this)
+
+/**
+ * Gets the location of a server module.
+ *
+ * @throws UnregisteredException if the module is not registered with the server
+ */
+public context(runner: ServerRuntime) val ServerBuilder.location: PathSpec0 get() = runner.server.location(this) ?: throw UnregisteredException(this)
+

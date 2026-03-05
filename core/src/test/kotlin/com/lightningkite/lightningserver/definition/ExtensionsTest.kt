@@ -2,20 +2,20 @@ package com.lightningkite.lightningserver.definition
 
 import com.lightningkite.lightningserver.definition.builder.ListRegistry
 import com.lightningkite.lightningserver.definition.builder.MapRegistry
-import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.toSealedList
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ExtensionsTest {
-
     object TestKey : MutableExtensions.Key<String>
-    object TestDegradingKey : MutableExtensions.DegradingKey<MutableList<String>, List<String>> {
+    object TestWritableKey : MutableExtensions.WritableKey<MutableList<String>, List<String>> {
         override fun default(): MutableList<String> = mutableListOf()
-        override fun MutableList<String>.include(other: List<String>, pathSpec: com.lightningkite.lightningserver.pathing.PathSpec0) {
+        override fun MutableList<String>.include(other: List<String>) {
             addAll(other)
         }
+        override fun seal(data: List<String>): List<String> = data.toSealedList()
     }
 
     @Test
@@ -33,11 +33,11 @@ class ExtensionsTest {
     @Test
     fun `test degrading key provides default`() {
         val ext = MutableExtensions()
-        val list = ext[TestDegradingKey]
+        val list = ext[TestWritableKey]
         assertEquals(emptyList(), list)
 
         list.add("item")
-        assertEquals(listOf("item"), ext[TestDegradingKey])
+        assertEquals(listOf("item"), ext[TestWritableKey])
     }
 
     class TestExtendable : Extendable {
@@ -75,21 +75,6 @@ class ExtensionsTest {
         assertEquals(1, computeCount) // Should not compute again
     }
 
-    var TestExtendable.cached: String by TestKey.cache { "default-${hashCode()}" }
-
-    @Test
-    fun `test cache delegate`() {
-        val instance = TestExtendable()
-        val value1 = instance.cached
-        assertTrue(value1.startsWith("default-"))
-
-        val value2 = instance.cached
-        assertEquals(value1, value2) // Should be cached
-
-        instance.cached = "new value"
-        assertEquals("new value", instance.cached)
-    }
-
     object TestMapExt : MapRegistryExtension<String, Int>
 
     val TestExtendable.map: MapRegistry<String, Int> by TestMapExt
@@ -121,7 +106,7 @@ class ExtensionsTest {
         val original = MutableExtensions()
         original[TestKey] = "original"
 
-        val sealed = original.toSealedExtensions()
+        val sealed = original.sealed()
         val copy = sealed.toMutableExtensions()
 
         assertEquals("original", copy[TestKey])
@@ -135,15 +120,15 @@ class ExtensionsTest {
     fun `test include merges extensions`() {
         val ext1 = MutableExtensions()
         ext1[TestKey] = "from ext1"
-        ext1[TestDegradingKey].add("item1")
+        ext1[TestWritableKey].add("item1")
 
         val ext2 = MutableExtensions()
-        ext2[TestDegradingKey].add("item2")
+        ext2[TestWritableKey].add("item2")
 
-        ext2.include(ext1.toSealedExtensions(), PathSpec.root)
+        ext2.include(ext1.sealed())
 
         assertEquals("from ext1", ext2[TestKey]) // Regular key should be copied
-        assertEquals(listOf("item2", "item1"), ext2[TestDegradingKey]) // Degrading key should be merged
+        assertEquals(listOf("item2", "item1"), ext2[TestWritableKey]) // Degrading key should be merged
     }
 
     // ========== Additional tests for Extensions.ext.kt coverage - by Claude ==========
@@ -157,7 +142,7 @@ class ExtensionsTest {
     fun `test Extensions Key getValue for Extended returns value when present`() {
         val ext = MutableExtensions()
         ext[TestKey] = "hello"
-        val instance = TestExtended(ext.toSealedExtensions())
+        val instance = TestExtended(ext.sealed())
 
         assertEquals("hello", instance.testProp)
     }
@@ -165,7 +150,7 @@ class ExtensionsTest {
     @Test
     fun `test Extensions Key getValue for Extended returns null when absent`() {
         val ext = MutableExtensions()
-        val instance = TestExtended(ext.toSealedExtensions())
+        val instance = TestExtended(ext.sealed())
 
         assertNull(instance.testProp)
     }
@@ -181,8 +166,8 @@ class ExtensionsTest {
     }
 
     // DegradingKey delegation tests
-    val TestExtendable.degradingList: MutableList<String> by TestDegradingKey
-    val TestExtended.degradingList: List<String> by TestDegradingKey
+    val TestExtendable.degradingList: MutableList<String> by TestWritableKey
+    val TestExtended.degradingList: List<String> by TestWritableKey
 
     @Test
     fun `test DegradingKey getValue for Extendable returns mutable type`() {
@@ -197,7 +182,7 @@ class ExtensionsTest {
     @Test
     fun `test DegradingKey getValue for Extended returns default when absent`() {
         val ext = MutableExtensions()
-        val instance = TestExtended(ext.toSealedExtensions())
+        val instance = TestExtended(ext.sealed())
 
         // Should return default (empty list)
         assertEquals(emptyList(), instance.degradingList)
@@ -206,8 +191,8 @@ class ExtensionsTest {
     @Test
     fun `test DegradingKey getValue for Extended returns existing value when present`() {
         val ext = MutableExtensions()
-        ext[TestDegradingKey].add("existing")
-        val instance = TestExtended(ext.toSealedExtensions())
+        ext[TestWritableKey].add("existing")
+        val instance = TestExtended(ext.sealed())
 
         assertEquals(listOf("existing"), instance.degradingList)
     }
@@ -217,7 +202,7 @@ class ExtensionsTest {
         // Note: This test documents the behavior that each access on Extended creates a new default
         // when the value is not present in extensions
         val ext = MutableExtensions()
-        val instance = TestExtended(ext.toSealedExtensions())
+        val instance = TestExtended(ext.sealed())
 
         val list1 = instance.degradingList
         val list2 = instance.degradingList
@@ -232,7 +217,7 @@ class ExtensionsTest {
     @Test
     fun `test MapRegistryExtension for Extended returns empty map when absent`() {
         val ext = MutableExtensions()
-        val instance = TestExtended(ext.toSealedExtensions())
+        val instance = TestExtended(ext.sealed())
 
         assertEquals(emptyMap(), instance.map)
     }
@@ -243,7 +228,7 @@ class ExtensionsTest {
         mutableInstance.map.register("key1", 1)
         mutableInstance.map.register("key2", 2)
 
-        val readOnlyInstance = TestExtended(mutableInstance.extensions.toSealedExtensions())
+        val readOnlyInstance = TestExtended(mutableInstance.extensions.sealed())
 
         assertEquals(mapOf("key1" to 1, "key2" to 2), readOnlyInstance.map)
     }
@@ -256,7 +241,7 @@ class ExtensionsTest {
         val ext2 = MutableExtensions()
         ext2[TestMapExt].register("key2", 2)
 
-        ext2.include(ext1.toSealedExtensions(), PathSpec.root)
+        ext2.include(ext1.sealed())
 
         assertEquals(mapOf("key2" to 2, "key1" to 1), ext2[TestMapExt])
     }
@@ -267,7 +252,7 @@ class ExtensionsTest {
     @Test
     fun `test ListRegistryExtension for Extended returns empty list when absent`() {
         val ext = MutableExtensions()
-        val instance = TestExtended(ext.toSealedExtensions())
+        val instance = TestExtended(ext.sealed())
 
         assertEquals(emptyList(), instance.list)
     }
@@ -278,7 +263,7 @@ class ExtensionsTest {
         mutableInstance.list.register("item1")
         mutableInstance.list.register("item2")
 
-        val readOnlyInstance = TestExtended(mutableInstance.extensions.toSealedExtensions())
+        val readOnlyInstance = TestExtended(mutableInstance.extensions.sealed())
 
         assertEquals(listOf("item1", "item2"), readOnlyInstance.list)
     }
@@ -291,32 +276,9 @@ class ExtensionsTest {
         val ext2 = MutableExtensions()
         ext2[TestListExt].register("item2")
 
-        ext2.include(ext1.toSealedExtensions(), PathSpec.root)
+        ext2.include(ext1.sealed())
 
         assertEquals(listOf("item2", "item1"), ext2[TestListExt])
-    }
-
-    // Cache delegate additional tests
-    @Test
-    fun `test cache delegate provides different defaults for different instances`() {
-        val instance1 = TestExtendable()
-        val instance2 = TestExtendable()
-
-        val value1 = instance1.cached
-        val value2 = instance2.cached
-
-        // Different instances should have different default values (based on hashCode)
-        assertTrue(value1 != value2 || instance1.hashCode() == instance2.hashCode())
-    }
-
-    @Test
-    fun `test cache delegate preserves value after set`() {
-        val instance = TestExtendable()
-        instance.cached = "custom"
-        assertEquals("custom", instance.cached)
-
-        // Access again should return the same value
-        assertEquals("custom", instance.cached)
     }
 
     // getOrPut edge cases
@@ -341,12 +303,12 @@ class ExtensionsTest {
     fun `test MutableExtensions constructor copies initial extensions`() {
         val original = MutableExtensions()
         original[TestKey] = "value"
-        original[TestDegradingKey].add("item")
+        original[TestWritableKey].add("item")
 
-        val copy = MutableExtensions(original.toSealedExtensions())
+        val copy = MutableExtensions(original.sealed())
 
         assertEquals("value", copy[TestKey])
-        assertEquals(listOf("item"), copy[TestDegradingKey])
+        assertEquals(listOf("item"), copy[TestWritableKey])
 
         // Modifying copy should not affect original (sealed)
         copy[TestKey] = "modified"
@@ -357,7 +319,7 @@ class ExtensionsTest {
     fun `test toSealedExtensions prevents modification`() {
         val mutable = MutableExtensions()
         mutable[TestKey] = "value"
-        val sealed = mutable.toSealedExtensions()
+        val sealed = mutable.sealed()
 
         // Sealed extensions should throw on modification attempt
         // Note: This test verifies the sealing behavior - the internal SealableMap
@@ -366,7 +328,9 @@ class ExtensionsTest {
             (sealed as MutableExtensions)[TestKey] = "new"
             assertTrue(false, "Should have thrown IllegalStateException")
         } catch (e: IllegalStateException) {
-            assertTrue(e.message?.contains("sealed") == true)
+            assertEquals(true, e.message?.contains("sealed"))
+        } catch (_: ClassCastException) {
+
         }
     }
 
@@ -378,7 +342,7 @@ class ExtensionsTest {
         val ext2 = MutableExtensions()
         ext2[TestKey] = "from ext2" // Existing value
 
-        ext2.include(ext1.toSealedExtensions(), PathSpec.root)
+        ext2.include(ext1.sealed())
 
         // putIfAbsent should preserve the existing value in ext2
         assertEquals("from ext2", ext2[TestKey])
@@ -388,21 +352,14 @@ class ExtensionsTest {
     fun `test entries returns all key-value pairs`() {
         val ext = MutableExtensions()
         ext[TestKey] = "value"
-        ext[TestDegradingKey].add("item")
+        ext[TestWritableKey].add("item")
 
         val entries = ext.entries
         assertEquals(2, entries.size)
 
         val keySet = entries.map { it.key }.toSet()
         assertTrue(keySet.contains(TestKey))
-        assertTrue(keySet.contains(TestDegradingKey))
-    }
-
-    @Test
-    fun `test MutableExtensions constructor with null creates empty extensions`() {
-        val ext = MutableExtensions(null)
-        assertTrue(ext.entries.isEmpty())
-        assertNull(ext[TestKey])
+        assertTrue(keySet.contains(TestWritableKey))
     }
 
     @Test
@@ -414,21 +371,18 @@ class ExtensionsTest {
         // so when we access via Extensions interface (not MutableExtensions), it returns null
 
         val ext2 = MutableExtensions()
-        ext2[TestDegradingKey].add("original")
+        ext2[TestWritableKey].add("original")
 
         // Create a mock Extensions that returns null for the DegradingKey
         val mockExtensions = object : Extensions {
             override fun <T : Any> get(key: Extensions.Key<T>): T? = null
-            override val entries: Set<Map.Entry<Extensions.Key<*>, Any>>
-                get() = setOf(object : Map.Entry<Extensions.Key<*>, Any> {
-                    override val key: Extensions.Key<*> = TestDegradingKey
-                    override val value: Any = emptyList<String>()
-                })
+            override val entries: Set<Extensions.Entry<*>>
+                get() = setOf(Extensions.Entry(TestWritableKey, emptyList()))
         }
 
-        ext2.include(mockExtensions, PathSpec.root)
+        ext2.include(mockExtensions)
 
         // Original value should be preserved since include skipped when get returned null
-        assertEquals(listOf("original"), ext2[TestDegradingKey])
+        assertEquals(listOf("original"), ext2[TestWritableKey])
     }
 }

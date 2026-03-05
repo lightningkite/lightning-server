@@ -1,11 +1,11 @@
 package com.lightningkite.lightningserver.auth
 
-import com.lightningkite.lightningserver.auth.AuthRequirement.Options
 import com.lightningkite.lightningserver.ForbiddenException
+import com.lightningkite.lightningserver.auth.AuthRequirement.Options
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.definition.set
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.HasId
-import kotlin.collections.plus
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
@@ -92,17 +92,17 @@ public val AuthRequirement.Companion.isDeveloper: AuthRequirement<HasId<*>>
 context(builder: ServerBuilder)
 public var AuthRequirement.Companion.isSuperUser: AuthRequirement<HasId<*>>
     get() = AuthRequirement.IsSuperUser
-    set(value) { builder.extensions[AuthRequirement.IsSuperUser] = value }
+    set(value) { AuthRequirement.IsSuperUser set value }
 
 context(builder: ServerBuilder)
 public var AuthRequirement.Companion.isAdmin: AuthRequirement<HasId<*>>
     get() = AuthRequirement.IsAdmin
-    set(value) { builder.extensions[AuthRequirement.IsAdmin] = value }
+    set(value) { AuthRequirement.IsAdmin set value }
 
 context(builder: ServerBuilder)
 public var AuthRequirement.Companion.isDeveloper: AuthRequirement<HasId<*>>
     get() = AuthRequirement.IsDeveloper
-    set(value) { builder.extensions[AuthRequirement.IsDeveloper] = value }
+    set(value) { AuthRequirement.IsDeveloper set value }
 
 
 

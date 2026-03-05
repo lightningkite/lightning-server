@@ -3,6 +3,8 @@ package com.lightningkite.lightningserver.definition
 import com.lightningkite.lightningserver.definition.builder.ListRegistry
 import com.lightningkite.lightningserver.definition.builder.MapRegistry
 import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.toSealedList
+import com.lightningkite.toSealedMap
 import kotlin.collections.component1
 import kotlin.collections.component2
 import kotlin.collections.iterator
@@ -47,66 +49,37 @@ public operator fun <T : Any> MutableExtensions.Key<T>.setValue(thisRef: Extenda
  * @param default A function that computes the default value if the key is not present
  * @return The existing or newly computed value for this key
  */
-public fun <T : Any> MutableExtensions.getOrPut(key: MutableExtensions.Key<T>, default: () -> T): T = get(key) ?: default().also { set(key, it) }
+public inline fun <T : Any> MutableExtensions.getOrPut(key: MutableExtensions.Key<T>, default: () -> T): T = get(key) ?: default().also { set(key, it) }
 
 /**
- * Creates a read-write property delegate that caches values using this key.
+ * Enables property delegation for [MutableExtensions.WritableKey] on [Extendable] types.
  *
- * The returned delegate ensures that a value always exists for the property by computing a default
- * value on first access. The default value is computed using the receiver instance, allowing
- * context-aware initialization.
- *
- * Example:
- * ```kotlin
- * object ConfigKey : MutableExtensions.Key<Config>
- *
- * var MyBuilder.config: Config by ConfigKey.cache { Config(defaultName = "builder-${hashCode()}") }
- *
- * fun example() {
- *     val builder = MyBuilder()
- *     val config = builder.config // Creates default Config with unique name
- *     builder.config = Config("custom") // Can still be overwritten
- * }
- * ```
- *
- * @param default a function that computes the initial value using the receiver instance
- * @return a [ReadWriteProperty] that ensures the property always has a value
- */
-public fun <T : Any, E : Extendable> MutableExtensions.Key<T>.cache(default: E.() -> T): ReadWriteProperty<E, T> =
-    object : ReadWriteProperty<E, T> {
-        override fun getValue(thisRef: E, property: KProperty<*>): T = thisRef.extensions.getOrPut(this@cache) { default(thisRef) }
-        override fun setValue(thisRef: E, property: KProperty<*>, value: T) { thisRef.extensions[this@cache] = value }
-    }
-
-/**
- * Enables property delegation for [MutableExtensions.DegradingKey] on [Extendable] types.
- *
- * This operator allows [MutableExtensions.DegradingKey] instances to be used with Kotlin's `by` delegation
+ * This operator allows [MutableExtensions.WritableKey] instances to be used with Kotlin's `by` delegation
  * syntax on [Extendable] receivers, providing access to the mutable `WRITE` type.
  *
  * @param thisRef the [Extendable] instance containing the mutable extensions
  * @param property the property being delegated (not used in implementation)
  * @return the mutable value of type [WRITE], creating a default if not present
  */
-public operator fun <WRITE : READ, READ : Any> MutableExtensions.DegradingKey<WRITE, READ>.getValue(thisRef: Extendable, property: KProperty<*>): WRITE =
+public operator fun <WRITE : READ, READ : Any> MutableExtensions.WritableKey<WRITE, READ>.getValue(thisRef: Extendable, property: KProperty<*>): WRITE =
     thisRef.extensions[this]
 
 /**
- * Enables property delegation for [MutableExtensions.DegradingKey] on [Extended] types.
+ * Enables property delegation for [MutableExtensions.WritableKey] on [Extended] types.
  *
- * This operator allows [MutableExtensions.DegradingKey] instances to be used with Kotlin's `by` delegation
+ * This operator allows [MutableExtensions.WritableKey] instances to be used with Kotlin's `by` delegation
  * syntax on [Extended] receivers, providing access to the read-only `READ` type.
  *
  * @param thisRef the [Extended] instance containing the extensions
  * @param property the property being delegated (not used in implementation)
  * @return the read-only value of type [READ], or a new default instance if not present
  */
-public operator fun <WRITE : READ, READ : Any> MutableExtensions.DegradingKey<WRITE, READ>.getValue(thisRef: Extended, property: KProperty<*>): READ =
+public operator fun <WRITE : READ, READ : Any> MutableExtensions.WritableKey<WRITE, READ>.getValue(thisRef: Extended, property: KProperty<*>): READ =
     thisRef.extensions[this] ?: default()
 
 
 /**
- * A convenience wrapper of [MutableExtensions.DegradingKey] for a [MapRegistry], providing an implementation of
+ * A convenience wrapper of [MutableExtensions.WritableKey] for a [MapRegistry], providing an implementation of
  * [default].
  *
  * This interface simplifies the creation of degrading keys for Registry types, automatically providing
@@ -121,15 +94,16 @@ public operator fun <WRITE : READ, READ : Any> MutableExtensions.DegradingKey<WR
  * val MyClass.handlers: Map<String, RequestHandler> by HandlersKey
  * ```
  */
-public interface MapRegistryExtension<L, V> : MutableExtensions.DegradingKey<MapRegistry<L, V>, Map<L, V>> {
+public interface MapRegistryExtension<L, V> : MutableExtensions.WritableKey<MapRegistry<L, V>, Map<L, V>> {
     override fun default(): MapRegistry<L, V> = MapRegistry()
-    override fun MapRegistry<L, V>.include(other: Map<L, V>, pathSpec: PathSpec0) {
+    override fun MapRegistry<L, V>.include(other: Map<L, V>) {
         for ((key, value) in other) register(key, value)
     }
+    override fun seal(data: Map<L, V>): Map<L, V> = data.toSealedMap()
 }
 
 /**
- * A convenience wrapper of [MutableExtensions.DegradingKey] for a [ListRegistry], providing an implementation of
+ * A convenience wrapper of [MutableExtensions.WritableKey] for a [ListRegistry], providing an implementation of
  * [default].
  *
  * This interface simplifies the creation of degrading keys for ListRegistry types, automatically providing
@@ -144,11 +118,12 @@ public interface MapRegistryExtension<L, V> : MutableExtensions.DegradingKey<Map
  * val MyClass.names: List<String> by NamesKey
  * ```
  */
-public interface ListRegistryExtension<V> : MutableExtensions.DegradingKey<ListRegistry<V>, List<V>> {
+public interface ListRegistryExtension<V> : MutableExtensions.WritableKey<ListRegistry<V>, List<V>> {
     override fun default(): ListRegistry<V> = ListRegistry()
-    override fun ListRegistry<V>.include(other: List<V>, pathSpec: PathSpec0) {
+    override fun ListRegistry<V>.include(other: List<V>) {
         for (value in other) register(value)
     }
+    override fun seal(data: List<V>): List<V> = data.toSealedList()
 }
 
 /**
@@ -160,3 +135,17 @@ public interface ListRegistryExtension<V> : MutableExtensions.DegradingKey<ListR
  * @return A new [MutableExtensions] instance containing copies of all entries from this extensions
  */
 public fun Extensions.toMutableExtensions(): MutableExtensions = MutableExtensions(this)
+
+public fun Extensions.sealed(): Extensions =
+    this as? SealedExtensions ?: SealedExtensions(this)
+
+context(extended: Extended)
+public fun <T : Any> Extensions.Key<T>.get(): T? = extended.extensions[this]
+
+context(extendable: Extendable)
+public fun <W : R, R : Any> MutableExtensions.WritableKey<W, R>.get(): W = extendable.extensions[this]
+
+context(extendable: Extendable)
+public infix fun <T : Any> MutableExtensions.Key<T>.set(value: T?) {
+    extendable.extensions[this] = value
+}
