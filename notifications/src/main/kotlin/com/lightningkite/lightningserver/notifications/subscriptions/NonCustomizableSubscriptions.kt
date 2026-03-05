@@ -1,8 +1,6 @@
 package com.lightningkite.lightningserver.notifications.subscriptions
 
-import com.lightningkite.lightningserver.definition.builder.ListRegistry
 import com.lightningkite.lightningserver.definition.builder.MapRegistry
-import com.lightningkite.lightningserver.definition.builder.getOrRegister
 import com.lightningkite.lightningserver.notifications.Frequency
 import com.lightningkite.lightningserver.notifications.NotificationEndpoints
 import com.lightningkite.lightningserver.notifications.ScheduledSendMethods
@@ -10,10 +8,7 @@ import com.lightningkite.lightningserver.notifications.events.Event
 import com.lightningkite.lightningserver.notifications.events.EventDefinition
 import com.lightningkite.lightningserver.notifications.events.EventRegistry
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.services.database.HasId
-import io.github.oshai.kotlinlogging.KLogger
-import io.github.oshai.kotlinlogging.KotlinLogging
 
 private typealias SendMethodsGenerator<UID, T, ID> = suspend context(ServerRuntime) (Event<T, ID>) -> List<ScheduledSendMethods<UID>>
 
@@ -102,22 +97,9 @@ public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UI
     @Suppress("UNCHECKED_CAST")
     context(runtime: ServerRuntime)
     override suspend fun <T : HasId<ID>, ID : Comparable<ID>> subscribed(event: Event<T, ID>): List<ScheduledSendMethods<UID>> {
-        val listener = eventListeners[event.type.name]?.let { it as SendMethodsGenerator<UID, T, ID> } ?: return emptyList()
-        val listeners = listOf(listener)
+        val interested = eventListeners[event.type.name]?.let { it as SendMethodsGenerator<UID, T, ID> } ?: return emptyList()
 
-        val interested = listeners.flatMap { it(event) }.groupBy { it.user }
-
-        val now = now()
-
-        return interested.map { (user, methods) ->
-            ScheduledSendMethods(
-                user,
-                email = methods.mapNotNull { it.email }.minByOrNull { it.schedule(now) },
-                sms = methods.mapNotNull { it.sms }.minByOrNull { it.schedule(now) },
-                push = methods.mapNotNull { it.push }.minByOrNull { it.schedule(now) },
-                inApp = methods.mapNotNull { it.inApp }.minByOrNull { it.schedule(now) },
-            )
-        }
+        return interested(event)
     }
 
     context(runtime: ServerRuntime)

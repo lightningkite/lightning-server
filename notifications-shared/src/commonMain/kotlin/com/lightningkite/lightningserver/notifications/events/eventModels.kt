@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.notifications.events
 
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.database.HasId
+import com.lightningkite.services.database.serializerOrContextual
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationStrategy
@@ -58,6 +59,8 @@ public data class EventData(
             public fun <ID> encode(json: Json, serializer: SerializationStrategy<ID>, id: ID): IdJsonEncoded = IdJsonEncoded(json.encodeToString(serializer, id))
         }
     }
+
+    public inline fun <reified ID> subjectId(json: Json): ID = subject.decode(json, serializerOrContextual())
 }
 
 
