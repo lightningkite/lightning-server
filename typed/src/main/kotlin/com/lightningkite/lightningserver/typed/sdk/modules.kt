@@ -1,10 +1,12 @@
 package com.lightningkite.lightningserver.typed.sdk
 
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.LightningServerDsl
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.withSdkInfo
+import com.lightningkite.toSealedMap
 import kotlin.uuid.Uuid
 
 /**
@@ -241,9 +243,8 @@ public infix fun <S : ServerBuilder> PathSpec0.module(module: S): S = module(mod
 @LightningServerDsl
 context(builder: ServerBuilder)
 public infix fun PathSpec0.module(module: SdkModule<ServerDefinition>): ServerDefinition {
-    val (mod, id) = module.value.withSdkId()
-    builder.extensions[ModuleRegistry][id] = module.info
-    return with(builder) { include(mod) }
+    builder.extensions[ModuleRegistry][module.value.thisLayer.sdkId] = module.info
+    return with(builder) { include(module.value) }
 }
 
 
@@ -259,37 +260,19 @@ public infix fun PathSpec0.module(module: SdkModule<ServerDefinition>): ServerDe
 //
 // These details are not part of the public API and may change.
 
-/**
- * Extension key for storing unique SDK identifiers on modules.
- * Each ServerBuilder/ServerDefinition gets a unique UUID for tracking its SDK metadata.
- */
-private object SdkId : MutableExtensions.Key<Uuid>
 
 /**
  * Gets or creates a unique SDK ID for this ServerBuilder.
  * IDs are lazily generated and cached in the extensions.
  */
-private val ServerBuilder.sdkId get() = extensions.getOrPut(SdkId) { Uuid.random() }
+@OptIn(InternalLightningServerApi::class)
+private inline val ServerBuilder.sdkId get() = moduleId
 
 /**
  * Retrieves the SDK ID from a ServerDefinition.Module if it exists.
  */
-private val ServerDefinition.Module.sdkId get() = extensions[SdkId]
-
-/**
- * Ensures a ServerDefinition has an SDK ID, creating a copy with a new ID if necessary.
- * @return A pair of (definition, id) where the definition has the ID registered
- */
-private fun ServerDefinition.withSdkId(): Pair<ServerDefinition, Uuid> {
-    thisLayer.extensions[SdkId]?.let { return this to it }
-    val id = Uuid.random()
-    val copied = copy(
-        thisLayer = thisLayer.copy(
-            extensions = extensions.toMutableExtensions().apply { set(SdkId, id) }
-        ),
-    )
-    return copied to id
-}
+@OptIn(InternalLightningServerApi::class)
+private inline val ServerDefinition.Module.sdkId get() = moduleId
 
 /**
  * Extension key for storing the registry of module SDK metadata.
@@ -298,11 +281,12 @@ private fun ServerDefinition.withSdkId(): Pair<ServerDefinition, Uuid> {
  * This registry is intentionally non-cascading - each module maintains
  * its own list of child module metadata without inheriting parent registries.
  */
-private object ModuleRegistry : MutableExtensions.DegradingKey<MutableMap<Uuid, SdkModule.Info>, Map<Uuid, SdkModule.Info>> {
+private object ModuleRegistry : MutableExtensions.WritableKey<MutableMap<Uuid, SdkModule.Info>, Map<Uuid, SdkModule.Info>> {
     override fun default(): MutableMap<Uuid, SdkModule.Info> = HashMap()
-    override fun MutableMap<Uuid, SdkModule.Info>.include(other: Map<Uuid, SdkModule.Info>, pathSpec: PathSpec0) {
+    override fun MutableMap<Uuid, SdkModule.Info>.include(other: Map<Uuid, SdkModule.Info>) {
         /*No-op, we want to keep registered modules specific per-module, not cascading.*/
     }
+    override fun seal(data: Map<Uuid, SdkModule.Info>): Map<Uuid, SdkModule.Info> = data.toSealedMap()
 }
 
 /**
@@ -312,6 +296,5 @@ private object ModuleRegistry : MutableExtensions.DegradingKey<MutableMap<Uuid, 
  * @return The SDK metadata if registered, null otherwise
  */
 internal fun ServerDefinition.Module.getModuleInfo(other: ServerDefinition.Module): SdkModule.Info? {
-    val id = other.sdkId ?: return null
-    return extensions[ModuleRegistry]?.get(id)
+    return extensions[ModuleRegistry]?.get(other.sdkId)
 }

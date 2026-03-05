@@ -1,8 +1,6 @@
 package com.lightningkite.lightningserver.definition
 
-import com.lightningkite.SealableMap
-import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.buildSealedMap
 
 
 /**
@@ -29,19 +27,27 @@ public interface Extensions {
      * */
     public interface Key<T : Any>
 
+    public data class Entry<T : Any>(val key: Key<T>, val value: T)
+
     /**
      * Retrieves the extension of type `T` for this [Key], if it exists. If the key is
      * not present returns `null`.
      * */
     public operator fun <T : Any> get(key: Key<T>): T?
-    public val entries: Set<Map.Entry<Key<*>, Any>>
+    public val entries: Set<Entry<*>>
 }
 
 /**
  * [MutableExtensions] provides read-write access to strongly-typed extension values.
- * Write access is provided in two ways: [MutableExtensions.Key] and [MutableExtensions.DegradingKey].
+ * Write access is provided in two ways: [MutableExtensions.Key] and [MutableExtensions.WritableKey].
  * */
-public class MutableExtensions: Extensions {
+public class MutableExtensions() : Extensions {
+    public constructor(start: Extensions) : this() {
+        for ((key, value) in start.entries) {
+            map[key] = value
+        }
+    }
+
     /**
      * Provides mutable access to an extension value of type `T`.
      *
@@ -77,8 +83,8 @@ public class MutableExtensions: Extensions {
      * degraded to [Extensions] retrieves `READ`. The typical use for this
      * is to degrade a type `WRITE` with read-write access to a read-only type `READ`.
      *
-     * [DegradingKey] instances defined for public use should also define an extension property so that
-     * the extension can be easily located. For convenience [DegradingKey] extension properties can be
+     * [WritableKey] instances defined for public use should also define an extension property so that
+     * the extension can be easily located. For convenience [WritableKey] extension properties can be
      * defined by delegation to the key itself, retrieving `WRITE` for [Extendable] receivers and
      * `READ` for [Extended] receivers.
      *
@@ -104,26 +110,19 @@ public class MutableExtensions: Extensions {
      * }
      * ```
      * */
-    public interface DegradingKey<WRITE : READ, READ : Any> : Extensions.Key<READ> {
+    public interface WritableKey<WRITE : READ, READ : Any> : Extensions.Key<READ> {
         public fun default(): WRITE
-        public fun WRITE.include(other: READ, pathSpec: PathSpec0)
+        public fun WRITE.include(other: READ)
+        public fun seal(data: READ): READ
     }
 
-    private val map: SealableMap<Extensions.Key<*>, Any> = SealableMap(HashMap())
-
-    public constructor(start: Extensions? = null) {
-        start?.entries?.let { entries ->
-            for ((key, value) in entries) {
-                map[key] = value
-            }
-        }
-    }
+    private val map = HashMap<Extensions.Key<*>, Any>()
 
     @Suppress("UNCHECKED_CAST")
     override operator fun <T : Any> get(key: Extensions.Key<T>): T? = map[key] as? T
 
     @Suppress("UNCHECKED_CAST")
-    public operator fun <W : R, R : Any> get(key: DegradingKey<W, R>): W =
+    public operator fun <W : R, R : Any> get(key: WritableKey<W, R>): W =
         map.getOrPut(key, key::default) as W
 
     /**
@@ -136,26 +135,38 @@ public class MutableExtensions: Extensions {
         else map[key] = value
     }
 
-    override val entries: Set<Map.Entry<Extensions.Key<*>, Any>>
-        get() = map.entries
+    @Suppress("UNCHECKED_CAST")
+    override val entries: Set<Extensions.Entry<*>>
+        get() = map.entries.mapTo(HashSet()) { Extensions.Entry(it.key as Extensions.Key<Any>, it.value) }
 
-    public fun include(extensions: Extensions, pathSpec: PathSpec0) {
+    public fun include(extensions: Extensions) {
         for ((key, value) in extensions.entries) {
-            if (key is DegradingKey<*, *>) {
+            if (key is WritableKey<*, *>) {
                 @Suppress("UNCHECKED_CAST")
-                key as DegradingKey<Any, Any>
+                key as WritableKey<Any, Any>
                 val including = extensions[key] ?: continue
                 val existing = get(key)
-                key.run { existing.include(including, pathSpec) }
+                key.run { existing.include(including) }
             }
             else map.putIfAbsent(key, value)
         }
     }
+}
 
-    /**
-     * Returns an immutable read-only [Extensions] instance with copied data
-     * */
-    public fun toSealedExtensions(): Extensions = MutableExtensions(this).also { it.map.seal() }
+public class SealedExtensions(extensions: Extensions): Extensions {
+    private val map = buildSealedMap {
+        for ((key, value) in extensions.entries) {
+            if (key is MutableExtensions.WritableKey<*, Any>) put(key, key.seal(value))
+            else put(key, value)
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    override val entries: Set<Extensions.Entry<*>>
+        get() = map.entries.mapTo(HashSet()) { Extensions.Entry(it.key as Extensions.Key<Any>, it.value) }
+
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : Any> get(key: Extensions.Key<T>): T? = map[key] as? T
 }
 
 /**
@@ -190,7 +201,7 @@ public interface Extended {
  * added to an [Extendable] are unique to that [Extendable] instance.
  *
  * By convention, publicly defined extensions for an [Extendable] type should be accessible
- * through extension properties that delegate to a [MutableExtensions.Key] or [MutableExtensions.DegradingKey],
+ * through extension properties that delegate to a [MutableExtensions.Key] or [MutableExtensions.WritableKey],
  * as this makes identifying relevant extensions easier.
  *
  * Example
@@ -213,7 +224,7 @@ public interface Extended {
  *
  * @see MutableExtensions
  * @see MutableExtensions.Key
- * @see MutableExtensions.DegradingKey
+ * @see MutableExtensions.WritableKey
  * */
 public interface Extendable : Extended {
     public override val extensions: MutableExtensions

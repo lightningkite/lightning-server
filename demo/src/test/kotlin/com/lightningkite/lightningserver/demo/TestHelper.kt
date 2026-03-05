@@ -19,6 +19,6 @@ object TestHelper {
     }
 
    inline fun testServer(action: context(TestRunner<Server>) Server.()->Unit) {
-        Server.test(settings = { database set Database.Settings("ram") }, action)
-    }
+        Server.test(settings = { database set Database.Settings("ram") }, action = action)
+   }
 }
