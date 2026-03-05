@@ -17,6 +17,7 @@ dependencies {
     api(project(":core"))
     api(project(":engine-ktor"))
     api(project(":typed"))
+    api(project(":load-test"))
     api(project(":engine-aws-serverless"))
     api(project(":engine-jdk-server"))
     api(project(":engine-netty"))
@@ -123,6 +124,21 @@ tasks.create("serveNetty", JavaExec::class.java) {
     classpath(sourceSets.main.get().runtimeClasspath)
     mainClass.set("com.lightningkite.lightningserver.demo.MainKt")
     args("serveNetty")
+    workingDir(project.rootDir)
+}
+
+// by Claude - run load test against a running demo server
+tasks.create("loadTest", JavaExec::class.java) {
+    group = "application"
+    classpath(sourceSets.main.get().runtimeClasspath)
+    mainClass.set("com.lightningkite.lightningserver.demo.LoadTestMainKt")
+    workingDir(project.rootDir)
+}
+// by Claude - compare all engines with the same load test
+tasks.create("engineComparison", JavaExec::class.java) {
+    group = "application"
+    classpath(sourceSets.main.get().runtimeClasspath)
+    mainClass.set("com.lightningkite.lightningserver.demo.EngineComparisonMainKt")
     workingDir(project.rootDir)
 }
 

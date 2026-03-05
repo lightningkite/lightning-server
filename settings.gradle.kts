@@ -46,4 +46,6 @@ include(":engine-jdk-server")
 
 include(":secret-source-aws")
 
+include(":load-test")
+
 include(":demo")
