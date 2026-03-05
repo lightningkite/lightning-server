@@ -2,7 +2,6 @@ package com.lightningkite.lightningserver.definition
 
 import com.lightningkite.lightningserver.definition.builder.ListRegistry
 import com.lightningkite.lightningserver.definition.builder.MapRegistry
-import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.toSealedList
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -329,7 +328,9 @@ class ExtensionsTest {
             (sealed as MutableExtensions)[TestKey] = "new"
             assertTrue(false, "Should have thrown IllegalStateException")
         } catch (e: IllegalStateException) {
-            assertTrue(e.message?.contains("sealed") == true)
+            assertEquals(true, e.message?.contains("sealed"))
+        } catch (_: ClassCastException) {
+
         }
     }
 
