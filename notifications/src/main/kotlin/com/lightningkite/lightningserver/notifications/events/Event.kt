@@ -23,29 +23,22 @@ import kotlin.uuid.Uuid
  * @property info Model information for the subject entity
  * @property conditionSerializer Serializer for type-safe conditions on the subject entity
  */
-public class EventDefinition<T : HasId<ID>, ID : Comparable<ID>>(
+public data class EventDefinition<T : HasId<ID>, ID : Comparable<ID>>(
     public val untyped: EventType,
     public val info: ModelInfo<*, T, ID>,
-    registry: EventRegistry
 ) {
     public constructor(
         name: String,
         tags: Set<String>,
         info: ModelInfo<*, T, ID>,
-        registry: EventRegistry
-    ) : this(EventType(name, tags), info, registry)
+    ) : this(EventType(EventType.Name(name), tags), info)
 
-    public val name: String get() = untyped.name
+    public val name: EventType.Name get() = untyped.name
     public val tags: Set<String> get() = untyped.tags
 
-    override fun toString(): String = name
+    override fun toString(): String = name.raw
 
     public val conditionSerializer: KSerializer<Condition<T>> = Condition.serializer(info.serializer)
-
-    init {
-        // This will throw if we get a duplicate somehow
-        registry.register(this)
-    }
 }
 
 /**

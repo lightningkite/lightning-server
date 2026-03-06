@@ -1,9 +1,11 @@
 package com.lightningkite.lightningserver.notifications.subscriptions
 
 import com.lightningkite.lightningserver.BadRequestException
+import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.PrincipalType
+import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.definition.builder.MapRegistry
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.notifications.Frequency
@@ -13,12 +15,14 @@ import com.lightningkite.lightningserver.notifications.events.EventType
 import com.lightningkite.lightningserver.notifications.events.Event
 import com.lightningkite.lightningserver.notifications.events.EventDefinition
 import com.lightningkite.lightningserver.notifications.events.EventRegistry
+import com.lightningkite.lightningserver.notifications.events.EventRegistry.Companion.events
 import com.lightningkite.lightningserver.notifications.events.UserEventType
+import com.lightningkite.lightningserver.notifications.events.event
 import com.lightningkite.lightningserver.notifications.events.type
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.typed.AuthAccess
 import com.lightningkite.lightningserver.typed.ModelInfo
-import com.lightningkite.lightningserver.typed.ModelRestEndpoints
 import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebsocket
 import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.DataClassPathSelf
@@ -99,25 +103,25 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
     info: ModelInfo<AUTH, NotificationEventSubscription<UID>, UserEventType<UID>>,
     users: ModelInfo<*, USER, UID>,
     private val principal: PrincipalType<USER, UID>,
-    private val events: EventRegistry,
     websocketKey: SerializableProperty<NotificationEventSubscription<UID>, *> = info.serializer.field_id,
     private val suppressRejectedAuthenticationWarnings: Boolean = false
 ) : NotificationEndpoints.Subscriptions<USER, UID>, ServerBuilder() {
+
     public val info: ModelInfo<AUTH, NotificationEventSubscription<UID>, UserEventType<UID>> =
         object : ModelInfo<AUTH, NotificationEventSubscription<UID>, UserEventType<UID>> by info {
-            context(server: ServerRuntime)
+            context(runtime: ServerRuntime)
             override suspend fun table(auth: AuthAccess<AUTH>): Table<NotificationEventSubscription<UID>> =
                 info.table(auth)
                     .interceptCreate { subscription ->
-                        val type = events.getValue(subscription._id.type.name)
+                        val type = runtime.server.events[subscription._id.event] ?: throw BadRequestException("EventType '${subscription._id.event}' not found.")
 
                         try {
-                            server.internalSerialization.json.decodeFromString(
+                            runtime.internalSerialization.json.decodeFromString(
                                 type.conditionSerializer,
                                 subscription.requestedFilter
                             )
                         } catch (e: Exception) {
-                            throw BadRequestException("Could not decode requested subscription filter for event type: $e", cause = e)
+                            throw BadRequestException("Could not decode requested subscription filter for event type '${type.name}': $e", cause = e)
                         }
 
                         subscription.copy(
@@ -163,7 +167,7 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
     ): NotificationEventSubscription<UID>? =
         subscription(user)?.let {
             NotificationEventSubscription(
-                UserEventType(user._id, eventType.untyped),
+                UserEventType(user._id, eventType.name),
                 requestedFilter = server.internalSerialization.json.encodeToString(
                     eventType.conditionSerializer,
                     it.filter
@@ -175,7 +179,7 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
             )
         }
 
-    private val defaultSubscriptions = MapRegistry<String, DefaultSubscription<USER, UID, *>>()
+    private val defaultSubscriptions = MapRegistry<EventType.Name, DefaultSubscription<USER, UID, *>>()
 
     /**
      * Retrieves the default subscription generator for an event type.
@@ -212,7 +216,7 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
     override suspend fun <T : HasId<ID>, ID : Comparable<ID>> subscribed(event: Event<T, ID>): List<ScheduledSendMethods<UID>> =
         info
             .table()
-            .find(self._id.type eq event.type.untyped)
+            .find(self._id.event eq event.type.name)
             .filter {
                 try {
                     val subscribedCondition = Condition.And(
@@ -255,7 +259,7 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
 
         val toRemove = defaults.flatMapTo(ArrayList()) { subscription ->
             deleted.map {
-                UserEventType(it._id, subscription.eventType.untyped)
+                UserEventType(it._id, subscription.eventType.name)
             }
         }
 
@@ -264,7 +268,7 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
                 for (default in defaults.filter { it.behavior == DefaultSubscriptionUpdateBehavior.UpdateRetainingUserChanges }) {
                     for (change in changed) {
                         val user = change.new ?: continue
-                        put(UserEventType(user._id, default.eventType.untyped), change.map { default(principal, it) })
+                        put(UserEventType(user._id, default.eventType.name), change.map { default(principal, it) })
                     }
                 }
             }
@@ -316,7 +320,7 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
                 for (default in defaults.filter { it.behavior == DefaultSubscriptionUpdateBehavior.UpdateReadPermissions }) {
                     for ((_, new) in changed) {
                         if (new == null) continue
-                        put(UserEventType(new._id, default.eventType.untyped), default.readPermissions(principal, new))
+                        put(UserEventType(new._id, default.eventType.name), default.readPermissions(principal, new))
                     }
                 }
             }
@@ -332,7 +336,7 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
             for (default in defaults.filter { it.behavior == DefaultSubscriptionUpdateBehavior.ReplaceExistingWithDefault }) {
                 for ((_, new) in changed) {
                     if (new == null) continue
-                    put(UserEventType(new._id, default.eventType.untyped), default(principal, new))
+                    put(UserEventType(new._id, default.eventType.name), default(principal, new))
                 }
             }
         }
@@ -350,8 +354,8 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
         users.registerChangeListener { updateDefaultSubscriptions(it.changes, null) }
     }
 
-    context(runtime: ServerRuntime)
-    override suspend fun verifyAllDependencies(registry: EventRegistry) {
+    private val verify = path.path("verify") bind StartupTask {
+        val registry = serverRuntime.server.events
         require(defaultSubscriptions.keys.containsAll(registry.keys)) {
             val missing = registry.keys - defaultSubscriptions.keys
             "Default subscriptions are missing for (${missing.size}) event definitions: $missing"
