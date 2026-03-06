@@ -26,10 +26,14 @@ import kotlin.time.Duration
 import kotlin.time.toJavaDuration
 
 data class S3File(val system: S3FileSystem, val path: File) : FileObject {
+    init{
+        if(this.path.unixPath.contains("+"))
+            throw IllegalArgumentException("Invalid File Path. File Path cannot contain '+'")
+    }
+
     override fun resolve(path: String): FileObject = S3File(
         system,
-        this.path.resolve(path.decodeURLPart()
-            .also { if (it.contains("+")) throw IllegalArgumentException("File Path cannot contain '+'") })
+        this.path.resolve(path.decodeURLPart())
     )
 
     override val name: String
