@@ -36,9 +36,12 @@ class LocalFileSystem(
 
     val fetchHead = ServerPath("$serveDirectory/{...}").head.handler {
         val wildcard = it.wildcard?.removePrefix("/") ?: throw BadRequestException("No file to look up")
-        if (wildcard.contains("..")) throw IllegalStateException()
         val file = rootFile.resolve(wildcard)
-        val fileObject = LocalFile(this, file)
+        val fileObject = try {
+            LocalFile(this, file)
+        } catch (_: Exception){
+            throw BadRequestException("Invalid File Path")
+        }
         if(!fileObject.checkSignature(it.queryParameters.joinToString("&") { "${it.first}=${it.second}" }))
             throw UnauthorizedException("Token invalid")
         if (!file.exists()) throw NotFoundException("No file ${wildcard} found")
@@ -55,9 +58,12 @@ class LocalFileSystem(
 
     val fetch = ServerPath("$serveDirectory/{...}").get.handler {
         val wildcard = it.wildcard?.removePrefix("/") ?: throw BadRequestException("No file to look up")
-        if (wildcard.contains("..")) throw IllegalStateException()
         val file = rootFile.resolve(wildcard)
-        val fileObject = LocalFile(this, file)
+        val fileObject = try {
+            LocalFile(this, file)
+        } catch (_: Exception){
+            throw BadRequestException("Invalid File Path")
+        }
         if(!fileObject.checkSignature(it.queryParameters.joinToString("&") { "${it.first}=${it.second}" }))
             throw UnauthorizedException("Token invalid")
         if (!file.exists()) throw NotFoundException("No file ${wildcard} found")
@@ -113,8 +119,11 @@ class LocalFileSystem(
 
     val upload = ServerPath("$serveDirectory/{...}").put.handler {
         val wildcard = it.wildcard!!.removePrefix("/")
-        if (wildcard.contains("..")) throw IllegalStateException()
-        val file = root.resolve(wildcard) as LocalFile
+        val file = try {
+            root.resolve(wildcard) as LocalFile
+        } catch (_: Exception){
+            throw BadRequestException("Invalid File Path")
+        }
         if(!file.checkSignatureWrite(it.queryParameters))
             throw UnauthorizedException("Token invalid")
         file.put(it.body!!)
