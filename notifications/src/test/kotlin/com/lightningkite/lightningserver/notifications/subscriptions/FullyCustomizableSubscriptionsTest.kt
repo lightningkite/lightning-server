@@ -43,8 +43,6 @@ class FullyCustomizableSubscriptionsTest {
     }
 
     private object Notifications : ServerBuilder() {
-        val sharedRegistry = EventRegistry()
-
         object Dispatcher : TestDispatcherBase(
             info = Server.database.testModelInfo(),
             cache = Server.cache,
@@ -58,7 +56,6 @@ class FullyCustomizableSubscriptionsTest {
             info = Server.database.testModelInfo<NotificationEventSubscription<Uuid>, UserEventType<Uuid>>(),
             users = Server.userInfo,
             principal = TestUser,
-            events = sharedRegistry,
             suppressRejectedAuthenticationWarnings = true
         )
 
@@ -66,7 +63,6 @@ class FullyCustomizableSubscriptionsTest {
             Server.userInfo,
             Dispatcher,
             subs,
-            registry = sharedRegistry
         )
 
         // Event with Condition.Always filter and UpdateReadPermissions behavior
@@ -119,7 +115,7 @@ class FullyCustomizableSubscriptionsTest {
                 Server.userInfo.table().insertOne(user)
 
                 val eventType = Notifications.modelCreated.event.untyped
-                val subscriptionId = UserEventType(user._id, eventType)
+                val subscriptionId = UserEventType(user._id, eventType.name)
                 val subscription = Notifications.subs.info.table().get(subscriptionId)
 
                 assertNotNull(subscription)
@@ -140,7 +136,7 @@ class FullyCustomizableSubscriptionsTest {
                 Server.userInfo.table().insertOne(user)
 
                 val eventType = Notifications.modelCreated.event.untyped
-                val subscriptionId = UserEventType(user._id, eventType)
+                val subscriptionId = UserEventType(user._id, eventType.name)
                 assertNotNull(Notifications.subs.info.table().get(subscriptionId))
 
                 Server.userInfo.table().deleteOneById(user._id)
@@ -161,9 +157,9 @@ class FullyCustomizableSubscriptionsTest {
                 Server.userInfo.table().insertOne(user)
 
                 val createdSub = Notifications.subs.info.table()
-                    .get(UserEventType(user._id, Notifications.modelCreated.event.untyped))
+                    .get(UserEventType(user._id, Notifications.modelCreated.event.name))
                 val deletedSub = Notifications.subs.info.table()
-                    .get(UserEventType(user._id, Notifications.modelDeleted.event.untyped))
+                    .get(UserEventType(user._id, Notifications.modelDeleted.event.name))
 
                 assertNotNull(createdSub)
                 assertNotNull(deletedSub)
@@ -208,7 +204,7 @@ class FullyCustomizableSubscriptionsTest {
                 Server.userInfo.table().insertOne(user)
 
                 val eventDef = Notifications.modelCreated.event
-                val subscriptionId = UserEventType(user._id, eventDef.untyped)
+                val subscriptionId = UserEventType(user._id, eventDef.name)
 
                 val existing = Notifications.subs.info.table().get(subscriptionId)
                 assertNotNull(existing)
@@ -236,7 +232,7 @@ class FullyCustomizableSubscriptionsTest {
                 Server.userInfo.table().insertOne(user)
 
                 val eventDef = Notifications.modelCreated.event
-                val subscriptionId = UserEventType(user._id, eventDef.untyped)
+                val subscriptionId = UserEventType(user._id, eventDef.name)
 
                 val existing = Notifications.subs.info.table().get(subscriptionId)
                 assertNotNull(existing)
@@ -272,9 +268,9 @@ class FullyCustomizableSubscriptionsTest {
                 val eventType = Notifications.modelCreated.event.untyped
 
                 val sub1 = Notifications.subs.info.table()
-                    .get(UserEventType(user1._id, eventType))
+                    .get(UserEventType(user1._id, eventType.name))
                 val sub2 = Notifications.subs.info.table()
-                    .get(UserEventType(user2._id, eventType))
+                    .get(UserEventType(user2._id, eventType.name))
 
                 assertNotNull(sub1)
                 assertNotNull(sub2)
@@ -301,9 +297,9 @@ class FullyCustomizableSubscriptionsTest {
                 Server.userInfo.table().deleteOneById(user1._id)
 
                 assertNull(Notifications.subs.info.table()
-                    .get(UserEventType(user1._id, eventType)))
+                    .get(UserEventType(user1._id, eventType.name)))
                 assertNotNull(Notifications.subs.info.table()
-                    .get(UserEventType(user2._id, eventType)))
+                    .get(UserEventType(user2._id, eventType.name)))
             }
         }
     }
@@ -321,7 +317,7 @@ class FullyCustomizableSubscriptionsTest {
                 Server.userInfo.table().insertOne(user)
 
                 val eventDef = Notifications.modelCreated.event
-                val subscriptionId = UserEventType(user._id, eventDef.untyped)
+                val subscriptionId = UserEventType(user._id, eventDef.untyped.name)
 
                 val existing = Notifications.subs.info.table().get(subscriptionId)
                 assertNotNull(existing)
@@ -355,7 +351,7 @@ class FullyCustomizableSubscriptionsTest {
                 Server.userInfo.table().insertOne(user)
 
                 val eventDef = Notifications.modelDeleted.event
-                val subscriptionId = UserEventType(user._id, eventDef.untyped)
+                val subscriptionId = UserEventType(user._id, eventDef.name)
 
                 val existing = Notifications.subs.info.table().get(subscriptionId)
                 assertNotNull(existing)
