@@ -1,7 +1,8 @@
 package com.lightningkite.lightningserver.notifications
 
-import com.lightningkite.lightningserver.notifications.events.Event
+import com.lightningkite.lightningserver.notifications.events.EventData
 import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.Index
 import com.lightningkite.services.data.IndexSet
 import com.lightningkite.services.database.HasId
 import kotlinx.datetime.DateTimeUnit
@@ -137,6 +138,7 @@ public data class Frequency private constructor(
  */
 @Serializable
 @GenerateDataClassPaths
+@IndexSet(["sent", "sendAt"])
 public data class SendInfo(
     val sendAt: Instant,
     val sent: Boolean = false
@@ -154,7 +156,7 @@ public data class SendInfo(
  * @param UID The type of user identifier
  * @param CONTENT The type of notification content (application-specific)
  * @property _id Unique identifier for this notification
- * @property event The event that triggered this notification
+ * @property eventData The event that triggered this notification
  * @property user The user who should receive this notification
  * @property content The notification content (format determined by application)
  * @property createdAt When this notification was created
@@ -166,11 +168,10 @@ public data class SendInfo(
  */
 @Serializable
 @GenerateDataClassPaths
-@IndexSet(["user", "sendAt",])
 public data class Notification<UID, CONTENT>(
     override val _id: Uuid = Uuid.random(),
-    val event: Event,
-    val user: UID,
+    val eventData: EventData,
+    @Index val user: UID,
     val content: CONTENT,
     val createdAt: Instant,
     val read: Instant? = null,

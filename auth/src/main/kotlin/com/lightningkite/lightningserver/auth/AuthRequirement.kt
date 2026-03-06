@@ -158,7 +158,7 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
      * ```kotlin
      * object Server : ServerBuilder() {
      *     init {
-     *         extensions[IsContentModerator] = UserPrincipal.require(scope = RequiredScope("moderate"))
+     *         IsContentModerator.value = UserPrincipal.require(scope = RequiredScope("moderate"))
      *     }
      * }
      * ```

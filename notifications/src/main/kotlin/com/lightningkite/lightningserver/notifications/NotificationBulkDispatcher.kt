@@ -4,11 +4,13 @@ import com.lightningkite.EmailAddress
 import com.lightningkite.PhoneNumber
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.auth.noAuth
+import com.lightningkite.lightningserver.data.Schedule
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.ScheduledTask
 import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.launch
+import com.lightningkite.lightningserver.notifications.events.EventRegistry
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.invoke
 import com.lightningkite.lightningserver.runtime.location
@@ -19,6 +21,9 @@ import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebso
 import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebsocket.Companion.plus
 import com.lightningkite.lightningserver.typed.ModelRestUpdatesWebsocket
 import com.lightningkite.lightningserver.typed.explicitModelInfo
+import com.lightningkite.lightningserver.typed.sdk.SdkModule
+import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
+import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.database.Condition
@@ -27,6 +32,7 @@ import com.lightningkite.services.database.DataClassPathSelf
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.ModelPermissions
+import com.lightningkite.services.database.SerializableProperty
 import com.lightningkite.services.database.SortBuilder
 import com.lightningkite.services.database.SortPart
 import com.lightningkite.services.database.andNotNull
@@ -48,6 +54,7 @@ import com.lightningkite.services.notifications.NotificationService
 import com.lightningkite.services.sms.SMS
 import io.github.oshai.kotlinlogging.KLogger
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.github.oshai.kotlinlogging.slf4j.logger
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
@@ -55,6 +62,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.builtins.serializer
+import kotlin.math.log
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -85,26 +93,55 @@ import kotlin.uuid.Uuid
  *   scheduled notifications, and returns the formatted and bulked list of method-specific send formats.
  */
 public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Comparable<UID>, CONTENT>(
-    public val info: ModelInfo<USER, Notification<UID, CONTENT>, Uuid>,
+    public val info: ModelInfo<*, Notification<UID, CONTENT>, Uuid>,
     public val cache: Runtime<Cache>,
     database: Runtime<Database>,
-    public val users: ModelInfo<USER, USER, UID>,
+    public val users: ModelInfo<*, USER, UID>,
     public val contentSerializer: KSerializer<CONTENT>,
     public val email: (Runtime<EmailService>)? = null,
     public val sms: (Runtime<SMS>)? = null,
     public val push: (Runtime<NotificationService>)? = null,
+    public val refreshSchedule: Schedule = Schedule.Frequency(1.minutes),
     public val timeout: Duration = 5.minutes,
-): ServerBuilder(), NotificationEventHandler.Dispatcher<UID, CONTENT> {
+    websocketKey: SerializableProperty<Notification<UID, CONTENT>, *>? = info.serializer.fieldInApp
+): ServerBuilder(), NotificationEndpoints.Dispatcher<UID, CONTENT> {
+    init {
+        sdkSettings.defaultInfo = SdkModule.Info("NotificationsApi")
+    }
+
+    /**
+     * Returns the email address for a user, or null if email notifications are not enabled for this user.
+     * @param user The user to get the email address for
+     */
     context(server: ServerRuntime) public abstract suspend fun email(user: USER): EmailAddress?
+
+    /**
+     * Returns the phone number for a user, or null if SMS notifications are not enabled for this user.
+     * @param user The user to get the phone number for
+     */
     context(server: ServerRuntime) public abstract suspend fun phone(user: USER): PhoneNumber?
+
+    /**
+     * Returns the set of FCM (Firebase Cloud Messaging) tokens for a user's devices.
+     * @param user The user to get FCM tokens for
+     * @return Set of FCM tokens, or empty set if push notifications are not enabled
+     */
     context(server: ServerRuntime) public abstract suspend fun fcmTokens(user: USER): Set<String>
+
+    /**
+     * Called when FCM tokens are detected as invalid or expired.
+     * Implementations should remove these tokens from the user's profile.
+     * @param user The user whose tokens are dead
+     * @param deadTokens The set of tokens that are no longer valid
+     */
     context(server: ServerRuntime) public abstract suspend fun onFcmTokensDead(user: USER, deadTokens: Set<String>)
 
     internal val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.notifications.NotificationBulkDispatcher")
 
-    public val rest: ModelRestEndpointsAndUpdatesWebsocket<USER, Notification<UID, CONTENT>, Uuid> =
-        path.path("rest") include ModelRestEndpoints(info) + ModelRestUpdatesWebsocket(info)
-
+    /**
+     * Additional condition to apply when querying for notifications to send.
+     * Override this to add custom filtering logic (e.g., only send notifications for active users).
+     */
     protected open val additionalSendCondition: Condition<Notification<UID, CONTENT>>? = null
 
     /**
@@ -161,6 +198,13 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
             ?.let { sendNotifications(it) }
     }
 
+    /**
+     * REST and WebSocket endpoints for managing notifications.
+     * Mounted at `/rest`. Provides CRUD operations and real-time updates for notifications.
+     */
+    public val rest: ModelRestEndpointsAndUpdatesWebsocket<*, Notification<UID, CONTENT>, Uuid> =
+        path.path("rest") include ModelRestEndpointsAndUpdatesWebsocket(info, websocketKey)
+
     //_____Refreshing and sending notifications_____
     // Notifications are created with a 'sendAt' time, this specifies when the notification should be sent
     // and is how groups of notifications are bulked together. Every minute refreshNotifications queries for
@@ -173,10 +217,18 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
 
     private val self = DataClassPathSelf(info.serializer)
 
+    private val sendLogger = KotlinLogging.logger("${logger.name}.send")
+
     context(runtime: ServerRuntime)
     private suspend fun sendEmailNotifications(user: USER, notifications: List<Notification<UID, CONTENT>>) {
-        if (email == null) return
-        if (email(user) == null) return
+        if (email == null) {
+            sendLogger.debug { "No EmailService settings provided, skipping emails" }
+            return
+        }
+        if (email(user) == null) {
+            sendLogger.debug { "No email found for user ${user._id}" }
+            return
+        }
 
         val emails = makeEmailNotifications(user, notifications)
         if (emails.isNotEmpty()) email().sendBulk(emails)
@@ -184,8 +236,14 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
 
     context(runtime: ServerRuntime)
     private suspend fun sendSmsNotifications(user: USER, notifications: List<Notification<UID, CONTENT>>) {
-        if (sms == null) return
-        val phoneNumber = phone(user) ?: return
+        if (sms == null) {
+            sendLogger.debug { "No SMS settings provided, skipping SMS" }
+            return
+        }
+        val phoneNumber = phone(user) ?: run {
+            sendLogger.debug { "No phone number found for user ${user._id}, skipping SMS" }
+            return
+        }
 
         val messages = makeSmsNotifications(user, notifications)
         if (messages.isEmpty()) return
@@ -195,9 +253,15 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
 
     context(runtime: ServerRuntime)
     private suspend fun sendPushNotifications(user: USER, notifications: List<Notification<UID, CONTENT>>) {
-        if (push == null) return
+        if (push == null) {
+            sendLogger.debug { "No NotificationService settings provided, skipping push notifications" }
+            return
+        }
         val allTokens = fcmTokens(user).toMutableSet()
-        if (allTokens.isEmpty()) return
+        if (allTokens.isEmpty()) {
+            sendLogger.debug { "No fcm tokens found for user ${user._id}, skipping push notifications" }
+            return
+        }
 
         val notificationData = makePushNotifications(user, notifications)
         if (notificationData.isEmpty()) return
@@ -217,19 +281,36 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
         if (deadTokens.isNotEmpty()) onFcmTokensDead(user, deadTokens)
     }
 
+    /**
+     * Pagination parameters for querying notifications.
+     * @property page The current page number (0-indexed)
+     * @property pageLimit The number of notifications per page
+     */
     @Serializable
     public data class BasicPager(
         val page: Int,
         val pageLimit: Int,
     )
 
+    /**
+     * Payload for the send notifications task, including pre-fetched user data.
+     * @property users Map of user IDs to user objects for efficient lookup
+     * @property notifications The notifications to send
+     */
     @Serializable
     public data class NotificationPager<USER:HasId<UID>, UID:Comparable<UID>, CONTENT>(
         val users: Map<UID, USER>,
         val notifications: List<Notification<UID, CONTENT>>
     )
 
-    // Task to a send list of notifications, pages to make sure all notifications are sent
+    /**
+     * Task that sends a batch of notifications to users.
+     *
+     * Processes notifications in parallel per user, sending email, SMS, push, and in-app
+     * notifications as configured. Marks each channel as sent after successful delivery.
+     * If the task times out before all notifications are sent, it automatically relaunches
+     * with the remaining notifications.
+     */
     public val sendNotifications: Task<NotificationPager<USER, UID, CONTENT>> =
         path.path("send-notifs") bind Task(NotificationPager.serializer(users.serializer, users.idSerializer, contentSerializer)) { startInfo ->
             val byUser = startInfo.notifications.groupBy { it.user }
@@ -309,7 +390,14 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
             if (unsent.isNotEmpty()) launch(NotificationPager(startInfo.users, unsent.flatMap { it.value }))
         }
 
-    /**Gets the users of the notifications and launches a `sendNotifications` task*/
+    /**
+     * Fetches users for the given notifications and launches the [sendNotifications] task.
+     *
+     * This is the main entry point for sending a batch of notifications. It automatically
+     * fetches user data required for delivery and invokes the task.
+     *
+     * @param notifications The notifications to send
+     */
     context(_: ServerRuntime)
     public suspend fun sendNotifications(notifications: List<Notification<UID, CONTENT>>) {
         val users = users.table()
@@ -319,10 +407,16 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
         sendNotifications(NotificationPager(users, notifications))
     }
 
+    /**
+     * Singleton record tracking the last time notifications were refreshed.
+     * Used to avoid re-sending notifications that have already been processed.
+     * @property instant The timestamp of the last refresh
+     */
     @Serializable
     @GenerateDataClassPaths
     public data class RunInstant(val instant: Instant) : HasId<String> {
         public companion object{
+            /** The singleton ID for this record */
             public const val ID: String = "SINGLETON"
         }
 
@@ -376,6 +470,13 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
     private fun <T> sort(path: DataClassPath<T, T>, setup: SortBuilder<T>.(DataClassPath<T, T>) -> Unit): List<SortPart<T>> =
         SortBuilder<T>().apply { setup(path) }.build()
     
+    /**
+     * Task that queries for pending notifications and dispatches them.
+     *
+     * Finds notifications whose `sendAt` time is between the last refresh and now,
+     * preventing duplicate sends. Paginates through results and automatically
+     * relaunches if there are more notifications to process.
+     */
     public val refreshNotifications: Task<BasicPager> = path.path("refresh-notifs") bind Task<BasicPager> { startInfo ->
         try {
             val now = now()
@@ -435,11 +536,21 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
         }
     }
 
+    /**
+     * Manually triggers a refresh of pending notifications.
+     * Starts from page 0 with a default page size of 200.
+     */
     context(_: ServerRuntime)
     public suspend fun refreshNotifications(): Unit = refreshNotifications(BasicPager(0, 200))
 
+    /**
+     * Scheduled task that automatically refreshes and sends pending notifications.
+     *
+     * Runs on the configured [refreshSchedule] (default: every minute). Uses a distributed
+     * lock via cache to prevent multiple instances from processing simultaneously.
+     */
     public val autoRefreshNotifications: ScheduledTask =
-        path.path("refresh-notifs") bind ScheduledTask(1.minutes) {
+        path.path("refresh-notifs") bind ScheduledTask(refreshSchedule, timeout) {
             val acquiredLock = cache().setIfNotExists(scheduleLockKey, "lock", String.serializer(), timeout*16)
             if (acquiredLock) refreshNotifications()
         }

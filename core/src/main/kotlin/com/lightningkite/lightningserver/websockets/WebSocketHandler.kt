@@ -1,3 +1,5 @@
+@file:OptIn(InternalLightningServerApi::class)
+
 package com.lightningkite.lightningserver.websockets
 
 import com.lightningkite.lightningserver.InternalLightningServerApi

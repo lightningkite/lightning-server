@@ -2,15 +2,14 @@ package com.lightningkite.lightningserver.notifications.events
 
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.database.HasId
+import com.lightningkite.services.database.serializerOrContextual
+import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationStrategy
+import kotlinx.serialization.json.Json
+import kotlin.jvm.JvmInline
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
-
-/**
- * Type alias for untyped IDs stored as JSON strings.
- * Used to store the serialized ID of an event subject without type information.
- */
-public typealias UntypedID = String
 
 /**
  * Represents a type of event that can occur in the system.
@@ -45,12 +44,24 @@ public data class EventType(
  */
 @Serializable
 @GenerateDataClassPaths
-public data class Event(
-    override val _id: Uuid = Uuid.random(),
+public data class EventData(
+    override val _id: Uuid,
     val timestamp: Instant,
     val type: EventType,
-    val subject: UntypedID  // JSON of ID of T
-): HasId<Uuid>
+    val subject: IdJsonEncoded
+): HasId<Uuid> {
+    @Serializable
+    @JvmInline
+    public value class IdJsonEncoded private constructor(public val rawJson: String) {
+        public fun <ID> decode(json: Json, serializer: DeserializationStrategy<ID>): ID = json.decodeFromString(serializer, rawJson)
+
+        public companion object {
+            public fun <ID> encode(json: Json, serializer: SerializationStrategy<ID>, id: ID): IdJsonEncoded = IdJsonEncoded(json.encodeToString(serializer, id))
+        }
+    }
+
+    public inline fun <reified ID> subjectId(json: Json): ID = subject.decode(json, serializerOrContextual())
+}
 
 
 /**

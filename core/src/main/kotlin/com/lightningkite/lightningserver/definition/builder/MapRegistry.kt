@@ -71,7 +71,7 @@ private class BasicMapRegistry<L, V>(
 ) : MapRegistry<L, V>, Map<L, V> by registry {
     override fun register(location: L, value: V) {
         if (registry.containsKey(location)) registry.getValue(location).let {
-            throw DuplicateRegistrationError("Location $location already has a registered value: $it", it, value)
+            throw DuplicateRegistrationError("Key $location already has a registered value: $it", it, value)
         }
         registry[location] = value
     }

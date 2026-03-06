@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpInterceptor
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpStatus
+import com.lightningkite.lightningserver.http.delete
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.http.put
@@ -23,7 +24,10 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.TimeSource
 
 /**
  * Tests for ServerDefinition class, focusing on the module flattening,
@@ -656,5 +660,98 @@ class ServerDefinitionTest {
             definition.endpoints[PathSpec.root.path("l1").path("l2").path("l3").path("deep")]?.http?.get(HttpMethod.GET),
             "Should have deeply nested endpoint at /l1/l2/l3/deep"
         )
+    }
+
+    // ==================== Performance Tests ====================
+
+    @Test
+    fun `build performance with complex configuration`() {
+        // Create a complex module with multiple endpoints
+        fun createComplexModule(name: String) = object : ServerBuilder() {
+            // Multiple HTTP endpoints with different methods
+            val list = path.get bind HttpHandler { HttpResponse(status = HttpStatus.OK) }
+            val create = path.post bind HttpHandler { HttpResponse(status = HttpStatus.OK) }
+            val detail = path.arg<Int>("id").get bind HttpHandler { HttpResponse(status = HttpStatus.OK) }
+            val update = path.arg<Int>("id").put bind HttpHandler { HttpResponse(status = HttpStatus.OK) }
+            val delete = path.arg<Int>("id").delete bind HttpHandler { HttpResponse(status = HttpStatus.OK) }
+
+            // Nested paths
+            val nested1 = path.path("nested").path("level1").get bind HttpHandler<PathSpec0> { HttpResponse(status = HttpStatus.OK) }
+            val nested2 = path.path("nested").path("level2").get bind HttpHandler<PathSpec0> { HttpResponse(status = HttpStatus.OK) }
+
+            // Settings
+            val setting1 = setting("${name}_setting1", "default1")
+            val setting2 = setting("${name}_setting2", 42)
+            val setting3 = setting("${name}_setting3", true)
+        }
+
+        // Create nested modules (3 levels deep)
+        fun createNestedModule(depth: Int, name: String): ServerBuilder = object : ServerBuilder() {
+            val endpoint = path.get bind HttpHandler<PathSpec0> { HttpResponse(status = HttpStatus.OK) }
+            val setting = setting("${name}_depth${depth}", "value")
+
+            val complex = path.path("complex") include createComplexModule("${name}_depth${depth}")
+
+            val nested = if (depth > 0) {
+                path.path("nested") include createNestedModule(depth - 1, "${name}_sub")
+            } else null
+        }
+
+        // Build the complex server
+        fun server() = object : ServerBuilder() {
+            // Root level endpoints
+            val root = path.get bind HttpHandler<PathSpec0> { HttpResponse(status = HttpStatus.OK) }
+            val health = path.path("health").get bind HttpHandler<PathSpec0> { HttpResponse(status = HttpStatus.OK) }
+            val docs = path.path("docs").get bind HttpHandler<PathSpec0> { HttpResponse(status = HttpStatus.OK) }
+
+            // Root level settings
+            val serverName = setting("server_name", "TestServer")
+            val debug = setting("debug", false)
+            val maxConnections = setting("max_connections", 100)
+
+            // Include many modules (simulating a realistic API)
+            val users = path.path("users") include createComplexModule("users")
+            val posts = path.path("posts") include createComplexModule("posts")
+            val comments = path.path("comments") include createComplexModule("comments")
+            val tags = path.path("tags") include createComplexModule("tags")
+            val categories = path.path("categories") include createComplexModule("categories")
+            val auth = path.path("auth") include createComplexModule("auth")
+            val admin = path.path("admin") include createComplexModule("admin")
+            val api = path.path("api") include createComplexModule("api")
+            val webhooks = path.path("webhooks") include createComplexModule("webhooks")
+            val notifications = path.path("notifications") include createComplexModule("notifications")
+
+            // Deeply nested modules
+            val nested1 = path.path("nested1") include createNestedModule(5, "nest1")
+            val nested2 = path.path("nested2") include createNestedModule(5, "nest2")
+            val nested3 = path.path("nested3") include createNestedModule(5, "nest3")
+        }
+
+        // Measure build time over multiple iterations
+        val iterations = 100
+        val times = mutableListOf<Duration>()
+
+        repeat(iterations) {
+            val server = server()   // construct a new server each time
+            val mark = TimeSource.Monotonic.markNow()
+            val definition = server.build()
+            definition.flattened
+            times.add(mark.elapsedNow())
+        }
+
+        val avgTime = times.fold(Duration.ZERO) { acc, d -> acc + d } / times.size
+        val minTime = times.min()
+        val maxTime = times.max()
+
+        println("=== ServerBuilder.build() Performance ===")
+        println("Iterations: $iterations")
+        println("Average time: $avgTime")
+        println("Min time: $minTime")
+        println("Max time: $maxTime")
+        println("All Times: ${times.joinToString { "${it.inWholeMilliseconds}ms" }}")
+        println("=========================================")
+
+        // Assert reasonable performance (should complete in under 100ms on average)
+        assertTrue(avgTime < 100.milliseconds, "Build should complete in under 100ms on average, but took $avgTime ms")
     }
 }

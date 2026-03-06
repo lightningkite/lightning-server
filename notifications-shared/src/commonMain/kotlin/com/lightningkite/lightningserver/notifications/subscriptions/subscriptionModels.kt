@@ -72,25 +72,3 @@ public data class NotificationSendMethods<UID : Comparable<UID>>(
 ): HasId<UserEventType<UID>>, ScheduledSendMethods<UID> {
     override val user: UID get() = _id.user
 }
-
-/**
- * Type-safe subscription configuration for a specific event type.
- *
- * Used in [FullyCustomizableSubscriptions] to define default subscriptions for users.
- * Unlike the database models above, this maintains type safety for the filtered entity.
- *
- * @param T The type of entity being filtered
- * @property filter Condition that determines which events match this subscription
- * @property email Email delivery frequency, or null to disable email notifications
- * @property push Push notification delivery frequency, or null to disable push notifications
- * @property sms SMS delivery frequency, or null to disable SMS notifications
- * @property inApp In-app notification delivery frequency, defaults to immediate
- */
-@Serializable
-public data class Subscription<T>(
-    val filter: Condition<T>,
-    val email: Frequency?,
-    val push: Frequency?,
-    val sms: Frequency?,
-    val inApp: Frequency? = Frequency.immediately()
-)
