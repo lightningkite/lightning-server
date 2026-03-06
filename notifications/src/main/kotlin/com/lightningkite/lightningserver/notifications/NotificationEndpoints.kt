@@ -6,19 +6,20 @@ import com.lightningkite.lightningserver.auth.accepts
 import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.definition.builder.MapRegistry
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.notifications.NotificationEndpoints.ContentRegistry
 import com.lightningkite.lightningserver.notifications.events.Event
 import com.lightningkite.lightningserver.notifications.events.EventDefinition
 import com.lightningkite.lightningserver.notifications.events.EventEndpoints
 import com.lightningkite.lightningserver.notifications.events.EventHandler
 import com.lightningkite.lightningserver.notifications.events.EventLauncher
 import com.lightningkite.lightningserver.notifications.events.EventRegistry
+import com.lightningkite.lightningserver.notifications.events.EventRegistry.Companion.events
 import com.lightningkite.lightningserver.notifications.events.EventType
 import com.lightningkite.lightningserver.notifications.subscriptions.FrequencyCustomizableSubscriptions
 import com.lightningkite.lightningserver.notifications.subscriptions.FullyCustomizableSubscriptions
 import com.lightningkite.lightningserver.notifications.subscriptions.NonCustomizableSubscriptions
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
+import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.typed.ModelInfo
 import com.lightningkite.lightningserver.typed.auth
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.withSdkInfo
@@ -111,7 +112,6 @@ public open class NotificationEndpoints<
     public val users: ModelInfo<*, USER, UID>,
     public val dispatcher: DISPATCH,
     public val subscriptions: SUBS,
-    override val registry: EventRegistry = EventRegistry()
 ) : EventHandler, ServerBuilder() {
     internal val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.notifications.NotificationEndpoints")
 
@@ -119,7 +119,7 @@ public open class NotificationEndpoints<
      * Registry for content generators that transform events into notification content.
      * Use the [content] extension function on [EventDefinition] to register generators.
      */
-    public val content: ContentRegistry<USER, UID, CONTENT> = ContentRegistry()
+    public val content: ContentRegistry<USER, UID, CONTENT> = path.path("content") include ContentRegistry()
 
     init {
         (dispatcher as? ServerBuilder)?.let { path.include(it) }
@@ -152,7 +152,7 @@ public open class NotificationEndpoints<
                 val user = users[sub.user] ?: return@mapNotNull null
 
                 Notification(
-                    eventData = event.toInternalEventData(),
+                    event = event.toInternalEventData(),
                     createdAt = now(),
                     user = sub.user,
                     content = content(user),
@@ -170,19 +170,6 @@ public open class NotificationEndpoints<
     }
 
     /**
-     * Startup task that verifies all event types have registered content generators,
-     * dispatcher configurations, and subscription handlers.
-     *
-     * This task runs on server startup and will throw an exception if any event type
-     * is missing a required dependency, helping catch configuration errors early.
-     */
-    public val verifyDependencies: StartupTask = path.path("verify") bind StartupTask {
-        content.verifyAllDependencies(registry)
-        dispatcher.verifyAllDependencies(registry)
-        subscriptions.verifyAllDependencies(registry)
-    }
-
-    /**
      * REST endpoints for querying registered event types.
      *
      * Mounted at `/events`. Requires the "events" scope for authentication.
@@ -190,7 +177,6 @@ public open class NotificationEndpoints<
      */
     public open val eventEndpoints: EventEndpoints<HasId<*>> =
         path.path("events") module EventEndpoints(
-            registry = registry,
             auth = AuthRequirement.Authenticated(scopes = setOf(RequiredScope("events"))),
             permissions = {
                 ModelPermissions(
@@ -198,24 +184,7 @@ public open class NotificationEndpoints<
                     manage = condition(AuthRequirement.IsSuperUser.accepts(auth))
                 )
             }
-        )
-
-    /**
-     * Interface for components that depend on event definitions being registered.
-     *
-     * Implementors can verify at startup that all required event types have been configured
-     * with the necessary handlers, content generators, or subscription logic.
-     */
-    public interface DefinitionDependency {
-        /**
-         * Verifies that all event types in the registry have the required configuration.
-         *
-         * @param registry The registry of all event types to verify against
-         * @throws IllegalArgumentException if any required configuration is missing
-         */
-        context(runtime: ServerRuntime)
-        public suspend fun verifyAllDependencies(registry: EventRegistry) {}
-    }
+        ).withSdkInfo(valueName = "events")
 
     /**
      * Determines which users should receive notifications for a given event.
@@ -235,7 +204,7 @@ public open class NotificationEndpoints<
      * @see FrequencyCustomizableSubscriptions
      * @see FullyCustomizableSubscriptions
      */
-    public interface Subscriptions<USER : HasId<UID>, UID : Comparable<UID>> : DefinitionDependency {
+    public interface Subscriptions<USER : HasId<UID>, UID : Comparable<UID>> {
         /**
          * Returns the list of users who should be notified about the given event.
          *
@@ -264,7 +233,7 @@ public open class NotificationEndpoints<
      *
      * @see NotificationBulkDispatcher
      */
-    public interface Dispatcher<UID : Comparable<UID>, CONTENT> : DefinitionDependency {
+    public interface Dispatcher<UID : Comparable<UID>, CONTENT> {
         /**
          * Dispatches a batch of notifications for delivery.
          *
@@ -285,8 +254,8 @@ public open class NotificationEndpoints<
      * @param UID The user ID type
      * @param CONTENT The notification content type (application-specific)
      */
-    public class ContentRegistry<USER : HasId<UID>, UID : Comparable<UID>, CONTENT> : ServerBuilder(), DefinitionDependency {
-        private val contentGenerators = MapRegistry<String, suspend context(ServerRuntime) (Event<*, *>) -> (USER) -> CONTENT>()
+    public class ContentRegistry<USER : HasId<UID>, UID : Comparable<UID>, CONTENT> : ServerBuilder() {
+        private val contentGenerators = MapRegistry<EventType.Name, suspend context(ServerRuntime) (Event<*, *>) -> (USER) -> CONTENT>()
 
         /**
          * Retrieves the content generator for an event and produces user-specific content.
@@ -320,8 +289,8 @@ public open class NotificationEndpoints<
             contentGenerators.register(event.name, generator as suspend context(ServerRuntime) (Event<*, *>) -> (USER) -> CONTENT)
         }
 
-        context(runtime: ServerRuntime)
-        override suspend fun verifyAllDependencies(registry: EventRegistry) {
+        private val verify = path.path("verify") bind StartupTask {
+            val registry = serverRuntime.server.events
             require(contentGenerators.keys.containsAll(registry.keys)) {
                 val missing = registry.keys - contentGenerators.keys
                 "Content is missing for (${missing.size}) event definitions: $missing"

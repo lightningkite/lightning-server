@@ -156,7 +156,7 @@ public data class SendInfo(
  * @param UID The type of user identifier
  * @param CONTENT The type of notification content (application-specific)
  * @property _id Unique identifier for this notification
- * @property eventData The event that triggered this notification
+ * @property event The event that triggered this notification
  * @property user The user who should receive this notification
  * @property content The notification content (format determined by application)
  * @property createdAt When this notification was created
@@ -170,7 +170,7 @@ public data class SendInfo(
 @GenerateDataClassPaths
 public data class Notification<UID, CONTENT>(
     override val _id: Uuid = Uuid.random(),
-    val eventData: EventData,
+    val event: EventData,
     @Index val user: UID,
     val content: CONTENT,
     val createdAt: Instant,
@@ -196,15 +196,17 @@ public interface ScheduledSendMethods<UID : Comparable<UID>> {
     public val sms: Frequency?
     public val push: Frequency?
     public val inApp: Frequency?
+
+    @Serializable
+    public data class Data<UID : Comparable<UID>>(
+        override val user: UID,
+        override val email: Frequency?,
+        override val sms: Frequency?,
+        override val push: Frequency?,
+        override val inApp: Frequency?
+    ) : ScheduledSendMethods<UID>
 }
 
-private data class ScheduledSendMethodsData<UID : Comparable<UID>>(
-    override val user: UID,
-    override val email: Frequency?,
-    override val sms: Frequency?,
-    override val push: Frequency?,
-    override val inApp: Frequency?
-) : ScheduledSendMethods<UID>
 
 /**
  * Factory function to create a [ScheduledSendMethods] instance.
@@ -215,13 +217,14 @@ private data class ScheduledSendMethodsData<UID : Comparable<UID>>(
  * @param push Push notification delivery frequency (defaults to immediate)
  * @param inApp In-app notification delivery frequency (defaults to immediate)
  */
+@Suppress("FunctionName")
 public fun <UID : Comparable<UID>> ScheduledSendMethods(
     user: UID,
     email: Frequency? = Frequency.immediately(),
     sms: Frequency? = Frequency.immediately(),
     push: Frequency? = Frequency.immediately(),
     inApp: Frequency? = Frequency.immediately()
-): ScheduledSendMethods<UID> = ScheduledSendMethodsData(user, email, sms, push, inApp)
+): ScheduledSendMethods.Data<UID> = ScheduledSendMethods.Data(user, email, sms, push, inApp)
 
 /*
  * TODO: API Recommendations for notificationModels.kt:

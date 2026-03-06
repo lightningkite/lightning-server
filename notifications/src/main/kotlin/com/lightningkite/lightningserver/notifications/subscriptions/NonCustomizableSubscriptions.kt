@@ -1,13 +1,18 @@
 package com.lightningkite.lightningserver.notifications.subscriptions
 
+import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.definition.builder.MapRegistry
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.notifications.Frequency
 import com.lightningkite.lightningserver.notifications.NotificationEndpoints
 import com.lightningkite.lightningserver.notifications.ScheduledSendMethods
 import com.lightningkite.lightningserver.notifications.events.Event
 import com.lightningkite.lightningserver.notifications.events.EventDefinition
 import com.lightningkite.lightningserver.notifications.events.EventRegistry
+import com.lightningkite.lightningserver.notifications.events.EventRegistry.Companion.events
+import com.lightningkite.lightningserver.notifications.events.EventType
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.services.database.HasId
 
 private typealias SendMethodsGenerator<UID, T, ID> = suspend context(ServerRuntime) (Event<T, ID>) -> List<ScheduledSendMethods<UID>>
@@ -34,10 +39,10 @@ public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UI
     public val defaultSms: Frequency? = Frequency.immediately(),
     public val defaultPush: Frequency? = Frequency.immediately(),
     public val defaultInApp: Frequency? = Frequency.immediately(),
-) : NotificationEndpoints.Subscriptions<USER, UID> {
+) : NotificationEndpoints.Subscriptions<USER, UID>, ServerBuilder() {
 //    private val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.notifications.subscriptions.NonCustomizableSubscriptions")
 
-    private val eventListeners = MapRegistry<String, SendMethodsGenerator<UID, *, *>>()
+    private val eventListeners = MapRegistry<EventType.Name, SendMethodsGenerator<UID, *, *>>()
 
     /**
      * Registers an event listener with full control over subscription configuration.
@@ -102,8 +107,8 @@ public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UI
         return interested(event)
     }
 
-    context(runtime: ServerRuntime)
-    override suspend fun verifyAllDependencies(registry: EventRegistry) {
+    private val verify = path.path("verify") bind StartupTask {
+        val registry = serverRuntime.server.events
         require(eventListeners.keys.containsAll(registry.keys)) {
             val missing = registry.keys - eventListeners.keys
             "Subscriptions are missing for (${missing.size}) event definitions: $missing"
