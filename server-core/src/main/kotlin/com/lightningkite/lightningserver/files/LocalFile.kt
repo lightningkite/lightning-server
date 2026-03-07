@@ -1,19 +1,16 @@
 package com.lightningkite.lightningserver.files
 
-import com.lightningkite.lightningserver.encryption.sign
-import com.lightningkite.lightningserver.encryption.verify
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.encryption.signUrl
 import com.lightningkite.lightningserver.encryption.verifyUrl
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.settings.generalSettings
-import kotlinx.datetime.Clock
 import com.lightningkite.now
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.Instant
 import java.io.File
 import kotlin.time.Duration
-import kotlinx.datetime.Instant
 
 val File.unixPath: String get() = path.replace("\\", "/")
 
@@ -22,7 +19,10 @@ val File.unixPath: String get() = path.replace("\\", "/")
  */
 class LocalFile(val system: LocalFileSystem, val file: File) : FileObject {
     init {
-        if (!file.absolutePath.startsWith(system.rootFile.absolutePath)) throw IllegalStateException()
+        val path = file.absolutePath.replace("\\", "/")
+        val rootPath = system.rootFile.unixPath
+        if (!path.startsWith(rootPath) || path.substringAfter(rootPath).split('/').any { it == ".." || it == "." })
+            throw IllegalArgumentException()
     }
 
     override val name: String
