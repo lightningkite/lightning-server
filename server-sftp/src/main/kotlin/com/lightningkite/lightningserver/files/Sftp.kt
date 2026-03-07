@@ -86,6 +86,11 @@ class Sftp(
     }
 
     data class SftpFile(val system: Sftp, val path: File) : FileObject {
+
+        init {
+            if (path.unixPath.split('/').any{ it == ".." || it == "."}) throw IllegalArgumentException()
+        }
+
         override fun resolve(path: String): FileObject = SftpFile(system, this.path.resolve(path))
         override val name: String
             get() = path.name
