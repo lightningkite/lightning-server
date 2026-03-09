@@ -125,14 +125,17 @@ public interface PathSpecMap<out V> : Map<PathSpec, V> {
     override fun isEmpty(): Boolean = asSequence().none()
 }
 
-public fun <V> buildPathSpecMap(setup: MutablePathSpecMap<V>.() -> Unit): PathSpecMap<V> =
-    ImmutablePathSpecMap(MutablePathSpecMap<V>().apply(setup))
+public inline fun <V> buildPathSpecMap(setup: MutablePathSpecMap<V>.() -> Unit): PathSpecMap<V> =
+    MutablePathSpecMap<V>().apply(setup)
+
+public inline fun <V> buildSealedPathSpecMap(setup: MutablePathSpecMap<V>.() -> Unit): PathSpecMap<V> =
+    buildPathSpecMap(setup).toSealedPathSpecMap()
 
 public fun <V> PathSpecMap<V>.toSealedPathSpecMap(): PathSpecMap<V> = when (this) {
     is ImmutablePathSpecMap<V> -> this
     is MutablePathSpecMap<V> -> ImmutablePathSpecMap(this)
     is PathSpecRegistryImpl<V> -> ImmutablePathSpecMap(this.wraps)
-    else -> buildPathSpecMap { putAll(PathSpec.root, this) }
+    else -> MutablePathSpecMap<V>().apply { putAll(PathSpec.root, this) }.let(::ImmutablePathSpecMap)
 }
 
 public fun <V, R> PathSpecMap<V>.mapValues(transform: (V) -> R): PathSpecMap<R> {

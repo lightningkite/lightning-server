@@ -1,7 +1,8 @@
 package com.lightningkite.lightningserver.notifications
 
-import com.lightningkite.lightningserver.notifications.events.Event
+import com.lightningkite.lightningserver.notifications.events.EventData
 import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.Index
 import com.lightningkite.services.data.IndexSet
 import com.lightningkite.services.database.HasId
 import kotlinx.datetime.DateTimeUnit
@@ -137,6 +138,7 @@ public data class Frequency private constructor(
  */
 @Serializable
 @GenerateDataClassPaths
+@IndexSet(["sent", "sendAt"])
 public data class SendInfo(
     val sendAt: Instant,
     val sent: Boolean = false
@@ -166,11 +168,10 @@ public data class SendInfo(
  */
 @Serializable
 @GenerateDataClassPaths
-@IndexSet(["user", "sendAt",])
 public data class Notification<UID, CONTENT>(
     override val _id: Uuid = Uuid.random(),
-    val event: Event,
-    val user: UID,
+    val event: EventData,
+    @Index val user: UID,
     val content: CONTENT,
     val createdAt: Instant,
     val read: Instant? = null,
@@ -195,15 +196,17 @@ public interface ScheduledSendMethods<UID : Comparable<UID>> {
     public val sms: Frequency?
     public val push: Frequency?
     public val inApp: Frequency?
+
+    @Serializable
+    public data class Data<UID : Comparable<UID>>(
+        override val user: UID,
+        override val email: Frequency?,
+        override val sms: Frequency?,
+        override val push: Frequency?,
+        override val inApp: Frequency?
+    ) : ScheduledSendMethods<UID>
 }
 
-private data class ScheduledSendMethodsData<UID : Comparable<UID>>(
-    override val user: UID,
-    override val email: Frequency?,
-    override val sms: Frequency?,
-    override val push: Frequency?,
-    override val inApp: Frequency?
-) : ScheduledSendMethods<UID>
 
 /**
  * Factory function to create a [ScheduledSendMethods] instance.
@@ -214,13 +217,14 @@ private data class ScheduledSendMethodsData<UID : Comparable<UID>>(
  * @param push Push notification delivery frequency (defaults to immediate)
  * @param inApp In-app notification delivery frequency (defaults to immediate)
  */
+@Suppress("FunctionName")
 public fun <UID : Comparable<UID>> ScheduledSendMethods(
     user: UID,
     email: Frequency? = Frequency.immediately(),
     sms: Frequency? = Frequency.immediately(),
     push: Frequency? = Frequency.immediately(),
     inApp: Frequency? = Frequency.immediately()
-): ScheduledSendMethods<UID> = ScheduledSendMethodsData(user, email, sms, push, inApp)
+): ScheduledSendMethods.Data<UID> = ScheduledSendMethods.Data(user, email, sms, push, inApp)
 
 /*
  * TODO: API Recommendations for notificationModels.kt:

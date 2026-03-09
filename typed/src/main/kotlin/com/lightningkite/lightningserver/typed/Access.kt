@@ -37,7 +37,7 @@ public typealias AuthAccess<SUBJECT> = Access<*, *, SUBJECT>
 context(runtime: ServerRuntime)
 public val <REQ : Request<PATH>, PATH : PathSpec> Access<REQ, PATH, *>.route: ResolvedPath<PATH> get() = request.pathInContext
 
-public val <SUBJECT : HasId<*>> Access<*, *, SUBJECT>.auth: Authentication<SUBJECT> get() = authOrNull!! // safe because the type is non-null (by convention)
+public val <SUBJECT : HasId<*>> Access<*, *, SUBJECT>.auth: Authentication<SUBJECT> get() = authOrNull!! // safe because the SUBJECT type is non-null (invariant in AuthRequirement)
 
 
 /**
