@@ -23,7 +23,7 @@ private fun signingInfo(
     value: String,
     strength: Int = 1,
     at: Instant,
-    expiresAt: Instant,
+    expiresAt: Instant?,
 ): ByteArray = Buffer()
     .apply {
         writeString(via)
@@ -31,7 +31,7 @@ private fun signingInfo(
         writeString(value)
         writeInt(strength)
         writeLong(at.toEpochMilliseconds())
-        writeLong(expiresAt.toEpochMilliseconds())
+        writeLong(expiresAt?.toEpochMilliseconds() ?: 0L)
     }
     .readByteArray()
 
