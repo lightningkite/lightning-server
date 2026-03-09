@@ -133,7 +133,7 @@ class FrequencyCustomizableSubscriptionsTest {
                 // Insert user override
                 Notifications.subs.info.table().insertOne(
                     NotificationSendMethods(
-                        _id = UserEventType(user._id, eventDef.untyped),
+                        _id = UserEventType(user._id, eventDef.name),
                         email = Frequency.daily(9, 0, kotlinx.datetime.TimeZone.UTC),
                         sms = null, // Disable SMS
                         push = Frequency.immediately(),
@@ -169,7 +169,7 @@ class FrequencyCustomizableSubscriptionsTest {
                 // User disables all channels except inApp
                 Notifications.subs.info.table().insertOne(
                     NotificationSendMethods(
-                        _id = UserEventType(user._id, eventDef.untyped),
+                        _id = UserEventType(user._id, eventDef.name),
                         email = null,
                         sms = null,
                         push = null,
@@ -239,7 +239,7 @@ class FrequencyCustomizableSubscriptionsTest {
                 // Override only for modelDeleted
                 Notifications.subs.info.table().insertOne(
                     NotificationSendMethods(
-                        _id = UserEventType(user._id, Notifications.modelDeleted.event.untyped),
+                        _id = UserEventType(user._id, Notifications.modelDeleted.event.name),
                         email = Frequency.weekly(kotlinx.datetime.DayOfWeek.FRIDAY, 10, 0, kotlinx.datetime.TimeZone.UTC),
                         sms = null,
                         push = Frequency.immediately(),
