@@ -22,11 +22,11 @@ import kotlin.test.assertTrue
 class HttpInterceptorTest {
 
     @Test
-    fun `HttpInterceptor None passes requests through unchanged`() {
+    fun `HttpInterceptor NoOp passes requests through unchanged`() {
         object : ServerBuilder() {
             init {
                 registerBasicMediaTypeCoders()
-                install(HttpInterceptor.None)
+                install(HttpInterceptor.NoOp)
             }
 
             val endpoint = path.path("test").get bind HttpHandler {
@@ -224,13 +224,13 @@ class HttpInterceptorTest {
         assertNotNull(namedInterceptor.name)
 
         // HttpInterceptor.None has a specific name
-        assertEquals("None", HttpInterceptor.None.name)
+        assertEquals("None", HttpInterceptor.NoOp.name)
     }
 
     @Test
     fun `compileAndInstrument returns None for empty list`() {
         val compiled = emptyList<HttpInterceptor>().compileAndInstrument()
-        assertEquals(HttpInterceptor.None, compiled)
+        assertEquals(HttpInterceptor.NoOp, compiled)
     }
 
     @Test
