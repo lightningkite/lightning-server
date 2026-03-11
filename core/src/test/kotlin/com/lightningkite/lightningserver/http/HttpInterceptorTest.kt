@@ -223,8 +223,8 @@ class HttpInterceptorTest {
         // Anonymous class name will contain $ and be non-null
         assertNotNull(namedInterceptor.name)
 
-        // HttpInterceptor.None has a specific name
-        assertEquals("None", HttpInterceptor.NoOp.name)
+        // HttpInterceptor.NoOp has a specific name
+        assertEquals("NoOp", HttpInterceptor.NoOp.name)
     }
 
     @Test
