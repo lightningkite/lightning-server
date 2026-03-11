@@ -57,7 +57,7 @@ public fun interface HttpInterceptor {
      * A no-op interceptor that simply passes requests through unchanged.
      * Used as a placeholder when no interceptors are configured.
      */
-    public object None : HttpInterceptor {
+    public object NoOp : HttpInterceptor {
         context(runtime: ServerRuntime)
         override suspend fun intercept(
             request: HttpRequest<*>,
@@ -94,12 +94,12 @@ public suspend inline fun HttpInterceptor.interceptInstrumented(request: HttpReq
  * @return A single HttpInterceptor that represents the entire chain
  */
 internal fun List<HttpInterceptor>.compileAndInstrument(): HttpInterceptor = when (size) {
-    0 -> HttpInterceptor.None
+    0 -> HttpInterceptor.NoOp
     1 -> HttpInterceptor { request, cont -> first().interceptInstrumented(request, cont) }
     else -> reduceIndexed { idx, acc, interceptor ->
         when {
-            acc === HttpInterceptor.None -> interceptor
-            interceptor === HttpInterceptor.None -> acc
+            acc === HttpInterceptor.NoOp -> interceptor
+            interceptor === HttpInterceptor.NoOp -> acc
 
             else -> HttpInterceptor { request, cont ->
                 // idx is of the current interceptor in the list, so will start at 1
