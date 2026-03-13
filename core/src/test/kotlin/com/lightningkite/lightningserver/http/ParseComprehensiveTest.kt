@@ -370,7 +370,7 @@ class ParseComprehensiveTest {
     fun `pathHack extracts nested query params from path value`() {
         val params = QueryParameters.parse("path=/api?nested=value")
         val hacked = params.pathHack()
-        assertEquals("/api?nested=value", hacked["path"])
+        assertEquals("/api", hacked["path"])
         assertEquals("value", hacked["nested"])
     }
 
@@ -381,7 +381,7 @@ class ParseComprehensiveTest {
         // So pathHack only extracts the nested params from the first path value
         val params = QueryParameters.parse("path=/api?a=1")
         val hacked = params.pathHack()
-        assertEquals("/api?a=1", hacked["path"])
+        assertEquals("/api", hacked["path"])
         assertEquals("1", hacked["a"])
     }
 
@@ -390,7 +390,7 @@ class ParseComprehensiveTest {
         val params = QueryParameters.parse("other=value&path=/api?nested=val")
         val hacked = params.pathHack()
         assertEquals("value", hacked["other"])
-        assertEquals("/api?nested=val", hacked["path"])
+        assertEquals("/api", hacked["path"])
         assertEquals("val", hacked["nested"])
     }
 
