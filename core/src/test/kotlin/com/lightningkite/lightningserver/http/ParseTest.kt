@@ -183,7 +183,7 @@ class ParseTest {
             .pathHack()
             .let {
                 assertEquals("path", it[0].first)
-                assertEquals("/my/path?asdf=fdsa", it[0].second)
+                assertEquals("/my/path", it[0].second)
                 assertEquals("asdf", it[1].first)
                 assertEquals("fdsa", it[1].second)
             }
@@ -204,7 +204,7 @@ class ParseTest {
             .let {
                 assertEquals(2, it.entries.size)
                 assertEquals("path", it[0].first)
-                assertEquals("/multiplex?param=5", it[0].second)
+                assertEquals("/multiplex", it[0].second)
                 assertEquals("param", it[1].first)
                 assertEquals("5", it[1].second)
             }
