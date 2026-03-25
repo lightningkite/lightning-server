@@ -5,10 +5,7 @@ import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.engine.local.LocalEngine
 import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
-import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.HttpStatus
-import com.lightningkite.lightningserver.http.PathSegments
-import com.lightningkite.lightningserver.http.QueryParameters
+import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawWebsocketPath
@@ -19,6 +16,7 @@ import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.Data
 import com.lightningkite.services.pubsub.PubSubChannel
 import io.ktor.http.*
+import io.ktor.http.HttpHeaders
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.plugins.*
@@ -80,8 +78,15 @@ public val ktorRunConfig: ServerSetting.Direct<KtorRuntimeSettings> = ServerSett
  *
  * @param server The server definition to run
  * @param clock The clock to use for timing operations (defaults to System clock, overridable for testing)
+ * @param disableResponseStreaming A lambda that takes a request and returns a Boolean. A return of true will disable
+ *      response streaming, meaning a guaranteed known content length in the response headers. This is useful for
+ *      responding to IOT devices that require ContentLength in responses due to memory limitations
  */
-public class KtorEngine(server: ServerDefinition, override val clock: Clock = Clock.System) : LocalEngine(server) {
+public class KtorEngine(
+    server: ServerDefinition,
+    override val clock: Clock = Clock.System,
+    private val disableResponseStreaming: (HttpRequest<*>) -> Boolean = { false },
+) : LocalEngine(server) {
 
     override val settings: ServerSettings = super.settings + ktorRunConfig
 
@@ -107,31 +112,28 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
                     }
                     val code = HttpStatusCode.fromValue(result.status.code)
                     val type = result.body?.mediaType?.toString()?.let { ContentType.parse(it) }
-                    when (val b = result.body?.data) {
-                        null -> {
-                            val contentType = call.response.headers[HttpHeaders.ContentType]
-                            val contentLength = call.response.headers[HttpHeaders.ContentLength]
-                            if (contentType != null && contentLength != null) {
-                                call.response.call.respondOutputStream(
-                                    ContentType.parse(contentType),
-                                    HttpStatusCode.NoContent,
-                                    contentLength.toLong()
-                                ) { close() }
-                            } else
-                                call.respondText(text = "", contentType = type, status = code, configure = { })
-                        }
 
-                        is Data.Bytes -> call.respondBytes(bytes = b.data, contentType = type, status = code)
-
-                        is Data.Text -> call.respondText(text = b.data, contentType = type, status = code)
-                        is Data.Sink -> b.source().use {
-                            call.respondSource(source = it, contentType = type, status = code, contentLength = b.size)
+                    val body = result.body?.data
+                    if (body == null) {
+                        val contentType = call.response.headers[HttpHeaders.ContentType]
+                        val contentLength = call.response.headers[HttpHeaders.ContentLength]
+                        if (contentType != null && contentLength != null) {
+                            call.response.call.respondOutputStream(
+                                ContentType.parse(contentType),
+                                HttpStatusCode.NoContent,
+                                contentLength.toLong()
+                            ) { close() }
+                        } else
+                            call.respondText("", type, code) { }
+                    } else if (disableResponseStreaming(request))
+                        call.respondBytes(body.bytes(), type, code)
+                    else
+                        when (body) {
+                            is Data.Bytes -> call.respondBytes(body.data, type, code)
+                            is Data.Text -> call.respondText(body.data, type, code)
+                            is Data.Sink -> body.source().use { call.respondSource(it, type, code, body.size) }
+                            is Data.Source -> body.source.use { call.respondSource(it, type, code, body.size) }
                         }
-
-                        is Data.Source -> b.source.use {
-                            call.respondSource(source = it, contentType = type, status = code, contentLength = b.size)
-                        }
-                    }
                 }
             }
             webSocket("{...}") {
@@ -177,7 +179,8 @@ public class KtorEngine(server: ServerDefinition, override val clock: Clock = Cl
                                 when (frame) {
                                     is Frame.Binary -> incomingChannel.send(WebSocketFrame(frame.data))
                                     is Frame.Text -> incomingChannel.send(WebSocketFrame(frame.readText()))
-                                    else -> { /* ignore ping/pong/close */ }
+                                    else -> { /* ignore ping/pong/close */
+                                    }
                                 }
                             }
                         } finally {

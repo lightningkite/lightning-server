@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.notifications.events
 import com.lightningkite.lightningserver.LightningServerDsl
 import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.notifications.events.EventRegistry.Companion.events
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.invoke
 import com.lightningkite.lightningserver.typed.ModelInfo
@@ -18,8 +19,6 @@ import kotlin.time.Duration.Companion.minutes
  * which users should be notified and generating notification content.
  */
 public interface EventHandler {
-    public val registry: EventRegistry
-
     context(runtime: ServerRuntime)
     public suspend fun <T : HasId<ID>, ID : Comparable<ID>> handle(event: Event<T, ID>)
 }
@@ -71,7 +70,7 @@ public class EventLauncher<H : EventHandler, T : HasId<ID>, ID : Comparable<ID>>
     public val handler: H,
     timeout: Duration = 5.minutes,
 ) : ServerBuilder() {
-    public val name: String get() = event.name
+    public val name: EventType.Name get() = event.name
 
     /**
      * Handles the event inline without going through the task system.
@@ -137,14 +136,16 @@ public fun <HANDLER : EventHandler, T : HasId<ID>, ID : Comparable<ID>> HANDLER.
     timeout: Duration = 5.minutes,
     additionalSetup: HANDLER.(EventDefinition<T, ID>) -> Unit
 ): EventLauncher<HANDLER, T, ID> {
-    val type = EventDefinition(name, tags, info, registry)
+    val type = EventDefinition(name, tags, info)
+
+    builder.events.register(type)
 
     additionalSetup(type)
 
     val launcher = EventLauncher(type, this, timeout)
 
     with(builder) {
-        path.path("events").path(type.name.kabobCase()) include launcher
+        path.path("events").path(type.name.raw.kabobCase()) include launcher
     }
 
     return launcher

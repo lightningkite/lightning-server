@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.notifications.events
 
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.database.HasId
+import com.lightningkite.services.database.TypedId
 import com.lightningkite.services.database.serializerOrContextual
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.Serializable
@@ -24,11 +25,18 @@ import kotlin.uuid.Uuid
 @Serializable
 @GenerateDataClassPaths
 public data class EventType(
-    val name: String,
+    val name: Name,
     val tags: Set<String> = emptySet()
 ) {
+    @Serializable
+    @JvmInline
+    @GenerateDataClassPaths
+    public value class Name(override val raw: String) : TypedId<String, Name> {
+        override fun toString(): String = raw
+    }
+
     override fun equals(other: Any?): Boolean = other is EventType && name == other.name
-    override fun hashCode(): Int = name.hashCode()
+    override fun hashCode(): Int = name.hashCode() + 17
 }
 
 /**
@@ -72,14 +80,14 @@ public data class EventData(
  *
  * @param UID The type of user identifier (must be comparable)
  * @property user The user identifier
- * @property type The event type
+ * @property event The event type identifier
  */
 @Serializable
 @GenerateDataClassPaths
 public data class UserEventType<UID : Comparable<UID>>(
     val user: UID,
-    val type: EventType
+    val event: EventType.Name
 ) : Comparable<UserEventType<UID>> {
     override fun compareTo(other: UserEventType<UID>): Int =
-        user.compareTo(other.user).takeIf { it != 0 } ?: type.name.compareTo(other.type.name)
+        user.compareTo(other.user).takeIf { it != 0 } ?: event.compareTo(other.event)
 }

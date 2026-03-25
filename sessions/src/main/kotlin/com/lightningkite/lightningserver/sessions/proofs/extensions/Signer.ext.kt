@@ -15,6 +15,7 @@ import kotlinx.io.readByteArray
 import kotlinx.io.writeString
 import kotlin.io.encoding.Base64
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
 private fun signingInfo(
@@ -23,7 +24,7 @@ private fun signingInfo(
     value: String,
     strength: Int = 1,
     at: Instant,
-    expiresAt: Instant,
+    expiresAt: Instant? = null,
 ): ByteArray = Buffer()
     .apply {
         writeString(via)
@@ -31,7 +32,7 @@ private fun signingInfo(
         writeString(value)
         writeInt(strength)
         writeLong(at.toEpochMilliseconds())
-        writeLong(expiresAt.toEpochMilliseconds())
+        writeLong(expiresAt?.toEpochMilliseconds() ?: (at.plus(1.hours)).toEpochMilliseconds())
     }
     .readByteArray()
 

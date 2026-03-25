@@ -202,7 +202,7 @@ class NotificationFlowTest {
                 // Set user preference to disable email
                 FreqCustomNotifications.subs.info.table().insertOne(
                     NotificationSendMethods(
-                        _id = com.lightningkite.lightningserver.notifications.events.UserEventType(user._id, FreqCustomNotifications.modelCreated.event.untyped),
+                        _id = UserEventType(user._id, FreqCustomNotifications.modelCreated.event.name),
                         email = null, // Disable email
                         sms = Frequency.immediately(),
                         push = null,
@@ -242,8 +242,6 @@ class NotificationFlowTest {
     }
 
     private object FullCustomNotifications : ServerBuilder() {
-        val sharedRegistry = EventRegistry()
-
         object Dispatcher : TestDispatcherBase(
             info = FullCustomServer.database.testModelInfo(),
             cache = FullCustomServer.cache,
@@ -257,7 +255,6 @@ class NotificationFlowTest {
             info = FullCustomServer.database.testModelInfo<NotificationEventSubscription<Uuid>, UserEventType<Uuid>>(),
             users = FullCustomServer.userInfo,
             principal = TestUser,
-            events = sharedRegistry,
             suppressRejectedAuthenticationWarnings = true
         )
 
@@ -265,7 +262,6 @@ class NotificationFlowTest {
             FullCustomServer.userInfo,
             Dispatcher,
             subs,
-            registry = sharedRegistry
         )
 
         val modelCreated = handler.event("Model Created", FullCustomServer.modelInfo) { notif ->

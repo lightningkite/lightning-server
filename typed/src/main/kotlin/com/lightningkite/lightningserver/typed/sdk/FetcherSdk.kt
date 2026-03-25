@@ -242,7 +242,9 @@ public class FetcherSdk(
             val pathPrefix = (ancestors + this).fold(PathSpec.root) { acc, mod -> acc + mod.path }
             fun PathSpec.absolute(): PathSpec = pathPrefix + this
 
-            val singleInterface = extendsInterfaces.singleOrNull()?.takeIf { declaredFunctions.isEmpty() && depth > 0 }
+            val singleInterface = extendsInterfaces.singleOrNull()?.takeIf {
+                depth > 0 && declaredFunctions.isEmpty() && children.isEmpty()
+            }
 
             appendLine()
 
