@@ -1,9 +1,9 @@
 import com.lightningkite.deployhelpers.*
 
 plugins {
-    alias(libs.plugins.kotlinJvm)
+    alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.ksp)
-    alias(libs.plugins.serialization)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.dokka)
     id("signing")
     alias(libs.plugins.vanniktechMavenPublish)
@@ -15,19 +15,19 @@ dependencies {
     api(project(":auth"))
     api(project(":typed"))
     api(project(":sessions-shared"))
-    api(libs.serviceAbstractionsDatabase)
-    api(libs.serviceAbstractionsCache)
-    api(libs.kotlinReflect)
+    api(libs.services.database)
+    api(libs.services.cache)
+    api(libs.kotlin.reflect)
 
     implementation(libs.oneTimePass)
-    implementation(libs.bouncyCastleBcprov)
-    implementation(libs.bouncyCastleBcpkix)
+    implementation(libs.bouncy.castle.bcprov)
+    implementation(libs.bouncy.castle.bcpkix)
 
-    implementation(libs.webauthn4jCore)
-    testImplementation(libs.kotlinTest)
-    testImplementation(libs.kotlinTestJunit)
+    implementation(libs.webauthn4j.core)
+    testImplementation(libs.kotlin.test)
+    testImplementation(libs.kotlin.test.junit)
 
-    ksp(libs.serviceAbstractionsDatabaseProcessor)
+    ksp(libs.services.database.processor)
 }
 
 kotlin {

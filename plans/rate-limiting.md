@@ -618,10 +618,10 @@ return current
 dependencies {
     api(project(":core"))
     api(project(":ratelimit-shared"))
-    api(libs.serviceAbstractionsCache)
+    api(libs.services.cache)
 
     testImplementation(project(":engine-local"))
-    testImplementation(libs.kotlinTest)
+    testImplementation(libs.kotlin.test)
 }
 ```
 
@@ -629,7 +629,7 @@ dependencies {
 ```kotlin
 dependencies {
     api(project(":core-shared"))
-    api(libs.kotlinXJson)
+    api(libs.kotlinx.json)
 }
 ```
 

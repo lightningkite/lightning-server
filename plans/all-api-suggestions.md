@@ -423,7 +423,6 @@ require { it.fetch().emailVerified }
 - [ ] **`parse.kt:207`** **ISSUE**: QueryParameters.parse() with an empty string results in one entry with empty key and value instead of EMPTY. Consider: if (path.isEmpty()) return EMPTY
 - [ ] **`parse.kt:209`** **CRITICAL TODO**: The pathHack() function is marked as a "fugly hack" and should be removed. This appears to be a workaround for WebSocket authentication. Document the proper fix.
 - [ ] **`parse.kt:211`** QueryParameters could benefit from a getAll(key: String): List<String> method for retrieving all values for a given key (e.g., multiple tags).
-- [ ] **`parse.kt:213`** The parsing doesn't handle invalid URL encoding gracefully - URLDecoder.decode can throw IllegalArgumentException. Consider wrapping in try-catch or using Result type.
 - [ ] **`parse.kt:215`** PathSegments removes leading slash but not trailing slash. A path like "/api/users/" will have an empty string as the last segment. Document or handle this behavior.
 - [ ] **`parse.kt:217`** Consider adding a merge/combine method for QueryParameters to easily combine query strings from different sources.
 - [ ] **`parse.kt:219`** The toString() implementation uses deprecated URLEncoder.encode(String, Charset). While it still works, consider updating to URLEncoder.encode(String, String) with "UTF-8".
