@@ -137,9 +137,22 @@ public class KtorEngine(
                 }
             }
             webSocket("{...}") {
-                val queryParams = call.request.queryParameters.flattenEntries().let(::QueryParameters).pathHack()
+
+                // TODO: Remove this fugly hack. It's around for backwards compatibility.
+                fun parseQueryParams(): QueryParameters = QueryParameters(
+                    call.request.queryParameters.flattenEntries()
+                        .flatMap {
+                            if (it.first == "path" && it.second.contains('?')) {
+                                listOf(it.first to it.second.substringBefore('?')) +
+                                        QueryParameters.parse(it.second.substringAfter('?')
+                                ).entries
+                            } else
+                                listOf(it)
+                        })
+
+                val queryParams = parseQueryParams()
                 val request = WebSocketConnectRequest(
-                    path = RawWebsocketPath(PathSegments.parse(queryParams["path"] ?: call.request.path())),
+                    path = RawWebsocketPath(queryParams["path"] ?: call.request.path().decodeURLPart()),
                     queryParameters = queryParams,
                     headers = call.request.headers.adapt(),
                     domain = call.request.origin.serverHost,
