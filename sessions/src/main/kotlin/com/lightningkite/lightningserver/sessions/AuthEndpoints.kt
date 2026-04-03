@@ -1,38 +1,19 @@
 package com.lightningkite.lightningserver.sessions
 
 import com.lightningkite.lightningserver.LSError
-import com.lightningkite.lightningserver.auth.PrincipalType
-import com.lightningkite.lightningserver.auth.RequiredScope
-import com.lightningkite.lightningserver.auth.require
-import com.lightningkite.lightningserver.auth.fetch
-import com.lightningkite.lightningserver.auth.noAuth
+import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.now
-import com.lightningkite.lightningserver.runtime.serverRuntime
-import com.lightningkite.lightningserver.sessions.proofs.AuthClientEndpoints
-import com.lightningkite.lightningserver.sessions.proofs.AuthRequirements
-import com.lightningkite.lightningserver.sessions.proofs.Proof
-import com.lightningkite.lightningserver.sessions.proofs.ProofOption
-import com.lightningkite.lightningserver.sessions.proofs.ProofMethod
-import com.lightningkite.lightningserver.sessions.proofs.extensions.isValid
-import com.lightningkite.lightningserver.sessions.proofs.proofMethods
+import com.lightningkite.lightningserver.runtime.*
+import com.lightningkite.lightningserver.sessions.proofs.*
 import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.sessions.token.TokenFormat
 import com.lightningkite.lightningserver.toException
-import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.lightningserver.typed.explicitApiHttpHandler
-import com.lightningkite.lightningserver.typed.ModelRestEndpoints
-import com.lightningkite.lightningserver.typed.auth
-import com.lightningkite.lightningserver.typed.invoke
-import com.lightningkite.lightningserver.typed.sdk.SdkModule
+import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
-import com.lightningkite.lightningserver.typed.sdk.clientInterface
-import com.lightningkite.lightningserver.typed.sdk.info
-import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.builtins.ListSerializer
@@ -83,7 +64,8 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 ) : SessionManager<SUBJECT, ID>(principal, database, tokenFormat) {
     init {
         sdkSettings.defaultInfo = SdkModule.Info(principal.name + "Auth")
-        sdkSettings.clientInterface = AuthClientEndpoints::class.info(principal.subjectSerializer, principal.idSerializer)
+        sdkSettings.clientInterface =
+            AuthClientEndpoints::class.info(principal.subjectSerializer, principal.idSerializer)
     }
 
     /**
@@ -173,7 +155,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     context(_: ServerRuntime)
     protected suspend fun newSession(
         request: LogInRequest,
-        result: ProofsCheckResult<ID>
+        result: ProofsCheckResult<ID>,
     ): Pair<Session<SUBJECT, ID>, RefreshToken>? {
         val subject = principal.fetch(result.id)
 
@@ -239,7 +221,7 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 )
             }
         )
-    
+
     /**
      * POST /login
      *
@@ -386,11 +368,13 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             errorCases = errors,
 //            belongsToInterface = belongsToInterface,
             implementation = { proofs: List<Proof> ->
-                proofs.forEach {
-                    if (!it.isValid()) throw errorInvalidProof.toException(data = it.via)
+                proofs.forEach { proof ->
+                    if (serverRuntime.proofMethods.find { it.info.via == proof.via }?.isValid(proof) != true)
+                        throw errorInvalidProof.toException(data = proof.via)
                 }
                 val used = proofs.map { it.via }.toSet()
-                val subjects = proofs.mapNotNull { principal.fetchByProperty(it.property, it.value) }.distinctBy { it._id }
+                val subjects =
+                    proofs.mapNotNull { principal.fetchByProperty(it.property, it.value) }.distinctBy { it._id }
 
                 val subject = subjects.singleOrNull() ?: run {
                     val properties = proofs.map { it.property }.toSet()
@@ -468,7 +452,8 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
      * @see SessionManager For session creation and token management
      * @see Session For session data model
      */
-    public val sessions: ModelRestEndpoints<SUBJECT, Session<SUBJECT, ID>, Uuid> = path.path("sessions") include ModelRestEndpoints(info = sessionInfo)
+    public val sessions: ModelRestEndpoints<SUBJECT, Session<SUBJECT, ID>, Uuid> =
+        path.path("sessions") include ModelRestEndpoints(info = sessionInfo)
 }
 
 /*
