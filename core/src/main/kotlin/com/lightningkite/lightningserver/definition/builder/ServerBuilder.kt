@@ -21,6 +21,8 @@ import com.lightningkite.lightningserver.websockets.WebSocketHandlerInterceptor
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
 import com.lightningkite.services.Setting
 import com.lightningkite.services.SettingContext
+import com.lightningkite.services.database.validation.AnnotationValidators
+import com.lightningkite.services.database.validation.EmptyAnnotationValidators
 import com.lightningkite.toSealedList
 import com.lightningkite.toSealedMap
 import kotlinx.serialization.KSerializer
@@ -82,6 +84,8 @@ public abstract class ServerBuilder : Extendable {
 
     protected open val internalSerialization: Runtime<SerializersModule> get() = Runtime.Constant(EmptySerializersModule())
     protected open val externalSerialization: Runtime<SerializersModule> get() = Runtime.Constant(EmptySerializersModule())
+
+    protected open val annotationValidators: Runtime<AnnotationValidators> get() = Runtime.Constant(EmptyAnnotationValidators())
 
     public val path: PathSpec0 get() = PathSpec.root // just for convenience
 
@@ -320,6 +324,7 @@ public abstract class ServerBuilder : Extendable {
             moduleId = moduleId,
             internalSerializersModule = internalSerialization,
             externalSerializersModule = externalSerialization,
+            annotationValidators = annotationValidators,
             httpInterceptors = httpInterceptors.toSealedList(),
             websocketInterceptors = websocketInterceptors.toSealedList(),
             endpoints = buildSealedPathSpecMap {

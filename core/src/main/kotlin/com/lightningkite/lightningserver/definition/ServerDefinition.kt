@@ -16,6 +16,7 @@ import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketHandlerInterceptor
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
 import com.lightningkite.lightningserver.websockets.compileAndInstrument
+import com.lightningkite.services.database.validation.AnnotationValidators
 import com.lightningkite.toSealedList
 import com.lightningkite.toSealedMap
 import kotlinx.serialization.modules.SerializersModule
@@ -43,6 +44,7 @@ public data class ServerDefinition(
 
         public val internalSerializersModule: Runtime<SerializersModule>,
         public val externalSerializersModule: Runtime<SerializersModule>,
+        public val annotationValidators: Runtime<AnnotationValidators>,
 
         public val endpoints: PathSpecMap<ServerPathEndpoints>,
         public val httpInterceptors: List<HttpInterceptor>,
@@ -67,6 +69,8 @@ public data class ServerDefinition(
 
     public val internalSerializersModule: Runtime<SerializersModule> get() = flattened.internalSerializersModule
     public val externalSerializersModule: Runtime<SerializersModule> get() = flattened.externalSerializersModule
+
+    public val annotationValidators: Runtime<AnnotationValidators> get() = flattened.annotationValidators
 
     public val endpoints: PathSpecMap<ServerPathEndpoints> get() = flattened.endpoints
     public val httpInterceptors: List<HttpInterceptor> get() = flattened.httpInterceptors
@@ -96,6 +100,7 @@ public data class ServerDefinition(
         moduleId = moduleId,
         internalSerializersModule = Runtime.Cached(internalSerializersModule),
         externalSerializersModule = Runtime.Cached(externalSerializersModule),
+        annotationValidators = Runtime.Cached(annotationValidators),
         httpInterceptors = httpInterceptors.toSealedList(),
         websocketInterceptors = websocketInterceptors.toSealedList(),
         endpoints = endpoints.toSealedPathSpecMap(),
@@ -152,6 +157,7 @@ public data class ServerDefinition(
             moduleId = Uuid.NIL,    // When flattening module identification loses meaning
             internalSerializersModule = { flattenedModuleItems.fold(thisLayer.internalSerializersModule()) { acc, module -> acc + module.internalSerializersModule() } },
             externalSerializersModule = { flattenedModuleItems.fold(thisLayer.externalSerializersModule()) { acc, module -> acc + module.externalSerializersModule() } },
+            annotationValidators = { flattenedModuleItems.fold(thisLayer.annotationValidators()) { acc, module -> acc + module.annotationValidators() } },
             httpInterceptors = flattenList { it.httpInterceptors },
             websocketInterceptors = flattenList { it.websocketInterceptors },
             endpoints = buildPathSpecMap { // We want to be able to override existing entries here, but we'll have to check for duplicate registration manually.

@@ -96,7 +96,7 @@ public fun startupOnce(
 
             val table = database().table<ActionHasOccurred>()
 
-            table.get(oldKey)?.let { old ->
+            if (table.get(newKey) == null) table.get(oldKey)?.let { old ->
                 table.insertOne(
                     old.copy(_id = newKey)
                 )

@@ -1,25 +1,10 @@
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.lightningserver.BadRequestException
-import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.services.data.ValidationIssue
-import com.lightningkite.services.data.Validators
-import com.lightningkite.services.data.validate
-import kotlinx.serialization.SerializationStrategy
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.modules.SerializersModule
+import com.lightningkite.lightningserver.serialization.assertValidOrBadRequest
+import com.lightningkite.services.data.MimeType
+import com.lightningkite.services.database.validation.AnnotationValidators
+import kotlinx.serialization.KSerializer
 
-private val validatorsCache = HashMap<SerializersModule, Validators>()
-public val ServerRuntime.validators: Validators get() = validatorsCache.getOrPut(internalSerializersModule) { Validators(internalSerializersModule) }
-
-public suspend fun <T> Validators.validateOrThrow(serializer: SerializationStrategy<T>, value: T) {
-    val out = ArrayList<ValidationIssue>()
-    validate(serializer, value) { out.add(it) }
-    if (out.isNotEmpty()) {
-        throw BadRequestException(
-            detail = "validation-failed",
-            message = out.joinToString("; ") { "${it.path.joinToString(".")}: ${it.text}" },
-            data = Json.encodeToString(out)
-        )
-    }
-}
+@Deprecated("Renamed", ReplaceWith("assertValidOrBadRequest(serializer, value)", "com.lightningkite.lightningserver.serialization.assertValidOrBadRequest"))
+public suspend fun <T> AnnotationValidators.validateOrThrow(serializer: KSerializer<T>, value: T): Unit =
+    assertValidOrBadRequest(serializer, value)
