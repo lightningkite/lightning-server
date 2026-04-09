@@ -9,7 +9,6 @@ import com.lightningkite.lightningserver.serialization.parse
 import com.lightningkite.lightningserver.typed.HttpAccess
 import com.lightningkite.lightningserver.typed.access
 import com.lightningkite.lightningserver.typed.validateOrThrow
-import com.lightningkite.lightningserver.typed.validators
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.default
