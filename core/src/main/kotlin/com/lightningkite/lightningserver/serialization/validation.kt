@@ -19,6 +19,7 @@ public val ServerRuntime.validators: AnnotationValidators get() = server.annotat
 
 public suspend fun <T> AnnotationValidators.assertValidOrBadRequest(serializer: KSerializer<T>, value: T) {
     val issues = validate(serializer, value)
+    println("Validating $value (${serializer.descriptor.serialName.substringAfterLast('.')}), got issues: $issues")
     if (issues.isNotEmpty()) {
         throw BadRequestException(
             detail = "validation-failed",
