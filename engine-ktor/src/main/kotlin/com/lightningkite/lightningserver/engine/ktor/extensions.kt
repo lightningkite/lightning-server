@@ -38,7 +38,7 @@ internal fun Headers.adapt(): HttpHeaders = HttpHeaders(flattenEntries())
 context(server: ServerRuntimeBase)
 internal suspend fun ApplicationCall.adapt(): HttpRequest<PathSpec> {
     return HttpRequest(
-        path = RawHttpEndpoint(PathSegments.parse(request.path()), HttpMethod(request.httpMethod.value)),
+        path = RawHttpEndpoint(request.path().decodeURLPart(), HttpMethod(request.httpMethod.value)),
         queryParameters = QueryParameters(request.queryParameters.flattenEntries()),
         headers = request.headers.adapt(),
         domain = request.origin.serverHost,

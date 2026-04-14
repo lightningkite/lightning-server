@@ -1,9 +1,9 @@
 import com.lightningkite.deployhelpers.*
 
 plugins {
-    alias(libs.plugins.kotlinJvm)
+    alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.ksp)
-    alias(libs.plugins.serialization)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.dokka)
     id("signing")
     alias(libs.plugins.vanniktechMavenPublish)
@@ -13,10 +13,10 @@ plugins {
 dependencies {
     api(project(":auth-shared"))
     api(project(":core"))
-    api(libs.serviceAbstractionsDatabase)
-    api(libs.kotlinReflect)
-    testImplementation(libs.kotlinTest)
-    testImplementation(libs.kotlinTestJunit)
+    api(libs.services.database)
+    api(libs.kotlin.reflect)
+    testImplementation(libs.kotlin.test)
+    testImplementation(libs.kotlin.test.junit)
 }
 
 ksp {

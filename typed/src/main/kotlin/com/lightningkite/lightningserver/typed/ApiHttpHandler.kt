@@ -7,9 +7,11 @@ import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.serialization.assertValidOrBadRequest
 import com.lightningkite.lightningserver.serialization.parse
 import com.lightningkite.lightningserver.serialization.queryParameters
 import com.lightningkite.lightningserver.serialization.toTypedData
+import com.lightningkite.lightningserver.serialization.validators
 import com.lightningkite.lightningserver.typed.sdk.SDK
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.KSerializer
@@ -100,7 +102,7 @@ public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT
                 else request.body?.parse(inputType) ?: throw BadRequestException("No request body provided")
         }
 
-        server.validators.validateOrThrow(inputType, input)
+        server.validators.assertValidOrBadRequest(inputType, input)
 
         val result = handle(request.access(auth), input)
 

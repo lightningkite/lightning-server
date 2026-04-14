@@ -2,9 +2,9 @@ import com.lightningkite.deployhelpers.*
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    alias(libs.plugins.kotlinJvm)
+    alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.ksp)
-    alias(libs.plugins.serialization)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.dokka)
     id("signing")
     alias(libs.plugins.vanniktechMavenPublish)
@@ -15,22 +15,22 @@ dependencies {
     api(project(":auth"))
     api(project(":typed"))
     api(project(":notifications-shared"))
-    api(libs.serviceAbstractionsDatabase)
-    api(libs.serviceAbstractionsEmail)
-    api(libs.serviceAbstractionsNotificationsFcm)
-    api(libs.serviceAbstractionsSms)
-    api(libs.serviceAbstractionsCache)
-    api(libs.kotlinReflect)
+    api(libs.services.database)
+    api(libs.services.email)
+    api(libs.services.notifications.fcm)
+    api(libs.services.sms)
+    api(libs.services.cache)
+    api(libs.kotlin.reflect)
 
     implementation(libs.oneTimePass)
-    implementation(libs.bouncyCastleBcprov)
-    implementation(libs.bouncyCastleBcpkix)
+    implementation(libs.bouncy.castle.bcprov)
+    implementation(libs.bouncy.castle.bcpkix)
 
-    implementation(libs.webauthn4jCore)
-    testImplementation(libs.kotlinTest)
-    testImplementation(libs.kotlinTestJunit)
+    implementation(libs.webauthn4j.core)
+    testImplementation(libs.kotlin.test)
+    testImplementation(libs.kotlin.test.junit)
 
-    ksp(libs.serviceAbstractionsDatabaseProcessor)
+    ksp(libs.services.database.processor)
 }
 
 ksp {

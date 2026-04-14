@@ -374,10 +374,10 @@ public class MetaEndpoints(
                         async {
                             val start = TimeSource.Monotonic.markNow()
                             val request = entry.value
-                            val pathAndParams = PathAndParams.parse(request.path)
+                            val split = request.path.split("?")
                             val properRequest = originalRequest.copyWithNewPathType(
-                                path = RawHttpEndpoint(pathAndParams.pathSegments, method = HttpMethod(request.method)),
-                                queryParameters = pathAndParams.queryParameters,
+                                path = RawHttpEndpoint(split[0], method = HttpMethod(request.method)),
+                                queryParameters = split.getOrNull(1)?.let { QueryParameters.parse(it) } ?: QueryParameters.EMPTY,
                                 body = request.body?.let { TypedData.text(it, MediaType.Application.Json) }
                             )
                             try {

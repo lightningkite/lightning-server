@@ -2,7 +2,6 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
 import com.lightningkite.lightningserver.auth.PrincipalType
-import com.lightningkite.lightningserver.auth.RequiredScope
 import com.lightningkite.lightningserver.auth.Subscope
 import com.lightningkite.lightningserver.auth.register
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
@@ -91,7 +90,7 @@ class ProofMethodsTest {
     }
 
     @Test
-    fun `verify returns true for valid proof`() = runBlocking {
+    fun `isValid returns true for valid proof`() = runBlocking {
         TestUser.users.clear()
 
         object : ServerBuilder() {
@@ -117,13 +116,13 @@ class ProofMethodsTest {
                 )
 
                 // Verify should return true
-                assertTrue(proofMethod.verify(proof))
+                assertTrue(proofMethod.isValid(proof))
             }
         }
     }
 
     @Test
-    fun `verify returns false when via does not match`() = runBlocking {
+    fun `isValid returns false when via does not match`() = runBlocking {
         TestUser.users.clear()
 
         object : ServerBuilder() {
@@ -149,13 +148,13 @@ class ProofMethodsTest {
                 )
 
                 // Verify should return false because via doesn't match
-                assertFalse(proofMethod.verify(proof))
+                assertFalse(proofMethod.isValid(proof))
             }
         }
     }
 
     @Test
-    fun `verify returns false when property does not match`() = runBlocking {
+    fun `isValid returns false when property does not match`() = runBlocking {
         TestUser.users.clear()
 
         object : ServerBuilder() {
@@ -183,13 +182,13 @@ class ProofMethodsTest {
                 )
 
                 // Verify should return false because property doesn't match
-                assertFalse(proofMethod.verify(proof))
+                assertFalse(proofMethod.isValid(proof))
             }
         }
     }
 
     @Test
-    fun `verify returns true when method has no required property`() = runBlocking {
+    fun `isValid returns true when method has no required property`() = runBlocking {
         TestUser.users.clear()
 
         object : ServerBuilder() {
@@ -217,13 +216,13 @@ class ProofMethodsTest {
                 )
 
                 // Verify should return true because method accepts any property
-                assertTrue(proofMethod.verify(proof))
+                assertTrue(proofMethod.isValid(proof))
             }
         }
     }
 
     @Test
-    fun `verify returns false when proof is expired`() = runBlocking {
+    fun `isValid returns false when proof is expired`() = runBlocking {
         TestUser.users.clear()
 
         object : ServerBuilder() {
@@ -250,13 +249,13 @@ class ProofMethodsTest {
                 )
 
                 // Verify should return false because proof is expired
-                assertFalse(proofMethod.verify(proof))
+                assertFalse(proofMethod.isValid(proof))
             }
         }
     }
 
     @Test
-    fun `verify returns false when signature is invalid`() = runBlocking {
+    fun `isValid returns false when signature is invalid`() = runBlocking {
         TestUser.users.clear()
 
         object : ServerBuilder() {
@@ -284,7 +283,7 @@ class ProofMethodsTest {
                 )
 
                 // Verify should return false because signature doesn't match
-                assertFalse(proofMethod.verify(proof))
+                assertFalse(proofMethod.isValid(proof))
             }
         }
     }

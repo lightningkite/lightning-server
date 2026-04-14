@@ -15,7 +15,6 @@ import software.amazon.awssdk.http.SdkHttpFullResponse
 import software.amazon.awssdk.services.apigatewaymanagementapi.model.*
 import software.amazon.awssdk.services.lambda.model.InvocationType
 import software.amazon.awssdk.services.lambda.model.InvokeRequest
-import java.net.URLDecoder
 import java.util.*
 
 internal class AwsAdapterWs(val root: AwsAdapter) {
@@ -353,9 +352,8 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
 
         // Try multiValueQueryStringParameters first, then fall back to queryStringParameters
         var queryParams = event.multiValueQueryStringParameters
-            ?.entries?.flatMap { it.value.map { v -> it.key to URLDecoder.decode(v, Charsets.UTF_8) } }
-            ?: event.queryStringParameters
-                ?.entries?.map { it.key to URLDecoder.decode(it.value, Charsets.UTF_8) }
+            ?.entries?.flatMap { it.value.map { v -> it.key to v } }
+            ?: event.queryStringParameters?.entries?.map { it.key to it.value }
             ?: listOf()
 
         return when (event.requestContext.routeKey) {

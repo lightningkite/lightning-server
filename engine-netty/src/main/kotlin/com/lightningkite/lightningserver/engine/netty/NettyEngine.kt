@@ -580,7 +580,8 @@ public class NettyEngine(
             ctx: ChannelHandlerContext,
             cfg: NettyRuntimeSettings,
         ): HttpRequest<PathSpec> {
-            val fullUri = PathAndParams.parse(this.uri())
+
+            val parts = QueryStringDecoder(this.uri())
             val headers = (this.headers() as NettyHttpHeaders).toLightningHeaders()
             val contentTypeHeader = headers.contentType
 
@@ -603,8 +604,8 @@ public class NettyEngine(
             } ?: ((ctx.channel().remoteAddress() as? InetSocketAddress)?.address?.hostAddress ?: "")
 
             return HttpRequest(
-                path = RawHttpEndpoint(fullUri.pathSegments, HttpMethod(this.method().name())),
-                queryParameters = fullUri.queryParameters,
+                path = RawHttpEndpoint(parts.path(), HttpMethod(this.method().name())),
+                queryParameters = QueryParameters(parts.parameters().flatMap { (key, values) -> values.map { key to it } }),
                 headers = headers,
                 domain = domain.ifEmpty { (ctx.channel().localAddress() as? InetSocketAddress)?.hostString.orEmpty() },
                 protocol = "http",
@@ -617,7 +618,7 @@ public class NettyEngine(
             ctx: ChannelHandlerContext,
             cfg: NettyRuntimeSettings,
         ): WebSocketConnectRequest<PathSpec> {
-            val fullUri = PathAndParams.parse(this.uri())
+            val parts = QueryStringDecoder(this.uri())
             val headers = (this.headers() as NettyHttpHeaders).toLightningHeaders()
             val hostHeader = this.headers()[HOST] ?: ""
             val domain = hostHeader.substringBefore(":")
@@ -629,8 +630,8 @@ public class NettyEngine(
             } ?: ((ctx.channel().remoteAddress() as? InetSocketAddress)?.address?.hostAddress ?: "")
 
             return WebSocketConnectRequest(
-                path = RawWebsocketPath(fullUri.pathSegments),
-                queryParameters = fullUri.queryParameters,
+                path = RawWebsocketPath(parts.path()),
+                queryParameters = QueryParameters(parts.parameters().flatMap { (key, values) -> values.map { key to it } }),
                 headers = headers,
                 domain = domain.ifEmpty { (ctx.channel().localAddress() as? InetSocketAddress)?.hostString.orEmpty() },
                 protocol = "http",

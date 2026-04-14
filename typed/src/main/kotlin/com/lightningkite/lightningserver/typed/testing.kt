@@ -172,6 +172,7 @@ context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT, 
         input
     )
 }
+
 context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT, A, B, C> ApiHttpHandler<PathSpec3<A, B, C>, USER, INPUT, OUTPUT>.test(
     path1: A,
     path2: B,
@@ -287,4 +288,3 @@ context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT, 
         input
     )
 }
-

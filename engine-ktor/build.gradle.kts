@@ -1,9 +1,9 @@
 import com.lightningkite.deployhelpers.*
 
 plugins {
-    alias(libs.plugins.kotlinJvm)
+    alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.ksp)
-    alias(libs.plugins.serialization)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.dokka)
     id("signing")
     alias(libs.plugins.vanniktechMavenPublish)
@@ -12,26 +12,26 @@ plugins {
 dependencies {
     api(project(":core"))
     api(project(":engine-local"))
-    api(libs.serviceAbstractionsDatabase)
-    api(libs.serviceAbstractionsCache)
-    api(libs.serviceAbstractionsPubsub)
-    api(libs.kotlinReflect)
+    api(libs.services.database)
+    api(libs.services.cache)
+    api(libs.services.pubsub)
+    api(libs.kotlin.reflect)
     
     // Ktor dependencies
-    api(libs.ktorCore)
-    api(libs.ktorNetty)
-    api(libs.ktorCioJvm)
-    api(libs.ktorWebsockets)
-    api(libs.ktorCallLogging)
+    api(libs.ktor.core)
+    api(libs.ktor.netty)
+    api(libs.ktor.cio.jvm)
+    api(libs.ktor.websockets)
+    api(libs.ktor.call.logging)
 //    api(libs.ktorCors)
-    api(libs.ktorJson)
+    api(libs.ktor.json)
 
     // Test dependencies
-    testImplementation(libs.kotlinTest)
-    testImplementation(libs.kotlinTestJunit)
-    testImplementation(libs.ktorTestHost)
-    testImplementation("io.ktor:ktor-client-cio-jvm:${libs.versions.ktor.get()}")
-    testImplementation("io.ktor:ktor-client-websockets-jvm:${libs.versions.ktor.get()}")
+    testImplementation(libs.kotlin.test)
+    testImplementation(libs.kotlin.test.junit)
+    testImplementation(libs.ktor.test.host)
+    testImplementation(libs.ktor.client.cio.jvm)
+    testImplementation(libs.ktor.client.websockets.jvm)
 }
 
 ksp {

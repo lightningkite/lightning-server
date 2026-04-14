@@ -1,60 +1,10 @@
 package com.lightningkite.lightningserver.http
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
-import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import java.net.URLDecoder
-import java.net.URLEncoder
 
-/**
- * Represents a complete URL path with its segments and query parameters.
- *
- * This combines the path portion (e.g., `/users/123`) and query string (e.g., `?filter=active`)
- * into a single structure.
- *
- * Example:
- * ```kotlin
- * val parsed = PathAndParams.parse("/api/users/123?filter=active&sort=name")
- * println(parsed.pathSegments.segments) // ["api", "users", "123"]
- * println(parsed.queryParameters["filter"]) // "active"
- * ```
- *
- * @property pathSegments The URL path broken into segments
- * @property queryParameters The query string parameters
- */
-@Serializable(PathAndParams.Serializer::class)
-public data class PathAndParams(
-    val pathSegments: PathSegments,
-    val queryParameters: QueryParameters
-) {
-    override fun toString(): String =
-        "$pathSegments${if (queryParameters.entries.isNotEmpty()) "?$queryParameters" else ""}"
-
-    public companion object {
-        /**
-         * Parses a full URL path with optional query string.
-         *
-         * @param path The path string (e.g., "/api/users?filter=active")
-         * @return The parsed PathAndParams
-         */
-        public fun parse(path: String): PathAndParams {
-            val split = path.split("?")
-            return PathAndParams(
-                PathSegments.parse(split[0]),
-                split.getOrNull(1)?.let { QueryParameters.parse(it) } ?: QueryParameters.EMPTY
-            )
-        }
-    }
-
-    private object Serializer: kotlinx.serialization.KSerializer<PathAndParams> {
-        override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.lightningserver.http.PathAndParams", PrimitiveKind.STRING)
-        override fun deserialize(decoder: Decoder): PathAndParams = parse(decoder.decodeString())
-        override fun serialize(encoder: Encoder, value: PathAndParams) = encoder.encodeString(value.toString())
-    }
-}
 
 /**
  * Represents URL path segments with URL encoding/decoding support.
@@ -76,13 +26,8 @@ public data class PathAndParams(
  */
 @Serializable(PathSegments.Serializer::class)
 @JvmInline
-public value class PathSegments(public val segments: List<String>): List<String> by segments {
-    override fun toString(): String = segments.joinToString("/") {
-        URLEncoder.encode(
-            it,
-            Charsets.UTF_8
-        )
-    }
+public value class PathSegments(public val segments: List<String>) : List<String> by segments {
+    override fun toString(): String = segments.joinToString("/")
 
     public companion object {
         /** An empty PathSegments with no segments. */
@@ -96,15 +41,17 @@ public value class PathSegments(public val segments: List<String>): List<String>
          * correct trailing slash redirect logic.
          *
          * @param path The URL path (e.g., "/api/users/123")
-         * @return The parsed PathSegments with decoded segment values
+         * @return The parsed PathSegments with segment values
          */
         public fun parse(path: String): PathSegments = PathSegments(
-            path.removePrefix("/").split("/").map { URLDecoder.decode(it, Charsets.UTF_8) }
+            path.removePrefix("/").split("/")
         )
     }
 
-    private object Serializer: kotlinx.serialization.KSerializer<PathSegments> {
-        override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.lightningserver.http.PathSegments", PrimitiveKind.STRING)
+    private object Serializer : kotlinx.serialization.KSerializer<PathSegments> {
+        override val descriptor: SerialDescriptor =
+            PrimitiveSerialDescriptor("com.lightningkite.lightningserver.http.PathSegments", PrimitiveKind.STRING)
+
         override fun deserialize(decoder: Decoder): PathSegments = parse(decoder.decodeString())
         override fun serialize(encoder: Encoder, value: PathSegments) = encoder.encodeString(value.toString())
     }
@@ -131,7 +78,8 @@ public value class PathSegments(public val segments: List<String>): List<String>
  */
 @Serializable(QueryParameters.Serializer::class)
 @JvmInline
-public value class QueryParameters(public val entries: List<Pair<String, String>>): List<Pair<String, String>> by entries {
+public value class QueryParameters(public val entries: List<Pair<String, String>>) :
+    List<Pair<String, String>> by entries {
 
     /**
      * Gets the first value for the specified parameter key.
@@ -143,22 +91,7 @@ public value class QueryParameters(public val entries: List<Pair<String, String>
      */
     public operator fun get(key: String): String? = entries.firstOrNull { it.first == key }?.second
 
-    // TODO: Remove this fugly hack and deal with websocket auth better
-    public fun pathHack(): QueryParameters = QueryParameters(entries.flatMap {
-        if (it.first == "path" && it.second.contains('?')) {
-            listOf(it.first to it.second.substringBefore('?')) + parse(it.second.substringAfter('?')).entries
-        } else
-            listOf(it)
-    })
-
-    override fun toString(): String = entries.joinToString("&") {
-        "${
-            URLEncoder.encode(
-                it.first,
-                Charsets.UTF_8
-            )
-        }=${URLEncoder.encode(it.second, Charsets.UTF_8)}"
-    }
+    override fun toString(): String = entries.joinToString("&") { "${it.first}=${it.second}" }
 
     public companion object {
         /** An empty QueryParameters with no parameters. */
@@ -168,22 +101,22 @@ public value class QueryParameters(public val entries: List<Pair<String, String>
          * Parses a query string into parameters, URL-decoding keys and values.
          *
          * @param path The query string (e.g., "filter=active&sort=name")
-         * @return The parsed QueryParameters with decoded keys and values
+         * @return The parsed QueryParameters with keys and values
          */
         public fun parse(path: String): QueryParameters {
             return QueryParameters(
-                path.split('&').filter { it.isNotBlank() }.map { it.split('=', limit = 2) }.map {
-                    URLDecoder.decode(
-                        it[0],
-                        Charsets.UTF_8
-                    ) to (it.getOrNull(1)?.let { URLDecoder.decode(it, Charsets.UTF_8) } ?: "")
-                }
+                path.split('&')
+                    .filter { it.isNotBlank() }
+                    .map { it.split('=', limit = 2) }
+                    .map { it[0] to (it.getOrNull(1) ?: "") }
             )
         }
     }
 
-    private object Serializer: kotlinx.serialization.KSerializer<QueryParameters> {
-        override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.lightningserver.http.QueryParameters", PrimitiveKind.STRING)
+    private object Serializer : kotlinx.serialization.KSerializer<QueryParameters> {
+        override val descriptor: SerialDescriptor =
+            PrimitiveSerialDescriptor("com.lightningkite.lightningserver.http.QueryParameters", PrimitiveKind.STRING)
+
         override fun deserialize(decoder: Decoder): QueryParameters = parse(decoder.decodeString())
         override fun serialize(encoder: Encoder, value: QueryParameters) = encoder.encodeString(value.toString())
     }
@@ -208,9 +141,6 @@ public value class QueryParameters(public val entries: List<Pair<String, String>
  *
  * 5. QueryParameters could benefit from a getAll(key: String): List<String> method
  *    for retrieving all values for a given key (e.g., multiple tags).
- *
- * 6. The parsing doesn't handle invalid URL encoding gracefully - URLDecoder.decode can throw
- *    IllegalArgumentException. Consider wrapping in try-catch or using Result type.
  *
  * 7. PathSegments removes leading slash but not trailing slash. A path like "/api/users/"
  *    will have an empty string as the last segment. Document or handle this behavior.

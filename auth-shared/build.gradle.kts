@@ -2,9 +2,9 @@ import com.lightningkite.deployhelpers.*
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    alias(libs.plugins.kotlinMultiplatform)
+    alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.ksp)
-    alias(libs.plugins.serialization)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.androidLibrary)
     alias(libs.plugins.dokka)
     id("signing")
@@ -48,7 +48,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api(libs.kotlinXDatetime)
+                api(libs.kotlinx.datetime)
                 api(project(":core-shared"))
             }
             kotlin {
@@ -57,7 +57,7 @@ kotlin {
         }
         val commonTest by getting {
             dependencies {
-                implementation(libs.kotlinTest)
+                implementation(libs.kotlin.test)
             }
             kotlin {
                 srcDir(file("build/generated/ksp/common/commonTest/kotlin"))
@@ -75,7 +75,7 @@ kotlin {
 
 dependencies {
     configurations.filter { it.name.startsWith("ksp") }.forEach {
-        add(it.name, libs.serviceAbstractionsDatabaseProcessor)
+        add(it.name, libs.services.database.processor)
     }
 }
 
