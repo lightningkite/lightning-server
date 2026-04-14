@@ -11,6 +11,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.KSerializer
+import java.lang.ref.WeakReference
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -95,15 +96,22 @@ public fun interface Runtime<out T> : RuntimeDeferred<T> {
      * the computation once, with other threads waiting for the result.
      */
     public data class Cached<out T>(private val wraps: Runtime<T>) : Runtime<T> {
-        @Volatile
-        private var cache: NullWrapper<T>? = null
+
+        private class Computed<T>(
+            val runtime: WeakReference<ServerRuntime>,
+            val result: T,
+        )
+        @Volatile private var cache: Computed<T>? = null
         private val lock = Any()
 
         context(server: ServerRuntime)
-        override operator fun invoke(): T =
-            cache?.value ?: synchronized(lock) {
-                cache?.value ?: wraps.invoke().also { cache = NullWrapper(it) }
+        override operator fun invoke(): T {
+            synchronized(lock) {
+                val c = cache
+                if (c != null && c.runtime.get() == server) return c.result
+                return wraps.invoke().also { cache = Computed(WeakReference(server), it) }
             }
+        }
     }
 
     /**
