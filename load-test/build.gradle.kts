@@ -1,12 +1,12 @@
 // by Claude - load test module for framework-native load testing
 plugins {
-    alias(libs.plugins.kotlinJvm)
-    alias(libs.plugins.serialization)
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 dependencies {
     api(project(":typed"))
-    implementation(libs.coroutinesJdk)
+    implementation(libs.coroutines.jdk)
 }
 
 kotlin {
