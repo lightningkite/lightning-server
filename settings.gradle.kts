@@ -44,6 +44,8 @@ include(":engine-aws-serverless")
 include(":engine-netty")
 include(":engine-jdk-server")
 
+include(":ratelimit")
+
 include(":secret-source-aws")
 
 include(":load-test")
