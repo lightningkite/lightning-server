@@ -16,6 +16,7 @@ import com.lightningkite.lightningserver.typed.sdk.filterSafeEndpoints
 import com.lightningkite.services.database.SerializationRegistry
 import com.lightningkite.services.database.VirtualAlias
 import com.lightningkite.services.database.VirtualEnum
+import com.lightningkite.services.database.VirtualSealed
 import com.lightningkite.services.database.VirtualStruct
 import com.lightningkite.services.database.VirtualTypeReference
 import com.lightningkite.services.database.virtualTypeReference
@@ -117,6 +118,7 @@ val lightningServerKSchema: LightningServerKSchema get() {
         }.toList(),
         enums = registry.virtualTypes.filterValues { it is VirtualEnum } as Map<String, VirtualEnum>,
         structures = registry.virtualTypes.filterValues { it is VirtualStruct } as Map<String, VirtualStruct>,
+        sealedStructures = registry.virtualTypes.filterValues { it is VirtualSealed } as Map<String, VirtualSealed>,
         aliases = registry.virtualTypes.filterValues { it is VirtualAlias } as Map<String, VirtualAlias>,
     )
 }
