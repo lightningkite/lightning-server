@@ -4,23 +4,13 @@ import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.encryption.SecretBasis
 import com.lightningkite.lightningserver.settings.ServerSettings
-import com.lightningkite.services.terraform.TerraformEmitter
-import com.lightningkite.services.terraform.TerraformEmitterAws
-import com.lightningkite.services.terraform.TerraformJsonObject
+import com.lightningkite.services.terraform.*
 import com.lightningkite.services.terraform.TerraformJsonObject.Companion.expression
-import com.lightningkite.services.terraform.TerraformNeed
-import com.lightningkite.services.terraform.TerraformProvider
-import com.lightningkite.services.terraform.TerraformProviderImport
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import java.io.File
 import java.security.SecureRandom
 import kotlin.io.encoding.Base64
@@ -124,7 +114,7 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
      */
     override fun emit(
         context: String?,
-        action: TerraformJsonObject.() -> Unit
+        action: TerraformJsonObject.() -> Unit,
     ) {
         files.getOrPut(context ?: "unclassified") { TerraformJsonObject() }.action()
     }
@@ -139,7 +129,8 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
         builder.settings()
         val built = builder.build()
         ServerSettings(built)   // run checks for conflicts & circular references
-        val required = built.settings.map { it.name }.toSet() + additionalSettings.map { it.name }
+        val required = built.settings.filter { !it.optional }.map { it.name }.toSet() +
+                additionalSettings.filter { !it.optional }.map { it.name }
         val missing = required - settings.keys - built.settingOverrides.keys.map { it.name }.toSet()
         if (missing.isNotEmpty()) throw IllegalStateException("Missing settings for deployment ${projectPrefix}: $missing")
     }
@@ -305,9 +296,11 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
         variables.forEach { need ->
             @Suppress("UNCHECKED_CAST")
             val serializer = need.serializer as KSerializer<Any?>
-            fun SerialDescriptor.isActuallyPrimitive(): Boolean = kind is PrimitiveKind || isInline && getElementDescriptor(0).isActuallyPrimitive()
-            if(serializer.descriptor.isActuallyPrimitive()) {
-                env["TF_VAR_${need.name}"] = Json.encodeToJsonElement(serializer, secretsSource.get(need)).jsonPrimitive.content
+            fun SerialDescriptor.isActuallyPrimitive(): Boolean =
+                kind is PrimitiveKind || isInline && getElementDescriptor(0).isActuallyPrimitive()
+            if (serializer.descriptor.isActuallyPrimitive()) {
+                env["TF_VAR_${need.name}"] =
+                    Json.encodeToJsonElement(serializer, secretsSource.get(need)).jsonPrimitive.content
             } else {
                 env["TF_VAR_${need.name}"] = Json.encodeToString(serializer, secretsSource.get(need))
             }
@@ -325,7 +318,7 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
      * @throws Exception if terraform exits with a non-zero exit code
      */
     public fun terraform(vararg command: String) {
-        terraformRoot.runTerraform(if(useTofu) "tofu" else "terraform", terraformEnv, *command)
+        terraformRoot.runTerraform(if (useTofu) "tofu" else "terraform", terraformEnv, *command)
     }
 
     /**
@@ -357,7 +350,7 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
         println("/!\\ STOP! /!\\")
         println("You are about to destroy all of the infrastructure related to the ${projectPrefix} deployment.")
         println("If you are SURE you want to proceed, please enter 'destroy ${projectPrefix}'.")
-        if(readLine() != "destroy $projectPrefix") {
+        if (readLine() != "destroy $projectPrefix") {
             println("That didn't match.  Bailing out...")
             return
         }
@@ -423,7 +416,8 @@ public interface Deployment {
  * }
  * ```
  */
-context(emitter: TerraformEmitterAws) public fun TerraformNeed<SecretBasis>.generated(): Unit {
+context(emitter: TerraformEmitterAws)
+public fun TerraformNeed<SecretBasis>.generated(): Unit {
     emitter.fulfillSetting(name, JsonPrimitive(expression("random_password.${name}.result")))
     emitter.emit("secretBasis") {
         "resource.random_password.${name}" {

@@ -16,6 +16,7 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.RequiredScope
+import com.lightningkite.services.database.VirtualSealed
 
 /**
  * Request to start tracking a new user funnel instance.
@@ -209,6 +210,7 @@ public data class LightningServerKSchema(
     val baseUrl: String,
     val baseWsUrl: String,
     val structures: Map<String, VirtualStruct>,
+    val sealedStructures: Map<String, VirtualSealed> = mapOf(),
     val enums: Map<String, VirtualEnum>,
     val aliases: Map<String, VirtualAlias> = mapOf(),
     val endpoints: List<LightningServerKSchemaEndpoint>,
