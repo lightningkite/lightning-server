@@ -210,7 +210,7 @@ public data class LightningServerKSchema(
     val baseUrl: String,
     val baseWsUrl: String,
     val structures: Map<String, VirtualStruct>,
-    val sealedStructures: Map<String, VirtualSealed>,
+    val sealedStructures: Map<String, VirtualSealed> = mapOf(),
     val enums: Map<String, VirtualEnum>,
     val aliases: Map<String, VirtualAlias> = mapOf(),
     val endpoints: List<LightningServerKSchemaEndpoint>,
