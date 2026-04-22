@@ -1,5 +1,8 @@
 package com.lightningkite.lightningserver.typed
 
+import com.lightningkite.lightningserver.BadRequestException
+import com.lightningkite.lightningserver.ForbiddenException
+import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.CollectionChanges
 import com.lightningkite.services.database.Condition
@@ -8,6 +11,43 @@ import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.Modification
 import com.lightningkite.services.database.SortPart
 import com.lightningkite.services.database.Table
+import com.lightningkite.services.database._id
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.serialization.serializer
+
+/**
+ * Retrieves the [Model] with [id], or throws a [NotFoundException] with the provided [message] if not found.
+ * */
+public suspend fun <Model : HasId<ID>, ID : Comparable<ID>> Table<Model>.getOrNotFound(
+    id: ID,
+    message: String = "${serializer.descriptor.serialName.substringAfterLast('.')} $id not found",
+): Model {
+    return find(Condition.OnField(serializer._id(), Condition.Equal(id)), limit = 1).firstOrNull()
+        ?: throw NotFoundException(message)
+}
+
+/**
+ * Retrieves the [Model] with [id], or throws a [BadRequestException] with the provided [message] if not found.
+ * */
+public suspend fun <Model : HasId<ID>, ID : Comparable<ID>> Table<Model>.getOrBadRequest(
+    id: ID,
+    message: String = "${serializer.descriptor.serialName.substringAfterLast('.')} $id not recognized",
+): Model {
+    return find(Condition.OnField(serializer._id(), Condition.Equal(id)), limit = 1).firstOrNull()
+        ?: throw BadRequestException(message)
+}
+
+/**
+ * Retrieves the [Model] with [id], or throws a [ForbiddenException] with the provided [message] if not found.
+ * */
+public suspend fun <Model : HasId<ID>, ID : Comparable<ID>> Table<Model>.getOrForbidden(
+    id: ID,
+    message: String = "${serializer.descriptor.serialName.substringAfterLast('.')} $id not recognized",
+): Model {
+    return find(Condition.OnField(serializer._id(), Condition.Equal(id)), limit = 1).firstOrNull()
+        ?: throw ForbiddenException(message)
+}
+
 
 public context(server: ServerRuntime)
 fun <Model : HasId<ID>, ID : Comparable<ID>> Table<Model>.withServerRuntimeChangeListeners(

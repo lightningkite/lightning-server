@@ -1,10 +1,7 @@
 package com.lightningkite.lightningserver
 
-import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpStatus
-import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
-import kotlinx.serialization.Serializable
 
 /**
  * Converts an LSError to an HttpStatusException.
@@ -124,7 +121,7 @@ public class RouteNotFoundException(
     public val requestedRoute: RawHttpEndpoint<*>
 ): NotFoundException(
     detail = "not-found",
-    message = "No route matching ${requestedRoute} was found.",
+    message = "No route matching $requestedRoute was found.",
     data = requestedRoute.toString(),
 )
 

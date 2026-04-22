@@ -1,20 +1,14 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
-import com.lightningkite.lightningserver.auth.AuthRequirement
-import com.lightningkite.lightningserver.auth.PrincipalType
-import com.lightningkite.lightningserver.auth.RequiredScope
-import com.lightningkite.lightningserver.auth.Subscope
-import com.lightningkite.lightningserver.definition.ListRegistryExtension
-import com.lightningkite.lightningserver.definition.RuntimeDeferred
-import com.lightningkite.lightningserver.definition.ServerDefinition
+import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ListRegistry
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.getValue
 import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.sessions.proofs.ProofMethod.Companion.baseScope
-import com.lightningkite.lightningserver.sessions.proofs.extensions.expired
 import com.lightningkite.lightningserver.sessions.proofs.extensions.verify
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.services.database.HasId
@@ -42,11 +36,15 @@ public interface ProofMethod {
      * Checks if the given [proof] is valid and was issued by this [ProofMethod]
      * */
     context(server: ServerRuntime)
-    public suspend fun verify(proof: Proof): Boolean =
-        info.via == proof.via &&
+    public suspend fun isValid(proof: Proof): Boolean {
+        // Backwards compatibility for expiresAt.
+        val proof = if (proof.expiresAt != null) proof
+        else proof.copy(expiresAt = proof.at + proofExpiration)
+        return info.via == proof.via &&
                 info.property?.let { proof.property == it } != false &&
-                !proof.expired &&
+                proof.expiresAt!! > now() &&
                 proofSigner.await().verify(proof)
+    }
 
     context(server: ServerRuntime)
     public suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> established(
@@ -72,8 +70,8 @@ public interface ExternalProofMethod : ProofMethod {
     public val start: ApiHttpHandler<PathSpec0, HasId<*>?, String, String>
 }
 
-public val ProofMethod.proofMethodAuth: AuthRequirement.Authenticated get() =
-    AuthRequirement.Authenticated(
+public val ProofMethod.proofMethodAuth: AuthRequirement.Authenticated
+    get() = AuthRequirement.Authenticated(
         scopes = setOf(baseScope.subscope(Subscope(info.via))),
         maxAge = 10.minutes
     )

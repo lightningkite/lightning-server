@@ -15,7 +15,7 @@ on:
 jobs:
   releaseServer:
     name: Server Test and Upload Release
-    runs-on: macos-latest
+    runs-on: macos-26
     steps:
 
       - uses: actions/checkout@v4

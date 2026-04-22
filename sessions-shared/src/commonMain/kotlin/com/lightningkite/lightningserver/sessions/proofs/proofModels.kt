@@ -111,6 +111,7 @@ public data class AuthRequirements(
  * @property value The actual value that was verified (e.g., "user@example.com").
  * @property at The timestamp when this proof was completed.
  * @property expiresAt The timestamp when this proof is no longer valid.
+ *           Nullable for now for backwards compatibility with mobile apps
  * @property signature A cryptographic signature that validates this proof's authenticity.
  *           **Security Note**: This prevents tampering and ensures the proof was issued by the server.
  */

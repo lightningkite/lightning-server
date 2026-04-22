@@ -2,71 +2,64 @@
 
 package com.lightningkite.lightningserver.demo
 
-import com.lightningkite.DataSize.Companion.bytes
-import com.lightningkite.PhoneNumber
-import com.lightningkite.lightningserver.demo.endpoints.*
+//import com.lightningkite.services.database.cassandra.*
 import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.cors.CorsInterceptor
 import com.lightningkite.lightningserver.cors.CorsSettings
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.*
-import com.lightningkite.lightningserver.deprecations.path1
+import com.lightningkite.lightningserver.demo.endpoints.*
+import com.lightningkite.lightningserver.files.Files
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.http.*
-import com.lightningkite.lightningserver.pathing.arg1
-import com.lightningkite.lightningserver.pathing.arg2
 import com.lightningkite.lightningserver.runtime.*
+import com.lightningkite.lightningserver.serialization.StandardWithExternalModule
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.sessions.proofs.*
 import com.lightningkite.lightningserver.typed.*
-import com.lightningkite.lightningserver.typed.route
 import com.lightningkite.lightningserver.typed.sdk.module
 import com.lightningkite.lightningserver.websockets.*
-import kotlinx.coroutines.flow.Flow
 import com.lightningkite.services.cache.*
 import com.lightningkite.services.cache.dynamodb.*
 import com.lightningkite.services.cache.memcached.*
-import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.*
 import com.lightningkite.services.database.jsonfile.JsonFileDatabase
 import com.lightningkite.services.database.mongodb.*
-//import com.lightningkite.services.database.cassandra.*
+import com.lightningkite.services.database.validation.AnnotationValidators
 import com.lightningkite.services.email.*
 import com.lightningkite.services.email.javasmtp.JavaSmtpEmailService
 import com.lightningkite.services.email.ses.SesEmailInboundService
 import com.lightningkite.services.files.*
 import com.lightningkite.services.files.s3.*
 import com.lightningkite.services.http.*
-import com.lightningkite.services.otel.OpenTelemetrySettings
-import com.lightningkite.services.sms.*
-import com.lightningkite.services.sms.twilio.TwilioSMS
-import com.lightningkite.services.sms.twilio.TwilioSmsInboundService
 import com.lightningkite.services.phonecall.PhoneCallService
 import com.lightningkite.services.phonecall.twilio.TwilioPhoneCallService
 import com.lightningkite.services.pubsub.PubSub
 import com.lightningkite.services.pubsub.aws.DynamoDbPubSub
+import com.lightningkite.services.sms.*
+import com.lightningkite.services.sms.twilio.TwilioSMS
+import com.lightningkite.services.sms.twilio.TwilioSmsInboundService
 import com.lightningkite.services.voiceagent.VoiceAgentService
 import com.lightningkite.services.voiceagent.openai.OpenAIVoiceAgentService
 import com.lightningkite.toPhoneNumber
 import io.ktor.client.request.*
-import io.ktor.server.plugins.NotFoundException
-import io.opentelemetry.exporter.otlp.logs.OtlpGrpcLogRecordExporter
-import io.opentelemetry.exporter.otlp.metrics.OtlpGrpcMetricExporter
-import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter
-import io.opentelemetry.sdk.OpenTelemetrySdk
-import io.opentelemetry.sdk.resources.Resource
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.Flow
 import kotlinx.html.*
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.*
 import kotlin.random.*
 import kotlin.time.*
-import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.*
 
 object Server : ServerBuilder() {
+//    override val annotationValidators: Runtime<AnnotationValidators> = AnnotationValidators.StandardWithExternalModule
+
+    override val annotationValidators: Runtime<AnnotationValidators> = Runtime.Cached {
+        AnnotationValidators.StandardWithExternalModule() + AnnotationValidators.Files()
+    }
 
     val database = setting("database", Database.Settings())
     val email = setting("email", EmailService.Settings())

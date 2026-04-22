@@ -26,8 +26,6 @@ import kotlinx.io.asSource
 import kotlinx.io.buffered
 import kotlinx.serialization.Serializable
 import java.net.InetSocketAddress
-import java.net.URLDecoder
-import java.nio.charset.StandardCharsets
 import kotlin.time.Clock
 
 /**
@@ -189,7 +187,6 @@ private fun HttpExchange.write(response: HttpResponse) {
 private fun HttpExchange.requestToLightningServer(realIpHeader: String?, engine: JdkEngine): HttpRequest<PathSpec> {
     val method = this.requestMethod
     val uri = this.requestURI
-    val path = PathSegments.parse(uri.path ?: "/")
     val queryParams = QueryParameters.parse(uri.rawQuery ?: "")
     val headers = this.requestHeaders.adapt()
     val hostHeader = this.requestHeaders.getFirst("Host") ?: ""
@@ -210,7 +207,7 @@ private fun HttpExchange.requestToLightningServer(realIpHeader: String?, engine:
     } else null
 
     return HttpRequest(
-        path = RawHttpEndpoint(path, HttpMethod(method)),
+        path = RawHttpEndpoint(uri.path ?: "/", HttpMethod(method)),
         queryParameters = queryParams,
         headers = headers,
         domain = domain,

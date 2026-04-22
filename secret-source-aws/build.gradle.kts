@@ -1,8 +1,8 @@
 import com.lightningkite.deployhelpers.*
 
 plugins {
-    alias(libs.plugins.kotlinJvm)
-    alias(libs.plugins.serialization)
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.dokka)
     id("signing")
     alias(libs.plugins.vanniktechMavenPublish)
@@ -14,9 +14,9 @@ dependencies {
         exclude("software.amazon.awssdk:netty-nio-client")
         exclude("software.amazon.awssdk:apache-client")
     }
-    api(libs.awsSecretsManager) { excludeNetty() }
-    testImplementation(libs.kotlinTest)
-    testImplementation(libs.kotlinTestJunit)
+    api(libs.aws.secrets.manager) { excludeNetty() }
+    testImplementation(libs.kotlin.test)
+    testImplementation(libs.kotlin.test.junit)
 }
 
 kotlin {

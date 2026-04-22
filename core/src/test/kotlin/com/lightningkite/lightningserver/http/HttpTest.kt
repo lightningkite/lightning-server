@@ -210,22 +210,9 @@ class HttpTest {
     }
 
     @Test
-    fun `PathSegments parse handles encoded characters`() {
-        val segments = PathSegments.parse("/api/users/john%20doe")
-        assertEquals(listOf("api", "users", "john doe"), segments.segments)
-    }
-
-    @Test
     fun `PathSegments parse strips leading slash`() {
         val segments = PathSegments.parse("/api")
         assertEquals(listOf("api"), segments.segments)
-    }
-
-    @Test
-    fun `PathSegments toString encodes segments`() {
-        val segments = PathSegments(listOf("api", "users", "john doe"))
-        val result = segments.toString()
-        assertTrue(result.contains("john+doe") || result.contains("john%20doe"))
     }
 
     @Test
@@ -240,13 +227,6 @@ class HttpTest {
         val params = QueryParameters.parse("filter=active&sort=name")
         assertEquals("active", params["filter"])
         assertEquals("name", params["sort"])
-    }
-
-    @Test
-    fun `QueryParameters parse handles encoded values`() {
-        val params = QueryParameters.parse("name=john%20doe&city=new%20york")
-        assertEquals("john doe", params["name"])
-        assertEquals("new york", params["city"])
     }
 
     @Test
@@ -278,42 +258,4 @@ class HttpTest {
         assertTrue(allTags.contains("server"))
     }
 
-    // PathAndParams Tests
-
-    @Test
-    fun `PathAndParams parse handles path with query string`() {
-        val pathAndParams = PathAndParams.parse("/api/users?filter=active")
-        assertEquals(listOf("api", "users"), pathAndParams.pathSegments.segments)
-        assertEquals("active", pathAndParams.queryParameters["filter"])
-    }
-
-    @Test
-    fun `PathAndParams parse handles path without query string`() {
-        val pathAndParams = PathAndParams.parse("/api/users")
-        assertEquals(listOf("api", "users"), pathAndParams.pathSegments.segments)
-        assertTrue(pathAndParams.queryParameters.entries.isEmpty())
-    }
-
-    @Test
-    fun `PathAndParams toString formats correctly with query params`() {
-        val pathAndParams = PathAndParams(
-            PathSegments(listOf("api", "users")),
-            QueryParameters(listOf("filter" to "active"))
-        )
-        val result = pathAndParams.toString()
-        assertTrue(result.startsWith("api/users"))
-        assertTrue(result.contains("?"))
-        assertTrue(result.contains("filter=active"))
-    }
-
-    @Test
-    fun `PathAndParams toString formats correctly without query params`() {
-        val pathAndParams = PathAndParams(
-            PathSegments(listOf("api", "users")),
-            QueryParameters.EMPTY
-        )
-        val result = pathAndParams.toString()
-        assertEquals("api/users", result)
-        assertFalse(result.contains("?"))
-    }
 }

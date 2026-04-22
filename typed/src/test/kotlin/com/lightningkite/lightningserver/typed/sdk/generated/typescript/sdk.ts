@@ -8,7 +8,7 @@ export interface CollectionUpdates<T, T1> {
 }
 
 export interface Mask<T> {
-	pairs: Array<Pair>
+	pairs: Array<Pair<Condition<T>, Modification<T>>>
 }
 
 export interface ModelPermissions<T> {
@@ -21,7 +21,9 @@ export interface ModelPermissions<T> {
 	maxQueryTimeMs: number
 }
 
-export interface Pair {
+export interface Pair<T, T1> {
+	first: T
+	second: T1
 }
 
 export interface TestInput {

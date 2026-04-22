@@ -1,9 +1,9 @@
 import com.lightningkite.deployhelpers.*
 
 plugins {
-    alias(libs.plugins.kotlinJvm)
+    alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.ksp)
-    alias(libs.plugins.serialization)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.dokka)
     id("signing")
     alias(libs.plugins.vanniktechMavenPublish)
@@ -14,14 +14,14 @@ dependencies {
     api(project(":core"))
     api(project(":auth"))
     api(project(":typed-shared"))
-    api(libs.serviceAbstractionsDatabase)
-    api(libs.serviceAbstractionsCache)
-    api(libs.serviceAbstractionsHttpClient)
-    api(libs.kotlinReflect)
-    testImplementation(libs.kotlinTestJunit)
+    api(libs.services.database)
+    api(libs.services.cache)
+    api(libs.services.http.client)
+    api(libs.kotlin.reflect)
+    testImplementation(libs.kotlin.test.junit)
 
     configurations.filter { it.name.startsWith("ksp") }.forEach {
-        add(it.name, libs.serviceAbstractionsDatabaseProcessor)
+        add(it.name, libs.services.database.processor)
     }
 }
 

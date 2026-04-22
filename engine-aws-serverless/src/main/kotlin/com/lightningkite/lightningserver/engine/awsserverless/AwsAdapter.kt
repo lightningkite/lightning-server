@@ -37,6 +37,7 @@ import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient
 import java.io.*
 import java.net.URI
 import kotlin.system.exitProcess
+import kotlin.time.Duration.Companion.milliseconds
 
 private val awsApiGatewayWsEndpointSetting = ServerSetting("awsApiGatewayWsEndpointSetting", "", String.serializer())
 
@@ -202,25 +203,18 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
     override fun handleRequest(input: InputStream, output: OutputStream, context: Context): Unit = runBlocking {
         try {
             val asJson = internalSerialization.json.parseToJsonElement(input.reader().readText()) as JsonObject
-            val response: APIGatewayV2HTTPResponse = withTimeout(context.remainingTimeInMillis - 5_000L) {
+            val response: APIGatewayV2HTTPResponse = withTimeout((context.remainingTimeInMillis - 5_000L).milliseconds) {
                 when {
                     asJson.containsKey("taskName") -> tasks.handleTask(
-                        internalSerialization.json.decodeFromJsonElement(
-                            AwsAdapterTask.TaskInvoke.serializer(),
-                            asJson
-                        )
+                        internalSerialization.json.decodeFromJsonElement(AwsAdapterTask.TaskInvoke.serializer(), asJson)
                     )
 
                     asJson.containsKey("httpMethod") -> http.handleHttp(
-                        internalSerialization.json.decodeFromJsonElement<APIGatewayV2HTTPEvent>(
-                            asJson
-                        )
-                    ){}
+                        internalSerialization.json.decodeFromJsonElement<APIGatewayV2HTTPEvent>(asJson)
+                    )
 
                     asJson.containsKey("storage") -> ws.handleWebsocketDidConnect(
-                        internalSerialization.json.decodeFromJsonElement<AwsAdapterWs.WebSocketDidConnect>(
-                            asJson
-                        )
+                        internalSerialization.json.decodeFromJsonElement<AwsAdapterWs.WebSocketDidConnect>(asJson)
                     )
 
                     asJson["requestContext"]?.jsonObject?.containsKey("connectionId") == true -> ws.handleWebsocket(

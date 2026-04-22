@@ -1,9 +1,9 @@
 import com.lightningkite.deployhelpers.*
 
 plugins {
-    alias(libs.plugins.kotlinJvm)
+    alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.ksp)
-    alias(libs.plugins.serialization)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.dokka)
     id("signing")
     alias(libs.plugins.vanniktechMavenPublish)
@@ -12,25 +12,25 @@ plugins {
 dependencies {
     api(project(":core"))
     api(project(":engine-local"))
-    api(libs.serviceAbstractionsDatabase)
-    api(libs.serviceAbstractionsCache)
-    api(libs.serviceAbstractionsPubsub)
-    api(libs.kotlinReflect)
+    api(libs.services.database)
+    api(libs.services.cache)
+    api(libs.services.pubsub)
+    api(libs.kotlin.reflect)
 
-    implementation(platform(libs.nettyBom))
-    implementation(libs.nettyCodecHttp)
-    implementation(libs.nettyHandler)
-    implementation(libs.nettyTransport)
-    implementation(libs.nettyBuffer)
-    implementation(libs.nettyCodec)
+    implementation(platform(libs.netty.bom))
+    implementation(libs.netty.codec.http)
+    implementation(libs.netty.handler)
+    implementation(libs.netty.transport)
+    implementation(libs.netty.buffer)
+    implementation(libs.netty.codec)
 
     // For native transports (compile-time APIs); actual native libs load if present on the platform
-    implementation(libs.nettyTransportClassesEpoll)
-    implementation(libs.nettyTransportClassesKqueue)
+    implementation(libs.netty.transport.classes.epoll)
+    implementation(libs.netty.transport.classes.kqueue)
 
-    testImplementation(libs.kotlinTest)
-    testImplementation(libs.kotlinTestJunit)
-    testImplementation("com.squareup.okhttp3:okhttp:4.12.0")
+    testImplementation(libs.kotlin.test)
+    testImplementation(libs.kotlin.test.junit)
+    testImplementation(libs.okhttp)
 }
 
 ksp {

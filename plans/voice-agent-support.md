@@ -13,20 +13,20 @@ Add voice agent capabilities to any `SystemChatEndpoints` implementation (includ
 ### libs.versions.toml
 
 ```toml
-serviceAbstractionsVoiceagent = { module = "com.lightningkite.services:voiceagent", version = { ref = "serviceAbstractions" } }
-serviceAbstractionsVoiceagentOpenai = { module = "com.lightningkite.services:voiceagent-openai", version = { ref = "serviceAbstractions" } }
-serviceAbstractionsVoiceagentPhonecall = { module = "com.lightningkite.services:voiceagent-phonecall", version = { ref = "serviceAbstractions" } }
+servicesVoiceagent = { module = "com.lightningkite.services:voiceagent", version = { ref = "serviceAbstractions" } }
+servicesVoiceagentOpenai = { module = "com.lightningkite.services:voiceagent-openai", version = { ref = "serviceAbstractions" } }
+servicesVoiceagentPhonecall = { module = "com.lightningkite.services:voiceagent-phonecall", version = { ref = "serviceAbstractions" } }
 ```
 
 ### ai/build.gradle.kts
 
 ```kotlin
 // Voice agent support
-api(libs.serviceAbstractionsVoiceagent)
-api(libs.serviceAbstractionsVoiceagentOpenai)
-api(libs.serviceAbstractionsVoiceagentPhonecall)
-api(libs.serviceAbstractionsPhonecall)
-api(libs.serviceAbstractionsPubsub)
+api(libs.services.voiceagent)
+api(libs.services.voiceagent.openai)
+api(libs.services.voiceagent.phonecall)
+api(libs.services.phonecall)
+api(libs.services.pubsub)
 ```
 
 ## Architecture

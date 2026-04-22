@@ -11,6 +11,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.KSerializer
+import java.lang.ref.WeakReference
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -95,15 +96,22 @@ public fun interface Runtime<out T> : RuntimeDeferred<T> {
      * the computation once, with other threads waiting for the result.
      */
     public data class Cached<out T>(private val wraps: Runtime<T>) : Runtime<T> {
-        @Volatile
-        private var cache: NullWrapper<T>? = null
+
+        private class Computed<T>(
+            val runtime: WeakReference<ServerRuntime>,
+            val result: T,
+        )
+        @Volatile private var cache: Computed<T>? = null
         private val lock = Any()
 
         context(server: ServerRuntime)
-        override operator fun invoke(): T =
-            cache?.value ?: synchronized(lock) {
-                cache?.value ?: wraps.invoke().also { cache = NullWrapper(it) }
+        override operator fun invoke(): T {
+            synchronized(lock) {
+                val c = cache
+                if (c != null && c.runtime.get() == server) return c.result
+                return wraps.invoke().also { cache = Computed(WeakReference(server), it) }
             }
+        }
     }
 
     /**
@@ -200,7 +208,13 @@ public interface ServerSetting<SETTING, RESULT> : Runtime<RESULT>, TerraformNeed
 @JvmInline
 private value class NullWrapper<T>(val value: T)
 
-/** Internal implementation of ServerSetting with custom getter logic. */
+/**
+ * Internal implementation of ServerSetting with custom getter logic.
+ *
+ * Caching of the transformed result lives in the per-runtime `ServerSettings.goal` registry,
+ * not on this definition object — definitions are shared across every `ServerRuntime` built
+ * from a given `ServerBuilder`, so caching here would leak values between runtimes.
+ */
 private data class BasicServerSetting<SETTING, RESULT>(
     override val name: String,
     override val default: SETTING,
@@ -209,21 +223,8 @@ private data class BasicServerSetting<SETTING, RESULT>(
     override val optional: Boolean,
     private val getter: SettingContext.(SETTING) -> RESULT
 ) : ServerSetting<SETTING, RESULT> {
-    @Volatile
-    private var cached: NullWrapper<RESULT>? = null
-    private val lock = Any()
-
     context(settings: SettingContext)
-    override fun get(setting: SETTING): RESULT =
-        cached?.value ?: synchronized(lock) {
-            cached?.value ?: getter(settings, setting).also { cached = NullWrapper(it) }
-        }
-
-    context(server: ServerRuntime)
-    override fun invoke(): RESULT =
-        cached?.value ?: synchronized(lock) {
-            cached?.value ?: server.settings.get(this)
-        }
+    override fun get(setting: SETTING): RESULT = getter(settings, setting)
 
     override fun toString(): String = "ServerSetting<${serializer.descriptor.serialName}>($name)"
 }
@@ -292,16 +293,6 @@ private data class BasicDirectServerSetting<SETTING>(
     override val instructions: String = "No instructions",
     override val optional: Boolean,
 ) : ServerSetting.Direct<SETTING> {
-    @Volatile
-    private var cached: NullWrapper<SETTING>? = null
-    private val lock = Any()
-
-    context(server: ServerRuntime)
-    override fun invoke(): SETTING =
-        cached?.value ?: synchronized(lock) {
-            cached?.value ?: server.settings.get(this).also { cached = NullWrapper(it) }
-        }
-
     override fun toString(): String = "DirectServerSetting<${serializer.descriptor.serialName}>($name)"
 }
 

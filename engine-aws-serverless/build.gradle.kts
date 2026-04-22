@@ -1,9 +1,9 @@
 import com.lightningkite.deployhelpers.*
 
 plugins {
-    alias(libs.plugins.kotlinJvm)
+    alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.ksp)
-    alias(libs.plugins.serialization)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.dokka)
     id("signing")
     alias(libs.plugins.vanniktechMavenPublish)
@@ -15,22 +15,22 @@ dependencies {
         exclude("software.amazon.awssdk:netty-nio-client")
         exclude("software.amazon.awssdk:apache-client")
     }
-    api(libs.serviceAbstractionsAwsClient) { excludeNetty() }
-    api(libs.serviceAbstractionsCacheDynamodb) { excludeNetty() }
-    api(libs.awsS3) { excludeNetty() }
-    api(libs.awsLambda) { excludeNetty() }
-    api(libs.awsApiGateway) { excludeNetty() }
-    api(libs.awsSecretsManager) { excludeNetty() }
-    api(libs.lambdaJavaCore) { excludeNetty() }
-    api(libs.lambdaJavaEvents) { excludeNetty() }
+    api(libs.services.aws.client) { excludeNetty() }
+    api(libs.services.cache.dynamodb) { excludeNetty() }
+    api(libs.aws.s3) { excludeNetty() }
+    api(libs.aws.lambda) { excludeNetty() }
+    api(libs.aws.apiGateway) { excludeNetty() }
+    api(libs.aws.secrets.manager) { excludeNetty() }
+    api(libs.lambda.java.core) { excludeNetty() }
+    api(libs.lambda.java.events) { excludeNetty() }
 //    api(libs.lambdaJavaLog4j2) { excludeNetty() }
     api(libs.dynamodb) { excludeNetty() }
     api(libs.orgCrac)
-    implementation(libs.coroutinesReactive)
-    implementation(libs.coroutinesJdk)
-    api(libs.kotlinReflect)
-    testImplementation(libs.kotlinTest)
-    testImplementation(libs.kotlinTestJunit)
+    implementation(libs.coroutines.reactive)
+    implementation(libs.coroutines.jdk)
+    api(libs.kotlin.reflect)
+    testImplementation(libs.kotlin.test)
+    testImplementation(libs.kotlin.test.junit)
 }
 
 ksp {

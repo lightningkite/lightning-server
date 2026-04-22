@@ -22,23 +22,6 @@ class ParseTest {
         assertEquals(listOf("api", "users"), segments.segments)
     }
 
-    @Test
-    fun `PathSegments URL decodes segments`() {
-        val segments = PathSegments.parse("/users/john%20doe")
-        assertEquals(listOf("users", "john doe"), segments.segments)
-    }
-
-    @Test
-    fun `PathSegments handles special characters`() {
-        val segments = PathSegments.parse("/path/with%2Fslash")
-        assertEquals(listOf("path", "with/slash"), segments.segments)
-    }
-
-    @Test
-    fun `PathSegments toString URL encodes`() {
-        val segments = PathSegments(listOf("users", "john doe"))
-        assertEquals("users/john+doe", segments.toString())
-    }
 
     @Test
     fun `PathSegments EMPTY has no segments`() {
@@ -77,13 +60,6 @@ class ParseTest {
     }
 
     @Test
-    fun `QueryParameters URL decodes keys and values`() {
-        val params = QueryParameters.parse("name=john%20doe&city=New%20York")
-        assertEquals("john doe", params["name"])
-        assertEquals("New York", params["city"])
-    }
-
-    @Test
     fun `QueryParameters handles empty value`() {
         val params = QueryParameters.parse("flag=")
         assertEquals("", params["flag"])
@@ -117,14 +93,6 @@ class ParseTest {
     }
 
     @Test
-    fun `QueryParameters toString URL encodes`() {
-        val params = QueryParameters(listOf("name" to "john doe", "city" to "New York"))
-        val result = params.toString()
-        assertTrue(result.contains("name=john+doe"))
-        assertTrue(result.contains("city=New+York"))
-    }
-
-    @Test
     fun `QueryParameters EMPTY has no entries`() {
         assertTrue(QueryParameters.EMPTY.entries.isEmpty())
     }
@@ -134,80 +102,6 @@ class ParseTest {
         val params = QueryParameters.parse("a=1&b=2")
         assertEquals(2, params.size)
         assertEquals("a" to "1", params[0])
-    }
-
-    // ========== PathAndParams Tests ==========
-
-    @Test
-    fun `PathAndParams parses path with query string`() {
-        val parsed = PathAndParams.parse("/api/users?filter=active")
-        assertEquals(listOf("api", "users"), parsed.pathSegments.segments)
-        assertEquals("active", parsed.queryParameters["filter"])
-    }
-
-    @Test
-    fun `PathAndParams parses path without query string`() {
-        val parsed = PathAndParams.parse("/api/users")
-        assertEquals(listOf("api", "users"), parsed.pathSegments.segments)
-        assertTrue(parsed.queryParameters.entries.isEmpty())
-    }
-
-    @Test
-    fun `PathAndParams handles multiple query params`() {
-        val parsed = PathAndParams.parse("/search?q=test&page=1&sort=desc")
-        assertEquals("test", parsed.queryParameters["q"])
-        assertEquals("1", parsed.queryParameters["page"])
-        assertEquals("desc", parsed.queryParameters["sort"])
-    }
-
-    @Test
-    fun `PathAndParams toString reconstructs URL`() {
-        val parsed = PathAndParams.parse("/api/users?filter=active")
-        val result = parsed.toString()
-        assertTrue(result.contains("api/users"))
-        assertTrue(result.contains("filter=active"))
-    }
-
-    @Test
-    fun `PathAndParams toString without params has no question mark`() {
-        val parsed = PathAndParams.parse("/api/users")
-        val result = parsed.toString()
-        assertTrue(!result.contains("?"))
-    }
-
-    // ========== pathHack Tests (existing) ==========
-
-    @Test
-    fun pathHack() {
-        QueryParameters.parse("path=/my/path?asdf=fdsa")
-            .pathHack()
-            .let {
-                assertEquals("path", it[0].first)
-                assertEquals("/my/path?asdf=fdsa", it[0].second)
-                assertEquals("asdf", it[1].first)
-                assertEquals("fdsa", it[1].second)
-            }
-    }
-
-    @Test
-    fun pathHackWithNoExtraParams() {
-        QueryParameters.parse("path=/multiplex")
-            .pathHack()
-            .let {
-                assertEquals(1, it.entries.size)
-                assertEquals("path", it[0].first)
-                assertEquals("/multiplex", it[0].second)
-            }
-
-        QueryParameters.parse("path=/multiplex?param=5")
-            .pathHack()
-            .let {
-                assertEquals(2, it.entries.size)
-                assertEquals("path", it[0].first)
-                assertEquals("/multiplex?param=5", it[0].second)
-                assertEquals("param", it[1].first)
-                assertEquals("5", it[1].second)
-            }
     }
 
     // ========== Edge Cases ==========

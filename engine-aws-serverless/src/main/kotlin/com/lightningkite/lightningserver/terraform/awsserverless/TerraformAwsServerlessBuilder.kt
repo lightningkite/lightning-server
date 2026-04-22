@@ -562,6 +562,13 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                     "apply_on" - "PublishedVersions"
                 }
 
+                if(emitter is TerraformEmitterAwsVpc){
+                    "vpc_config" {
+                        "subnet_ids" - expression("module.vpc.private_subnets")
+                        "security_group_ids" - listOf(expression("aws_security_group.internal.id"), expression("aws_security_group.access_outside.id"))
+                    }
+                }
+
                 emitter.lambdaTracingMode?.let { mode ->
                     "tracing_config" {
                         "mode" - mode.name
@@ -665,13 +672,13 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 "source_dir" - $$"${path.module}/build/lambda"
                 "output_path" - $$"${path.module}/build/lambda.jar"
             }
-            "data.aws_caller_identity.current" {}
+            "data.aws_caller_identity.lambda_current" {}
             "resource.aws_lambda_permission.scheduled_tasks" {
                 "action" - "lambda:InvokeFunction"
                 "function_name" - expression("aws_lambda_alias.main.function_name")
                 "qualifier" - expression("aws_lambda_alias.main.name")
                 "principal" - "events.amazonaws.com"
-                "source_arn" - $$"arn:aws:events:$${emitter.applicationRegion}:${data.aws_caller_identity.current.account_id}:rule/$${emitter.projectPrefix}*"
+                "source_arn" - $$"arn:aws:events:$${emitter.applicationRegion}:${data.aws_caller_identity.lambda_current.account_id}:rule/$${emitter.projectPrefix}*"
                 "lifecycle" {
                     "create_before_destroy" - true
                 }

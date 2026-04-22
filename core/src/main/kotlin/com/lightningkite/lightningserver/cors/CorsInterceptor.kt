@@ -77,7 +77,7 @@ public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpIn
     ): HttpResponse {
         val config = config()
         // If no Origin header, request is not cross-origin - pass through without CORS headers
-        val origin = request.headers[HttpHeader.Origin].takeUnless { it == allowAll }?.root ?: return cont(request)
+        val origin = request.headers[HttpHeader.Origin]?.root ?: return cont(request)
 
         // Check if origin matches allowed patterns
         // null limitToDomains = allow all, non-null = check against patterns
@@ -88,52 +88,47 @@ public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpIn
         if (config.forbidOnMatchFail && !originAllowed)
             throw ForbiddenException(
                 message = "Origin '$origin' is not allowed",
-                detail = if (origin.substringAfter("://") == generalSettings().publicUrl.substringAfter("://").substringBefore('/'))
-                    "This server's public url is not an allowed domain. Add this server's public url to limitToDomains in the Cors settings to make these requests."
-                else
-                    "",
+                detail =
+                    if (origin.substringAfter("://") == generalSettings().publicUrl.substringAfter("://").substringBefore('/'))
+                        "This server's public url is not an allowed domain. Add this server's public url to limitToDomains in the Cors settings to make these requests."
+                    else
+                        "",
             )
 
         // Handle preflight OPTIONS requests
-        val baseResponse = if (request.path.method == HttpMethod.OPTIONS) {
+        val baseResponse: HttpResponse = if (request.path.method == HttpMethod.OPTIONS) {
             // Discover which HTTP methods are actually implemented for this path
-            val perEndpoint = listOf(
-                HttpMethod.GET,
-                HttpMethod.POST,
-                HttpMethod.PUT,
-                HttpMethod.PATCH,
-                HttpMethod.DELETE,
-                HttpMethod.OPTIONS,
-                HttpMethod.HEAD,
-            ).associateWith { method ->
-                runtime.server.endpoints.match(
+            val existingMethods = runtime.server.endpoints
+                .match(
                     runtime.externalSerialization.stringArrayFormat,
                     request.path.pathSegments
-                ) { it.http[method] }
-            }
-
-            val existingMethods = perEndpoint.entries.filter { it.value != null }.mapTo(HashSet()) { it.key }
+                )
+                ?.value?.http?.keys?.toMutableSet()
+                ?: throw NotFoundException()
 
             // HEAD is implicitly supported if GET is defined
-            if (existingMethods.contains(HttpMethod.GET)) existingMethods += HttpMethod.HEAD
+            if (existingMethods.contains(HttpMethod.GET))
+                existingMethods += HttpMethod.HEAD
 
-            if (existingMethods.isEmpty()) throw NotFoundException()
             // TODO: Potential issue - if origin is not allowed, we still return 204 No Content
             // instead of 403 Forbidden. This reveals that the endpoint exists even for
             // disallowed origins. Consider whether this is desired behavior.
-            else if (!originAllowed) return HttpResponse(status = HttpStatus.NoContent)
-            else HttpResponse(
-                status = HttpStatus.NoContent,
-                headers = HttpHeaders {
-                    add(
-                        HttpHeader.AccessControlAllowMethods,
-                        // Filter methods by limitToMethods if configured
-                        (config.limitToMethods.takeUnless { it == allowAll }
-                            ?.let { limit -> existingMethods.filter { limit.contains(it.toString()) } }
-                            ?: existingMethods).joinToString(",")
-                    )
-                }
-            )
+            if (!originAllowed) {
+                return HttpResponse(status = HttpStatus.NoContent)
+            } else {
+                HttpResponse(
+                    status = HttpStatus.NoContent,
+                    headers = HttpHeaders {
+                        add(
+                            HttpHeader.AccessControlAllowMethods,
+                            // Filter methods by limitToMethods if configured
+                            (config.limitToMethods.takeUnless { it == allowAll }
+                                ?.let { limit -> existingMethods.filter { limit.contains(it.toString()) } }
+                                ?: existingMethods).joinToString(",")
+                        )
+                    }
+                )
+            }
         } else {
             // Regular (non-preflight) request
             val response = cont(request)

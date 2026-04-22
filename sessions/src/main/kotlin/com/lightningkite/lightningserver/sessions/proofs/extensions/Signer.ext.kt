@@ -1,18 +1,10 @@
 package com.lightningkite.lightningserver.sessions.proofs.extensions
 
-import com.lightningkite.lightningserver.encryption.Signer
-import com.lightningkite.lightningserver.encryption.sign
-import com.lightningkite.lightningserver.encryption.signBlocking
-import com.lightningkite.lightningserver.encryption.verify
-import com.lightningkite.lightningserver.encryption.verifyBlocking
+import com.lightningkite.lightningserver.encryption.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
-import com.lightningkite.lightningserver.sessions.proofs.Proof
-import com.lightningkite.lightningserver.sessions.proofs.ProofMethod
-import com.lightningkite.lightningserver.sessions.proofs.ProofMethodInfo
-import kotlinx.io.Buffer
-import kotlinx.io.readByteArray
-import kotlinx.io.writeString
+import com.lightningkite.lightningserver.sessions.proofs.*
+import kotlinx.io.*
 import kotlin.io.encoding.Base64
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
@@ -24,7 +16,7 @@ private fun signingInfo(
     value: String,
     strength: Int = 1,
     at: Instant,
-    expiresAt: Instant?=null,
+    expiresAt: Instant? = null,
 ): ByteArray = Buffer()
     .apply {
         writeString(via)
@@ -41,7 +33,7 @@ public suspend fun Signer.makeProof(
     property: String,
     value: String,
     at: Instant,
-    expireAfter: Duration
+    expireAfter: Duration,
 ): Proof = Proof(
     via = info.via,
     property = property,
@@ -59,7 +51,7 @@ public fun Signer.makeProofBlocking(
     property: String,
     value: String,
     at: Instant,
-    expireAfter: Duration
+    expireAfter: Duration,
 ): Proof = Proof(
     via = info.via,
     property = property,
@@ -76,7 +68,7 @@ context(_: ServerRuntime, method: ProofMethod)
 public suspend fun Signer.makeProof(
     property: String,
     value: String,
-    info: ProofMethodInfo = method.info
+    info: ProofMethodInfo = method.info,
 ): Proof =
     makeProof(
         info,
