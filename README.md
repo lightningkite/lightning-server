@@ -1,3 +1,5 @@
+[![Nightly](https://img.shields.io/maven-metadata/v?strategy=latestProperty&label=lightningkite-maven-nightly&metadataUrl=https://lightningkite-maven.s3.us-west-2.amazonaws.com/com/lightningkite/lightningserver/core/maven-metadata.xml)](https://lightningkite-maven.s3.us-west-2.amazonaws.com/com/lightningkite/lightningserver/core/maven-metadata.xml)
+
 # Lightning Server
 
 A project that drastically speeds up server development.  Comparable to Django for Python.
