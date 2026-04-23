@@ -47,13 +47,12 @@ public data class RateLimitSettings(
  *
  * @property key Unique identifier for the caller (e.g. IP address, user id). Requests sharing a key
  *   share the same budget.
- * @property multiplier A Value greater than 0.0. Multiplier applied to [borrowTime]. Values higher than 1 tightens
- *   the limit (more expensive requests), values less than 1 loosen it (cheaper requests). Negative or zero values
- *   result in undefined behavior.
+ * @property multiplier A Value greater than 0.0. [multiplier] is applied to the final time used by a request. Values
+ *   higher than 1 tightens the limit (more expensive requests), values less than 1 loosen it (cheaper requests).
+ *   Negative or zero values result in undefined behavior.
  * @property leeway How far ahead of real time the caller is allowed to reserve before being throttled.
  *   Larger values permit bigger bursts.
- * @property borrowTime Nominal amount of time reserved up front for a single request, before being
- *   multiplied by [multiplier].
+ * @property borrowTime Nominal amount of time reserved up front for a single request.
  * @property overhead Extra time charged against the caller after each request to account for work
  *   not captured by the measured duration.
  */
@@ -149,10 +148,11 @@ public class RateLimitInterceptor(
         val cacheKey = "rateLimiter-${settings.rateLimiterId}-${limits.key}"
         val stoppedUntil = cache().get<Long>(cacheKey)
         val stoppedUntilTime = stoppedUntil?.let { Instant.fromEpochMilliseconds(it) }
-        val borrowedValue = limits.borrowTime * limits.multiplier
 
-        logger.trace { "stoppedUntilTime: ${stoppedUntilTime?.let { "$it (rel ${it - now()})" }}" }
-        logger.trace { "borrowedValue: $borrowedValue" }
+        logger.trace {
+            """stoppedUntilTime: ${stoppedUntilTime?.let { "$it (rel ${it - now()})" }}
+               borrowedValue: ${limits.borrowTime}""".trimMargin()
+        }
 
         val stoppedUntilNew: Long = if (stoppedUntilTime == null || start - stoppedUntilTime > limits.leeway) {
             logger.trace {
@@ -161,7 +161,7 @@ public class RateLimitInterceptor(
                 }"
             }
 
-            val stoppedUntil = start.minus(limits.leeway).plus(borrowedValue).toEpochMilliseconds()
+            val stoppedUntil = start.minus(limits.leeway).plus(limits.borrowTime).toEpochMilliseconds()
             cache().set<Long>(cacheKey, stoppedUntil, timeToLive = 15.minutes)
 
             stoppedUntil
@@ -182,7 +182,7 @@ public class RateLimitInterceptor(
                 )
             )
         } else
-            cache().add(cacheKey, borrowedValue.inWholeMilliseconds)
+            cache().add(cacheKey, limits.borrowTime.inWholeMilliseconds)
 
         logger.trace {
             val time = Instant.fromEpochMilliseconds(stoppedUntilNew)
@@ -197,17 +197,16 @@ public class RateLimitInterceptor(
         }
         val done = now()
         val takenValue = (done - start + limits.overhead) * limits.multiplier
-        val valueToReturn = borrowedValue - takenValue
-
-        logger.trace { "time taken: ${done - start}" }
-        logger.trace { "takenValue: $takenValue" }
-        logger.trace { "valueToReturn: $valueToReturn" }
+        val valueToReturn = limits.borrowTime - takenValue
 
         val afterRefund = cache().add(cacheKey, -valueToReturn.inWholeMilliseconds)
         val final = Instant.fromEpochMilliseconds(afterRefund)
 
         logger.trace {
-            "stoppedUntilTime after return: $final (rel ${final - now()})"
+            """time taken: ${done - start}
+               takenValue: $takenValue
+               valueToReturn: $valueToReturn
+               "stoppedUntilTime after return: $final (rel ${final - now()})"""".trimMargin()
         }
 
         issue?.let { throw it }
