@@ -10,7 +10,6 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.cache.*
-import com.lightningkite.services.data.FloatRange
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
@@ -41,25 +40,26 @@ public data class RateLimitSettings(
 /**
  * Per-request limits describing how much server time a given caller is permitted to consume.
  *
- * The rate limiter uses a borrow-and-repay model: each request reserves [borrowTime] / [multiplier]
- * of future time up front, then refunds the unused portion after the request completes. When a
+ * The rate limiter uses a borrow-and-repay model: each request reserves [borrowTime] of future time up front,
+ * then refunds the unused portion after the request completes. When a
  * caller's reserved time would extend further than [leeway] into the future, subsequent requests
  * are rejected with HTTP 429 until the reservation catches up.
  *
  * @property key Unique identifier for the caller (e.g. IP address, user id). Requests sharing a key
  *   share the same budget.
- * @property multiplier Divisor applied to [borrowTime] and [overhead]. A value between 0.0 - 1.0. Higher values loosen
- *   the limit (cheaper requests), lower values tighten it (more expensive requests).
+ * @property multiplier A Value greater than 0.0. Multiplier applied to [borrowTime]. Values higher than 1 tightens
+ *   the limit (more expensive requests), values less than 1 loosen it (cheaper requests). Negative or zero values
+ *   result in undefined behavior.
  * @property leeway How far ahead of real time the caller is allowed to reserve before being throttled.
  *   Larger values permit bigger bursts.
  * @property borrowTime Nominal amount of time reserved up front for a single request, before being
- *   divided by [multiplier].
+ *   multiplied by [multiplier].
  * @property overhead Extra time charged against the caller after each request to account for work
  *   not captured by the measured duration.
  */
 public data class RequestLimits(
     val key: String,
-    @FloatRange(0.0, 1.0) val multiplier: Double = 0.1,
+    val multiplier: Double = 10.0,
     val leeway: Duration = 200.seconds,
     val borrowTime: Duration = 10.seconds,
     val overhead: Duration = 0.25.seconds,
@@ -135,6 +135,7 @@ public class RateLimitInterceptor(
         @Contextual val availableAfter: Instant,
     )
 
+    // this suppression is okay, it's mad because we catch throwables when executing the lambda and then rethrow later.
     @Suppress("WRONG_INVOCATION_KIND")
     @OptIn(ExperimentalContracts::class)
     context(runtime: ServerRuntime)
@@ -144,30 +145,30 @@ public class RateLimitInterceptor(
         action: () -> Unit,
     ): RateLimitInfo? {
         contract { callsInPlace(action, InvocationKind.EXACTLY_ONCE) }
-        val now = now()
+        val start = now()
         val cacheKey = "rateLimiter-${settings.rateLimiterId}-${limits.key}"
         val stoppedUntil = cache().get<Long>(cacheKey)
         val stoppedUntilTime = stoppedUntil?.let { Instant.fromEpochMilliseconds(it) }
-        val borrowedValue = limits.borrowTime / limits.multiplier
+        val borrowedValue = limits.borrowTime * limits.multiplier
 
-//        logger.trace { "stoppedUntilTime: ${stoppedUntilTime?.let { "$it (rel ${it - now()})" }}" }
-//        logger.trace { "borrowedValue: $borrowedValue" }
+        logger.trace { "stoppedUntilTime: ${stoppedUntilTime?.let { "$it (rel ${it - now()})" }}" }
+        logger.trace { "borrowedValue: $borrowedValue" }
 
-        if (stoppedUntilTime == null) {
+        val stoppedUntilNew: Long = if (stoppedUntilTime == null || start - stoppedUntilTime > limits.leeway) {
             logger.trace {
                 "stoppedUntilTime virtual before borrow: ${
-                    now.minus(limits.leeway).let { "$it (rel ${it - now()})" }
+                    start.minus(limits.leeway).let { "$it (rel ${it - now()})" }
                 }"
             }
-            cache().set(
-                cacheKey,
-                now.minus(limits.leeway).plus(borrowedValue).toEpochMilliseconds(),
-                timeToLive = 15.minutes
-            )
-        } else if (now < stoppedUntilTime) {
-            val currentWait = stoppedUntilTime - now
+
+            val stoppedUntil = start.minus(limits.leeway).plus(borrowedValue).toEpochMilliseconds()
+            cache().set<Long>(cacheKey, stoppedUntil, timeToLive = 15.minutes)
+
+            stoppedUntil
+        } else if (start < stoppedUntilTime) {
+            val currentWait = stoppedUntilTime - start
             val newWait = (currentWait.inWholeSeconds + 1).seconds
-            val newUntilTime = now + newWait
+            val newUntilTime = start + newWait
             cache().set(cacheKey, newUntilTime.toEpochMilliseconds())
             throw HttpStatusException(
                 LSError(
@@ -180,27 +181,13 @@ public class RateLimitInterceptor(
                     })
                 )
             )
-        } else if (now - stoppedUntilTime > limits.leeway) {
-            logger.trace {
-                "stoppedUntilTime virtual before borrow: ${
-                    now.minus(limits.leeway).let { "$it (rel ${it - now()})" }
-                }"
-            }
-            cache().set(
-                cacheKey,
-                now.minus(limits.leeway).plus(borrowedValue).toEpochMilliseconds(),
-                timeToLive = 15.minutes
-            )
         } else
-            cache().add(cacheKey, borrowedValue.inWholeMilliseconds.toInt())
+            cache().add(cacheKey, borrowedValue.inWholeMilliseconds)
 
-        @Suppress("Deprecation")
-        logger.trace(
-            "stoppedUntilTime after borrow: ${
-                cache().get<Long>(cacheKey)?.let { Instant.fromEpochMilliseconds(it) }
-                    ?.let { "$it (rel ${it - now()})" }
-            }"
-        )
+        logger.trace {
+            val time = Instant.fromEpochMilliseconds(stoppedUntilNew)
+            "stoppedUntilTime after borrow: $time (rel ${time - now()})"
+        }
 
         var issue: Throwable? = null
         try {
@@ -209,27 +196,29 @@ public class RateLimitInterceptor(
             issue = t
         }
         val done = now()
-        val takenValue = (done - now + limits.overhead) / limits.multiplier
+        val takenValue = (done - start + limits.overhead) * limits.multiplier
         val valueToReturn = borrowedValue - takenValue
-//        logger.trace { "time taken: ${done - now}" }
-//        logger.trace { "takenValue: $takenValue" }
-//        logger.trace { "valueToReturn: $valueToReturn" }
-        cache().add(cacheKey, (-valueToReturn.inWholeMilliseconds.toInt()))
 
-        @Suppress("Deprecation")
-        logger.trace(
-            "stoppedUntilTime after return: ${
-                cache().get<Long>(cacheKey)?.let { Instant.fromEpochMilliseconds(it) }
-                    ?.let { "$it (rel ${it - now()})" }
-            }"
-        )
+        logger.trace { "time taken: ${done - start}" }
+        logger.trace { "takenValue: $takenValue" }
+        logger.trace { "valueToReturn: $valueToReturn" }
+
+        val afterRefund = cache().add(cacheKey, -valueToReturn.inWholeMilliseconds)
+        val final = Instant.fromEpochMilliseconds(afterRefund)
+
+        logger.trace {
+            "stoppedUntilTime after return: $final (rel ${final - now()})"
+        }
+
         issue?.let { throw it }
-        val final = cache().get<Long>(cacheKey)?.let { Instant.fromEpochMilliseconds(it) }
-        return if (settings()?.includeHeaders == true) RateLimitInfo(
-            key = limits.key,
-            remainingTime = final?.let { now() - it } ?: limits.leeway,
-            availableAfter = final ?: now().minus(limits.leeway),
-        ) else null
+
+        return if (settings()?.includeHeaders == true) {
+            RateLimitInfo(
+                key = limits.key,
+                remainingTime = now() - final,
+                availableAfter = final,
+            )
+        } else null
     }
 
 }

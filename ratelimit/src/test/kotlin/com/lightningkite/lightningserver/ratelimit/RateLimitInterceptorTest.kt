@@ -94,7 +94,7 @@ class RateLimiterTest {
                                 key = "simpleTest",
                                 leeway = 200.seconds,
                                 borrowTime = 10.seconds,
-                                multiplier = 0.1,
+                                multiplier = 10.0,
                                 overhead = 0.seconds
                             )
                         }
@@ -104,7 +104,7 @@ class RateLimiterTest {
                 )
                 (cache() as? MapCache)?.clear()
 
-                // perAuth is the key to controlling cost; higher values allow more requests
+                // multiplier is the key to controlling cost; lower values allow more requests
                 assertSuccessesForLimiter(
                     expected = 51,
                     limiter = RateLimitInterceptor(
@@ -115,7 +115,7 @@ class RateLimiterTest {
                                 key = "simpleTest",
                                 leeway = 200.seconds,
                                 borrowTime = 10.seconds,
-                                multiplier = 0.2,
+                                multiplier = 5.0,
                                 overhead = 0.seconds
                             )
                         }
@@ -136,7 +136,7 @@ class RateLimiterTest {
                                 key = "simpleTest",
                                 leeway = 200.seconds,
                                 borrowTime = 100.seconds,
-                                multiplier = 0.1,
+                                multiplier = 10.0,
                                 overhead = 0.seconds
                             )
                         }
@@ -158,7 +158,7 @@ class RateLimiterTest {
                                 key = "simpleTest",
                                 leeway = 200.seconds,
                                 borrowTime = 10.seconds,
-                                multiplier = 0.1,
+                                multiplier = 10.0,
                                 overhead = 0.seconds
                             )
                         }
@@ -180,7 +180,7 @@ class RateLimiterTest {
                                 key = "simpleTest",
                                 leeway = 200.seconds,
                                 borrowTime = 10.seconds,
-                                multiplier = 0.1,
+                                multiplier = 10.0,
                                 overhead = 0.seconds
                             )
                         }
@@ -191,7 +191,7 @@ class RateLimiterTest {
 
                 (cache() as? MapCache)?.clear()
 
-                // virtualDurationModifier allows you to make requests artificially "take more time"
+                // overhead allows you to make requests artificially "take more time"
                 // This allows you to make users pay for your load balancer
                 assertSuccessesForLimiter(
                     expected = 11,
@@ -203,7 +203,7 @@ class RateLimiterTest {
                                 key = "simpleTest",
                                 leeway = 200.seconds,
                                 borrowTime = 10.seconds,
-                                multiplier = 0.1,
+                                multiplier = 10.0,
                                 overhead = 1.seconds
                             )
                         }
@@ -234,7 +234,7 @@ class RateLimiterTest {
                             key = "test",
                             leeway = 200.seconds,
                             borrowTime = 10.seconds,
-                            multiplier = 0.5,
+                            multiplier = 2.0,
                             overhead = 0.seconds
                         )
                     }
