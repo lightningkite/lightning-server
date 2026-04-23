@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.settings
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.ScheduledTask
+import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -19,6 +20,7 @@ import com.lightningkite.services.data.WebhookSubserviceWithResponse
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
+@Deprecated("This is hard to read; consider using the top level serviceWebhook function instead.")
 public operator fun <Input, Output> Runtime<WebhookSubserviceWithResponse<Input, Output>>.invoke(frequency: Duration = 1.minutes, handler: suspend context(ServerRuntime) (Input)->Output): WebhookServer<Input, Output> =
     WebhookServer(this, handler, frequency)
 
@@ -63,4 +65,21 @@ public operator fun <Input, Output> Runtime<HttpAdapter<Input, Output>>.invoke(h
     }
 }
 
-//public operator fun <Input, Output> Runtime<WebsocketAdapter<Input, Output>>.invoke(handler: context(ServerRuntime) (Input)->Output): WebSocketHandler<Input, Output> = WebSocketHand
+/**
+ * Creates a webhook server module for a particular WebhookSubserviceWithResponse.
+ */
+public fun <Input, Output> serviceWebhook(forThing: context(ServerRuntime) ()-> WebhookSubserviceWithResponse<Input, Output>, frequency: Duration = 1.minutes, handler: suspend context(ServerRuntime) (Input)->Output): WebhookServer<Input, Output> =
+    WebhookServer(Runtime.Cached(forThing), handler, frequency)
+
+//private object SampleUsage: ServerBuilder() {
+//    class Container {
+//        val x: WebhookSubserviceWithResponse<String, String> = TODO()
+//    }
+//    val someSetting: ServerSetting<Unit, Container> = TODO()
+//    val oldcrap = path.path("x") include Runtime.Cached { someSetting().x }.invoke { it }
+//    val idea2 = path.path("x") include serviceWebhook(
+//        forThing = { someSetting().x },
+//        handler = { it }
+//    )
+//}
+
