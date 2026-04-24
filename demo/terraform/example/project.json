@@ -1,35 +1,35 @@
 {
-    "projectName": "demo-example",
-    "bucket": "ivieleague-deployment-states",
-    "bucketPathOverride": "demo/example",
-    "region": "us-west-2",
-    "availabilityZones": [
-        "us-west-2a",
-        "us-west-2b",
-        "us-west-2c"
-    ],
-    "core": "Lambda",
-    "vpc": false,
-    "existingVpc": false,
-    "domain": true,
-    "profile": "default",
-    "createBeforeDestroy": false,
-    "handlers": {
-        "general": "Standard",
-        "database": "MongoDB Free",
-        "cache": "DynamoDB",
-        "secretBasis": "Standard",
-        "jwt": "Standard",
-        "sms": "Direct",
-        "logging": "Direct",
-        "files": "S3",
-        "metrics": "Cloudwatch",
-        "exceptions": "Direct",
-        "email": "SMTP through SES",
-        "slack": "Direct",
-        "oauth_github": "Direct",
-        "oauth_apple": "Direct",
-        "oauth_google": "Direct",
-        "oauth_microsoft": "Direct"
-    }
+  "projectName": "demo-example",
+  "bucket": "ivieleague-deployment-states",
+  "bucketPathOverride": "demo/example",
+  "region": "us-west-2",
+  "availabilityZones": [
+    "us-west-2a",
+    "us-west-2b",
+    "us-west-2c"
+  ],
+  "core": "Lambda",
+  "vpc": false,
+  "existingVpc": false,
+  "domain": true,
+  "profile": "default",
+  "createBeforeDestroy": false,
+  "handlers": {
+    "general": "Standard",
+    "database": "MongoDB Free",
+    "cache": "DynamoDB",
+    "secretBasis": "Standard",
+    "jwt": "Standard",
+    "sms": "Direct",
+    "logging": "Direct",
+    "files": "S3",
+    "metrics": "Cloudwatch",
+    "exceptions": "Direct",
+    "email": "SMTP through SES",
+    "slack": "Direct",
+    "oauth_github": "Direct",
+    "oauth_apple": "Direct",
+    "oauth_google": "Direct",
+    "oauth_microsoft": "Direct"
+  }
 }

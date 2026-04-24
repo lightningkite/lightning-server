@@ -1,24 +1,16 @@
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.ZonedDateTime
-import com.lightningkite.atZone
-import com.lightningkite.lightningserver.auth.AuthRequirement
-import com.lightningkite.lightningserver.auth.noAuth
-import com.lightningkite.lightningserver.auth.or
+import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.ScheduledTask
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.http.HttpStatus
-import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.http.post
-import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.pathing.PathSpec1
-import com.lightningkite.lightningserver.pathing.arg1
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.withSdkInfo
 import com.lightningkite.lightningserver.typed.sdk.module
-import com.lightningkite.services.HealthStatus
+import com.lightningkite.services.data.*
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toCollection
 import kotlinx.datetime.*
@@ -132,7 +124,7 @@ public class FunnelEndpoints(
             }
         )
 
-    public val start:  ApiHttpHandler<PathSpec0, HasId<*>?, FunnelStart, Uuid> =
+    public val start: ApiHttpHandler<PathSpec0, HasId<*>?, FunnelStart, Uuid> =
         path.path("start").post bind ApiHttpHandler(
             auth = read or noAuth,
             summary = "Start Funnel Instance"

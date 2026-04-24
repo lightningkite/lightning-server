@@ -6,9 +6,7 @@ import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.encryption.checkAgainstHash
 import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.services.cache.Cache
-import com.lightningkite.services.cache.get
-import com.lightningkite.services.cache.set
+import com.lightningkite.services.cache.*
 import java.security.SecureRandom
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes

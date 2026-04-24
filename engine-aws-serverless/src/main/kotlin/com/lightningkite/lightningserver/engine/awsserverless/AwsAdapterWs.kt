@@ -7,7 +7,7 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.websockets.*
-import com.lightningkite.services.data.KotlinBytesFormat
+import com.lightningkite.services.serializers.KotlinBytesFormat
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import software.amazon.awssdk.core.SdkBytes

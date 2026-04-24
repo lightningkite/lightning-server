@@ -4,7 +4,8 @@ Core HTTP types and utilities for Lightning Server applications.
 
 ## Overview
 
-This package provides the fundamental building blocks for HTTP request/response handling in Lightning Server. It includes types for requests, responses, headers, status codes, URL parsing, and middleware support.
+This package provides the fundamental building blocks for HTTP request/response handling in Lightning Server. It
+includes types for requests, responses, headers, status codes, URL parsing, and middleware support.
 
 ## Key Components
 
@@ -29,14 +30,15 @@ This package provides the fundamental building blocks for HTTP request/response 
 ### Exception Handling
 
 - **[ExceptionHttpHandler](ExceptionHttpHandler.kt)** - Interface for converting exceptions to HTTP responses
-- **[DefaultExceptionHttpHandler](DefaultExceptionHttpHandler.kt)** - Default implementation that handles HttpStatusException and generic errors
+- **[DefaultExceptionHttpHandler](DefaultExceptionHttpHandler.kt)** - Default implementation that handles
+  HttpStatusException and generic errors
 
 ### URL Parsing
 
 - **[parse.kt](parse.kt)** - URL parsing utilities:
-  - **PathSegments** - Parsed URL path with automatic URL decoding
-  - **QueryParameters** - Parsed query string parameters with URL decoding
-  - **PathAndParams** - Combined path and query parameters
+    - **PathSegments** - Parsed URL path with automatic URL decoding
+    - **QueryParameters** - Parsed query string parameters with URL decoding
+    - **PathAndParams** - Combined path and query parameters
 
 ## Usage Examples
 
@@ -104,6 +106,7 @@ val endpoint = path.path("search").get bind HttpHandler { request ->
 ### Immutability
 
 Most types in this package are immutable for thread safety:
+
 - `HttpHeaders` - Use builder or `copy()` for modifications
 - `HttpStatus` - Immutable value class
 - `PathSegments`, `QueryParameters` - Immutable value classes
@@ -136,6 +139,7 @@ val postId: Int = request.path.arg2     // Typed as Int
 ### URL Encoding
 
 All URL parsing utilities automatically handle URL encoding/decoding:
+
 - `PathSegments.parse()` - Decodes path segments
 - `QueryParameters.parse()` - Decodes parameter keys and values
 - `toString()` methods - Encode output appropriately
@@ -209,9 +213,11 @@ val endpoint = path.path("data").get bind HttpHandler { request ->
 ## Testing
 
 Unit tests for this package can be found at:
+
 - `core/src/test/kotlin/com/lightningkite/lightningserver/http/HttpTest.kt`
 
 These tests cover:
+
 - HttpStatus success detection and string formatting
 - HttpHeaders case-insensitive access and builder pattern
 - HttpHeaderValue parsing for standard headers and cookies

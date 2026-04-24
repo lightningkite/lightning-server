@@ -3,15 +3,9 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.test.test
-import com.lightningkite.services.database.Database
-import com.lightningkite.services.database.get
-import com.lightningkite.services.database.table
+import com.lightningkite.services.database.*
 import kotlinx.coroutines.runBlocking
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -144,7 +138,7 @@ class DoOnceTest {
             val record = table.get("completion-test")
 
             assertNotNull(record?.completed, "completed should be set on success")
-            assertNull(record?.errorMessage, "errorMessage should be null on success")
+            assertNull(record.errorMessage, "errorMessage should be null on success")
         }
     }
 

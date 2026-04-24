@@ -3,13 +3,8 @@
 package com.lightningkite.lightningserver.typed.sdk
 
 import com.lightningkite.services.data.ExperimentalLightningServer
-import com.lightningkite.services.data.KFile
-import kotlinx.io.IOException
-import kotlinx.io.RawSink
-import kotlinx.io.Sink
-import kotlinx.io.asSink
-import kotlinx.io.buffered
-import kotlinx.io.writeString
+import com.lightningkite.services.kfile.KFile
+import kotlinx.io.*
 import java.io.OutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -134,7 +129,8 @@ public interface Archive : AutoCloseable {
          * @param delimiter an optional delimiter to write when a new entry is created
          * @return A [SingleStreamArchive] instance
          */
-        public fun singleStream(out: Sink, delimiter: ((path: String) -> String)? = null): SingleStreamArchive = SingleStreamArchive(out, delimiter)
+        public fun singleStream(out: Sink, delimiter: ((path: String) -> String)? = null): SingleStreamArchive =
+            SingleStreamArchive(out, delimiter)
     }
 }
 
@@ -207,7 +203,7 @@ private fun pathOf(base: String, new: String) = if (base.isEmpty()) new else "$b
 @ExperimentalLightningServer("This is unstable and may change at any time.")
 public class SingleStreamArchive(
     private val out: Sink,
-    private val delimiter: ((path: String) -> String)?
+    private val delimiter: ((path: String) -> String)?,
 ) : Archive {
     public var closed: Boolean = false
         private set
@@ -298,7 +294,7 @@ public class SingleStreamArchive(
 @ExperimentalLightningServer("This is unstable and may change at any time.")
 public class ZipArchive(
     private val zip: ZipOutputStream,
-): Archive {
+) : Archive {
     public var closed: Boolean = false
         private set
 
@@ -322,13 +318,16 @@ public class ZipArchive(
             ensureEntryOpen { "Cannot write to entry /$path" }
             zip.write(b)
         }
+
         override fun write(b: ByteArray, off: Int, len: Int) {
             ensureEntryOpen { "Cannot write to entry /$path" }
             zip.write(b, off, len)
         }
+
         override fun flush() {
             zip.flush()
         }
+
         override fun close() {
             if (closed) return
             zip.closeEntry()

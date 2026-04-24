@@ -9,12 +9,15 @@
 ## 🔴 CRITICAL - Security Concerns
 
 ### 1. Apple OAuth JWT Signature Not Verified (SECURITY)
-**File:** `sessions-oauth/src/main/kotlin/com/lightningkite/lightningserver/sessions/proofs/oauth/OauthProviderInfo.kt:148`
+
+**File:**
+`sessions-oauth/src/main/kotlin/com/lightningkite/lightningserver/sessions/proofs/oauth/OauthProviderInfo.kt:148`
 **Severity:** HIGH
 **Priority:** 1 (Fix Immediately)
 
 **Issue:**
-The Apple OAuth provider decodes the JWT id_token manually without verifying the cryptographic signature. This allows potential token forgery attacks.
+The Apple OAuth provider decodes the JWT id_token manually without verifying the cryptographic signature. This allows
+potential token forgery attacks.
 
 ```kotlin
 val decoded = Serialization.json.parseToJsonElement(
@@ -23,16 +26,19 @@ val decoded = Serialization.json.parseToJsonElement(
 ```
 
 **Risk:**
-An attacker could forge a JWT with arbitrary email addresses and bypass authentication if they know the JWT structure. This completely undermines the security of Apple Sign In.
+An attacker could forge a JWT with arbitrary email addresses and bypass authentication if they know the JWT structure.
+This completely undermines the security of Apple Sign In.
 
 **Recommendation:**
 Use a proper JWT library (e.g., `com.auth0:java-jwt` or `io.jsonwebtoken:jjwt`) to validate:
+
 - Signature using Apple's public keys (fetched from `https://appleid.apple.com/auth/keys`)
 - Expiration (`exp` claim)
 - Issuer (`iss` claim should be "https://appleid.apple.com")
 - Audience (`aud` claim should match your client ID)
 
 **Example Fix:**
+
 ```kotlin
 val jwt = JWT.require(Algorithm.RSA256(applePublicKey))
     .withIssuer("https://appleid.apple.com")
@@ -46,12 +52,14 @@ val jwt = JWT.require(Algorithm.RSA256(applePublicKey))
 ## 🟡 HIGH PRIORITY - Code Quality Issues
 
 ### 2. NPE Risk with realIpHeader Configuration
+
 **File:** `engine-jdk-server/src/main/kotlin/com/lightningkite/lightningserver/engine/jdk/JdkEngine.kt:203-204`
 **Severity:** MEDIUM
 **Priority:** 2
 
 **Issue:**
-When `realIpHeader` is configured but the header is missing from the request, the code uses `!!` operator which throws NPE:
+When `realIpHeader` is configured but the header is missing from the request, the code uses `!!` operator which throws
+NPE:
 
 ```kotlin
 val sourceIp = realIpHeader?.let { h ->
@@ -64,6 +72,7 @@ Server crashes when proxy forgets to set the configured header, making the appli
 
 **Recommendation:**
 Use safe navigation with logging:
+
 ```kotlin
 val sourceIp = realIpHeader?.let { h ->
     this.requestHeaders.getFirst(h).also {
@@ -73,6 +82,7 @@ val sourceIp = realIpHeader?.let { h ->
 ```
 
 ### 3. NPE Risks in Type Casting (AnonType.kt)
+
 **File:** `core/src/main/kotlin/com/lightningkite/lightningserver/AnonType.kt:19,23`
 **Severity:** MEDIUM
 **Priority:** 3
@@ -90,6 +100,7 @@ NPE or ClassCastException if called with unexpected type structures.
 
 **Recommendation:**
 Add validation with descriptive errors:
+
 ```kotlin
 val firstArg = type.arguments.firstOrNull()?.type
     ?: throw IllegalArgumentException("Expected type with at least one argument: $type")
@@ -98,6 +109,7 @@ val params = firstArg.classifier as? KClass<*>
 ```
 
 ### 4. TypedData.path() NPE Risk
+
 **File:** `core/src/main/kotlin/com/lightningkite/lightningserver/shortcuts.kt:43`
 **Severity:** MEDIUM
 **Priority:** 4
@@ -113,12 +125,14 @@ val existing = file.fileObject.get()!!
 NPE when trying to wrap non-existent files, unclear error message.
 
 **Recommendation:**
+
 ```kotlin
 val existing = file.fileObject.get()
     ?: throw FileNotFoundException("File not found: ${file.fileObject}")
 ```
 
 ### 5. Dependency Lookup NPE Risk
+
 **File:** `core/src/main/kotlin/com/lightningkite/lightningserver/runtime/ServerRuntimeBase.kt`
 **Severity:** MEDIUM
 **Priority:** 5
@@ -133,6 +147,7 @@ Cryptic NPE instead of clear "dependency X not found" error during startup.
 Add validation with descriptive errors explaining which task is missing which dependency.
 
 ### 6. Media File Parent Directory NPE
+
 **File:** `media/src/main/kotlin/com/lightningkite/lightningserver/media/processing.kt:73-76`
 **Severity:** MEDIUM
 **Priority:** 6
@@ -148,6 +163,7 @@ val fileObject = originalFileObject.parent!!.then(...)
 NPE when processing files without parent directories (e.g., root-level files).
 
 **Recommendation:**
+
 ```kotlin
 val parent = originalFileObject.parent
     ?: throw IllegalStateException("Cannot create preview: file has no parent directory")
@@ -159,11 +175,13 @@ val fileObject = parent.then(...)
 ## 🟢 MEDIUM PRIORITY - Parsing & Data Issues
 
 ### 7. Empty Path Parsing Bug
+
 **File:** `core/src/main/kotlin/com/lightningkite/lightningserver/http/parse.kt`
 **Severity:** LOW
 **Priority:** 7
 
 **Issue:**
+
 - `PathSegments.parse("")` returns `[""]` instead of empty list
 - `QueryParameters.parse("")` returns one entry instead of EMPTY
 
@@ -174,11 +192,13 @@ Inconsistent behavior with empty paths/queries, potential routing issues.
 Add special case handling for empty strings to return empty collections.
 
 ### 8. HttpHeaderValue Parsing Issues
+
 **File:** `core/src/main/kotlin/com/lightningkite/lightningserver/http/HttpHeaderValue.kt`
 **Severity:** LOW
 **Priority:** 8
 
 **Issues:**
+
 - Quoted values with semicolons not handled: `filename="file; with; semicolons.txt"`
 - Cookie values without `=` may parse incorrectly
 
@@ -189,11 +209,13 @@ Malformed header parsing for edge cases, particularly file uploads and cookies.
 Implement proper quoted-string parsing according to RFC 7230.
 
 ### 9. ServerSettings Properties Parsing Bugs
+
 **File:** `core/src/main/kotlin/com/lightningkite/lightningserver/settings/ServerSettings.ext.kt`
 **Severity:** LOW
 **Priority:** 9
 
 **Issues:**
+
 - Values containing `=` are truncated (splits on first `=` but doesn't handle multiple)
 - Values containing `#` are truncated (comment handling too aggressive)
 
@@ -208,6 +230,7 @@ Improve parsing to handle escaped characters and quotes in property values.
 ## 🔵 LOW PRIORITY - Thread Safety & Consistency
 
 ### 10. ServerSetting Cached Implementation Not Thread-Safe
+
 **File:** `core/src/main/kotlin/com/lightningkite/lightningserver/definition/ServerSetting.kt`
 **Severity:** LOW
 **Priority:** 10
@@ -222,6 +245,7 @@ Potential race conditions in multi-threaded startup, possible duplicate initiali
 Use `lazy(LazyThreadSafetyMode.SYNCHRONIZED)` for cached settings.
 
 ### 11. SecretBasis HMAC Field Not Thread-Safe
+
 **File:** `core/src/main/kotlin/com/lightningkite/lightningserver/encryption/SecretBasis.kt`
 **Severity:** LOW
 **Priority:** 11
@@ -236,12 +260,14 @@ Potential race condition during first access, though likely harmless due to dete
 Use `lazy(LazyThreadSafetyMode.SYNCHRONIZED)` or document single-threaded initialization requirement.
 
 ### 12. Timeout Default Inconsistencies
+
 **Files:**
+
 - `core/src/main/kotlin/com/lightningkite/lightningserver/definition/Task.kt`
 - `core/src/main/kotlin/com/lightningkite/lightningserver/definition/ScheduledTask.kt`
 - `core/src/main/kotlin/com/lightningkite/lightningserver/definition/StartupTask.kt`
-**Severity:** LOW
-**Priority:** 12
+  **Severity:** LOW
+  **Priority:** 12
 
 **Issue:**
 Default timeout is 30 seconds in interface but 5 minutes in factory functions.
@@ -257,6 +283,7 @@ Unify default timeout values across all task creation methods.
 ## 🔵 LOW PRIORITY - Design & Maintenance
 
 ### 13. Circular Dependency Detection Missing
+
 **File:** `core/src/main/kotlin/com/lightningkite/lightningserver/definition/StartupTask.kt`
 **Severity:** LOW
 **Priority:** 13
@@ -271,12 +298,14 @@ Infinite loops or stack overflow during startup if circular dependencies exist.
 Implement cycle detection algorithm (e.g., topological sort with cycle checking).
 
 ### 14. Media Preview Scaling Logic Issue
+
 **File:** `media/src/main/kotlin/com/lightningkite/lightningserver/media/MediaPreviewOptions.kt:131`
 **Severity:** LOW
 **Priority:** 14
 
 **Issue:**
-Scaling logic may be incorrect when both `needsRatio` and `needsScaling` are true. The second condition might always be true after ratio adjustment.
+Scaling logic may be incorrect when both `needsRatio` and `needsScaling` are true. The second condition might always be
+true after ratio adjustment.
 
 **Impact:**
 Potential incorrect scaling behavior in edge cases.
@@ -285,6 +314,7 @@ Potential incorrect scaling behavior in edge cases.
 Review and simplify the scaling condition logic, add unit tests for various combinations.
 
 ### 15. RawPath.kt Entirely Commented Out
+
 **File:** `core/src/main/kotlin/com/lightningkite/lightningserver/pathing/RawPath.kt`
 **Severity:** LOW
 **Priority:** 15
@@ -299,6 +329,7 @@ Dead code in repository, potential confusion.
 Remove file if truly obsolete, or document why it's preserved.
 
 ### 16. Missing Validation in MediaPreviewOptions
+
 **File:** `media/src/main/kotlin/com/lightningkite/lightningserver/media/MediaPreviewOptions.kt`
 **Severity:** LOW
 **Priority:** 16
@@ -316,32 +347,36 @@ Add `require()` checks in init block or factory methods.
 
 ## Summary Statistics
 
-| Severity | Count | Percentage |
-|----------|-------|------------|
-| HIGH (Security) | 1 | 6.25% |
-| MEDIUM (NPE Risks) | 5 | 31.25% |
-| LOW (Parsing) | 3 | 18.75% |
-| LOW (Thread Safety) | 3 | 18.75% |
-| LOW (Design) | 4 | 25% |
-| **TOTAL** | **16** | **100%** |
+| Severity            | Count  | Percentage |
+|---------------------|--------|------------|
+| HIGH (Security)     | 1      | 6.25%      |
+| MEDIUM (NPE Risks)  | 5      | 31.25%     |
+| LOW (Parsing)       | 3      | 18.75%     |
+| LOW (Thread Safety) | 3      | 18.75%     |
+| LOW (Design)        | 4      | 25%        |
+| **TOTAL**           | **16** | **100%**   |
 
 ## Recommendations Priority Summary
 
 **Immediate Action Required (Priority 1-2):**
+
 1. Fix Apple OAuth JWT signature verification (SECURITY)
 2. Fix realIpHeader NPE risk in JdkEngine
 
 **High Priority (Priority 3-6):**
+
 3. Fix type casting NPE risks in AnonType.kt
 4. Fix TypedData.path() NPE risk
 5. Fix dependency lookup NPE risk in ServerRuntimeBase
 6. Fix media file parent directory NPE
 
 **Medium Priority (Priority 7-12):**
+
 - Address parsing bugs (empty paths, header values, properties)
 - Fix thread safety issues (settings, HMAC field, timeout consistency)
 
 **Low Priority (Priority 13-16):**
+
 - Implement circular dependency detection
 - Review media scaling logic
 - Clean up commented-out code

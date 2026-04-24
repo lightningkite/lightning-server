@@ -1,7 +1,5 @@
 package com.lightningkite.lightningserver.http
 
-import com.lightningkite.lightningserver.definition.generalSettings
-import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.data.TypedData
 
 /**

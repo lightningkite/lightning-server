@@ -2,11 +2,8 @@ package com.lightningkite.lightningserver.definition
 
 import com.lightningkite.lightningserver.definition.builder.ListRegistry
 import com.lightningkite.lightningserver.definition.builder.MapRegistry
-import com.lightningkite.toSealedList
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import com.lightningkite.services.data.toSealedList
+import kotlin.test.*
 
 class ExtensionsTest {
     object TestKey : MutableExtensions.Key<String>
@@ -15,6 +12,7 @@ class ExtensionsTest {
         override fun MutableList<String>.include(other: List<String>) {
             addAll(other)
         }
+
         override fun seal(data: List<String>): List<String> = data.toSealedList()
     }
 

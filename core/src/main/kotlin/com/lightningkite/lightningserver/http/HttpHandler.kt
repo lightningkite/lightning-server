@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.http
 
-import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -60,7 +60,7 @@ public interface HttpHandler<PATH : PathSpec> {
  */
 public fun <PATH : PathSpec> HttpHandler(
     timeout: Duration = 30.seconds,
-    handler: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse
+    handler: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
 ): HttpHandler<PATH> = object : HttpHandler<PATH> {
     override val timeout: Duration = timeout
 

@@ -1,7 +1,5 @@
 package com.lightningkite.lightningserver.notifications
 
-import com.lightningkite.EmailAddress
-import com.lightningkite.PhoneNumber
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.require
 import com.lightningkite.lightningserver.definition.Runtime
@@ -17,17 +15,12 @@ import com.lightningkite.lightningserver.typed.ModelInfo
 import com.lightningkite.lightningserver.typed.modelInfo
 import com.lightningkite.lightningserver.typed.sdk.module
 import com.lightningkite.services.cache.Cache
-import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.*
 import com.lightningkite.services.database.*
-import com.lightningkite.services.email.Email
-import com.lightningkite.services.email.EmailAddressWithName
-import com.lightningkite.services.email.EmailService
-import com.lightningkite.services.email.TestEmailService
+import com.lightningkite.services.email.*
 import com.lightningkite.services.notifications.NotificationData
 import com.lightningkite.services.sms.SMS
 import com.lightningkite.services.sms.TestSMS
-import com.lightningkite.toEmailAddress
-import com.lightningkite.toPhoneNumber
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toSet
 import kotlinx.coroutines.runBlocking
@@ -36,9 +29,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.time.Clock
-import kotlin.time.Instant
-import kotlin.time.TimeSource
+import kotlin.time.*
 import kotlin.uuid.Uuid
 
 class SyntaxTest {
@@ -64,10 +55,11 @@ class SyntaxTest {
 
             val info = Server.database.modelInfo(User.require(), permissions = { ModelPermissions.allowAll<User>() })
 
-            inline fun <reified T : HasId<ID>, reified ID : Comparable<ID>> Runtime<Database>.testModelInfo() = modelInfo(
-                User.require(),
-                permissions = { ModelPermissions.allowAll<T>() }
-            )
+            inline fun <reified T : HasId<ID>, reified ID : Comparable<ID>> Runtime<Database>.testModelInfo() =
+                modelInfo(
+                    User.require(),
+                    permissions = { ModelPermissions.allowAll<T>() }
+                )
         }
     }
 
@@ -81,15 +73,20 @@ class SyntaxTest {
             email = Server.email,
             contentSerializer = String.serializer(),
         ) {
-            context(server: ServerRuntime) override suspend fun email(user: User): EmailAddress = "fake@email.com".toEmailAddress()
-            context(server: ServerRuntime) override suspend fun phone(user: User): PhoneNumber = "1234567890".toPhoneNumber()
-            context(server: ServerRuntime) override suspend fun fcmTokens(user: User): Set<String> = emptySet()
-            context(server: ServerRuntime) override suspend fun onFcmTokensDead(user: User, deadTokens: Set<String>) {}
+            context(server: ServerRuntime)
+            override suspend fun email(user: User): EmailAddress = "fake@email.com".toEmailAddress()
+            context(server: ServerRuntime)
+            override suspend fun phone(user: User): PhoneNumber = "1234567890".toPhoneNumber()
+            context(server: ServerRuntime)
+            override suspend fun fcmTokens(user: User): Set<String> = emptySet()
+            context(server: ServerRuntime)
+            override suspend fun onFcmTokensDead(user: User, deadTokens: Set<String>) {
+            }
 
             context(runtime: ServerRuntime)
             override suspend fun makeEmailNotifications(
                 user: User,
-                notifications: List<Notification<Uuid, String>>
+                notifications: List<Notification<Uuid, String>>,
             ): List<Email> = notifications.map {
                 Email(
                     subject = it.content,
@@ -101,13 +98,13 @@ class SyntaxTest {
             context(runtime: ServerRuntime)
             override suspend fun makeSmsNotifications(
                 user: User,
-                notifications: List<Notification<Uuid, String>>
+                notifications: List<Notification<Uuid, String>>,
             ): List<String> = notifications.map { it.content }
 
             context(runtime: ServerRuntime)
             override suspend fun makePushNotifications(
                 user: User,
-                notifications: List<Notification<Uuid, String>>
+                notifications: List<Notification<Uuid, String>>,
             ): List<NotificationData> = emptyList()
         }
 
@@ -124,7 +121,7 @@ class SyntaxTest {
     @GenerateDataClassPaths
     data class Model(
         override val _id: Uuid = Uuid.random(),
-        val name: String = "Hello World"
+        val name: String = "Hello World",
     ) : HasId<Uuid>
 
 

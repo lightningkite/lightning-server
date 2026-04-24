@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver
 
+import com.lightningkite.lightningserver.HttpMethod.Companion.WEBSOCKET
 import kotlinx.serialization.Serializable
 import kotlin.jvm.JvmInline
 

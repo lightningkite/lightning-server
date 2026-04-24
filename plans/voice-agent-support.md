@@ -2,7 +2,9 @@
 
 ## Overview
 
-Add voice agent capabilities to any `SystemChatEndpoints` implementation (including `LLMChatEndpoints`) using the same composition pattern as `ExternalChannelSupport`. This enables:
+Add voice agent capabilities to any `SystemChatEndpoints` implementation (including `LLMChatEndpoints`) using the same
+composition pattern as `ExternalChannelSupport`. This enables:
+
 - Real-time voice conversations using OpenAI Realtime API
 - Phone call integration via Twilio audio streaming
 - Reuse of existing `ChatTool` infrastructure for tool calling
@@ -33,7 +35,8 @@ api(libs.services.pubsub)
 
 ### Pattern: Composition (following ExternalChannelSupport)
 
-Just like `ExternalChannelSupport` adds SMS/Email channels to any `SystemChatEndpoints`, `VoiceChannelSupport` adds voice channels:
+Just like `ExternalChannelSupport` adds SMS/Email channels to any `SystemChatEndpoints`, `VoiceChannelSupport` adds
+voice channels:
 
 ```kotlin
 class VoiceChannelSupport<Subject : HasId<ID>, ID : Comparable<ID>>(
@@ -63,16 +66,16 @@ class VoiceChannelSupport<Subject : HasId<ID>, ID : Comparable<ID>>(
 ### How It Works
 
 1. **WebSocket Voice Endpoint** (`/voice`)
-   - Client connects with auth token and optional `conversationId`
-   - Creates `VoiceAgentSession` with configured instructions
-   - Bidirectional audio streaming
-   - Tool calls → `chatEndpoints.processToolCall()` → results back to voice agent
-   - Transcriptions → stored as `SystemChatMessage` via `chatEndpoints.messageInfo`
+    - Client connects with auth token and optional `conversationId`
+    - Creates `VoiceAgentSession` with configured instructions
+    - Bidirectional audio streaming
+    - Tool calls → `chatEndpoints.processToolCall()` → results back to voice agent
+    - Transcriptions → stored as `SystemChatMessage` via `chatEndpoints.messageInfo`
 
 2. **Phone Call Integration** (optional)
-   - Incoming call webhook → TwiML to connect audio stream
-   - Audio WebSocket → `PubSubVoiceAgentHandler` bridges to voice agent
-   - Uses same tool handling and message storage
+    - Incoming call webhook → TwiML to connect audio stream
+    - Audio WebSocket → `PubSubVoiceAgentHandler` bridges to voice agent
+    - Uses same tool handling and message storage
 
 3. **Message Flow**
    ```
@@ -92,8 +95,8 @@ class VoiceChannelSupport<Subject : HasId<ID>, ID : Comparable<ID>>(
    ```
 
 4. **Channel Identifier**
-   - Voice messages use `channel = "voice"`
-   - Phone messages use `channel = "phone"` with `externalIdentifier = phoneNumber`
+    - Voice messages use `channel = "voice"`
+    - Phone messages use `channel = "phone"` with `externalIdentifier = phoneNumber`
 
 ## Implementation
 
@@ -223,14 +226,14 @@ public class VoiceChannelSupport<Subject : HasId<ID>, ID : Comparable<ID>>(
 
 ### Key Differences from ExternalChannelSupport
 
-| Aspect | ExternalChannelSupport | VoiceChannelSupport |
-|--------|------------------------|---------------------|
-| Input | Text (SMS/Email body) | Audio stream |
-| Output | Text (SMS/Email) | Audio stream |
-| Real-time | No (webhook-based) | Yes (WebSocket) |
+| Aspect      | ExternalChannelSupport      | VoiceChannelSupport                                    |
+|-------------|-----------------------------|--------------------------------------------------------|
+| Input       | Text (SMS/Email body)       | Audio stream                                           |
+| Output      | Text (SMS/Email)            | Audio stream                                           |
+| Real-time   | No (webhook-based)          | Yes (WebSocket)                                        |
 | Tool Format | Uses chatEndpoints directly | Needs ChatTool → SerializableToolDescriptor conversion |
-| State | Stateless per message | Stateful session |
-| Response | Via message listener | Direct to voice session |
+| State       | Stateless per message       | Stateful session                                       |
+| Response    | Via message listener        | Direct to voice session                                |
 
 ### Voice Tool Descriptor Conversion
 
@@ -312,6 +315,7 @@ object Server : ServerBuilder() {
 ## Key Considerations
 
 ### 1. Tool Approval in Voice Context
+
 - Voice is real-time, so approval workflow needs adaptation
 - Options:
   a. Auto-approve read operations (same as text chat)
@@ -319,23 +323,28 @@ object Server : ServerBuilder() {
   c. Return pending status and let voice agent explain the hold
 
 ### 2. Transcript Storage
+
 - User speech → `SystemChatMessage` with `role = User`, `channel = "voice"`
 - Agent responses → `SystemChatMessage` with `role = Assistant`
 - Enables conversation history continuity between voice and text
 
 ### 3. Conversation Continuity
+
 - Voice sessions can reference existing text conversations
 - Load history via `chatEndpoints.getConversationHistory()`
 - Inject context via `session.addMessage()`
 
 ### 4. Session State Management
+
 - Direct WebSocket: state managed in memory during connection
 - Phone/Lambda: `PubSubVoiceAgentHandler` uses PubSub for cross-instance state
 
 ### 5. Error Handling
+
 - Provide audio feedback for errors
 - Don't leave user in silence - say something went wrong
 
 ### 6. Cost Tracking
+
 - OpenAI Realtime API charges per minute
 - Track `UsageStats` from `VoiceAgentEvent.ResponseDone`

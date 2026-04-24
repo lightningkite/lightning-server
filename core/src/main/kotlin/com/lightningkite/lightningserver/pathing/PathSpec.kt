@@ -5,9 +5,7 @@ import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
-import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
@@ -141,6 +139,7 @@ public sealed class PathSpec protected constructor(public val segments: List<Seg
 
         public companion object {
             public val Empty: Constant = Constant("")
+
             /**
              * String format:
              * /constant/{argument}/something/{...}
@@ -220,7 +219,8 @@ public class PathSpec0(segments: List<Segment>, after: Afterwards) : PathSpec(se
         arg(Segment.Wildcard(name, serializerOrContextual<T>()))
 
     public companion object {
-        public fun fromString(string: String): PathSpec0 = PathSpec0(string.removePrefix("/").split('/').map { Segment.Constant(it) }, Afterwards.fromString(string))
+        public fun fromString(string: String): PathSpec0 =
+            PathSpec0(string.removePrefix("/").split('/').map { Segment.Constant(it) }, Afterwards.fromString(string))
     }
 }
 
@@ -230,7 +230,7 @@ public class PathSpec0(segments: List<Segment>, after: Afterwards) : PathSpec(se
 public class PathSpec1<A>(
     segments: List<Segment>,
     after: Afterwards,
-    public val first: Segment.Wildcard<A>
+    public val first: Segment.Wildcard<A>,
 ) : PathSpec(segments, after) {
     override val wildcards: List<Segment.Wildcard<*>> = listOf(first)
     public val slash: PathSpec1<A> get() = PathSpec1(segments + Segment.Empty, Afterwards.None, first)
@@ -256,7 +256,7 @@ public class PathSpec2<A, B>(
     segments: List<Segment>,
     after: Afterwards,
     public val first: Segment.Wildcard<A>,
-    public val second: Segment.Wildcard<B>
+    public val second: Segment.Wildcard<B>,
 ) : PathSpec(segments, after) {
     override val wildcards: List<Segment.Wildcard<*>> = listOf(first, second)
     public val slash: PathSpec2<A, B> get() = PathSpec2(segments + Segment.Empty, Afterwards.None, first, second)
@@ -271,7 +271,7 @@ public class PathSpec2<A, B>(
     public fun resolved(
         first: A,
         second: B,
-        trailingWildcard: PathSegments? = null
+        trailingWildcard: PathSegments? = null,
     ): ResolvedPath<PathSpec2<A, B>> = ResolvedPath(this, first, second, trailingWildcard)
 
     public inline fun <reified T> arg(name: String): PathSpec3<A, B, T> =
@@ -286,10 +286,17 @@ public class PathSpec3<A, B, C>(
     after: Afterwards,
     public val first: Segment.Wildcard<A>,
     public val second: Segment.Wildcard<B>,
-    public val third: Segment.Wildcard<C>
+    public val third: Segment.Wildcard<C>,
 ) : PathSpec(segments, after) {
     override val wildcards: List<Segment.Wildcard<*>> = listOf(first, second, third)
-    public val slash: PathSpec3<A, B, C> get() = PathSpec3(segments + Segment.Empty, Afterwards.None, first, second, third)
+    public val slash: PathSpec3<A, B, C>
+        get() = PathSpec3(
+            segments + Segment.Empty,
+            Afterwards.None,
+            first,
+            second,
+            third
+        )
     public val any: PathSpec3<A, B, C> get() = PathSpec3(segments, Afterwards.TrailingSegments, first, second, third)
 
     public override fun path(constant: String): PathSpec3<A, B, C> =
@@ -302,7 +309,7 @@ public class PathSpec3<A, B, C>(
         first: A,
         second: B,
         third: C,
-        trailingWildcard: PathSegments? = null
+        trailingWildcard: PathSegments? = null,
     ): ResolvedPath<PathSpec3<A, B, C>> = ResolvedPath(this, first, second, third, trailingWildcard)
 
     public inline fun <reified T> arg(name: String): PathSpecMany =
@@ -315,7 +322,7 @@ public class PathSpec3<A, B, C>(
 public class PathSpecMany(
     segments: List<Segment>,
     after: Afterwards,
-    override val wildcards: List<Segment.Wildcard<*>>
+    override val wildcards: List<Segment.Wildcard<*>>,
 ) : PathSpec(segments, after) {
     public val slash: PathSpecMany get() = PathSpecMany(segments + Segment.Empty, Afterwards.None, wildcards)
     public val any: PathSpecMany get() = PathSpecMany(segments, Afterwards.TrailingSegments, wildcards)

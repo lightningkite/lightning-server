@@ -4,38 +4,42 @@ Last updated January 2025 (`version-5`)
 
 <!-- by Claude -->
 
-This guide helps Spring Boot developers understand Lightning Server by mapping familiar concepts to their equivalents. While both frameworks solve similar problems, Lightning Server takes a different philosophical approach: **compile-time configuration over runtime magic**.
+This guide helps Spring Boot developers understand Lightning Server by mapping familiar concepts to their equivalents.
+While both frameworks solve similar problems, Lightning Server takes a different philosophical approach: **compile-time
+configuration over runtime magic**.
 
 ## Philosophy Differences
 
-| Aspect | Spring Boot | Lightning Server |
-|--------|-------------|------------------|
-| Configuration | Runtime dependency injection | Compile-time object references |
-| Discovery | Classpath scanning, annotations | Explicit registration in code |
-| Beans | Container-managed singletons | Kotlin objects and lazy values |
-| Magic | Convention over configuration | Explicit over implicit |
-| Type safety | Runtime checks | Compile-time guarantees |
+| Aspect        | Spring Boot                     | Lightning Server               |
+|---------------|---------------------------------|--------------------------------|
+| Configuration | Runtime dependency injection    | Compile-time object references |
+| Discovery     | Classpath scanning, annotations | Explicit registration in code  |
+| Beans         | Container-managed singletons    | Kotlin objects and lazy values |
+| Magic         | Convention over configuration   | Explicit over implicit         |
+| Type safety   | Runtime checks                  | Compile-time guarantees        |
 
-The core insight: Spring Boot uses annotations and runtime reflection to wire things together. Lightning Server uses Kotlin's type system and explicit code. This means fewer surprises at runtime, but more explicit code.
+The core insight: Spring Boot uses annotations and runtime reflection to wire things together. Lightning Server uses
+Kotlin's type system and explicit code. This means fewer surprises at runtime, but more explicit code.
 
 ## Quick Reference Table
 
-| Spring Boot | Lightning Server | Notes |
-|-------------|------------------|-------|
-| `@RestController` | `ServerBuilder` object | Define endpoints explicitly |
-| `@Autowired` | Direct object reference | No DI container needed |
-| `@ConfigurationProperties` | `setting()` | Type-safe, auto-generated defaults |
-| `@Repository` | `database().table<T>()` | Type-safe query DSL |
-| `@Scheduled` | `schedule()` | Cron, frequency, or daily time |
-| `@Async` | `task()` | Fire-and-forget async tasks |
-| Spring Security | `PrincipalType` + `AuthEndpoints` | JWT-based, multiple proof methods |
-| `@Cacheable` | Explicit cache calls | `cache().get()` / `cache().set()` |
-| Actuator | `MetaEndpoints` | Health, metrics, OpenAPI |
-| Profiles | URL-based service selection | `ram://` vs `mongodb://` etc. |
+| Spring Boot                | Lightning Server                  | Notes                              |
+|----------------------------|-----------------------------------|------------------------------------|
+| `@RestController`          | `ServerBuilder` object            | Define endpoints explicitly        |
+| `@Autowired`               | Direct object reference           | No DI container needed             |
+| `@ConfigurationProperties` | `setting()`                       | Type-safe, auto-generated defaults |
+| `@Repository`              | `database().table<T>()`           | Type-safe query DSL                |
+| `@Scheduled`               | `schedule()`                      | Cron, frequency, or daily time     |
+| `@Async`                   | `task()`                          | Fire-and-forget async tasks        |
+| Spring Security            | `PrincipalType` + `AuthEndpoints` | JWT-based, multiple proof methods  |
+| `@Cacheable`               | Explicit cache calls              | `cache().get()` / `cache().set()`  |
+| Actuator                   | `MetaEndpoints`                   | Health, metrics, OpenAPI           |
+| Profiles                   | URL-based service selection       | `ram://` vs `mongodb://` etc.      |
 
 ## Dependency Injection
 
 ### Spring Boot
+
 ```java
 @Service
 public class UserService {
@@ -48,6 +52,7 @@ public class UserService {
 ```
 
 ### Lightning Server
+
 ```kotlin
 object Server : ServerBuilder() {
     val database = setting("database", Database.Settings())
@@ -66,11 +71,14 @@ object Server : ServerBuilder() {
 }
 ```
 
-**Key difference**: Instead of a runtime DI container managing bean lifecycles, you access services through settings that resolve at startup. Services are accessed via function calls (`database()`, `email()`) which return cached instances.
+**Key difference**: Instead of a runtime DI container managing bean lifecycles, you access services through settings
+that resolve at startup. Services are accessed via function calls (`database()`, `email()`) which return cached
+instances.
 
 ## Controllers and Endpoints
 
 ### Spring Boot
+
 ```java
 @RestController
 @RequestMapping("/api/users")
@@ -91,6 +99,7 @@ public class UserController {
 ```
 
 ### Lightning Server
+
 ```kotlin
 object UserEndpoints : ServerBuilder() {
 
@@ -122,6 +131,7 @@ object Server : ServerBuilder() {
 ```
 
 **Key differences**:
+
 - Endpoint definitions are stored as values, making them easy to reference in tests
 - Path arguments are type-safe (`arg1` has the type you declared)
 - Typed endpoints (`api()`) generate OpenAPI docs automatically
@@ -129,6 +139,7 @@ object Server : ServerBuilder() {
 ## Repository Pattern / Data Access
 
 ### Spring Boot (Spring Data JPA)
+
 ```java
 public interface UserRepository extends JpaRepository<User, UUID> {
     List<User> findByEmailContaining(String email);
@@ -138,6 +149,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 ```
 
 ### Lightning Server
+
 ```kotlin
 @Serializable
 @GenerateDataClassPaths  // Enables the type-safe query DSL
@@ -168,6 +180,7 @@ users.updateOne(
 ```
 
 **Key differences**:
+
 - No repository interfaces to define - just use the table directly
 - Queries are type-safe Kotlin DSL, not method naming conventions
 - IDE autocomplete works on field names
@@ -177,6 +190,7 @@ users.updateOne(
 ## Configuration Properties
 
 ### Spring Boot
+
 ```java
 @ConfigurationProperties(prefix = "myapp")
 public class MyAppProperties {
@@ -194,6 +208,7 @@ myapp:
 ```
 
 ### Lightning Server
+
 ```kotlin
 @Serializable
 data class FeatureFlags(
@@ -225,6 +240,7 @@ object Server : ServerBuilder() {
 ```
 
 **Key differences**:
+
 - Settings use KotlinX Serialization - any `@Serializable` type works
 - Default values are required and used to auto-generate `settings.json`
 - First run generates `settings.suggested.json` with all needed settings
@@ -233,6 +249,7 @@ object Server : ServerBuilder() {
 ## Spring Security vs Lightning Server Auth
 
 ### Spring Boot
+
 ```java
 @Configuration
 @EnableWebSecurity
@@ -250,6 +267,7 @@ public class SecurityConfig {
 ```
 
 ### Lightning Server
+
 ```kotlin
 @Serializable
 @GenerateDataClassPaths
@@ -301,6 +319,7 @@ object Server : ServerBuilder() {
 ```
 
 **Key differences**:
+
 - Auth requirements are per-endpoint, not centralized
 - User fetching is explicit (`auth.fetch()`)
 - Multiple authentication methods: email PIN, SMS, password, TOTP, OAuth
@@ -309,6 +328,7 @@ object Server : ServerBuilder() {
 ## Actuator / Health Monitoring
 
 ### Spring Boot
+
 ```java
 // application.properties
 management.endpoints.web.exposure.include=health,info,metrics
@@ -327,6 +347,7 @@ public class CustomHealthIndicator implements HealthIndicator {
 ```
 
 ### Lightning Server
+
 ```kotlin
 object Server : ServerBuilder() {
     val meta = path.path("meta") module MetaEndpoints(
@@ -338,6 +359,7 @@ object Server : ServerBuilder() {
 ```
 
 This provides:
+
 - `/meta/health` - Aggregated health from all services (database, cache, email, etc.)
 - `/meta/online` - Simple "Server is running" check
 - `/meta/openapi` - Swagger UI
@@ -346,15 +368,18 @@ This provides:
 - `/meta/admin` - React admin panel for your models
 
 Health checks automatically include:
+
 - Memory usage and CPU load
 - Per-service health status (OK, WARNING, ERROR, URGENT)
 - Results cached with configurable TTL
 
-**Key difference**: Health checks are automatic for registered services. No custom indicators needed unless you have non-standard dependencies.
+**Key difference**: Health checks are automatic for registered services. No custom indicators needed unless you have
+non-standard dependencies.
 
 ## Caching
 
 ### Spring Boot
+
 ```java
 @Service
 public class UserService {
@@ -371,6 +396,7 @@ public class UserService {
 ```
 
 ### Lightning Server
+
 ```kotlin
 object Server : ServerBuilder() {
     val cache = setting("cache", Cache.Settings())
@@ -394,9 +420,11 @@ object Server : ServerBuilder() {
 }
 ```
 
-**Key difference**: Caching is explicit. You see exactly what's cached and for how long. No annotation magic that might surprise you.
+**Key difference**: Caching is explicit. You see exactly what's cached and for how long. No annotation magic that might
+surprise you.
 
 Cache backends available:
+
 - `local` - RAM (single instance only, good for testing)
 - `redis://` - Redis
 - `memcached://` - Memcached
@@ -405,6 +433,7 @@ Cache backends available:
 ## Scheduled Tasks
 
 ### Spring Boot
+
 ```java
 @Component
 public class ScheduledTasks {
@@ -421,6 +450,7 @@ public class ScheduledTasks {
 ```
 
 ### Lightning Server
+
 ```kotlin
 object Server : ServerBuilder() {
     // Every 15 minutes
@@ -448,6 +478,7 @@ object Server : ServerBuilder() {
 ## Async Tasks
 
 ### Spring Boot
+
 ```java
 @Service
 public class NotificationService {
@@ -460,6 +491,7 @@ public class NotificationService {
 ```
 
 ### Lightning Server
+
 ```kotlin
 object Server : ServerBuilder() {
     // Define the task
@@ -484,11 +516,13 @@ object Server : ServerBuilder() {
 }
 ```
 
-**Key difference**: Tasks are first-class citizens with proper serialization. In AWS Lambda deployments, they automatically use SQS for reliable delivery.
+**Key difference**: Tasks are first-class citizens with proper serialization. In AWS Lambda deployments, they
+automatically use SQS for reliable delivery.
 
 ## Profiles / Environments
 
 ### Spring Boot
+
 ```java
 // application-dev.properties
 spring.datasource.url=jdbc:h2:mem:testdb
@@ -517,11 +551,13 @@ Different environments use different `settings.json` files:
 }
 ```
 
-**Key difference**: Service backends are selected by URL scheme, not profile name. `ram://` vs `mongodb://` is explicit about what's being used.
+**Key difference**: Service backends are selected by URL scheme, not profile name. `ram://` vs `mongodb://` is explicit
+about what's being used.
 
 ## Conditional Beans
 
 ### Spring Boot
+
 ```java
 @Bean
 @ConditionalOnProperty(name = "features.debug", havingValue = "true")
@@ -531,6 +567,7 @@ public DebugController debugController() {
 ```
 
 ### Lightning Server
+
 ```kotlin
 object Server : ServerBuilder() {
     val features = setting("features", FeatureFlags())
@@ -554,6 +591,7 @@ object Server : ServerBuilder() {
 ## Testing
 
 ### Spring Boot
+
 ```java
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -577,6 +615,7 @@ public class UserControllerTest {
 ```
 
 ### Lightning Server
+
 ```kotlin
 class UserEndpointsTest {
     companion object {
@@ -608,11 +647,13 @@ class UserEndpointsTest {
 }
 ```
 
-**Key difference**: Endpoint references are stored in variables, making them directly testable. Use mock service implementations (`JsonFileDatabase`, RAM cache) instead of mocking.
+**Key difference**: Endpoint references are stored in variables, making them directly testable. Use mock service
+implementations (`JsonFileDatabase`, RAM cache) instead of mocking.
 
 ## OpenAPI / Swagger
 
 ### Spring Boot
+
 ```java
 @Operation(summary = "Get user by ID")
 @ApiResponses({
@@ -624,6 +665,7 @@ public User getUser(@PathVariable String id) { ... }
 ```
 
 ### Lightning Server
+
 ```kotlin
 val getUser = path.path("users").arg<String>("id").get.api(
     summary = "Get user by ID",
@@ -636,11 +678,13 @@ val getUser = path.path("users").arg<String>("id").get.api(
 )
 ```
 
-OpenAPI is generated automatically from typed endpoints. Access at `/meta/openapi` for Swagger UI or `/meta/openapi.json` for the raw spec.
+OpenAPI is generated automatically from typed endpoints. Access at `/meta/openapi` for Swagger UI or
+`/meta/openapi.json` for the raw spec.
 
 ## Retry / Circuit Breaker
 
 ### Spring Boot (with Resilience4j)
+
 ```java
 @Retry(name = "external-service")
 @CircuitBreaker(name = "external-service")
@@ -673,6 +717,7 @@ val client = HttpClient {
 ```
 
 For AWS Lambda deployments:
+
 - Lambda automatically retries failed invocations
 - Use Step Functions for circuit breaker patterns
 - SQS dead-letter queues handle persistent failures
@@ -680,6 +725,7 @@ For AWS Lambda deployments:
 ## DevTools / Hot Reload
 
 ### Spring Boot
+
 ```xml
 <dependency>
     <groupId>org.springframework.boot</groupId>
@@ -690,32 +736,36 @@ For AWS Lambda deployments:
 ### Lightning Server
 
 Use Gradle continuous build:
+
 ```bash
 ./gradlew -t :your-module:run --args="serve"
 ```
 
-Or run from IntelliJ with automatic recompilation on save. Kotlin compilation is fast enough that hot reload is rarely needed.
+Or run from IntelliJ with automatic recompilation on save. Kotlin compilation is fast enough that hot reload is rarely
+needed.
 
 ## Summary
 
 Lightning Server trades runtime "magic" for compile-time explicitness:
 
-| Spring Boot Magic | Lightning Server Explicit |
-|-------------------|---------------------------|
-| Classpath scanning finds beans | You list what you use |
-| `@Autowired` injects dependencies | You call `service()` directly |
-| `@Cacheable` magically caches | You call `cache().get()` |
-| Method naming creates queries | You write query conditions |
-| Profiles switch configurations | You deploy different `settings.json` |
+| Spring Boot Magic                 | Lightning Server Explicit            |
+|-----------------------------------|--------------------------------------|
+| Classpath scanning finds beans    | You list what you use                |
+| `@Autowired` injects dependencies | You call `service()` directly        |
+| `@Cacheable` magically caches     | You call `cache().get()`             |
+| Method naming creates queries     | You write query conditions           |
+| Profiles switch configurations    | You deploy different `settings.json` |
 
 This approach has tradeoffs:
+
 - **More explicit code** - You write more, but understand what happens
 - **Faster startup** - No classpath scanning or reflection
 - **Type safety** - Compiler catches errors Spring finds at runtime
 - **Serverless friendly** - Designed for AWS Lambda from the start
 - **Learning curve** - Less documentation online than Spring
 
-For Spring developers, the key mental shift is: **if you don't see it in code, it doesn't happen**. There's no annotation processor wiring things together behind the scenes.
+For Spring developers, the key mental shift is: **if you don't see it in code, it doesn't happen**. There's no
+annotation processor wiring things together behind the scenes.
 
 ## See Also
 

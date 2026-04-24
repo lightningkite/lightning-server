@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.definition.builder
 
-import com.lightningkite.toSealedMap
+import com.lightningkite.services.data.toSealedMap
 
 /**
  * A write-once [Map] used during server building to register items at unique locations.
@@ -36,7 +36,8 @@ public interface MapRegistry<L, V> : Map<L, V> {
  * @property initial The value that was originally registered at the location
  * @property overwrite The value that was attempted to be registered (and rejected)
  */
-public class DuplicateRegistrationError(message: String, public val initial: Any?, public val overwrite: Any?) : Error(message)
+public class DuplicateRegistrationError(message: String, public val initial: Any?, public val overwrite: Any?) :
+    Error(message)
 
 /**
  * Registers all entries from a map into this registry.
@@ -67,7 +68,7 @@ public fun <L, V> MapRegistry<L, V>.getOrRegister(location: L, defaultValue: () 
     }
 
 private class BasicMapRegistry<L, V>(
-    private val registry: LinkedHashMap<L, V> = LinkedHashMap()
+    private val registry: LinkedHashMap<L, V> = LinkedHashMap(),
 ) : MapRegistry<L, V>, Map<L, V> by registry {
     override fun register(location: L, value: V) {
         if (registry.containsKey(location)) registry.getValue(location).let {
@@ -95,4 +96,5 @@ public fun <L, V> MapRegistry(): MapRegistry<L, V> = BasicMapRegistry()
  * @param setup A function that populates the registry
  * @return An immutable map containing all registered entries
  */
-public fun <L, V> buildMapRegistry(setup: MapRegistry<L, V>.() -> Unit): Map<L, V> = MapRegistry<L, V>().apply(setup).toSealedMap()
+public fun <L, V> buildMapRegistry(setup: MapRegistry<L, V>.() -> Unit): Map<L, V> =
+    MapRegistry<L, V>().apply(setup).toSealedMap()

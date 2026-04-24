@@ -46,7 +46,7 @@ public interface Fetcher {
         method: HttpMethod,
         inSerializer: KSerializer<I>,
         body: I,
-        outSerializer: KSerializer<O>
+        outSerializer: KSerializer<O>,
     ): O
 
     /**
@@ -61,7 +61,11 @@ public interface Fetcher {
      * @param outSerializer Serializer for incoming messages
      * @return A WebSocket client configured for this connection
      */
-    public fun <I, O> websocket(url: String, inSerializer: KSerializer<I>, outSerializer: KSerializer<O>): ClientWebSocket<I, O>
+    public fun <I, O> websocket(
+        url: String,
+        inSerializer: KSerializer<I>,
+        outSerializer: KSerializer<O>,
+    ): ClientWebSocket<I, O>
 
     /**
      * Encodes a value to a URL-safe string representation for use in path parameters.

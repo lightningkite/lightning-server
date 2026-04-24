@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
-import com.lightningkite.lightningserver.sessions.EstablishTotp
 import com.lightningkite.lightningserver.sessions.EstablishPassword
+import com.lightningkite.lightningserver.sessions.EstablishTotp
 import com.lightningkite.lightningserver.typed.LiveVersion
 
 /**

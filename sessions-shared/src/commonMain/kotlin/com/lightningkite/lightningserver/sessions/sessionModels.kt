@@ -1,17 +1,13 @@
 package com.lightningkite.lightningserver.sessions
 
+import com.lightningkite.lightningserver.auth.GrantedScope
 import com.lightningkite.lightningserver.sessions.proofs.Proof
 import com.lightningkite.lightningserver.sessions.proofs.ProofOption
-import com.lightningkite.services.data.AdminTableColumns
-import com.lightningkite.services.data.GenerateDataClassPaths
-import com.lightningkite.services.data.IndexSet
+import com.lightningkite.services.data.*
 import com.lightningkite.services.database.HasId
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.serializer
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
-import com.lightningkite.lightningserver.auth.*
 
 /**
  * Request to create a sub-session with reduced privileges derived from an existing session.
@@ -102,10 +98,13 @@ public data class IdAndAuthMethods<ID>(
     val options: List<ProofOption> = listOf(),
     val strengthRequired: Int = 1,
     val refreshToken: String? = null,
-){
+) {
 
     // Backwards compatibility, must serialize so cannot be a getter.
-    @Deprecated("Use refreshToken instead. This will be removed at a later date.", replaceWith = ReplaceWith("refreshToken"))
+    @Deprecated(
+        "Use refreshToken instead. This will be removed at a later date.",
+        replaceWith = ReplaceWith("refreshToken")
+    )
     val session: String? = refreshToken
 }
 

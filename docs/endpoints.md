@@ -2,9 +2,12 @@
 
 Last updated January 2025 (`version-5`)
 
-This guide covers everything you need to know about defining HTTP endpoints in Lightning Server, from basic routing to advanced request/response handling.
+This guide covers everything you need to know about defining HTTP endpoints in Lightning Server, from basic routing to
+advanced request/response handling.
 
-First, you won't get very far in this section without some knowledge of HTTP. One tutorial you could go to for general HTTP information is [this one I found](https://dev.to/abbeyperini/a-beginners-guide-to-http-part-1-definitions-38m7) by Abbey Perini.
+First, you won't get very far in this section without some knowledge of HTTP. One tutorial you could go to for general
+HTTP information is [this one I found](https://dev.to/abbeyperini/a-beginners-guide-to-http-part-1-definitions-38m7) by
+Abbey Perini.
 
 ## Routing Basics
 
@@ -29,7 +32,8 @@ object Server : ServerBuilder() {
 }
 ```
 
-**Important:** Always store the endpoint reference in a constant. This is useful for testing and for calling endpoints internally.
+**Important:** Always store the endpoint reference in a constant. This is useful for testing and for calling endpoints
+internally.
 
 ```kotlin
 val endpointReference = path.path("path-string-here").get bind HttpHandler {
@@ -84,7 +88,8 @@ val endpointReference = path.path("hello").get bind HttpHandler { request ->
 }
 ```
 
-**Tip:** In Kotlin, naming a single parameter to a lambda is optional. If you don't explicitly call it out, the name will be `it`.
+**Tip:** In Kotlin, naming a single parameter to a lambda is optional. If you don't explicitly call it out, the name
+will be `it`.
 
 ### Custom Timeouts
 
@@ -211,15 +216,18 @@ val createUser = path.path("users").post bind HttpHandler { request ->
 }
 ```
 
-The `parse<T>()` extension function on `TypedData` automatically selects the correct deserializer based on the body's media type. Similarly, `HttpResponse.json()` uses `Serialization.json` to serialize your object.
+The `parse<T>()` extension function on `TypedData` automatically selects the correct deserializer based on the body's
+media type. Similarly, `HttpResponse.json()` uses `Serialization.json` to serialize your object.
 
 **Key Points:**
+
 - `TypedData.parse<T>()` - Deserializes based on Content-Type (JSON, CSV, XML, etc.)
 - `HttpResponse.json(obj)` - Serializes using `Serialization.json`
 - Both use `kotlinx.serialization` under the hood
 - Custom media types can be registered via `Serialization.handler()`
 
-See [Serialization Documentation](serialization.md) for more details on customizing serialization, adding custom media types, and working with different formats.
+See [Serialization Documentation](serialization.md) for more details on customizing serialization, adding custom media
+types, and working with different formats.
 
 ## Creating Responses
 
@@ -242,7 +250,8 @@ HttpResponse(body = TypedData.json(data))  // 200 OK (has body)
 HttpResponse()  // 204 No Content (no body)
 ```
 
-**Important:** The status defaults to 200 OK if a body is provided, or 204 No Content if the body is null. For other status codes (like 201 Created), specify explicitly.
+**Important:** The status defaults to 200 OK if a body is provided, or 204 No Content if the body is null. For other
+status codes (like 201 Created), specify explicitly.
 
 ### Response Shortcuts
 
@@ -386,6 +395,7 @@ HttpHeaders {
 ```
 
 **SameSite Options:**
+
 - **Strict**: Cookie only sent in first-party context
 - **Lax**: Cookie sent with top-level navigation and same-site requests
 - **None**: Cookie sent in all contexts (requires Secure flag)
@@ -404,6 +414,7 @@ response.headers[HttpHeader.AccessControlAllowOrigin]
 ```
 
 Available categories:
+
 - Standard HTTP headers (Accept, Content-Type, etc.)
 - CORS headers (Access-Control-*)
 - WebSocket headers (Sec-WebSocket-*)
@@ -483,11 +494,13 @@ object ApiEndpoints : ServerBuilder() {
 }
 ```
 
-This format allows you to group and separate your endpoints effectively while still making routing centralized and clear, as well as ensuring testing is still easy.
+This format allows you to group and separate your endpoints effectively while still making routing centralized and
+clear, as well as ensuring testing is still easy.
 
 ## Interceptors and Middleware
 
-`HttpInterceptor` provides middleware functionality for cross-cutting concerns like authentication, logging, CORS, rate limiting, etc.
+`HttpInterceptor` provides middleware functionality for cross-cutting concerns like authentication, logging, CORS, rate
+limiting, etc.
 
 ### Creating Interceptors
 
@@ -534,6 +547,7 @@ object Server : ServerBuilder() {
 ### Interceptor Capabilities
 
 Interceptors can:
+
 - **Modify requests** before passing to next handler
 - **Short-circuit** and return responses without calling next handler
 - **Modify responses** after calling next handler
@@ -543,7 +557,8 @@ Interceptors can:
 - **Add CORS headers**
 - **Rate limit requests**
 
-**Order matters:** Interceptors execute in the order they are installed. Put cheaper checks (like CORS) before expensive ones (like authentication).
+**Order matters:** Interceptors execute in the order they are installed. Put cheaper checks (like CORS) before expensive
+ones (like authentication).
 
 ## Exception Handling
 

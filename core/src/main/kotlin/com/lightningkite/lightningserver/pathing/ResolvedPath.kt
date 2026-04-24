@@ -40,7 +40,7 @@ import kotlinx.serialization.StringFormat
  * @property trailingSegments Optional trailing path segments if the PathSpec uses [PathSpec.Afterwards.TrailingSegments]
  */
 @ConsistentCopyVisibility
-public data class ResolvedPath<out PATH: PathSpec> internal constructor(
+public data class ResolvedPath<out PATH : PathSpec> internal constructor(
     public val pathSpec: PATH,
     public val rawPathArguments: List<Any?>,
     public val trailingSegments: PathSegments? = null,
@@ -50,7 +50,10 @@ public data class ResolvedPath<out PATH: PathSpec> internal constructor(
         pathSpec.segments.map {
             when (it) {
                 is PathSpec.Segment.Constant -> Segment.Constant(it)
-                is PathSpec.Segment.Wildcard<*> -> Segment.WildcardWithValue(it as PathSpec.Segment.Wildcard<Any?>, rawPathArguments[index++])
+                is PathSpec.Segment.Wildcard<*> -> Segment.WildcardWithValue(
+                    it as PathSpec.Segment.Wildcard<Any?>,
+                    rawPathArguments[index++]
+                )
             }
         } + (trailingSegments?.segments?.map(Segment::Constant) ?: emptyList())
     }
@@ -64,8 +67,13 @@ public data class ResolvedPath<out PATH: PathSpec> internal constructor(
             override fun toString(): String = value
             override fun toString(format: StringFormat): String = value
         }
+
         data class WildcardWithValue<T>(val name: String, val serializer: KSerializer<T>, val value: T) : Segment {
-            public constructor(segment: PathSpec.Segment.Wildcard<T>, value: T) : this(segment.name, segment.serializer, value)
+            public constructor(segment: PathSpec.Segment.Wildcard<T>, value: T) : this(
+                segment.name,
+                segment.serializer,
+                value
+            )
 
             override fun toString(): String = "{$name=$value}"
             override fun toString(format: StringFormat): String = format.encodeToString(serializer, value)
@@ -85,11 +93,15 @@ public data class ResolvedPath<out PATH: PathSpec> internal constructor(
 }
 
 context(serverRuntime: ServerRuntime)
-public fun ResolvedPath<*>.pathSegments(): PathSegments = pathSegments(serverRuntime.externalSerialization.stringArrayFormat)
+public fun ResolvedPath<*>.pathSegments(): PathSegments =
+    pathSegments(serverRuntime.externalSerialization.stringArrayFormat)
+
 context(serverRuntime: ServerRuntime)
 public fun ResolvedPath<*>.path(): String = path(serverRuntime.externalSerialization.stringArrayFormat)
+
 context(serverRuntime: ServerRuntime)
 public fun ResolvedPath<*>.fullUrl(): String = generalSettings().publicUrl + path()
+
 context(serverRuntime: ServerRuntime)
 public fun ResolvedPath<*>.wsFullUrl(): String = generalSettings().wsUrl + path()
 
@@ -102,7 +114,8 @@ public fun ResolvedPath<*>.wsFullUrl(): String = generalSettings().wsUrl + path(
  * @param PATH The PathSpec type
  */
 public interface HasContextualPath<out PATH : PathSpec> {
-    context(server: ServerRuntime) public val pathInContext: ResolvedPath<PATH>
+    context(server: ServerRuntime)
+    public val pathInContext: ResolvedPath<PATH>
 }
 
 /**
@@ -119,22 +132,52 @@ public interface HasResolvedPath<PATH : PathSpec> {
 
 public fun ResolvedPath(path: PathSpec0, trailingWildcard: PathSegments? = null): ResolvedPath<PathSpec0> =
     ResolvedPath(path, emptyList(), trailingWildcard?.takeIf { path.after == PathSpec.Afterwards.TrailingSegments })
-public fun <A> ResolvedPath(path: PathSpec1<A>, first: A, trailingWildcard: PathSegments? = null): ResolvedPath<PathSpec1<A>> =
-    ResolvedPath(path, listOf(first), trailingWildcard?.takeIf { path.after == PathSpec.Afterwards.TrailingSegments })
-public fun <A, B> ResolvedPath(path: PathSpec2<A, B>, first: A, second: B, trailingWildcard: PathSegments? = null): ResolvedPath<PathSpec2<A, B>> =
-    ResolvedPath(path, listOf(first, second), trailingWildcard?.takeIf { path.after == PathSpec.Afterwards.TrailingSegments })
-public fun <A, B, C> ResolvedPath(path: PathSpec3<A, B, C>, first: A, second: B, third: C, trailingWildcard: PathSegments? = null): ResolvedPath<PathSpec3<A, B, C>> =
-    ResolvedPath(path, listOf(first, second, third), trailingWildcard?.takeIf { path.after == PathSpec.Afterwards.TrailingSegments })
 
-public fun HasResolvedPath<*>.pathSegments(stringArrayFormat: StringArrayFormat): PathSegments = path.pathSegments(stringArrayFormat)
+public fun <A> ResolvedPath(
+    path: PathSpec1<A>,
+    first: A,
+    trailingWildcard: PathSegments? = null,
+): ResolvedPath<PathSpec1<A>> =
+    ResolvedPath(path, listOf(first), trailingWildcard?.takeIf { path.after == PathSpec.Afterwards.TrailingSegments })
+
+public fun <A, B> ResolvedPath(
+    path: PathSpec2<A, B>,
+    first: A,
+    second: B,
+    trailingWildcard: PathSegments? = null,
+): ResolvedPath<PathSpec2<A, B>> =
+    ResolvedPath(
+        path,
+        listOf(first, second),
+        trailingWildcard?.takeIf { path.after == PathSpec.Afterwards.TrailingSegments })
+
+public fun <A, B, C> ResolvedPath(
+    path: PathSpec3<A, B, C>,
+    first: A,
+    second: B,
+    third: C,
+    trailingWildcard: PathSegments? = null,
+): ResolvedPath<PathSpec3<A, B, C>> =
+    ResolvedPath(
+        path,
+        listOf(first, second, third),
+        trailingWildcard?.takeIf { path.after == PathSpec.Afterwards.TrailingSegments })
+
+public fun HasResolvedPath<*>.pathSegments(stringArrayFormat: StringArrayFormat): PathSegments =
+    path.pathSegments(stringArrayFormat)
+
 public fun HasResolvedPath<*>.path(stringArrayFormat: StringArrayFormat): String = path.path(stringArrayFormat)
 
 context(serverRuntime: ServerRuntime)
-public fun HasResolvedPath<*>.pathSegments(): PathSegments = path.pathSegments(serverRuntime.externalSerialization.stringArrayFormat)
+public fun HasResolvedPath<*>.pathSegments(): PathSegments =
+    path.pathSegments(serverRuntime.externalSerialization.stringArrayFormat)
+
 context(serverRuntime: ServerRuntime)
 public fun HasResolvedPath<*>.path(): String = path.path(serverRuntime.externalSerialization.stringArrayFormat)
+
 context(serverRuntime: ServerRuntime)
 public fun HasResolvedPath<*>.fullUrl(): String = generalSettings().publicUrl + path()
+
 context(serverRuntime: ServerRuntime)
 public fun HasResolvedPath<*>.wsFullUrl(): String = generalSettings().wsUrl + path()
 
@@ -155,7 +198,6 @@ public inline val <A, B, C> ResolvedPath<PathSpec3<A, B, C>>.arg2: B get() = raw
 
 @get:JvmName("arg3_3")
 public inline val <A, B, C> ResolvedPath<PathSpec3<A, B, C>>.arg3: C get() = rawPathArguments[2] as C
-
 
 
 public val HasResolvedPath<*>.trailingSegments: PathSegments? get() = path.trailingSegments
@@ -207,10 +249,15 @@ context(serverRuntime: ServerRuntime)
 public val <A, B, C> HasContextualPath<PathSpec3<A, B, C>>.arg3: C get() = pathInContext.arg3
 
 context(serverRuntime: ServerRuntime)
-public fun HasContextualPath<*>.pathSegments(): PathSegments = pathInContext.pathSegments(serverRuntime.externalSerialization.stringArrayFormat)
+public fun HasContextualPath<*>.pathSegments(): PathSegments =
+    pathInContext.pathSegments(serverRuntime.externalSerialization.stringArrayFormat)
+
 context(serverRuntime: ServerRuntime)
-public fun HasContextualPath<*>.path(): String = pathInContext.path(serverRuntime.externalSerialization.stringArrayFormat)
+public fun HasContextualPath<*>.path(): String =
+    pathInContext.path(serverRuntime.externalSerialization.stringArrayFormat)
+
 context(serverRuntime: ServerRuntime)
 public fun HasContextualPath<*>.fullUrl(): String = generalSettings().publicUrl + path()
+
 context(serverRuntime: ServerRuntime)
 public fun HasContextualPath<*>.wsFullUrl(): String = generalSettings().wsUrl + path()

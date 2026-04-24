@@ -1,14 +1,12 @@
 package com.lightningkite.lightningserver.settings
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.services.data.workingDirectory
+import com.lightningkite.services.kfile.workingDirectory
+import com.lightningkite.services.kfile.KFile
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.modules.EmptySerializersModule
 import org.junit.After
 import org.junit.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /**
  * Tests for OpenSSL encryption/decryption support.
@@ -40,17 +38,17 @@ class OpenSslTest {
     /**
      * Helper to get absolute file path from KFile for OpenSSL command
      */
-    private fun com.lightningkite.services.data.KFile.absolutePath(): String =
+    private fun KFile.absolutePath(): String =
         java.io.File(this.path.toString()).absolutePath
 
     /**
      * Helper to execute OpenSSL encryption command
      */
     private fun encryptFileWithOpenSsl(
-        inFile: com.lightningkite.services.data.KFile,
-        outFile: com.lightningkite.services.data.KFile,
+        inFile: KFile,
+        outFile: KFile,
         password: String,
-        usePbkdf2: Boolean
+        usePbkdf2: Boolean,
     ): Boolean {
         val args = if (usePbkdf2) {
             arrayOf(
@@ -75,7 +73,7 @@ class OpenSslTest {
 
     @Test
     fun testDecryptPbkdf2Format() {
-        testRoot.mkdirs()
+        testRoot.createDirectories()
 
         // Create a test JSON file
         val plainFile = testRoot.then("test-plain.json")
@@ -127,7 +125,7 @@ class OpenSslTest {
 
     @Test
     fun testDecryptLegacyFormat() {
-        testRoot.mkdirs()
+        testRoot.createDirectories()
 
         // Create a test JSON file
         val plainFile = testRoot.then("test-plain.json")
@@ -179,7 +177,7 @@ class OpenSslTest {
 
     @Test
     fun testWrongPassword() {
-        testRoot.mkdirs()
+        testRoot.createDirectories()
 
         // Create a test file
         val plainFile = testRoot.then("test-plain.json")
@@ -200,7 +198,7 @@ class OpenSslTest {
 
         assertTrue(
             exception.message!!.contains("Failed to decrypt") ||
-            exception.message!!.contains("Padding")
+                    exception.message!!.contains("Padding")
         )
     }
 
@@ -209,7 +207,7 @@ class OpenSslTest {
         val password = "test123"
         val plaintext = "Hello, World!"
 
-        testRoot.mkdirs()
+        testRoot.createDirectories()
         val plainFile = testRoot.then("direct-test.txt")
         plainFile.writeString(plaintext)
 
@@ -229,7 +227,7 @@ class OpenSslTest {
         val password = "test123"
         val plaintext = "Legacy Test Data"
 
-        testRoot.mkdirs()
+        testRoot.createDirectories()
         val plainFile = testRoot.then("legacy-test.txt")
         plainFile.writeString(plaintext)
 
@@ -247,7 +245,7 @@ class OpenSslTest {
         // Test that the auto-detection works correctly by creating both formats
         // and ensuring both decrypt successfully
 
-        testRoot.mkdirs()
+        testRoot.createDirectories()
         val password = "autodetect"
         val plaintext = "Format Detection Test"
 

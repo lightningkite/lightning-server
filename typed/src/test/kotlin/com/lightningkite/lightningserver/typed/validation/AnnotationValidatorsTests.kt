@@ -1,34 +1,24 @@
 package com.lightningkite.lightningserver.typed.validation
 
-import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
-import com.lightningkite.lightningserver.http.HttpHeaders
-import com.lightningkite.lightningserver.http.HttpRequest
-import com.lightningkite.lightningserver.http.QueryParameters
-import com.lightningkite.lightningserver.http.post
+import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.runtime.test.test
-import com.lightningkite.lightningserver.serialization.StandardWithInternalModule
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.serialization.validators
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.lightningserver.typed.test
-import com.lightningkite.services.data.MaxLength
-import com.lightningkite.services.data.MaxSize
-import com.lightningkite.services.data.TypedData
+import com.lightningkite.services.data.*
 import com.lightningkite.services.database.validation.AnnotationValidators
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.SerializersModule
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.fail
+import kotlin.test.*
 
 inline fun assertBadRequest(action: () -> Unit) {
     try {
@@ -41,14 +31,14 @@ inline fun assertBadRequest(action: () -> Unit) {
 @Serializable
 data class TestModel(
     @MaxLength(5) val string: String = "12345",
-    @MaxSize(3) @MaxLength(5) val list: List<String> = emptyList()
+    @MaxSize(3) @MaxLength(5) val list: List<String> = emptyList(),
 )
 
 class AnnotationValidatorsTests {
 
     object TestServer : ServerBuilder() {
         override val annotationValidators: Runtime<AnnotationValidators> = Runtime {
-            AnnotationValidators(SerializersModule {  })
+            AnnotationValidators(SerializersModule { })
         }
 
         val endpoint = path.post bind ApiHttpHandler(
@@ -65,12 +55,13 @@ class AnnotationValidatorsTests {
 
     @Test
     fun testValidators() {
-        val validators = AnnotationValidators(SerializersModule {  })
+        val validators = AnnotationValidators(SerializersModule { })
 
         suspend fun assertPasses(model: TestModel) {
             val issues = validators.validate(TestModel.serializer(), model)
             assertEquals(0, issues.size, "Did not pass, issues: $issues")
         }
+
         suspend fun assertFails(model: TestModel, failures: Int = 1) {
             val issues = validators.validate(TestModel.serializer(), model)
             assertEquals(failures, issues.size, "Did not fail as expected ($failures): $issues")
@@ -114,7 +105,12 @@ class AnnotationValidatorsTests {
                             domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                             protocol = generalSettings().publicUrl.substringBefore("://"),
                             sourceIp = "localhost",
-                            body = TypedData.text(serverRuntime.externalSerialization.json.encodeToString(endpoint.inputType, model), MediaType.Application.Json),
+                            body = TypedData.text(
+                                serverRuntime.externalSerialization.json.encodeToString(
+                                    endpoint.inputType,
+                                    model
+                                ), MediaType.Application.Json
+                            ),
                         )
                     )
                 }

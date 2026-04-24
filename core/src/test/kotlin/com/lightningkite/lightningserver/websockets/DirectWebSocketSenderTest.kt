@@ -11,9 +11,7 @@ import com.lightningkite.services.pubsub.PubSub
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.runBlocking
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /**
  * Tests for DirectWebSocketSender and the direct send optimization path.
@@ -37,7 +35,7 @@ class DirectWebSocketSenderTest {
                 request: WebSocketConnectRequest<PathSpec0>,
                 waitForFullConnect: suspend () -> Unit,
                 incoming: Flow<WebSocketFrame>,
-                send: suspend (WebSocketFrame) -> Unit
+                send: suspend (WebSocketFrame) -> Unit,
             ) {
                 waitForFullConnect()
                 incoming.collect { frame ->

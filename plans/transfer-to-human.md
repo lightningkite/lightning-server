@@ -2,9 +2,11 @@
 
 ## Overview
 
-Add capability for the voice/phone AI agent to transfer calls to a human support agent using a conference bridge pattern where the AI introduces both parties before disconnecting.
+Add capability for the voice/phone AI agent to transfer calls to a human support agent using a conference bridge pattern
+where the AI introduces both parties before disconnecting.
 
 ## Requirements
+
 - **Conference/bridge**: AI stays on briefly to introduce both parties
 - **Phone number destination**: Transfer to a specific phone number
 - **AI continues conversation during wait**: Gathers info, provides updates, handles limited hours
@@ -12,7 +14,8 @@ Add capability for the voice/phone AI agent to transfer calls to a human support
 
 ## Prerequisites
 
-The `Conference` instruction must be added to service-abstractions first. Update the service-abstractions dependency version in `gradle.properties` before implementing.
+The `Conference` instruction must be added to service-abstractions first. Update the service-abstractions dependency
+version in `gradle.properties` before implementing.
 
 ---
 
@@ -58,6 +61,7 @@ enum class TransferStatus {
 **File**: `ai-shared/src/main/kotlin/com/lightningkite/lightningserver/ai/SystemChatModels.kt`
 
 Add optional transfer state to conversation:
+
 ```kotlin
 data class SystemChatConversation(
     // ...existing fields...
@@ -74,10 +78,10 @@ data class SystemChatConversation(
 - `description()`: Explains when AI should use this tool
 - `checkApproval()`: Checks support hours availability
 - `execute()`:
-  1. Checks if support is available (hours)
-  2. Generates handoff summary using LLM
-  3. Creates TransferState and updates conversation
-  4. Returns JSON with status and instructions for AI to continue conversation
+    1. Checks if support is available (hours)
+    2. Generates handoff summary using LLM
+    3. Creates TransferState and updates conversation
+    4. Returns JSON with status and instructions for AI to continue conversation
 
 ### Step 4: Add Transfer Configuration to VoiceChannelSupport
 
@@ -91,14 +95,14 @@ data class SystemChatConversation(
 2. Register TransferToHumanTool when building tools list (if transferConfig is set)
 
 3. Add conference status webhook endpoints:
-   - `conferenceStatus`: Handle join/leave events
-   - `dialStatus`: Handle human agent answer/no-answer
+    - `conferenceStatus`: Handle join/leave events
+    - `dialStatus`: Handle human agent answer/no-answer
 
 4. Handle transfer initiation:
-   - Move caller into conference
-   - Dial out to human agent
-   - On human answer: AI speaks introduction, then disconnects
-   - On no-answer/timeout: Return to AI conversation
+    - Move caller into conference
+    - Dial out to human agent
+    - On human answer: AI speaks introduction, then disconnects
+    - On no-answer/timeout: Return to AI conversation
 
 ### Step 5: Add tests
 
@@ -112,12 +116,12 @@ data class SystemChatConversation(
 
 ## Key Files to Modify
 
-| File | Change |
-|------|--------|
-| `ai-shared/.../TransferModels.kt` | New file with data models |
-| `ai-shared/.../SystemChatModels.kt` | Add `activeTransfer` field |
-| `ai/.../TransferToHumanTool.kt` | New file with transfer tool |
-| `ai/.../VoiceChannelSupport.kt` | Integration and webhooks |
+| File                                | Change                      |
+|-------------------------------------|-----------------------------|
+| `ai-shared/.../TransferModels.kt`   | New file with data models   |
+| `ai-shared/.../SystemChatModels.kt` | Add `activeTransfer` field  |
+| `ai/.../TransferToHumanTool.kt`     | New file with transfer tool |
+| `ai/.../VoiceChannelSupport.kt`     | Integration and webhooks    |
 
 ---
 

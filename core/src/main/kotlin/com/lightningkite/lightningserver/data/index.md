@@ -1,10 +1,12 @@
 # Data Package
 
-The `com.lightningkite.lightningserver.data` package provides utility classes and functions for common data handling tasks in Lightning Server applications.
+The `com.lightningkite.lightningserver.data` package provides utility classes and functions for common data handling
+tasks in Lightning Server applications.
 
 ## Files
 
 ### Cron.kt
+
 Cron-style scheduling patterns for recurring tasks.
 
 - **CronPattern**: Define minute/hour/day/month patterns for task scheduling
@@ -12,15 +14,18 @@ Cron-style scheduling patterns for recurring tasks.
 - **DayOfWeekRange**: Range support for weekday specifications
 
 **Key Features**:
+
 - Standard cron syntax with builder-style API
 - Calculate next occurrence from a given datetime
 - Validation of pattern components
 
 **Limitations**:
+
 - Advanced day-of-month features (Last, NearestWeekday) not yet implemented
 - Day-of-week recurrence patterns (e.g., "2nd Monday") not yet supported
 
 ### Expiring.kt
+
 Wrapper for values with expiration times.
 
 - **Expiring\<T\>**: Wraps a value with an optional expiration instant
@@ -30,6 +35,7 @@ Wrapper for values with expiration times.
 **Usage**: Cache values that should expire after a certain time period.
 
 ### KFile.ext.kt
+
 Conversion utilities between Java `File` and multiplatform `KFile`.
 
 - `KFile.toJavaFile()`: Convert to Java File
@@ -38,6 +44,7 @@ Conversion utilities between Java `File` and multiplatform `KFile`.
 **Usage**: Bridge between Java APIs and Lightning Server's multiplatform file handling.
 
 ### LongBits.kt
+
 Compact bit set stored in a single Long, supporting indices 0-63.
 
 - **LongBits**: Value class wrapping a Long as a bit set
@@ -45,21 +52,25 @@ Compact bit set stored in a single Long, supporting indices 0-63.
 - String representation using ranges (e.g., "0-5,10,15-20")
 
 **Known Issues**:
+
 - Bug with index 63 due to sign bit - fails in `contains()` check
 - Loop in `toString()` goes to 64 instead of 63
 
 **Usage**: Efficiently store small sets of integers, particularly for cron minute/hour patterns.
 
 ### Request.kt
+
 Base class for HTTP requests with caching support.
 
 - **Request\<PATH\>**: Abstract base for request objects
 - Implements `Caching` interface for built-in cache
 - Provides access to path, headers, query parameters, domain, protocol, and source IP
 
-**Usage**: Extended by framework-provided request implementations. Users interact with Request objects in endpoint handlers.
+**Usage**: Extended by framework-provided request implementations. Users interact with Request objects in endpoint
+handlers.
 
 ### Schedule.kt
+
 Different scheduling strategies for recurring tasks.
 
 - **Schedule.Frequency**: Run at fixed time intervals
@@ -71,6 +82,7 @@ All schedules support timezone specification.
 **Usage**: Define when background tasks should run.
 
 ### SerializableCache.kt
+
 Type-safe, serializable cache with optional expiration.
 
 - **SerializableCache**: Main cache class
@@ -79,6 +91,7 @@ Type-safe, serializable cache with optional expiration.
 - **Caching**: Interface for objects with attached caches
 
 **Key Features**:
+
 - Type-safe keys with serializers
 - Optional expiration per key
 - Local-only mode for non-serializable values

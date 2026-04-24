@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.media
 
-import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.definition.Runtime
+import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.MimeType
 import com.lightningkite.services.database.validation.AnnotationValidators
 

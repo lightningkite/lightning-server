@@ -6,10 +6,7 @@ import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.set
 import kotlinx.coroutines.runBlocking
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
@@ -108,6 +105,7 @@ class ExpiringTest {
         ) {
             runBlocking {
                 data class User(val name: String, val age: Int)
+
                 val user = User("Alice", 30)
                 val expiring = Expiring(user, expiresAt = null)
 

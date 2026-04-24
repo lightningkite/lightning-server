@@ -1,10 +1,8 @@
 package com.lightningkite.lightningserver.pathing
 
-import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.services.data.StringArrayFormat
-import kotlinx.serialization.SerializationException
 
 /**
  * A specialized map for routing requests to handlers based on [PathSpec] patterns.
@@ -98,13 +96,13 @@ public interface PathSpecMap<out V> : Map<PathSpec, V> {
      */
     public class Match<out V>(
         override val path: ResolvedPath<PathSpec>,
-        public val value: V
+        public val value: V,
     ) : HasResolvedPath<PathSpec> {
         public constructor(
             pathSpec: PathSpec,
             rawPathArguments: List<Any?>,
             wildcard: PathSegments?,
-            value: V
+            value: V,
         ) : this(
             ResolvedPath(pathSpec, rawPathArguments, trailingSegments = wildcard),
             value

@@ -12,11 +12,7 @@ import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.uuid.Uuid
 
 /**
@@ -124,7 +120,8 @@ class ModelRestEndpointsTest {
             CrudTestServer.rest.insert.test(null, item3)
 
             // Query for CategoryA only
-            val results = CrudTestServer.rest.query.test(null, Query(
+            val results = CrudTestServer.rest.query.test(
+                null, Query(
                 condition = condition { it.category eq "CategoryA" }
             ))
 
@@ -145,10 +142,12 @@ class ModelRestEndpointsTest {
                 CrudTestServer.rest.insert.test(null, item)
             }
 
-            val results = CrudTestServer.rest.query.test(null, Query(
-                condition = Condition.Always,
-                limit = 2
-            ))
+            val results = CrudTestServer.rest.query.test(
+                null, Query(
+                    condition = Condition.Always,
+                    limit = 2
+                )
+            )
 
             assertEquals(2, results.size)
         }
@@ -351,7 +350,8 @@ class ModelRestEndpointsTest {
             CrudTestServer.rest.insert.test(null, item3)
 
             // Modify all items in "ToModify" category
-            val modifiedCount = CrudTestServer.rest.bulkModify.test(null, MassModification(
+            val modifiedCount = CrudTestServer.rest.bulkModify.test(
+                null, MassModification(
                 condition = condition { it.category eq "ToModify" },
                 modification = modification { it.price assign 99.0 }
             ))
@@ -359,7 +359,8 @@ class ModelRestEndpointsTest {
             assertEquals(2, modifiedCount)
 
             // Verify the modifications
-            val modified = CrudTestServer.rest.query.test(null, Query(
+            val modified = CrudTestServer.rest.query.test(
+                null, Query(
                 condition = condition { it.category eq "ToModify" }
             ))
             assertTrue(modified.all { it.price == 99.0 })
@@ -485,17 +486,21 @@ class ModelRestEndpointsTest {
                 CrudTestServer.rest.insert.test(null, CrudItem(name = "Item $i", price = (i + 1) * 10.0))
             }
 
-            val page1 = CrudTestServer.rest.query.test(null, Query(
-                condition = Condition.Always,
-                skip = 0,
-                limit = 3
-            ))
+            val page1 = CrudTestServer.rest.query.test(
+                null, Query(
+                    condition = Condition.Always,
+                    skip = 0,
+                    limit = 3
+                )
+            )
 
-            val page2 = CrudTestServer.rest.query.test(null, Query(
-                condition = Condition.Always,
-                skip = 3,
-                limit = 3
-            ))
+            val page2 = CrudTestServer.rest.query.test(
+                null, Query(
+                    condition = Condition.Always,
+                    skip = 3,
+                    limit = 3
+                )
+            )
 
             assertEquals(3, page1.size)
             assertEquals(3, page2.size)
@@ -576,5 +581,5 @@ data class CrudItem(
     val name: String = "",
     val category: String = "",
     val price: Double = 0.0,
-    val quantity: Int = 0
+    val quantity: Int = 0,
 ) : HasId<Uuid>

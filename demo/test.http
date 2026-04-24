@@ -36,7 +36,11 @@ POST http://0.0.0.0:8941/test-model/rest/count
 Accept: application/json
 Content-Type: application/json
 
-{ "number": { "LessThan": 2000 }}
+{
+  "number": {
+    "LessThan": 2000
+  }
+}
 
 ### Get group count
 POST http://0.0.0.0:8941/test-model/rest/group-count
@@ -45,7 +49,9 @@ Content-Type: application/json
 
 {
   "groupBy": "name",
-  "condition": { "Always": true }
+  "condition": {
+    "Always": true
+  }
 }
 
 ### Get aggregate
@@ -53,7 +59,10 @@ POST http://0.0.0.0:8941/test-model/rest/aggregate
 Accept: application/json
 Content-Type: application/json
 
-{ "property": "number", "aggregate": "Average" }
+{
+  "property": "number",
+  "aggregate": "Average"
+}
 
 ### Get group aggregate
 POST http://0.0.0.0:8941/test-model/rest/group-aggregate

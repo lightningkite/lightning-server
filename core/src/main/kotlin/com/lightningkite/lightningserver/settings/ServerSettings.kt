@@ -1,19 +1,11 @@
 package com.lightningkite.lightningserver.settings
 
-import com.lightningkite.lightningserver.definition.Runtime
-import com.lightningkite.lightningserver.definition.ServerDefinition
-import com.lightningkite.lightningserver.definition.ServerSetting
-import com.lightningkite.lightningserver.definition.builder.MapRegistry
-import com.lightningkite.lightningserver.definition.builder.buildMapRegistry
-import com.lightningkite.lightningserver.definition.builder.getOrRegister
-import com.lightningkite.lightningserver.definition.builder.include
-import com.lightningkite.lightningserver.definition.loggingSettings
+import com.lightningkite.lightningserver.definition.*
+import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.otel.applyToLogback
-import kotlin.contracts.ExperimentalContracts
-import kotlin.contracts.InvocationKind
-import kotlin.contracts.contract
+import kotlin.contracts.*
 
 /**
  * Manages server configuration settings with a two-phase lifecycle (configuration → ready).
@@ -45,13 +37,14 @@ import kotlin.contracts.contract
  * @property settings The complete set of [ServerSetting] instances to manage
  * @property ready Indicates whether settings have been validated and are ready for use
  */
-public class ServerSettings private constructor( // duplicate settings can be ignored
+public class ServerSettings private constructor(
+    // duplicate settings can be ignored
     public val settings: Set<ServerSetting<*, *>>,
-    public val overrides: Map<ServerSetting<*, *>, Runtime<*>>
+    public val overrides: Map<ServerSetting<*, *>, Runtime<*>>,
 ) {
     public constructor(
         settings: Collection<ServerSetting<*, *>>,
-        vararg overrides: Override<*, *>    // ensure override type safety
+        vararg overrides: Override<*, *>,    // ensure override type safety
     ) : this(
         (settings + overrides.map { it.deferTo }.filterIsInstance<ServerSetting<*, *>>()).toSet(),
         buildMapRegistry {
@@ -74,7 +67,10 @@ public class ServerSettings private constructor( // duplicate settings can be ig
             }
 
         // Check for circular references in overrides
-        fun findCycle(start: ServerSetting<*, *>, visited: Set<ServerSetting<*, *>> = emptySet()): List<ServerSetting<*, *>>? {
+        fun findCycle(
+            start: ServerSetting<*, *>,
+            visited: Set<ServerSetting<*, *>> = emptySet(),
+        ): List<ServerSetting<*, *>>? {
             if (start in visited) return listOf(start)
             val target = overrides[start] as? ServerSetting<*, *> ?: return null
             val cycle = findCycle(target, visited + start)
@@ -296,7 +292,8 @@ public class ServerSettings private constructor( // duplicate settings can be ig
      *
      * @return A map of all settings to their serializable values (using defaults for unset settings)
      */
-    public fun allSerializable(): Map<ServerSetting<*, *>, Any?> = settings.associateWith { serializable[it] ?: it.default }
+    public fun allSerializable(): Map<ServerSetting<*, *>, Any?> =
+        settings.associateWith { serializable[it] ?: it.default }
 
     /**
      * Returns all settings with their transformed result values.
@@ -313,14 +310,15 @@ public class ServerSettings private constructor( // duplicate settings can be ig
 
     private fun copy(
         settings: Set<ServerSetting<*, *>> = this.settings,
-        overrides: Map<ServerSetting<*, *>, Runtime<*>> = this.overrides
+        overrides: Map<ServerSetting<*, *>, Runtime<*>> = this.overrides,
     ) = ServerSettings(settings, overrides).also {
         it.serializable.include(this.serializable)
         it.goal.include(this.goal)
     }
 
     public operator fun plus(requirement: ServerSetting<*, *>): ServerSettings = copy(settings + requirement)
-    public operator fun plus(requirements: Collection<ServerSetting<*, *>>): ServerSettings = copy(settings + requirements)
+    public operator fun plus(requirements: Collection<ServerSetting<*, *>>): ServerSettings =
+        copy(settings + requirements)
 
     public data class Override<S, R>(val override: ServerSetting<S, R>, val deferTo: Runtime<R>)
 }

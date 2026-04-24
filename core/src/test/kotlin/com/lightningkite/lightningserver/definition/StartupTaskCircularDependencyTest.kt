@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.definition
 
-import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import org.junit.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
@@ -18,13 +17,14 @@ class StartupTaskCircularDependencyTest {
      * In real code, this pattern should never be used - dependencies should be immutable.
      */
     private class MutableDependencyTask(
-        private val deps: MutableList<StartupTask> = mutableListOf()
+        private val deps: MutableList<StartupTask> = mutableListOf(),
     ) : StartupTask {
         override val dependencies: Collection<StartupTask> get() = deps
         fun addDependency(task: StartupTask) = deps.add(task)
 
         context(server: com.lightningkite.lightningserver.runtime.ServerRuntime)
-        override suspend fun execute() {}
+        override suspend fun execute() {
+        }
     }
 
     @Test

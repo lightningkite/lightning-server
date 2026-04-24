@@ -21,7 +21,9 @@ private object LoggerKey : MutableExtensions.Key<KLogger> {
  */
 public var ServerBuilder.logger: KLogger
     get() = extensions[LoggerKey] ?: LoggerKey.default()
-    set(value) { extensions[LoggerKey] = value }
+    set(value) {
+        extensions[LoggerKey] = value
+    }
 
 /**
  * Gets the logger for this ServerDefinition.

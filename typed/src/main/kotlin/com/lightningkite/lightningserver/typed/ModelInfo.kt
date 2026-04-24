@@ -1,19 +1,9 @@
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.lightningserver.auth.AuthRequirement
-import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.auth.Subscope
-import com.lightningkite.lightningserver.auth.subscope
+import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.services.database.CollectionChanges
-import com.lightningkite.services.database.Database
-import com.lightningkite.services.database.Table
-import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.ModelPermissions
-import com.lightningkite.services.database.default
-import com.lightningkite.services.database.serializerOrContextual
-import com.lightningkite.services.database.withPermissions
+import com.lightningkite.services.database.*
 import kotlinx.serialization.KSerializer
 
 public interface ModelInfo<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> {
@@ -34,19 +24,26 @@ public interface ModelInfo<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<I
 
     public fun registerChangeListener(action: suspend context(ServerRuntime) (CollectionChanges<T>) -> Unit)
 
-    context(server: ServerRuntime) public fun baseTable(): Table<T>
-    context(server: ServerRuntime) public fun table(): Table<T>
+    context(server: ServerRuntime)
+    public fun baseTable(): Table<T>
+    context(server: ServerRuntime)
+    public fun table(): Table<T>
 
-    context(server: ServerRuntime) public suspend fun table(auth: AuthAccess<SUBJECT>): Table<T>
-    context(server: ServerRuntime) public suspend fun permissions(auth: AuthAccess<SUBJECT>): ModelPermissions<T>
+    context(server: ServerRuntime)
+    public suspend fun table(auth: AuthAccess<SUBJECT>): Table<T>
+    context(server: ServerRuntime)
+    public suspend fun permissions(auth: AuthAccess<SUBJECT>): ModelPermissions<T>
 
-    context(server: ServerRuntime) public suspend fun defaultItem(auth: Authentication<SUBJECT & Any>?): T = serializer.default()
-    context(server: ServerRuntime) public fun exampleItem(): T? = null
+    context(server: ServerRuntime)
+    public suspend fun defaultItem(auth: Authentication<SUBJECT & Any>?): T = serializer.default()
+    context(server: ServerRuntime)
+    public fun exampleItem(): T? = null
 }
 
 public inline fun <reified USER : HasId<*>?, reified T : HasId<ID>, reified ID : Comparable<ID>> Runtime<Database>.modelInfo(
     auth: AuthRequirement<USER>,
-    tableName: String = serializerOrContextual<T>().descriptor.serialName.substringBefore('/').substringBefore('<').substringAfterLast('.'),
+    tableName: String = serializerOrContextual<T>().descriptor.serialName.substringBefore('/').substringBefore('<')
+        .substringAfterLast('.'),
     subscope: Subscope? = Subscope(tableName.lowercase()),
     crossinline signals: context(ServerRuntime) (Table<T>) -> Table<T> = { it },
     crossinline log: context(ServerRuntime) AuthAccess<USER>?.(Table<T>) -> Table<T> = { it },
@@ -135,8 +132,10 @@ public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> Runtime<Databa
 }
 
 context(_: ServerRuntime)
-public suspend fun <USER : HasId<*>, T : HasId<ID>, ID : Comparable<ID>> ModelInfo<USER, T, ID>.table(auth: Authentication<USER>): Table<T> = table(AuthAccess(auth))
+public suspend fun <USER : HasId<*>, T : HasId<ID>, ID : Comparable<ID>> ModelInfo<USER, T, ID>.table(auth: Authentication<USER>): Table<T> =
+    table(AuthAccess(auth))
 
 @JvmName("authTableNullable")
 context(_: ServerRuntime)
-public suspend fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ModelInfo<USER, T, ID>.table(auth: Authentication<USER & Any>?): Table<T> = table(AuthAccess(auth))
+public suspend fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ModelInfo<USER, T, ID>.table(auth: Authentication<USER & Any>?): Table<T> =
+    table(AuthAccess(auth))

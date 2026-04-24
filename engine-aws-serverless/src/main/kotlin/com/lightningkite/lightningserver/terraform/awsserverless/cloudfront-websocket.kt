@@ -1,7 +1,6 @@
 package com.lightningkite.lightningserver.terraform.awsserverless
 
 import com.lightningkite.services.terraform.TerraformJsonObject
-import com.lightningkite.services.terraform.TerraformJsonObject.Companion.expression
 
 /**
  * CloudFront Function JavaScript code that transforms URI paths into a `path` query parameter.

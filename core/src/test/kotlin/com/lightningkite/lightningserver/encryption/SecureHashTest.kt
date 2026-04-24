@@ -2,11 +2,7 @@
 package com.lightningkite.lightningserver.encryption
 
 import kotlinx.coroutines.runBlocking
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotEquals
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /**
  * Tests for SecureHash utility functions.

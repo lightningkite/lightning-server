@@ -1,18 +1,6 @@
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.services.database.AggregateQuery
-import com.lightningkite.services.database.CollectionUpdates
-import com.lightningkite.services.database.Condition
-import com.lightningkite.services.database.EntryChange
-import com.lightningkite.services.database.GroupAggregateQuery
-import com.lightningkite.services.database.GroupCountQuery
-import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.MassModification
-import com.lightningkite.services.database.ModelPermissions
-import com.lightningkite.services.database.Modification
-import com.lightningkite.services.database.Partial
-import com.lightningkite.services.database.Query
-import com.lightningkite.services.database.QueryPartial
+import com.lightningkite.services.database.*
 
 /**
  * Client-side interface for a complete REST CRUD API for a model type.
@@ -243,7 +231,8 @@ public interface ClientModelRestUpdatesWebsocket<T : HasId<ID>, ID : Comparable<
  * @param ID The type of the model's ID field
  */
 @LiveVersion(LiveClientModelRestEndpointsAndUpdatesWebsocket::class)
-public interface ClientModelRestEndpointsAndUpdatesWebsocket<T : HasId<ID>, ID : Comparable<ID>> : ClientModelRestEndpoints<T, ID>, ClientModelRestUpdatesWebsocket<T, ID>
+public interface ClientModelRestEndpointsAndUpdatesWebsocket<T : HasId<ID>, ID : Comparable<ID>> :
+    ClientModelRestEndpoints<T, ID>, ClientModelRestUpdatesWebsocket<T, ID>
 
 /*
  * TODO: API Improvements

@@ -3,21 +3,15 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
 import com.lightningkite.services.data.*
-import com.lightningkite.services.database.*
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.EncodeDefault
+import com.lightningkite.services.database.HasId
+import kotlinx.serialization.*
 import kotlinx.serialization.EncodeDefault.Mode
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.UseContextualSerialization
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
-import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlin.time.Instant
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.time.Instant
 
 
 /**

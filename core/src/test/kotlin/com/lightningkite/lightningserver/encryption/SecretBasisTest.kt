@@ -1,10 +1,7 @@
 package com.lightningkite.lightningserver.encryption
 
 import kotlinx.coroutines.runBlocking
-import kotlin.test.Test
-import kotlin.test.assertContentEquals
-import kotlin.test.assertEquals
-import kotlin.test.assertNotEquals
+import kotlin.test.*
 
 class SecretBasisTest {
 
@@ -26,7 +23,7 @@ class SecretBasisTest {
     fun testSecretBasisSerialization() {
         val basis = SecretBasis()
         val reconstructed = SecretBasis(basis.string)
-        
+
         // Should be able to reconstruct from string
         assertContentEquals(basis.bytes, reconstructed.bytes)
     }
@@ -34,22 +31,22 @@ class SecretBasisTest {
     @Test
     fun testDerivationConsistency(): Unit = runBlocking {
         val basis = SecretBasis()
-        
+
         // Same variant should produce same derived key
         val derived1 = basis.derive("test-variant")
         val derived2 = basis.derive("test-variant")
-        
+
         assertContentEquals(derived1, derived2)
     }
 
     @Test
     fun testDerivationUniqueness(): Unit = runBlocking {
         val basis = SecretBasis()
-        
+
         // Different variants should produce different derived keys
         val derived1 = basis.derive("variant-1")
         val derived2 = basis.derive("variant-2")
-        
+
         assert(!derived1.contentEquals(derived2)) {
             "Different variants should produce different keys"
         }
@@ -58,11 +55,11 @@ class SecretBasisTest {
     @Test
     fun testBlockingVsSuspending(): Unit = runBlocking {
         val basis = SecretBasis()
-        
+
         // Blocking and suspending versions should produce same results
         val suspended = basis.derive("test")
         val blocking = basis.deriveBlocking("test")
-        
+
         assertContentEquals(suspended, blocking)
     }
 
@@ -70,11 +67,11 @@ class SecretBasisTest {
     fun testByteArrayVsStringDerivation(): Unit = runBlocking {
         val basis = SecretBasis()
         val variant = "test-variant"
-        
+
         // String and byte array versions should produce same results
         val fromString = basis.derive(variant)
         val fromBytes = basis.derive(variant.encodeToByteArray())
-        
+
         assertContentEquals(fromString, fromBytes)
     }
 }

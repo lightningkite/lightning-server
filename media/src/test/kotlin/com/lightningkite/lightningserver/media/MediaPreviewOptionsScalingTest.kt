@@ -77,8 +77,10 @@ class MediaPreviewOptionsScalingTest {
 
         // max(800/1200, 800/900) = max(0.666..., 0.888...) = 0.888...
         // This scales the image so the SMALLEST dimension matches sizeInPixels
-        assertEquals(800.0 / 900.0, scaleFactor, 0.001,
-            "Scale factor should be the larger of the two ratios")
+        assertEquals(
+            800.0 / 900.0, scaleFactor, 0.001,
+            "Scale factor should be the larger of the two ratios"
+        )
 
         // Verify scaled dimensions
         val scaledWidth = (width * scaleFactor).toInt()
@@ -107,8 +109,10 @@ class MediaPreviewOptionsScalingTest {
 
         // Without coerceAtMost: max(1000/600, 1000/400) = max(1.666, 2.5) = 2.5
         // With coerceAtMost: min(2.5, 1.0) = 1.0
-        assertEquals(1.0, scaleFactor, 0.001,
-            "Scale factor should not exceed 1.0 (no upscaling)")
+        assertEquals(
+            1.0, scaleFactor, 0.001,
+            "Scale factor should not exceed 1.0 (no upscaling)"
+        )
     }
 
     @Test
@@ -134,8 +138,10 @@ class MediaPreviewOptionsScalingTest {
 
         // max(800/1600, 800/900) = max(0.5, 0.888...) = 0.888...
         // The scale factor comes from height since it requires less scaling
-        assertEquals(800.0 / 900.0, scaleFactor, 0.001,
-            "Scale factor calculated from adjusted dimensions")
+        assertEquals(
+            800.0 / 900.0, scaleFactor, 0.001,
+            "Scale factor calculated from adjusted dimensions"
+        )
 
         // This demonstrates the fix: the scale factor is calculated AFTER ratio adjustment,
         // ensuring the final image dimensions are correct relative to the new aspect ratio
@@ -152,7 +158,7 @@ class MediaPreviewOptionsScalingTest {
         }
 
         assertTrue(exception != null, "Should throw exception for negative sizeInPixels")
-        assertTrue(exception?.message?.contains("sizeInPixels must be positive") == true)
+        assertTrue(exception.message?.contains("sizeInPixels must be positive") == true)
     }
 
     @Test
@@ -165,7 +171,7 @@ class MediaPreviewOptionsScalingTest {
         }
 
         assertTrue(exception != null, "Should throw exception for negative forceRatio")
-        assertTrue(exception?.message?.contains("forceRatio must be positive") == true)
+        assertTrue(exception.message?.contains("forceRatio must be positive") == true)
     }
 
     @Test
@@ -178,6 +184,6 @@ class MediaPreviewOptionsScalingTest {
         }
 
         assertTrue(exception != null, "Should throw exception for quality > 1.0")
-        assertTrue(exception?.message?.contains("quality must be between 0.0 and 1.0") == true)
+        assertTrue(exception.message?.contains("quality must be between 0.0 and 1.0") == true)
     }
 }

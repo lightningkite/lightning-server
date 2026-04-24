@@ -4,31 +4,13 @@ import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.pathing.PathSpec1
+import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.send
-import com.lightningkite.lightningserver.typed.sdk.SdkModule
+import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
-import com.lightningkite.lightningserver.typed.sdk.clientInterface
-import com.lightningkite.lightningserver.typed.sdk.info
-import com.lightningkite.lightningserver.typed.sdk.pascalCase
-import com.lightningkite.lightningserver.typed.sdk.sdkSettings
-import com.lightningkite.lightningserver.websockets.WebSocketClose
-import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
-import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
-import com.lightningkite.lightningserver.websockets.WebSocketTopic
-import com.lightningkite.lightningserver.websockets.request
-import com.lightningkite.services.database.CollectionChanges
-import com.lightningkite.services.database.CollectionUpdates
-import com.lightningkite.services.database.Condition
-import com.lightningkite.services.database.EntryChange
-import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.ListChange
-import com.lightningkite.services.database.Mask
-import com.lightningkite.services.database.SerializableProperty
-import com.lightningkite.services.database.simplify
+import com.lightningkite.lightningserver.websockets.*
+import com.lightningkite.services.database.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 
@@ -48,7 +30,7 @@ public data class ModelRestUpdatesWebsocketData<T : HasId<ID>, ID : Comparable<I
 public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     public val info: ModelInfo<USER, T, ID>,
     public val key: SerializableProperty<T, *>? = null,
-): ServerBuilder() {
+) : ServerBuilder() {
     init {
         sdkSettings.clientInterface = ClientModelRestUpdatesWebsocket::class.info(info.serializer, info.idSerializer)
         sdkSettings.defaultInfo = SdkModule.Info(
@@ -57,14 +39,17 @@ public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
         )
     }
 
-    private inner class Websocket : ApiWebsocketHandler<PathSpec0, ModelRestUpdatesWebsocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>> {
+    private inner class Websocket :
+        ApiWebsocketHandler<PathSpec0, ModelRestUpdatesWebsocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>> {
         override val auth: AuthRequirement<USER> = info.auth
         override val inputType: KSerializer<Condition<T>> = Condition.serializer(info.serializer)
-        override val outputType: KSerializer<CollectionUpdates<T, ID>> = CollectionUpdates.serializer(info.serializer, info.idSerializer)
+        override val outputType: KSerializer<CollectionUpdates<T, ID>> =
+            CollectionUpdates.serializer(info.serializer, info.idSerializer)
         override val summary: String = "Updates"
         override val description: String = "Streams updates about items that fulfill your condition."
         override val errorCases: List<LSError> get() = listOf()
-        override val innerStorageSerializer: KSerializer<ModelRestUpdatesWebsocketData<T, ID>> = ModelRestUpdatesWebsocketData.serializer(info.serializer, info.idSerializer)
+        override val innerStorageSerializer: KSerializer<ModelRestUpdatesWebsocketData<T, ID>> =
+            ModelRestUpdatesWebsocketData.serializer(info.serializer, info.idSerializer)
 
         context(serverRuntime: ServerRuntime)
         override suspend fun willConnectTyped(access: WebSocketConnectRequestAccess<PathSpec0, USER>): ModelRestUpdatesWebsocketData<T, ID> {
@@ -83,19 +68,23 @@ public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
         override suspend fun messageFromClientTyped(frame: Condition<T>) {
             val p = info.table(connection.auth())
             val c = p.fullCondition(frame).simplify()
-            val oldTopics: Set<WebSocketSubscriptionRequest<out PathSpec, *>> = connection.currentState.topics.mapTo(HashSet()) {
-                connection.server.webSocketTopics.match(connection.internalSerialization.stringArrayFormat, it)
-                    ?.let { match -> WebSocketSubscriptionRequest(match.value, match.path.rawPathArguments) }
-                    ?: throw IllegalArgumentException(
-                        "WebSocket topic $it does not exist.  " +
-                                "Topics must be registered with the server before they can be used."
-                    )
-            }
-            val newTopics: Set<WebSocketSubscriptionRequest<out PathSpec, *>> = key?.let { key -> c.relevantHashCodesForKey(key) }?.mapTo(HashSet()) {
-                hashTopic.request(it)
-            } ?: setOf(generalTopic.request())
+            val oldTopics: Set<WebSocketSubscriptionRequest<out PathSpec, *>> =
+                connection.currentState.topics.mapTo(HashSet()) {
+                    connection.server.webSocketTopics.match(connection.internalSerialization.stringArrayFormat, it)
+                        ?.let { match -> WebSocketSubscriptionRequest(match.value, match.path.rawPathArguments) }
+                        ?: throw IllegalArgumentException(
+                            "WebSocket topic $it does not exist.  " +
+                                    "Topics must be registered with the server before they can be used."
+                        )
+                }
+            val newTopics: Set<WebSocketSubscriptionRequest<out PathSpec, *>> =
+                key?.let { key -> c.relevantHashCodesForKey(key) }?.mapTo(HashSet()) {
+                    hashTopic.request(it)
+                } ?: setOf(generalTopic.request())
             connection.queueStateUpdate { data ->
-                data.copy(condition = c, topics = newTopics.mapTo(HashSet()) { it.pathInContext.path(connection.internalSerialization.stringArrayFormat) })
+                data.copy(
+                    condition = c,
+                    topics = newTopics.mapTo(HashSet()) { it.pathInContext.path(connection.internalSerialization.stringArrayFormat) })
             }
             (oldTopics - newTopics.toHashSet()).forEach { connection.unsubscribe(it) }
             newTopics.filter { it !in oldTopics }.forEach { connection.subscribe(it) }
@@ -105,18 +94,20 @@ public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
         context(connection: ApiWebsocketHandler.Connection<PathSpec0, ModelRestUpdatesWebsocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>>)
         override suspend fun messageFromSubscriptionTyped(topic: WebSocketSubscriptionMessage<*, *>) {
             @Suppress("Unchecked_cast")
-            val message = when(topic.topic) {
+            val message = when (topic.topic) {
                 generalTopic -> topic.value
                 hashTopic -> topic.value
                 else -> return
             } as CollectionChanges<T>
             val toSend = message.changes.map { entry ->
                 ListChange(
-                    old = entry.old?.takeIf { connection.currentState.condition(it) }?.let { connection.currentState.mask(it) },
-                    new = entry.new?.takeIf { connection.currentState.condition(it) }?.let { connection.currentState.mask(it) },
+                    old = entry.old?.takeIf { connection.currentState.condition(it) }
+                        ?.let { connection.currentState.mask(it) },
+                    new = entry.new?.takeIf { connection.currentState.condition(it) }
+                        ?.let { connection.currentState.mask(it) },
                 )
             }.filter { it.old != null || it.new != null }
-            if(toSend.isEmpty()) return
+            if (toSend.isEmpty()) return
             val updates = CollectionUpdates(
                 updates = toSend.mapNotNull { it.new }.toSet(),
                 remove = toSend.mapNotNull { it.old.takeIf { _ -> it.new == null }?._id }.toSet()
@@ -135,13 +126,17 @@ public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
         }
 
         context(connection: ApiWebsocketHandler.Connection<PathSpec0, ModelRestUpdatesWebsocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>>)
-        override suspend fun disconnectTyped(reason: WebSocketClose) {}
+        override suspend fun disconnectTyped(reason: WebSocketClose) {
+        }
     }
 
-    public val websocket: ApiWebsocketHandler<PathSpec0, ModelRestUpdatesWebsocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>> = path bind Websocket()
+    public val websocket: ApiWebsocketHandler<PathSpec0, ModelRestUpdatesWebsocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>> =
+        path bind Websocket()
 
-    public val generalTopic: WebSocketTopic<PathSpec0, CollectionChanges<T>> = path.path("general").topic(CollectionChanges.serializer(info.serializer))
-    public val hashTopic: WebSocketTopic<PathSpec1<Int>, CollectionChanges<T>> = path.arg<Int>("id").topic(CollectionChanges.serializer(info.serializer))
+    public val generalTopic: WebSocketTopic<PathSpec0, CollectionChanges<T>> =
+        path.path("general").topic(CollectionChanges.serializer(info.serializer))
+    public val hashTopic: WebSocketTopic<PathSpec1<Int>, CollectionChanges<T>> =
+        path.arg<Int>("id").topic(CollectionChanges.serializer(info.serializer))
 
     init {
         info.registerChangeListener { changes ->
@@ -157,8 +152,8 @@ public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
                     hashTopic.send(hash, CollectionChanges(changes.changes.mapNotNull {
                         val old = it.old?.takeIf { key.get(it).hashCode() == hash }
                         val new = it.new?.takeIf { key.get(it).hashCode() == hash }
-                        if(old == null && new == null) null
-                        else if(old != null && new != null) it  // saves a common allocation
+                        if (old == null && new == null) null
+                        else if (old != null && new != null) it  // saves a common allocation
                         else EntryChange(old, new)
                     }))
                 }
@@ -168,7 +163,7 @@ public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
 }
 
 
-private fun <T, V> Condition<T>.relevantHashCodesForKey(key: SerializableProperty<T, V>): Set<Int>? = when(this) {
+private fun <T, V> Condition<T>.relevantHashCodesForKey(key: SerializableProperty<T, V>): Set<Int>? = when (this) {
     is Condition.And<T> -> conditions
         .asSequence()
         .mapNotNull { it.relevantHashCodesForKey(key) }

@@ -112,6 +112,7 @@ public enum class OauthPromptType {
 public enum class OauthResponseMode {
     form_post, query
 }
+
 @Serializable
 public enum class OauthAccessType {
     online, offline
@@ -122,9 +123,10 @@ public enum class OauthAccessType {
  */
 public object OauthGrantTypes {
     /** Authorization code grant type for initial token exchange */
-    public const val authorizationCode : String = "authorization_code"
+    public const val authorizationCode: String = "authorization_code"
+
     /** Refresh token grant type for obtaining new access tokens */
-    public const val refreshToken : String = "refresh_token"
+    public const val refreshToken: String = "refresh_token"
 }
 
 /*

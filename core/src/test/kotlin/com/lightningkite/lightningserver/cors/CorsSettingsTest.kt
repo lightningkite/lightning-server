@@ -1,10 +1,7 @@
 // Tests added by Claude
 package com.lightningkite.lightningserver.cors
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 

@@ -1,9 +1,6 @@
 package com.lightningkite.lightningserver.auth
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /**
  * Tests for edge cases and boundary conditions in scope handling.
@@ -176,16 +173,24 @@ class EdgeCaseTests {
         )
 
         // Should meet these requirements
-        assertTrue(grants.meetsRequirements(setOf(
-            RequiredScope("admin:users:list"),
-            RequiredScope("admin:posts:create"),
-            RequiredScope("public:read")
-        )))
+        assertTrue(
+            grants.meetsRequirements(
+                setOf(
+                    RequiredScope("admin:users:list"),
+                    RequiredScope("admin:posts:create"),
+                    RequiredScope("public:read")
+                )
+            )
+        )
 
         // Should NOT meet these requirements (missing admin root)
-        assertFalse(grants.meetsRequirements(setOf(
-            RequiredScope("admin") // too broad, grants are more specific
-        )))
+        assertFalse(
+            grants.meetsRequirements(
+                setOf(
+                    RequiredScope("admin") // too broad, grants are more specific
+                )
+            )
+        )
     }
 
     @Test

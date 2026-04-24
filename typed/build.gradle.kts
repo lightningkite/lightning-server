@@ -1,4 +1,4 @@
-import com.lightningkite.deployhelpers.*
+import com.lightningkite.deployhelpers.lkLibrary
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
@@ -18,16 +18,11 @@ dependencies {
     api(libs.services.cache)
     api(libs.services.http.client)
     api(libs.kotlin.reflect)
+    ksp(libs.services.database.processor)
+
     testImplementation(libs.kotlin.test.junit)
-
-    configurations.filter { it.name.startsWith("ksp") }.forEach {
-        add(it.name, libs.services.database.processor)
-    }
 }
 
-ksp {
-    arg("generateFields", "true")
-}
 
 kotlin {
     explicitApi()
@@ -44,6 +39,10 @@ kotlin {
     }
 }
 
-lkLibrary("lightningkite", "lightning-server") {
-    description.set("A set of tools to fill in/replace what Ktor is lacking in.")
+lkLibrary(
+    "lightningkite",
+    "lightning-server",
+    mavenAutomaticRelease = project.findProperty("mavenAutomaticRelease") as? Boolean ?: false
+) {
+    description.set("A set of tools for typing, documenting, and requiring authentication in endpoints.")
 }

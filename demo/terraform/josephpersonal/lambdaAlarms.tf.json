@@ -1,150 +1,150 @@
 {
-    "resource": {
-        "aws_sns_topic": {
-            "emergency": {
-                "name": "josephpersonal-example_emergencies"
-            }
-        },
-        "aws_cloudwatch_metric_alarm": {
-            "josephpersonalexamplelambdaspend4h": {
-                "alarm_name": "josephpersonal-example_josephpersonalexamplelambdaspend4h",
-                "period": 14400,
-                "statistic": "Sum",
-                "alarm_actions": [
-                    "${aws_sns_topic.emergency.arn}"
-                ],
-                "threshold": 13333306,
-                "datapoints_to_alarm": 1,
-                "insufficient_data_actions": [],
-                "metric_name": "Duration",
-                "evaluation_periods": 1,
-                "alarm_description": "JosephPersonal Example Lambda Spend (4h)",
-                "comparison_operator": "GreaterThanOrEqualToThreshold",
-                "namespace": "AWS/Lambda",
-                "dimensions": {
-                    "FunctionName": "${aws_lambda_function.main.function_name}"
-                }
-            },
-            "josephpersonalexamplelambdaspend1h": {
-                "alarm_name": "josephpersonal-example_josephpersonalexamplelambdaspend1h",
-                "period": 3600,
-                "statistic": "Sum",
-                "alarm_actions": [
-                    "${aws_sns_topic.emergency.arn}"
-                ],
-                "threshold": 6666653,
-                "datapoints_to_alarm": 1,
-                "insufficient_data_actions": [],
-                "metric_name": "Duration",
-                "evaluation_periods": 1,
-                "alarm_description": "JosephPersonal Example Lambda Spend (1h)",
-                "comparison_operator": "GreaterThanOrEqualToThreshold",
-                "namespace": "AWS/Lambda",
-                "dimensions": {
-                    "FunctionName": "${aws_lambda_function.main.function_name}"
-                }
-            },
-            "josephpersonalexamplelambdaspend5m": {
-                "alarm_name": "josephpersonal-example_josephpersonalexamplelambdaspend5m",
-                "period": 300,
-                "statistic": "Sum",
-                "alarm_actions": [
-                    "${aws_sns_topic.emergency.arn}"
-                ],
-                "threshold": 2222217,
-                "datapoints_to_alarm": 1,
-                "insufficient_data_actions": [],
-                "metric_name": "Duration",
-                "evaluation_periods": 1,
-                "alarm_description": "JosephPersonal Example Lambda Spend (5m)",
-                "comparison_operator": "GreaterThanOrEqualToThreshold",
-                "namespace": "AWS/Lambda",
-                "dimensions": {
-                    "FunctionName": "${aws_lambda_function.main.function_name}"
-                }
-            },
-            "josephpersonalexamplelambdaspend7d": {
-                "alarm_name": "josephpersonal-example_josephpersonalexamplelambdaspend7d",
-                "period": 604800,
-                "statistic": "Sum",
-                "alarm_actions": [
-                    "${aws_sns_topic.emergency.arn}"
-                ],
-                "threshold": 139999720,
-                "datapoints_to_alarm": 1,
-                "insufficient_data_actions": [],
-                "metric_name": "Duration",
-                "evaluation_periods": 1,
-                "alarm_description": "JosephPersonal Example Lambda Spend (7d)",
-                "comparison_operator": "GreaterThanOrEqualToThreshold",
-                "namespace": "AWS/Lambda",
-                "dimensions": {
-                    "FunctionName": "${aws_lambda_function.main.function_name}"
-                }
-            },
-            "josephpersonalexamplelambdaspend15m": {
-                "alarm_name": "josephpersonal-example_josephpersonalexamplelambdaspend15m",
-                "period": 900,
-                "statistic": "Sum",
-                "alarm_actions": [
-                    "${aws_sns_topic.emergency.arn}"
-                ],
-                "threshold": 3333326,
-                "datapoints_to_alarm": 1,
-                "insufficient_data_actions": [],
-                "metric_name": "Duration",
-                "evaluation_periods": 1,
-                "alarm_description": "JosephPersonal Example Lambda Spend (15m)",
-                "comparison_operator": "GreaterThanOrEqualToThreshold",
-                "namespace": "AWS/Lambda",
-                "dimensions": {
-                    "FunctionName": "${aws_lambda_function.main.function_name}"
-                }
-            },
-            "josephpersonalexamplelambdaspend1d": {
-                "alarm_name": "josephpersonal-example_josephpersonalexamplelambdaspend1d",
-                "period": 86400,
-                "statistic": "Sum",
-                "alarm_actions": [
-                    "${aws_sns_topic.emergency.arn}"
-                ],
-                "threshold": 39999920,
-                "datapoints_to_alarm": 1,
-                "insufficient_data_actions": [],
-                "metric_name": "Duration",
-                "evaluation_periods": 1,
-                "alarm_description": "JosephPersonal Example Lambda Spend (1d)",
-                "comparison_operator": "GreaterThanOrEqualToThreshold",
-                "namespace": "AWS/Lambda",
-                "dimensions": {
-                    "FunctionName": "${aws_lambda_function.main.function_name}"
-                }
-            }
-        },
-        "aws_api_gateway_account": {
-            "main": {
-                "cloudwatch_role_arn": "${aws_iam_role.cloudwatch.arn}"
-            }
-        },
-        "aws_iam_role": {
-            "cloudwatch": {
-                "name": "josephpersonalexample",
-                "assume_role_policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"apigateway.amazonaws.com\",\"lambda.amazonaws.com\"]},\"Sid\":\"\"}]}"
-            }
-        },
-        "aws_sns_topic_subscription": {
-            "emergency_primary": {
-                "protocol": "email",
-                "endpoint": "josephivie@gmail.com",
-                "topic_arn": "${aws_sns_topic.emergency.arn}"
-            }
-        },
-        "aws_iam_role_policy": {
-            "cloudwatch": {
-                "role": "${aws_iam_role.cloudwatch.id}",
-                "name": "josephpersonalexample_policy",
-                "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Action\":[\"logs:CreateLogGroup\",\"logs:CreateLogStream\",\"logs:DescribeLogGroups\",\"logs:DescribeLogStreams\",\"logs:PutLogEvents\",\"logs:GetLogEvents\",\"logs:FilterLogEvents\"],\"Resource\":\"*\",\"Effect\":\"Allow\"}]}"
-            }
+  "resource": {
+    "aws_sns_topic": {
+      "emergency": {
+        "name": "josephpersonal-example_emergencies"
+      }
+    },
+    "aws_cloudwatch_metric_alarm": {
+      "josephpersonalexamplelambdaspend4h": {
+        "alarm_name": "josephpersonal-example_josephpersonalexamplelambdaspend4h",
+        "period": 14400,
+        "statistic": "Sum",
+        "alarm_actions": [
+          "${aws_sns_topic.emergency.arn}"
+        ],
+        "threshold": 13333306,
+        "datapoints_to_alarm": 1,
+        "insufficient_data_actions": [],
+        "metric_name": "Duration",
+        "evaluation_periods": 1,
+        "alarm_description": "JosephPersonal Example Lambda Spend (4h)",
+        "comparison_operator": "GreaterThanOrEqualToThreshold",
+        "namespace": "AWS/Lambda",
+        "dimensions": {
+          "FunctionName": "${aws_lambda_function.main.function_name}"
         }
+      },
+      "josephpersonalexamplelambdaspend1h": {
+        "alarm_name": "josephpersonal-example_josephpersonalexamplelambdaspend1h",
+        "period": 3600,
+        "statistic": "Sum",
+        "alarm_actions": [
+          "${aws_sns_topic.emergency.arn}"
+        ],
+        "threshold": 6666653,
+        "datapoints_to_alarm": 1,
+        "insufficient_data_actions": [],
+        "metric_name": "Duration",
+        "evaluation_periods": 1,
+        "alarm_description": "JosephPersonal Example Lambda Spend (1h)",
+        "comparison_operator": "GreaterThanOrEqualToThreshold",
+        "namespace": "AWS/Lambda",
+        "dimensions": {
+          "FunctionName": "${aws_lambda_function.main.function_name}"
+        }
+      },
+      "josephpersonalexamplelambdaspend5m": {
+        "alarm_name": "josephpersonal-example_josephpersonalexamplelambdaspend5m",
+        "period": 300,
+        "statistic": "Sum",
+        "alarm_actions": [
+          "${aws_sns_topic.emergency.arn}"
+        ],
+        "threshold": 2222217,
+        "datapoints_to_alarm": 1,
+        "insufficient_data_actions": [],
+        "metric_name": "Duration",
+        "evaluation_periods": 1,
+        "alarm_description": "JosephPersonal Example Lambda Spend (5m)",
+        "comparison_operator": "GreaterThanOrEqualToThreshold",
+        "namespace": "AWS/Lambda",
+        "dimensions": {
+          "FunctionName": "${aws_lambda_function.main.function_name}"
+        }
+      },
+      "josephpersonalexamplelambdaspend7d": {
+        "alarm_name": "josephpersonal-example_josephpersonalexamplelambdaspend7d",
+        "period": 604800,
+        "statistic": "Sum",
+        "alarm_actions": [
+          "${aws_sns_topic.emergency.arn}"
+        ],
+        "threshold": 139999720,
+        "datapoints_to_alarm": 1,
+        "insufficient_data_actions": [],
+        "metric_name": "Duration",
+        "evaluation_periods": 1,
+        "alarm_description": "JosephPersonal Example Lambda Spend (7d)",
+        "comparison_operator": "GreaterThanOrEqualToThreshold",
+        "namespace": "AWS/Lambda",
+        "dimensions": {
+          "FunctionName": "${aws_lambda_function.main.function_name}"
+        }
+      },
+      "josephpersonalexamplelambdaspend15m": {
+        "alarm_name": "josephpersonal-example_josephpersonalexamplelambdaspend15m",
+        "period": 900,
+        "statistic": "Sum",
+        "alarm_actions": [
+          "${aws_sns_topic.emergency.arn}"
+        ],
+        "threshold": 3333326,
+        "datapoints_to_alarm": 1,
+        "insufficient_data_actions": [],
+        "metric_name": "Duration",
+        "evaluation_periods": 1,
+        "alarm_description": "JosephPersonal Example Lambda Spend (15m)",
+        "comparison_operator": "GreaterThanOrEqualToThreshold",
+        "namespace": "AWS/Lambda",
+        "dimensions": {
+          "FunctionName": "${aws_lambda_function.main.function_name}"
+        }
+      },
+      "josephpersonalexamplelambdaspend1d": {
+        "alarm_name": "josephpersonal-example_josephpersonalexamplelambdaspend1d",
+        "period": 86400,
+        "statistic": "Sum",
+        "alarm_actions": [
+          "${aws_sns_topic.emergency.arn}"
+        ],
+        "threshold": 39999920,
+        "datapoints_to_alarm": 1,
+        "insufficient_data_actions": [],
+        "metric_name": "Duration",
+        "evaluation_periods": 1,
+        "alarm_description": "JosephPersonal Example Lambda Spend (1d)",
+        "comparison_operator": "GreaterThanOrEqualToThreshold",
+        "namespace": "AWS/Lambda",
+        "dimensions": {
+          "FunctionName": "${aws_lambda_function.main.function_name}"
+        }
+      }
+    },
+    "aws_api_gateway_account": {
+      "main": {
+        "cloudwatch_role_arn": "${aws_iam_role.cloudwatch.arn}"
+      }
+    },
+    "aws_iam_role": {
+      "cloudwatch": {
+        "name": "josephpersonalexample",
+        "assume_role_policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"apigateway.amazonaws.com\",\"lambda.amazonaws.com\"]},\"Sid\":\"\"}]}"
+      }
+    },
+    "aws_sns_topic_subscription": {
+      "emergency_primary": {
+        "protocol": "email",
+        "endpoint": "josephivie@gmail.com",
+        "topic_arn": "${aws_sns_topic.emergency.arn}"
+      }
+    },
+    "aws_iam_role_policy": {
+      "cloudwatch": {
+        "role": "${aws_iam_role.cloudwatch.id}",
+        "name": "josephpersonalexample_policy",
+        "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Action\":[\"logs:CreateLogGroup\",\"logs:CreateLogStream\",\"logs:DescribeLogGroups\",\"logs:DescribeLogStreams\",\"logs:PutLogEvents\",\"logs:GetLogEvents\",\"logs:FilterLogEvents\"],\"Resource\":\"*\",\"Effect\":\"Allow\"}]}"
+      }
     }
+  }
 }

@@ -1,5 +1,4 @@
-import com.lightningkite.deployhelpers.*
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import com.lightningkite.deployhelpers.lkLibrary
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
@@ -26,16 +25,13 @@ dependencies {
     implementation(libs.bouncy.castle.bcprov)
     implementation(libs.bouncy.castle.bcpkix)
 
+    ksp(libs.services.database.processor)
+
     implementation(libs.webauthn4j.core)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
-
-    ksp(libs.services.database.processor)
 }
 
-ksp {
-    arg("generateFields", "true")
-}
 
 kotlin {
     explicitApi()
@@ -50,6 +46,10 @@ kotlin {
     }
 }
 
-lkLibrary("lightningkite", "lightning-server") {
-    description.set("A set of tools to fill in/replace what Ktor is lacking in.")
+lkLibrary(
+    "lightningkite",
+    "lightning-server",
+    mavenAutomaticRelease = project.findProperty("mavenAutomaticRelease") as? Boolean ?: false
+) {
+    description.set("A set of tools and endpoints for handling user notifications.")
 }

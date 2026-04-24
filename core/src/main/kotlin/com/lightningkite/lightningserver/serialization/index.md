@@ -1,41 +1,48 @@
 # Package com.lightningkite.lightningserver.serialization
 
-This package provides the serialization infrastructure for Lightning Server, enabling automatic encoding and decoding of data in various formats for HTTP requests and responses.
+This package provides the serialization infrastructure for Lightning Server, enabling automatic encoding and decoding of
+data in various formats for HTTP requests and responses.
 
 ## Core Components
 
 ### Configuration
 
-- **[Serialization.kt](Serialization.kt)** - Central configuration class that provides preconfigured instances of various serialization formats (JSON, form data, binary) with a shared `SerializersModule`. All formats are configured with sensible defaults for web API development.
+- **[Serialization.kt](Serialization.kt)** - Central configuration class that provides preconfigured instances of
+  various serialization formats (JSON, form data, binary) with a shared `SerializersModule`. All formats are configured
+  with sensible defaults for web API development.
 
 ### Media Type Support
 
 - **[MediaTypeCoder.kt](MediaTypeCoder.kt)** - Core interfaces for serialization:
-  - `MediaTypeEncoder` - Encodes Kotlin objects to typed data
-  - `MediaTypeDecoder` - Decodes typed data to Kotlin objects
-  - `MediaTypeCoder` - Combined encoder/decoder interface
+    - `MediaTypeEncoder` - Encodes Kotlin objects to typed data
+    - `MediaTypeDecoder` - Decodes typed data to Kotlin objects
+    - `MediaTypeCoder` - Combined encoder/decoder interface
 
   These interfaces support both HTTP body content and WebSocket frames, with optional streaming capabilities.
 
 - **[media.kt](media.kt)** - Registries and extension functions for media types:
-  - `MediaTypeEncoderRegistry` - Maps media types to encoders
-  - `MediaTypeDecoderRegistry` - Maps media types to decoders
-  - Extension functions for content negotiation and automatic encoder/decoder selection
-  - Query parameter parsing utilities
+    - `MediaTypeEncoderRegistry` - Maps media types to encoders
+    - `MediaTypeDecoderRegistry` - Maps media types to decoders
+    - Extension functions for content negotiation and automatic encoder/decoder selection
+    - Query parameter parsing utilities
 
 ### Format Implementations
 
 - **[registerBasicMediaTypeCoders.kt](registerBasicMediaTypeCoders.kt)** - Concrete implementations and registration:
-  - `BinaryFormatMediaTypeCoder` - Wrapper for binary formats
-  - `StringFormatMediaTypeCoder` - Wrapper for string-based formats
-  - `JsonMediaTypeCoder` - Specialized JSON coder with streaming support
-  - `registerBasicMediaTypeCoders()` - Extension to register JSON, form data, and binary formats
+    - `BinaryFormatMediaTypeCoder` - Wrapper for binary formats
+    - `StringFormatMediaTypeCoder` - Wrapper for string-based formats
+    - `JsonMediaTypeCoder` - Specialized JSON coder with streaming support
+    - `registerBasicMediaTypeCoders()` - Extension to register JSON, form data, and binary formats
 
-- **[FormDataFormat.kt](FormDataFormat.kt)** - StringFormat implementation for `application/x-www-form-urlencoded` data. Handles URL encoding/decoding and provides utility methods for working with maps and lists. Automatically wraps primitive types and enums for compatibility with the Properties format.
+- **[FormDataFormat.kt](FormDataFormat.kt)** - StringFormat implementation for `application/x-www-form-urlencoded` data.
+  Handles URL encoding/decoding and provides utility methods for working with maps and lists. Automatically wraps
+  primitive types and enums for compatibility with the Properties format.
 
 ### Utilities
 
-- **[serializerOrContextual.kt](serializerOrContextual.kt)** - Utility functions for obtaining serializers at runtime, falling back to contextual serializers when built-in serializers aren't available. Useful for generic code that works with both `@Serializable` types and custom serialized types.
+- **[serializerOrContextual.kt](serializerOrContextual.kt)** - Utility functions for obtaining serializers at runtime,
+  falling back to contextual serializers when built-in serializers aren't available. Useful for generic code that works
+  with both `@Serializable` types and custom serialized types.
 
 ## Key Features
 

@@ -1,13 +1,7 @@
 // by Claude
 package com.lightningkite.lightningserver.http
 
-import com.lightningkite.MediaType
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /**
  * Tests for HttpHeaders class.

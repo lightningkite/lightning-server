@@ -2,7 +2,8 @@
 
 Last updated January 2025 (`version-5`)
 
-Lightning Server provides a comprehensive Terraform integration layer for Infrastructure-as-Code deployments. This allows you to define your infrastructure programmatically and manage it through Terraform.
+Lightning Server provides a comprehensive Terraform integration layer for Infrastructure-as-Code deployments. This
+allows you to define your infrastructure programmatically and manage it through Terraform.
 
 ## Overview
 
@@ -18,7 +19,8 @@ The terraform package (`com.lightningkite.lightningserver.terraform`) provides:
 
 ### Terraform Emitters
 
-A Terraform emitter generates `.tf.json` files (Terraform's JSON format) from your server configuration. Service implementations contribute their own Terraform resources by implementing the `TerraformEmitter` interface.
+A Terraform emitter generates `.tf.json` files (Terraform's JSON format) from your server configuration. Service
+implementations contribute their own Terraform resources by implementing the `TerraformEmitter` interface.
 
 ### Secret Management
 
@@ -102,13 +104,15 @@ val secrets = EncryptedFileSecretSource("production")
 ```
 
 **Security Features**:
+
 - AES-256 encryption
 - PBKDF2 key derivation with 100,000 iterations
 - Random 32-byte salt per file
 - Automatic migration from legacy format (if upgrading from older versions)
 - File is created on first use
 
-This implementation provides strong encryption suitable for local development and testing. For production deployments, consider using a dedicated secret manager (AWS Secrets Manager, HashiCorp Vault, etc.).
+This implementation provides strong encryption suitable for local development and testing. For production deployments,
+consider using a dedicated secret manager (AWS Secrets Manager, HashiCorp Vault, etc.).
 
 #### EnvironmentSecretSource
 
@@ -188,6 +192,7 @@ A typical deployment follows these steps:
 ### Local Development
 
 `EncryptedFileSecretSource` provides strong security for local development:
+
 - ✅ Encrypted at rest with AES-256
 - ✅ Password protected with PBKDF2 (100,000 iterations)
 - ✅ Random salt per file (prevents rainbow table attacks)
@@ -197,6 +202,7 @@ A typical deployment follows these steps:
 ### Production Deployments
 
 For production, consider:
+
 - Using `EnvironmentSecretSource` with secrets from a proper secret manager
 - Integrating with AWS Secrets Manager, HashiCorp Vault, or similar
 - Never committing secrets to version control
@@ -205,6 +211,7 @@ For production, consider:
 ### CI/CD Integration
 
 For CI/CD pipelines:
+
 ```kotlin
 val secrets = ManySecretSources(
     EnvironmentSecretSource, // Primary source for CI/CD
@@ -213,6 +220,7 @@ val secrets = ManySecretSources(
 ```
 
 Set environment variables in your CI system:
+
 ```bash
 export LS_SECRET_AWS_ACCESS_KEY_ID="..."
 export LS_SECRET_AWS_SECRET_ACCESS_KEY="..."
@@ -223,6 +231,7 @@ export LS_SECRET_AWS_SECRET_ACCESS_KEY="..."
 ### "Missing secret" Errors
 
 If you see errors about missing secrets:
+
 1. Run `editVars()` to configure them interactively
 2. Check environment variables are set correctly
 3. Verify your `SecretSource` implementation can access the secrets
@@ -230,6 +239,7 @@ If you see errors about missing secrets:
 ### Terraform Command Failures
 
 If Terraform commands fail:
+
 1. Ensure Terraform is installed and on your PATH
 2. Check that AWS credentials are configured correctly
 3. Review Terraform logs for specific errors
@@ -238,30 +248,32 @@ If Terraform commands fail:
 ### File Not Found
 
 If the terraform root directory doesn't exist:
+
 - It will be created automatically by `write()`
 - Ensure you have write permissions to the parent directory
 
 ## Examples
 
 See also:
+
 - [Deploy to AWS](deploy-aws.md) - AWS Lambda deployment with Terraform
 - Demo module - Example server with complete deployment configuration
 
 ## API Reference
 
 - **`BaseTerraformEmitter<S>`**: Base class for Terraform generation
-  - `write()`: Generate Terraform JSON files
-  - `deploy()`: Full deployment workflow (init/plan/apply)
-  - `editVars()`: Interactive secret editor
-  - `terraformShell()`: Interactive Terraform command shell
+    - `write()`: Generate Terraform JSON files
+    - `deploy()`: Full deployment workflow (init/plan/apply)
+    - `editVars()`: Interactive secret editor
+    - `terraformShell()`: Interactive Terraform command shell
 
 - **`SecretSource`**: Interface for secret retrieval
-  - `get(need)`: Get required secret or throw
-  - `getOrNull(need)`: Get optional secret
+    - `get(need)`: Get required secret or throw
+    - `getOrNull(need)`: Get optional secret
 
 - **`PopulatableSecretSource`**: Secret source that can store secrets
-  - `set(need, value)`: Store a secret
-  - `prompt(need)`: Interactively prompt for a secret
+    - `set(need, value)`: Store a secret
+    - `prompt(need)`: Interactively prompt for a secret
 
 ## Next Steps
 

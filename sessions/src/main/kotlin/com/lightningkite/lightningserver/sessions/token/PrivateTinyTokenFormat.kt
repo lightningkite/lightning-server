@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.sessions.token
 
-import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.auth.Authentication
+import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.encryption.cipher
@@ -16,11 +17,11 @@ import kotlin.time.Duration.Companion.minutes
 public class PrivateTinyTokenFormat(
     public val cipher: RuntimeDeferred<Cipher> = secretBasis.cipher("tinyToken"),
     public val expiration: Duration = 5.minutes,
-): TokenFormat {
+) : TokenFormat {
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> create(
         principal: PrincipalType<SUBJECT, ID>,
-        auth: Authentication<SUBJECT>
+        auth: Authentication<SUBJECT>,
     ): String =
         principal.name + '/' + cipher.await().encrypt(
             server.internalSerialization.kotlinBytesFormat.encodeToByteArray(
@@ -32,7 +33,7 @@ public class PrivateTinyTokenFormat(
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> read(
         principal: PrincipalType<SUBJECT, ID>,
-        value: String
+        value: String,
     ): Authentication<SUBJECT>? {
         if (!value.startsWith(principal.name + '/')) return null
         try {

@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.http
 
-import com.lightningkite.MediaType
+import com.lightningkite.services.data.MediaType
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.MapSerializer
@@ -10,8 +10,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
-import kotlin.String
-import kotlin.collections.Map
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
 
@@ -39,8 +37,10 @@ import kotlin.time.toJavaInstant
  * @property normalizedEntries Internal map of lowercase header names to their values
  */
 @Serializable(HttpHeadersSerializer::class)
-public class HttpHeaders internal constructor (public val normalizedEntries: Map<String, List<HttpHeaderValue>>) {
-    override fun equals(other: Any?): Boolean = other is HttpHeaders && other.normalizedEntries == this.normalizedEntries
+public class HttpHeaders internal constructor(public val normalizedEntries: Map<String, List<HttpHeaderValue>>) {
+    override fun equals(other: Any?): Boolean =
+        other is HttpHeaders && other.normalizedEntries == this.normalizedEntries
+
     override fun hashCode(): Int = normalizedEntries.hashCode() + 1
     override fun toString(): String = normalizedEntries.toString()
 
@@ -118,6 +118,7 @@ public class HttpHeaders internal constructor (public val normalizedEntries: Map
             )
         }
     }
+
     /**
      * Parses and returns the Content-Length header as a Long.
      *
@@ -165,7 +166,7 @@ public class HttpHeaders internal constructor (public val normalizedEntries: Map
      * @param builder Lambda to modify the headers
      * @return A new HttpHeaders instance with the modifications applied
      */
-    public fun copy(builder: Builder.()->Unit): HttpHeaders = Builder(this).apply(builder).build()
+    public fun copy(builder: Builder.() -> Unit): HttpHeaders = Builder(this).apply(builder).build()
 
     /**
      * Builder for constructing HttpHeaders instances.
@@ -237,7 +238,9 @@ public class HttpHeaders internal constructor (public val normalizedEntries: Map
             entries.remove(key.lowercase())
         }
 
-        init { start?.let(::add) }
+        init {
+            start?.let(::add)
+        }
 
         /**
          * Sets a cookie in the response headers.
@@ -280,13 +283,19 @@ public class HttpHeaders internal constructor (public val normalizedEntries: Map
             sameSite: SameSite? = null,
             extensions: Map<String, String?> = emptyMap(),
         ) {
-            add(HttpHeader.SetCookie, HttpHeaderValue(
+            add(
+                HttpHeader.SetCookie, HttpHeaderValue(
                 root = "",
                 parameters = buildMap {
                     put("key", name)
                     put("value", value)
                     if (expiresAt != null) {
-                        put("expiresAt", DateTimeFormatter.RFC_1123_DATE_TIME.format(expiresAt.toJavaInstant().atOffset(ZoneOffset.UTC)))
+                        put(
+                            "expiresAt",
+                            DateTimeFormatter.RFC_1123_DATE_TIME.format(
+                                expiresAt.toJavaInstant().atOffset(ZoneOffset.UTC)
+                            )
+                        )
                     }
                     if (maxAge != null) {
                         put("maxAge", maxAge.toString())
@@ -374,7 +383,8 @@ public fun HttpHeaders(vararg entries: Pair<String, String>): HttpHeaders = Http
  * @param setup Builder configuration lambda
  * @return The constructed HttpHeaders
  */
-public inline fun HttpHeaders(setup: HttpHeaders.Builder.() -> Unit): HttpHeaders = HttpHeaders.Builder().apply(setup).build()
+public inline fun HttpHeaders(setup: HttpHeaders.Builder.() -> Unit): HttpHeaders =
+    HttpHeaders.Builder().apply(setup).build()
 
 /**
  * Internal serializer for HttpHeaders.

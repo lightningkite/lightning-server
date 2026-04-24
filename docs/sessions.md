@@ -1,6 +1,8 @@
 # Sessions Module
 
-The sessions system provides comprehensive authentication and session management for Lightning Server applications. It supports multiple authentication methods, multi-factor authentication, session lifecycle management, and OAuth 2.0 integration.
+The sessions system provides comprehensive authentication and session management for Lightning Server applications. It
+supports multiple authentication methods, multi-factor authentication, session lifecycle management, and OAuth 2.0
+integration.
 
 ## Overview
 
@@ -15,7 +17,8 @@ The sessions system consists of four modules:
 
 ### Sessions
 
-A **Session** represents an authenticated user's access to your application. Sessions are created after successful authentication and contain:
+A **Session** represents an authenticated user's access to your application. Sessions are created after successful
+authentication and contain:
 
 - Unique session ID
 - Subject (user) ID
@@ -53,15 +56,15 @@ Stepped-down on known device (strength 10 required):
 
 ### Available Proof Methods
 
-| Method | Strength | Description |
-|--------|----------|-------------|
-| **Password** | 10 | Traditional password authentication |
-| **Email** | 5 | PIN code or magic link via email |
-| **SMS** | 5 | PIN code via text message |
-| **TOTP** | 5 | Time-based codes from authenticator apps |
-| **WebAuthn** | 10 | Hardware keys, Touch ID, Face ID, Windows Hello |
-| **Backup Code** | 10 | Single-use recovery codes |
-| **Known Device** | N/A | Reduces strength requirement on trusted devices |
+| Method           | Strength | Description                                     |
+|------------------|----------|-------------------------------------------------|
+| **Password**     | 10       | Traditional password authentication             |
+| **Email**        | 5        | PIN code or magic link via email                |
+| **SMS**          | 5        | PIN code via text message                       |
+| **TOTP**         | 5        | Time-based codes from authenticator apps        |
+| **WebAuthn**     | 10       | Hardware keys, Touch ID, Face ID, Windows Hello |
+| **Backup Code**  | 10       | Single-use recovery codes                       |
+| **Known Device** | N/A      | Reduces strength requirement on trusted devices |
 
 ## Basic Usage
 

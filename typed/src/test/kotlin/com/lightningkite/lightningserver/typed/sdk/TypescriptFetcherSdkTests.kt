@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.typed.sdk
 
 import com.lightningkite.lightningserver.typed.sdk.SDK.writeUsingDefaultSettings
-import com.lightningkite.services.data.KFile
+import com.lightningkite.services.kfile.KFile
 import kotlin.test.Test
 
 class TypescriptFetcherSdkTests {

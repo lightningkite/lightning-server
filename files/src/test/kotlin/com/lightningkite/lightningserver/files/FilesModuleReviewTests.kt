@@ -1,25 +1,18 @@
 package com.lightningkite.lightningserver.files
 
-import com.lightningkite.MediaType
-import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.http.QueryParameters
-import com.lightningkite.lightningserver.http.head
 import com.lightningkite.lightningserver.http.post
-import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.files.PublicFileSystem
 import com.lightningkite.services.files.ServerFile
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.uuid.Uuid
 
 class FilesModuleReviewTests {
@@ -38,7 +31,10 @@ class FilesModuleReviewTests {
             auth = noAuth,
             implementation = { file: ServerFile -> file }
         )
-        init { registerBasicMediaTypeCoders() }
+
+        init {
+            registerBasicMediaTypeCoders()
+        }
     }
 
 

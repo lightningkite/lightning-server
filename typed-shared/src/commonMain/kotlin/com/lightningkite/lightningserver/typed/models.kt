@@ -1,22 +1,14 @@
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.DataSize
-import kotlinx.serialization.Serializable
-import com.lightningkite.services.HealthStatus
-import com.lightningkite.services.data.Description
-import com.lightningkite.services.data.GenerateDataClassPaths
-import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.VirtualAlias
-import com.lightningkite.services.database.VirtualEnum
-import com.lightningkite.services.database.VirtualStruct
-import com.lightningkite.services.database.VirtualTypeReference
+import com.lightningkite.lightningserver.LSError
+import com.lightningkite.lightningserver.auth.RequiredScope
+import com.lightningkite.services.data.*
+import com.lightningkite.services.database.*
 import kotlinx.datetime.LocalDate
+import kotlinx.serialization.Serializable
 import kotlin.math.roundToInt
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
-import com.lightningkite.lightningserver.LSError
-import com.lightningkite.lightningserver.auth.RequiredScope
-import com.lightningkite.services.database.VirtualSealed
 
 /**
  * Request to start tracking a new user funnel instance.
@@ -33,8 +25,9 @@ public data class FunnelStart(
     val userAgent: String,
     val version: String,
     val expireAfterMinutes: Int = 20,
-    val expectedErrorRate: Float = 0.05f
+    val expectedErrorRate: Float = 0.05f,
 )
+
 /**
  * Aggregated summary of funnel completion metrics for a specific date.
  *
@@ -61,7 +54,7 @@ public data class FunnelSummary(
     val error: Float = 0f,
     val abandoned: Float = 0f,
     val count: Int = 0,
-): HasId<Uuid>
+) : HasId<Uuid>
 
 /**
  * Represents an individual user's journey through a funnel.
@@ -92,8 +85,8 @@ public data class FunnelInstance(
     val success: Instant? = null,
     val started: Instant,
     val expiry: Instant,
-    val expectedErrorRate: Float = 0.05f
-): HasId<Uuid>
+    val expectedErrorRate: Float = 0.05f,
+) : HasId<Uuid>
 
 
 /**
@@ -275,7 +268,7 @@ public data class BulkRequest(
     val path: String,
     val method: String,
     @Description("JSON")
-    val body: String? = null
+    val body: String? = null,
 )
 
 /**
@@ -292,7 +285,7 @@ public data class BulkResponse(
     @Description("JSON")
     val result: String? = null,
     val error: LSError? = null,
-    val durationMs: Long = 0L
+    val durationMs: Long = 0L,
 )
 
 /*

@@ -12,7 +12,7 @@ import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
  */
 public fun LSError.toException(
     message: String = this.message,
-    data: String = this.data
+    data: String = this.data,
 ): HttpStatusException = HttpStatusException(
     status = HttpStatus(http),
     detail = detail,
@@ -32,9 +32,9 @@ public open class HttpStatusException(
     public val detail: String = "",
     message: String = "",
     public val data: String = "",
-    cause: Throwable? = null
+    cause: Throwable? = null,
 ) : Exception(message, cause) {
-    public constructor(lsError: LSError): this(
+    public constructor(lsError: LSError) : this(
         status = HttpStatus(lsError.http),
         detail = lsError.detail,
         message = lsError.message,
@@ -63,7 +63,8 @@ public open class BadRequestException(
 /**
  * A Helper function for creating an instance of BadRequestException.
  */
-public fun BadRequestException(message: String): BadRequestException = BadRequestException(message = message, detail = "")
+public fun BadRequestException(message: String): BadRequestException =
+    BadRequestException(message = message, detail = "")
 
 
 /**
@@ -118,8 +119,8 @@ public fun NotFoundException(message: String): NotFoundException = NotFoundExcep
  * @property requestedRoute The endpoint that was requested but not found
  */
 public class RouteNotFoundException(
-    public val requestedRoute: RawHttpEndpoint<*>
-): NotFoundException(
+    public val requestedRoute: RawHttpEndpoint<*>,
+) : NotFoundException(
     detail = "not-found",
     message = "No route matching $requestedRoute was found.",
     data = requestedRoute.toString(),

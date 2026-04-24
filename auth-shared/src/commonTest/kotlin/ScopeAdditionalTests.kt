@@ -1,9 +1,6 @@
 package com.lightningkite.lightningserver.auth
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class ScopeAdditionalTests {
 
@@ -51,7 +48,14 @@ class ScopeAdditionalTests {
 
         // Duplicates should not affect outcome
         assertTrue(setOf(GrantedScope("a"), GrantedScope("a")).meetsRequirements(setOf(RequiredScope("a"))))
-        assertTrue(setOf(GrantedScope("a"), GrantedScope("b")).meetsRequirements(setOf(RequiredScope("a"), RequiredScope("b"))))
+        assertTrue(
+            setOf(GrantedScope("a"), GrantedScope("b")).meetsRequirements(
+                setOf(
+                    RequiredScope("a"),
+                    RequiredScope("b")
+                )
+            )
+        )
         assertTrue(setOf(GrantedScope("a"), GrantedScope("b")).meetsRequirements(setOf(RequiredScope("a:c"))))
 
         // Mixed narrow and broad grants

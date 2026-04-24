@@ -16,7 +16,7 @@ import kotlin.time.Instant
 @Serializable
 public data class FinishProof(
     val key: String,
-    val password: String
+    val password: String,
 )
 
 /**
@@ -34,7 +34,7 @@ public data class IdentificationAndPassword(
     val type: String,
     val property: String,
     val value: String,
-    val password: String
+    val password: String,
 )
 
 
@@ -137,7 +137,7 @@ public data class Proof(
 @Serializable
 public data class KnownDeviceOptions(
     val duration: Duration,
-    val strength: Int
+    val strength: Int,
 )
 
 /**
@@ -152,5 +152,5 @@ public data class KnownDeviceOptions(
 @Serializable
 public data class KnownDeviceSecretAndExpiration(
     val secret: String,
-    val expiresAt: Instant
+    val expiresAt: Instant,
 )

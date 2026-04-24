@@ -4,13 +4,13 @@
 ##########
 
 variable "database_org_id" {
-    type = string
-    nullable = false
+  type     = string
+  nullable = false
 }
 variable "database_continuous_backup" {
-    type = bool
-    default = false
-    nullable = false
+  type     = bool
+  default  = false
+  nullable = false
 }
 
 ##########
@@ -25,7 +25,7 @@ variable "database_continuous_backup" {
 resource "mongodbatlas_project" "database" {
   name   = "demoexamplesingleec2database"
   org_id = var.database_org_id
-  
+
   is_collect_database_specifics_statistics_enabled = true
   is_data_explorer_enabled                         = true
   is_performance_advisor_enabled                   = true
@@ -38,13 +38,13 @@ resource "random_password" "database" {
   override_special = "-_"
 }
 resource "mongodbatlas_serverless_instance" "database" {
-  project_id   = mongodbatlas_project.database.id
-  name         = "demoexamplesingleec2database"
+  project_id = mongodbatlas_project.database.id
+  name       = "demoexamplesingleec2database"
 
   provider_settings_backing_provider_name = "AWS"
-  provider_settings_provider_name = "SERVERLESS"
-  provider_settings_region_name = replace(upper(var.deployment_location), "-", "_")
-  
+  provider_settings_provider_name         = "SERVERLESS"
+  provider_settings_region_name           = replace(upper(var.deployment_location), "-", "_")
+
   continuous_backup_enabled = var.database_continuous_backup
 }
 resource "mongodbatlas_database_user" "database" {
@@ -65,8 +65,8 @@ resource "mongodbatlas_database_user" "database" {
 
 }
 resource "mongodbatlas_project_ip_access_list" "database" {
-  for_each = toset([for s in data.aws_nat_gateway.main : s.public_ip])
-  project_id   = mongodbatlas_project.database.id
+  for_each   = toset([for s in data.aws_nat_gateway.main : s.public_ip])
+  project_id = mongodbatlas_project.database.id
   cidr_block = "${each.value}/32"
   comment    = "NAT Gateway"
 }

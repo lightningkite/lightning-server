@@ -1,10 +1,6 @@
 package com.lightningkite.lightningserver.data
 
-import kotlin.test.Ignore
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class LongBitsTest {
     @Test

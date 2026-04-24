@@ -24,6 +24,7 @@ import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.cache.*
 import com.lightningkite.services.cache.dynamodb.*
 import com.lightningkite.services.cache.memcached.*
+import com.lightningkite.services.data.toPhoneNumber
 import com.lightningkite.services.database.*
 import com.lightningkite.services.database.jsonfile.JsonFileDatabase
 import com.lightningkite.services.database.mongodb.*
@@ -43,7 +44,6 @@ import com.lightningkite.services.sms.twilio.TwilioSMS
 import com.lightningkite.services.sms.twilio.TwilioSmsInboundService
 import com.lightningkite.services.voiceagent.VoiceAgentService
 import com.lightningkite.services.voiceagent.openai.OpenAIVoiceAgentService
-import com.lightningkite.toPhoneNumber
 import io.ktor.client.request.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
@@ -93,21 +93,30 @@ object Server : ServerBuilder() {
     }
 
     val setupAdmins = path.path("setup-admins2") bind startupOnce(database) {
-        userInfo.table().insertOne(User(email = "joseph@lightningkite.com", isSuperUser = true, phone = "+18013693729".toPhoneNumber()))
+        userInfo.table().insertOne(
+            User(
+                email = "joseph@lightningkite.com",
+                isSuperUser = true,
+                phone = "+18013693729".toPhoneNumber()
+            )
+        )
     }
 
-    object UserAuth: PrincipalType<User, Uuid> {
+    object UserAuth : PrincipalType<User, Uuid> {
         override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
         override val subjectSerializer: KSerializer<User> = User.Companion.serializer()
         override val name: String get() = User.serializer().descriptor.serialName.substringAfterLast('.')
 
         context(server: ServerRuntime)
-        override suspend fun fetch(id: Uuid): User = userInfo.table().get(id) ?: throw com.lightningkite.lightningserver.NotFoundException()
+        override suspend fun fetch(id: Uuid): User =
+            userInfo.table().get(id) ?: throw com.lightningkite.lightningserver.NotFoundException()
 
         context(server: ServerRuntime)
         override suspend fun fetchByProperty(property: String, value: String): User? {
-            return when(property) {
-                "email" -> return userInfo.table().findOne(condition { it.email eq value }) ?: userInfo.table().insertOne(User(email = value))
+            return when (property) {
+                "email" -> return userInfo.table().findOne(condition { it.email eq value }) ?: userInfo.table()
+                    .insertOne(User(email = value))
+
                 else -> super.fetchByProperty(property, value)
             }
         }
@@ -135,7 +144,7 @@ object Server : ServerBuilder() {
     )
 
     val user = path.path("user") include object : ServerBuilder() {
-        val rest = path.path("rest") module ModelRestEndpoints(userInfo)
+        val rest = path.path("rest") module ModelRestEndpoints(this@Server.userInfo)
     }
     val uploadEarly = path.path("upload") module UploadEarlyEndpoint(files, database, Runtime.Constant(listOf()))
 
@@ -188,7 +197,7 @@ object Server : ServerBuilder() {
             request: WebSocketConnectRequest<com.lightningkite.lightningserver.pathing.PathSpec0>,
             waitForFullConnect: suspend () -> Unit,
             incoming: Flow<WebSocketFrame>,
-            send: suspend (WebSocketFrame) -> Unit
+            send: suspend (WebSocketFrame) -> Unit,
         ) {
             // Signal ready immediately
             waitForFullConnect()
@@ -202,6 +211,7 @@ object Server : ServerBuilder() {
                     is WebSocketFrame.Text -> {
                         send(WebSocketFrame.Text("""{"type":"echo","original":"${frame.content}"}"""))
                     }
+
                     is WebSocketFrame.Binary -> {
                         send(WebSocketFrame.Text("""{"type":"echo","binary":true,"size":${frame.content.size}}"""))
                     }
@@ -224,7 +234,7 @@ object Server : ServerBuilder() {
     val proofOtp = path.path("proof").path("otp") module TimeBasedOTPProofEndpoints(database, cache)
     val proofPassword = path.path("proof").path("password") module PasswordProofEndpoints(database, cache)
     val proofDevices = path.path("proof").path("devices") module KnownDeviceProofEndpoints(database, cache)
-    val subjects = path.path("auth") module object: AuthEndpoints<User, Uuid>(
+    val subjects = path.path("auth") module object : AuthEndpoints<User, Uuid>(
         principal = UserAuth,
         database = database,
     ) {
@@ -238,5 +248,7 @@ object Server : ServerBuilder() {
         override suspend fun sessionStaleAfter(subject: User): Duration? = null
     }
 
-    init { registerBasicMediaTypeCoders() }
+    init {
+        registerBasicMediaTypeCoders()
+    }
 }

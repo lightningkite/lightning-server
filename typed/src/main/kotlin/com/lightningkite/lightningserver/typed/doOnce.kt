@@ -2,25 +2,9 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.StartupTask
-import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.location
-import com.lightningkite.lightningserver.runtime.locationOrNull
-import com.lightningkite.lightningserver.runtime.now
+import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.services.data.GenerateDataClassPaths
-import com.lightningkite.services.database.Database
-import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.and
-import com.lightningkite.services.database.condition
-import com.lightningkite.services.database.deleteOneById
-import com.lightningkite.services.database.eq
-import com.lightningkite.services.database.get
-import com.lightningkite.services.database.insertOne
-import com.lightningkite.services.database.lt
-import com.lightningkite.services.database.modification
-import com.lightningkite.services.database.notNull
-import com.lightningkite.services.database.or
-import com.lightningkite.services.database.table
-import com.lightningkite.services.database.updateOneById
+import com.lightningkite.services.database.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration
@@ -68,7 +52,8 @@ public suspend fun doOnce(
             }
         )
     } catch (e: Exception) {
-        KotlinLogging.logger("com.lightningkite.lightningserver.typed.doOnce").error(e) { "doOnce($key) failed to complete" }
+        KotlinLogging.logger("com.lightningkite.lightningserver.typed.doOnce")
+            .error(e) { "doOnce($key) failed to complete" }
         table.updateOneById(
             key,
             modification {
@@ -87,7 +72,7 @@ public fun startupOnce(
     migrateKey: Boolean = false,
     dependencies: List<StartupTask> = emptyList(),
     timeout: Duration = 60.seconds,
-    action: suspend context(ServerRuntime) () -> Unit
+    action: suspend context(ServerRuntime) () -> Unit,
 ): StartupTask =
     StartupTask(dependencies, timeout) {
         if (migrateKey) {

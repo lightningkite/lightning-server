@@ -1,12 +1,7 @@
 // by Claude
 package com.lightningkite.lightningserver.sessions
 
-import com.lightningkite.lightningserver.UnauthorizedException
-import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.auth.GrantedScope
-import com.lightningkite.lightningserver.auth.PrincipalType
-import com.lightningkite.lightningserver.auth.id
-import com.lightningkite.lightningserver.auth.register
+import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -15,25 +10,14 @@ import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.condition
-import com.lightningkite.services.database.eq
-import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import org.junit.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertNotEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
-import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -45,7 +29,7 @@ class SessionManagerTest {
     @Serializable
     data class SessionTestUser(
         override val _id: Uuid = Uuid.random(),
-        val email: String = ""
+        val email: String = "",
     ) : HasId<Uuid> {
         companion object : PrincipalType<SessionTestUser, Uuid> {
             override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
@@ -61,7 +45,7 @@ class SessionManagerTest {
     class TestSessionManager(
         database: Runtime<Database>,
         private val expirationDuration: Duration? = 30.days,
-        private val staleDuration: Duration? = 7.days
+        private val staleDuration: Duration? = 7.days,
     ) : SessionManager<SessionTestUser, Uuid>(
         principal = SessionTestUser,
         database = database,

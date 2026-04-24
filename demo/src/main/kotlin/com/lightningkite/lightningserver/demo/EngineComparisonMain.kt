@@ -2,9 +2,7 @@
 package com.lightningkite.lightningserver.demo
 
 import com.lightningkite.lightningserver.demo.endpoints.*
-import com.lightningkite.lightningserver.loadtest.LoadTestSummary
-import com.lightningkite.lightningserver.loadtest.Scenario
-import com.lightningkite.lightningserver.loadtest.loadTest
+import com.lightningkite.lightningserver.loadtest.*
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URI
@@ -129,12 +127,32 @@ suspend fun main(args: Array<String>) {
         return
     }
 
-    println(String.format("%-16s %10s %10s %10s %10s %10s", "Engine", "Requests", "Errors", "Avg(ms)", "Max(ms)", "Req/s"))
+    println(
+        String.format(
+            "%-16s %10s %10s %10s %10s %10s",
+            "Engine",
+            "Requests",
+            "Errors",
+            "Avg(ms)",
+            "Max(ms)",
+            "Req/s"
+        )
+    )
     println("-".repeat(80))
     for ((name, summary) in results) {
         val avgMs = summary.endpoints.map { it.avgMs }.average()
         val maxMs = summary.endpoints.maxOfOrNull { it.maxMs } ?: 0.0
-        println(String.format("%-16s %10d %10d %10.1f %10.1f %10.1f", name, summary.totalRequests, summary.totalErrors, avgMs, maxMs, summary.requestsPerSecond))
+        println(
+            String.format(
+                "%-16s %10d %10d %10.1f %10.1f %10.1f",
+                name,
+                summary.totalRequests,
+                summary.totalErrors,
+                avgMs,
+                maxMs,
+                summary.requestsPerSecond
+            )
+        )
     }
     println()
 
@@ -145,7 +163,16 @@ suspend fun main(args: Array<String>) {
         for ((name, summary) in results) {
             val ep = summary.endpoints.find { "${it.method} ${it.path}" == endpointKey }
             if (ep != null) {
-                println(String.format("    %-16s  avg=%.1fms  min=%.1fms  max=%.1fms  %d req", name, ep.avgMs, ep.minMs, ep.maxMs, ep.requests))
+                println(
+                    String.format(
+                        "    %-16s  avg=%.1fms  min=%.1fms  max=%.1fms  %d req",
+                        name,
+                        ep.avgMs,
+                        ep.minMs,
+                        ep.maxMs,
+                        ep.requests
+                    )
+                )
             }
         }
     }

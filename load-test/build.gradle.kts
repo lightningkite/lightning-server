@@ -1,7 +1,6 @@
 // by Claude - load test module for framework-native load testing
 plugins {
     alias(libs.plugins.kotlin.jvm)
-    alias(libs.plugins.kotlin.serialization)
 }
 
 dependencies {

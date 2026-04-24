@@ -4,17 +4,17 @@
 ##########
 
 variable "database_org_id" {
-    type = string
-    nullable = false
+  type     = string
+  nullable = false
 }
 variable "database_zone_name" {
-    type = string
-    nullable = true
+  type     = string
+  nullable = true
 }
 variable "database_existing_project_id" {
-    type = string
-    nullable = true
-    description = "An Existing Mongo Atlas Project you want this database added to (nullable). If null a new project will be created."
+  type        = string
+  nullable    = true
+  description = "An Existing Mongo Atlas Project you want this database added to (nullable). If null a new project will be created."
 }
 
 ##########
@@ -30,7 +30,7 @@ resource "mongodbatlas_project" "database" {
   count  = var.database_existing_project_id == null ? 1 : 0
   name   = "demoexampledatabase"
   org_id = var.database_org_id
-  
+
   is_collect_database_specifics_statistics_enabled = true
   is_data_explorer_enabled                         = true
   is_performance_advisor_enabled                   = true
@@ -43,8 +43,8 @@ resource "random_password" "database" {
   override_special = "-_"
 }
 resource "mongodbatlas_advanced_cluster" "database" {
-  project_id   = (var.database_existing_project_id != null ? var.database_existing_project_id : 
-    mongodbatlas_project.database[0].id)
+  project_id = (var.database_existing_project_id != null ? var.database_existing_project_id :
+  mongodbatlas_project.database[0].id)
   name         = "demoexampledatabase"
   cluster_type = "REPLICASET"
 
@@ -62,10 +62,10 @@ resource "mongodbatlas_advanced_cluster" "database" {
   }
 }
 resource "mongodbatlas_database_user" "database" {
-  username           = "demoexampledatabase-main"
-  password           = random_password.database.result
-  project_id         = (var.database_existing_project_id != null ? var.database_existing_project_id : 
-    mongodbatlas_project.database[0].id)
+  username = "demoexampledatabase-main"
+  password = random_password.database.result
+  project_id = (var.database_existing_project_id != null ? var.database_existing_project_id :
+  mongodbatlas_project.database[0].id)
   auth_database_name = "admin"
 
   roles {
@@ -80,8 +80,8 @@ resource "mongodbatlas_database_user" "database" {
 
 }
 resource "mongodbatlas_project_ip_access_list" "database" {
-  project_id   = (var.database_existing_project_id != null ? var.database_existing_project_id : 
-    mongodbatlas_project.database[0].id)
+  project_id = (var.database_existing_project_id != null ? var.database_existing_project_id :
+  mongodbatlas_project.database[0].id)
   cidr_block = "0.0.0.0/0"
   comment    = "Anywhere"
 }

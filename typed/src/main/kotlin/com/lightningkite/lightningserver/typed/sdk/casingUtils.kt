@@ -11,8 +11,11 @@ private inline fun String.caseAlter(crossinline update: (after: String) -> Strin
         else update(it.value.filter { !(it == '-' || it == '_' || it.isWhitespace()) })
     }
 
-private fun String.capitalize(): String = replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
-private fun String.decapitalize(): String = replaceFirstChar { if (it.isUpperCase()) it.lowercase(Locale.getDefault()) else it.toString() }
+private fun String.capitalize(): String =
+    replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+
+private fun String.decapitalize(): String =
+    replaceFirstChar { if (it.isUpperCase()) it.lowercase(Locale.getDefault()) else it.toString() }
 
 public fun String.titleCase(): String = caseAlter { " " + it.capitalize() }.capitalize()
 public fun String.spaceCase(): String = caseAlter { " $it" }.decapitalize()

@@ -7,7 +7,6 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.HttpAccess
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.json.JsonElement
 
 /**
  * Represents a single JSON-RPC method that can be invoked.
@@ -64,7 +63,10 @@ public interface JsonRpcMethod<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT>
      * @return Method result to be serialized
      */
     context(server: ServerRuntime)
-    public suspend fun handleWithCustomHeaders(access: HttpAccess<PATH, USER>, input: INPUT): Pair<OUTPUT, HttpHeaders> = handle(access, input) to HttpHeaders.EMPTY
+    public suspend fun handleWithCustomHeaders(
+        access: HttpAccess<PATH, USER>,
+        input: INPUT,
+    ): Pair<OUTPUT, HttpHeaders> = handle(access, input) to HttpHeaders.EMPTY
 }
 
 /**
@@ -76,7 +78,7 @@ internal data class JsonRpcMethodData<PATH : PathSpec, USER : HasId<*>?, INPUT, 
     override val auth: AuthRequirement<USER>,
     override val inputType: KSerializer<INPUT>,
     override val outputType: KSerializer<OUTPUT>,
-    val implementation: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT
+    val implementation: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT,
 ) : JsonRpcMethod<PATH, USER, INPUT, OUTPUT> {
     context(server: ServerRuntime)
     override suspend fun handle(access: HttpAccess<PATH, USER>, input: INPUT): OUTPUT =

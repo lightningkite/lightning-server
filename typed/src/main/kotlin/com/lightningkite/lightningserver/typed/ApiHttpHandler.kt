@@ -1,17 +1,11 @@
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.lightningserver.BadRequestException
-import com.lightningkite.lightningserver.HttpMethod
-import com.lightningkite.lightningserver.LSError
+import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.serialization.assertValidOrBadRequest
-import com.lightningkite.lightningserver.serialization.parse
-import com.lightningkite.lightningserver.serialization.queryParameters
-import com.lightningkite.lightningserver.serialization.toTypedData
-import com.lightningkite.lightningserver.serialization.validators
+import com.lightningkite.lightningserver.serialization.*
 import com.lightningkite.lightningserver.typed.sdk.SDK
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.KSerializer
@@ -35,7 +29,8 @@ import kotlinx.serialization.builtins.serializer
  * @param INPUT The request input type
  * @param OUTPUT The response output type
  */
-public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> : HttpHandler<PATH>, SDK.Documentable {
+public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> : HttpHandler<PATH>,
+    SDK.Documentable {
     /**
      * Authentication requirements for this endpoint.
      */

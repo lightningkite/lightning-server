@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.files
 
-import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -12,17 +11,13 @@ import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCod
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.test
+import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.Database
-import com.lightningkite.services.files.KotlinxIoPublicFileSystem
-import com.lightningkite.services.files.PublicFileSystem
-import com.lightningkite.services.files.ServerFile
-import com.lightningkite.services.files.serverFile
+import com.lightningkite.services.files.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
-import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
@@ -32,7 +27,7 @@ import kotlin.uuid.Uuid
 
 class UploadEarlyEndpointTest {
 
-    object Server: ServerBuilder() {
+    object Server : ServerBuilder() {
         val files = setting("files", PublicFileSystem.Settings())
         val database = setting("database", Database.Settings())
         val served = path.path("files") include FileSystemEndpoints(files)
@@ -48,19 +43,22 @@ class UploadEarlyEndpointTest {
                 file
             }
         )
+
         init {
             registerBasicMediaTypeCoders()
         }
     }
 
-    @Test fun contextualUsage(): Unit {
+    @Test
+    fun contextualUsage(): Unit {
         val json = Json {
-            serializersModule = serializersModuleOf(ServerFile::class, object: KSerializer<ServerFile> {
-                override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("ServerFile", PrimitiveKind.STRING)
+            serializersModule = serializersModuleOf(ServerFile::class, object : KSerializer<ServerFile> {
+                override val descriptor: SerialDescriptor =
+                    PrimitiveSerialDescriptor("ServerFile", PrimitiveKind.STRING)
 
                 override fun serialize(
                     encoder: Encoder,
-                    value: ServerFile
+                    value: ServerFile,
                 ) {
                     encoder.encodeString("SF: " + value.location)
                 }
@@ -87,14 +85,21 @@ class UploadEarlyEndpointTest {
             val file = files().root.then("test.txt")
             file.put(TypedData.text("Hello world!", MediaType.Text.Plain))
             println(file.url)
-            val serialized = contextOf<ServerRuntime>().externalSerialization.stringArrayFormat.encodeToString(uploadEarly.serializer(), file.serverFile)
+            val serialized = contextOf<ServerRuntime>().externalSerialization.stringArrayFormat.encodeToString(
+                uploadEarly.serializer(),
+                file.serverFile
+            )
             println(serialized)
             files().parseExternalUrl(serialized)!!
             run {
                 val match = contextOf<ServerRuntime>().server.endpoints.match(
                     contextOf<ServerRuntime>().externalSerialization.stringArrayFormat,
                     serialized.substringBefore('?').substringAfter("://").substringAfter("/")
-                ) { it.http[HttpMethod.GET] } ?: throw Exception("Endpoint for '${serialized.substringBefore('?').substringAfter("://").substringAfter("/")}' not found")
+                ) { it.http[HttpMethod.GET] } ?: throw Exception(
+                    "Endpoint for '${
+                        serialized.substringBefore('?').substringAfter("://").substringAfter("/")
+                    }' not found"
+                )
                 Server.served.fetch.test(
                     trailingWildcard = match.path.trailingSegments,
                     queryParameters = serialized.substringAfter('?').let { QueryParameters.parse(it) },
@@ -102,6 +107,7 @@ class UploadEarlyEndpointTest {
             }
         }
     }
+
     @Test
     fun test(): Unit = runBlocking {
         Server.test(
@@ -125,10 +131,12 @@ class UploadEarlyEndpointTest {
             }
             val ready = Server.uploadEarly.verify.test(null, prepare.futureCallToken)
 
-            val clientSideServerFile = Server.consume.test(body = TypedData.text(
-                Json.encodeToString(ServerFile(ready)),
-                MediaType.Application.Json
-            ))
+            val clientSideServerFile = Server.consume.test(
+                body = TypedData.text(
+                    Json.encodeToString(ServerFile(ready)),
+                    MediaType.Application.Json
+                )
+            )
                 .also { assert(it.status.success) }
                 .body!!
                 .text()
@@ -141,7 +149,8 @@ class UploadEarlyEndpointTest {
                 ) { it.http[HttpMethod.GET] }!!
                 Server.served.fetch.test(
                     trailingWildcard = match.path.trailingSegments,
-                    queryParameters = clientSideServerFile.location.substringAfter('?').let { QueryParameters.parse(it) },
+                    queryParameters = clientSideServerFile.location.substringAfter('?')
+                        .let { QueryParameters.parse(it) },
                 )
             }
         }

@@ -6,7 +6,7 @@ import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.withSdkInfo
-import com.lightningkite.toSealedMap
+import com.lightningkite.services.data.toSealedMap
 import kotlin.uuid.Uuid
 
 /**
@@ -64,7 +64,7 @@ public data class SdkModule<S>(
      */
     public data class Info(
         val interfaceName: String,
-        val valueName: String = interfaceName.camelCase()
+        val valueName: String = interfaceName.camelCase(),
     )
 
     /**
@@ -133,9 +133,11 @@ public data class SdkModule<S>(
          * ```
          */
         public fun <S : ServerBuilder> S.withSdkInfo(
-            interfaceName: String = sdkSettings.defaultInfo?.interfaceName ?: this::class.simpleName?.let { it.removeLast("Endpoints").removeLast("Module").pascalCase() + "Api" } ?: throw IllegalArgumentException("Cannot infer name for anonymous object"),
-            valueName: String = sdkSettings.defaultInfo?.valueName ?: interfaceName.camelCase().removeSuffix("Api")
-        ) : SdkModule<S> =
+            interfaceName: String = sdkSettings.defaultInfo?.interfaceName
+                ?: this::class.simpleName?.let { it.removeLast("Endpoints").removeLast("Module").pascalCase() + "Api" }
+                ?: throw IllegalArgumentException("Cannot infer name for anonymous object"),
+            valueName: String = sdkSettings.defaultInfo?.valueName ?: interfaceName.camelCase().removeSuffix("Api"),
+        ): SdkModule<S> =
             SdkModule(this, interfaceName, valueName)
 
         /**
@@ -156,8 +158,8 @@ public data class SdkModule<S>(
          */
         public fun ServerDefinition.withSdkInfo(
             interfaceName: String,
-            valueName: String = interfaceName.camelCase()
-        ) : SdkModule<ServerDefinition> =
+            valueName: String = interfaceName.camelCase(),
+        ): SdkModule<ServerDefinition> =
             SdkModule(this, interfaceName, valueName)
     }
 }
@@ -181,6 +183,7 @@ public data class SdkModule<S>(
  * @param module The [SdkModule] containing both the server module and SDK metadata
  * @return The included server module
  */
+@Suppress("DSL_MARKER_APPLIED_TO_WRONG_TARGET")
 @LightningServerDsl
 context(builder: ServerBuilder)
 public infix fun <S : ServerBuilder> PathSpec0.module(module: SdkModule<S>): S {
@@ -215,6 +218,7 @@ public infix fun <S : ServerBuilder> PathSpec0.module(module: SdkModule<S>): S {
  * }
  * ```
  */
+@Suppress("DSL_MARKER_APPLIED_TO_WRONG_TARGET")
 @LightningServerDsl
 context(builder: ServerBuilder)
 public infix fun <S : ServerBuilder> PathSpec0.module(module: S): S = module(module.withSdkInfo())
@@ -240,13 +244,13 @@ public infix fun <S : ServerBuilder> PathSpec0.module(module: S): S = module(mod
  * }
  * ```
  */
+@Suppress("DSL_MARKER_APPLIED_TO_WRONG_TARGET")
 @LightningServerDsl
 context(builder: ServerBuilder)
 public infix fun PathSpec0.module(module: SdkModule<ServerDefinition>): ServerDefinition {
     builder.extensions[ModuleRegistry][module.value.thisLayer.sdkId] = module.info
     return with(builder) { include(module.value) }
 }
-
 
 
 // ============================================================================
@@ -281,11 +285,13 @@ private inline val ServerDefinition.Module.sdkId get() = moduleId
  * This registry is intentionally non-cascading - each module maintains
  * its own list of child module metadata without inheriting parent registries.
  */
-private object ModuleRegistry : MutableExtensions.WritableKey<MutableMap<Uuid, SdkModule.Info>, Map<Uuid, SdkModule.Info>> {
+private object ModuleRegistry :
+    MutableExtensions.WritableKey<MutableMap<Uuid, SdkModule.Info>, Map<Uuid, SdkModule.Info>> {
     override fun default(): MutableMap<Uuid, SdkModule.Info> = HashMap()
     override fun MutableMap<Uuid, SdkModule.Info>.include(other: Map<Uuid, SdkModule.Info>) {
         /*No-op, we want to keep registered modules specific per-module, not cascading.*/
     }
+
     override fun seal(data: Map<Uuid, SdkModule.Info>): Map<Uuid, SdkModule.Info> = data.toSealedMap()
 }
 

@@ -2,11 +2,7 @@
 package com.lightningkite.lightningserver.terraform
 
 import kotlinx.serialization.builtins.serializer
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /**
  * Tests for TerraformNeed constants defined in BaseTerraformEmitter.

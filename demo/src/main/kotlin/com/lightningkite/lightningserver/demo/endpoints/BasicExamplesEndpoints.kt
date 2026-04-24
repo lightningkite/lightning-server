@@ -1,11 +1,11 @@
 package com.lightningkite.lightningserver.demo.endpoints
 
-import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.arg1
 import com.lightningkite.lightningserver.pathing.arg2
 import com.lightningkite.lightningserver.plainText
+import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
 import kotlinx.serialization.json.*
 
@@ -20,7 +20,7 @@ import kotlinx.serialization.json.*
  * - Different response types (plain text, JSON, HTML)
  */
 object BasicExamplesEndpoints : ServerBuilder() {
-    
+
     /**
      * GET /
      * 
@@ -30,7 +30,7 @@ object BasicExamplesEndpoints : ServerBuilder() {
     val root = path.get bind HttpHandler {
         HttpResponse.plainText("Welcome to Lightning Server Demo!")
     }
-    
+
     /**
      * GET /hello/{name}
      * 
@@ -43,7 +43,7 @@ object BasicExamplesEndpoints : ServerBuilder() {
         val name = request.path.arg1
         HttpResponse.plainText("Hello, $name!")
     }
-    
+
     /**
      * GET /greet?name=...&title=...
      * 
@@ -62,7 +62,7 @@ object BasicExamplesEndpoints : ServerBuilder() {
         }
         HttpResponse.plainText(greeting)
     }
-    
+
     /**
      * POST /echo
      * 
@@ -75,7 +75,7 @@ object BasicExamplesEndpoints : ServerBuilder() {
         val body = request.body?.text() ?: "(empty)"
         HttpResponse.plainText("You sent: $body")
     }
-    
+
     /**
      * GET /calc/{a}/{b}
      * 
@@ -96,7 +96,7 @@ object BasicExamplesEndpoints : ServerBuilder() {
         """.trimMargin()
         HttpResponse.plainText(result)
     }
-    
+
     /**
      * GET /info
      *
@@ -124,7 +124,7 @@ object BasicExamplesEndpoints : ServerBuilder() {
             body = TypedData.text(jsonString, MediaType.Application.Json)
         )
     }
-    
+
     /**
      * GET /special-chars/{value}
      * 

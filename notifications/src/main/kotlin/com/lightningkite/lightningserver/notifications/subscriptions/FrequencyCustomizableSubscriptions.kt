@@ -8,51 +8,21 @@ import com.lightningkite.lightningserver.definition.builder.MapRegistry
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
-import com.lightningkite.lightningserver.notifications.Frequency
-import com.lightningkite.lightningserver.notifications.NotificationEndpoints
-import com.lightningkite.lightningserver.notifications.ScheduledSendMethods
-import com.lightningkite.lightningserver.notifications.events.Event
-import com.lightningkite.lightningserver.notifications.events.EventDefinition
+import com.lightningkite.lightningserver.notifications.*
+import com.lightningkite.lightningserver.notifications.events.*
 import com.lightningkite.lightningserver.notifications.events.EventRegistry.Companion.events
-import com.lightningkite.lightningserver.notifications.events.EventType
-import com.lightningkite.lightningserver.notifications.events.UserEventType
-import com.lightningkite.lightningserver.notifications.query
-import com.lightningkite.lightningserver.notifications.queryBy
-import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.pathing.PathSpec1
-import com.lightningkite.lightningserver.pathing.arg1
+import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.serverRuntime
-import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.lightningserver.typed.ModelInfo
-import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebsocket
-import com.lightningkite.lightningserver.typed.auth
-import com.lightningkite.lightningserver.typed.explicitApiHttpHandler
-import com.lightningkite.lightningserver.typed.invoke
-import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.Query
-import com.lightningkite.services.database.SerializableProperty
-import com.lightningkite.services.database.condition
-import com.lightningkite.services.database.get
-import com.lightningkite.services.database.getMany
-import com.lightningkite.services.database.query
-import com.lightningkite.services.database.typeParametersSerializersOrNull
+import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.services.database.*
 import io.github.oshai.kotlinlogging.KLogger
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
-import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.buildClassSerialDescriptor
-import kotlinx.serialization.descriptors.element
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
-import kotlinx.serialization.encoding.decodeStructure
-import kotlinx.serialization.encoding.encodeStructure
-import kotlinx.serialization.internal.GeneratedSerializer
 
 /**
  * Subscription provider allowing users to customize delivery frequencies only.
@@ -92,9 +62,10 @@ public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Compara
     public val defaultPush: Frequency? = Frequency.immediately(),
     public val defaultInApp: Frequency? = Frequency.immediately(),
     websocketKey: SerializableProperty<NotificationSendMethods<UID>, *>? = info.serializer.fieldInApp,
-    userIdSerializer: KSerializer<UID>? = null
+    userIdSerializer: KSerializer<UID>? = null,
 ) : ServerBuilder(), NotificationEndpoints.Subscriptions<USER, UID> {
-    private val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.notifications.subscriptions.FrequencyCustomizableSubscriptions")
+    private val logger: KLogger =
+        KotlinLogging.logger("com.lightningkite.lightningserver.notifications.subscriptions.FrequencyCustomizableSubscriptions")
 
     public data class Subscriptions<UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>>(
         val eventType: EventDefinition<T, *>,
@@ -102,7 +73,7 @@ public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Compara
         val defaultSms: Frequency? = Frequency.immediately(),
         val defaultPush: Frequency? = Frequency.immediately(),
         val defaultInApp: Frequency? = Frequency.immediately(),
-        val interested: suspend context(ServerRuntime) (Event<T, ID>) -> Set<UID>
+        val interested: suspend context(ServerRuntime) (Event<T, ID>) -> Set<UID>,
     ) {
         public fun toSendMethods(user: UID): NotificationSendMethods<UID> = NotificationSendMethods(
             UserEventType(user, eventType.name),
@@ -136,36 +107,41 @@ public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Compara
         defaultSms: Frequency? = this.defaultSms,
         defaultPush: Frequency? = this.defaultPush,
         defaultInApp: Frequency? = this.defaultInApp,
-        interested: suspend context(ServerRuntime) (Event<T, ID>) -> Set<UID>
+        interested: suspend context(ServerRuntime) (Event<T, ID>) -> Set<UID>,
     ) {
-        eventListeners.register(type.name, Subscriptions(type, defaultEmail, defaultSms, defaultPush, defaultInApp, interested))
+        eventListeners.register(
+            type.name,
+            Subscriptions(type, defaultEmail, defaultSms, defaultPush, defaultInApp, interested)
+        )
     }
 
     @Suppress("UNCHECKED_CAST")
     context(_: ServerRuntime) // making this runtime-only so that we're guaranteed to have registered subscribers already
     public fun <T : HasId<ID>, ID : Comparable<ID>> getSubscribers(type: EventDefinition<T, ID>): Subscriptions<UID, T, ID> {
-        return eventListeners[type.name]?.let { it as Subscriptions<UID, T, ID> } ?: throw IllegalStateException("No subscribers registered for event type $type")
+        return eventListeners[type.name]?.let { it as Subscriptions<UID, T, ID> }
+            ?: throw IllegalStateException("No subscribers registered for event type $type")
     }
 
     @Suppress("UNCHECKED_CAST")
-    context(server: ServerRuntime)
-    override suspend fun <T : HasId<ID>, ID : Comparable<ID>> subscribed(event: Event<T, ID>): List<ScheduledSendMethods<UID>> = try {
-        val subscriptions = getSubscribers(event.type)
+    context(_: ServerRuntime)
+    override suspend fun <T : HasId<ID>, ID : Comparable<ID>> subscribed(event: Event<T, ID>): List<ScheduledSendMethods<UID>> =
+        try {
+            val subscriptions = getSubscribers(event.type)
 
-        val interested = subscriptions.interested(event)
+            val interested = subscriptions.interested(event)
 
-        val userSpecifiedMethods = info
-            .table()
-            .getMany(interested.map { UserEventType(it, event.type.name) })
-            .associateBy { it._id.user }
+            val userSpecifiedMethods = info
+                .table()
+                .getMany(interested.map { UserEventType(it, event.type.name) })
+                .associateBy { it._id.user }
 
-        interested.map { user ->
-            userSpecifiedMethods[user] ?: subscriptions.toSendMethods(user)
+            interested.map { user ->
+                userSpecifiedMethods[user] ?: subscriptions.toSendMethods(user)
+            }
+        } catch (e: ClassCastException) {
+            logger.error(e) { "Getting event listeners for notification subscriptions" }
+            emptyList()
         }
-    } catch (e: ClassCastException) {
-        logger.error(e) { "Getting event listeners for notification subscriptions" }
-        emptyList()
-    }
 
     private val verify = path.path("verify") bind StartupTask {
         val registry = serverRuntime.server.events
@@ -186,10 +162,11 @@ public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Compara
     @Suppress("UNCHECKED_CAST")
     private val returnTypeSerializer = NotificationSendMethods.DbOrDefault.serializer(
         userIdSerializer ?: info.serializer.typeParametersSerializersOrNull()?.firstOrNull() as? KSerializer<UID>
-            ?: throw IllegalStateException("Cannot infer serializer for user ID (`UID`). Please specify it explicitly with the `userIdSerializer` parameter.")
+        ?: throw IllegalStateException("Cannot infer serializer for user ID (`UID`). Please specify it explicitly with the `userIdSerializer` parameter.")
     )
 
-    private fun NotificationSendMethods<UID>.isDefault(isDefault: Boolean) = NotificationSendMethods.DbOrDefault(this, isDefault)
+    private fun NotificationSendMethods<UID>.isDefault(isDefault: Boolean) =
+        NotificationSendMethods.DbOrDefault(this, isDefault)
 
     public val getSendMethodsForEvent: ApiHttpHandler<PathSpec1<EventType.Name>, USER, Unit, NotificationSendMethods.DbOrDefault<UID>> =
         path.arg<EventType.Name>("event").get bind explicitApiHttpHandler(
@@ -290,7 +267,7 @@ public fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Compar
     defaultSms: Frequency? = handler.subscriptions.defaultSms,
     defaultPush: Frequency? = handler.subscriptions.defaultPush,
     defaultInApp: Frequency? = handler.subscriptions.defaultInApp,
-    generator: suspend context(ServerRuntime) (Event<T, ID>) -> Set<UID>
+    generator: suspend context(ServerRuntime) (Event<T, ID>) -> Set<UID>,
 ) {
     handler.subscriptions.setSubscribers(this, defaultEmail, defaultSms, defaultPush, defaultInApp, generator)
 }

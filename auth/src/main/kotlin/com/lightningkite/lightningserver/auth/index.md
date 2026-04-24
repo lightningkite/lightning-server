@@ -4,7 +4,9 @@ JVM-side authentication and authorization system for Lightning Server.
 
 ## Overview
 
-This package provides the complete authentication and authorization infrastructure for Lightning Server applications. It includes:
+This package provides the complete authentication and authorization infrastructure for Lightning Server applications. It
+includes:
+
 - Authentication token management
 - Authorization requirement definitions
 - Principal type system
@@ -23,6 +25,7 @@ The core authentication token type:
 - **AuthCacheKey** - Type alias for cache keys specific to authentication
 
 #### Key Features
+
 - Type-safe subject access via `principalType` and `id` extension properties
 - Automatic caching of fetched subjects with `fetch()` extension
 - Masquerading support via `fromMasquerade` property
@@ -41,11 +44,13 @@ Defines requirements for accessing protected resources:
 - **AuthRequirement.Options** - Multiple alternative requirements (OR logic)
 
 #### Built-in Auth Settings
+
 - **IsSuperUser** - Highest privilege level
 - **IsAdmin** - Administrative access (defaults to IsSuperUser)
 - **IsDeveloper** - Developer access (defaults to IsSuperUser)
 
 #### Checking Requirements
+
 - `AuthRequirement.check(auth)` - Returns `Result.Accepted` or `Result.Rejected`
 - `AuthRequirement.assert(auth)` - Throws `ForbiddenException` if rejected
 - `AuthRequirement.accepts(auth)` - Returns boolean for quick checks
@@ -59,6 +64,7 @@ Defines types of authenticated principals:
 - **principalTypeFor<T>()** - Lookup registered principal types by subject type
 
 #### Key Methods
+
 - `fetch(id)` - Retrieve subject data from storage
 - `permitMasquerade(from, into)` - Control masquerading authorization
 - `fetchByProperty(property, value)` - Look up subjects by properties

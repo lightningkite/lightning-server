@@ -1,15 +1,15 @@
 package com.lightningkite.lightningserver.demo
 
-import com.lightningkite.kotlinercli.*
-import com.lightningkite.lightningserver.engine.jdk.*
-import com.lightningkite.lightningserver.engine.ktor.*
-import com.lightningkite.lightningserver.engine.netty.*
-import com.lightningkite.lightningserver.settings.*
-import com.lightningkite.lightningserver.typed.sdk.*
+import com.lightningkite.kotlinercli.cli
+import com.lightningkite.lightningserver.engine.jdk.JdkEngine
+import com.lightningkite.lightningserver.engine.ktor.KtorEngine
+import com.lightningkite.lightningserver.engine.netty.NettyEngine
+import com.lightningkite.lightningserver.settings.loadFromFile
+import com.lightningkite.lightningserver.typed.sdk.FetcherSdk
 import com.lightningkite.lightningserver.typed.sdk.SDK.writeUsingDefaultSettings
-import com.lightningkite.services.data.*
+import com.lightningkite.services.kfile.KFile
 import io.ktor.server.netty.*
-import kotlin.time.*
+import kotlin.time.TimeSource
 
 
 private fun serve() {
@@ -44,7 +44,10 @@ private fun serveNetty() {
 
 fun sdk() {
     println("Writing SDK")
-    FetcherSdk("com.lightningkite.lightningserver.demo").writeUsingDefaultSettings(Server, KFile("demo/src/main/kotlin/sdk"))
+    FetcherSdk("com.lightningkite.lightningserver.demo").writeUsingDefaultSettings(
+        Server,
+        KFile("demo/src/main/kotlin/sdk")
+    )
     println("Finished")
 }
 

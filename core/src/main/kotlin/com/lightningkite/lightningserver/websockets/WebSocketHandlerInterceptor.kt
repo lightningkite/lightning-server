@@ -11,13 +11,14 @@ public interface WebSocketHandlerInterceptor {
     public fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T>
 
     public object None : WebSocketHandlerInterceptor {
-        override fun <PATH: PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> = handler
+        override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> =
+            handler
     }
 }
 
 
-private fun <PATH: PathSpec, T> WebSocketHandler<PATH, T>.instrumented(name: String): WebSocketHandler<PATH, T> {
-    return object: WebSocketHandler<PATH, T> {
+private fun <PATH : PathSpec, T> WebSocketHandler<PATH, T>.instrumented(name: String): WebSocketHandler<PATH, T> {
+    return object : WebSocketHandler<PATH, T> {
         override val storageSerializer: KSerializer<T>
             get() = this@instrumented.storageSerializer
 
@@ -60,23 +61,27 @@ private fun <PATH: PathSpec, T> WebSocketHandler<PATH, T>.instrumented(name: Str
 }
 
 internal fun List<WebSocketHandlerInterceptor>.compileAndInstrument(): WebSocketHandlerInterceptor {
-    return when(size) {
+    return when (size) {
         0 -> WebSocketHandlerInterceptor.None
         1 -> {
             val one = this[0]
-            object: WebSocketHandlerInterceptor {
+            object : WebSocketHandlerInterceptor {
                 override val name: String
                     get() = one.name
+
                 override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> {
                     return one.intercept(handler).instrumented(one.name)
                 }
             }
         }
+
         else -> {
             reduceRightOrNull { laterInterceptors, interceptor ->
-                object: WebSocketHandlerInterceptor {
+                object : WebSocketHandlerInterceptor {
                     override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> {
-                        return laterInterceptors.intercept(interceptor.intercept(handler).instrumented(interceptor.name))
+                        return laterInterceptors.intercept(
+                            interceptor.intercept(handler).instrumented(interceptor.name)
+                        )
                     }
                 }
             } ?: WebSocketHandlerInterceptor.None

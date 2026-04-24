@@ -9,16 +9,16 @@
 ##########
 
 output "http_url" {
-    value = aws_apigatewayv2_stage.http.invoke_url
+  value = aws_apigatewayv2_stage.http.invoke_url
 }
 output "http" {
-    value = {
-    id = aws_apigatewayv2_stage.http.id
-    api_id = aws_apigatewayv2_stage.http.api_id
+  value = {
+    id         = aws_apigatewayv2_stage.http.id
+    api_id     = aws_apigatewayv2_stage.http.api_id
     invoke_url = aws_apigatewayv2_stage.http.invoke_url
-    arn = aws_apigatewayv2_stage.http.arn
-    name = aws_apigatewayv2_stage.http.name
-}
+    arn        = aws_apigatewayv2_stage.http.arn
+    name       = aws_apigatewayv2_stage.http.name
+  }
 }
 
 ##########
@@ -26,14 +26,14 @@ output "http" {
 ##########
 
 resource "aws_apigatewayv2_api" "http" {
-  name = "demo-example-http"
+  name          = "demo-example-http"
   protocol_type = "HTTP"
 }
 
 resource "aws_apigatewayv2_stage" "http" {
   api_id = aws_apigatewayv2_api.http.id
 
-  name = "demo-example-gateway-stage"
+  name        = "demo-example-gateway-stage"
   auto_deploy = true
 
   access_log_settings {
@@ -70,9 +70,9 @@ resource "aws_cloudwatch_log_group" "http_api" {
 }
 
 resource "aws_apigatewayv2_route" "http" {
-    api_id = aws_apigatewayv2_api.http.id
-    route_key = "$default"
-    target    = "integrations/${aws_apigatewayv2_integration.http.id}"
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "$default"
+  target    = "integrations/${aws_apigatewayv2_integration.http.id}"
 }
 
 resource "aws_lambda_permission" "api_gateway_http" {
@@ -86,21 +86,21 @@ resource "aws_lambda_permission" "api_gateway_http" {
   }
 }
 resource "aws_acm_certificate" "http" {
-  domain_name   = var.domain_name
+  domain_name       = var.domain_name
   validation_method = "DNS"
 }
 resource "aws_route53_record" "http" {
   zone_id = data.aws_route53_zone.main.zone_id
-  name = tolist(aws_acm_certificate.http.domain_validation_options)[0].resource_record_name
-  type = tolist(aws_acm_certificate.http.domain_validation_options)[0].resource_record_type
+  name    = tolist(aws_acm_certificate.http.domain_validation_options)[0].resource_record_name
+  type    = tolist(aws_acm_certificate.http.domain_validation_options)[0].resource_record_type
   records = [tolist(aws_acm_certificate.http.domain_validation_options)[0].resource_record_value]
-  ttl = "300"
+  ttl     = "300"
 }
 resource "aws_acm_certificate_validation" "http" {
-  certificate_arn = aws_acm_certificate.http.arn
+  certificate_arn         = aws_acm_certificate.http.arn
   validation_record_fqdns = [aws_route53_record.http.fqdn]
 }
-resource aws_apigatewayv2_domain_name http {
+resource "aws_apigatewayv2_domain_name" "http" {
   domain_name = var.domain_name
   domain_name_configuration {
     certificate_arn = aws_acm_certificate.http.arn
@@ -109,19 +109,19 @@ resource aws_apigatewayv2_domain_name http {
   }
   depends_on = [aws_acm_certificate_validation.http]
 }
-resource aws_apigatewayv2_api_mapping http {
+resource "aws_apigatewayv2_api_mapping" "http" {
   stage       = aws_apigatewayv2_stage.http.id
   api_id      = aws_apigatewayv2_stage.http.api_id
   domain_name = aws_apigatewayv2_domain_name.http.domain_name
 }
-resource aws_route53_record httpAccess {
+resource "aws_route53_record" "httpAccess" {
   type    = "A"
   name    = aws_apigatewayv2_domain_name.http.domain_name
   zone_id = data.aws_route53_zone.main.id
-    alias {
-      evaluate_target_health = false
-      name                   = aws_apigatewayv2_domain_name.http.domain_name_configuration[0].target_domain_name
-      zone_id                = aws_apigatewayv2_domain_name.http.domain_name_configuration[0].hosted_zone_id
-    }
+  alias {
+    evaluate_target_health = false
+    name                   = aws_apigatewayv2_domain_name.http.domain_name_configuration[0].target_domain_name
+    zone_id                = aws_apigatewayv2_domain_name.http.domain_name_configuration[0].hosted_zone_id
+  }
 }
 

@@ -117,7 +117,9 @@ graph TB
 ## Module Categories
 
 ### Multiplatform Modules (KMP)
-These modules use Kotlin Multiplatform and can target JVM, JS, iOS, and other platforms. They contain shared data models and types.
+
+These modules use Kotlin Multiplatform and can target JVM, JS, iOS, and other platforms. They contain shared data models
+and types.
 
 - **core-shared**: Base types (LSError, HttpMethod, MultiplexMessage) shared between client and server
 - **auth-shared**: Authentication-related types
@@ -127,6 +129,7 @@ These modules use Kotlin Multiplatform and can target JVM, JS, iOS, and other pl
 - **sessions-shared**: Session management types
 
 ### JVM Implementation Modules
+
 These modules provide JVM-specific implementations and server functionality.
 
 - **core**: HTTP handling, serialization, settings management, service abstractions
@@ -137,12 +140,14 @@ These modules provide JVM-specific implementations and server functionality.
 - **sessions**: Session management with cache and database support
 
 ### Session Extensions
+
 Authentication method implementations built on top of the sessions module.
 
 - **sessions-email**: Email-based authentication (magic links)
 - **sessions-sms**: SMS-based authentication (PIN codes)
 
 ### Engine Implementations
+
 Different deployment targets for Lightning Server applications.
 
 - **engine-local**: In-memory engine for unit testing
@@ -159,10 +164,12 @@ Different deployment targets for Lightning Server applications.
 ## Paired Module Pattern
 
 Lightning Server follows a **paired module pattern** where most features have both:
+
 1. A **-shared** multiplatform module (data models, types)
 2. A **JVM implementation** module (server logic, database, services)
 
 This allows:
+
 - Client applications (JS, iOS, Android) to use shared types
 - Server applications to use full JVM implementations
 - Type-safe communication between client and server

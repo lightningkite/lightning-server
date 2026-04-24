@@ -1,10 +1,7 @@
 package com.lightningkite.lightningserver.data
 
 import kotlinx.datetime.*
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class CronTest {
     @Test

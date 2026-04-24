@@ -4,44 +4,44 @@
 ##########
 
 variable "deployment_location" {
-    type = string
-    default = "us-west-2"
-    nullable = false
-    description = "The AWS region key to deploy all resources in."
+  type        = string
+  default     = "us-west-2"
+  nullable    = false
+  description = "The AWS region key to deploy all resources in."
 }
 variable "debug" {
-    type = bool
-    default = false
-    nullable = false
-    description = "The GeneralSettings debug. Debug true will turn on various things during run time for easier development and bug tracking. Should be false for production environments."
+  type        = bool
+  default     = false
+  nullable    = false
+  description = "The GeneralSettings debug. Debug true will turn on various things during run time for easier development and bug tracking. Should be false for production environments."
 }
 variable "ip_prefix" {
-    type = string
-    default = "10.0"
-    nullable = false
+  type     = string
+  default  = "10.0"
+  nullable = false
 }
 variable "domain_name_zone" {
-    type = string
-    nullable = false
-    description = "The AWS Hosted zone the domain will be placed under."
+  type        = string
+  nullable    = false
+  description = "The AWS Hosted zone the domain will be placed under."
 }
 variable "domain_name" {
-    type = string
-    nullable = false
-    description = "The domain the server will be hosted at."
+  type        = string
+  nullable    = false
+  description = "The domain the server will be hosted at."
 }
 variable "vpc_id" {
-    type = string
-    nullable = false
-    description = "The AWS VPC id that you want your resources to be placed under."
+  type        = string
+  nullable    = false
+  description = "The AWS VPC id that you want your resources to be placed under."
 }
 variable "vpc_private_subnets" {
-    type = list(string)
-    nullable = false
+  type     = list(string)
+  nullable = false
 }
 variable "vpc_nat_gateways" {
-    type = list(string)
-    nullable = false
+  type     = list(string)
+  nullable = false
 }
 
 ##########
@@ -66,21 +66,21 @@ data "aws_nat_gateway" "main" {
 }
 
 resource "aws_vpc_endpoint" "s3" {
-  vpc_id = data.aws_vpc.main.id
-  service_name = "com.amazonaws.${var.deployment_location}.s3"
+  vpc_id          = data.aws_vpc.main.id
+  service_name    = "com.amazonaws.${var.deployment_location}.s3"
   route_table_ids = toset([data.aws_vpc.main.main_route_table_id])
 }
 resource "aws_vpc_endpoint" "executeapi" {
-  vpc_id = data.aws_vpc.main.id
-  service_name = "com.amazonaws.${var.deployment_location}.execute-api"
+  vpc_id             = data.aws_vpc.main.id
+  service_name       = "com.amazonaws.${var.deployment_location}.execute-api"
   security_group_ids = [aws_security_group.executeapi.id]
-  vpc_endpoint_type = "Interface"
+  vpc_endpoint_type  = "Interface"
 }
 resource "aws_vpc_endpoint" "lambdainvoke" {
-  vpc_id = data.aws_vpc.main.id
-  service_name = "com.amazonaws.${var.deployment_location}.lambda"
+  vpc_id             = data.aws_vpc.main.id
+  service_name       = "com.amazonaws.${var.deployment_location}.lambda"
   security_group_ids = [aws_security_group.lambdainvoke.id]
-  vpc_endpoint_type = "Interface"
+  vpc_endpoint_type  = "Interface"
 }
 
 resource "aws_security_group" "internal" {
@@ -110,7 +110,7 @@ resource "aws_security_group" "access_outside" {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks     = ["0.0.0.0/0"]
+    cidr_blocks = ["0.0.0.0/0"]
   }
 }
 

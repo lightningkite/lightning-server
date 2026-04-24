@@ -7,7 +7,7 @@ import com.lightningkite.lightningserver.typed.ApiWebsocketHandler
 
 public data class ServerApiEndpoints(
     override val http: Map<HttpMethod, ApiHttpHandler<*, *, *, *>>,
-    override val websocket: ApiWebsocketHandler<*, *, *, *, *>?
+    override val websocket: ApiWebsocketHandler<*, *, *, *, *>?,
 ) : ServerPathEndpoints {
     public constructor(endpoints: ServerPathEndpoints) : this(
         http = buildMap {

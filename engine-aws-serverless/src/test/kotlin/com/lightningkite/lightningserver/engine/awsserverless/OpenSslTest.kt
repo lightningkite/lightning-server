@@ -1,13 +1,10 @@
 package com.lightningkite.lightningserver.engine.awsserverless
 
-import kotlin.test.Test
-import kotlin.test.assertContentEquals
-import kotlin.test.assertFails
-import kotlin.test.assertNotEquals
 import java.security.MessageDigest
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
+import kotlin.test.*
 
 class OpenSslTest {
 
@@ -29,7 +26,7 @@ class OpenSslTest {
     @Test
     fun decrypt_roundTrip_matchesPlaintext() {
         val password = "super-secret".toByteArray()
-        val salt = byteArrayOf(1,2,3,4,5,6,7,8)
+        val salt = byteArrayOf(1, 2, 3, 4, 5, 6, 7, 8)
         val (key, iv) = deriveKeyAndIv(password, salt)
         val plain = "Hello AWS Serverless!".encodeToByteArray()
         val cipherBytes = encryptAesCbcPkcs5(plain, key, iv)
@@ -43,7 +40,7 @@ class OpenSslTest {
     fun decrypt_wrongPassword_doesNotMatchAndMayThrow() {
         val correctPassword = "correct".toByteArray()
         val wrongPassword = "wrong".toByteArray()
-        val salt = byteArrayOf(9,8,7,6,5,4,3,2)
+        val salt = byteArrayOf(9, 8, 7, 6, 5, 4, 3, 2)
         val (key, iv) = deriveKeyAndIv(correctPassword, salt)
         val plain = ByteArray(32) { it.toByte() }
         val cipherBytes = encryptAesCbcPkcs5(plain, key, iv)

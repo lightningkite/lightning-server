@@ -4,8 +4,8 @@
 ##########
 
 variable "reporting_email" {
-    type = string
-    nullable = false
+  type     = string
+  nullable = false
 }
 
 ##########
@@ -33,7 +33,7 @@ data "aws_iam_policy_document" "email" {
 }
 
 resource "aws_iam_policy" "email" {
-  name = "demo-example-email-policy"
+  name        = "demo-example-email-policy"
   description = "Allows sending of e-mails via Simple Email Service"
   policy      = data.aws_iam_policy_document.email.json
 }

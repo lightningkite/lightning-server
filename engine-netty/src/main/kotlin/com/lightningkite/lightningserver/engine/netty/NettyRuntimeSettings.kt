@@ -1,9 +1,9 @@
 package com.lightningkite.lightningserver.engine.netty
 
-import com.lightningkite.DataSize
-import com.lightningkite.DataSize.Companion.bytes
-import com.lightningkite.DataSize.Companion.mebibytes
 import com.lightningkite.lightningserver.definition.ServerSetting
+import com.lightningkite.services.data.DataSize
+import com.lightningkite.services.data.DataSize.Companion.bytes
+import com.lightningkite.services.data.DataSize.Companion.mebibytes
 import kotlinx.serialization.Serializable
 
 /**

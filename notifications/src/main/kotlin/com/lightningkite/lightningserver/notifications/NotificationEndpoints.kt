@@ -1,34 +1,18 @@
 package com.lightningkite.lightningserver.notifications
 
-import com.lightningkite.lightningserver.auth.AuthRequirement
-import com.lightningkite.lightningserver.auth.RequiredScope
-import com.lightningkite.lightningserver.auth.accepts
+import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.definition.builder.MapRegistry
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.notifications.events.Event
-import com.lightningkite.lightningserver.notifications.events.EventDefinition
-import com.lightningkite.lightningserver.notifications.events.EventEndpoints
-import com.lightningkite.lightningserver.notifications.events.EventHandler
-import com.lightningkite.lightningserver.notifications.events.EventLauncher
-import com.lightningkite.lightningserver.notifications.events.EventRegistry
+import com.lightningkite.lightningserver.notifications.events.*
 import com.lightningkite.lightningserver.notifications.events.EventRegistry.Companion.events
-import com.lightningkite.lightningserver.notifications.events.EventType
-import com.lightningkite.lightningserver.notifications.subscriptions.FrequencyCustomizableSubscriptions
-import com.lightningkite.lightningserver.notifications.subscriptions.FullyCustomizableSubscriptions
-import com.lightningkite.lightningserver.notifications.subscriptions.NonCustomizableSubscriptions
-import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.now
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.notifications.subscriptions.*
+import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.typed.ModelInfo
 import com.lightningkite.lightningserver.typed.auth
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.withSdkInfo
 import com.lightningkite.lightningserver.typed.sdk.module
-import com.lightningkite.services.database.Condition
-import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.ModelPermissions
-import com.lightningkite.services.database.condition
-import com.lightningkite.services.database.getMany
+import com.lightningkite.services.database.*
 import io.github.oshai.kotlinlogging.KLogger
 import io.github.oshai.kotlinlogging.KotlinLogging
 
@@ -104,16 +88,17 @@ import io.github.oshai.kotlinlogging.KotlinLogging
  * @see NotificationBulkDispatcher
  */
 public open class NotificationEndpoints<
-    USER : HasId<UID>, UID : Comparable<UID>,
-    CONTENT,
-    DISPATCH : NotificationEndpoints.Dispatcher<UID, CONTENT>,
-    SUBS : NotificationEndpoints.Subscriptions<USER, UID>,
->(
+        USER : HasId<UID>, UID : Comparable<UID>,
+        CONTENT,
+        DISPATCH : NotificationEndpoints.Dispatcher<UID, CONTENT>,
+        SUBS : NotificationEndpoints.Subscriptions<USER, UID>,
+        >(
     public val users: ModelInfo<*, USER, UID>,
     public val dispatcher: DISPATCH,
     public val subscriptions: SUBS,
 ) : EventHandler, ServerBuilder() {
-    internal val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.notifications.NotificationEndpoints")
+    internal val logger: KLogger =
+        KotlinLogging.logger("com.lightningkite.lightningserver.notifications.NotificationEndpoints")
 
     /**
      * Registry for content generators that transform events into notification content.
@@ -123,7 +108,9 @@ public open class NotificationEndpoints<
 
     init {
         (dispatcher as? ServerBuilder)?.let { path.include(it) }
-        (subscriptions as? ServerBuilder)?.let { path.path("subscriptions").module(it.withSdkInfo("SubscriptionsApi", "subscriptions")) }
+        (subscriptions as? ServerBuilder)?.let {
+            path.path("subscriptions").module(it.withSdkInfo("SubscriptionsApi", "subscriptions"))
+        }
     }
 
     context(runtime: ServerRuntime)
@@ -255,7 +242,8 @@ public open class NotificationEndpoints<
      * @param CONTENT The notification content type (application-specific)
      */
     public class ContentRegistry<USER : HasId<UID>, UID : Comparable<UID>, CONTENT> : ServerBuilder() {
-        private val contentGenerators = MapRegistry<EventType.Name, suspend context(ServerRuntime) (Event<*, *>) -> (USER) -> CONTENT>()
+        private val contentGenerators =
+            MapRegistry<EventType.Name, suspend context(ServerRuntime) (Event<*, *>) -> (USER) -> CONTENT>()
 
         /**
          * Retrieves the content generator for an event and produces user-specific content.
@@ -283,10 +271,13 @@ public open class NotificationEndpoints<
          */
         public fun <T : HasId<ID>, ID : Comparable<ID>> setContent(
             event: EventDefinition<T, ID>,
-            generator: suspend context(ServerRuntime) (Event<T, ID>) -> (USER) -> CONTENT
+            generator: suspend context(ServerRuntime) (Event<T, ID>) -> (USER) -> CONTENT,
         ) {
             @Suppress("UNCHECKED_CAST")
-            contentGenerators.register(event.name, generator as suspend context(ServerRuntime) (Event<*, *>) -> (USER) -> CONTENT)
+            contentGenerators.register(
+                event.name,
+                generator as suspend context(ServerRuntime) (Event<*, *>) -> (USER) -> CONTENT
+            )
         }
 
         private val verify = path.path("verify") bind StartupTask {
@@ -321,14 +312,14 @@ public open class NotificationEndpoints<
  */
 context(handler: NotificationEndpoints<USER, UID, CONTENT, *, *>)
 public fun <USER : HasId<UID>, UID : Comparable<UID>, CONTENT, T : HasId<ID>, ID : Comparable<ID>> EventDefinition<T, ID>.content(
-    generator: suspend context(ServerRuntime) (Event<T, ID>) -> (USER) -> CONTENT
+    generator: suspend context(ServerRuntime) (Event<T, ID>) -> (USER) -> CONTENT,
 ) {
     handler.content.setContent(this, generator)
 }
 
 context(_: ServerRuntime)
 public inline val <USER, UID, T, ID, CONTENT, H> EventLauncher<H, T, ID>.content: suspend context(ServerRuntime) (Event<T, ID>) -> (USER) -> CONTENT
-where USER : HasId<UID>, UID : Comparable<UID>,
-      T : HasId<ID>, ID : Comparable<ID>,
-      H : NotificationEndpoints<USER, UID, CONTENT, *, *>
+        where USER : HasId<UID>, UID : Comparable<UID>,
+              T : HasId<ID>, ID : Comparable<ID>,
+              H : NotificationEndpoints<USER, UID, CONTENT, *, *>
     get() = handler.content.getContent(this.event)

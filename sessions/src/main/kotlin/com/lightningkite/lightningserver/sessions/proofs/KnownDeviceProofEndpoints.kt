@@ -2,32 +2,19 @@ package com.lightningkite.lightningserver.sessions.proofs
 
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.auth.*
-import com.lightningkite.lightningserver.definition.Runtime
-import com.lightningkite.lightningserver.definition.RuntimeDeferred
+import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.secretBasis
-import com.lightningkite.lightningserver.encryption.Signer
-import com.lightningkite.lightningserver.encryption.checkAgainstHash
-import com.lightningkite.lightningserver.encryption.signer
-import com.lightningkite.lightningserver.http.HttpHeader
-import com.lightningkite.lightningserver.http.HttpStatus
-import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.http.post
+import com.lightningkite.lightningserver.encryption.*
+import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.sessions.proofs.extensions.constrainAttemptRate
-import com.lightningkite.lightningserver.auth.idString
-import com.lightningkite.lightningserver.encryption.fastHash
-import com.lightningkite.lightningserver.encryption.isSlowHash
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.typed.*
-import com.lightningkite.lightningserver.typed.sdk.SdkModule
+import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
-import com.lightningkite.lightningserver.typed.sdk.clientInterface
-import com.lightningkite.lightningserver.typed.sdk.info
-import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.database.*
 import kotlinx.serialization.InternalSerializationApi
@@ -63,9 +50,10 @@ public class KnownDeviceProofEndpoints(
     )
 
     context(_: ServerRuntime)
-    private val active get() = condition<KnownDeviceSecret> {
-        it.disabledAt.eq(null) and ((it.expiresAt.eq(null) or it.expiresAt.notNull.gte(now())))
-    }
+    private val active
+        get() = condition<KnownDeviceSecret> {
+            it.disabledAt.eq(null) and ((it.expiresAt.eq(null) or it.expiresAt.notNull.gte(now())))
+        }
 
     public val modelInfo: ModelInfo<HasId<*>, KnownDeviceSecret, Uuid> = database.modelInfo(
         auth = proofMethodAuth or AuthRequirement.IsAdmin,
@@ -100,10 +88,11 @@ public class KnownDeviceProofEndpoints(
         }
     )
 
-    public val rest: ModelRestEndpoints<HasId<*>, KnownDeviceSecret, Uuid> = path.path("secrets") include ModelRestEndpoints(modelInfo)
+    public val rest: ModelRestEndpoints<HasId<*>, KnownDeviceSecret, Uuid> =
+        path.path("secrets") include ModelRestEndpoints(modelInfo)
 
     context(_: ServerRuntime)
-    public suspend fun <SUBJECT : HasId<ID>, ID: Comparable<ID>> establish(
+    public suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> establish(
         principal: PrincipalType<SUBJECT, ID>,
         id: ID,
         deviceInfo: String,
@@ -128,7 +117,7 @@ public class KnownDeviceProofEndpoints(
     context(_: ServerRuntime)
     private suspend fun <SUBJECT : HasId<*>> establish(
         auth: Authentication<SUBJECT>,
-        deviceInfo: String
+        deviceInfo: String,
     ) = establish(
         auth.untypedPrincipal as PrincipalType<HasId<Comparable<Any?>>, Comparable<Any?>>,
         auth.untypedId as Comparable<Any?>,

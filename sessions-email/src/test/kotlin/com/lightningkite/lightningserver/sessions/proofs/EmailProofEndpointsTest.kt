@@ -12,18 +12,13 @@ import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.database.HasId
-import com.lightningkite.services.email.Email
-import com.lightningkite.services.email.EmailAddressWithName
-import com.lightningkite.services.email.EmailService
-import com.lightningkite.services.email.TestEmailService
+import com.lightningkite.services.email.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import org.junit.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.Uuid
@@ -36,7 +31,7 @@ class EmailProofEndpointsTest {
     @Serializable
     data class TestUser(
         override val _id: Uuid = Uuid.random(),
-        val email: String = ""
+        val email: String = "",
     ) : HasId<Uuid> {
         companion object : PrincipalType<TestUser, Uuid> {
             override val idSerializer: KSerializer<Uuid> = Uuid.serializer()

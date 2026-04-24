@@ -1,8 +1,7 @@
 package com.lightningkite.lightningserver.serialization
 
-import com.lightningkite.lightningserver.serialization.FormDataFormat
-import com.lightningkite.services.data.KotlinBytesFormat
 import com.lightningkite.services.data.StringArrayFormat
+import com.lightningkite.services.serializers.KotlinBytesFormat
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 

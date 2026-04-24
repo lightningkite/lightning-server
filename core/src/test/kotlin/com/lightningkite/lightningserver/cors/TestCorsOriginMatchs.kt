@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 class TestCorsOriginMatchs {
 
     @Test
-    fun testOriginMatchesWildCard(){
+    fun testOriginMatchesWildCard() {
         var allowed = listOf("*")
 
         assertTrue(originMatches(allowed, "some.domain"))
@@ -29,7 +29,7 @@ class TestCorsOriginMatchs {
     }
 
     @Test
-    fun testOriginMatchesExactMatch(){
+    fun testOriginMatchesExactMatch() {
         var allowed = listOf("some.domain")
 
         assertTrue(originMatches(allowed, "some.domain"))
@@ -48,7 +48,7 @@ class TestCorsOriginMatchs {
     }
 
     @Test
-    fun testOriginMatchesSubWildCard(){
+    fun testOriginMatchesSubWildCard() {
         var allowed = listOf("*.some.domain")
 
         assertFalse(originMatches(allowed, "some.domain"))
@@ -61,7 +61,7 @@ class TestCorsOriginMatchs {
     }
 
     @Test
-    fun testOriginMatchesSchema(){
+    fun testOriginMatchesSchema() {
         var allowed = listOf("some.domain")
 
         assertTrue(originMatches(allowed, "some.domain"))

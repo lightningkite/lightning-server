@@ -1,41 +1,17 @@
 package com.lightningkite.lightningserver.notifications.subscriptions
 
 import com.lightningkite.lightningserver.BadRequestException
-import com.lightningkite.lightningserver.NotFoundException
-import com.lightningkite.lightningserver.auth.AuthRequirement
-import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.auth.PrincipalType
+import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.definition.builder.MapRegistry
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.notifications.Frequency
-import com.lightningkite.lightningserver.notifications.NotificationEndpoints
-import com.lightningkite.lightningserver.notifications.ScheduledSendMethods
-import com.lightningkite.lightningserver.notifications.events.EventType
-import com.lightningkite.lightningserver.notifications.events.Event
-import com.lightningkite.lightningserver.notifications.events.EventDefinition
-import com.lightningkite.lightningserver.notifications.events.EventRegistry
+import com.lightningkite.lightningserver.notifications.*
+import com.lightningkite.lightningserver.notifications.events.*
 import com.lightningkite.lightningserver.notifications.events.EventRegistry.Companion.events
-import com.lightningkite.lightningserver.notifications.events.UserEventType
-import com.lightningkite.lightningserver.notifications.events.event
-import com.lightningkite.lightningserver.notifications.events.type
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.serverRuntime
-import com.lightningkite.lightningserver.typed.AuthAccess
-import com.lightningkite.lightningserver.typed.ModelInfo
-import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebsocket
-import com.lightningkite.services.database.Condition
-import com.lightningkite.services.database.DataClassPathSelf
-import com.lightningkite.services.database.EntryChange
-import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.SerializableProperty
-import com.lightningkite.services.database.Table
-import com.lightningkite.services.database.eq
-import com.lightningkite.services.database.getMany
-import com.lightningkite.services.database.insertMany
-import com.lightningkite.services.database.inside
-import com.lightningkite.services.database.interceptCreate
-import com.lightningkite.services.database.map
+import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.services.database.*
 import io.github.oshai.kotlinlogging.KLogger
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.flow.filter
@@ -104,24 +80,28 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
     users: ModelInfo<*, USER, UID>,
     private val principal: PrincipalType<USER, UID>,
     websocketKey: SerializableProperty<NotificationEventSubscription<UID>, *> = info.serializer.field_id,
-    private val suppressRejectedAuthenticationWarnings: Boolean = false
+    private val suppressRejectedAuthenticationWarnings: Boolean = false,
 ) : NotificationEndpoints.Subscriptions<USER, UID>, ServerBuilder() {
 
     public val info: ModelInfo<AUTH, NotificationEventSubscription<UID>, UserEventType<UID>> =
         object : ModelInfo<AUTH, NotificationEventSubscription<UID>, UserEventType<UID>> by info {
-            context(runtime: ServerRuntime)
+            context(server: ServerRuntime)
             override suspend fun table(auth: AuthAccess<AUTH>): Table<NotificationEventSubscription<UID>> =
                 info.table(auth)
                     .interceptCreate { subscription ->
-                        val type = runtime.server.events[subscription._id.event] ?: throw BadRequestException("EventType '${subscription._id.event}' not found.")
+                        val type = server.server.events[subscription._id.event]
+                            ?: throw BadRequestException("EventType '${subscription._id.event}' not found.")
 
                         try {
-                            runtime.internalSerialization.json.decodeFromString(
+                            server.internalSerialization.json.decodeFromString(
                                 type.conditionSerializer,
                                 subscription.requestedFilter
                             )
                         } catch (e: Exception) {
-                            throw BadRequestException("Could not decode requested subscription filter for event type '${type.name}': $e", cause = e)
+                            throw BadRequestException(
+                                "Could not decode requested subscription filter for event type '${type.name}': $e",
+                                cause = e
+                            )
                         }
 
                         subscription.copy(
@@ -157,13 +137,17 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
         principal: PrincipalType<USER, UID>,
         user: USER,
     ): String = eventType.serializedReadPermissions(
-        Authentication(principal, user, sessionId = null)    // NOTE: This gives full auth access to user, but that should be fine since this is an internal process
+        Authentication(
+            principal,
+            user,
+            sessionId = null
+        )    // NOTE: This gives full auth access to user, but that should be fine since this is an internal process
     )
 
     context(server: ServerRuntime)
     public suspend operator fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<*>> DefaultSubscription<USER, UID, T>.invoke(
         principal: PrincipalType<USER, UID>,
-        user: USER
+        user: USER,
     ): NotificationEventSubscription<UID>? =
         subscription(user)?.let {
             NotificationEventSubscription(
@@ -189,7 +173,7 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
      */
     @Suppress("UNCHECKED_CAST")
     public fun <T : HasId<*>> getDefaultSubscription(
-        type: EventDefinition<T, *>
+        type: EventDefinition<T, *>,
     ): (suspend context(ServerRuntime) (USER) -> FullEventSubscription<T>?)? =
         defaultSubscriptions[type.name]?.let { (it as DefaultSubscription<USER, UID, T>).subscription }
 
@@ -207,12 +191,12 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
     public fun <T : HasId<*>> setDefaultSubscription(
         type: EventDefinition<T, *>,
         behavior: DefaultSubscriptionUpdateBehavior = DefaultSubscriptionUpdateBehavior.UpdateReadPermissions,
-        subscription: suspend context(ServerRuntime) (USER) -> FullEventSubscription<T>?
+        subscription: suspend context(ServerRuntime) (USER) -> FullEventSubscription<T>?,
     ) {
         defaultSubscriptions.register(type.name, DefaultSubscription(type, behavior, subscription))
     }
 
-    context(server: ServerRuntime)
+    context(runtime: ServerRuntime)
     override suspend fun <T : HasId<ID>, ID : Comparable<ID>> subscribed(event: Event<T, ID>): List<ScheduledSendMethods<UID>> =
         info
             .table()
@@ -220,8 +204,14 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
             .filter {
                 try {
                     val subscribedCondition = Condition.And(
-                        server.internalSerialization.json.decodeFromString(event.type.conditionSerializer, it.requestedFilter),
-                        server.internalSerialization.json.decodeFromString(event.type.conditionSerializer, it.readPermissions)
+                        runtime.internalSerialization.json.decodeFromString(
+                            event.type.conditionSerializer,
+                            it.requestedFilter
+                        ),
+                        runtime.internalSerialization.json.decodeFromString(
+                            event.type.conditionSerializer,
+                            it.readPermissions
+                        )
                     )
                     subscribedCondition(event.subject)
                 } catch (e: SerializationException) {
@@ -282,7 +272,10 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
 
                     if (stored == null) {
                         // If there is no stored subscription, but the old default does exist, then the subscription was manually deleted and shouldn't be replaced.
-                        if (old == null && new != null) put(id, new)   // If there is nothing stored, and there was previously no default, and there now is a default, insert it.
+                        if (old == null && new != null) put(
+                            id,
+                            new
+                        )   // If there is nothing stored, and there was previously no default, and there now is a default, insert it.
                         continue
                     }
 
@@ -345,7 +338,8 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
             val removeKeys = (toRemove + withUserChanges.keys + toReplace.keys + justReadPermissions.keys).toSet()
             if (removeKeys.isNotEmpty()) deleteManyIgnoringOld(self._id inside removeKeys)
 
-            val inserted = toInsert + withUserChanges.values + toReplace.values.filterNotNull() + justReadPermissions.values
+            val inserted =
+                toInsert + withUserChanges.values + toReplace.values.filterNotNull() + justReadPermissions.values
             if (inserted.isNotEmpty()) insertMany(inserted)
         }
     }
@@ -363,8 +357,8 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
     }
 
     context(_: ServerRuntime)
-    private suspend fun <T : HasId<*>, AUTH: HasId<*>?> EventDefinition<T, *>.readPermissions(
-        auth: Authentication<AUTH & Any>?
+    private suspend fun <T : HasId<*>, AUTH : HasId<*>?> EventDefinition<T, *>.readPermissions(
+        auth: Authentication<AUTH & Any>?,
     ): Condition<T> =
         when (val result = info.auth.check(auth)) {
             is AuthRequirement.Result.Accepted<*> ->
@@ -388,8 +382,8 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
         }
 
     context(server: ServerRuntime)
-    private suspend fun <T : HasId<*>, AUTH: HasId<*>?> EventDefinition<T, *>.serializedReadPermissions(
-        auth: Authentication<AUTH & Any>?
+    private suspend fun <T : HasId<*>, AUTH : HasId<*>?> EventDefinition<T, *>.serializedReadPermissions(
+        auth: Authentication<AUTH & Any>?,
     ): String =
         server.internalSerialization.json.encodeToString(
             conditionSerializer,
@@ -397,7 +391,8 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
         )
 
     public companion object {
-        private val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.notifications.subscriptions.FullyCustomizableSubscriptions")
+        private val logger: KLogger =
+            KotlinLogging.logger("com.lightningkite.lightningserver.notifications.subscriptions.FullyCustomizableSubscriptions")
     }
 }
 
@@ -420,7 +415,7 @@ public data class FullEventSubscription<T>(
     val email: Frequency?,
     val push: Frequency?,
     val sms: Frequency?,
-    val inApp: Frequency? = Frequency.immediately()
+    val inApp: Frequency? = Frequency.immediately(),
 )
 
 /**
@@ -448,7 +443,7 @@ public data class FullEventSubscription<T>(
 context(handler: NotificationEndpoints<USER, UID, *, *, FullyCustomizableSubscriptions<USER, UID>>)
 public fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>> EventDefinition<T, ID>.defaultSubscription(
     behavior: DefaultSubscriptionUpdateBehavior = DefaultSubscriptionUpdateBehavior.UpdateReadPermissions,
-    subscription: suspend context(ServerRuntime) (USER) -> FullEventSubscription<T>?
+    subscription: suspend context(ServerRuntime) (USER) -> FullEventSubscription<T>?,
 ) {
     handler.subscriptions.setDefaultSubscription(this, behavior, subscription)
 }

@@ -1,14 +1,10 @@
-import org.gradle.api.internal.file.archive.ZipFileTree
-import proguard.gradle.ProGuardTask
-import java.util.*
-
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     application
     alias(libs.plugins.graalVmNative)
-    alias(libs.plugins.shadow)
+//    alias(libs.plugins.shadow)
 }
 
 group = "com.lightningkite.lightningserver"
@@ -33,7 +29,6 @@ dependencies {
     api(libs.services.pubsub.redis)
     api(libs.services.pubsub.aws)
     api(libs.services.pubsub.test)
-    api(libs.services.shouldBeStandardLibrary)
     api(libs.services.sms)
     api(libs.services.sms.test)
     api(libs.services.sms.twilio)
@@ -100,9 +95,9 @@ application {
     this.applicationName = "server"
 }
 
-tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
-    isZip64 = true
-}
+//tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
+//    isZip64 = true
+//}
 
 tasks.create("serve", JavaExec::class.java) {
     group = "application"
@@ -175,15 +170,15 @@ tasks.create("deploy", JavaExec::class.java) {
     workingDir(project.rootDir)
 }
 
-tasks.create("proguardTest", ProGuardTask::class) {
-    this.injars(tasks.getByName("shadowJar"))
-    this.outjars("${buildDir}/outputs/proguarded.jar")
-    File("${System.getProperty("java.home")}/jmods").listFiles()?.filter { it.extension == "jmod" }?.forEach {
-        this.libraryjars(it)
-    }
-//    this.libraryjars("${System.getProperty("java.home")}/lib/rt.jar".also { println("rt jar is ${it}") })
-    this.libraryjars(configurations.runtimeClasspath)
-    this.configuration("src/main/proguard.pro")
-//    this.keepnames("com.lightningkite.lightningserver.demo.**")
-//    this.keepnames("com.lightningkite.lightningserver.demo.AwsHandler")
-}
+//tasks.create("proguardTest", ProGuardTask::class) {
+//    this.injars(tasks.getByName("shadowJar"))
+//    this.outjars("${buildDir}/outputs/proguarded.jar")
+//    File("${System.getProperty("java.home")}/jmods").listFiles()?.filter { it.extension == "jmod" }?.forEach {
+//        this.libraryjars(it)
+//    }
+////    this.libraryjars("${System.getProperty("java.home")}/lib/rt.jar".also { println("rt jar is ${it}") })
+//    this.libraryjars(configurations.runtimeClasspath)
+//    this.configuration("src/main/proguard.pro")
+////    this.keepnames("com.lightningkite.lightningserver.demo.**")
+////    this.keepnames("com.lightningkite.lightningserver.demo.AwsHandler")
+//}

@@ -23,6 +23,7 @@ public data class LambdaAlarm(
             15.minutes to 16.0,
             5.minutes to 32.0
         )
+
         public fun defaultSpendAlarms(
             computeSecondsPerMonth: Duration,
             description: String,
@@ -45,7 +46,7 @@ public fun LambdaInvocationAlarm(
     evaluationPeriods: Int = 1,
     dataPointsToAlarm: Int = 1,
     description: String,
-):LambdaAlarm = LambdaAlarm(
+): LambdaAlarm = LambdaAlarm(
     LambdaAlarmMetric.Invocations,
     statistic,
     threshold,
@@ -62,7 +63,7 @@ public fun LambdaDurationAlarm(
     evaluationPeriods: Int = 1,
     dataPointsToAlarm: Int = 1,
     description: String,
-) : LambdaAlarm = LambdaAlarm(
+): LambdaAlarm = LambdaAlarm(
     LambdaAlarmMetric.Duration,
     statistic,
     threshold.inWholeMilliseconds,

@@ -4,9 +4,9 @@
 ##########
 
 variable "sms" {
-    type = any
-    default = {"url":"console","from":null}
-    nullable = false
+  type     = any
+  default  = { "url" : "console", "from" : null }
+  nullable = false
 }
 
 ##########

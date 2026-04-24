@@ -1,16 +1,12 @@
 package com.lightningkite.lightningserver.cors
 
-import com.lightningkite.lightningserver.ForbiddenException
-import com.lightningkite.lightningserver.HttpMethod
-import com.lightningkite.lightningserver.NotFoundException
+import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
-import com.lightningkite.lightningserver.websockets.WebSocketHandler
-import com.lightningkite.lightningserver.websockets.WebSocketHandlerInterceptor
+import com.lightningkite.lightningserver.websockets.*
 
 /**
  * Checks if a given origin matches any of the allowed origin patterns.
@@ -89,7 +85,9 @@ public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpIn
             throw ForbiddenException(
                 message = "Origin '$origin' is not allowed",
                 detail =
-                    if (origin.substringAfter("://") == generalSettings().publicUrl.substringAfter("://").substringBefore('/'))
+                    if (origin.substringAfter("://") == generalSettings().publicUrl.substringAfter("://")
+                            .substringBefore('/')
+                    )
                         "This server's public url is not an allowed domain. Add this server's public url to limitToDomains in the Cors settings to make these requests."
                     else
                         "",

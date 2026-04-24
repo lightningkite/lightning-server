@@ -1,8 +1,7 @@
 package com.lightningkite.lightningserver.media
 
-import com.lightningkite.MediaType
+import com.lightningkite.services.data.MediaType
 import com.sksamuel.scrimage.ImmutableImage
-import com.sksamuel.scrimage.metadata.Orientation
 import org.junit.Assert.*
 import org.junit.Test
 import java.awt.Color

@@ -2,7 +2,8 @@
 
 Last updated January 2025 (`version-5`)
 
-By combining [typed endpoints](typed-endpoints.md), [authentication](authentication.md), and [databases](database.md), we can conveniently generate REST endpoints for any given model automatically.
+By combining [typed endpoints](typed-endpoints.md), [authentication](authentication.md), and [databases](database.md),
+we can conveniently generate REST endpoints for any given model automatically.
 
 ## Basic Example
 
@@ -53,6 +54,7 @@ object Server : ServerBuilder() {
 ## Understanding ModelInfo
 
 `ModelInfo` is the key to automatic REST endpoint generation. It combines:
+
 - **Authentication requirements** - Who can access the endpoints
 - **Permissions** - What operations users can perform on which items
 - **Database access** - How to access the underlying data
@@ -78,7 +80,7 @@ val postInfo = database.modelInfo(
 When you create `ModelRestEndpoints`, the following endpoints are automatically generated:
 
 - `GET /posts/rest` - List all posts (respecting read permissions)
-  - Supports query parameters for filtering, sorting, and pagination
+    - Supports query parameters for filtering, sorting, and pagination
 - `POST /posts/rest` - Create a new post (respecting create permissions)
 - `GET /posts/rest/{id}` - Get a specific post
 - `PATCH /posts/rest/{id}` - Update a specific post (respecting update permissions)
@@ -153,6 +155,7 @@ val rest = path.path("rest") module ModelRestEndpointsAndUpdatesWebsocket(info)
 ```
 
 Both patterns add a WebSocket endpoint at `/posts/rest/updates` that provides:
+
 - Real-time notifications when posts are created, updated, or deleted
 - Automatic filtering based on user permissions
 - Initial snapshot of existing data matching the query

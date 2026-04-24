@@ -179,7 +179,7 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
      * @property default The fallback requirement if not explicitly configured
      */
     public abstract class AuthSetting(
-        public val default: AuthRequirement<HasId<*>>? = null
+        public val default: AuthRequirement<HasId<*>>? = null,
     ) : AuthRequirement<HasId<*>>, MutableExtensions.Key<AuthRequirement<HasId<*>>> {
         context(server: ServerRuntime)
         public fun setting(): AuthRequirement<HasId<*>>? = server.server.extensions[this]
@@ -189,11 +189,12 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
 
         context(runtime: ServerRuntime)
         override suspend fun check(auth: Authentication<*>?): Result<HasId<*>> =
-            setting()?.check(auth) ?: default?.check(auth) ?: Result.Rejected("AuthSetting $this has no set value or default")
+            setting()?.check(auth) ?: default?.check(auth)
+            ?: Result.Rejected("AuthSetting $this has no set value or default")
 
         public data class Scoped(
             val wraps: AuthSetting,
-            val subscopes: Iterable<Subscope>
+            val subscopes: Iterable<Subscope>,
         ) : AuthRequirement<HasId<*>> {
             override val requiredScopes: Runtime<Set<RequiredScope>> =
                 Runtime { wraps.setting()?.requiredScopes()?.subscope(subscopes) ?: emptySet() }
@@ -203,9 +204,8 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
 
             context(runtime: ServerRuntime)
             override suspend fun check(auth: Authentication<*>?): Result<HasId<*>> =
-                wraps.setting()?.subscope(subscopes)?.check(auth) ?:
-                    wraps.default?.subscope(subscopes)?.check(auth) ?:
-                        Result.Rejected("AuthSetting $wraps has no set value or default")
+                wraps.setting()?.subscope(subscopes)?.check(auth) ?: wraps.default?.subscope(subscopes)?.check(auth)
+                ?: Result.Rejected("AuthSetting $wraps has no set value or default")
         }
     }
 
@@ -262,7 +262,7 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
     public data class Authenticated(
         val scopes: Set<RequiredScope> = setOf(RequiredScope.root),
         val maxAge: Duration? = null,
-        val requirement: (suspend context(ServerRuntime) (Authentication<*>) -> Boolean)? = null
+        val requirement: (suspend context(ServerRuntime) (Authentication<*>) -> Boolean)? = null,
     ) : AuthRequirement<HasId<*>> {
         override val requiredScopes: Runtime.Constant<Set<RequiredScope>>
             get() = Runtime.Constant(scopes)
@@ -270,12 +270,16 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
         override fun subscope(subscopes: Iterable<Subscope>): Authenticated =
             copy(scopes = scopes.subscope(subscopes))
 
-        context(server: ServerRuntime)
+        context(runtime: ServerRuntime)
         override suspend fun check(auth: Authentication<*>?): Result<HasId<*>> {
             if (auth == null) return Result.Rejected("Auth required")
             if (maxAge != null && now() - auth.issuedAt > maxAge) return Result.Rejected("Auth is older than max age $maxAge")
             if (!auth.meetsRequirements(scopes)) return Result.Rejected("Auth does not have required scopes $scopes")
-            if (requirement?.invoke(server, auth) == false) return Result.Rejected("Auth does not meet additional requirement")
+            if (requirement?.invoke(
+                    runtime,
+                    auth
+                ) == false
+            ) return Result.Rejected("Auth does not meet additional requirement")
             return Result.Accepted(auth)
         }
 
@@ -320,7 +324,7 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
         val principalType: PrincipalType<SUBJECT, ID>,
         val scopes: Set<RequiredScope> = setOf(RequiredScope.root),
         val maxAge: Duration? = null,
-        val requirement: (suspend context(ServerRuntime) (Authentication<SUBJECT>) -> Boolean)? = null
+        val requirement: (suspend context(ServerRuntime) (Authentication<SUBJECT>) -> Boolean)? = null,
     ) : AuthRequirement<SUBJECT> {
         override val requiredScopes: Runtime.Constant<Set<RequiredScope>>
             get() = Runtime.Constant(scopes)
@@ -328,7 +332,7 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
         override fun subscope(subscopes: Iterable<Subscope>): AuthenticatedAs<SUBJECT, ID> =
             copy(scopes = scopes.subscope(subscopes))
 
-        context(server: ServerRuntime)
+        context(runtime: ServerRuntime)
         override suspend fun check(auth: Authentication<*>?): Result<SUBJECT> {
             if (auth == null) return Result.Rejected("Auth required")
             if (principalType !== auth.untypedPrincipal) return Result.Rejected("Auth is not of type ${principalType.name}")
@@ -338,7 +342,11 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
             @Suppress("UNCHECKED_CAST") // typecheck done when principal type was checked
             auth as Authentication<SUBJECT>
 
-            if (requirement?.invoke(server, auth) == false) return Result.Rejected("Auth does not meet additional requirement")
+            if (requirement?.invoke(
+                    runtime,
+                    auth
+                ) == false
+            ) return Result.Rejected("Auth does not meet additional requirement")
 
             return Result.Accepted(auth)
         }
@@ -381,7 +389,7 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
      * **Note**: [None] is always checked last to ensure other requirements are tried first.
      */
     public data class Options<out SUBJECT : HasId<*>?>(
-        public val options: Set<AuthRequirement<SUBJECT>>
+        public val options: Set<AuthRequirement<SUBJECT>>,
     ) : AuthRequirement<SUBJECT> {
         public constructor(vararg requirements: AuthRequirement<SUBJECT>) : this(requirements.toSet())
 
@@ -391,7 +399,7 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
         override fun subscope(subscopes: Iterable<Subscope>): Options<SUBJECT> =
             Options(options.map { it.subscope(subscopes) }.toSet())
 
-        context(server: ServerRuntime)
+        context(runtime: ServerRuntime)
         override suspend fun check(auth: Authentication<*>?): Result<SUBJECT> = options
             .sortedBy { it === None } // None should always be last resort
             .map {

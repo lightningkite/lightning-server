@@ -2,15 +2,12 @@
 package com.lightningkite.lightningserver.settings
 
 import com.lightningkite.lightningserver.definition.ServerSetting
-import com.lightningkite.services.data.KFile
+import com.lightningkite.services.kfile.KFile
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.serialization.builtins.serializer
 import java.io.File
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /**
  * Tests for settings-related exceptions.

@@ -11,7 +11,7 @@ import kotlin.uuid.Uuid
 class StringTests {
     @Serializable
     data class User(
-        override val _id: Uuid
+        override val _id: Uuid,
     ) : HasId<Uuid> {
         companion object : PrincipalType<User, Uuid> {
             override val idSerializer: KSerializer<Uuid> = Uuid.serializer()

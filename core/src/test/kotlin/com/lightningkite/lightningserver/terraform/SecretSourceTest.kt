@@ -3,14 +3,9 @@ package com.lightningkite.lightningserver.terraform
 import com.lightningkite.services.terraform.TerraformNeed
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
-import org.junit.Ignore
 import org.junit.Test
 import java.io.File
-import kotlin.test.assertEquals
-import kotlin.test.assertNull
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
-import kotlin.test.assertFailsWith
+import kotlin.test.*
 
 /**
  * Unit tests for SecretSource implementations.
@@ -59,11 +54,11 @@ class SecretSourceTest {
             override val name: String = "Source1"
             override fun <T> getOrNull(need: TerraformNeed<T>): T? = null
         }
-        val source2 = object : SecretSource {
+        @Suppress("UNCHECKED_CAST") val source2 = object : SecretSource {
             override val name: String = "Source2"
             override fun <T> getOrNull(need: TerraformNeed<T>): T? = "from-source2" as? T
         }
-        val source3 = object : SecretSource {
+        @Suppress("UNCHECKED_CAST") val source3 = object : SecretSource {
             override val name: String = "Source3"
             override fun <T> getOrNull(need: TerraformNeed<T>): T? = "from-source3" as? T
         }
@@ -195,7 +190,7 @@ class SecretSourceTest {
 
     @Test
     fun `ManySecretSources with single source`() {
-        val source = object : SecretSource {
+        @Suppress("UNCHECKED_CAST") val source = object : SecretSource {
             override val name: String = "SingleSource"
             override fun <T> getOrNull(need: TerraformNeed<T>): T? = "single-value" as? T
         }

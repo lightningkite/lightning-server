@@ -2,7 +2,8 @@
 
 ## Context
 
-The Lightning Server AI module is focused on **customer support chatbots** and similar customer-facing support activities, not general-purpose autonomous agents. This significantly affects design priorities.
+The Lightning Server AI module is focused on **customer support chatbots** and similar customer-facing support
+activities, not general-purpose autonomous agents. This significantly affects design priorities.
 
 ## Current State: What's Already Good
 
@@ -21,6 +22,7 @@ The ai module has a **solid foundation**:
 ### 🔴 **CRITICAL** - Customer Support Essentials
 
 #### 1. **Observability & Quality Monitoring** ⭐ HIGHEST PRIORITY
+
 ```kotlin
 data class ConversationQualityMetrics(
     val conversationId: Uuid,
@@ -45,6 +47,7 @@ data class IssuePattern(
 **Why**: Must measure customer satisfaction, identify problem areas, track resolution rates
 
 #### 2. **Human Escalation/Handoff** ⭐ CRITICAL
+
 ```kotlin
 // Already in progress (transfer-to-human.md)!
 
@@ -68,6 +71,7 @@ enum class EscalationReason {
 **Why**: Every support bot needs a clear path to human agents when it can't help
 
 #### 3. **Error Recovery & Graceful Degradation** ⭐ HIGH PRIORITY
+
 ```kotlin
 data class ToolFallbackChain(
     val primaryTool: String,
@@ -83,6 +87,7 @@ data class ToolFallbackChain(
 ### 🟡 **HIGH VALUE** - Enhanced Support Capabilities
 
 #### 4. **Session Context Management** (Not long-term memory)
+
 ```kotlin
 // SHORT-TERM session context, not episodic memory
 data class SupportSessionContext(
@@ -97,6 +102,7 @@ data class SupportSessionContext(
 **Why**: Track what's been tried in THIS conversation, identify intent quickly
 
 #### 5. **Sentiment Detection & Proactive Escalation**
+
 ```kotlin
 data class SentimentSignals(
     val frustrationLevel: Int,  // 0-10
@@ -116,6 +122,7 @@ class SentimentMonitoringTool : AutoApprovedTool<...>() {
 ### 🔵 **NICE TO HAVE** - Optimization
 
 #### 6. **Response Templates & Consistency**
+
 ```kotlin
 data class ResponseTemplate(
     val category: String,  // "greeting", "closing", "apology", "escalation"
@@ -129,6 +136,7 @@ data class ResponseTemplate(
 **Why**: Brand consistency matters, but LLMs handle this reasonably well already
 
 #### 7. **Knowledge Base Integration** (If not already present)
+
 ```kotlin
 class KnowledgeBaseTool : AutoApprovedTool<...>() {
     // Search FAQ, docs, help articles
@@ -141,32 +149,38 @@ class KnowledgeBaseTool : AutoApprovedTool<...>() {
 ### ⚪ **LOW PRIORITY** - Not Needed for Support
 
 #### ❌ Long-term Episodic Memory
+
 - Support sessions are typically independent
 - Privacy concerns with storing customer data long-term
 - **Exception**: VIP customer notes, account history (but that's in your DB, not AI memory)
 
 #### ❌ Hierarchical Goal Planning
+
 - Support is reactive (customer asks, bot answers)
 - Not doing complex multi-day projects
 - **Exception**: Multi-step troubleshooting workflows (but these can be scripted)
 
 #### ❌ Multi-Agent Orchestration
+
 - One support bot per conversation is fine
 - **Exception**: Routing to specialist bots (billing vs technical support)
 
 ## Recommended Implementation Order for Support Bots
 
 ### Sprint 1: Foundation
+
 1. ✅ **Finish Human Transfer** (in progress!)
 2. **Add Conversation Metrics** - Track resolution, satisfaction, escalations
 3. **Sentiment Detection** - Catch frustrated customers early
 
 ### Sprint 2: Reliability
+
 4. **Tool Fallback Chains** - Graceful degradation when tools fail
 5. **Session Context Tracking** - Remember what's been tried THIS conversation
 6. **Error Message Templates** - User-friendly error responses
 
 ### Sprint 3: Optimization
+
 7. **Issue Pattern Analytics** - Identify common problems
 8. **Response Time Monitoring** - Ensure fast responses
 9. **A/B Testing Framework** - Test different prompts/approaches
@@ -182,25 +196,30 @@ class KnowledgeBaseTool : AutoApprovedTool<...>() {
 ## Sources
 
 **Design Patterns:**
+
 - [6 Design Patterns for AI Agents](https://valanor.co/design-patterns-for-ai-agents/)
 - [Azure AI Agent Orchestration Patterns](https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/ai-agent-design-patterns)
 - [Google Cloud Agentic AI Patterns](https://docs.cloud.google.com/architecture/choose-design-pattern-agentic-ai-system)
 
 **Memory Systems:**
+
 - [Episodic Memory for RAG](https://arxiv.org/html/2511.07587v1)
 - [MongoDB LangGraph Memory](https://www.mongodb.com/company/blog/product-release-announcements/powering-long-term-memory-for-agents-langgraph)
 - [AI Agent Memory (IBM)](https://www.ibm.com/think/topics/ai-agent-memory)
 
 **Planning:**
+
 - [AgentOrchestra Hierarchical Planning](https://arxiv.org/html/2506.12508v3)
 - [AI Agent Planning (IBM)](https://www.ibm.com/think/topics/ai-agent-planning)
 - [Hierarchical Task Networks](https://www.geeksforgeeks.org/hierarchical-task-network-htn-planning-in-ai/)
 
 **Resilience:**
+
 - [Error Recovery Strategies](https://www.gocodeo.com/post/error-recovery-and-fallback-strategies-in-ai-agent-development)
 - [Retry Logic Best Practices](https://sparkco.ai/blog/mastering-retry-logic-agents-a-deep-dive-into-2025-best-practices)
 - [Resilience Patterns](https://www.codecentric.de/en/knowledge-hub/blog/resilience-design-patterns-retry-fallback-timeout-circuit-breaker)
 
 **Orchestration:**
+
 - [AWS Workflow Orchestration Agents](https://docs.aws.amazon.com/prescriptive-guidance/latest/agentic-ai-patterns/workflow-orchestration-agents.html)
 - [LangGraph State Machines](https://dev.to/jamesli/langgraph-state-machines-managing-complex-agent-task-flows-in-production-36f4)

@@ -4,29 +4,15 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.settings.set
-import com.lightningkite.lightningserver.websockets.CoroutineWebsocketHandler
-import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
-import com.lightningkite.lightningserver.websockets.WebSocketFrame
+import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.pubsub.PubSub
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.runBlocking
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.Response
-import okhttp3.WebSocket
-import okhttp3.WebSocketListener
+import okhttp3.*
 import okio.ByteString
 import java.net.InetSocketAddress
 import java.net.ServerSocket
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
-import kotlin.test.AfterTest
-import kotlin.test.Ignore
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import java.util.concurrent.*
+import kotlin.test.*
 
 /**
  * Tests for DirectExecutableWebSocketHandler optimization in NettyEngine.
@@ -49,7 +35,7 @@ class DirectWebSocketExecutionTest {
                 request: WebSocketConnectRequest<PathSpec0>,
                 waitForFullConnect: suspend () -> Unit,
                 incoming: Flow<WebSocketFrame>,
-                send: suspend (WebSocketFrame) -> Unit
+                send: suspend (WebSocketFrame) -> Unit,
             ) {
                 waitForFullConnect()
                 incoming.collect { frame ->
@@ -67,7 +53,7 @@ class DirectWebSocketExecutionTest {
                 request: WebSocketConnectRequest<PathSpec0>,
                 waitForFullConnect: suspend () -> Unit,
                 incoming: Flow<WebSocketFrame>,
-                send: suspend (WebSocketFrame) -> Unit
+                send: suspend (WebSocketFrame) -> Unit,
             ) {
                 waitForFullConnect()
                 send(WebSocketFrame.Text("Hello from server!"))
@@ -84,7 +70,7 @@ class DirectWebSocketExecutionTest {
                 request: WebSocketConnectRequest<PathSpec0>,
                 waitForFullConnect: suspend () -> Unit,
                 incoming: Flow<WebSocketFrame>,
-                send: suspend (WebSocketFrame) -> Unit
+                send: suspend (WebSocketFrame) -> Unit,
             ) {
                 waitForFullConnect()
                 send(WebSocketFrame.Text("One"))
@@ -159,9 +145,11 @@ class DirectWebSocketExecutionTest {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 openLatch.countDown()
             }
+
             override fun onMessage(webSocket: WebSocket, text: String) {
                 messageFuture.complete(text)
             }
+
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 messageFuture.completeExceptionally(t)
                 openLatch.countDown()
@@ -188,9 +176,11 @@ class DirectWebSocketExecutionTest {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 openLatch.countDown()
             }
+
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
                 messageFuture.complete(bytes.toByteArray())
             }
+
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 messageFuture.completeExceptionally(t)
                 openLatch.countDown()
@@ -217,6 +207,7 @@ class DirectWebSocketExecutionTest {
             override fun onMessage(webSocket: WebSocket, text: String) {
                 messageFuture.complete(text)
             }
+
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 messageFuture.completeExceptionally(t)
             }
@@ -242,6 +233,7 @@ class DirectWebSocketExecutionTest {
                 }
                 allReceived.countDown()
             }
+
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 repeat(3) { allReceived.countDown() }
             }
@@ -265,12 +257,14 @@ class DirectWebSocketExecutionTest {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 openLatch.countDown()
             }
+
             override fun onMessage(webSocket: WebSocket, text: String) {
                 synchronized(messages) {
                     messages.add(text)
                 }
                 allReceived.countDown()
             }
+
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 openLatch.countDown()
                 repeat(5) { allReceived.countDown() }
@@ -303,9 +297,11 @@ class DirectWebSocketExecutionTest {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 openLatch.countDown()
             }
+
             override fun onMessage(webSocket: WebSocket, text: String) {
                 messageFuture.complete(text)
             }
+
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 messageFuture.completeExceptionally(t)
                 openLatch.countDown()
@@ -332,6 +328,7 @@ class DirectWebSocketExecutionTest {
             override fun onMessage(webSocket: WebSocket, text: String) {
                 messageFuture.complete(text)
             }
+
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 messageFuture.completeExceptionally(t)
             }

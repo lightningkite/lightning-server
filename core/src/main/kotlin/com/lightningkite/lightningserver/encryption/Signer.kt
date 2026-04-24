@@ -10,14 +10,7 @@
 package com.lightningkite.lightningserver.encryption
 
 import dev.whyoleg.cryptography.CryptographyAlgorithmId
-import dev.whyoleg.cryptography.algorithms.AES
-import dev.whyoleg.cryptography.algorithms.Digest
-import dev.whyoleg.cryptography.algorithms.HMAC
-import dev.whyoleg.cryptography.algorithms.ECDSA
-import dev.whyoleg.cryptography.algorithms.RSA
-import dev.whyoleg.cryptography.algorithms.SHA256
-import dev.whyoleg.cryptography.algorithms.SHA384
-import dev.whyoleg.cryptography.algorithms.SHA512
+import dev.whyoleg.cryptography.algorithms.*
 import dev.whyoleg.cryptography.operations.SignatureGenerator
 import dev.whyoleg.cryptography.operations.SignatureVerifier
 import kotlin.io.encoding.Base64
@@ -51,7 +44,8 @@ public interface Signer {
      * @property key The HMAC key
      * @property name The algorithm name (e.g., "HS256", "HS384", "HS512")
      */
-    public data class HMAC(public val key: dev.whyoleg.cryptography.algorithms.HMAC.Key, override val name: String) : Signer {
+    public data class HMAC(public val key: dev.whyoleg.cryptography.algorithms.HMAC.Key, override val name: String) :
+        Signer {
         override val generator: SignatureGenerator get() = key.signatureGenerator()
         override val verifier: SignatureVerifier get() = key.signatureVerifier()
     }
@@ -85,7 +79,7 @@ public interface Signer {
         public val keyPair: dev.whyoleg.cryptography.algorithms.ECDSA.KeyPair,
         public val digest: CryptographyAlgorithmId<Digest>,
         public val format: dev.whyoleg.cryptography.algorithms.ECDSA.SignatureFormat,
-        override val name: String
+        override val name: String,
     ) : Signer {
         override val generator: SignatureGenerator get() = keyPair.privateKey.signatureGenerator(digest, format)
         override val verifier: SignatureVerifier get() = keyPair.publicKey.signatureVerifier(digest, format)
@@ -101,7 +95,8 @@ public interface Signer {
      * @property keyPair The RSA key pair
      * @property name The algorithm name (e.g., "PS256", "PS384", "PS512")
      */
-    public data class RSA_PSS(public val keyPair: RSA.PSS.KeyPair, override val name: String /*Example: PS256*/) : Signer {
+    public data class RSA_PSS(public val keyPair: RSA.PSS.KeyPair, override val name: String /*Example: PS256*/) :
+        Signer {
         override val generator: SignatureGenerator get() = keyPair.privateKey.signatureGenerator()
         override val verifier: SignatureVerifier get() = keyPair.publicKey.signatureVerifier()
     }
@@ -116,7 +111,8 @@ public interface Signer {
      * @property keyPair The RSA key pair
      * @property name The algorithm name (e.g., "RS256", "RS384", "RS512")
      */
-    public data class RSA_PKCS1(public val keyPair: RSA.PKCS1.KeyPair, override val name: String /*Example: RS256*/) : Signer {
+    public data class RSA_PKCS1(public val keyPair: RSA.PKCS1.KeyPair, override val name: String /*Example: RS256*/) :
+        Signer {
         override val generator: SignatureGenerator get() = keyPair.privateKey.signatureGenerator()
         override val verifier: SignatureVerifier get() = keyPair.publicKey.signatureVerifier()
     }
@@ -139,7 +135,8 @@ public suspend fun Signer.sign(bytes: ByteArray): ByteArray = generator.generate
  * @param signature The signature to verify
  * @return `true` if the signature is valid, `false` otherwise
  */
-public suspend fun Signer.verify(bytes: ByteArray, signature: ByteArray): Boolean = verifier.tryVerifySignature(bytes, signature)
+public suspend fun Signer.verify(bytes: ByteArray, signature: ByteArray): Boolean =
+    verifier.tryVerifySignature(bytes, signature)
 
 /**
  * Signs a byte array and returns the signature (blocking version).
@@ -158,7 +155,8 @@ public fun Signer.signBlocking(bytes: ByteArray): ByteArray = generator.generate
  * @param signature The signature to verify
  * @return `true` if the signature is valid, `false` otherwise
  */
-public fun Signer.verifyBlocking(bytes: ByteArray, signature: ByteArray): Boolean = verifier.tryVerifySignatureBlocking(bytes, signature)
+public fun Signer.verifyBlocking(bytes: ByteArray, signature: ByteArray): Boolean =
+    verifier.tryVerifySignatureBlocking(bytes, signature)
 
 /**
  * Signs a string and returns a Base64-encoded signature.
@@ -183,11 +181,13 @@ public suspend fun Signer.sign(string: String): String = Base64.encode(sign(stri
  * @param signature The Base64-encoded signature
  * @return `true` if the signature is valid, `false` otherwise
  */
-public suspend fun Signer.verify(string: String, signature: String): Boolean = verify(string.encodeToByteArray(), signature.encodeToByteArray())
+public suspend fun Signer.verify(string: String, signature: String): Boolean =
+    verify(string.encodeToByteArray(), signature.encodeToByteArray())
 
 public fun Signer.signBlocking(string: String): String = Base64.encode(signBlocking(string.encodeToByteArray()))
 
-public fun Signer.verifyBlocking(string: String, signature: String): Boolean = verifyBlocking(string.encodeToByteArray(), signature.encodeToByteArray())
+public fun Signer.verifyBlocking(string: String, signature: String): Boolean =
+    verifyBlocking(string.encodeToByteArray(), signature.encodeToByteArray())
 
 /**
  * Creates an ES256 (ECDSA with SHA-256) signer from this key pair.
@@ -195,7 +195,8 @@ public fun Signer.verifyBlocking(string: String, signature: String): Boolean = v
  * @param format The signature format (defaults to RAW)
  * @return A Signer configured for ES256
  */
-public fun ECDSA.KeyPair.ES256(format: ECDSA.SignatureFormat = ECDSA.SignatureFormat.RAW): Signer = Signer.ECDSA(this, SHA256, format, "ES256")
+public fun ECDSA.KeyPair.ES256(format: ECDSA.SignatureFormat = ECDSA.SignatureFormat.RAW): Signer =
+    Signer.ECDSA(this, SHA256, format, "ES256")
 
 /**
  * Creates an ES384 (ECDSA with SHA-384) signer from this key pair.
@@ -203,7 +204,8 @@ public fun ECDSA.KeyPair.ES256(format: ECDSA.SignatureFormat = ECDSA.SignatureFo
  * @param format The signature format (defaults to RAW)
  * @return A Signer configured for ES384
  */
-public fun ECDSA.KeyPair.ES384(format: ECDSA.SignatureFormat = ECDSA.SignatureFormat.RAW): Signer = Signer.ECDSA(this, SHA384, format, "ES384")
+public fun ECDSA.KeyPair.ES384(format: ECDSA.SignatureFormat = ECDSA.SignatureFormat.RAW): Signer =
+    Signer.ECDSA(this, SHA384, format, "ES384")
 
 /**
  * Creates an ES512 (ECDSA with SHA-512) signer from this key pair.
@@ -211,7 +213,8 @@ public fun ECDSA.KeyPair.ES384(format: ECDSA.SignatureFormat = ECDSA.SignatureFo
  * @param format The signature format (defaults to RAW)
  * @return A Signer configured for ES512
  */
-public fun ECDSA.KeyPair.ES512(format: ECDSA.SignatureFormat = ECDSA.SignatureFormat.RAW): Signer = Signer.ECDSA(this, SHA512, format, "ES512")
+public fun ECDSA.KeyPair.ES512(format: ECDSA.SignatureFormat = ECDSA.SignatureFormat.RAW): Signer =
+    Signer.ECDSA(this, SHA512, format, "ES512")
 
 /*
  * TODO: API Recommendations

@@ -10,35 +10,23 @@ import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.now
-import com.lightningkite.lightningserver.auth.fetchUserIdString
-import com.lightningkite.lightningserver.auth.idString
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.typed.*
-import com.lightningkite.lightningserver.typed.sdk.SdkModule
+import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
-import com.lightningkite.lightningserver.typed.sdk.clientInterface
-import com.lightningkite.lightningserver.typed.sdk.info
-import com.lightningkite.lightningserver.typed.sdk.sdkSettings
-import com.lightningkite.services.cache.Cache
-import com.lightningkite.services.cache.get
-import com.lightningkite.services.cache.set
+import com.lightningkite.services.cache.*
 import com.lightningkite.services.database.*
 import com.webauthn4j.WebAuthnManager
-import com.webauthn4j.authenticator.AuthenticatorImpl
 import com.webauthn4j.converter.AttestationObjectConverter
 import com.webauthn4j.converter.util.ObjectConverter
+import com.webauthn4j.credential.CredentialRecordImpl
 import com.webauthn4j.data.*
 import com.webauthn4j.data.attestation.statement.COSEAlgorithmIdentifier
 import com.webauthn4j.data.client.Origin
-import com.webauthn4j.data.client.challenge.Challenge
 import com.webauthn4j.server.ServerProperty
 import com.webauthn4j.verifier.exception.VerificationException
-import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.flow.*
 import kotlinx.serialization.Serializable
 import java.security.SecureRandom
 import kotlin.io.encoding.Base64
@@ -55,9 +43,9 @@ public class WebAuthNProofEndpoints(
     override val proofExpiration: Duration = 1.hours,
     private val challengeLength: Int = 64,
     private val expiration: Duration = 5.minutes,
-    private val rpId: () -> String,
-    private val registrationForUser: (HasId<*>, WebAuthN.GeneralPreference) -> WebAuthN.Registration.RegistrationOptions,
-    private val proveOptions: (String?) -> WebAuthN.Authentication.ProveOptions = { WebAuthN.Authentication.ProveOptions() },
+    private val rpId: context(ServerRuntime) () -> String,
+    private val registrationForUser: context(ServerRuntime) (HasId<*>, WebAuthN.GeneralPreference) -> WebAuthN.Registration.RegistrationOptions,
+    private val proveOptions: context(ServerRuntime) (String?) -> WebAuthN.Authentication.ProveOptions = { WebAuthN.Authentication.ProveOptions() },
 ) : ServerBuilder(), ProofMethod {
     init {
         proofMethodsRegistry.register(this)
@@ -111,7 +99,8 @@ public class WebAuthNProofEndpoints(
         }
     )
 
-    public val rest: ModelRestEndpoints<HasId<*>, WebAuthNCredential, String> = path.path("credentials") include ModelRestEndpoints(modelInfo)
+    public val rest: ModelRestEndpoints<HasId<*>, WebAuthNCredential, String> =
+        path.path("credentials") include ModelRestEndpoints(modelInfo)
 
 
     private fun challengeCacheKey(key: String): String =
@@ -130,6 +119,7 @@ public class WebAuthNProofEndpoints(
         val challenge: String,
         val userVerification: Boolean,
         val subjectType: String,
+        val allowCredentials: List<String>,
     )
 
     @OptIn(ExperimentalEncodingApi::class)
@@ -228,10 +218,10 @@ public class WebAuthNProofEndpoints(
             errorCases = listOf(),
             examples = listOf(),
             successCode = HttpStatus.OK,
-            implementation = { (challengeId, displayName, credentials): WebAuthN.Registration.RegisterRequest ->
+            implementation = { (challengeId, displayName, credential): WebAuthN.Registration.RegisterRequest ->
 
                 val clientData = serverRuntime.externalSerialization.json.decodeFromString<WebAuthN.ClientData>(
-                    Base64.decode(credentials.response.clientDataJSON).decodeToString()
+                    Base64.decode(credential.response.clientDataJSON).decodeToString()
                 )
 
                 val cacheKey = challengeCacheKey(challengeId)
@@ -244,19 +234,19 @@ public class WebAuthNProofEndpoints(
 
 
                 val data = RegistrationRequest(
-                    WebAuthN.base64Decoder.decode(credentials.response.attestationObject),
-                    WebAuthN.base64Decoder.decode(credentials.response.clientDataJSON),
-                    serverRuntime.externalSerialization.json.encodeToString(credentials.clientExtensionResults),
-                    credentials.response.transports.map { it.standardName }.toSet(),
+                    WebAuthN.base64Decoder.decode(credential.response.attestationObject),
+                    WebAuthN.base64Decoder.decode(credential.response.clientDataJSON),
+                    serverRuntime.externalSerialization.json.encodeToString(credential.clientExtensionResults),
+                    credential.response.transports.map { it.standardName }.toSet(),
                 )
 
                 val registrationParams: RegistrationParameters = RegistrationParameters(
                     /* serverProperty = */
-                    ServerProperty(
-                        /* origin = */ Origin(clientData.origin),
-                        /* rpId = */ rpId(),
-                        /* challenge = */ Challenge { fromCache.challenge.encodeToByteArray() }
-                    ),
+                    ServerProperty.builder()
+                        .origin(Origin(clientData.origin))
+                        .rpId(rpId())
+                        .challenge { fromCache.challenge.encodeToByteArray() }
+                        .build(),
                     /* pubKeyCredParams = */
                     fromCache.allowedAlgorithms.map {
                         PublicKeyCredentialParameters(
@@ -278,22 +268,22 @@ public class WebAuthNProofEndpoints(
 
                 modelInfo.table().insertOne(
                     WebAuthNCredential(
-                        _id = credentials.id,
+                        _id = credential.id,
                         displayName = displayName,
                         subjectId = auth.rawId,
                         subjectType = auth.principalName,
                         residentKey = when (fromCache.residentKeyPreference) {
                             WebAuthN.GeneralPreference.Discouraged -> false
                             WebAuthN.GeneralPreference.Preferred -> {
-                                credentials.clientExtensionResults?.credProps?.rk == true
+                                credential.clientExtensionResults?.credProps?.rk == true
                             }
 
                             WebAuthN.GeneralPreference.Required -> true
                         },
                         lastSignCount = dataResult.attestationObject?.authenticatorData?.signCount ?: 0,
-                        authenticatorAttachment = credentials.authenticatorAttachment,
-                        attestationObject = credentials.response.attestationObject,
-                        transports = credentials.response.transports.map { it.standardName },
+                        authenticatorAttachment = credential.authenticatorAttachment,
+                        attestationObject = credential.response.attestationObject,
+                        transports = credential.response.transports.map { it.standardName },
                         establishedAt = now()
                     )
                 )
@@ -360,6 +350,7 @@ public class WebAuthNProofEndpoints(
                         challenge = challenge,
                         userVerification = options.userVerification == WebAuthN.GeneralPreference.Required,
                         subjectType = subjectType,
+                        allowCredentials = existingCreds.map { it.id },
                     ),
                     timeToLive = 15.minutes
                 )
@@ -419,19 +410,26 @@ public class WebAuthNProofEndpoints(
                     AttestationObjectConverter(ObjectConverter()).convert(publicKeyCredential.attestationObject)!!
 
 
-                @Suppress("DEPRECATION")
                 val authParams = AuthenticationParameters(
-                    ServerProperty(
-                        /* origin = */ Origin(clientData.origin),
-                        /* rpId = */ rpId(),
-                        /* challenge = */ Challenge { fromCache.challenge.encodeToByteArray() }
-                    ),
-                    AuthenticatorImpl(
-                        attestation.authenticatorData.attestedCredentialData!!,
-                        attestation.attestationStatement,
+                    ServerProperty.builder()
+                        .origin(Origin(clientData.origin))
+                        .rpId(rpId())
+                        .challenge { fromCache.challenge.encodeToByteArray() }
+                        .build(),
+                    CredentialRecordImpl(
+                        /* attestationStatement = */ attestation.attestationStatement,
+                        /* uvInitialized = */ null,
+                        /* backupEligible = */ null,
+                        /* backupState = */ null,
                         // Sign count anomaly detection is implemented in the webauthn4j library and is checked here.
-                        publicKeyCredential.lastSignCount
+                        /* counter = */ publicKeyCredential.lastSignCount,
+                        /* attestedCredentialData = */ attestation.authenticatorData.attestedCredentialData!!,
+                        /* authenticatorExtensions = */ null,
+                        /* clientData = */ null,
+                        /* clientExtensions = */ null,
+                        /* transports = */ null,
                     ),
+                    fromCache.allowCredentials.map { WebAuthN.base64Decoder.decode(it) }.takeIf { it.isNotEmpty() },
                     fromCache.userVerification,
                 )
 

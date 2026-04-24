@@ -10,11 +10,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
 
@@ -27,7 +23,7 @@ class AuthenticationExtTest {
     data class AuthUser(
         override val _id: Uuid = Uuid.random(),
         val email: String = "",
-        val displayName: String = ""
+        val displayName: String = "",
     ) : HasId<Uuid> {
         companion object : PrincipalType<AuthUser, Uuid> {
             override val idSerializer: KSerializer<Uuid> = Uuid.serializer()

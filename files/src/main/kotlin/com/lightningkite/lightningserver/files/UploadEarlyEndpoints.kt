@@ -1,19 +1,17 @@
 package com.lightningkite.lightningserver.files
 
-import com.lightningkite.lightningserver.auth.*
-import com.lightningkite.lightningserver.definition.builder.*
+import com.lightningkite.lightningserver.auth.AuthRequirement
+import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.*
-import com.lightningkite.lightningserver.definition.ScheduledTask
-import com.lightningkite.lightningserver.deprecations.*
-import com.lightningkite.lightningserver.encryption.*
-import com.lightningkite.lightningserver.pathing.*
-import com.lightningkite.lightningserver.runtime.*
-import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.encryption.HMAC_Blocking
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
-import com.lightningkite.lightningserver.typed.sdk.clientInterface
-import com.lightningkite.lightningserver.typed.sdk.info
-import com.lightningkite.lightningserver.typed.sdk.sdkSettings
+import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.runtime.now
+import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.typed.ApiHttpHandler
+import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.services.database.*
 import com.lightningkite.services.files.*
 import kotlinx.coroutines.runBlocking
@@ -85,37 +83,37 @@ public class UploadEarlyEndpoint(
      */
     public val endpoint: ApiHttpHandler<PathSpec0, HasId<*>?, Unit, UploadInformation> =
         path.get bind ApiHttpHandler(
-        auth = authOptions,
-        summary = "Upload File for Request",
-        description = "Upload a file to make a request later. Times out in $expiration.",
-        errorCases = listOf(),
-        implementation = { _: Unit ->
-            val key = "${Uuid.random()}.file"
-            if (fileScanner().isEmpty()) {
-                val newFile = serializer().ready.then(key)
-                val newItem = UploadForNextRequest(
-                    expires = now().plus(expiration),
-                    file = ServerFile(newFile.url)
-                )
-                database().table<UploadForNextRequest>().insertOne(newItem)
-                UploadInformation(
-                    uploadUrl = newFile.uploadUrl(expiration),
-                    futureCallToken = serializer().certifyAlreadyScannedForUse(key, expiration)
-                )
-            } else {
-                val newFile = serializer().jail.then(key)
-                val newItem = UploadForNextRequest(
-                    expires = now().plus(expiration),
-                    file = ServerFile(newFile.url)
-                )
-                database().table<UploadForNextRequest>().insertOne(newItem)
-                UploadInformation(
-                    uploadUrl = newFile.uploadUrl(expiration),
-                    futureCallToken = serializer().certifyForUse(key, expiration)
-                )
+            auth = authOptions,
+            summary = "Upload File for Request",
+            description = "Upload a file to make a request later. Times out in $expiration.",
+            errorCases = listOf(),
+            implementation = { _: Unit ->
+                val key = "${Uuid.random()}.file"
+                if (fileScanner().isEmpty()) {
+                    val newFile = serializer().ready.then(key)
+                    val newItem = UploadForNextRequest(
+                        expires = now().plus(expiration),
+                        file = ServerFile(newFile.url)
+                    )
+                    database().table<UploadForNextRequest>().insertOne(newItem)
+                    UploadInformation(
+                        uploadUrl = newFile.uploadUrl(expiration),
+                        futureCallToken = serializer().certifyAlreadyScannedForUse(key, expiration)
+                    )
+                } else {
+                    val newFile = serializer().jail.then(key)
+                    val newItem = UploadForNextRequest(
+                        expires = now().plus(expiration),
+                        file = ServerFile(newFile.url)
+                    )
+                    database().table<UploadForNextRequest>().insertOne(newItem)
+                    UploadInformation(
+                        uploadUrl = newFile.uploadUrl(expiration),
+                        futureCallToken = serializer().certifyForUse(key, expiration)
+                    )
+                }
             }
-        }
-    )
+        )
 
     /**
      * POST handler to verify a previously uploaded file, scanning and moving it to the ready location if safe.

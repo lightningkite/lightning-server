@@ -4,7 +4,6 @@ package com.lightningkite.lightningserver.typed.jsonschema
 import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 
 /**
  * Tests for JSON merge utility functions in Util.kt.
@@ -70,12 +69,14 @@ class UtilTest {
 
         val result = merge(a, b)
 
-        val expected = JsonArray(listOf(
-            JsonPrimitive(1),
-            JsonPrimitive(2),
-            JsonPrimitive(3),
-            JsonPrimitive(4)
-        ))
+        val expected = JsonArray(
+            listOf(
+                JsonPrimitive(1),
+                JsonPrimitive(2),
+                JsonPrimitive(3),
+                JsonPrimitive(4)
+            )
+        )
         assertEquals(expected, result)
     }
 
@@ -284,12 +285,14 @@ class UtilTest {
 
         val result = merge(a, b)
 
-        val expected = JsonArray(listOf(
-            JsonPrimitive(1),
-            JsonPrimitive("text"),
-            JsonPrimitive(true),
-            JsonNull
-        ))
+        val expected = JsonArray(
+            listOf(
+                JsonPrimitive(1),
+                JsonPrimitive("text"),
+                JsonPrimitive(true),
+                JsonNull
+            )
+        )
         assertEquals(expected, result)
     }
 

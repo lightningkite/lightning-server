@@ -1,7 +1,6 @@
 // by Claude
 package com.lightningkite.lightningserver.auth
 
-import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
@@ -10,9 +9,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
+import kotlin.test.*
 import kotlin.uuid.Uuid
 
 /**
@@ -23,7 +20,7 @@ class AuthenticationCacheKeyTest {
     @Serializable
     data class CacheTestUser(
         override val _id: Uuid = Uuid.random(),
-        val email: String = ""
+        val email: String = "",
     ) : HasId<Uuid> {
         companion object : PrincipalType<CacheTestUser, Uuid> {
             override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
@@ -58,7 +55,8 @@ class AuthenticationCacheKeyTest {
     fun `Reader default priority is 0`() {
         val reader = object : Authentication.Reader<CacheTestUser> {
             context(server: ServerRuntime)
-            override suspend fun read(request: com.lightningkite.lightningserver.data.Request<*>): Authentication<CacheTestUser>? = null
+            override suspend fun read(request: com.lightningkite.lightningserver.data.Request<*>): Authentication<CacheTestUser>? =
+                null
         }
         assertEquals(0.0, reader.priority)
     }
@@ -67,8 +65,10 @@ class AuthenticationCacheKeyTest {
     fun `Reader can have custom priority`() {
         val reader = object : Authentication.Reader<CacheTestUser> {
             override val priority: Double = 100.0
+
             context(server: ServerRuntime)
-            override suspend fun read(request: com.lightningkite.lightningserver.data.Request<*>): Authentication<CacheTestUser>? = null
+            override suspend fun read(request: com.lightningkite.lightningserver.data.Request<*>): Authentication<CacheTestUser>? =
+                null
         }
         assertEquals(100.0, reader.priority)
     }
@@ -77,8 +77,10 @@ class AuthenticationCacheKeyTest {
     fun `Reader can have negative priority`() {
         val reader = object : Authentication.Reader<CacheTestUser> {
             override val priority: Double = -50.0
+
             context(server: ServerRuntime)
-            override suspend fun read(request: com.lightningkite.lightningserver.data.Request<*>): Authentication<CacheTestUser>? = null
+            override suspend fun read(request: com.lightningkite.lightningserver.data.Request<*>): Authentication<CacheTestUser>? =
+                null
         }
         assertEquals(-50.0, reader.priority)
     }
@@ -89,8 +91,10 @@ class AuthenticationCacheKeyTest {
     fun `authReaders can be registered`() = runBlocking {
         val reader = object : Authentication.Reader<CacheTestUser> {
             override val priority: Double = 10.0
+
             context(server: ServerRuntime)
-            override suspend fun read(request: com.lightningkite.lightningserver.data.Request<*>): Authentication<CacheTestUser>? = null
+            override suspend fun read(request: com.lightningkite.lightningserver.data.Request<*>): Authentication<CacheTestUser>? =
+                null
         }
 
         object : ServerBuilder() {

@@ -5,24 +5,19 @@ import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.verify
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
-import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.sessions.token.JwtClaims
-import com.lightningkite.lightningserver.sessions.token.JwtHeader
-import com.lightningkite.lightningserver.sessions.token.JwtSignatureException
+import com.lightningkite.lightningserver.sessions.token.*
 import com.lightningkite.services.http.client
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.RSA
-import dev.whyoleg.cryptography.algorithms.SHA256 as CryptoSHA256
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
+import dev.whyoleg.cryptography.algorithms.SHA256 as CryptoSHA256
 
 /**
  * Verifies Apple ID tokens (JWTs) with proper signature validation.
@@ -55,7 +50,7 @@ public object AppleJwtVerifier {
 
     @Serializable
     private data class AppleJwks(
-        val keys: List<ApplePublicKey>
+        val keys: List<ApplePublicKey>,
     )
 
     @Serializable
@@ -65,7 +60,7 @@ public object AppleJwtVerifier {
         val use: String,  // Usage (sig for signature)
         val alg: String,  // Algorithm (RS256)
         val n: String,    // RSA modulus (base64url)
-        val e: String     // RSA exponent (base64url)
+        val e: String,     // RSA exponent (base64url)
     )
 
     /**
@@ -108,7 +103,7 @@ public object AppleJwtVerifier {
     context(runtime: ServerRuntime)
     public suspend fun verifyAppleIdToken(
         idToken: String,
-        expectedAudience: String
+        expectedAudience: String,
     ): JwtClaims {
         val decoder = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
 
@@ -252,8 +247,8 @@ public object AppleJwtVerifier {
 
         // Algorithm identifier SEQUENCE { OID, NULL }
         val algorithm = byteArrayOf(0x30) + encodeDerLength(rsaOid.size + 4) +
-                       byteArrayOf(0x06) + byteArrayOf(rsaOid.size.toByte()) + rsaOid +
-                       byteArrayOf(0x05, 0x00) // NULL
+                byteArrayOf(0x06) + byteArrayOf(rsaOid.size.toByte()) + rsaOid +
+                byteArrayOf(0x05, 0x00) // NULL
 
         // Full SPKI SEQUENCE
         val fullSequence = algorithm + bitString

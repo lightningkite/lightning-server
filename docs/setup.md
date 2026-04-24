@@ -4,7 +4,8 @@ Last updated January 2025 (`version-5`)
 
 ## Create a new Kotlin/Gradle KTS project.
 
-IntelliJ has a quick option for this under "New Project".  Make sure you select Kotlin, Gradle, and Kotlin as your DSL language.
+IntelliJ has a quick option for this under "New Project". Make sure you select Kotlin, Gradle, and Kotlin as your DSL
+language.
 
 ## Add Gradle Plugins
 
@@ -119,9 +120,11 @@ fun main(args: Array<String>) {
 
 ## Try it out!
 
-Run the program twice - the first time it will create a default `settings.json` file for you, and the second time it will run the server normally.
+Run the program twice - the first time it will create a default `settings.json` file for you, and the second time it
+will run the server normally.
 
-*It is considered an important Lightning Server principal to ensure your application works out of the box with the generated `settings.json`.*
+*It is considered an important Lightning Server principal to ensure your application works out of the box with the
+generated `settings.json`.*
 
 Go to [http://localhost:8080](http://localhost:8080) to see your "Hello world!"
 

@@ -1,8 +1,7 @@
-import com.lightningkite.deployhelpers.*
+import com.lightningkite.deployhelpers.lkLibrary
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
-    alias(libs.plugins.ksp)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.dokka)
     id("signing")
@@ -12,14 +11,15 @@ plugins {
 
 dependencies {
     api(libs.kotlinx.io)
-    api(libs.kotlinx.json)
-    api(libs.kotlinx.json.io)
+    api(libs.kotlinx.serialization.json)
+    api(libs.kotlinx.serialization.json.io)
     api(libs.serialization.properties)
     api(libs.services.data)
     api(libs.services.basis)
+    api(libs.services.kotlin.bytes.format)
     api(libs.services.otel.jvm)
+    api(libs.services.webhook.subservice)
     api(libs.services.pubsub)
-    api(libs.services.shouldBeStandardLibrary)
     api(libs.kotlin.html.jvm)
     api(project(":core-shared"))
 
@@ -31,10 +31,6 @@ dependencies {
     testImplementation(libs.kotlin.test.junit)
 }
 
-ksp {
-    arg("generateFields", "true")
-}
-
 kotlin {
     explicitApi()
     compilerOptions {
@@ -42,14 +38,12 @@ kotlin {
         optIn.add("kotlin.uuid.ExperimentalUuidApi")
         freeCompilerArgs.add("-Xcontext-parameters")
     }
-    sourceSets.main {
-        kotlin.srcDir("build/generated/ksp/main/kotlin")
-    }
-    sourceSets.test {
-        kotlin.srcDir("build/generated/ksp/test/kotlin")
-    }
 }
 
-lkLibrary("lightningkite", "lightning-server") {
-    description.set("A set of tools to fill in/replace what Ktor is lacking in.")
+lkLibrary(
+    "lightningkite",
+    "lightning-server",
+    mavenAutomaticRelease = project.findProperty("mavenAutomaticRelease") as? Boolean ?: false
+) {
+    description.set("The core components that make up a Lightning Server framework.")
 }

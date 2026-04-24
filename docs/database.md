@@ -2,7 +2,8 @@
 
 Last updated January 2025 (`version-5`)
 
-Lightning Server contains a database abstraction that enables you to build applications without worrying about exactly which database will be used.  It is abstracted over both NoSQL and SQL databases.
+Lightning Server contains a database abstraction that enables you to build applications without worrying about exactly
+which database will be used. It is abstracted over both NoSQL and SQL databases.
 
 ## Declaring the need for a database
 
@@ -18,7 +19,8 @@ object Server : ServerBuilder() {
 
 ## Declaring a model
 
-Next we need to declare a model.  All models are serializable via `kotlinx.serialization`, and need the additional annotation `@GenerateDataClassPaths` for the query DSL to work properly.
+Next we need to declare a model. All models are serializable via `kotlinx.serialization`, and need the additional
+annotation `@GenerateDataClassPaths` for the query DSL to work properly.
 
 It is strongly recommended you define the primary key yourself by making the class implement `HasId<T>`.
 
@@ -227,7 +229,8 @@ object Server: ServerBuilder() {
 
 #### MongoDB Run Locally
 
-Useful for running on a local machine for testing.  Downloads and runs a copy of Mongo on the machine with the database files stored at the given path.
+Useful for running on a local machine for testing. Downloads and runs a copy of Mongo on the machine with the database
+files stored at the given path.
 
 ```json5
 // settings.json
@@ -249,7 +252,8 @@ Good for unit tests.
 
 ### PostgreSQL
 
-**WARNING** - Support is not considered ready for production.  If you wish to use this, reach out to us and we'll polish it off.
+**WARNING** - Support is not considered ready for production. If you wish to use this, reach out to us and we'll polish
+it off.
 
 Most things work, but `Map` modifications do not.
 

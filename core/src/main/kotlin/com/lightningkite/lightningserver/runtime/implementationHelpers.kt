@@ -1,14 +1,8 @@
 package com.lightningkite.lightningserver.runtime
 
-import com.lightningkite.MediaType
-import com.lightningkite.lightningserver.HttpMethod
-import com.lightningkite.lightningserver.RouteNotFoundException
-import com.lightningkite.lightningserver.definition.ScheduledTask
-import com.lightningkite.lightningserver.definition.StartupTask
-import com.lightningkite.lightningserver.definition.Task
+import com.lightningkite.lightningserver.*
+import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.http.*
-import com.lightningkite.lightningserver.logger
-import com.lightningkite.lightningserver.pathMoved
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.telemetry.use
@@ -17,9 +11,7 @@ import com.lightningkite.services.data.Data
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.otel.get
 import io.opentelemetry.api.trace.Span
-import kotlinx.io.asOutputStream
-import kotlinx.io.asSink
-import kotlinx.io.buffered
+import kotlinx.io.*
 import java.util.zip.GZIPOutputStream
 
 /**
@@ -202,7 +194,8 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
  * @param request The HTTP request to handle
  * @return The HTTP response from the handler
  */
-context(serverRuntime: ServerRuntime) private suspend inline fun <PATH : PathSpec> HttpHandler<PATH>.handleWithMetrics(
+context(serverRuntime: ServerRuntime)
+private suspend inline fun <PATH : PathSpec> HttpHandler<PATH>.handleWithMetrics(
     request: HttpRequest<PATH>,
 ): HttpResponse {
     val startTime = System.currentTimeMillis()

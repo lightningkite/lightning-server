@@ -1,14 +1,8 @@
 // by Claude
 package com.lightningkite.lightningserver.pathing
 
-import com.lightningkite.lightningserver.http.PathSegments
 import kotlinx.serialization.builtins.serializer
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /**
  * Tests for PathSpec and related classes.
@@ -161,7 +155,6 @@ class PathSpecExtensionsTest {
     @Test
     fun `PathSpec1 has one wildcard`() {
         val spec = PathSpec0.fromString("/users").arg<String>("id")
-        assertTrue(spec is PathSpec1<*>)
         assertEquals(1, spec.wildcards.size)
         assertEquals("id", spec.wildcards[0].name)
     }
@@ -172,7 +165,6 @@ class PathSpecExtensionsTest {
             .arg<String>("userId")
             .path("posts")
             .arg<Int>("postId")
-        assertTrue(spec is PathSpec2<*, *>)
         assertEquals(2, spec.wildcards.size)
     }
 
@@ -184,7 +176,6 @@ class PathSpecExtensionsTest {
             .arg<Int>("postId")
             .path("comments")
             .arg<Long>("commentId")
-        assertTrue(spec is PathSpec3<*, *, *>)
         assertEquals(3, spec.wildcards.size)
     }
 

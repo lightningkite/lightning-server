@@ -1,32 +1,20 @@
 package com.lightningkite.lightningserver.typed.sdk
 
 import com.lightningkite.lightningserver.auth.AuthRequirement
-import com.lightningkite.lightningserver.definition.Locationed
-import com.lightningkite.lightningserver.definition.ServerDefinition
-import com.lightningkite.lightningserver.definition.Task
+import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.mapItems
 import com.lightningkite.lightningserver.http.HttpEndpoint
-import com.lightningkite.lightningserver.pathing.MutablePathSpecMap
-import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.pathing.PathSpecMap
-import com.lightningkite.lightningserver.pathing.plus
-import com.lightningkite.lightningserver.pathing.toSealedPathSpecMap
+import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.ApiWebsocketHandler
+import com.lightningkite.lightningserver.typed.sdk.SDK.sdk
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
-import com.lightningkite.services.data.ExperimentalLightningServer
-import com.lightningkite.services.data.KFile
-import com.lightningkite.toSealedList
-import com.lightningkite.toSealedMap
+import com.lightningkite.services.data.*
+import com.lightningkite.services.kfile.KFile
 import kotlinx.serialization.KSerializer
-import kotlin.collections.component1
-import kotlin.collections.component2
 import kotlin.reflect.KClass
-import kotlin.sequences.forEach
 
 /**
  * SDK generation framework for Lightning Server applications.
@@ -306,7 +294,7 @@ public object SDK {
      */
     public data class Data(
         val layer: Layer,
-        val children: List<Locationed<PathSpec0, Data>>
+        val children: List<Locationed<PathSpec0, Data>>,
     ) {
         /**
          * Metadata and endpoint information for a single module/layer in the API hierarchy.
@@ -318,7 +306,7 @@ public object SDK {
          */
         public data class Layer(
             val info: SdkModule.Info,
-            val endpoints: Map<Locationed<PathSpec0, InterfaceInfo>?, PathSpecMap<ServerApiEndpoints>>
+            val endpoints: Map<Locationed<PathSpec0, InterfaceInfo>?, PathSpecMap<ServerApiEndpoints>>,
         )
 
         /**
@@ -335,7 +323,7 @@ public object SDK {
         public data class Node(
             val ancestors: List<Layer>,
             val absolutePath: PathSpec0,
-            val layer: Layer
+            val layer: Layer,
         ) {
             public val depth: Int get() = ancestors.size
         }
@@ -388,26 +376,28 @@ public object SDK {
             val handler: ApiHttpHandler<*, *, *, *>,
             val endpoint: HttpEndpoint<PathSpec>,
             override val fromInterface: InterfaceInfo?,
-            override val functionName: String = handler.functionName.functionCase()
+            override val functionName: String = handler.functionName.functionCase(),
         ) : Function, Documentable by handler {
             override val path: PathSpec get() = endpoint.path
 
-            override val arguments: List<Argument> get() = path.wildcards
-                .map { Argument(it.name, it.serializer) }
-                .plus(
-                    if (inputType.isUnit()) emptyList()
-                    else listOf(Argument("input", inputType))
-                )
+            override val arguments: List<Argument>
+                get() = path.wildcards
+                    .map { Argument(it.name, it.serializer) }
+                    .plus(
+                        if (inputType.isUnit()) emptyList()
+                        else listOf(Argument("input", inputType))
+                    )
         }
 
         public data class Websocket(
             val handler: ApiWebsocketHandler<*, *, *, *, *>,
             override val path: PathSpec,
             override val fromInterface: InterfaceInfo?,
-            override val functionName: String = handler.functionName.functionCase()
+            override val functionName: String = handler.functionName.functionCase(),
         ) : Function, Documentable by handler {
-            override val arguments: List<Argument> get() =
-                path.wildcards.map { Argument(it.name, it.serializer) }
+            override val arguments: List<Argument>
+                get() =
+                    path.wildcards.map { Argument(it.name, it.serializer) }
         }
     }
 
@@ -432,7 +422,7 @@ public object SDK {
         val path: PathSpec0,
         val extendsInterfaces: List<Locationed<PathSpec0, InterfaceInfo>>,
         val functions: List<Function>,
-        val children: List<Module>
+        val children: List<Module>,
     ) {
         public val declaredFunctions: List<Function> get() = functions.filter { it.fromInterface == null }
         public val functionOverrides: List<Function> get() = functions.filter { it.fromInterface != null }
@@ -467,7 +457,10 @@ public object SDK {
 
             fun append(relativePath: PathSpec0, module: ServerDefinition) {
                 endpoints
-                    .getOrPut(module.thisLayer.extensions[InterfaceInfo]?.let { Locationed(relativePath, it) }, ::MutablePathSpecMap)
+                    .getOrPut(
+                        module.thisLayer.extensions[InterfaceInfo]?.let { Locationed(relativePath, it) },
+                        ::MutablePathSpecMap
+                    )
                     .apply {
                         module.thisLayer.endpoints.asSequence().forEach { entry ->
                             val api = ServerApiEndpoints(entry.value)

@@ -127,6 +127,7 @@ public class EventLauncher<H : EventHandler, T : HasId<ID>, ID : Comparable<ID>>
  * @param additionalSetup DSL lambda for event setup (e.g., setting content generators or subscribers)
  * @return The created event launcher
  */
+@Suppress("DSL_MARKER_APPLIED_TO_WRONG_TARGET")
 @LightningServerDsl
 context(builder: ServerBuilder)
 public fun <HANDLER : EventHandler, T : HasId<ID>, ID : Comparable<ID>> HANDLER.event(
@@ -134,7 +135,7 @@ public fun <HANDLER : EventHandler, T : HasId<ID>, ID : Comparable<ID>> HANDLER.
     info: ModelInfo<*, T, ID>,
     tags: Set<String> = emptySet(),
     timeout: Duration = 5.minutes,
-    additionalSetup: HANDLER.(EventDefinition<T, ID>) -> Unit
+    additionalSetup: HANDLER.(EventDefinition<T, ID>) -> Unit,
 ): EventLauncher<HANDLER, T, ID> {
     val type = EventDefinition(name, tags, info)
 

@@ -1,30 +1,17 @@
 package com.lightningkite.lightningserver.definition.builder
 
-import com.lightningkite.lightningserver.HttpMethod
-import com.lightningkite.lightningserver.InternalLightningServerApi
-import com.lightningkite.lightningserver.LightningServerDsl
+import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.http.*
-import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.pathing.PathSpecRegistry
-import com.lightningkite.lightningserver.pathing.buildSealedPathSpecMap
-import com.lightningkite.lightningserver.pathing.toSealedPathSpecMap
-import com.lightningkite.lightningserver.serialization.MediaTypeCoder
-import com.lightningkite.lightningserver.serialization.MediaTypeDecoder
-import com.lightningkite.lightningserver.serialization.MediaTypeDecoderRegistry
-import com.lightningkite.lightningserver.serialization.MediaTypeEncoder
-import com.lightningkite.lightningserver.serialization.MediaTypeEncoderRegistry
-import com.lightningkite.lightningserver.serialization.serializerOrContextual
-import com.lightningkite.lightningserver.websockets.WebSocketHandler
-import com.lightningkite.lightningserver.websockets.WebSocketHandlerInterceptor
-import com.lightningkite.lightningserver.websockets.WebSocketTopic
+import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.serialization.*
+import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.Setting
 import com.lightningkite.services.SettingContext
+import com.lightningkite.services.data.toSealedList
+import com.lightningkite.services.data.toSealedMap
 import com.lightningkite.services.database.validation.AnnotationValidators
 import com.lightningkite.services.database.validation.EmptyAnnotationValidators
-import com.lightningkite.toSealedList
-import com.lightningkite.toSealedMap
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
@@ -78,6 +65,8 @@ import kotlin.uuid.Uuid
  * }
  * ```
  * */
+
+@LightningServerDsl
 public abstract class ServerBuilder : Extendable {
     @InternalLightningServerApi
     public val moduleId: Uuid = Uuid.random()
@@ -85,7 +74,10 @@ public abstract class ServerBuilder : Extendable {
     protected open val internalSerialization: Runtime<SerializersModule> get() = Runtime.Constant(EmptySerializersModule())
     protected open val externalSerialization: Runtime<SerializersModule> get() = Runtime.Constant(EmptySerializersModule())
 
-    protected open val annotationValidators: Runtime<AnnotationValidators> get() = Runtime.Constant(EmptyAnnotationValidators())
+    protected open val annotationValidators: Runtime<AnnotationValidators>
+        get() = Runtime.Constant(
+            EmptyAnnotationValidators()
+        )
 
     public val path: PathSpec0 get() = PathSpec.root // just for convenience
 
@@ -113,63 +105,56 @@ public abstract class ServerBuilder : Extendable {
     private val imports: ListRegistry<Locationed<PathSpec0, ServerDefinition>> = ListRegistry()
     private val modules: ListRegistry<Locationed<PathSpec0, ServerBuilder>> = ListRegistry()
 
-    @LightningServerDsl
     @JvmName("installHttpInterceptor")
-    public fun <T: HttpInterceptor> install(interceptor: T): T = interceptor.also { httpInterceptors.register(it) }
-    @LightningServerDsl
-    @JvmName("installWebSocketHandlerInterceptor")
-    public fun <T: WebSocketHandlerInterceptor> install(interceptor: T): T = interceptor.also { websocketInterceptors.register(it) }
-    @LightningServerDsl
-    @JvmName("installRequestInterceptor")
-    public fun <T> install(interceptor: T): T where T: HttpInterceptor, T: WebSocketHandlerInterceptor = interceptor.also {
-        httpInterceptors.register(it)
-        websocketInterceptors.register(it)
-    }
+    public fun <T : HttpInterceptor> install(interceptor: T): T = interceptor.also { httpInterceptors.register(it) }
 
-    @LightningServerDsl
+    @JvmName("installWebSocketHandlerInterceptor")
+    public fun <T : WebSocketHandlerInterceptor> install(interceptor: T): T =
+        interceptor.also { websocketInterceptors.register(it) }
+
+    @JvmName("installRequestInterceptor")
+    public fun <T> install(interceptor: T): T where T : HttpInterceptor, T : WebSocketHandlerInterceptor =
+        interceptor.also {
+            httpInterceptors.register(it)
+            websocketInterceptors.register(it)
+        }
+
     public infix fun <PATH : PathSpec, HANDLER : HttpHandler<PATH>> HttpEndpoint<PATH>.bind(handler: HANDLER): HANDLER {
         httpHandlers.getOrRegister(this.path, ::MapRegistry).register(this.method, handler)
         return handler
     }
 
-    @LightningServerDsl
     public infix fun <PATH : PathSpec, STORAGE, T : WebSocketHandler<PATH, STORAGE>> PATH.bind(handler: T): T {
         websocketHandlers.register(this, handler)
         return handler
     }
 
-    @LightningServerDsl
     public infix fun <T> PathSpec0.bind(task: Task<T>): Task<T> {
         tasks.register(this, task)
         return task
     }
 
-    @LightningServerDsl
     public infix fun PathSpec0.bind(startupTask: StartupTask): StartupTask {
         startupTasks.register(this, startupTask)
         return startupTask
     }
 
-    @LightningServerDsl
     public infix fun PathSpec0.bind(schedule: ScheduledTask): ScheduledTask {
         schedules.register(this, schedule)
         return schedule
     }
 
-    @LightningServerDsl
     public fun <PATH : PathSpec, T> PATH.topic(type: KSerializer<T>): WebSocketTopic<PATH, T> {
         val topic = WebSocketTopic<PATH, T>(type)
         websocketTopics.register(this, topic)
         return topic
     }
 
-    @LightningServerDsl
     public fun <Setting, Result> setting(setting: ServerSetting<Setting, Result>): ServerSetting<Setting, Result> {
         settings.register(setting)
         return setting
     }
 
-    @LightningServerDsl
     public fun <Setting, Result> setting(
         name: String,
         default: Setting,
@@ -188,7 +173,6 @@ public abstract class ServerBuilder : Extendable {
             ) { value -> getter(this, value) }
         )
 
-    @LightningServerDsl
     public fun <SETTING : Setting<RESULT>, RESULT> setting(
         name: String,
         default: SETTING,
@@ -206,7 +190,6 @@ public abstract class ServerBuilder : Extendable {
             )
         )
 
-    @LightningServerDsl
     public inline fun <reified SETTING : Setting<RESULT>, RESULT> setting(
         name: String,
         default: SETTING,
@@ -223,7 +206,6 @@ public abstract class ServerBuilder : Extendable {
             )
         )
 
-    @LightningServerDsl
     public fun <Result> setting(
         name: String,
         default: Result,
@@ -242,7 +224,6 @@ public abstract class ServerBuilder : Extendable {
         return setting
     }
 
-    @LightningServerDsl
     public inline fun <reified Setting, Result> setting(
         name: String,
         default: Setting,
@@ -260,7 +241,6 @@ public abstract class ServerBuilder : Extendable {
             ) { value -> getter(this, value) }
         )
 
-    @LightningServerDsl
     public inline fun <reified Result> setting(
         name: String,
         default: Result,
@@ -275,20 +255,17 @@ public abstract class ServerBuilder : Extendable {
             optional,
         )
 
-    @LightningServerDsl
     public infix fun <S, R> ServerSetting<S, R>.bind(deferTo: Runtime<R>): Runtime<R> {
         settingOverrides.register(this, deferTo)
         if (deferTo is ServerSetting<*, *>) settings.register(deferTo)
         return deferTo
     }
 
-    @LightningServerDsl
     public infix fun <T : ServerBuilder> PathSpec0.include(module: T): T {
         modules.register(Locationed(this, module))
         return module
     }
 
-    @LightningServerDsl
     public infix fun PathSpec0.include(import: ServerDefinition): ServerDefinition {
         imports.register(Locationed(this, import))
         return import
@@ -329,10 +306,12 @@ public abstract class ServerBuilder : Extendable {
             websocketInterceptors = websocketInterceptors.toSealedList(),
             endpoints = buildSealedPathSpecMap {
                 for (path in httpHandlers.keys + websocketHandlers.keys) {
-                    put(path, ServerPathEndpoints(
-                        http = httpHandlers[path] ?: emptyMap(),
-                        websocket = websocketHandlers[path]
-                    ))
+                    put(
+                        path, ServerPathEndpoints(
+                            http = httpHandlers[path] ?: emptyMap(),
+                            websocket = websocketHandlers[path]
+                        )
+                    )
                 }
             },
             schedules = schedules.toSealedMap(),

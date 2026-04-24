@@ -4,45 +4,48 @@
 
 Last updated January 2025 (`version-5`)
 
-Welcome! If you're coming from Ruby on Rails, you already have excellent instincts for building web applications. This guide maps your Rails knowledge to Lightning Server concepts, helping you get productive quickly.
+Welcome! If you're coming from Ruby on Rails, you already have excellent instincts for building web applications. This
+guide maps your Rails knowledge to Lightning Server concepts, helping you get productive quickly.
 
 ## Philosophy Differences
 
 Before diving into specifics, it's worth understanding how Lightning Server's philosophy differs from Rails:
 
-| Rails | Lightning Server |
-|-------|------------------|
-| Full-stack framework (views, assets, etc.) | API-focused backend framework |
-| Convention over configuration | Explicit configuration with sensible defaults |
-| Ruby (interpreted, dynamic typing) | Kotlin (compiled, static typing) |
-| ActiveRecord ORM | Type-safe query DSL |
-| Code generation (scaffolding) | Runtime-generated admin UI |
-| Migration-based schema changes | Schemaless (MongoDB) or additive changes |
+| Rails                                      | Lightning Server                              |
+|--------------------------------------------|-----------------------------------------------|
+| Full-stack framework (views, assets, etc.) | API-focused backend framework                 |
+| Convention over configuration              | Explicit configuration with sensible defaults |
+| Ruby (interpreted, dynamic typing)         | Kotlin (compiled, static typing)              |
+| ActiveRecord ORM                           | Type-safe query DSL                           |
+| Code generation (scaffolding)              | Runtime-generated admin UI                    |
+| Migration-based schema changes             | Schemaless (MongoDB) or additive changes      |
 
-Lightning Server is designed for modern API-first architectures where your frontend (React, mobile apps, etc.) handles presentation. Think of it as "Rails API mode" but with compile-time safety.
+Lightning Server is designed for modern API-first architectures where your frontend (React, mobile apps, etc.) handles
+presentation. Think of it as "Rails API mode" but with compile-time safety.
 
 ## Quick Reference Table
 
-| Rails Concept | Lightning Server Equivalent |
-|--------------|----------------------------|
-| `rails console` | IntelliJ debugger + auto-generated admin UI |
-| `rails generate scaffold` | `ModelRestEndpoints` + runtime admin UI |
-| ActiveRecord validations | `@MaxLength`, `@IntegerRange`, etc. |
-| ActiveRecord callbacks | `interceptCreate`, `postChange`, etc. |
-| Scopes | Kotlin extension functions |
-| Active Job | `Schedule` (recurring) + `task` (async) |
-| Action Mailer | Email service abstraction |
-| Fixtures/factories | Data class default parameters |
-| `config/environments/` | URL-based settings (`ram://` vs `mongodb://`) |
-| Rake tasks | CLI commands via kotlinercli |
-| Asset pipeline | Not applicable (API-focused) |
-| Database migrations | Not needed (see below) |
+| Rails Concept             | Lightning Server Equivalent                   |
+|---------------------------|-----------------------------------------------|
+| `rails console`           | IntelliJ debugger + auto-generated admin UI   |
+| `rails generate scaffold` | `ModelRestEndpoints` + runtime admin UI       |
+| ActiveRecord validations  | `@MaxLength`, `@IntegerRange`, etc.           |
+| ActiveRecord callbacks    | `interceptCreate`, `postChange`, etc.         |
+| Scopes                    | Kotlin extension functions                    |
+| Active Job                | `Schedule` (recurring) + `task` (async)       |
+| Action Mailer             | Email service abstraction                     |
+| Fixtures/factories        | Data class default parameters                 |
+| `config/environments/`    | URL-based settings (`ram://` vs `mongodb://`) |
+| Rake tasks                | CLI commands via kotlinercli                  |
+| Asset pipeline            | Not applicable (API-focused)                  |
+| Database migrations       | Not needed (see below)                        |
 
 ## Detailed Comparisons
 
 ### Models and Database Access
 
 **Rails ActiveRecord:**
+
 ```ruby
 class Post < ApplicationRecord
   belongs_to :author, class_name: 'User'
@@ -56,6 +59,7 @@ Post.where(author: current_user).published.recent
 ```
 
 **Lightning Server:**
+
 ```kotlin
 @Serializable
 @GenerateDataClassPaths
@@ -75,7 +79,8 @@ fun Query<Post>.recent() = sort(Post::createdAt.descending()).take(10)
 posts.find(condition { it.authorId eq currentUser._id }).published().recent()
 ```
 
-The `@GenerateDataClassPaths` annotation enables the type-safe query DSL. Typos in field names become compile errors, not runtime bugs.
+The `@GenerateDataClassPaths` annotation enables the type-safe query DSL. Typos in field names become compile errors,
+not runtime bugs.
 
 ### Database Migrations
 
@@ -100,6 +105,7 @@ val migrateData = schedule("migrate-posts-2025-01", Schedule.Frequency(Duration.
 ### Validations
 
 **Rails:**
+
 ```ruby
 class User < ApplicationRecord
   validates :email, format: { with: URI::MailTo::EMAIL_REGEXP }
@@ -109,6 +115,7 @@ end
 ```
 
 **Lightning Server (via service-abstractions):**
+
 ```kotlin
 @Serializable
 data class User(
@@ -120,6 +127,7 @@ data class User(
 ```
 
 Available validation annotations:
+
 - `@MaxLength(size)` - Maximum string length
 - `@MaxSize(size)` - Maximum collection size
 - `@ExpectedPattern(regex)` - Regex pattern matching
@@ -131,6 +139,7 @@ Typed endpoints validate input automatically and return appropriate error respon
 ### Model Callbacks
 
 **Rails:**
+
 ```ruby
 class Post < ApplicationRecord
   before_create :set_defaults
@@ -141,6 +150,7 @@ end
 ```
 
 **Lightning Server:**
+
 ```kotlin
 val posts = database().table<Post>()
     .interceptCreate { value ->
@@ -162,6 +172,7 @@ val posts = database().table<Post>()
 ```
 
 Available lifecycle hooks:
+
 - `interceptCreate` - Modify value before creation
 - `interceptChange` - Modify the modification before application
 - `postCreate` - After successful creation
@@ -201,6 +212,7 @@ object Server : ServerBuilder() {
 ```
 
 This generates:
+
 - `GET /posts/rest` - List with filtering, sorting, pagination
 - `POST /posts/rest` - Create
 - `GET /posts/rest/{id}` - Read
@@ -209,11 +221,13 @@ This generates:
 - `POST /posts/rest/query` - Advanced queries
 - `POST /posts/rest/count` - Count matching records
 
-The [lightning-server-kiteui](https://github.com/lightningkite/lightning-server-kiteui) package provides an auto-generated admin UI at runtime, similar to Rails Admin but without any additional configuration.
+The [lightning-server-kiteui](https://github.com/lightningkite/lightning-server-kiteui) package provides an
+auto-generated admin UI at runtime, similar to Rails Admin but without any additional configuration.
 
 ### Background Jobs
 
 **Rails Active Job:**
+
 ```ruby
 class SendWelcomeEmailJob < ApplicationJob
   queue_as :default
@@ -228,6 +242,7 @@ SendWelcomeEmailJob.perform_later(user)
 ```
 
 **Lightning Server async tasks:**
+
 ```kotlin
 val sendWelcomeEmail = task("send-welcome-email") { userId: Uuid ->
     val user = users.findOne(condition { it._id eq userId })!!
@@ -247,6 +262,7 @@ Tasks automatically integrate with AWS SQS when deployed to Lambda.
 ### Scheduled Tasks (Cron Jobs)
 
 **Rails (with whenever gem):**
+
 ```ruby
 # schedule.rb
 every 15.minutes do
@@ -259,6 +275,7 @@ end
 ```
 
 **Lightning Server:**
+
 ```kotlin
 // Every 15 minutes
 val cleanup = schedule("cleanup", Schedule.Frequency(15.minutes)) {
@@ -289,6 +306,7 @@ val businessHoursTask = schedule("business-hours", Schedule.Cron(
 ### Action Mailer
 
 **Rails:**
+
 ```ruby
 class UserMailer < ApplicationMailer
   def welcome(user)
@@ -301,6 +319,7 @@ UserMailer.welcome(user).deliver_later
 ```
 
 **Lightning Server:**
+
 ```kotlin
 object Server : ServerBuilder() {
     val email = setting("email", EmailService.Settings())
@@ -323,6 +342,7 @@ Email backends (SMTP, Amazon SES, console mock) are configured via settings, not
 ### Test Fixtures and Factories
 
 **Rails (with FactoryBot):**
+
 ```ruby
 FactoryBot.define do
   factory :post do
@@ -357,6 +377,7 @@ No factory library needed. Named parameters make test data creation clear and ty
 ### Environment Configuration
 
 **Rails:**
+
 ```yaml
 # config/database.yml
 development:
@@ -401,11 +422,14 @@ Deploy different `settings.json` files per environment. The URL scheme determine
 
 **Lightning Server alternatives:**
 
-1. **IntelliJ Debugger** - Set breakpoints and use "Evaluate Expression" to run arbitrary Kotlin code against your running server
+1. **IntelliJ Debugger** - Set breakpoints and use "Evaluate Expression" to run arbitrary Kotlin code against your
+   running server
 
-2. **Auto-generated Admin UI** - The lightning-server-kiteui package provides a web-based admin panel for data exploration and manipulation
+2. **Auto-generated Admin UI** - The lightning-server-kiteui package provides a web-based admin panel for data
+   exploration and manipulation
 
 3. **Custom REPL endpoint** (for development only):
+
 ```kotlin
 // Development-only endpoint for quick queries
 val devQuery = path.path("dev").path("query").post.api(
@@ -448,7 +472,8 @@ This catches bugs before your code ever runs.
 
 ### No Asset Pipeline
 
-Lightning Server is API-only. Your frontend application (React, Vue, mobile apps) handles assets, bundling, and presentation. This is intentional - it enables:
+Lightning Server is API-only. Your frontend application (React, Vue, mobile apps) handles assets, bundling, and
+presentation. This is intentional - it enables:
 
 - True separation of concerns
 - Different frontend technologies for different clients
@@ -458,6 +483,7 @@ Lightning Server is API-only. Your frontend application (React, Vue, mobile apps
 ### Settings Auto-Generation
 
 Run your server twice:
+
 1. First run generates a default `settings.json`
 2. Second run uses those settings
 

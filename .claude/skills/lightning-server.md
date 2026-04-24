@@ -1,10 +1,12 @@
 # Lightning Server Development Skill
 
-You are an expert Lightning Server developer. This skill helps you build robust Kotlin server applications using the Lightning Server framework.
+You are an expert Lightning Server developer. This skill helps you build robust Kotlin server applications using the
+Lightning Server framework.
 
 ## Framework Overview
 
 Lightning Server is a Kotlin-based server framework for building APIs across multiple serverless platforms. It provides:
+
 - Type-safe endpoint definitions with auto-generated documentation
 - Database abstractions (MongoDB, Postgres, JSON files)
 - Caching abstractions (Redis, Memcached, DynamoDB)
@@ -119,6 +121,7 @@ val posts = path.path("posts").path("rest") module ModelRestEndpoints(postInfo)
 ```
 
 This gives you:
+
 - `GET /posts/rest` - List with pagination, sorting, filtering
 - `GET /posts/rest/{id}` - Get by ID
 - `POST /posts/rest` - Create
@@ -142,12 +145,14 @@ val postsWithWs = path.path("posts").path("rest") module
 ```
 
 Both patterns add a WebSocket endpoint that provides:
+
 - `WS /posts/rest/updates` - Real-time notifications for creates, updates, deletes
 - Automatic filtering based on user permissions
 - Initial snapshot of data matching the query
 - Incremental updates as changes occur
 
 **When to Use WebSocket Updates:**
+
 - Real-time dashboards or live data displays
 - Collaborative editing features
 - Chat or messaging systems
@@ -188,6 +193,7 @@ posts.find(
 ```
 
 Use manual operations when you need:
+
 - Custom business logic beyond CRUD
 - Complex queries not supported by ModelRestEndpoints
 - Special validation or transformation logic
@@ -359,7 +365,8 @@ suspend fun getExpensiveData(id: String): Data {
 
 **⚠️ CRITICAL: Use Modern Server.test() Pattern**
 
-When writing tests, use the `Server.test()` extension function which handles server building and settings configuration automatically:
+When writing tests, use the `Server.test()` extension function which handles server building and settings configuration
+automatically:
 
 ```kotlin
 // TestHelper.kt - shared across all test files
@@ -388,6 +395,7 @@ class ServerTest {
 **Test Method Signatures**
 
 For basic `HttpHandler` endpoints:
+
 ```kotlin
 // No path args
 Server.endpoint.test(
@@ -404,6 +412,7 @@ Server.endpoint.test(
 ```
 
 For `ApiHttpHandler` endpoints:
+
 ```kotlin
 // Create test authentication using PrincipalType.testAuth()
 val user = User(email = "test@example.com", ...)
@@ -424,7 +433,9 @@ Server.typedEndpoint.test("pathArg", auth = auth, input = RequestData(...))
 
 ⚠️ **Duplicate UploadEarlyEndpoint Declarations**
 
-If you create multiple instances of `UploadEarlyEndpoint` (e.g., in different modules or endpoints), they will have **conflicting declarations for how `ServerFile` is serialized**. This causes runtime serialization errors that manifest as `500 Internal Server Error` responses in tests, even though the code compiles successfully.
+If you create multiple instances of `UploadEarlyEndpoint` (e.g., in different modules or endpoints), they will have *
+*conflicting declarations for how `ServerFile` is serialized**. This causes runtime serialization errors that manifest
+as `500 Internal Server Error` responses in tests, even though the code compiles successfully.
 
 **Solution:** Only instantiate `UploadEarlyEndpoint` once in your server definition:
 
@@ -532,6 +543,7 @@ Lightning Server uses Gradle with Kotlin Multiplatform:
 ### Module Structure
 
 Projects typically have paired modules:
+
 - `module` - JVM-only code (server implementation)
 - `module-shared` - Multiplatform code (shared models, DTOs)
 
@@ -612,6 +624,7 @@ First run generates `settings.json`:
 ## Getting Help
 
 When stuck:
+
 1. Check the demo server for examples
 2. Review relevant docs in `/docs`
 3. Look at existing endpoint implementations
@@ -621,6 +634,7 @@ When stuck:
 ## Usage
 
 Invoke this skill when you need to:
+
 - Build Lightning Server endpoints
 - Set up authentication
 - Work with databases

@@ -1,6 +1,7 @@
 # AI Module
 
-The AI module provides intelligent chatbot capabilities for Lightning Server, including LLM integration, database access through tools, and multi-channel communication (WebSocket, voice, phone, SMS, email).
+The AI module provides intelligent chatbot capabilities for Lightning Server, including LLM integration, database access
+through tools, and multi-channel communication (WebSocket, voice, phone, SMS, email).
 
 ## Installation
 
@@ -130,6 +131,7 @@ WS   /chat/simple-chat            - WebSocket for real-time chat
 Base class providing conversation and message management with tool approval workflow.
 
 Key features:
+
 - Conversation and message tables with REST endpoints
 - WebSocket support for real-time message streaming
 - Tool execution with dynamic approval workflow
@@ -191,6 +193,7 @@ abstract class ChatTool<Subject: HasId<*>?, T> {
 ```
 
 Helper base classes:
+
 - `AutoApprovedTool<Subject, T>` - Never requires approval (for read-only operations)
 - `AlwaysRequiresApprovalTool<Subject, T>` - Always requires approval (for writes)
 
@@ -208,12 +211,12 @@ override val tools: Map<String, ChatTool<User, *>> = buildMap {
 
 This creates 4 tools per table:
 
-| Tool | Description |
-|------|-------------|
-| `get_{table}_by_id(id)` | Get a single record by ID |
-| `count_{table}(condition)` | Count records matching condition |
-| `query_{table}(condition, orderBy, skip, limit)` | Advanced queries with sorting/pagination |
-| `aggregate_{table}(aggregate, condition, property)` | Aggregate queries (Sum, Average, etc.) |
+| Tool                                                | Description                              |
+|-----------------------------------------------------|------------------------------------------|
+| `get_{table}_by_id(id)`                             | Get a single record by ID                |
+| `count_{table}(condition)`                          | Count records matching condition         |
+| `query_{table}(condition, orderBy, skip, limit)`    | Advanced queries with sorting/pagination |
+| `aggregate_{table}(aggregate, condition, property)` | Aggregate queries (Sum, Average, etc.)   |
 
 ### Write Tools
 
@@ -231,11 +234,11 @@ override val tools: Map<String, ChatTool<User, *>> = buildMap {
 
 Write tools always require user approval:
 
-| Tool | Description |
-|------|-------------|
-| `insert_{table}(records)` | Insert records (max: writeLimit) |
-| `update_{table}(ids, modification)` | Update records by ID |
-| `delete_{table}(ids)` | Delete records by ID |
+| Tool                                | Description                      |
+|-------------------------------------|----------------------------------|
+| `insert_{table}(records)`           | Insert records (max: writeLimit) |
+| `update_{table}(ids, modification)` | Update records by ID             |
+| `delete_{table}(ids)`               | Delete records by ID             |
 
 ### Query Syntax
 
@@ -282,6 +285,7 @@ class MyDangerousTool : AlwaysRequiresApprovalTool<User, MyArgs>(
 ```
 
 When a tool requires approval:
+
 1. LLM requests to call the tool
 2. A `ToolRequest` message is created with `requiresApproval = true`
 3. User is notified via their channel (WebSocket, SMS, email, etc.)
@@ -339,6 +343,7 @@ val voice = path.path("voice") include MyVoiceSupport
 ```
 
 This provides:
+
 - `WS /voice/voice` - Direct voice WebSocket
 - `WS /voice/phone/audio/{conversationId}/{subjectId}` - Phone call audio
 - `POST /voice/phone/incoming` - Twilio incoming call webhook
@@ -370,6 +375,7 @@ val channels = path.path("channels") include MyExternalChannels
 ```
 
 When users send SMS or email:
+
 1. System resolves sender to a user
 2. Creates or finds existing conversation
 3. Inserts user message

@@ -2,22 +2,26 @@
 
 Last updated December 2024 (`version-5`)
 
-Lightning Server can automatically generate Terraform configuration to deploy your application to AWS EC2 with Auto Scaling and Application Load Balancing. This provides a traditional VM-based deployment as an alternative to serverless Lambda deployment.
+Lightning Server can automatically generate Terraform configuration to deploy your application to AWS EC2 with Auto
+Scaling and Application Load Balancing. This provides a traditional VM-based deployment as an alternative to serverless
+Lambda deployment.
 
 ## When to Use EC2 vs Lambda
 
-| Consideration | EC2 | Lambda |
-|---------------|-----|--------|
-| Cold starts | None | Can be significant |
-| Long-running tasks | Supported | 15-minute limit |
+| Consideration       | EC2                 | Lambda             |
+|---------------------|---------------------|--------------------|
+| Cold starts         | None                | Can be significant |
+| Long-running tasks  | Supported           | 15-minute limit    |
 | Predictable traffic | More cost-effective | Pay per invocation |
-| WebSockets | Full support | Limited |
-| Memory/CPU | Full control | Up to 10GB RAM |
-| Scaling speed | Minutes | Seconds |
+| WebSockets          | Full support        | Limited            |
+| Memory/CPU          | Full control        | Up to 10GB RAM     |
+| Scaling speed       | Minutes             | Seconds            |
 
-**Choose EC2 when you need**: No cold starts, long-running processes, WebSocket connections, or predictable high traffic.
+**Choose EC2 when you need**: No cold starts, long-running processes, WebSocket connections, or predictable high
+traffic.
 
-**Choose Lambda when you need**: Zero infrastructure management, pay-per-use billing, or automatic scaling for variable traffic.
+**Choose Lambda when you need**: Zero infrastructure management, pay-per-use billing, or automatic scaling for variable
+traffic.
 
 ## Prerequisites
 
@@ -328,7 +332,8 @@ object Server : ServerBuilder() {
 }
 ```
 
-EventBridge rules trigger SQS messages, and the `SqsScheduleHandler` on each instance processes them. SQS visibility timeout ensures each task runs on exactly one instance.
+EventBridge rules trigger SQS messages, and the `SqsScheduleHandler` on each instance processes them. SQS visibility
+timeout ensures each task runs on exactly one instance.
 
 ## Updating Deployments
 
@@ -372,6 +377,7 @@ aws ssm start-session --target i-xxxxxxxxxxxxx
 ### CloudWatch Alarms
 
 The deployment creates alarms for:
+
 - Unhealthy hosts in the target group
 - High CPU utilization (>90%)
 
@@ -389,6 +395,7 @@ Alerts are sent to the `emergencyContact` email.
 ### Instances Keep Getting Replaced
 
 If the ASG continuously terminates and launches instances:
+
 1. Check `healthCheckPath` returns HTTP 200
 2. Verify the endpoint responds within `healthCheckTimeout`
 3. Check CloudWatch logs for application startup errors
@@ -397,6 +404,7 @@ If the ASG continuously terminates and launches instances:
 ### Application Won't Start
 
 Check the user-data log:
+
 ```bash
 aws ssm start-session --target i-xxxxxxxxxxxxx
 sudo cat /var/log/user-data.log
@@ -412,6 +420,7 @@ sudo journalctl -u lightning-server
 ### S3 Download Failures
 
 The user-data script retries S3 downloads with exponential backoff. If downloads still fail:
+
 1. Check IAM role has `s3:GetObject` permission
 2. Verify the deployment bucket exists
 3. Check VPC has internet access (NAT gateway)

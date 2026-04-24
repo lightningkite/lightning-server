@@ -4,22 +4,22 @@
 ##########
 
 variable "lambda_memory_size" {
-    type = number
-    default = 1024
-    nullable = false
-    description = "The amount of ram available (in Megabytes) to the virtual machine running in Lambda."
+  type        = number
+  default     = 1024
+  nullable    = false
+  description = "The amount of ram available (in Megabytes) to the virtual machine running in Lambda."
 }
 variable "lambda_timeout" {
-    type = number
-    default = 30
-    nullable = false
-    description = "How long an individual lambda invocation can run before forcefully being shut down."
+  type        = number
+  default     = 30
+  nullable    = false
+  description = "How long an individual lambda invocation can run before forcefully being shut down."
 }
 variable "lambda_snapstart" {
-    type = bool
-    default = false
-    nullable = false
-    description = "Whether or not lambda will deploy with SnapStart which compromises deploy time for shorter cold start time."
+  type        = bool
+  default     = false
+  nullable    = false
+  description = "Whether or not lambda will deploy with SnapStart which compromises deploy time for shorter cold start time."
 }
 
 ##########
@@ -55,7 +55,7 @@ resource "aws_iam_role" "main_exec" {
 
 resource "aws_iam_policy" "bucketDynamoAndInvoke" {
   name        = "demo-example-bucketDynamoAndInvoke"
-  path = "/demo/example/bucketDynamoAndInvoke/"
+  path        = "/demo/example/bucketDynamoAndInvoke/"
   description = "Access to the demo-example bucket, dynamo, and invoke"
   policy = jsonencode({
     Version = "2012-10-17"
@@ -64,10 +64,10 @@ resource "aws_iam_policy" "bucketDynamoAndInvoke" {
         Action = [
           "s3:GetObject",
         ]
-        Effect   = "Allow"
+        Effect = "Allow"
         Resource = [
-            "${aws_s3_bucket.lambda_bucket.arn}",
-            "${aws_s3_bucket.lambda_bucket.arn}/*",
+          "${aws_s3_bucket.lambda_bucket.arn}",
+          "${aws_s3_bucket.lambda_bucket.arn}/*",
         ]
       },
       {
@@ -124,39 +124,39 @@ resource "aws_s3_object" "app_storage" {
   source = data.archive_file.lambda.output_path
 
   source_hash = data.archive_file.lambda.output_md5
-  depends_on = [data.archive_file.lambda]
+  depends_on  = [data.archive_file.lambda]
 }
 
 resource "aws_lambda_function" "main" {
   function_name = "demo-example-main"
-  publish = var.lambda_snapstart
+  publish       = var.lambda_snapstart
 
   s3_bucket = aws_s3_bucket.lambda_bucket.id
   s3_key    = aws_s3_object.app_storage.key
 
   runtime = "java17"
   handler = "com.lightningkite.lightningserverdemo.AwsHandler"
-  
-  memory_size = "${var.lambda_memory_size}"
-  timeout = var.lambda_timeout
+
+  memory_size = var.lambda_memory_size
+  timeout     = var.lambda_timeout
   # memory_size = "1024"
 
   source_code_hash = data.archive_file.lambda.output_base64sha256
 
   role = aws_iam_role.main_exec.arn
-  
+
   snap_start {
     apply_on = "PublishedVersions"
   }
 
-  
-  
+
+
   environment {
     variables = {
       LIGHTNING_SERVER_SETTINGS_DECRYPTION = random_password.settings.result
     }
   }
-  
+
   depends_on = [aws_s3_object.app_storage]
 }
 
@@ -168,47 +168,47 @@ resource "aws_lambda_alias" "main" {
 }
 
 resource "aws_cloudwatch_log_group" "main" {
-  name = "demo-example-main-log"
+  name              = "demo-example-main-log"
   retention_in_days = 30
 }
 
 resource "local_sensitive_file" "settings_raw" {
   content = jsonencode({
     general = {
-        projectName = var.display_name
-        publicUrl = "https://${var.domain_name}"
-        wsUrl = "wss://ws.${var.domain_name}?path="
-        debug = var.debug
-        cors = var.cors
-        
+      projectName = var.display_name
+      publicUrl   = "https://${var.domain_name}"
+      wsUrl       = "wss://ws.${var.domain_name}?path="
+      debug       = var.debug
+      cors        = var.cors
+
     }
     database = {
       url = "mongodb+srv://demoexampledatabase-main:${random_password.database.result}@${replace(mongodbatlas_advanced_cluster.database.connection_strings[0].standard_srv, "mongodb+srv://", "")}/default?retryWrites=true&w=majority"
     }
     cache = {
-        url = "dynamodb://${var.deployment_location}/demo_example"
+      url = "dynamodb://${var.deployment_location}/demo_example"
     }
     secretBasis = random_password.secretBasis.result
     jwt = {
-        expiration = var.jwt_expiration 
-        emailExpiration = var.jwt_emailExpiration 
-        secret = random_password.jwt.result
+      expiration      = var.jwt_expiration
+      emailExpiration = var.jwt_emailExpiration
+      secret          = random_password.jwt.result
     }
-    sms = var.sms
+    sms     = var.sms
     logging = var.logging
     files = {
-        storageUrl = "s3://${aws_s3_bucket.files.id}.s3-${aws_s3_bucket.files.region}.amazonaws.com"
-        signedUrlExpiration = var.files_expiry
+      storageUrl          = "s3://${aws_s3_bucket.files.id}.s3-${aws_s3_bucket.files.region}.amazonaws.com"
+      signedUrlExpiration = var.files_expiry
     }
     metrics = {
-        url = "cloudwatch://${var.deployment_location}/${var.metrics_namespace}"
-        trackingByEntryPoint = var.metrics_tracked
+      url                  = "cloudwatch://${var.deployment_location}/${var.metrics_namespace}"
+      trackingByEntryPoint = var.metrics_tracked
     }
     exceptions = var.exceptions
     email = {
-        url = "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.${var.deployment_location}.amazonaws.com:587" 
-        fromEmail = "noreply@${var.domain_name}"
-    }})
+      url       = "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.${var.deployment_location}.amazonaws.com:587"
+      fromEmail = "noreply@${var.domain_name}"
+  } })
   filename = "${path.module}/build/raw-settings.json"
 }
 
@@ -221,15 +221,15 @@ resource "null_resource" "lambda_jar_source" {
     always = timestamp()
   }
   provisioner "local-exec" {
-    command = (local.is_windows ? "if(test-path \"${path.module}/build/lambda/\") { rd -Recurse \"${path.module}/build/lambda/\" }" : "rm -rf \"${path.module}/build/lambda/\"")
+    command     = (local.is_windows ? "if(test-path \"${path.module}/build/lambda/\") { rd -Recurse \"${path.module}/build/lambda/\" }" : "rm -rf \"${path.module}/build/lambda/\"")
     interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
   }
   provisioner "local-exec" {
-    command = (local.is_windows ? "cp -r -force \"${path.module}/../../build/dist/lambda/.\" \"${path.module}/build/lambda/\"" : "cp -rf \"${path.module}/../../build/dist/lambda/.\" \"${path.module}/build/lambda/\"")
+    command     = (local.is_windows ? "cp -r -force \"${path.module}/../../build/dist/lambda/.\" \"${path.module}/build/lambda/\"" : "cp -rf \"${path.module}/../../build/dist/lambda/.\" \"${path.module}/build/lambda/\"")
     interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
   }
   provisioner "local-exec" {
-    command = "openssl enc -aes-256-cbc -md sha256 -in \"${local_sensitive_file.settings_raw.filename}\" -out \"${path.module}/build/lambda/settings.enc\" -pass pass:${random_password.settings.result}"
+    command     = "openssl enc -aes-256-cbc -md sha256 -in \"${local_sensitive_file.settings_raw.filename}\" -out \"${path.module}/build/lambda/settings.enc\" -pass pass:${random_password.settings.result}"
     interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
   }
 }
@@ -253,7 +253,7 @@ resource "random_password" "settings" {
 data "archive_file" "lambda" {
   depends_on  = [null_resource.lambda_jar_source, null_resource.settings_reread]
   type        = "zip"
-  source_dir = "${path.module}/build/lambda"
+  source_dir  = "${path.module}/build/lambda"
   output_path = "${path.module}/build/lambda.jar"
 }
 

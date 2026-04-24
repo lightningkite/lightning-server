@@ -1,9 +1,6 @@
 package com.lightningkite.lightningserver.auth
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class ScopeTests {
 
@@ -18,15 +15,31 @@ class ScopeTests {
 
     @Test
     fun multiScopeAcceptance() {
-        assertEquals(true, setOf("auth", "scope").mapTo(HashSet(), ::GrantedScope).meetsRequirements(setOf("auth", "scope").mapTo(HashSet(), ::RequiredScope)))
-        assertEquals(true, setOf("auth", "scope").mapTo(HashSet(), ::GrantedScope).meetsRequirements(setOf("auth:sub", "scope:sub").mapTo(HashSet(), ::RequiredScope)))
-        assertEquals(true, setOf("auth:sub", "scope").mapTo(HashSet(), ::GrantedScope).meetsRequirements(setOf("auth:sub", "scope:sub").mapTo(HashSet(), ::RequiredScope)))
-        assertEquals(true, setOf("*").mapTo(HashSet(), ::GrantedScope).meetsRequirements(setOf("auth", "scope", "*").mapTo(HashSet(), ::RequiredScope)))
-        assertEquals(false, setOf("auth:sub", "scope").mapTo(HashSet(), ::GrantedScope).meetsRequirements(setOf("*").mapTo(HashSet(), ::RequiredScope)))
+        assertEquals(true,
+            setOf("auth", "scope").mapTo(HashSet(), ::GrantedScope)
+                .meetsRequirements(setOf("auth", "scope").mapTo(HashSet(), ::RequiredScope))
+        )
+        assertEquals(true,
+            setOf("auth", "scope").mapTo(HashSet(), ::GrantedScope)
+                .meetsRequirements(setOf("auth:sub", "scope:sub").mapTo(HashSet(), ::RequiredScope))
+        )
+        assertEquals(true,
+            setOf("auth:sub", "scope").mapTo(HashSet(), ::GrantedScope)
+                .meetsRequirements(setOf("auth:sub", "scope:sub").mapTo(HashSet(), ::RequiredScope))
+        )
+        assertEquals(true,
+            setOf("*").mapTo(HashSet(), ::GrantedScope)
+                .meetsRequirements(setOf("auth", "scope", "*").mapTo(HashSet(), ::RequiredScope))
+        )
+        assertEquals(false,
+            setOf("auth:sub", "scope").mapTo(HashSet(), ::GrantedScope)
+                .meetsRequirements(setOf("*").mapTo(HashSet(), ::RequiredScope))
+        )
     }
 
 
-    @Test fun contains() {
+    @Test
+    fun contains() {
         assertTrue(RequiredScope("a") in RequiredScope("a"))
         assertTrue(RequiredScope("a") in RequiredScope("*"))
         assertTrue(RequiredScope("a:b") in RequiredScope("a"))
@@ -35,7 +48,8 @@ class ScopeTests {
     }
 
 
-    @Test fun simplify() {
+    @Test
+    fun simplify() {
         assertEquals(
             setOf("*").mapTo(LinkedHashSet(), ::RequiredScope),
             setOf("*").mapTo(LinkedHashSet(), ::RequiredScope).simplify()

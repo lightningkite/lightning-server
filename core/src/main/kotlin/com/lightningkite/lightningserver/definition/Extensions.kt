@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.definition
 
-import com.lightningkite.buildSealedMap
+import com.lightningkite.services.data.buildSealedMap
 
 
 /**
@@ -147,13 +147,12 @@ public class MutableExtensions() : Extensions {
                 val including = extensions[key] ?: continue
                 val existing = get(key)
                 key.run { existing.include(including) }
-            }
-            else map.putIfAbsent(key, value)
+            } else map.putIfAbsent(key, value)
         }
     }
 }
 
-public class SealedExtensions(extensions: Extensions): Extensions {
+public class SealedExtensions(extensions: Extensions) : Extensions {
     private val map = buildSealedMap {
         for ((key, value) in extensions.entries) {
             if (key is MutableExtensions.WritableKey<*, Any>) put(key, key.seal(value))

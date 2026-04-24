@@ -1,12 +1,9 @@
 package com.lightningkite.lightningserver.media
 
-import com.lightningkite.MediaType
 import com.lightningkite.services.data.GenerateDataClassPaths
-import com.lightningkite.services.database.HasId
+import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.files.ServerFile
 import kotlinx.serialization.Serializable
-import kotlin.time.Instant
-import kotlin.uuid.Uuid
 
 /**
  * Represents a server file with associated metadata and optional preview variants.
@@ -30,7 +27,7 @@ public data class ServerFileWithMetadata(
     val size: Long? = null,
     val width: Int? = null,
     val height: Int? = null,
-    val previews: List<ServerFileWithMetadataPreview> = listOf()
+    val previews: List<ServerFileWithMetadataPreview> = listOf(),
 ) {
 
     /**
@@ -89,7 +86,7 @@ public data class ServerFileWithMetadataPreview(
     val mimeType: MediaType,
     val size: Long,
     val width: Int? = null,
-    val height: Int? = null
+    val height: Int? = null,
 )
 
 /*

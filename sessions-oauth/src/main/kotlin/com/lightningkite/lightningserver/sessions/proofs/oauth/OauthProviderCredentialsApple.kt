@@ -7,12 +7,8 @@ import com.lightningkite.lightningserver.runtime.now
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.EC
 import dev.whyoleg.cryptography.algorithms.ECDSA
-import dev.whyoleg.cryptography.algorithms.SHA256
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import java.util.*
+import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.days
@@ -40,7 +36,7 @@ public data class OauthProviderCredentialsApple(
     val serviceId: String,
     val teamId: String,
     val keyId: String,
-    val keyString: String
+    val keyString: String,
 ) {
     context(_: ServerRuntime)
     public fun toOauthProviderCredentials(): OauthProviderCredentials = OauthProviderCredentials(
@@ -77,12 +73,13 @@ public data class OauthProviderCredentialsApple(
             )
             val soFar = this.toString()
             append('.')
-            
+
             // Parse the ECDSA P-256 private key and sign
             // The cryptography library API: get ECDSA algorithm, then get key decoder with curve only
             val ecdsaAlgorithm = CryptographyProvider.Default.get(ECDSA)
             val privateKeyDecoder = ecdsaAlgorithm.privateKeyDecoder(EC.Curve.P256)
-            val privateKey = privateKeyDecoder.decodeFromByteArrayBlocking(EC.PrivateKey.Format.PEM, keyString.toByteArray())
+            val privateKey =
+                privateKeyDecoder.decodeFromByteArrayBlocking(EC.PrivateKey.Format.PEM, keyString.toByteArray())
 
             // We only have private key, but KeyPair interface requires both. Create a minimal public key.
             val publicKeyDecoder = ecdsaAlgorithm.publicKeyDecoder(EC.Curve.P256)
@@ -94,7 +91,7 @@ public data class OauthProviderCredentialsApple(
                 override val publicKey = publicKey
             }
             val signer = keyPair.ES256()
-            
+
             append(
                 Base64.UrlSafe.encode(signer.signBlocking(soFar.toByteArray())).trimEnd('=')
             )

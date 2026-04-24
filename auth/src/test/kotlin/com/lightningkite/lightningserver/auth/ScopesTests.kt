@@ -2,7 +2,7 @@ package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.test.TestRunner
+import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -24,19 +24,24 @@ class ScopesTests {
     @Test
     fun multiScopeAcceptance() {
         assert(
-            setOf("auth", "scope").mapTo(HashSet(), ::GrantedScope).meetsRequirements(setOf("auth", "scope").mapTo(HashSet(), ::RequiredScope))
+            setOf("auth", "scope").mapTo(HashSet(), ::GrantedScope)
+                .meetsRequirements(setOf("auth", "scope").mapTo(HashSet(), ::RequiredScope))
         )
         assert(
-            setOf("auth", "scope").mapTo(HashSet(), ::GrantedScope).meetsRequirements(setOf("auth:sub", "scope:sub").mapTo(HashSet(), ::RequiredScope))
+            setOf("auth", "scope").mapTo(HashSet(), ::GrantedScope)
+                .meetsRequirements(setOf("auth:sub", "scope:sub").mapTo(HashSet(), ::RequiredScope))
         )
         assert(
-            setOf("auth:sub", "scope").mapTo(HashSet(), ::GrantedScope).meetsRequirements(setOf("auth:sub", "scope:sub").mapTo(HashSet(), ::RequiredScope))
+            setOf("auth:sub", "scope").mapTo(HashSet(), ::GrantedScope)
+                .meetsRequirements(setOf("auth:sub", "scope:sub").mapTo(HashSet(), ::RequiredScope))
         )
         assert(
-            setOf("*").mapTo(HashSet(), ::GrantedScope).meetsRequirements(setOf("auth", "scope", "*").mapTo(HashSet(), ::RequiredScope))
+            setOf("*").mapTo(HashSet(), ::GrantedScope)
+                .meetsRequirements(setOf("auth", "scope", "*").mapTo(HashSet(), ::RequiredScope))
         )
         assert(
-            !setOf("auth:sub", "scope").mapTo(HashSet(), ::GrantedScope).meetsRequirements(setOf("*").mapTo(HashSet(), ::RequiredScope))
+            !setOf("auth:sub", "scope").mapTo(HashSet(), ::GrantedScope)
+                .meetsRequirements(setOf("*").mapTo(HashSet(), ::RequiredScope))
         )
     }
 
@@ -44,7 +49,7 @@ class ScopesTests {
 
     @Serializable
     data class User(
-        override val _id: Uuid
+        override val _id: Uuid,
     ) : HasId<Uuid> {
         companion object : PrincipalType<User, Uuid> {
             override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
@@ -57,9 +62,9 @@ class ScopesTests {
 
     private fun testAuth(
         scopes: Set<GrantedScope> = setOf(GrantedScope.root),
-        test: context(ServerRuntime) (Authentication<*>) -> Unit
+        test: context(ServerRuntime) (Authentication<*>) -> Unit,
     ) {
-        TestRunner(Server).run {
+        Server.test({}) {
             test(Authentication(User, Uuid.random(), sessionId = null, scopes = scopes))
         }
     }
@@ -70,7 +75,11 @@ class ScopesTests {
             testAuth(
                 scopes = granted.mapTo(HashSet(), ::GrantedScope)
             ) {
-                assertEquals(permitted, it.meetsRequirements(required.mapTo(HashSet(), ::RequiredScope)), "limits: ${it.scopes}  actual: $required")
+                assertEquals(
+                    permitted,
+                    it.meetsRequirements(required.mapTo(HashSet(), ::RequiredScope)),
+                    "limits: ${it.scopes}  actual: $required"
+                )
             }
         }
 

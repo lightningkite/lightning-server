@@ -1,29 +1,14 @@
 package com.lightningkite.lightningserver.engine.netty
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.http.HttpHandler
-import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.get
+import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.plainText
-import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
-import com.lightningkite.lightningserver.settings.set
 import kotlinx.serialization.builtins.serializer
 import java.net.InetSocketAddress
 import java.net.ServerSocket
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse.BodyHandlers
-import java.net.http.WebSocket
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class NettyEngineTest {
 

@@ -1,78 +1,78 @@
 {
-    "resource": {
-        "aws_cloudwatch_event_rule": {
-            "scheduled_task_assistantchannelsemailschedule": {
-                "name": "josephpersonal-example_assistantchannelsemailschedule",
-                "schedule_expression": "rate(1 minute)"
-            },
-            "scheduled_task_taskstasksscheduledhealthcheck": {
-                "name": "josephpersonal-example_taskstasksscheduledhealthcheck",
-                "schedule_expression": "rate(1 minute)"
-            },
-            "scheduled_task_uploadcleanupUploads": {
-                "name": "josephpersonal-example_uploadcleanupUploads",
-                "schedule_expression": "rate(1440 minutes)"
-            },
-            "scheduled_task_assistantvoicephoneincomingschedule": {
-                "name": "josephpersonal-example_assistantvoicephoneincomingschedule",
-                "schedule_expression": "rate(1 minute)"
-            },
-            "scheduled_task_assistantvoicephonestatusschedule": {
-                "name": "josephpersonal-example_assistantvoicephonestatusschedule",
-                "schedule_expression": "rate(1 minute)"
-            },
-            "scheduled_task_taskstasksscheduledcleanup": {
-                "name": "josephpersonal-example_taskstasksscheduledcleanup",
-                "schedule_expression": "rate(5 minutes)"
-            },
-            "scheduled_task_assistantchannelssmsschedule": {
-                "name": "josephpersonal-example_assistantchannelssmsschedule",
-                "schedule_expression": "rate(1 minute)"
-            }
-        },
-        "aws_cloudwatch_event_target": {
-            "scheduled_task_assistantchannelsemailschedule": {
-                "input": "{\"scheduled\": \"/assistant-channels/email/schedule\"}",
-                "rule": "${aws_cloudwatch_event_rule.scheduled_task_assistantchannelsemailschedule.name}",
-                "target_id": "lambda",
-                "arn": "${aws_lambda_alias.main.arn}"
-            },
-            "scheduled_task_taskstasksscheduledhealthcheck": {
-                "input": "{\"scheduled\": \"/tasks/tasks/scheduled-health-check\"}",
-                "rule": "${aws_cloudwatch_event_rule.scheduled_task_taskstasksscheduledhealthcheck.name}",
-                "target_id": "lambda",
-                "arn": "${aws_lambda_alias.main.arn}"
-            },
-            "scheduled_task_uploadcleanupUploads": {
-                "input": "{\"scheduled\": \"/upload/cleanupUploads\"}",
-                "rule": "${aws_cloudwatch_event_rule.scheduled_task_uploadcleanupUploads.name}",
-                "target_id": "lambda",
-                "arn": "${aws_lambda_alias.main.arn}"
-            },
-            "scheduled_task_assistantvoicephoneincomingschedule": {
-                "input": "{\"scheduled\": \"/assistant-voice/phone/incoming/schedule\"}",
-                "rule": "${aws_cloudwatch_event_rule.scheduled_task_assistantvoicephoneincomingschedule.name}",
-                "target_id": "lambda",
-                "arn": "${aws_lambda_alias.main.arn}"
-            },
-            "scheduled_task_assistantvoicephonestatusschedule": {
-                "input": "{\"scheduled\": \"/assistant-voice/phone/status/schedule\"}",
-                "rule": "${aws_cloudwatch_event_rule.scheduled_task_assistantvoicephonestatusschedule.name}",
-                "target_id": "lambda",
-                "arn": "${aws_lambda_alias.main.arn}"
-            },
-            "scheduled_task_taskstasksscheduledcleanup": {
-                "input": "{\"scheduled\": \"/tasks/tasks/scheduled-cleanup\"}",
-                "rule": "${aws_cloudwatch_event_rule.scheduled_task_taskstasksscheduledcleanup.name}",
-                "target_id": "lambda",
-                "arn": "${aws_lambda_alias.main.arn}"
-            },
-            "scheduled_task_assistantchannelssmsschedule": {
-                "input": "{\"scheduled\": \"/assistant-channels/sms/schedule\"}",
-                "rule": "${aws_cloudwatch_event_rule.scheduled_task_assistantchannelssmsschedule.name}",
-                "target_id": "lambda",
-                "arn": "${aws_lambda_alias.main.arn}"
-            }
-        }
+  "resource": {
+    "aws_cloudwatch_event_rule": {
+      "scheduled_task_assistantchannelsemailschedule": {
+        "name": "josephpersonal-example_assistantchannelsemailschedule",
+        "schedule_expression": "rate(1 minute)"
+      },
+      "scheduled_task_taskstasksscheduledhealthcheck": {
+        "name": "josephpersonal-example_taskstasksscheduledhealthcheck",
+        "schedule_expression": "rate(1 minute)"
+      },
+      "scheduled_task_uploadcleanupUploads": {
+        "name": "josephpersonal-example_uploadcleanupUploads",
+        "schedule_expression": "rate(1440 minutes)"
+      },
+      "scheduled_task_assistantvoicephoneincomingschedule": {
+        "name": "josephpersonal-example_assistantvoicephoneincomingschedule",
+        "schedule_expression": "rate(1 minute)"
+      },
+      "scheduled_task_assistantvoicephonestatusschedule": {
+        "name": "josephpersonal-example_assistantvoicephonestatusschedule",
+        "schedule_expression": "rate(1 minute)"
+      },
+      "scheduled_task_taskstasksscheduledcleanup": {
+        "name": "josephpersonal-example_taskstasksscheduledcleanup",
+        "schedule_expression": "rate(5 minutes)"
+      },
+      "scheduled_task_assistantchannelssmsschedule": {
+        "name": "josephpersonal-example_assistantchannelssmsschedule",
+        "schedule_expression": "rate(1 minute)"
+      }
+    },
+    "aws_cloudwatch_event_target": {
+      "scheduled_task_assistantchannelsemailschedule": {
+        "input": "{\"scheduled\": \"/assistant-channels/email/schedule\"}",
+        "rule": "${aws_cloudwatch_event_rule.scheduled_task_assistantchannelsemailschedule.name}",
+        "target_id": "lambda",
+        "arn": "${aws_lambda_alias.main.arn}"
+      },
+      "scheduled_task_taskstasksscheduledhealthcheck": {
+        "input": "{\"scheduled\": \"/tasks/tasks/scheduled-health-check\"}",
+        "rule": "${aws_cloudwatch_event_rule.scheduled_task_taskstasksscheduledhealthcheck.name}",
+        "target_id": "lambda",
+        "arn": "${aws_lambda_alias.main.arn}"
+      },
+      "scheduled_task_uploadcleanupUploads": {
+        "input": "{\"scheduled\": \"/upload/cleanupUploads\"}",
+        "rule": "${aws_cloudwatch_event_rule.scheduled_task_uploadcleanupUploads.name}",
+        "target_id": "lambda",
+        "arn": "${aws_lambda_alias.main.arn}"
+      },
+      "scheduled_task_assistantvoicephoneincomingschedule": {
+        "input": "{\"scheduled\": \"/assistant-voice/phone/incoming/schedule\"}",
+        "rule": "${aws_cloudwatch_event_rule.scheduled_task_assistantvoicephoneincomingschedule.name}",
+        "target_id": "lambda",
+        "arn": "${aws_lambda_alias.main.arn}"
+      },
+      "scheduled_task_assistantvoicephonestatusschedule": {
+        "input": "{\"scheduled\": \"/assistant-voice/phone/status/schedule\"}",
+        "rule": "${aws_cloudwatch_event_rule.scheduled_task_assistantvoicephonestatusschedule.name}",
+        "target_id": "lambda",
+        "arn": "${aws_lambda_alias.main.arn}"
+      },
+      "scheduled_task_taskstasksscheduledcleanup": {
+        "input": "{\"scheduled\": \"/tasks/tasks/scheduled-cleanup\"}",
+        "rule": "${aws_cloudwatch_event_rule.scheduled_task_taskstasksscheduledcleanup.name}",
+        "target_id": "lambda",
+        "arn": "${aws_lambda_alias.main.arn}"
+      },
+      "scheduled_task_assistantchannelssmsschedule": {
+        "input": "{\"scheduled\": \"/assistant-channels/sms/schedule\"}",
+        "rule": "${aws_cloudwatch_event_rule.scheduled_task_assistantchannelssmsschedule.name}",
+        "target_id": "lambda",
+        "arn": "${aws_lambda_alias.main.arn}"
+      }
     }
+  }
 }

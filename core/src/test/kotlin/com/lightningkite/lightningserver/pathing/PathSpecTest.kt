@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.pathing
 
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
 import kotlin.test.Test
 
 class PathSpecTest {

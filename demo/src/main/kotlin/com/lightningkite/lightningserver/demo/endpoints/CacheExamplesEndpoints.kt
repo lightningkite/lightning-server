@@ -1,16 +1,16 @@
 package com.lightningkite.lightningserver.demo.endpoints
 
 import com.lightningkite.lightningserver.auth.noAuth
+import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.arg1
-import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.route
 import com.lightningkite.services.cache.Cache
-import kotlinx.serialization.builtins.serializer
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.serializer
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -26,9 +26,9 @@ import kotlin.time.Duration.Companion.seconds
  * - Integration with different cache backends (Redis, Memcached, DynamoDB, RAM)
  */
 class CacheExamplesEndpoints(
-    private val cache: Runtime<Cache>
+    private val cache: Runtime<Cache>,
 ) : ServerBuilder() {
-    
+
     /**
      * POST /cache/set
      * 
@@ -47,7 +47,7 @@ class CacheExamplesEndpoints(
                 String.serializer(),
                 input.expireSeconds?.seconds
             )
-            
+
             SetCacheResponse(
                 success = true,
                 message = "Value cached successfully",
@@ -56,7 +56,7 @@ class CacheExamplesEndpoints(
             )
         }
     )
-    
+
     /**
      * GET /cache/get/{key}
      * 
@@ -71,7 +71,7 @@ class CacheExamplesEndpoints(
         implementation = { _: Unit ->
             val key = route.arg1
             val value = cache().get(key, String.serializer())
-            
+
             GetCacheResponse(
                 key = key,
                 value = value,
@@ -79,24 +79,25 @@ class CacheExamplesEndpoints(
             )
         }
     )
-    
+
     /**
      * DELETE /cache/delete/{key}
      * 
      * Remove a value from the cache.
      * Demonstrates: Cache invalidation
      */
-    val deleteCache = path.path("cache").path("delete").arg<String>("key").delete bind ApiHttpHandler<_, Nothing?, Unit, Unit>(
-        summary = "Delete a cached value",
-        description = "Removes a key-value pair from the cache",
-        auth = noAuth,
-        successCode = HttpStatus.NoContent,
-        implementation = { _: Unit ->
-            val key = route.arg1
-            cache().remove(key)
-        }
-    )
-    
+    val deleteCache =
+        path.path("cache").path("delete").arg<String>("key").delete bind ApiHttpHandler<_, Nothing?, Unit, Unit>(
+            summary = "Delete a cached value",
+            description = "Removes a key-value pair from the cache",
+            auth = noAuth,
+            successCode = HttpStatus.NoContent,
+            implementation = { _: Unit ->
+                val key = route.arg1
+                cache().remove(key)
+            }
+        )
+
     /**
      * GET /cache/expensive-operation/{id}
      * 
@@ -114,34 +115,34 @@ class CacheExamplesEndpoints(
 
             // Try to get from cache first
             val cached = cache().get(cacheKey, ExpensiveOperationResult.serializer())
-            
+
             if (cached != null) {
                 return@ApiHttpHandler cached.copy(
                     message = "Retrieved from cache (fast!)"
                 )
             }
-            
+
             // Cache miss - perform expensive operation
             println("Cache miss for $cacheKey - performing expensive operation")
             val startTime = System.currentTimeMillis()
-            
+
             // Simulate expensive database query or computation
             delay(2000) // 2 second delay
-            
+
             val result = ExpensiveOperationResult(
                 id = id,
                 data = "Computed result for $id: ${Random.nextInt(1000, 9999)}",
                 computationTimeMs = System.currentTimeMillis() - startTime,
                 message = "Computed and cached (slow)"
             )
-            
+
             // Cache the result for 5 minutes
             cache().set(cacheKey, result, ExpensiveOperationResult.serializer(), 5.minutes)
-            
+
             result
         }
     )
-    
+
     /**
      * POST /cache/increment/{key}
      * 
@@ -162,7 +163,7 @@ class CacheExamplesEndpoints(
 
             // Set new value with expiration
             cache().set(key, newValue, Int.serializer(), input.expireSeconds?.seconds)
-            
+
             IncrementResponse(
                 key = key,
                 previousValue = current,
@@ -171,7 +172,7 @@ class CacheExamplesEndpoints(
             )
         }
     )
-    
+
     /**
      * POST /cache/batch-set
      * 
@@ -194,14 +195,14 @@ class CacheExamplesEndpoints(
                 )
                 count++
             }
-            
+
             BatchSetResponse(
                 success = true,
                 entriesSet = count
             )
         }
     )
-    
+
     /**
      * POST /cache/clear-pattern
      * 
@@ -217,10 +218,10 @@ class CacheExamplesEndpoints(
             // Note: This is a simplified example
             // In production, you'd need backend-specific pattern matching
             var cleared = 0
-            
+
             // For demonstration, we'll show the concept
             // Actual implementation depends on cache backend capabilities
-            
+
             ClearPatternResponse(
                 pattern = input.prefix,
                 entriesCleared = cleared,
@@ -236,7 +237,7 @@ class CacheExamplesEndpoints(
 data class SetCacheRequest(
     val key: String,
     val value: String,
-    val expireSeconds: Int? = null
+    val expireSeconds: Int? = null,
 )
 
 @Serializable
@@ -244,14 +245,14 @@ data class SetCacheResponse(
     val success: Boolean,
     val message: String,
     val key: String,
-    val expiresIn: Int?
+    val expiresIn: Int?,
 )
 
 @Serializable
 data class GetCacheResponse(
     val key: String,
     val value: String?,
-    val found: Boolean
+    val found: Boolean,
 )
 
 @Serializable
@@ -259,13 +260,13 @@ data class ExpensiveOperationResult(
     val id: String,
     val data: String,
     val computationTimeMs: Long,
-    val message: String
+    val message: String,
 )
 
 @Serializable
 data class IncrementRequest(
     val incrementBy: Int = 1,
-    val expireSeconds: Int? = null
+    val expireSeconds: Int? = null,
 )
 
 @Serializable
@@ -273,35 +274,35 @@ data class IncrementResponse(
     val key: String,
     val previousValue: Int,
     val newValue: Int,
-    val incrementedBy: Int
+    val incrementedBy: Int,
 )
 
 @Serializable
 data class CacheEntry(
     val key: String,
-    val value: String
+    val value: String,
 )
 
 @Serializable
 data class BatchSetRequest(
     val entries: List<CacheEntry>,
-    val defaultExpireSeconds: Int? = null
+    val defaultExpireSeconds: Int? = null,
 )
 
 @Serializable
 data class BatchSetResponse(
     val success: Boolean,
-    val entriesSet: Int
+    val entriesSet: Int,
 )
 
 @Serializable
 data class ClearPatternRequest(
-    val prefix: String
+    val prefix: String,
 )
 
 @Serializable
 data class ClearPatternResponse(
     val pattern: String,
     val entriesCleared: Int,
-    val message: String
+    val message: String,
 )

@@ -17,7 +17,8 @@ class TaskTimeoutDefaultsTest {
             // Don't override timeout - use default
 
             context(server: com.lightningkite.lightningserver.runtime.ServerRuntime)
-            override suspend fun executeInline(input: String) {}
+            override suspend fun executeInline(input: String) {
+            }
         }
 
         assertEquals(5.minutes, task.timeout, "Task interface default timeout should be 5 minutes")
@@ -37,7 +38,8 @@ class TaskTimeoutDefaultsTest {
             // Don't override timeout - use default
 
             context(server: com.lightningkite.lightningserver.runtime.ServerRuntime)
-            override suspend fun execute() {}
+            override suspend fun execute() {
+            }
         }
 
         assertEquals(5.minutes, task.timeout, "ScheduledTask interface default timeout should be 5 minutes")
@@ -73,7 +75,8 @@ class TaskTimeoutDefaultsTest {
             // Don't override timeout - use default
 
             context(server: com.lightningkite.lightningserver.runtime.ServerRuntime)
-            override suspend fun execute() {}
+            override suspend fun execute() {
+            }
         }
 
         assertEquals(5.minutes, task.timeout, "StartupTask interface default timeout should be 5 minutes")

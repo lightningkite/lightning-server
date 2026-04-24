@@ -2,9 +2,11 @@
 
 Last updated January 2025 (`version-5`)
 
-When building servers, it is frequently necessary to keep some information on hand that is shared between every instance.
+When building servers, it is frequently necessary to keep some information on hand that is shared between every
+instance.
 
-That's where the cache comes in.  It uses `kotlinx.serialization` to serialize values in and out of the cache, which could be local, Memcached, Redis, or DynamoDB.
+That's where the cache comes in. It uses `kotlinx.serialization` to serialize values in and out of the cache, which
+could be local, Memcached, Redis, or DynamoDB.
 
 ## Declaring the need for a cache
 
@@ -46,7 +48,8 @@ TODO: Document further
 
 ### Local
 
-Simply use RAM as the cache.  Will only work if there is strictly one instance of the server, so practically speaking it's useful for testing only.
+Simply use RAM as the cache. Will only work if there is strictly one instance of the server, so practically speaking
+it's useful for testing only.
 
 ```json5
 // settings.json

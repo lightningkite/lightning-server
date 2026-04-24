@@ -19,9 +19,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import org.junit.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.Uuid
@@ -34,7 +32,7 @@ class SmsProofEndpointsTest {
     @Serializable
     data class TestUser(
         override val _id: Uuid = Uuid.random(),
-        val phone: String = ""
+        val phone: String = "",
     ) : HasId<Uuid> {
         companion object : PrincipalType<TestUser, Uuid> {
             override val idSerializer: KSerializer<Uuid> = Uuid.serializer()

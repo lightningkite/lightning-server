@@ -4,9 +4,9 @@
 ##########
 
 variable "files_expiry" {
-    type = string
-    default = "P1D"
-    nullable = true
+  type     = string
+  default  = "P1D"
+  nullable = true
 }
 
 ##########
@@ -40,19 +40,19 @@ resource "aws_s3_bucket_cors_configuration" "files" {
   }
 }
 resource "aws_s3_bucket_public_access_block" "files" {
-  count = var.files_expiry == null ? 1 : 0
+  count  = var.files_expiry == null ? 1 : 0
   bucket = aws_s3_bucket.files.id
 
-  block_public_acls   = false
-  block_public_policy = false
-  ignore_public_acls = false
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
   restrict_public_buckets = false
 }
-resource "aws_s3_bucket_policy" "files" {  
+resource "aws_s3_bucket_policy" "files" {
   depends_on = [aws_s3_bucket_public_access_block.files]
-  count = var.files_expiry == null ? 1 : 0
-  bucket = aws_s3_bucket.files.id   
-  policy = <<POLICY
+  count      = var.files_expiry == null ? 1 : 0
+  bucket     = aws_s3_bucket.files.id
+  policy     = <<POLICY
 {    
     "Version": "2012-10-17",    
     "Statement": [        
@@ -77,7 +77,7 @@ POLICY
 # }
 resource "aws_iam_policy" "files" {
   name        = "demo-example-single-ec2-files"
-  path = "/demo/example/single/ec2/files/"
+  path        = "/demo/example/single/ec2/files/"
   description = "Access to the demo-example-single-ec2_files bucket"
   policy = jsonencode({
     Version = "2012-10-17"
@@ -86,10 +86,10 @@ resource "aws_iam_policy" "files" {
         Action = [
           "s3:*",
         ]
-        Effect   = "Allow"
+        Effect = "Allow"
         Resource = [
-            "${aws_s3_bucket.files.arn}",
-            "${aws_s3_bucket.files.arn}/*",
+          "${aws_s3_bucket.files.arn}",
+          "${aws_s3_bucket.files.arn}/*",
         ]
       },
     ]

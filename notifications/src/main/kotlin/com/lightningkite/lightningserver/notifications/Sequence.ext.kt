@@ -1,11 +1,10 @@
 package com.lightningkite.lightningserver.notifications
 
-import com.lightningkite.services.database.ModelPermissions
-import com.lightningkite.services.database.Query
-import com.lightningkite.services.database.comparator
+import com.lightningkite.services.database.*
 
 @PublishedApi
-internal fun <T> Sequence<T>.sortedWithNullable(comparator: Comparator<T>?): Sequence<T> = if (comparator == null) this else sortedWith(comparator)
+internal fun <T> Sequence<T>.sortedWithNullable(comparator: Comparator<T>?): Sequence<T> =
+    if (comparator == null) this else sortedWith(comparator)
 
 public fun <T> Sequence<T>.query(query: Query<T>): Sequence<T> = this
     .filter { query.condition(it) }

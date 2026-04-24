@@ -1,24 +1,11 @@
 package com.lightningkite.lightningserver.runtime.test
 
 import com.lightningkite.lightningserver.definition.generalSettings
-import com.lightningkite.lightningserver.http.HttpHandler
-import com.lightningkite.lightningserver.http.HttpHeaders
-import com.lightningkite.lightningserver.http.HttpRequest
-import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.PathSegments
-import com.lightningkite.lightningserver.http.QueryParameters
-import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.pathing.PathSpec1
-import com.lightningkite.lightningserver.pathing.PathSpec2
-import com.lightningkite.lightningserver.pathing.PathSpec3
-import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
-import com.lightningkite.lightningserver.pathing.RawWebsocketPath
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.handle
 import com.lightningkite.lightningserver.runtime.location
-import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
-import com.lightningkite.lightningserver.websockets.WebSocketHandler
-import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
+import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.TypedData
 
 /**
@@ -35,7 +22,7 @@ import com.lightningkite.services.data.TypedData
  * Sends a WebSocket subscription message in the test environment.
  */
 context(test: TestRunner<*>)
-public suspend fun <PATH: PathSpec, T> sendWebSocketSubscriptionMessage(message: WebSocketSubscriptionMessage<PATH, T>) {
+public suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(message: WebSocketSubscriptionMessage<PATH, T>) {
     test.sendWebSocketSubscriptionMessage(message)
 }
 
@@ -62,7 +49,9 @@ public suspend fun <STORAGE> WebSocketHandler<PathSpec0, STORAGE>.test(
         with(it.server) { intercepted.didConnect() }
     }
 }
-context(test: TestRunner<*>) public suspend fun <STORAGE, A> WebSocketHandler<PathSpec1<A>, STORAGE>.test(
+
+context(test: TestRunner<*>)
+public suspend fun <STORAGE, A> WebSocketHandler<PathSpec1<A>, STORAGE>.test(
     path1: A,
     queryParameters: QueryParameters = QueryParameters.EMPTY,
     headers: HttpHeaders = HttpHeaders.EMPTY,
@@ -85,7 +74,9 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A> WebSocketHandler<Pa
         with(it.server) { intercepted.didConnect() }
     }
 }
-context(test: TestRunner<*>) public suspend fun <STORAGE, A, B> WebSocketHandler<PathSpec2<A, B>, STORAGE>.test(
+
+context(test: TestRunner<*>)
+public suspend fun <STORAGE, A, B> WebSocketHandler<PathSpec2<A, B>, STORAGE>.test(
     path1: A,
     path2: B,
     queryParameters: QueryParameters = QueryParameters.EMPTY,
@@ -109,7 +100,9 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A, B> WebSocketHandler
         with(it.server) { intercepted.didConnect() }
     }
 }
-context(test: TestRunner<*>) public suspend fun <STORAGE, A, B, C> WebSocketHandler<PathSpec3<A, B, C>, STORAGE>.test(
+
+context(test: TestRunner<*>)
+public suspend fun <STORAGE, A, B, C> WebSocketHandler<PathSpec3<A, B, C>, STORAGE>.test(
     path1: A,
     path2: B,
     path3: C,
@@ -134,7 +127,9 @@ context(test: TestRunner<*>) public suspend fun <STORAGE, A, B, C> WebSocketHand
         with(it.server) { intercepted.didConnect() }
     }
 }
-context(test: TestRunner<*>) public suspend fun HttpHandler<PathSpec0>.test(
+
+context(test: TestRunner<*>)
+public suspend fun HttpHandler<PathSpec0>.test(
     queryParameters: QueryParameters = QueryParameters.EMPTY,
     headers: HttpHeaders = HttpHeaders.EMPTY,
     trailingWildcard: PathSegments? = null,
@@ -156,7 +151,8 @@ context(test: TestRunner<*>) public suspend fun HttpHandler<PathSpec0>.test(
     )
 }
 
-context(test: TestRunner<*>) public suspend fun <A> HttpHandler<PathSpec1<A>>.test(
+context(test: TestRunner<*>)
+public suspend fun <A> HttpHandler<PathSpec1<A>>.test(
     path1: A,
     queryParameters: QueryParameters = QueryParameters.EMPTY,
     headers: HttpHeaders = HttpHeaders.EMPTY,
@@ -178,7 +174,9 @@ context(test: TestRunner<*>) public suspend fun <A> HttpHandler<PathSpec1<A>>.te
         )
     )
 }
-context(test: TestRunner<*>) public suspend fun <A, B> HttpHandler<PathSpec2<A, B>>.test(
+
+context(test: TestRunner<*>)
+public suspend fun <A, B> HttpHandler<PathSpec2<A, B>>.test(
     path1: A,
     path2: B,
     queryParameters: QueryParameters = QueryParameters.EMPTY,
@@ -201,7 +199,9 @@ context(test: TestRunner<*>) public suspend fun <A, B> HttpHandler<PathSpec2<A, 
         )
     )
 }
-context(test: TestRunner<*>) public suspend fun <A, B, C> HttpHandler<PathSpec3<A, B, C>>.test(
+
+context(test: TestRunner<*>)
+public suspend fun <A, B, C> HttpHandler<PathSpec3<A, B, C>>.test(
     path1: A,
     path2: B,
     path3: C,

@@ -1,8 +1,7 @@
-import com.lightningkite.deployhelpers.*
+import com.lightningkite.deployhelpers.lkLibrary
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
-    alias(libs.plugins.ksp)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.dokka)
     id("signing")
@@ -20,10 +19,6 @@ dependencies {
     testImplementation(libs.kotlin.test.junit)
 }
 
-ksp {
-    arg("generateFields", "true")
-}
-
 kotlin {
     explicitApi()
     compilerOptions {
@@ -31,14 +26,12 @@ kotlin {
         optIn.add("kotlin.uuid.ExperimentalUuidApi")
         freeCompilerArgs.add("-Xcontext-parameters")
     }
-    sourceSets.main {
-        kotlin.srcDir("build/generated/ksp/main/kotlin")
-    }
-    sourceSets.test {
-        kotlin.srcDir("build/generated/ksp/test/kotlin")
-    }
 }
 
-lkLibrary("lightningkite", "lightning-server") {
-    description.set("A Vert.x engine implementation for Lightning Server.")
+lkLibrary(
+    "lightningkite",
+    "lightning-server",
+    mavenAutomaticRelease = project.findProperty("mavenAutomaticRelease") as? Boolean ?: false
+) {
+    description.set("A set of endpoints and tools for managing PublicFileSystems.")
 }

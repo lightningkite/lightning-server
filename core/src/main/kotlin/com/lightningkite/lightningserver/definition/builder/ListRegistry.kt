@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.definition.builder
 
-import com.lightningkite.toSealedList
+import com.lightningkite.services.data.toSealedList
 
 /**
  * An append-only [List] used during server building to accumulate items.
@@ -23,9 +23,11 @@ public interface ListRegistry<V> : List<V> {
 }
 
 private data class BasicListRegistry<V>(
-    private val registry: ArrayList<V> = ArrayList()
+    private val registry: ArrayList<V> = ArrayList(),
 ) : ListRegistry<V>, List<V> by registry {
-    override fun register(value: V) { registry.add(value) }
+    override fun register(value: V) {
+        registry.add(value)
+    }
 }
 
 /**
@@ -62,4 +64,5 @@ public fun <V> ListRegistry(vararg items: V): ListRegistry<V> = BasicListRegistr
  * @param setup A function that populates the registry
  * @return An immutable list containing all registered items
  */
-public fun <V> buildListRegistry(setup: ListRegistry<V>.() -> Unit): List<V> = ListRegistry<V>().apply(setup).toSealedList()
+public fun <V> buildListRegistry(setup: ListRegistry<V>.() -> Unit): List<V> =
+    ListRegistry<V>().apply(setup).toSealedList()

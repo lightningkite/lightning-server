@@ -1,18 +1,15 @@
 package com.lightningkite.lightningserver.typed.jsonrpc
 
-import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.serialization.parse
-import com.lightningkite.lightningserver.typed.HttpAccess
 import com.lightningkite.lightningserver.typed.access
-import com.lightningkite.lightningserver.typed.validateOrThrow
+import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.default
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 
 /**
@@ -36,7 +33,7 @@ import kotlinx.serialization.json.*
  * @param methods List of available RPC methods
  */
 public class JsonRpcHandler<PATH : PathSpec>(
-    private val methods: List<JsonRpcMethod<PATH, *, *, *>>
+    private val methods: List<JsonRpcMethod<PATH, *, *, *>>,
 ) : HttpHandler<PATH> {
 
     private val methodMap: Map<String, JsonRpcMethod<PATH, *, *, *>> = methods.associateBy { it.name }
@@ -65,7 +62,7 @@ public class JsonRpcHandler<PATH : PathSpec>(
         // Find the method
         val method = methodMap[rpcRequest.method]
             ?: return if (isNotification) HttpResponse(status = HttpStatus.Accepted)
-                else errorResponse(rpcRequest.id, JsonRpcError.methodNotFound(rpcRequest.method))
+            else errorResponse(rpcRequest.id, JsonRpcError.methodNotFound(rpcRequest.method))
 
         // Process the method invocation
         return try {
@@ -76,15 +73,18 @@ public class JsonRpcHandler<PATH : PathSpec>(
             // by Claude - MCP notifications like notifications/initialized send no params
             val params = try {
                 when (rpcRequest.params) {
-                    null, is JsonNull -> if(typedMethod.inputType.descriptor.isNullable) null else typedMethod.inputType.default()
-                    else -> server.externalSerialization.jsonWithoutExplicitNulls.decodeFromJsonElement(typedMethod.inputType, rpcRequest.params)
+                    null, is JsonNull -> if (typedMethod.inputType.descriptor.isNullable) null else typedMethod.inputType.default()
+                    else -> server.externalSerialization.jsonWithoutExplicitNulls.decodeFromJsonElement(
+                        typedMethod.inputType,
+                        rpcRequest.params
+                    )
                 }
             } catch (e: Exception) {
                 return if (isNotification) HttpResponse(status = HttpStatus.Accepted)
-                    else errorResponse(
-                        rpcRequest.id,
-                        JsonRpcError.invalidParams(e.message ?: "Failed to parse params")
-                    )
+                else errorResponse(
+                    rpcRequest.id,
+                    JsonRpcError.invalidParams(e.message ?: "Failed to parse params")
+                )
             }
 
             // Get authenticated access
@@ -97,7 +97,10 @@ public class JsonRpcHandler<PATH : PathSpec>(
             if (isNotification) return HttpResponse(status = HttpStatus.Accepted)
 
             // Serialize result, stripping nulls for MCP/JSON-RPC compatibility
-            val resultJson = server.externalSerialization.jsonWithoutExplicitNulls.encodeToJsonElement(typedMethod.outputType, result)
+            val resultJson = server.externalSerialization.jsonWithoutExplicitNulls.encodeToJsonElement(
+                typedMethod.outputType,
+                result
+            )
 
             // Return success response
             successResponse(rpcRequest.id, resultJson, customHeaders)
@@ -124,7 +127,11 @@ public class JsonRpcHandler<PATH : PathSpec>(
     }
 
     context(server: ServerRuntime)
-    private fun successResponse(id: JsonElement?, result: JsonElement, customHeaders: HttpHeaders = HttpHeaders.EMPTY): HttpResponse {
+    private fun successResponse(
+        id: JsonElement?,
+        result: JsonElement,
+        customHeaders: HttpHeaders = HttpHeaders.EMPTY,
+    ): HttpResponse {
         val response = JsonRpcResponse(
             jsonrpc = "2.0",
             result = result,

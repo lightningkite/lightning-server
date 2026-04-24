@@ -8,10 +8,8 @@ import com.lightningkite.lightningserver.typed.modelInfo
 import com.lightningkite.lightningserver.typed.sdk.FetcherSdk
 import com.lightningkite.lightningserver.typed.sdk.SDK.writeUsingDefaultSettings
 import com.lightningkite.lightningserver.typed.sdk.module
-import com.lightningkite.services.data.KFile
-import com.lightningkite.services.database.Database
-import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.ModelPermissions
+import com.lightningkite.services.kfile.KFile
+import com.lightningkite.services.database.*
 import com.lightningkite.services.files.PublicFileSystem
 import kotlinx.serialization.Serializable
 import org.junit.Test
@@ -34,7 +32,7 @@ class UploadEarlySdkTests {
     @Serializable
     data class Model(
         override val _id: Uuid,
-        val name: String
+        val name: String,
     ) : HasId<Uuid>
 
     private object Module : ServerBuilder() {
@@ -48,6 +46,9 @@ class UploadEarlySdkTests {
 
     @Test
     fun generateSdk() {
-        FetcherSdk("com.lightningkite.lightningserver.files").writeUsingDefaultSettings(Server, KFile("./src/test/kotlin/com/lightningkite/lightningserver/files/generated"))
+        FetcherSdk("com.lightningkite.lightningserver.files").writeUsingDefaultSettings(
+            Server,
+            KFile("./src/test/kotlin/com/lightningkite/lightningserver/files/generated")
+        )
     }
 }

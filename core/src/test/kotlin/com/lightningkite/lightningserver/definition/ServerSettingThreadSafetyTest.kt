@@ -35,9 +35,11 @@ class ServerSettingThreadSafetyTest {
             override val serverVersion get() = ""
             override val projectName get() = ""
             override val sharedResources get() = throw NotImplementedError()
-            override suspend fun <T> com.lightningkite.lightningserver.definition.Task<T>.invoke(input: T) = throw NotImplementedError()
+            override suspend fun <T> com.lightningkite.lightningserver.definition.Task<T>.invoke(input: T) =
+                throw NotImplementedError()
+
             override suspend fun <PATH : com.lightningkite.lightningserver.pathing.PathSpec, T> sendWebSocketSubscriptionMessage(
-                event: com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage<PATH, T>
+                event: com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage<PATH, T>,
             ) = throw NotImplementedError()
         }
 

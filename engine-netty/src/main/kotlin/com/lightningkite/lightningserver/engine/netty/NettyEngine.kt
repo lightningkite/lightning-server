@@ -1,8 +1,5 @@
 package com.lightningkite.lightningserver.engine.netty
 
-import com.lightningkite.DataSize.Companion.bytes
-import com.lightningkite.DataSize.Companion.kibibytes
-import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.NotFoundException
@@ -13,26 +10,19 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
-import com.lightningkite.lightningserver.pathing.RawWebsocketPath
+import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.*
-import com.lightningkite.services.data.Data
-import com.lightningkite.services.data.TypedData
+import com.lightningkite.services.data.*
+import com.lightningkite.services.data.DataSize.Companion.bytes
+import com.lightningkite.services.data.DataSize.Companion.kibibytes
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.netty.bootstrap.ServerBootstrap
-import io.netty.buffer.ByteBufUtil
-import io.netty.buffer.PooledByteBufAllocator
-import io.netty.buffer.Unpooled
+import io.netty.buffer.*
 import io.netty.channel.*
-import io.netty.channel.epoll.Epoll
-import io.netty.channel.epoll.EpollEventLoopGroup
-import io.netty.channel.epoll.EpollServerSocketChannel
-import io.netty.channel.kqueue.KQueue
-import io.netty.channel.kqueue.KQueueEventLoopGroup
-import io.netty.channel.kqueue.KQueueServerSocketChannel
+import io.netty.channel.epoll.*
+import io.netty.channel.kqueue.*
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.NioServerSocketChannel
@@ -50,7 +40,6 @@ import kotlinx.coroutines.channels.SendChannel
 import kotlinx.serialization.KSerializer
 import java.net.InetSocketAddress
 import java.net.URI
-import java.nio.charset.StandardCharsets
 import kotlin.time.Clock
 import com.lightningkite.lightningserver.http.HttpHeaders as LsHttpHeaders
 import com.lightningkite.lightningserver.websockets.WebSocketFrame as LkWebSocketFrame
@@ -455,6 +444,7 @@ public class NettyEngine(
                                         is LkWebSocketFrame.Binary -> ctx.writeAndFlush(
                                             BinaryWebSocketFrame(Unpooled.wrappedBuffer(frame.content))
                                         )
+
                                         is LkWebSocketFrame.Text -> ctx.writeAndFlush(TextWebSocketFrame(frame.content))
                                     }
                                 },
@@ -605,7 +595,8 @@ public class NettyEngine(
 
             return HttpRequest(
                 path = RawHttpEndpoint(parts.path(), HttpMethod(this.method().name())),
-                queryParameters = QueryParameters(parts.parameters().flatMap { (key, values) -> values.map { key to it } }),
+                queryParameters = QueryParameters(
+                    parts.parameters().flatMap { (key, values) -> values.map { key to it } }),
                 headers = headers,
                 domain = domain.ifEmpty { (ctx.channel().localAddress() as? InetSocketAddress)?.hostString.orEmpty() },
                 protocol = "http",
@@ -631,7 +622,8 @@ public class NettyEngine(
 
             return WebSocketConnectRequest(
                 path = RawWebsocketPath(parts.path()),
-                queryParameters = QueryParameters(parts.parameters().flatMap { (key, values) -> values.map { key to it } }),
+                queryParameters = QueryParameters(
+                    parts.parameters().flatMap { (key, values) -> values.map { key to it } }),
                 headers = headers,
                 domain = domain.ifEmpty { (ctx.channel().localAddress() as? InetSocketAddress)?.hostString.orEmpty() },
                 protocol = "http",
@@ -641,7 +633,7 @@ public class NettyEngine(
 
         private fun HttpResponse.toNettyResponse(version: HttpVersion): FullHttpResponse {
             val contentBuf = this.body?.data?.bytes()
-                ?.let{Unpooled.wrappedBuffer(it)}
+                ?.let { Unpooled.wrappedBuffer(it) }
                 ?: Unpooled.EMPTY_BUFFER
 
             val res = DefaultFullHttpResponse(version, HttpResponseStatus.valueOf(this.status.code), contentBuf)

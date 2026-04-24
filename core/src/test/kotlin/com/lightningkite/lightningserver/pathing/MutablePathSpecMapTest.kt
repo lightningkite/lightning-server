@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.pathing
 
-import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.services.data.StringArrayFormat
 import kotlinx.serialization.modules.EmptySerializersModule
 import org.junit.Test

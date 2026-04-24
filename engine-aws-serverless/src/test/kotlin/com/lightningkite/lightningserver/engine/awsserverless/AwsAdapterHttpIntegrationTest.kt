@@ -1,21 +1,12 @@
 package com.lightningkite.lightningserver.engine.awsserverless
 
-import com.amazonaws.services.lambda.runtime.ClientContext
-import com.amazonaws.services.lambda.runtime.CognitoIdentity
-import com.amazonaws.services.lambda.runtime.Context
-import com.amazonaws.services.lambda.runtime.LambdaLogger
-import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.http.HttpResponse
+import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.plainText
-import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
-import com.lightningkite.services.data.TypedData
-import kotlinx.serialization.encodeToString
+import com.lightningkite.services.data.MediaType
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 
 class AwsAdapterHttpIntegrationTest {
 
@@ -27,7 +18,10 @@ class AwsAdapterHttpIntegrationTest {
             val text = req.body?.text() ?: ""
             HttpResponse.plainText("E:$text")
         }
-        init { registerBasicMediaTypeCoders() }
+
+        init {
+            registerBasicMediaTypeCoders()
+        }
     }
 
     private fun makeHttpEvent(
@@ -80,10 +74,14 @@ class AwsAdapterHttpIntegrationTest {
         val output = java.io.ByteArrayOutputStream()
         adapter.handleRequest(input, output, TestLambdaContext())
         val responseJson = output.toByteArray().toString(Charsets.UTF_8)
-        val response = adapter.internalSerialization.json.decodeFromString(APIGatewayV2HTTPResponse.serializer(), responseJson)
+        val response =
+            adapter.internalSerialization.json.decodeFromString(APIGatewayV2HTTPResponse.serializer(), responseJson)
         assertEquals(200, response.statusCode)
         assertEquals("hi", response.body)
-        assertEquals(MediaType.Text.Plain.toString(), response.headers.entries.find { it.key.equals("content-type", true) }!!.value)
+        assertEquals(
+            MediaType.Text.Plain.toString(),
+            response.headers.entries.find { it.key.equals("content-type", true) }!!.value
+        )
     }
 
     @Test
@@ -103,7 +101,8 @@ class AwsAdapterHttpIntegrationTest {
         val output = java.io.ByteArrayOutputStream()
         adapter.handleRequest(input, output, TestLambdaContext())
         val responseJson = output.toByteArray().toString(Charsets.UTF_8)
-        val response = adapter.internalSerialization.json.decodeFromString(APIGatewayV2HTTPResponse.serializer(), responseJson)
+        val response =
+            adapter.internalSerialization.json.decodeFromString(APIGatewayV2HTTPResponse.serializer(), responseJson)
         assertEquals(200, response.statusCode)
         assertEquals("E:$bodyText", response.body)
     }
@@ -117,7 +116,8 @@ class AwsAdapterHttpIntegrationTest {
         val output = java.io.ByteArrayOutputStream()
         adapter.handleRequest(input, output, TestLambdaContext())
         val responseJson = output.toByteArray().toString(Charsets.UTF_8)
-        val response = adapter.internalSerialization.json.decodeFromString(APIGatewayV2HTTPResponse.serializer(), responseJson)
+        val response =
+            adapter.internalSerialization.json.decodeFromString(APIGatewayV2HTTPResponse.serializer(), responseJson)
         println(responseJson)
         assertEquals(404, response.statusCode)
     }

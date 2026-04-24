@@ -28,7 +28,8 @@ Also contains a link to get SDKs for several programming languages.
 
 ## /meta/health
 
-A JSON-returning endpoint that will report the health status of your system, including memory usage, load, and health statuses for each individual dependent system such as caches, database, files, and emails.
+A JSON-returning endpoint that will report the health status of your system, including memory usage, load, and health
+statuses for each individual dependent system such as caches, database, files, and emails.
 
 ## /meta/online
 
@@ -36,7 +37,8 @@ Simply returns the plain-text 200 response "Server is running."  Can be useful f
 
 ## /meta/admin
 
-A React-driven administrative panel that allows for management of any models you've exposed RESTful endpoints for, as well as testers for your endpoints.
+A React-driven administrative panel that allows for management of any models you've exposed RESTful endpoints for, as
+well as testers for your endpoints.
 
 ## /meta/openapi
 

@@ -1,10 +1,10 @@
 package com.lightningkite.lightningserver.sessions
 
 import com.lightningkite.lightningserver.sessions.proofs.TotpHashAlgorithm
-import com.lightningkite.services.data.*
+import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.IndexSet
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.UseContextualSerialization
 import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -165,7 +165,7 @@ public data class KnownDeviceSecret(
 @Serializable
 public data class EstablishPassword(
     val password: String,
-    val hint: String? = null
+    val hint: String? = null,
 )
 
 /**
@@ -188,5 +188,5 @@ public data class EstablishPassword(
  */
 @Serializable
 public data class EstablishTotp(
-    val label: String? = null
+    val label: String? = null,
 )

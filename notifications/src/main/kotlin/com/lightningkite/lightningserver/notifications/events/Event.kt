@@ -59,8 +59,8 @@ public data class Event<T : HasId<ID>, ID : Comparable<ID>>(
     override val _id: Uuid,
     val time: Instant,
     val type: EventDefinition<T, ID>,
-    val subject: T
-): HasId<Uuid> {
+    val subject: T,
+) : HasId<Uuid> {
     /**
      * Converts this typed event to an untyped [EventData] for storage.
      *
@@ -91,5 +91,5 @@ public data class Event<T : HasId<ID>, ID : Comparable<ID>>(
 context(server: ServerRuntime)
 public fun <T : HasId<ID>, ID : Comparable<ID>> Event(
     type: EventDefinition<T, ID>,
-    subject: T
+    subject: T,
 ): Event<T, ID> = Event(Uuid.random(), now(), type, subject)

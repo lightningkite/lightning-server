@@ -1,8 +1,6 @@
 package com.lightningkite.lightningserver.definition
 
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-
 
 
 /**
@@ -27,8 +25,8 @@ import kotlinx.serialization.Serializable
 public data class GeneralServerSettings(
     val projectName: String = "My Project",
     val publicUrl: String = "http://localhost:8080",
-    val wsUrl: String = if(publicUrl.startsWith("https")) publicUrl.removePrefix("https").let { "wss$it" }
-        else publicUrl.removePrefix("http").let { "ws$it" },
+    val wsUrl: String = if (publicUrl.startsWith("https")) publicUrl.removePrefix("https").let { "wss$it" }
+    else publicUrl.removePrefix("http").let { "ws$it" },
     val debug: Boolean = false,
     val emergencyContact: String? = null,
 ) {

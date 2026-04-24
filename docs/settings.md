@@ -2,15 +2,17 @@
 
 Last updated October 29, 2025 (`version-5`)
 
-Settings in Lightning Server are defined programmatically, are fully customizable, and are strictly typed. They leverage the KotlinX serialization system, and are usually placed into some form of `settings.json` file.
+Settings in Lightning Server are defined programmatically, are fully customizable, and are strictly typed. They leverage
+the KotlinX serialization system, and are usually placed into some form of `settings.json` file.
 
 Settings follow a two-phase lifecycle:
+
 1. **Configuration Phase**: Settings are loaded from files or set programmatically
 2. **Ready Phase**: Settings are validated, transformed, and made available for runtime use
 
 ## Defining a Setting
 
-At the top of your server object, define a new setting by using the following syntax: 
+At the top of your server object, define a new setting by using the following syntax:
 
 ```kotlin
 // Server.kt
@@ -20,7 +22,8 @@ object Server : ServerBuilder() {
 }
 ```
 
-The given name will be the property name in the `settings.json` file.  Settings can be of any type; the default value above defines the type as being a `String`.
+The given name will be the property name in the `settings.json` file. Settings can be of any type; the default value
+above defines the type as being a `String`.
 
 We can then access the value of the setting by accessing the value and adding `()` to the end, like so:
 
@@ -40,17 +43,21 @@ Now, rerun your application and you'll see that it does not run and gives you th
 Settings were incorrect.  Suggested updates are inside settings.suggested.json.
 ```
 
-Now, take a look at that generated file and you'll see the setting is now there populated to its default value.  You will thus always be forced to define *every* setting before the application will run.
+Now, take a look at that generated file and you'll see the setting is now there populated to its default value. You will
+thus always be forced to define *every* setting before the application will run.
 
 Copy from `settings.suggested.json` into `settings.json` and run again, and your server will be up again!
 
-As mentioned in the previous section, *it is considered an important Lightning Server principal to ensure your application works out of the box with the generated `settings.json`.*  Make sure you establish good, working defaults for every setting in your system.  Mock external services as necessary.
+As mentioned in the previous section, *it is considered an important Lightning Server principal to ensure your
+application works out of the box with the generated `settings.json`.*  Make sure you establish good, working defaults
+for every setting in your system. Mock external services as necessary.
 
 ## File Formats
 
 Lightning Server supports two settings file formats:
 
 ### JSON Format
+
 The default and recommended format. Files are detected as JSON unless they contain `.properties` in the filename.
 
 ```json
@@ -64,6 +71,7 @@ The default and recommended format. Files are detected as JSON unless they conta
 ```
 
 ### Properties Format
+
 Java properties format is also supported for simpler configurations:
 
 ```properties
@@ -78,6 +86,7 @@ setting=value # comment
 ```
 
 **Properties format features:**
+
 - Comments start with `#` (both full-line and inline)
 - Empty lines are automatically ignored
 - Nested properties use dot notation (e.g., `database.host`)
@@ -86,30 +95,36 @@ setting=value # comment
 
 ### Encrypted Settings Files
 
-You can encrypt your settings files using OpenSSL for added security. Both modern and legacy OpenSSL encryption formats are supported:
+You can encrypt your settings files using OpenSSL for added security. Both modern and legacy OpenSSL encryption formats
+are supported:
 
 **Modern OpenSSL (recommended):**
+
 ```bash
 openssl enc -aes-256-cbc -pbkdf2 -in settings.json -out settings.json.enc
 ```
 
 **Legacy OpenSSL:**
+
 ```bash
 openssl enc -aes-256-cbc -md sha256 -in settings.json -out settings.json.enc
 ```
 
-To use encrypted settings, set the `LIGHTNING_SERVER_SETTINGS_DECRYPTION` environment variable to your encryption password. Lightning Server will automatically:
+To use encrypted settings, set the `LIGHTNING_SERVER_SETTINGS_DECRYPTION` environment variable to your encryption
+password. Lightning Server will automatically:
+
 1. Detect the encryption format (PBKDF2 or EVP_BytesToKey)
 2. Decrypt the file using the appropriate method
 3. Load the settings normally
 
 **Supported encryption formats:**
+
 - **PBKDF2-HMAC-SHA256** (OpenSSL 1.1.1+ default with `-pbkdf2` flag)
-  - 10,000 iterations for key derivation
-  - More secure against brute-force attacks
+    - 10,000 iterations for key derivation
+    - More secure against brute-force attacks
 - **EVP_BytesToKey with SHA-256** (legacy format with `-md sha256`)
-  - Single-round SHA-256 key derivation
-  - Compatible with older OpenSSL versions
+    - Single-round SHA-256 key derivation
+    - Compatible with older OpenSSL versions
 
 The format is automatically detected at runtime, so no configuration is needed.
 
@@ -125,6 +140,7 @@ You can reference a defaults file from your main configuration using the special
 ```
 
 **Key features:**
+
 - Settings in the main file override settings from the defaults file
 - Both JSON and properties formats are supported for defaults files
 - The tilde (`~`) expands to your home directory
@@ -133,6 +149,7 @@ You can reference a defaults file from your main configuration using the special
 - Circular dependencies are automatically detected and reported with clear error messages
 
 **Example with relative paths:**
+
 ```
 /config/
   ├── base.json         # Base configuration
@@ -176,7 +193,8 @@ The transformation happens once during the ready phase and is cached for subsequ
 
 ## Settings in Tests
 
-Back in [setup](setup.md), you may remember the `TestSettings` object.  We centrally define one set of settings for unit tests.  If you wish to override the default value of a setting for your unit test, make the following modification:
+Back in [setup](setup.md), you may remember the `TestSettings` object. We centrally define one set of settings for unit
+tests. If you wish to override the default value of a setting for your unit test, make the following modification:
 
 ```kotlin
 // ServerTest.kt

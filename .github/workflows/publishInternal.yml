@@ -4,12 +4,10 @@ on:
   workflow_dispatch:
     branches:
       - master
-      - development
       - version-**
   push:
     branches:
       - master
-      - development
       - version-**
 
 jobs:
@@ -37,7 +35,10 @@ jobs:
       - name: Clean
         run: ./gradlew clean
 
-      - name: Test
+      - name: Test (Multiplatform code, JVM only)
+        run: ./gradlew jvmTest
+
+      - name: Test (normal)
         run: ./gradlew test
 
       - uses: actions/upload-artifact@v4

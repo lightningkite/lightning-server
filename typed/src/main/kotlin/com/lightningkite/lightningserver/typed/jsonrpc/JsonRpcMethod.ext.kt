@@ -28,7 +28,7 @@ public fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> explicitJsonRpcMet
     inputType: KSerializer<INPUT>,
     outputType: KSerializer<OUTPUT>,
     auth: AuthRequirement<USER>,
-    implementation: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT
+    implementation: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT,
 ): JsonRpcMethod<PATH, USER, INPUT, OUTPUT> =
     JsonRpcMethodData(name, description, auth, inputType, outputType, implementation)
 
@@ -64,7 +64,7 @@ public inline fun <PATH : PathSpec, USER : HasId<*>?, reified INPUT, reified OUT
     name: String,
     description: String = "",
     auth: AuthRequirement<USER>,
-    noinline implementation: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT
+    noinline implementation: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT,
 ): JsonRpcMethod<PATH, USER, INPUT, OUTPUT> =
     explicitJsonRpcMethod(
         name = name,

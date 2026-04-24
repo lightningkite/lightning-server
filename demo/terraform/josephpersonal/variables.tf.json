@@ -1,8 +1,8 @@
 {
-    "variable": {
-        "someSecret": {
-            "type": "string"
-        },
-        "datadog_api_key": {}
-    }
+  "variable": {
+    "someSecret": {
+      "type": "string"
+    },
+    "datadog_api_key": {}
+  }
 }

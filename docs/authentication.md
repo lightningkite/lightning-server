@@ -2,7 +2,8 @@
 
 Last updated January 2025 (`version-5`)
 
-Authentication is a fundamental concept in Lightning Server, and authentication works the same way across all endpoints. Multiple methods can be checked, and the system is highly customizable while providing sensible defaults.
+Authentication is a fundamental concept in Lightning Server, and authentication works the same way across all endpoints.
+Multiple methods can be checked, and the system is highly customizable while providing sensible defaults.
 
 ## Quick Start: Setting Up Authentication
 
@@ -230,19 +231,19 @@ val userInfo = database.modelInfo(
 ## Authentication Flow
 
 1. **Client requests proof**:
-   - `POST /proof/email/request` with `{"property": "email", "value": "user@example.com"}`
-   - Server sends email with PIN
+    - `POST /proof/email/request` with `{"property": "email", "value": "user@example.com"}`
+    - Server sends email with PIN
 
 2. **Client submits proof**:
-   - `POST /proof/email/prove` with `{"property": "email", "value": "user@example.com", "proof": "123456"}`
-   - Server returns a proof token
+    - `POST /proof/email/prove` with `{"property": "email", "value": "user@example.com", "proof": "123456"}`
+    - Server returns a proof token
 
 3. **Client exchanges proof for session**:
-   - `POST /auth/login-anonymous` with proof token
-   - Server returns JWT session token
+    - `POST /auth/login-anonymous` with proof token
+    - Server returns JWT session token
 
 4. **Client uses session**:
-   - Include `Authorization: Bearer <token>` header in requests
+    - Include `Authorization: Bearer <token>` header in requests
 
 ## Customizing Authentication
 
@@ -288,7 +289,8 @@ override suspend fun requiredProofStrengthFor(subject: User): Int {
 
 ## Testing Authentication
 
-When writing tests, you often need to create an `AuthAccess` to simulate an authenticated user without going through the full authentication flow. Use the `testAuth` extension function on your `PrincipalType`:
+When writing tests, you often need to create an `AuthAccess` to simulate an authenticated user without going through the
+full authentication flow. Use the `testAuth` extension function on your `PrincipalType`:
 
 ```kotlin
 import com.lightningkite.lightningserver.auth.testAuth

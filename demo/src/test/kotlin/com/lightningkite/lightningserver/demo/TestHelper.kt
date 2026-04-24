@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.demo
 
-import com.lightningkite.lightningserver.demo.Server.database
 import com.lightningkite.lightningserver.runtime.test.TestRunner
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.set
@@ -18,7 +17,7 @@ object TestHelper {
         JsonFileDatabase // Ensure service implementations are loaded
     }
 
-   inline fun testServer(action: context(TestRunner<Server>) Server.()->Unit) {
+    inline fun testServer(action: context(TestRunner<Server>) Server.() -> Unit) {
         Server.test(settings = { database set Database.Settings("ram") }, action = action)
-   }
+    }
 }

@@ -2,7 +2,9 @@
 
 Last updated January 2025 (`version-5`)
 
-Lightning Server can automatically generate and deploy serverless infrastructure to AWS using Terraform. This allows you to deploy your application to AWS Lambda with API Gateway, complete with database, cache, file storage, and other services.
+Lightning Server can automatically generate and deploy serverless infrastructure to AWS using Terraform. This allows you
+to deploy your application to AWS Lambda with API Gateway, complete with database, cache, file storage, and other
+services.
 
 ## Prerequisites
 
@@ -130,6 +132,7 @@ Run the deployment main function to generate Terraform files:
 ```
 
 This will:
+
 1. Generate Terraform configuration in the `terraformRoot` directory
 2. Create a `.env` file with required variables
 3. Set up the AWS infrastructure definition
@@ -158,6 +161,7 @@ terraform apply
 ```
 
 Terraform will create:
+
 - **Lambda Function**: Your server code
 - **API Gateway**: HTTP API endpoint
 - **IAM Roles**: Required permissions
@@ -272,7 +276,8 @@ To update your deployed application:
 
 ## Managing Secrets
 
-Sensitive values are stored in the `.env` file in your Terraform directory. **Never commit this file to version control.**
+Sensitive values are stored in the `.env` file in your Terraform directory. **Never commit this file to version control.
+**
 
 To edit secrets:
 
@@ -318,11 +323,13 @@ override val lambdaMemoryMb: Int = 512
 ### Cold Starts
 
 For critical endpoints, consider:
+
 - Provisioned concurrency
 - Keeping Lambdas warm with scheduled pings
 
 ## Alternative: EC2 Deployment
 
-If Lambda cold starts are unacceptable, you need long-running processes, or have predictable high traffic, consider [Deploy to AWS EC2](deploy-aws-ec2.md) which provides traditional VM-based deployment with Auto Scaling.
+If Lambda cold starts are unacceptable, you need long-running processes, or have predictable high traffic,
+consider [Deploy to AWS EC2](deploy-aws-ec2.md) which provides traditional VM-based deployment with Auto Scaling.
 
 NEXT: [Deploy to AWS EC2](deploy-aws-ec2.md) | [Deploy to VM](deploy-vm.md)

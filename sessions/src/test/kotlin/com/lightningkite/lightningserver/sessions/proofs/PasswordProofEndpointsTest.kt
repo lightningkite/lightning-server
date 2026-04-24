@@ -2,39 +2,24 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
 import com.lightningkite.lightningserver.BadRequestException
-import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.auth.GrantedScope
 import com.lightningkite.lightningserver.auth.PrincipalType
-import com.lightningkite.lightningserver.auth.id
 import com.lightningkite.lightningserver.auth.register
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.encryption.SecretBasis
-import com.lightningkite.lightningserver.encryption.checkAgainstHash
-import com.lightningkite.lightningserver.encryption.signer
+import com.lightningkite.lightningserver.encryption.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
-import com.lightningkite.lightningserver.sessions.EstablishPassword
-import com.lightningkite.lightningserver.sessions.PasswordSecret
-import com.lightningkite.lightningserver.sessions.subjectId
+import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.cache.Cache
-import com.lightningkite.services.database.Database
-import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.condition
-import com.lightningkite.services.database.eq
+import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import org.junit.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertNotEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
 
@@ -46,7 +31,7 @@ class PasswordProofEndpointsTest {
     @Serializable
     data class TestUser(
         override val _id: Uuid = Uuid.random(),
-        val email: String = ""
+        val email: String = "",
     ) : HasId<Uuid> {
         companion object : PrincipalType<TestUser, Uuid> {
             override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
@@ -138,10 +123,12 @@ class PasswordProofEndpointsTest {
             server.test({}) {
                 // Try to establish with hint containing the password
                 assertFailsWith<BadRequestException>("Hint containing password should be rejected") {
-                    server.passwordProof.establish(TestUser, userId, EstablishPassword(
-                        password = "secretPassword",
-                        hint = "My hint is secretPassword"
-                    ))
+                    server.passwordProof.establish(
+                        TestUser, userId, EstablishPassword(
+                            password = "secretPassword",
+                            hint = "My hint is secretPassword"
+                        )
+                    )
                 }
             }
         }
@@ -174,12 +161,14 @@ class PasswordProofEndpointsTest {
                 server.passwordProof.establish(TestUser, userId, EstablishPassword("correctPassword"))
 
                 // Now prove with correct password
-                val proof = server.passwordProof.prove.test(null, IdentificationAndPassword(
-                    type = "TestUser",
-                    property = "email",
-                    value = "test@example.com",
-                    password = "correctPassword"
-                ))
+                val proof = server.passwordProof.prove.test(
+                    null, IdentificationAndPassword(
+                        type = "TestUser",
+                        property = "email",
+                        value = "test@example.com",
+                        password = "correctPassword"
+                    )
+                )
 
                 assertNotNull(proof)
                 assertEquals("email", proof.property)
@@ -217,12 +206,14 @@ class PasswordProofEndpointsTest {
 
                 // Try to prove with wrong password
                 assertFailsWith<BadRequestException>("Wrong password should be rejected") {
-                    server.passwordProof.prove.test(null, IdentificationAndPassword(
-                        type = "TestUser",
-                        property = "email",
-                        value = "test@example.com",
-                        password = "wrongPassword"
-                    ))
+                    server.passwordProof.prove.test(
+                        null, IdentificationAndPassword(
+                            type = "TestUser",
+                            property = "email",
+                            value = "test@example.com",
+                            password = "wrongPassword"
+                        )
+                    )
                 }
             }
         }
@@ -299,21 +290,25 @@ class PasswordProofEndpointsTest {
 
                 // Old password should no longer work
                 assertFailsWith<BadRequestException>("Old password should be disabled") {
-                    server.passwordProof.prove.test(null, IdentificationAndPassword(
-                        type = "TestUser",
-                        property = "email",
-                        value = "test@example.com",
-                        password = "oldPassword"
-                    ))
+                    server.passwordProof.prove.test(
+                        null, IdentificationAndPassword(
+                            type = "TestUser",
+                            property = "email",
+                            value = "test@example.com",
+                            password = "oldPassword"
+                        )
+                    )
                 }
 
                 // New password should work
-                val proof = server.passwordProof.prove.test(null, IdentificationAndPassword(
-                    type = "TestUser",
-                    property = "email",
-                    value = "test@example.com",
-                    password = "newPassword"
-                ))
+                val proof = server.passwordProof.prove.test(
+                    null, IdentificationAndPassword(
+                        type = "TestUser",
+                        property = "email",
+                        value = "test@example.com",
+                        password = "newPassword"
+                    )
+                )
                 assertNotNull(proof)
             }
         }
@@ -345,12 +340,14 @@ class PasswordProofEndpointsTest {
                 server.passwordProof.establish(TestUser, userId, EstablishPassword("password123"))
 
                 // Prove with uppercase email
-                val proof = server.passwordProof.prove.test(null, IdentificationAndPassword(
-                    type = "TestUser",
-                    property = "email",
-                    value = "TEST@EXAMPLE.COM",
-                    password = "password123"
-                ))
+                val proof = server.passwordProof.prove.test(
+                    null, IdentificationAndPassword(
+                        type = "TestUser",
+                        property = "email",
+                        value = "TEST@EXAMPLE.COM",
+                        password = "password123"
+                    )
+                )
 
                 assertNotNull(proof)
                 // Proof value should be normalized to lowercase

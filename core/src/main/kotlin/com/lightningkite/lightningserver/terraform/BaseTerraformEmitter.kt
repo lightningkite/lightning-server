@@ -278,7 +278,7 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
 
         terraformRoot.resolve("main.tf.json").takeIf { it.exists() }?.let { Json.parseToJsonElement(it.readText()) }
             ?.let {
-                val usesEncryption = it.jsonObject?.get("terraform")
+                val usesEncryption = it.jsonObject["terraform"]
                     ?.jsonObject?.get("backend")
                     ?.jsonObject?.get("s3")
                     ?.jsonObject?.get("encrypt")

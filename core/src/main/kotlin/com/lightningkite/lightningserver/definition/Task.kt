@@ -5,7 +5,6 @@ import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import kotlinx.serialization.KSerializer
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * Represents a background task that can be invoked with input data.
@@ -44,7 +43,7 @@ public interface Task<INPUT> {
  */
 public inline fun <reified INPUT> Task(
     timeout: Duration = 5.minutes,
-    noinline handler: suspend context(ServerRuntime) Task<INPUT>.(INPUT) -> Unit
+    noinline handler: suspend context(ServerRuntime) Task<INPUT>.(INPUT) -> Unit,
 ): Task<INPUT> = Task(serializerOrContextual<INPUT>(), timeout, handler)
 
 /**
@@ -61,7 +60,7 @@ public inline fun <reified INPUT> Task(
 public fun <INPUT> Task(
     input: KSerializer<INPUT>,
     timeout: Duration = 5.minutes,
-    handler: suspend context(ServerRuntime) Task<INPUT>.(INPUT) -> Unit
+    handler: suspend context(ServerRuntime) Task<INPUT>.(INPUT) -> Unit,
 ): Task<INPUT> =
     object : Task<INPUT> {
         override val timeout: Duration = timeout

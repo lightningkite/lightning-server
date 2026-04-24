@@ -10,10 +10,7 @@ import com.lightningkite.services.pubsub.PubSub
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.runBlocking
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class CoroutineWebsocketHandlerTest {
 
@@ -29,7 +26,7 @@ class CoroutineWebsocketHandlerTest {
                 request: WebSocketConnectRequest<PathSpec0>,
                 waitForFullConnect: suspend () -> Unit,
                 incoming: Flow<WebSocketFrame>,
-                send: suspend (WebSocketFrame) -> Unit
+                send: suspend (WebSocketFrame) -> Unit,
             ) {
                 // Signal that we're ready
                 waitForFullConnect()
@@ -50,7 +47,7 @@ class CoroutineWebsocketHandlerTest {
                 request: WebSocketConnectRequest<PathSpec0>,
                 waitForFullConnect: suspend () -> Unit,
                 incoming: Flow<WebSocketFrame>,
-                send: suspend (WebSocketFrame) -> Unit
+                send: suspend (WebSocketFrame) -> Unit,
             ) {
                 waitForFullConnect()
                 // Small delay to ensure didConnect() has subscribed to the outbound topic
@@ -69,7 +66,7 @@ class CoroutineWebsocketHandlerTest {
                 request: WebSocketConnectRequest<PathSpec0>,
                 waitForFullConnect: suspend () -> Unit,
                 incoming: Flow<WebSocketFrame>,
-                send: suspend (WebSocketFrame) -> Unit
+                send: suspend (WebSocketFrame) -> Unit,
             ) {
                 throw HttpStatusException(HttpStatus.InternalServerError, "Intentional error")
             }
@@ -84,7 +81,7 @@ class CoroutineWebsocketHandlerTest {
                 request: WebSocketConnectRequest<PathSpec0>,
                 waitForFullConnect: suspend () -> Unit,
                 incoming: Flow<WebSocketFrame>,
-                send: suspend (WebSocketFrame) -> Unit
+                send: suspend (WebSocketFrame) -> Unit,
             ) {
                 delay(30000) // 30 seconds - longer than the 25 second timeout
                 waitForFullConnect()
@@ -101,7 +98,7 @@ class CoroutineWebsocketHandlerTest {
                 request: WebSocketConnectRequest<PathSpec0>,
                 waitForFullConnect: suspend () -> Unit,
                 incoming: Flow<WebSocketFrame>,
-                send: suspend (WebSocketFrame) -> Unit
+                send: suspend (WebSocketFrame) -> Unit,
             ) {
                 waitForFullConnect()
                 // Small delay to ensure didConnect() has subscribed to the outbound topic

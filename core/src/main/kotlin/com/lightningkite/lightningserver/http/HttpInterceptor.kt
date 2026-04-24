@@ -51,7 +51,10 @@ public fun interface HttpInterceptor {
      * @return The HTTP response (potentially modified by this interceptor)
      */
     context(runtime: ServerRuntime)
-    public suspend fun intercept(request: HttpRequest<*>, cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse): HttpResponse
+    public suspend fun intercept(
+        request: HttpRequest<*>,
+        cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+    ): HttpResponse
 
     /**
      * A no-op interceptor that simply passes requests through unchanged.
@@ -61,7 +64,7 @@ public fun interface HttpInterceptor {
         context(runtime: ServerRuntime)
         override suspend fun intercept(
             request: HttpRequest<*>,
-            cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse
+            cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
         ): HttpResponse {
             return cont(request)
         }
@@ -78,7 +81,10 @@ public fun interface HttpInterceptor {
  * @return The HTTP response
  */
 context(server: ServerRuntime)
-public suspend inline fun HttpInterceptor.interceptInstrumented(request: HttpRequest<*>, noinline action: suspend ServerRuntime.(HttpRequest<*>) -> HttpResponse): HttpResponse {
+public suspend inline fun HttpInterceptor.interceptInstrumented(
+    request: HttpRequest<*>,
+    noinline action: suspend ServerRuntime.(HttpRequest<*>) -> HttpResponse,
+): HttpResponse {
     return instrument(name) {
         intercept(request, action)
     }

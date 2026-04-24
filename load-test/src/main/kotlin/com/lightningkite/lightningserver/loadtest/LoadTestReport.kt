@@ -16,7 +16,7 @@ internal fun printReport(metrics: LoadTestMetrics, totalDuration: Duration) {
     val totalSeconds = totalDuration.inWholeMilliseconds / 1000.0
 
     println()
-    println("=" .repeat(100))
+    println("=".repeat(100))
     println("  LOAD TEST RESULTS")
     println("=".repeat(100))
     println()

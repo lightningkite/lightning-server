@@ -1,25 +1,20 @@
 // by Claude
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.ZonedDateTime
 import com.lightningkite.lightningserver.auth.AuthRequirement
-import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.GeneralServerSettings
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.set
-import com.lightningkite.services.HealthStatus
+import com.lightningkite.services.data.HealthStatus
+import com.lightningkite.services.data.ZonedDateTime
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.*
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Duration.Companion.minutes
-import kotlin.uuid.Uuid
 
 /**
  * Tests for FunnelEndpoints - user funnel tracking and analytics.
@@ -28,6 +23,7 @@ class FunnelEndpointsTest {
 
     object TestServer : ServerBuilder() {
         val database = setting("database", Database.Settings())
+
         // Use AuthRequirement.IsAdmin which has the correct type for FunnelEndpoints
         val funnel = path.path("funnel") include FunnelEndpoints(database, read = AuthRequirement.IsAdmin)
     }
@@ -235,7 +231,8 @@ class FunnelEndpointsTest {
             TestServer.funnel.summarizeNow.test(null, targetDate)
 
             // Verify summary was created
-            val summaries = TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList()
+            val summaries =
+                TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList()
             assertEquals(1, summaries.size)
 
             val summary = summaries.first()
@@ -356,7 +353,8 @@ class FunnelEndpointsTest {
 
             TestServer.funnel.summarizeNow.test(null, targetDate)
 
-            val summaries = TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList()
+            val summaries =
+                TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList()
             assertEquals(1, summaries.size)
 
             val summary = summaries.first()
@@ -414,7 +412,8 @@ class FunnelEndpointsTest {
 
             TestServer.funnel.summarizeNow.test(null, targetDate)
 
-            val summaries = TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList()
+            val summaries =
+                TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList()
             assertEquals(1, summaries.size)
 
             val summary = summaries.first()
@@ -472,7 +471,8 @@ class FunnelEndpointsTest {
 
             TestServer.funnel.summarizeNow.test(null, targetDate)
 
-            val summaries = TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList()
+            val summaries =
+                TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList()
             assertEquals(1, summaries.size)
 
             val summary = summaries.first()
@@ -524,7 +524,8 @@ class FunnelEndpointsTest {
             // Run summarize - should replace the existing summary
             TestServer.funnel.summarizeNow.test(null, targetDate)
 
-            val summaries = TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList()
+            val summaries =
+                TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList()
             assertEquals(1, summaries.size)
 
             val summary = summaries.first()

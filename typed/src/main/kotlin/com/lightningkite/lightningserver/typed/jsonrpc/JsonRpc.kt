@@ -2,7 +2,6 @@ package com.lightningkite.lightningserver.typed.jsonrpc
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
 
 /**
  * JSON-RPC 2.0 request.
@@ -17,7 +16,7 @@ public data class JsonRpcRequest(
     val jsonrpc: String = "2.0",
     val method: String,
     val params: JsonElement? = null,
-    val id: JsonElement? = null
+    val id: JsonElement? = null,
 )
 
 /**
@@ -31,7 +30,7 @@ public data class JsonRpcRequest(
 public data class JsonRpcResponse(
     val jsonrpc: String = "2.0",
     val result: JsonElement,
-    val id: JsonElement? = null
+    val id: JsonElement? = null,
 )
 
 /**
@@ -45,7 +44,7 @@ public data class JsonRpcResponse(
 public data class JsonRpcErrorResponse(
     val jsonrpc: String = "2.0",
     val error: JsonRpcError,
-    val id: JsonElement? = null
+    val id: JsonElement? = null,
 )
 
 /**
@@ -59,7 +58,7 @@ public data class JsonRpcErrorResponse(
 public data class JsonRpcError(
     val code: Int,
     val message: String,
-    val data: JsonElement? = null
+    val data: JsonElement? = null,
 ) {
     public companion object {
         /** Invalid JSON was received by the server */

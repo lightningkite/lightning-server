@@ -11,13 +11,13 @@ public interface TokenFormat {
     context(server: ServerRuntime)
     public suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> create(
         principal: PrincipalType<SUBJECT, ID>,
-        auth: Authentication<SUBJECT>
+        auth: Authentication<SUBJECT>,
     ): String
 
     context(server: ServerRuntime)
     public suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> read(
         principal: PrincipalType<SUBJECT, ID>,
-        value: String
+        value: String,
     ): Authentication<SUBJECT>?
 }
 

@@ -1,22 +1,12 @@
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.definition.generalSettings
-import com.lightningkite.lightningserver.http.HttpHandler
-import com.lightningkite.lightningserver.http.HttpHeaders
-import com.lightningkite.lightningserver.http.HttpRequest
-import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.QueryParameters
-import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.pathing.PathSpec1
-import com.lightningkite.lightningserver.pathing.PathSpec2
-import com.lightningkite.lightningserver.pathing.PathSpec3
-import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.runtime.test.TestRunner
-import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
-import com.lightningkite.lightningserver.websockets.WebSocketHandler
+import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.HasId
 
@@ -108,7 +98,8 @@ import com.lightningkite.services.database.HasId
 //        with(it.server) { didConnect() }
 //    }
 //}
-context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT> ApiHttpHandler<PathSpec0, USER, INPUT, OUTPUT>.test(
+context(test: TestRunner<*>)
+public suspend fun <USER : HasId<*>, INPUT, OUTPUT> ApiHttpHandler<PathSpec0, USER, INPUT, OUTPUT>.test(
     auth: Authentication<USER>,
     input: INPUT,
 ): OUTPUT {
@@ -121,7 +112,10 @@ context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT> 
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
                 sourceIp = "localhost",
-                body = TypedData.text(test.externalSerialization.json.encodeToString(inputType, input), MediaType.Application.Json),
+                body = TypedData.text(
+                    test.externalSerialization.json.encodeToString(inputType, input),
+                    MediaType.Application.Json
+                ),
             ),
             auth,
         ),
@@ -129,7 +123,8 @@ context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT> 
     )
 }
 
-context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT, A> ApiHttpHandler<PathSpec1<A>, USER, INPUT, OUTPUT>.test(
+context(test: TestRunner<*>)
+public suspend fun <USER : HasId<*>, INPUT, OUTPUT, A> ApiHttpHandler<PathSpec1<A>, USER, INPUT, OUTPUT>.test(
     path1: A,
     auth: Authentication<USER>,
     input: INPUT,
@@ -143,14 +138,19 @@ context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT, 
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
                 sourceIp = "localhost",
-                body = TypedData.text(test.externalSerialization.json.encodeToString(inputType, input), MediaType.Application.Json),
+                body = TypedData.text(
+                    test.externalSerialization.json.encodeToString(inputType, input),
+                    MediaType.Application.Json
+                ),
             ),
             auth,
         ),
         input
     )
 }
-context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT, A, B> ApiHttpHandler<PathSpec2<A, B>, USER, INPUT, OUTPUT>.test(
+
+context(test: TestRunner<*>)
+public suspend fun <USER : HasId<*>, INPUT, OUTPUT, A, B> ApiHttpHandler<PathSpec2<A, B>, USER, INPUT, OUTPUT>.test(
     path1: A,
     path2: B,
     auth: Authentication<USER>,
@@ -165,7 +165,10 @@ context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT, 
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
                 sourceIp = "localhost",
-                body = TypedData.text(test.externalSerialization.json.encodeToString(inputType, input), MediaType.Application.Json),
+                body = TypedData.text(
+                    test.externalSerialization.json.encodeToString(inputType, input),
+                    MediaType.Application.Json
+                ),
             ),
             auth,
         ),
@@ -173,7 +176,8 @@ context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT, 
     )
 }
 
-context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT, A, B, C> ApiHttpHandler<PathSpec3<A, B, C>, USER, INPUT, OUTPUT>.test(
+context(test: TestRunner<*>)
+public suspend fun <USER : HasId<*>, INPUT, OUTPUT, A, B, C> ApiHttpHandler<PathSpec3<A, B, C>, USER, INPUT, OUTPUT>.test(
     path1: A,
     path2: B,
     path3: C,
@@ -189,7 +193,10 @@ context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT, 
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
                 sourceIp = "localhost",
-                body = TypedData.text(test.externalSerialization.json.encodeToString(inputType, input), MediaType.Application.Json),
+                body = TypedData.text(
+                    test.externalSerialization.json.encodeToString(inputType, input),
+                    MediaType.Application.Json
+                ),
             ),
             auth,
         ),
@@ -198,7 +205,7 @@ context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT, 
 }
 
 @JvmName("testNullableAuth")
-context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT> ApiHttpHandler<PathSpec0, USER?, INPUT, OUTPUT>.test(
+context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT> ApiHttpHandler<PathSpec0, USER?, INPUT, OUTPUT>.test(
     auth: Authentication<USER>?,
     input: INPUT,
 ): OUTPUT {
@@ -211,7 +218,10 @@ context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT> 
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
                 sourceIp = "localhost",
-                body = TypedData.text(test.externalSerialization.json.encodeToString(inputType, input), MediaType.Application.Json),
+                body = TypedData.text(
+                    test.externalSerialization.json.encodeToString(inputType, input),
+                    MediaType.Application.Json
+                ),
             ),
             auth,
         ),
@@ -220,7 +230,7 @@ context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT> 
 }
 
 @JvmName("testNullableAuth")
-context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT, A> ApiHttpHandler<PathSpec1<A>, USER?, INPUT, OUTPUT>.test(
+context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT, A> ApiHttpHandler<PathSpec1<A>, USER?, INPUT, OUTPUT>.test(
     path1: A,
     auth: Authentication<USER>?,
     input: INPUT,
@@ -234,15 +244,19 @@ context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT, 
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
                 sourceIp = "localhost",
-                body = TypedData.text(test.externalSerialization.json.encodeToString(inputType, input), MediaType.Application.Json),
+                body = TypedData.text(
+                    test.externalSerialization.json.encodeToString(inputType, input),
+                    MediaType.Application.Json
+                ),
             ),
             auth,
         ),
         input
     )
 }
+
 @JvmName("testNullableAuth")
-context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT, A, B> ApiHttpHandler<PathSpec2<A, B>, USER?, INPUT, OUTPUT>.test(
+context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT, A, B> ApiHttpHandler<PathSpec2<A, B>, USER?, INPUT, OUTPUT>.test(
     path1: A,
     path2: B,
     auth: Authentication<USER>?,
@@ -257,15 +271,19 @@ context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT, 
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
                 sourceIp = "localhost",
-                body = TypedData.text(test.externalSerialization.json.encodeToString(inputType, input), MediaType.Application.Json),
+                body = TypedData.text(
+                    test.externalSerialization.json.encodeToString(inputType, input),
+                    MediaType.Application.Json
+                ),
             ),
             auth,
         ),
         input
     )
 }
+
 @JvmName("testNullableAuth")
-context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT, A, B, C> ApiHttpHandler<PathSpec3<A, B, C>, USER?, INPUT, OUTPUT>.test(
+context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT, A, B, C> ApiHttpHandler<PathSpec3<A, B, C>, USER?, INPUT, OUTPUT>.test(
     path1: A,
     path2: B,
     path3: C,
@@ -281,7 +299,10 @@ context(test: TestRunner<*>) public suspend fun <USER: HasId<*>, INPUT, OUTPUT, 
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
                 sourceIp = "localhost",
-                body = TypedData.text(test.externalSerialization.json.encodeToString(inputType, input), MediaType.Application.Json),
+                body = TypedData.text(
+                    test.externalSerialization.json.encodeToString(inputType, input),
+                    MediaType.Application.Json
+                ),
             ),
             auth,
         ),

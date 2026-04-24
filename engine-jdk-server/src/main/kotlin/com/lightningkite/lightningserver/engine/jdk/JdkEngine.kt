@@ -1,29 +1,20 @@
 package com.lightningkite.lightningserver.engine.jdk
 
-import com.lightningkite.MediaType
+import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.engine.local.LocalEngine
-import com.lightningkite.lightningserver.HttpMethod
-import com.lightningkite.lightningserver.http.HttpHeader
-import com.lightningkite.lightningserver.http.HttpRequest
-import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.HttpHeaders
-import com.lightningkite.lightningserver.http.PathSegments
-import com.lightningkite.lightningserver.http.QueryParameters
+import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.runtime.handle
 import com.lightningkite.lightningserver.settings.ServerSettings
-import com.lightningkite.services.data.Data
-import com.lightningkite.services.data.TypedData
+import com.lightningkite.services.data.*
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import kotlinx.coroutines.runBlocking
-import kotlinx.io.asSink
-import kotlinx.io.asSource
-import kotlinx.io.buffered
+import kotlinx.io.*
 import kotlinx.serialization.Serializable
 import java.net.InetSocketAddress
 import kotlin.time.Clock
@@ -69,7 +60,7 @@ public val jdkRunConfig: ServerSetting.Direct<JdkRuntimeSettings> = ServerSettin
  */
 public class JdkEngine(
     server: ServerDefinition,
-    override val clock: Clock = Clock.System
+    override val clock: Clock = Clock.System,
 ) : LocalEngine(server) {
 
     override val settings: ServerSettings = super.settings + jdkRunConfig
@@ -111,9 +102,13 @@ public class JdkEngine(
                             out.write(msg.toByteArray())
                         }
                     }
-                } catch (_: Throwable) { }
+                } catch (_: Throwable) {
+                }
             } finally {
-                try { exchange.close() } catch (_: Throwable) {}
+                try {
+                    exchange.close()
+                } catch (_: Throwable) {
+                }
             }
         }
 
@@ -156,11 +151,13 @@ private fun HttpExchange.write(response: HttpResponse) {
                 this.responseBody.use { /* no body */ }
             }
         }
+
         is Data.Bytes, is Data.Text -> {
             val bytes = b.bytes()
             sendResponseHeaders(status, bytes.size.toLong())
             this.responseBody.use { os -> os.write(bytes) }
         }
+
         is Data.Sink -> {
             // Unknown length; use chunked
             sendResponseHeaders(status, b.size ?: 0)
@@ -168,6 +165,7 @@ private fun HttpExchange.write(response: HttpResponse) {
                 b.emit(os.asSink().buffered())
             }
         }
+
         is Data.Source -> {
             sendResponseHeaders(status, b.size ?: 0)
             this.responseBody.use { os ->
@@ -201,7 +199,10 @@ private fun HttpExchange.requestToLightningServer(realIpHeader: String?, engine:
     val contentLength = headers.contentLength ?: -1L
     val body = if (this.requestBody != null) {
         val src = this.requestBody
-        TypedData.sink(contentTypeHeader ?: headers.contentType ?: MediaType.Application.OctetStream, contentLength) { out ->
+        TypedData.sink(
+            contentTypeHeader ?: headers.contentType ?: MediaType.Application.OctetStream,
+            contentLength
+        ) { out ->
             out.transferFrom(src.asSource())
         }
     } else null

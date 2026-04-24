@@ -1,8 +1,6 @@
 package com.lightningkite.lightningserver.sessions
 
-import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.auth.GrantedScope
-import com.lightningkite.lightningserver.auth.PrincipalType
+import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.HasId

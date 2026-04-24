@@ -1,26 +1,23 @@
 package com.lightningkite.lightningserver.runtime
 
 import com.lightningkite.lightningserver.HttpMethod
-import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.loggingSettings
-import com.lightningkite.lightningserver.http.HttpRequest
-import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.services.LoggingSettings
+import com.lightningkite.services.data.MediaType
+import com.lightningkite.services.data.TypedData
 import io.github.oshai.kotlinlogging.Level
 import kotlinx.coroutines.runBlocking
+import kotlinx.io.writeString
 import java.io.ByteArrayInputStream
 import java.util.zip.GZIPInputStream
 import kotlin.test.*
-import com.lightningkite.MediaType
-import com.lightningkite.services.data.TypedData
-import kotlinx.io.writeString
 
 class ImplementationHelpersHandleTest {
 
@@ -31,6 +28,7 @@ class ImplementationHelpersHandleTest {
             limitToDomains = listOf("example.com"),
             limitToMethods = listOf("*")
         )
+
         init {
             install(com.lightningkite.lightningserver.cors.CorsInterceptor(setting("cors", cors)))
         }
@@ -108,7 +106,7 @@ class ImplementationHelpersHandleTest {
                 )
                 assertEquals(HttpStatus.OK, resp.status)
                 assertNotNull(resp.body)
-                assertEquals("pong", resp.body!!.text())
+                assertEquals("pong", resp.body.text())
             }
         }
     }
@@ -286,6 +284,7 @@ class ImplementationHelpersHandleTest {
             }
         }
     }
+
     @Test
     fun trailing_slash_redirects_root2() {
         TestServer.test(
@@ -402,7 +401,8 @@ class ImplementationHelpersHandleTest {
                 // Should have content-encoding: gzip and body compressed
                 assertEquals("gzip", resp.headers[HttpHeader.ContentEncoding]?.root)
                 val compressed = resp.body?.data?.bytes() ?: error("Expected body bytes")
-                val decompressed = GZIPInputStream(ByteArrayInputStream(compressed)).readBytes().toString(Charsets.UTF_8)
+                val decompressed =
+                    GZIPInputStream(ByteArrayInputStream(compressed)).readBytes().toString(Charsets.UTF_8)
                 assertEquals("x".repeat(100_000), decompressed)
             }
         }

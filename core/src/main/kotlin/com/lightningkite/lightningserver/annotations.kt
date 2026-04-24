@@ -4,7 +4,10 @@ package com.lightningkite.lightningserver
  * Marks declarations that are internal to Lightning Server's implementation.
  * These APIs should not be used by external consumers as they may change without notice.
  */
-@RequiresOptIn("This is essentially internal, and its usage is unstable and may change at any time.", RequiresOptIn.Level.WARNING)
+@RequiresOptIn(
+    "This is essentially internal, and its usage is unstable and may change at any time.",
+    RequiresOptIn.Level.WARNING
+)
 @Target(
     AnnotationTarget.PROPERTY,
     AnnotationTarget.CLASS,

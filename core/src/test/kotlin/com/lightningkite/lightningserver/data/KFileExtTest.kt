@@ -12,7 +12,7 @@ class KFileExtTest {
     @Test
     fun testKFileToJavaFile() {
         val path = Path("/tmp/test.txt")
-        val kFile = com.lightningkite.services.data.KFile(SystemFileSystem, path)
+        val kFile = com.lightningkite.services.kfile.KFile(SystemFileSystem, path)
         val javaFile = kFile.toJavaFile()
 
         assertEquals("/tmp/test.txt", javaFile.path.unix)

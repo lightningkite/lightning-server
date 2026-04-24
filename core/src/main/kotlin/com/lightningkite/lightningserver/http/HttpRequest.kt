@@ -36,7 +36,7 @@ import kotlinx.serialization.Transient
  * @property body The request body as TypedData, or null if no body
  */
 @Serializable
-public data class HttpRequest<PATH: PathSpec>(
+public data class HttpRequest<PATH : PathSpec>(
     override val path: RawHttpEndpoint<PATH>,
     override val queryParameters: QueryParameters,
     override val headers: HttpHeaders,
@@ -56,7 +56,7 @@ public data class HttpRequest<PATH: PathSpec>(
      * @param path The new path with the updated type
      * @return A new HttpRequest with the specified path type
      */
-    public fun <PATH2: PathSpec> copyWithNewPathType(
+    public fun <PATH2 : PathSpec> copyWithNewPathType(
         path: RawHttpEndpoint<PATH2>,
         queryParameters: QueryParameters = this.queryParameters,
         headers: HttpHeaders = this.headers,

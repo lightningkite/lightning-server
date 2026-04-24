@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.definition
 
-import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.HttpMethod
+import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 
 /**
@@ -20,7 +20,7 @@ public interface ServerPathEndpoints {
 
 private data class ServerPathEndpointsData(
     override val http: Map<HttpMethod, HttpHandler<*>>,
-    override val websocket: WebSocketHandler<*, *>?
+    override val websocket: WebSocketHandler<*, *>?,
 ) : ServerPathEndpoints
 
 /**
@@ -32,7 +32,7 @@ private data class ServerPathEndpointsData(
  */
 public fun ServerPathEndpoints(
     http: Map<HttpMethod, HttpHandler<*>>,
-    websocket: WebSocketHandler<*, *>?
+    websocket: WebSocketHandler<*, *>?,
 ): ServerPathEndpoints = ServerPathEndpointsData(http, websocket)
 
 /**

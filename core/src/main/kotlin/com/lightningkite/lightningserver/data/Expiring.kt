@@ -28,7 +28,7 @@ import kotlin.time.Instant
 @Serializable
 public data class Expiring<T>(
     val value: T,
-    val expiresAt: Instant?
+    val expiresAt: Instant?,
 ) {
     /**
      * Returns true if the value has expired based on the server's current time.
@@ -51,7 +51,8 @@ public data class Expiring<T>(
  * Note: Requires ServerRuntime context to access the server's clock for calculating expiration time.
  */
 context(server: ServerRuntime)
-public fun <T> Expiring(value: T, expireAfter: Duration?): Expiring<T> = Expiring(value, expireAfter?.let { server.clock.now() + it })
+public fun <T> Expiring(value: T, expireAfter: Duration?): Expiring<T> =
+    Expiring(value, expireAfter?.let { server.clock.now() + it })
 
 /*
  * TODO: API Recommendations for Expiring.kt

@@ -1,15 +1,13 @@
 package com.lightningkite.lightningserver.typed.sdk
 
-import com.lightningkite.lightningserver.definition.MutableExtensions
-import com.lightningkite.lightningserver.definition.getValue
-import com.lightningkite.lightningserver.definition.setValue
+import com.lightningkite.lightningserver.definition.*
 import kotlinx.serialization.KSerializer
 import kotlin.reflect.KClass
 
 public data class InterfaceInfo(
     val type: KClass<*>,
     val typeParameters: List<KSerializer<*>> = emptyList(),
-    val imports: Set<String> = emptySet()
+    val imports: Set<String> = emptySet(),
 ) {
     init {
         require(type.typeParameters.size == typeParameters.size) {

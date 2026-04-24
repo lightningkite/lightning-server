@@ -2,14 +2,16 @@
 
 ## Overview
 
-Add OpenTelemetry-based observability for AI chat agents, including conversation quality metrics and sentiment detection for proactive escalation. This builds on the existing OTel infrastructure in Lightning Server.
+Add OpenTelemetry-based observability for AI chat agents, including conversation quality metrics and sentiment detection
+for proactive escalation. This builds on the existing OTel infrastructure in Lightning Server.
 
 ## Context
 
 - **Use Case**: Customer support chatbots need to measure effectiveness and catch frustrated customers
 - **Existing Infrastructure**: Lightning Server has OTel support via `serviceAbstractionsOtelJvm`
 - **Related Work**: HTTP metrics already implemented in `HttpMetrics.kt`
-- **AI Semantic Conventions**: Use emerging [OpenTelemetry GenAI conventions](https://opentelemetry.io/blog/2025/ai-agent-observability/)
+- **AI Semantic Conventions**: Use
+  emerging [OpenTelemetry GenAI conventions](https://opentelemetry.io/blog/2025/ai-agent-observability/)
 
 ## Goals
 
@@ -612,7 +614,8 @@ public class KeywordSentimentAnalyzer(
 
 ### Design Philosophy
 
-Instead of extending classes, provide **utility objects** that `LLMChatEndpoints` implementations can use via delegation. Each utility is self-contained and can be mixed-and-matched.
+Instead of extending classes, provide **utility objects** that `LLMChatEndpoints` implementations can use via
+delegation. Each utility is self-contained and can be mixed-and-matched.
 
 ### Utility 1: Sentiment Detection Helper
 
@@ -651,14 +654,15 @@ import kotlinx.serialization.Serializable
  *     }
  * }
  * ```
- */
+
+*/
 public class ConversationSentimentDetection<Subject : HasId<*>>(
-    private val analyzer: SentimentAnalyzer,
-    private val onEscalation: (suspend context(ServerRuntime) (
-        auth: AuthAccess<Subject>,
-        conversation: SystemChatConversation,
-        result: SentimentAnalysisResult
-    ) -> Unit)? = null
+private val analyzer: SentimentAnalyzer,
+private val onEscalation: (suspend context(ServerRuntime) (
+auth: AuthAccess<Subject>,
+conversation: SystemChatConversation,
+result: SentimentAnalysisResult
+) -> Unit)? = null
 ) {
 
     /**
@@ -727,7 +731,9 @@ public class ConversationSentimentDetection<Subject : HasId<*>>(
             )
         )
     }
+
 }
+
 ```
 
 ### Utility 2: Agent Metrics Tracker
@@ -760,9 +766,10 @@ import com.lightningkite.services.database.HasId
  *     }
  * }
  * ```
- */
+
+*/
 public class ConversationMetricsTracker<Subject : HasId<*>>(
-    private val agentName: String
+private val agentName: String
 ) {
 
     /**
@@ -864,7 +871,9 @@ public class ConversationMetricsTracker<Subject : HasId<*>>(
         // return AiAgentMetrics(serverRuntime.openTelemetry?.getMeter(...))
         return null
     }
+
 }
+
 ```
 
 ### Utility 3: Conversation Lifecycle Endpoints
@@ -900,11 +909,12 @@ import kotlin.uuid.Uuid
  *     }
  * }
  * ```
- */
+
+*/
 public class ConversationLifecycleEndpoints<Subject : HasId<*>>(
-    private val conversations: ModelInfo<Subject, SystemChatConversation, Uuid>,
-    private val authRequirement: AuthRequirement<Subject>,
-    private val metricsTracker: ConversationMetricsTracker<Subject>? = null
+private val conversations: ModelInfo<Subject, SystemChatConversation, Uuid>,
+private val authRequirement: AuthRequirement<Subject>,
+private val metricsTracker: ConversationMetricsTracker<Subject>? = null
 ) : ServerBuilder() {
 
     /**
@@ -961,20 +971,22 @@ public class ConversationLifecycleEndpoints<Subject : HasId<*>>(
             )
         }
     )
+
 }
 
 @Serializable
 public data class MarkResolvedInput(
-    val conversationId: Uuid,
-    val satisfactionScore: Int? = null, // 1-5
-    val category: String? = null
+val conversationId: Uuid,
+val satisfactionScore: Int? = null, // 1-5
+val category: String? = null
 )
 
 @Serializable
 public data class CategorizeInput(
-    val conversationId: Uuid,
-    val category: String
+val conversationId: Uuid,
+val category: String
 )
+
 ```
 
 ### Complete Example: Composing All Utilities
@@ -1075,6 +1087,7 @@ class BlogAssistantChat(
 ## Implementation Steps
 
 ### Phase 1: Foundation (Sprint 1)
+
 1. ✅ Create `AiAgentMetrics.kt` with OTel metric instruments
 2. ✅ Update `SystemChatConversation` data model with sentiment/outcome fields
 3. ✅ Create `SentimentAnalyzer` interface for pluggability
@@ -1085,12 +1098,14 @@ class BlogAssistantChat(
 8. Test sentiment detection with mock conversations
 
 ### Phase 2: Integration & Testing (Sprint 1 continued)
+
 9. Wire up `ConversationMetricsTracker.getMetrics()` to ServerRuntime's OpenTelemetry
 10. Update `BlogAssistantChat` demo to use utilities
 11. Add integration tests for sentiment + metrics composition
 12. Test lifecycle endpoints (resolve, categorize)
 
 ### Phase 3: Testing & Validation (Sprint 2)
+
 13. Write unit tests for sentiment detection
 14. Write integration tests for metrics recording
 15. Set up Grafana dashboards for agent metrics

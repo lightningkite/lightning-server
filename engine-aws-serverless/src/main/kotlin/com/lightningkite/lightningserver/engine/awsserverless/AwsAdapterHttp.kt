@@ -1,21 +1,13 @@
 package com.lightningkite.lightningserver.engine.awsserverless
 
-import com.lightningkite.MediaType
-import com.lightningkite.lightningserver.http.HttpHeader
-import com.lightningkite.lightningserver.http.HttpHeaderValue
-import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.HttpMethod
-import com.lightningkite.lightningserver.http.HttpRequest
-import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.PathSegments
-import com.lightningkite.lightningserver.http.QueryParameters
+import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.runtime.handle
-import com.lightningkite.services.data.Data
-import com.lightningkite.services.data.TypedData
+import com.lightningkite.services.data.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.util.Base64
+import java.util.*
 
 
 internal class AwsAdapterHttp(val root: AwsAdapter) {
@@ -32,8 +24,8 @@ internal class AwsAdapterHttp(val root: AwsAdapter) {
                 TypedData.text(raw, headers.contentType ?: MediaType.Text.Plain)
         }
         val queryParams = event.multiValueQueryStringParameters?.entries
-                ?.flatMap { it.value.map { v -> it.key to v } }
-                ?: emptyList()
+            ?.flatMap { it.value.map { v -> it.key to v } }
+            ?: emptyList()
 
         val request = HttpRequest(
             path = RawHttpEndpoint(event.path.removePrefix("/" + event.requestContext.stage), method),
@@ -58,7 +50,7 @@ internal suspend fun HttpResponse.toAws(
     val b = body
     b?.mediaType?.let { outHeaders.put(HttpHeader.ContentType, it.toString()) }
     b?.data?.size?.let { outHeaders.put(HttpHeader.ContentLength, it.toString()) }
-    when(val data = b?.data) {
+    when (val data = b?.data) {
         null -> {
             val response = APIGatewayV2HTTPResponse(
                 statusCode = status.code,

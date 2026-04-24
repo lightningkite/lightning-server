@@ -1,8 +1,7 @@
-import com.lightningkite.deployhelpers.*
+import com.lightningkite.deployhelpers.lkLibrary
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
-    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.dokka)
     id("signing")
     alias(libs.plugins.vanniktechMavenPublish)
@@ -28,6 +27,10 @@ kotlin {
     }
 }
 
-lkLibrary("lightningkite", "lightning-server") {
-    description.set("A set of tools to fill in/replace what Ktor is lacking in.")
+lkLibrary(
+    "lightningkite",
+    "lightning-server",
+    mavenAutomaticRelease = project.findProperty("mavenAutomaticRelease") as? Boolean ?: false
+) {
+    description.set("An AWS Secrets implementation of SecretSource")
 }

@@ -2,9 +2,7 @@ package com.lightningkite.lightningserver.telemetry
 
 import io.opentelemetry.api.common.AttributeKey
 import io.opentelemetry.api.common.Attributes
-import io.opentelemetry.api.metrics.LongCounter
-import io.opentelemetry.api.metrics.LongHistogram
-import io.opentelemetry.api.metrics.Meter
+import io.opentelemetry.api.metrics.*
 
 /**
  * HTTP metrics registry for OpenTelemetry.
@@ -74,7 +72,7 @@ public class HttpMetrics(meter: Meter) {
         route: String,
         statusCode: Int,
         durationMs: Long,
-        errorType: String? = null
+        errorType: String? = null,
     ) {
         val attributes = Attributes.of(
             HTTP_METHOD, method,

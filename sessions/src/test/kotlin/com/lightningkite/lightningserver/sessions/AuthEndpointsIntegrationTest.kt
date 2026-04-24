@@ -1,10 +1,8 @@
 // by Claude
 package com.lightningkite.lightningserver.sessions
 
-import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.auth.GrantedScope
 import com.lightningkite.lightningserver.auth.PrincipalType
-import com.lightningkite.lightningserver.auth.id
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -14,7 +12,6 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.sessions.proofs.IdentificationAndPassword
 import com.lightningkite.lightningserver.sessions.proofs.PasswordProofEndpoints
-import com.lightningkite.lightningserver.sessions.proofs.Proof
 import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.cache.Cache
@@ -25,12 +22,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import org.junit.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
@@ -47,7 +39,7 @@ class AuthEndpointsIntegrationTest {
         override val _id: Uuid = Uuid.random(),
         val email: String = "",
         val phone: String = "",
-        val isAdmin: Boolean = false
+        val isAdmin: Boolean = false,
     ) : HasId<Uuid> {
         companion object : PrincipalType<AuthTestUser, Uuid> {
             override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
@@ -79,7 +71,7 @@ class AuthEndpointsIntegrationTest {
 
     class TestAuthEndpoints(
         database: Runtime<Database>,
-        private val proofStrength: Int = 100
+        private val proofStrength: Int = 100,
     ) : AuthEndpoints<AuthTestUser, Uuid>(
         principal = AuthTestUser,
         database = database,
@@ -122,12 +114,14 @@ class AuthEndpointsIntegrationTest {
                 server.passwordEndpoints.establish(AuthTestUser, userId, EstablishPassword("securePassword123"))
 
                 // Get password proof
-                val proof = server.passwordEndpoints.prove.test(null, IdentificationAndPassword(
-                    type = "AuthTestUser",
-                    property = "email",
-                    value = "test@example.com",
-                    password = "securePassword123"
-                ))
+                val proof = server.passwordEndpoints.prove.test(
+                    null, IdentificationAndPassword(
+                        type = "AuthTestUser",
+                        property = "email",
+                        value = "test@example.com",
+                        password = "securePassword123"
+                    )
+                )
 
                 // Login with the proof
                 val result = server.authEndpoints.login.test(null, listOf(proof))
@@ -165,12 +159,14 @@ class AuthEndpointsIntegrationTest {
                 server.passwordEndpoints.establish(AuthTestUser, userId, EstablishPassword("adminPassword"))
 
                 // Get password proof
-                val proof = server.passwordEndpoints.prove.test(null, IdentificationAndPassword(
-                    type = "AuthTestUser",
-                    property = "email",
-                    value = "admin@example.com",
-                    password = "adminPassword"
-                ))
+                val proof = server.passwordEndpoints.prove.test(
+                    null, IdentificationAndPassword(
+                        type = "AuthTestUser",
+                        property = "email",
+                        value = "admin@example.com",
+                        password = "adminPassword"
+                    )
+                )
 
                 // Login with the proof - system caps required strength at max achievable
                 val result = server.authEndpoints.login.test(null, listOf(proof))
@@ -178,7 +174,10 @@ class AuthEndpointsIntegrationTest {
                 assertNotNull(result)
                 assertEquals(userId, result.id)
                 // Admin can log in because required strength is capped at what's achievable
-                assertNotNull(result.refreshToken, "Admin should be able to login when strength is capped at max achievable")
+                assertNotNull(
+                    result.refreshToken,
+                    "Admin should be able to login when strength is capped at max achievable"
+                )
             }
         }
     }
@@ -208,12 +207,14 @@ class AuthEndpointsIntegrationTest {
                 server.passwordEndpoints.establish(AuthTestUser, userId, EstablishPassword("myPassword"))
 
                 // Get password proof
-                val proof = server.passwordEndpoints.prove.test(null, IdentificationAndPassword(
-                    type = "AuthTestUser",
-                    property = "email",
-                    value = "test@example.com",
-                    password = "myPassword"
-                ))
+                val proof = server.passwordEndpoints.prove.test(
+                    null, IdentificationAndPassword(
+                        type = "AuthTestUser",
+                        property = "email",
+                        value = "test@example.com",
+                        password = "myPassword"
+                    )
+                )
 
                 // Check proofs
                 val result = server.authEndpoints.proofsCheck.test(null, listOf(proof))
@@ -256,19 +257,23 @@ class AuthEndpointsIntegrationTest {
                 server.passwordEndpoints.establish(AuthTestUser, userId2, EstablishPassword("password2"))
 
                 // Get proofs for both users
-                val proof1 = server.passwordEndpoints.prove.test(null, IdentificationAndPassword(
-                    type = "AuthTestUser",
-                    property = "email",
-                    value = "user1@example.com",
-                    password = "password1"
-                ))
+                val proof1 = server.passwordEndpoints.prove.test(
+                    null, IdentificationAndPassword(
+                        type = "AuthTestUser",
+                        property = "email",
+                        value = "user1@example.com",
+                        password = "password1"
+                    )
+                )
 
-                val proof2 = server.passwordEndpoints.prove.test(null, IdentificationAndPassword(
-                    type = "AuthTestUser",
-                    property = "email",
-                    value = "user2@example.com",
-                    password = "password2"
-                ))
+                val proof2 = server.passwordEndpoints.prove.test(
+                    null, IdentificationAndPassword(
+                        type = "AuthTestUser",
+                        property = "email",
+                        value = "user2@example.com",
+                        password = "password2"
+                    )
+                )
 
                 // Try to login with proofs from different users - should fail
                 assertFailsWith<Exception>("Login with proofs from different users should fail") {
@@ -303,20 +308,24 @@ class AuthEndpointsIntegrationTest {
                 server.passwordEndpoints.establish(AuthTestUser, userId, EstablishPassword("securePassword"))
 
                 // Get password proof
-                val proof = server.passwordEndpoints.prove.test(null, IdentificationAndPassword(
-                    type = "AuthTestUser",
-                    property = "email",
-                    value = "test@example.com",
-                    password = "securePassword"
-                ))
+                val proof = server.passwordEndpoints.prove.test(
+                    null, IdentificationAndPassword(
+                        type = "AuthTestUser",
+                        property = "email",
+                        value = "test@example.com",
+                        password = "securePassword"
+                    )
+                )
 
                 // Login2 with custom parameters
                 val customScopes = setOf(GrantedScope("api:read"))
-                val result = server.authEndpoints.login2.test(null, LogInRequest(
-                    proofs = listOf(proof),
-                    label = "Test Device",
-                    scopes = customScopes
-                ))
+                val result = server.authEndpoints.login2.test(
+                    null, LogInRequest(
+                        proofs = listOf(proof),
+                        label = "Test Device",
+                        scopes = customScopes
+                    )
+                )
 
                 assertNotNull(result)
                 assertEquals(userId, result.id)
@@ -364,12 +373,14 @@ class AuthEndpointsIntegrationTest {
             server.test({}) {
                 // Try to prove with nonexistent user
                 assertFailsWith<Exception>("Nonexistent user should fail") {
-                    server.passwordEndpoints.prove.test(null, IdentificationAndPassword(
-                        type = "AuthTestUser",
-                        property = "email",
-                        value = "nonexistent@example.com",
-                        password = "anyPassword"
-                    ))
+                    server.passwordEndpoints.prove.test(
+                        null, IdentificationAndPassword(
+                            type = "AuthTestUser",
+                            property = "email",
+                            value = "nonexistent@example.com",
+                            password = "anyPassword"
+                        )
+                    )
                 }
             }
         }
@@ -400,12 +411,14 @@ class AuthEndpointsIntegrationTest {
                 server.passwordEndpoints.establish(AuthTestUser, userId, EstablishPassword("adminPassword"))
 
                 // Get password proof
-                val proof = server.passwordEndpoints.prove.test(null, IdentificationAndPassword(
-                    type = "AuthTestUser",
-                    property = "email",
-                    value = "test@example.com",
-                    password = "adminPassword"
-                ))
+                val proof = server.passwordEndpoints.prove.test(
+                    null, IdentificationAndPassword(
+                        type = "AuthTestUser",
+                        property = "email",
+                        value = "test@example.com",
+                        password = "adminPassword"
+                    )
+                )
 
                 // Check proofs for admin user
                 val result = server.authEndpoints.proofsCheck.test(null, listOf(proof))
@@ -445,12 +458,14 @@ class AuthEndpointsIntegrationTest {
                 server.passwordEndpoints.establish(AuthTestUser, userId, EstablishPassword("testPassword"))
 
                 // Get password proof
-                val proof = server.passwordEndpoints.prove.test(null, IdentificationAndPassword(
-                    type = "AuthTestUser",
-                    property = "email",
-                    value = "test@example.com",
-                    password = "testPassword"
-                ))
+                val proof = server.passwordEndpoints.prove.test(
+                    null, IdentificationAndPassword(
+                        type = "AuthTestUser",
+                        property = "email",
+                        value = "test@example.com",
+                        password = "testPassword"
+                    )
+                )
 
                 // Login and get refresh token
                 val loginResult = server.authEndpoints.login.test(null, listOf(proof))

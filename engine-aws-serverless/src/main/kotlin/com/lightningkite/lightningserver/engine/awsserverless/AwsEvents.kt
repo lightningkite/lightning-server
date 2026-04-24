@@ -18,7 +18,7 @@ internal data class APIGatewayV2HTTPEvent(
     val isBase64Encoded: Boolean,
     val path: String,
     val multiValueQueryStringParameters: Map<String, List<String>>? = null,
-): AwsLambdaInput {
+) : AwsLambdaInput {
     @Serializable
     data class RequestContext(
         val accountId: String,
@@ -51,7 +51,7 @@ internal data class APIGatewayV2HTTPResponse(
     val isBase64Encoded: Boolean = false,
     // Enabling this breaks websockets?!
 //    val cookies: List<String> = emptyList(),
-    val headers: Map<String, String> = mapOf()
+    val headers: Map<String, String> = mapOf(),
 )
 
 
@@ -64,7 +64,7 @@ internal data class APIGatewayV2WebsocketRequest(
     val requestContext: RequestContext,
     val isBase64Encoded: Boolean,
     val body: String? = null,
-): AwsLambdaInput {
+) : AwsLambdaInput {
     @Serializable
     data class RequestContext(
         val routeKey: String,
@@ -91,33 +91,20 @@ internal data class APIGatewayV2WebsocketRequest(
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-private fun JsonElement.jankType(key: String): String = when(this) {
+private fun JsonElement.jankType(key: String): String = when (this) {
     JsonNull -> "Any?"
     is JsonObject -> key.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
     is JsonArray -> "List<${this.firstOrNull()?.jankType(key)}>"
-    is JsonPrimitive -> when(this.content) {
+    is JsonPrimitive -> when (this.content) {
         "true", "false" -> "Boolean"
-        else -> if(this.isString) "String" else "Int"
+        else -> if (this.isString) "String" else "Int"
     }
 }
 
 internal fun JsonObject.jankMeADataClass(name: String) {
     println("@Serializable")
     println("data class $name(")
-    for(entry in this) {
+    for (entry in this) {
         println("val ${entry.key}: ${entry.value.jankType(entry.key)},")
     }
     println(") {")

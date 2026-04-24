@@ -10,10 +10,7 @@ import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
 import kotlinx.coroutines.runBlocking
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /**
  * Tests for HttpInterceptor functionality including chaining, instrumentation,
@@ -157,10 +154,11 @@ class HttpInterceptorTest {
 
         val firstInterceptor = object : HttpInterceptor {
             override val name = "FirstInterceptor"
+
             context(runtime: ServerRuntime)
             override suspend fun intercept(
                 request: HttpRequest<*>,
-                cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse
+                cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
             ): HttpResponse {
                 executionOrder.add("first-before")
                 val response = cont(request)
@@ -171,10 +169,11 @@ class HttpInterceptorTest {
 
         val secondInterceptor = object : HttpInterceptor {
             override val name = "SecondInterceptor"
+
             context(runtime: ServerRuntime)
             override suspend fun intercept(
                 request: HttpRequest<*>,
-                cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse
+                cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
             ): HttpResponse {
                 executionOrder.add("second-before")
                 val response = cont(request)
@@ -216,7 +215,7 @@ class HttpInterceptorTest {
             context(runtime: ServerRuntime)
             override suspend fun intercept(
                 request: HttpRequest<*>,
-                cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse
+                cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
             ): HttpResponse = cont(request)
         }
 

@@ -2,11 +2,13 @@
 
 Last updated December 2024 (`version-5`)
 
-Lightning Server applications can be deployed to traditional virtual machines or bare metal servers. This guide covers general VM deployment concepts, with AWS EC2 as a fully automated option.
+Lightning Server applications can be deployed to traditional virtual machines or bare metal servers. This guide covers
+general VM deployment concepts, with AWS EC2 as a fully automated option.
 
 ## AWS EC2 (Recommended)
 
 For AWS deployments, use the `deploy-aws-ec2` module which provides:
+
 - Fully automated Terraform generation
 - Auto Scaling with Application Load Balancer
 - Distributed scheduled task handling via SQS
@@ -150,7 +152,8 @@ java -jar server.jar
 
 For single-server deployments, scheduled tasks run automatically. No additional configuration is needed.
 
-For multi-server deployments without SQS, you'll need to implement your own coordination (database locks, Redis, etc.) or designate one server as the scheduler.
+For multi-server deployments without SQS, you'll need to implement your own coordination (database locks, Redis, etc.)
+or designate one server as the scheduler.
 
 ## Health Checks
 

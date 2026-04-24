@@ -1,10 +1,8 @@
 package com.lightningkite.lightningserver.definition
 
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import kotlinx.serialization.KSerializer
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * Represents a task that executes once during server initialization.
@@ -41,7 +39,7 @@ public interface StartupTask {
 public fun StartupTask(
     dependencies: Collection<StartupTask> = emptyList(),
     timeout: Duration = 5.minutes,
-    handler: suspend context(ServerRuntime) StartupTask.() -> Unit
+    handler: suspend context(ServerRuntime) StartupTask.() -> Unit,
 ): StartupTask =
     object : StartupTask {
         override val timeout: Duration = timeout

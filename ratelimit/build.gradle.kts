@@ -1,4 +1,4 @@
-import com.lightningkite.deployhelpers.*
+import com.lightningkite.deployhelpers.lkLibrary
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
@@ -27,6 +27,10 @@ kotlin {
     }
 }
 
-lkLibrary("lightningkite", "lightning-server") {
-    description.set("Rate limiting for Lightning Server")
+lkLibrary(
+    "lightningkite",
+    "lightning-server",
+    mavenAutomaticRelease = project.findProperty("mavenAutomaticRelease") as? Boolean ?: false
+) {
+    description.set("Request rate limiting for Lightning Server")
 }

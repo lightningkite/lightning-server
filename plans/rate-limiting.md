@@ -1,6 +1,7 @@
 # Complete Plan: Per-Endpoint Rate Limiting for Lightning Server
 
-Based on analysis of the Lightning Server architecture, this document provides a comprehensive implementation plan for rate limiting at the individual HTTP endpoint level.
+Based on analysis of the Lightning Server architecture, this document provides a comprehensive implementation plan for
+rate limiting at the individual HTTP endpoint level.
 
 ## 1. Architecture Overview
 
@@ -17,16 +18,19 @@ The implementation will follow Lightning Server's architectural patterns:
 Create two new modules following the framework convention:
 
 ### **Module: `ratelimit`** (JVM)
+
 - Location: `/ratelimit/`
 - Dependencies: `core`, `ratelimit-shared`, `service-abstractions`
 - Contains: Interceptor implementation, cache-based counter logic, JVM-specific utilities
 
 ### **Module: `ratelimit-shared`** (Multiplatform)
+
 - Location: `/ratelimit-shared/`
 - Dependencies: `core-shared`
 - Contains: Configuration classes, rate limit metadata, shared types
 
 Update `settings.gradle.kts`:
+
 ```kotlin
 include(":ratelimit")
 include(":ratelimit-shared")
@@ -614,6 +618,7 @@ return current
 ## 10. Dependencies
 
 **`ratelimit/build.gradle.kts`:**
+
 ```kotlin
 dependencies {
     api(project(":core"))
@@ -626,6 +631,7 @@ dependencies {
 ```
 
 **`ratelimit-shared/build.gradle.kts`:**
+
 ```kotlin
 dependencies {
     api(project(":core-shared"))
@@ -638,6 +644,7 @@ dependencies {
 ### 11.1 Why Use Cache Abstraction?
 
 The existing `Cache` service abstraction provides:
+
 - Multi-backend support (Redis, Memcached, DynamoDB, local RAM)
 - Built-in serialization via KotlinX Serialization
 - Atomic operations (increment, add-if-not-exists)
@@ -648,7 +655,9 @@ This eliminates the need for a separate rate limit storage abstraction.
 
 ### 11.2 Why Use Extensions for Metadata?
 
-Lightning Server uses the `Extensions` pattern (similar to Kotlin's context receivers) to attach metadata to endpoints without modifying core types. This allows:
+Lightning Server uses the `Extensions` pattern (similar to Kotlin's context receivers) to attach metadata to endpoints
+without modifying core types. This allows:
+
 - Non-invasive feature additions
 - Type-safe metadata access
 - Composability with other features
@@ -657,6 +666,7 @@ Lightning Server uses the `Extensions` pattern (similar to Kotlin's context rece
 ### 11.3 Why Interceptor-Based?
 
 The `HttpInterceptor` pattern provides:
+
 - Separation of concerns (rate limiting is orthogonal to business logic)
 - Execution before handler (early rejection saves resources)
 - Access to request and response for header modification
@@ -665,12 +675,14 @@ The `HttpInterceptor` pattern provides:
 ### 11.4 Algorithm Choice: Sliding Window vs Token Bucket
 
 **Sliding Window (Recommended for initial implementation):**
+
 - Simpler to implement
 - Easier to reason about ("X requests per Y time period")
 - Works well with cache TTL features
 - Sufficient for most use cases
 
 **Token Bucket (Advanced):**
+
 - Smoother rate limiting (allows bursts)
 - Better UX for legitimate users
 - More complex state management

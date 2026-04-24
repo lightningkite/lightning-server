@@ -1,18 +1,9 @@
 package com.lightningkite.lightningserver.notifications
 
 import com.lightningkite.lightningserver.notifications.events.EventData
-import com.lightningkite.services.data.GenerateDataClassPaths
-import com.lightningkite.services.data.Index
-import com.lightningkite.services.data.IndexSet
+import com.lightningkite.services.data.*
 import com.lightningkite.services.database.HasId
-import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.DayOfWeek
-import kotlinx.datetime.LocalDateTime
-import kotlinx.datetime.LocalTime
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.plus
-import kotlinx.datetime.toInstant
-import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.*
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -29,7 +20,7 @@ import kotlin.uuid.Uuid
 @GenerateDataClassPaths
 public data class TimeInZone(
     val time: LocalTime,
-    val zone: TimeZone
+    val zone: TimeZone,
 )
 
 /**
@@ -49,7 +40,7 @@ public data class Frequency private constructor(
     val onlyAt: TimeInZone?,
     val onlyOn: DayOfWeek?,
     val batchMinutes: Int?,
-    val delay: Duration?
+    val delay: Duration?,
 ) {
     // CONSTRUCTORS
     public companion object {
@@ -60,22 +51,35 @@ public data class Frequency private constructor(
         public fun delayed(duration: Duration): Frequency = Frequency(null, null, null, duration)
 
         /**Creates a [Frequency] instance for daily scheduling at a specific time and time zone.*/
-        public fun daily(timeZone: TimeZone, time: LocalTime): Frequency = Frequency(TimeInZone(time, timeZone), null, null, null)
+        public fun daily(timeZone: TimeZone, time: LocalTime): Frequency =
+            Frequency(TimeInZone(time, timeZone), null, null, null)
 
         /**Creates a [Frequency] instance for daily scheduling at a specific hour and minute in a given time zone.*/
-        public fun daily(hour: Int, minute: Int, timeZone: TimeZone = TimeZone.currentSystemDefault()): Frequency = daily(timeZone, LocalTime(hour, minute))
+        public fun daily(hour: Int, minute: Int, timeZone: TimeZone = TimeZone.currentSystemDefault()): Frequency =
+            daily(timeZone, LocalTime(hour, minute))
 
         /**Creates a [Frequency] instance for daily scheduling at a specific time (in string format) and time zone.*/
-        public fun daily(time: String, timeZone: TimeZone = TimeZone.currentSystemDefault()): Frequency = daily(timeZone, LocalTime.parse(time))
+        public fun daily(time: String, timeZone: TimeZone = TimeZone.currentSystemDefault()): Frequency =
+            daily(timeZone, LocalTime.parse(time))
 
         /**Creates a [Frequency] instance for weekly scheduling on a specific day, time, and time zone.*/
-        public fun weekly(timeZone: TimeZone, weekDay: DayOfWeek, time: LocalTime): Frequency = Frequency(TimeInZone(time, timeZone), weekDay, null, null)
+        public fun weekly(timeZone: TimeZone, weekDay: DayOfWeek, time: LocalTime): Frequency =
+            Frequency(TimeInZone(time, timeZone), weekDay, null, null)
 
         /**Creates a [Frequency] instance for weekly scheduling on a specific day, hour, and minute in a given time zone.*/
-        public fun weekly(weekDay: DayOfWeek, hour: Int, minute: Int, timeZone: TimeZone = TimeZone.currentSystemDefault()): Frequency = weekly(timeZone, weekDay, LocalTime(hour, minute))
+        public fun weekly(
+            weekDay: DayOfWeek,
+            hour: Int,
+            minute: Int,
+            timeZone: TimeZone = TimeZone.currentSystemDefault(),
+        ): Frequency = weekly(timeZone, weekDay, LocalTime(hour, minute))
 
         /**Creates a [Frequency] instance for weekly scheduling on a specific day and time (in string format) in a given time zone.*/
-        public fun weekly(weekDay: DayOfWeek, time: String, timeZone: TimeZone = TimeZone.currentSystemDefault()): Frequency = weekly(timeZone, weekDay, LocalTime.parse(time))
+        public fun weekly(
+            weekDay: DayOfWeek,
+            time: String,
+            timeZone: TimeZone = TimeZone.currentSystemDefault(),
+        ): Frequency = weekly(timeZone, weekDay, LocalTime.parse(time))
 
         /**Creates a [Frequency] instance for batch scheduling with a specified interval in minutes.*/
         public fun batch(minutes: Int): Frequency = Frequency(null, null, minutes, null)
@@ -109,7 +113,7 @@ public data class Frequency private constructor(
     private fun batchAt(now: Instant): Instant? {
         val minutes = batchMinutes ?: return null
 
-        val minutesUntilSend = minutes - (now.toLocalDateTime(TimeZone.UTC).time.run { hour*60 + minute } % minutes)
+        val minutesUntilSend = minutes - (now.toLocalDateTime(TimeZone.UTC).time.run { hour * 60 + minute } % minutes)
         return now + minutesUntilSend.minutes
     }
 
@@ -141,7 +145,7 @@ public data class Frequency private constructor(
 @IndexSet(["sent", "sendAt"])
 public data class SendInfo(
     val sendAt: Instant,
-    val sent: Boolean = false
+    val sent: Boolean = false,
 )
 
 /**
@@ -179,7 +183,7 @@ public data class Notification<UID, CONTENT>(
     val push: SendInfo? = null,
     val sms: SendInfo? = null,
     val inApp: SendInfo? = null,
-): HasId<Uuid>
+) : HasId<Uuid>
 
 
 /**
@@ -203,7 +207,7 @@ public interface ScheduledSendMethods<UID : Comparable<UID>> {
         override val email: Frequency?,
         override val sms: Frequency?,
         override val push: Frequency?,
-        override val inApp: Frequency?
+        override val inApp: Frequency?,
     ) : ScheduledSendMethods<UID>
 }
 
@@ -223,7 +227,7 @@ public fun <UID : Comparable<UID>> ScheduledSendMethods(
     email: Frequency? = Frequency.immediately(),
     sms: Frequency? = Frequency.immediately(),
     push: Frequency? = Frequency.immediately(),
-    inApp: Frequency? = Frequency.immediately()
+    inApp: Frequency? = Frequency.immediately(),
 ): ScheduledSendMethods.Data<UID> = ScheduledSendMethods.Data(user, email, sms, push, inApp)
 
 /*

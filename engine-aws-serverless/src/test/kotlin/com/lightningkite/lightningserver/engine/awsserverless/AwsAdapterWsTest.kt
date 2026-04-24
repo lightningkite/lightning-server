@@ -3,12 +3,10 @@ package com.lightningkite.lightningserver.engine.awsserverless
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import kotlinx.serialization.builtins.serializer
 import kotlin.test.Test
 
@@ -19,13 +17,16 @@ class AwsAdapterWsTest {
         }
         val echo = path.path("echo") bind WebSocketHandler(
             storageSerializer = Unit.serializer(),
-            willConnect = { println("willConnect");  Unit },
-            didConnect = { println("didConnect");  },
-            topicHandlers = {  },
+            willConnect = { println("willConnect"); Unit },
+            didConnect = { println("didConnect"); },
+            topicHandlers = { },
             messageFromClient = { println("send"); send(it) },
             disconnect = { println("disconnect"); }
         )
-        init { registerBasicMediaTypeCoders() }
+
+        init {
+            registerBasicMediaTypeCoders()
+        }
     }
 
     @Test
@@ -35,12 +36,14 @@ class AwsAdapterWsTest {
     }
 
 
-    @Test fun fullSocket() {
+    @OptIn(DelicateCoroutinesApi::class)
+    @Test
+    fun fullSocket() {
         val adapter = TestAwsAdapter(SampleServer.build())
         val connectionId = "test"
         val channel = adapter.websocketChannel(connectionId)
         GlobalScope.launch {
-            while(true) {
+            while (true) {
                 println("Sent " + channel.receive())
             }
         }
@@ -65,24 +68,30 @@ class AwsAdapterWsTest {
             isBase64Encoded = false,
             body = ""
         )
-        adapter.handleRequest(baseMessage.copy(
-            multiValueQueryStringParameters = mapOf(
-                "path" to listOf("/echo")
-            ),
-            requestContext = baseMessage.requestContext.copy(
-                routeKey = "\$connect"
+        adapter.handleRequest(
+            baseMessage.copy(
+                multiValueQueryStringParameters = mapOf(
+                    "path" to listOf("/echo")
+                ),
+                requestContext = baseMessage.requestContext.copy(
+                    routeKey = "\$connect"
+                )
             )
-        ))
-        adapter.handleRequest(baseMessage.copy(
-            requestContext = baseMessage.requestContext.copy(
-                routeKey = "blah"
-            ),
-            body = "Ping!"
-        ))
-        adapter.handleRequest(baseMessage.copy(
-            requestContext = baseMessage.requestContext.copy(
-                routeKey = "\$disconnect"
+        )
+        adapter.handleRequest(
+            baseMessage.copy(
+                requestContext = baseMessage.requestContext.copy(
+                    routeKey = "blah"
+                ),
+                body = "Ping!"
             )
-        ))
+        )
+        adapter.handleRequest(
+            baseMessage.copy(
+                requestContext = baseMessage.requestContext.copy(
+                    routeKey = "\$disconnect"
+                )
+            )
+        )
     }
 }

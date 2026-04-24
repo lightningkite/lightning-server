@@ -15,7 +15,7 @@ package com.lightningkite.lightningserver.definition
  */
 public data class Locationed<out Location, out Item>(
     public val location: Location,
-    public val item: Item
+    public val item: Item,
 ) : Map.Entry<Location, Item> {
     override val key: Location get() = location
     override val value: Item get() = item
@@ -30,4 +30,5 @@ public data class Locationed<out Location, out Item>(
  * @param transform A function that transforms each item
  * @return A new list with transformed items at the same locations
  */
-public fun <L, I, R> List<Locationed<L, I>>.mapItems(transform: (I) -> R): List<Locationed<L, R>> = map { Locationed(it.location, transform(it.item)) }
+public fun <L, I, R> List<Locationed<L, I>>.mapItems(transform: (I) -> R): List<Locationed<L, R>> =
+    map { Locationed(it.location, transform(it.item)) }

@@ -2,18 +2,8 @@
 
 package com.lightningkite.lightningserver.serialization
 
-import kotlinx.serialization.DeserializationStrategy
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerializationStrategy
-import kotlinx.serialization.StringFormat
-import kotlinx.serialization.descriptors.PolymorphicKind
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.SerialKind
-import kotlinx.serialization.descriptors.StructureKind
-import kotlinx.serialization.descriptors.getContextualDescriptor
+import kotlinx.serialization.*
+import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.properties.Properties
 import java.net.URLDecoder
@@ -107,7 +97,7 @@ public class FormDataFormat(override val serializersModule: SerializersModule) :
      * @return The decoded object
      */
     public fun <T> decodeFromMap(deserializer: DeserializationStrategy<T>, strings: Map<String, String>): T {
-        return if(deserializer.descriptor.needsWrapping(this.serializersModule)) {
+        return if (deserializer.descriptor.needsWrapping(this.serializersModule)) {
             properties.decodeFromStringMap(WrappingBox.serializer(deserializer as KSerializer<T>), strings).value
         } else {
             properties.decodeFromStringMap(deserializer, strings)
@@ -125,7 +115,7 @@ public class FormDataFormat(override val serializersModule: SerializersModule) :
      * @return The map of string key-value pairs
      */
     public fun <T> encodeToMap(serializer: SerializationStrategy<T>, value: T): Map<String, String> {
-        return if(serializer.descriptor.needsWrapping(this.serializersModule)) {
+        return if (serializer.descriptor.needsWrapping(this.serializersModule)) {
             properties.encodeToStringMap(WrappingBox.serializer(serializer as KSerializer<T>), WrappingBox(value))
         } else {
             properties.encodeToStringMap(serializer, value)
@@ -144,13 +134,14 @@ public class FormDataFormat(override val serializersModule: SerializersModule) :
      * Primitive types and enums require wrapping because Properties format
      * only works with structure-kind descriptors at the root level.
      */
-    private fun SerialDescriptor.needsWrapping(module: SerializersModule): Boolean = when(kind) {
+    private fun SerialDescriptor.needsWrapping(module: SerializersModule): Boolean = when (kind) {
         is PrimitiveKind -> true
         SerialKind.ENUM -> true
         is StructureKind -> false
         PolymorphicKind.OPEN -> false
         PolymorphicKind.SEALED -> false
-        SerialKind.CONTEXTUAL -> (module.getContextualDescriptor(this) ?: throw IllegalArgumentException("No contextual serializer found for '$serialName'")).needsWrapping(module)
+        SerialKind.CONTEXTUAL -> (module.getContextualDescriptor(this)
+            ?: throw IllegalArgumentException("No contextual serializer found for '$serialName'")).needsWrapping(module)
     }
 
 }

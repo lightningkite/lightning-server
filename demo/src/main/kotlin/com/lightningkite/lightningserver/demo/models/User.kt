@@ -1,9 +1,7 @@
 package com.lightningkite.lightningserver.demo.models
 
 import com.lightningkite.services.data.GenerateDataClassPaths
-import com.lightningkite.services.database.HasEmail
-import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.HasPassword
+import com.lightningkite.services.database.*
 import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
 
@@ -24,5 +22,5 @@ data class User(
     override val hashedPassword: String = "",
     val displayName: String = "",
     val isSuperUser: Boolean = false,
-    val bio: String? = null
+    val bio: String? = null,
 ) : HasId<Uuid>, HasEmail, HasPassword

@@ -18,7 +18,7 @@ public data class UploadForNextRequest(
     /** The file location (as a ServerFile URL) associated with this prepared upload. */
     val file: ServerFile,
     /** Expiration time after which the upload is considered invalid/garbage. */
-    val expires: Instant
+    val expires: Instant,
 ) : HasId<Uuid>
 
 /**
@@ -31,7 +31,7 @@ public data class UploadForNextRequest(
 @Serializable
 public data class UploadInformation(
     val uploadUrl: String,
-    val futureCallToken: String
+    val futureCallToken: String,
 )
 
 /*

@@ -3,14 +3,9 @@ package com.lightningkite.lightningserver.notifications.subscriptions
 import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.definition.builder.MapRegistry
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.notifications.Frequency
-import com.lightningkite.lightningserver.notifications.NotificationEndpoints
-import com.lightningkite.lightningserver.notifications.ScheduledSendMethods
-import com.lightningkite.lightningserver.notifications.events.Event
-import com.lightningkite.lightningserver.notifications.events.EventDefinition
-import com.lightningkite.lightningserver.notifications.events.EventRegistry
+import com.lightningkite.lightningserver.notifications.*
+import com.lightningkite.lightningserver.notifications.events.*
 import com.lightningkite.lightningserver.notifications.events.EventRegistry.Companion.events
-import com.lightningkite.lightningserver.notifications.events.EventType
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.services.database.HasId
@@ -55,7 +50,7 @@ public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UI
      */
     public fun <T : HasId<ID>, ID : Comparable<ID>> setSubscribedDirect(
         type: EventDefinition<T, ID>,
-        interested: suspend context(ServerRuntime) (Event<T, ID>) -> List<ScheduledSendMethods<UID>>
+        interested: suspend context(ServerRuntime) (Event<T, ID>) -> List<ScheduledSendMethods<UID>>,
     ) {
         @Suppress("UNCHECKED_CAST")
         eventListeners.register(type.name, interested as SendMethodsGenerator<UID, *, *>)
@@ -80,7 +75,7 @@ public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UI
         sms: Frequency? = this.defaultSms,
         push: Frequency? = this.defaultPush,
         inApp: Frequency? = this.defaultInApp,
-        crossinline interested: suspend context(ServerRuntime) (Event<T, ID>) -> Set<UID>
+        crossinline interested: suspend context(ServerRuntime) (Event<T, ID>) -> Set<UID>,
     ) {
         setSubscribedDirect(type) { event ->
             interested(event).map {
@@ -102,7 +97,8 @@ public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UI
     @Suppress("UNCHECKED_CAST")
     context(runtime: ServerRuntime)
     override suspend fun <T : HasId<ID>, ID : Comparable<ID>> subscribed(event: Event<T, ID>): List<ScheduledSendMethods<UID>> {
-        val interested = eventListeners[event.type.name]?.let { it as SendMethodsGenerator<UID, T, ID> } ?: return emptyList()
+        val interested =
+            eventListeners[event.type.name]?.let { it as SendMethodsGenerator<UID, T, ID> } ?: return emptyList()
 
         return interested(event)
     }
@@ -143,7 +139,7 @@ public class NonCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UI
  */
 context(handler: NotificationEndpoints<USER, UID, *, *, NonCustomizableSubscriptions<USER, UID>>)
 public fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>> EventDefinition<T, ID>.subscribedDirect(
-    interested: suspend context(ServerRuntime) (Event<T, ID>) -> List<ScheduledSendMethods<UID>>
+    interested: suspend context(ServerRuntime) (Event<T, ID>) -> List<ScheduledSendMethods<UID>>,
 ) {
     handler.subscriptions.setSubscribedDirect(this, interested)
 }
@@ -177,7 +173,7 @@ public inline fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID :
     sms: Frequency? = handler.subscriptions.defaultSms,
     push: Frequency? = handler.subscriptions.defaultPush,
     inApp: Frequency? = handler.subscriptions.defaultInApp,
-    crossinline interested: suspend context(ServerRuntime) (Event<T, ID>) -> Set<UID>
+    crossinline interested: suspend context(ServerRuntime) (Event<T, ID>) -> Set<UID>,
 ) {
     handler.subscriptions.setSubscribed(this, email, sms, push, inApp, interested)
 }

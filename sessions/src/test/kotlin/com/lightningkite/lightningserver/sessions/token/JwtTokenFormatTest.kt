@@ -1,18 +1,11 @@
 // by Claude
 package com.lightningkite.lightningserver.sessions.token
 
-import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.auth.GrantedScope
-import com.lightningkite.lightningserver.auth.PrincipalType
-import com.lightningkite.lightningserver.auth.id
-import com.lightningkite.lightningserver.auth.register
+import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.encryption.HS256
-import com.lightningkite.lightningserver.encryption.HS384
-import com.lightningkite.lightningserver.encryption.SecretBasis
-import com.lightningkite.lightningserver.encryption.Signer
+import com.lightningkite.lightningserver.encryption.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.services.database.HasId
@@ -21,10 +14,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import org.junit.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
+import kotlin.test.*
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -69,7 +59,7 @@ class JwtTokenFormatTest {
 
     private fun createJwtFormat(
         basis: SecretBasis = testBasis,
-        expiration: kotlin.time.Duration = 5.minutes
+        expiration: kotlin.time.Duration = 5.minutes,
     ): JwtTokenFormat {
         return JwtTokenFormat(
             hasher = RuntimeDeferred.Cached { basis.HS256("jwt-test") },

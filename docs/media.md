@@ -1,12 +1,16 @@
 # Media Processing
 
-The media module provides automatic image processing capabilities for Lightning Server applications, including thumbnail generation, format conversion, and image optimization.
+The media module provides automatic image processing capabilities for Lightning Server applications, including thumbnail
+generation, format conversion, and image optimization.
 
 ## Overview
 
-The media module helps you automatically generate preview variants (thumbnails, different formats, etc.) of uploaded images. It integrates seamlessly with the files module and database layer to provide both synchronous and asynchronous processing options.
+The media module helps you automatically generate preview variants (thumbnails, different formats, etc.) of uploaded
+images. It integrates seamlessly with the files module and database layer to provide both synchronous and asynchronous
+processing options.
 
 **Key Features:**
+
 - Automatic thumbnail generation with configurable sizes
 - Image format conversion (PNG, JPEG, WebP, TIFF, GIF, BMP)
 - Quality control for lossy formats
@@ -79,6 +83,7 @@ Lightning Server offers two ways to process images:
 Process images immediately when records are created or updated. This blocks the API response until processing completes.
 
 **Use when:**
+
 - Previews must be available immediately
 - Images are small and process quickly
 - You need guaranteed preview generation
@@ -102,9 +107,11 @@ object Server : ServerBuilder() {
 
 ### 2. Background Processing (Tasks)
 
-Process images asynchronously after the record is saved. This provides faster API responses but previews may not be immediately available.
+Process images asynchronously after the record is saved. This provides faster API responses but previews may not be
+immediately available.
 
 **Use when:**
+
 - Working with large images
 - Processing time is unpredictable
 - Fast API responses are critical
@@ -149,6 +156,7 @@ val fileToUse = bestPreview?.file ?: metadata.original
 ```
 
 The method returns previews sorted by best fit:
+
 1. Previews that meet or exceed preferred dimensions (closest match first)
 2. Previews smaller than preferred (with penalty, furthest match last)
 
@@ -259,16 +267,19 @@ val documents = database
 ### Previews Not Generated
 
 **Background tasks not executing:**
+
 - Ensure the task is bound to a server path
 - Check server logs for warnings about unregistered tasks
 
 **Synchronous processing slow:**
+
 - Consider switching to background processing for large images
 - Reduce the number of preview sizes being generated
 
 ### Memory Issues
 
 If processing very large images causes memory issues:
+
 - Use background processing with appropriate timeouts
 - Limit the maximum upload size
 - Generate fewer preview variants
@@ -276,6 +287,7 @@ If processing very large images causes memory issues:
 ### File Storage
 
 Preview files are stored in the same directory as the original with suffixes:
+
 - Original: `photo.jpg`
 - Previews: `photo-200-jpg.jpg`, `photo-800-jpg.jpg`, etc.
 

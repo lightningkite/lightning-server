@@ -1,30 +1,16 @@
 package com.lightningkite.lightningserver.typed.sdk
 
-import com.lightningkite.lightningserver.auth.AuthRequirement
-import com.lightningkite.lightningserver.auth.PrincipalType
-import com.lightningkite.lightningserver.auth.RequiredScope
-import com.lightningkite.lightningserver.auth.anyAuth
-import com.lightningkite.lightningserver.auth.require
-import com.lightningkite.lightningserver.auth.fetch
-import com.lightningkite.lightningserver.auth.isSuperUser
-import com.lightningkite.lightningserver.auth.noAuth
-import com.lightningkite.lightningserver.auth.or
+import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec1
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.lightningserver.typed.explicitApiHttpHandler
-import com.lightningkite.lightningserver.typed.ModelRestEndpoints
+import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebsocket.Companion.plus
-import com.lightningkite.lightningserver.typed.ModelRestUpdatesWebsocket
-import com.lightningkite.lightningserver.typed.modelInfo
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.withSdkInfo
-import com.lightningkite.services.database.Database
-import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.ModelPermissions
+import com.lightningkite.services.database.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
@@ -34,7 +20,7 @@ import kotlin.uuid.Uuid
 @Serializable
 data class User(
     override val _id: Uuid = Uuid.random(),
-    val isSuperUser: Boolean = false
+    val isSuperUser: Boolean = false,
 ) : HasId<Uuid> {
     companion object : PrincipalType<User, Uuid> {
         override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
@@ -86,7 +72,7 @@ object Server : ServerBuilder() {
 @Serializable
 data class TestInput(
     val id: Int,
-    val name: String
+    val name: String,
 )
 
 private val testEndpoint = explicitApiHttpHandler<PathSpec1<String>, HasId<*>?, TestInput, String>(
@@ -104,7 +90,7 @@ private val testEndpoint = explicitApiHttpHandler<PathSpec1<String>, HasId<*>?, 
 @Serializable
 data class TestModel(
     override val _id: Uuid = Uuid.random(),
-    val name: String
+    val name: String,
 ) : HasId<Uuid>
 
 object Module : ServerBuilder() {

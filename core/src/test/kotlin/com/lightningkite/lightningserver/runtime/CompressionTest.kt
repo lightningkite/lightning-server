@@ -1,7 +1,6 @@
 package com.lightningkite.lightningserver.runtime
 
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertContentEquals
 
 class CompressionTest {

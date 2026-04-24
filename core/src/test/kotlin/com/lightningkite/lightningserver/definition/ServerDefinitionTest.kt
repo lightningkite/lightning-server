@@ -4,14 +4,7 @@ package com.lightningkite.lightningserver.definition
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationError
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.http.HttpHandler
-import com.lightningkite.lightningserver.http.HttpInterceptor
-import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.HttpStatus
-import com.lightningkite.lightningserver.http.delete
-import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.http.post
-import com.lightningkite.lightningserver.http.put
+import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
@@ -19,11 +12,7 @@ import com.lightningkite.lightningserver.settings.ConflictingSettingsException
 import com.lightningkite.lightningserver.settings.ServerSettings
 import kotlinx.serialization.builtins.serializer
 import org.junit.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
@@ -103,9 +92,9 @@ class ServerDefinitionTest {
         val rootEndpoints = definition.endpoints[PathSpec.root]
 
         assertNotNull(rootEndpoints?.http?.get(HttpMethod.GET))
-        assertNotNull(rootEndpoints?.http?.get(HttpMethod.POST))
-        assertNotNull(rootEndpoints?.http?.get(HttpMethod.PUT))
-        assertEquals(3, rootEndpoints?.http?.size)
+        assertNotNull(rootEndpoints.http[HttpMethod.POST])
+        assertNotNull(rootEndpoints.http[HttpMethod.PUT])
+        assertEquals(3, rootEndpoints.http.size)
     }
 
     // ==================== Module Inclusion Tests ====================
@@ -152,8 +141,12 @@ class ServerDefinitionTest {
         val definition = mainServer.build()
 
         assertNotNull(definition.endpoints[PathSpec.root]?.http?.get(HttpMethod.GET))
-        assertNotNull(definition.endpoints[PathSpec.root.path("api").path("v1").path("users")]?.http?.get(HttpMethod.GET))
-        assertNotNull(definition.endpoints[PathSpec.root.path("api").path("v1").path("posts")]?.http?.get(HttpMethod.GET))
+        assertNotNull(
+            definition.endpoints[PathSpec.root.path("api").path("v1").path("users")]?.http?.get(HttpMethod.GET)
+        )
+        assertNotNull(
+            definition.endpoints[PathSpec.root.path("api").path("v1").path("posts")]?.http?.get(HttpMethod.GET)
+        )
     }
 
     @Test
@@ -194,6 +187,7 @@ class ServerDefinitionTest {
                 val first = path.path("test").get bind HttpHandler<PathSpec0> {
                     HttpResponse(status = HttpStatus.OK)
                 }
+
                 // Attempting to register same path and method again
                 val second = path.path("test").get bind HttpHandler<PathSpec0> {
                     HttpResponse(status = HttpStatus.OK)
@@ -251,7 +245,7 @@ class ServerDefinitionTest {
         val sharedEndpoints = definition.endpoints[PathSpec.root.path("shared")]
 
         assertNotNull(sharedEndpoints?.http?.get(HttpMethod.GET))
-        assertNotNull(sharedEndpoints?.http?.get(HttpMethod.POST))
+        assertNotNull(sharedEndpoints.http[HttpMethod.POST])
     }
 
     // ==================== Interceptor Compilation Tests ====================
@@ -266,6 +260,7 @@ class ServerDefinitionTest {
             init {
                 install(interceptor)
             }
+
             val root = path.get bind HttpHandler<PathSpec0> {
                 HttpResponse(status = HttpStatus.OK)
             }
@@ -289,6 +284,7 @@ class ServerDefinitionTest {
                 install(interceptor2)
                 install(interceptor3)
             }
+
             val root = path.get bind HttpHandler<PathSpec0> {
                 HttpResponse(status = HttpStatus.OK)
             }
@@ -312,6 +308,7 @@ class ServerDefinitionTest {
             init {
                 install(childInterceptor)
             }
+
             val endpoint = path.path("child").get bind HttpHandler<PathSpec0> {
                 HttpResponse(status = HttpStatus.OK)
             }
@@ -321,6 +318,7 @@ class ServerDefinitionTest {
             init {
                 install(parentInterceptor)
             }
+
             val child = path include childModule
         }
 
@@ -549,6 +547,7 @@ class ServerDefinitionTest {
             init {
                 registerBasicMediaTypeCoders()
             }
+
             val root = path.get bind HttpHandler<PathSpec0> {
                 HttpResponse(status = HttpStatus.OK)
             }
@@ -657,7 +656,8 @@ class ServerDefinitionTest {
         val definition = root.build()
 
         assertNotNull(
-            definition.endpoints[PathSpec.root.path("l1").path("l2").path("l3").path("deep")]?.http?.get(HttpMethod.GET),
+            definition.endpoints[PathSpec.root.path("l1").path("l2").path("l3")
+                .path("deep")]?.http?.get(HttpMethod.GET),
             "Should have deeply nested endpoint at /l1/l2/l3/deep"
         )
     }
@@ -676,8 +676,10 @@ class ServerDefinitionTest {
             val delete = path.arg<Int>("id").delete bind HttpHandler { HttpResponse(status = HttpStatus.OK) }
 
             // Nested paths
-            val nested1 = path.path("nested").path("level1").get bind HttpHandler<PathSpec0> { HttpResponse(status = HttpStatus.OK) }
-            val nested2 = path.path("nested").path("level2").get bind HttpHandler<PathSpec0> { HttpResponse(status = HttpStatus.OK) }
+            val nested1 = path.path("nested")
+                .path("level1").get bind HttpHandler<PathSpec0> { HttpResponse(status = HttpStatus.OK) }
+            val nested2 = path.path("nested")
+                .path("level2").get bind HttpHandler<PathSpec0> { HttpResponse(status = HttpStatus.OK) }
 
             // Settings
             val setting1 = setting("${name}_setting1", "default1")

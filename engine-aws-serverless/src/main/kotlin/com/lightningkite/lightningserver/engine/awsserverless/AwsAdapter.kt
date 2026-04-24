@@ -4,6 +4,7 @@ package com.lightningkite.lightningserver.engine.awsserverless
 
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.RequestStreamHandler
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.path
@@ -63,6 +64,7 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
         loadSettings()
     }
 
+    @OptIn(InternalLightningServerApi::class)
     protected open fun loadSettings() {
         fun loadSettings(bytes: ByteArray) {
             val decryptedBytes = System.getenv("LIGHTNING_SERVER_SETTINGS_DECRYPTION")
@@ -203,45 +205,49 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
     override fun handleRequest(input: InputStream, output: OutputStream, context: Context): Unit = runBlocking {
         try {
             val asJson = internalSerialization.json.parseToJsonElement(input.reader().readText()) as JsonObject
-            val response: APIGatewayV2HTTPResponse = withTimeout((context.remainingTimeInMillis - 5_000L).milliseconds) {
-                when {
-                    asJson.containsKey("taskName") -> tasks.handleTask(
-                        internalSerialization.json.decodeFromJsonElement(AwsAdapterTask.TaskInvoke.serializer(), asJson)
-                    )
-
-                    asJson.containsKey("httpMethod") -> http.handleHttp(
-                        internalSerialization.json.decodeFromJsonElement<APIGatewayV2HTTPEvent>(asJson)
-                    )
-
-                    asJson.containsKey("storage") -> ws.handleWebsocketDidConnect(
-                        internalSerialization.json.decodeFromJsonElement<AwsAdapterWs.WebSocketDidConnect>(asJson)
-                    )
-
-                    asJson["requestContext"]?.jsonObject?.containsKey("connectionId") == true -> ws.handleWebsocket(
-                        internalSerialization.json.decodeFromJsonElement<APIGatewayV2WebsocketRequest>(asJson)
-                    )
-
-                    asJson.containsKey("scheduled") -> {
-                        val parsed: AwsAdapterSchedule.Scheduled =
-                            internalSerialization.json.decodeFromJsonElement(asJson)
-                        schedules.handleSchedule(parsed)
-                    }
-
-                    asJson.containsKey("topic") -> {
-                        val parsed: AwsAdapterWs.WebSocketPublish =
-                            internalSerialization.json.decodeFromJsonElement(asJson)
-                        ws.publishHandler(parsed)
-                    }
-
-                    else -> {
-                        logger.error { "Unrecognized message: $asJson" }
-                        APIGatewayV2HTTPResponse(
-                            statusCode = 500,
-                            body = "No response available for the handler"
+            val response: APIGatewayV2HTTPResponse =
+                withTimeout((context.remainingTimeInMillis - 5_000L).milliseconds) {
+                    when {
+                        asJson.containsKey("taskName") -> tasks.handleTask(
+                            internalSerialization.json.decodeFromJsonElement(
+                                AwsAdapterTask.TaskInvoke.serializer(),
+                                asJson
+                            )
                         )
+
+                        asJson.containsKey("httpMethod") -> http.handleHttp(
+                            internalSerialization.json.decodeFromJsonElement<APIGatewayV2HTTPEvent>(asJson)
+                        )
+
+                        asJson.containsKey("storage") -> ws.handleWebsocketDidConnect(
+                            internalSerialization.json.decodeFromJsonElement<AwsAdapterWs.WebSocketDidConnect>(asJson)
+                        )
+
+                        asJson["requestContext"]?.jsonObject?.containsKey("connectionId") == true -> ws.handleWebsocket(
+                            internalSerialization.json.decodeFromJsonElement<APIGatewayV2WebsocketRequest>(asJson)
+                        )
+
+                        asJson.containsKey("scheduled") -> {
+                            val parsed: AwsAdapterSchedule.Scheduled =
+                                internalSerialization.json.decodeFromJsonElement(asJson)
+                            schedules.handleSchedule(parsed)
+                        }
+
+                        asJson.containsKey("topic") -> {
+                            val parsed: AwsAdapterWs.WebSocketPublish =
+                                internalSerialization.json.decodeFromJsonElement(asJson)
+                            ws.publishHandler(parsed)
+                        }
+
+                        else -> {
+                            logger.error { "Unrecognized message: $asJson" }
+                            APIGatewayV2HTTPResponse(
+                                statusCode = 500,
+                                body = "No response available for the handler"
+                            )
+                        }
                     }
                 }
-            }
 
             internalSerialization.json.encodeToStream(response, output)
             output.flush()

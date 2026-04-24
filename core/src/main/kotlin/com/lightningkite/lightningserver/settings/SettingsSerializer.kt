@@ -4,15 +4,10 @@ import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.definition.ServerSetting
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.StringFormat
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
-import kotlinx.serialization.encoding.CompositeDecoder
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.encoding.*
 import kotlinx.serialization.modules.SerializersModule
 import java.io.File
 
@@ -44,7 +39,12 @@ import java.io.File
  * @property traversed Set of files already visited in the defaults chain (for circular dependency detection)
  */
 @InternalLightningServerApi
-public class SettingsSerializer(private val keys: List<ServerSetting<*, *>>, private val module: SerializersModule, private val relativeTo: File?, private val traversed: Set<File> = setOf()) :
+public class SettingsSerializer(
+    private val keys: List<ServerSetting<*, *>>,
+    private val module: SerializersModule,
+    private val relativeTo: File?,
+    private val traversed: Set<File> = setOf(),
+) :
     KSerializer<Map<ServerSetting<*, *>, Any?>> {
     /**
      * The serialization descriptor for settings.
@@ -116,12 +116,30 @@ public class SettingsSerializer(private val keys: List<ServerSetting<*, *>>, pri
                 if (index == CompositeDecoder.UNKNOWN_NAME) continue
                 if (index == keys.size) {
                     // Handle the "defaults" property
-                    if(relativeTo == null) throw SerializationException("Defaults file usage is disabled.")
-                    val f = relativeTo.resolve(decodeStringElement(descriptor, index).replace("~", System.getProperty("user.home")))
-                    if(f in traversed) throw SerializationException("Circular defaults chain detected: ${traversed.joinToString(" -> ")} -> ${f.absolutePath}")
-                    if(!f.exists()) throw SerializationException("Defaults file '${f.absolutePath}' does not exist.")
+                    if (relativeTo == null) throw SerializationException("Defaults file usage is disabled.")
+                    val f = relativeTo.resolve(
+                        decodeStringElement(descriptor, index).replace(
+                            "~",
+                            System.getProperty("user.home")
+                        )
+                    )
+                    if (f in traversed) throw SerializationException(
+                        "Circular defaults chain detected: ${
+                            traversed.joinToString(
+                                " -> "
+                            )
+                        } -> ${f.absolutePath}"
+                    )
+                    if (!f.exists()) throw SerializationException("Defaults file '${f.absolutePath}' does not exist.")
                     val format = settingsFormat(f.extension, module)
-                    lowPriorityMap += format.decodeFromString(SettingsSerializer(keys, module, f.parentFile ?: File("."), traversed = traversed + f), f.readText())
+                    lowPriorityMap += format.decodeFromString(
+                        SettingsSerializer(
+                            keys,
+                            module,
+                            f.parentFile ?: File("."),
+                            traversed = traversed + f
+                        ), f.readText()
+                    )
                 } else {
                     val setting = keys[index]
                     @Suppress("UNCHECKED_CAST")

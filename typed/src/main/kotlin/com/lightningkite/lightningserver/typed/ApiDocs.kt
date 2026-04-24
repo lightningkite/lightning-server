@@ -1,29 +1,16 @@
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.auth.options
-import com.lightningkite.lightningserver.definition.Locationed
-import com.lightningkite.lightningserver.definition.ServerDefinition
+import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.html
-import com.lightningkite.lightningserver.http.HttpEndpoint
-import com.lightningkite.lightningserver.http.HttpHandler
-import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.get
+import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.serverRuntime
-import com.lightningkite.lightningserver.typed.sdk.Archive
-import com.lightningkite.lightningserver.typed.sdk.FetcherSdk
-import com.lightningkite.lightningserver.typed.sdk.TypescriptFetcherSdk
-import com.lightningkite.services.data.Description
-import com.lightningkite.services.data.ExperimentalLightningServer
-import com.lightningkite.services.data.TypedData
-import com.lightningkite.services.database.childSerializersOrNull
-import com.lightningkite.services.database.nullElement
-import com.lightningkite.services.database.serializableProperties
-import com.lightningkite.services.database.typeParametersSerializersOrNull
+import com.lightningkite.lightningserver.typed.sdk.*
+import com.lightningkite.services.data.*
+import com.lightningkite.services.database.*
 import kotlinx.html.*
 import kotlinx.io.asOutputStream
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -394,7 +381,7 @@ internal val ServerDefinition.locationedApiHttpHandlers: List<Locationed<HttpEnd
             .filter { it.value is ApiHttpHandler<*, *, *, *> }
             .map { h -> Locationed(HttpEndpoint(it.key, h.key), h.value as ApiHttpHandler<*, *, *, *>) }
     }
-        .sortedBy { it.location.run { "$method $path"} }
+        .sortedBy { it.location.run { "$method $path" } }
 
 internal val ServerDefinition.locationedApiWebsocketHandlers: List<Locationed<PathSpec, ApiWebsocketHandler<*, *, *, *, *>>>
     get() = endpoints.entries.mapNotNull {

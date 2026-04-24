@@ -1,37 +1,36 @@
-
 [versions]
-agp = "8.12.3"
+agp = "8.13.2"
 androidDesugaring = "2.1.5"
-awsVersion = "2.42.21"
-bouncyCastle = "1.83"
+awsVersion = "2.42.34"
+bouncyCastle = "1.84"
 coroutines = "1.10.2"
-cryptographyKotlin = "0.5.0"
+cryptographyKotlin = "0.6.0"
 dokka = "2.2.0"
-dynamodb = "2.42.21"
-graalVmNative = "0.11.5"
-kotlin = "2.2.21"
+dynamodb = "2.42.34"
+graalVmNative = "1.0.0"
+kotlin = "2.3.20"
 kotlinHtmlJvm = "0.12.0"
 kotlinXDatetime = "0.7.1"
-kotlinXIO = "0.8.2"
-kotlinXSerialization = "1.9.0"
+kotlinXIO = "0.9.0"
+kotlinXSerialization = "1.11.0"
 kotlinerCli = "1.0.5"
 kover = "0.9.8"
-ksp = "2.2.21-2.0.5"
-ktor = "3.3.3"
+ksp = "2.3.6"
+ktor = "3.4.3"
 lambdaJavaCore = "1.4.0"
 lambdaJavaEvents = "3.16.1"
-lkGradleHelpers = "4.0.6"
+lkGradleHelpers = "4.0.7"
 netty = "4.1.114.Final"
 okhttp = "5.3.2"
 oneTimePass = "2.4.1"
 orgCrac = "0.1.3"
-proguard = "7.9.0"
-scrimage = "4.3.3"
-serializationLibs = "1.9.0"
-serviceAbstractions = "0.0.1-234"
+proguard = "7.9.1"
+scrimage = "4.4.2"
+serializationLibs = "1.11.0"
+serviceAbstractions = "1.0.0"
 shadow = "8.1.1"
-vanniktechMavenPublish = "0.35.0"
-webauthn4jCore = "0.29.4.RELEASE"
+vanniktechMavenPublish = "0.36.0"
+webauthn4jCore = "0.31.3.RELEASE"
 
 [libraries]
 androidDesugaring = { module = "com.android.tools:desugar_jdk_libs", version = { ref = "androidDesugaring" } }
@@ -53,8 +52,8 @@ kotlinx-crypto-core = { module = "dev.whyoleg.cryptography:cryptography-core", v
 kotlinx-crypto-optimal = { module = "dev.whyoleg.cryptography:cryptography-provider-optimal", version = { ref = "cryptographyKotlin" } }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version = { ref = "kotlinXDatetime" } }
 kotlinx-io = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version = { ref = "kotlinXIO" } }
-kotlinx-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version = { ref = "kotlinXSerialization" } }
-kotlinx-json-io = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json-io", version = { ref = "kotlinXSerialization" } }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version = { ref = "kotlinXSerialization" } }
+kotlinx-serialization-json-io = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json-io", version = { ref = "kotlinXSerialization" } }
 ktor-call-logging = { module = "io.ktor:ktor-server-call-logging", version = { ref = "ktor" } }
 ktor-cio-jvm = { module = "io.ktor:ktor-server-cio-jvm", version = { ref = "ktor" } }
 ktor-core = { module = "io.ktor:ktor-server-core-jvm", version = { ref = "ktor" } }
@@ -116,6 +115,7 @@ services-files-client = { module = "com.lightningkite.services:files-client", ve
 services-files-s3 = { module = "com.lightningkite.services:files-s3", version = { ref = "serviceAbstractions" } }
 services-files-test = { module = "com.lightningkite.services:files-test", version = { ref = "serviceAbstractions" } }
 services-http-client = { module = "com.lightningkite.services:http-client", version = { ref = "serviceAbstractions" } }
+services-kotlin-bytes-format = { module = "com.lightningkite.services:kotlin-bytes-format", version = { ref = "serviceAbstractions" } }
 services-notifications = { module = "com.lightningkite.services:notifications", version = { ref = "serviceAbstractions" } }
 services-notifications-fcm = { module = "com.lightningkite.services:notifications-fcm", version = { ref = "serviceAbstractions" } }
 services-notifications-test = { module = "com.lightningkite.services:notifications-test", version = { ref = "serviceAbstractions" } }
@@ -127,7 +127,6 @@ services-pubsub = { module = "com.lightningkite.services:pubsub", version = { re
 services-pubsub-aws = { module = "com.lightningkite.services:pubsub-aws", version = { ref = "serviceAbstractions" } }
 services-pubsub-redis = { module = "com.lightningkite.services:pubsub-redis", version = { ref = "serviceAbstractions" } }
 services-pubsub-test = { module = "com.lightningkite.services:pubsub-test", version = { ref = "serviceAbstractions" } }
-services-shouldBeStandardLibrary = { module = "com.lightningkite.services:should-be-standard-library", version = { ref = "serviceAbstractions" } }
 services-sms = { module = "com.lightningkite.services:sms", version = { ref = "serviceAbstractions" } }
 services-sms-inbound = { module = "com.lightningkite.services:sms-inbound", version = { ref = "serviceAbstractions" } }
 services-sms-inbound-twilio = { module = "com.lightningkite.services:sms-inbound-twilio", version = { ref = "serviceAbstractions" } }
@@ -137,6 +136,7 @@ services-test = { module = "com.lightningkite.services:test", version = { ref = 
 services-voiceagent = { module = "com.lightningkite.services:voiceagent", version = { ref = "serviceAbstractions" } }
 services-voiceagent-openai = { module = "com.lightningkite.services:voiceagent-openai", version = { ref = "serviceAbstractions" } }
 services-voiceagent-phonecall = { module = "com.lightningkite.services:voiceagent-phonecall", version = { ref = "serviceAbstractions" } }
+services-webhook-subservice = { module = "com.lightningkite.services:webhook-subservice", version = { ref = "serviceAbstractions" } }
 webauthn4j-core = { module = "com.webauthn4j:webauthn4j-core", version = { ref = "webauthn4jCore" } }
 
 [plugins]

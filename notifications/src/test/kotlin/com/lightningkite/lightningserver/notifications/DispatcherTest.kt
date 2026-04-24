@@ -16,12 +16,7 @@ import com.lightningkite.services.sms.SMS
 import com.lightningkite.services.sms.TestSMS
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
 
@@ -139,7 +134,7 @@ class DispatcherTest {
                 Notifications.modelCreated(model)
 
                 assertTrue(testEmail!!.sentEmails.isNotEmpty())
-                assertEquals("Created: Test", testEmail!!.sentEmails.first().subject)
+                assertEquals("Created: Test", testEmail.sentEmails.first().subject)
             }
         }
     }
@@ -227,7 +222,7 @@ class DispatcherTest {
                 Notifications.Dispatcher.refreshNotifications()
 
                 // Email should now be sent
-                assertTrue(testEmail!!.sentEmails.isNotEmpty(), "Email should be sent after time travel and refresh")
+                assertTrue(testEmail.sentEmails.isNotEmpty(), "Email should be sent after time travel and refresh")
             }
         }
     }

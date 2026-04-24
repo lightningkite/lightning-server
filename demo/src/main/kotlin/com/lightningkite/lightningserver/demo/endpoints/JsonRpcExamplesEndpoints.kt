@@ -25,19 +25,19 @@ object JsonRpcExamplesEndpoints : ServerBuilder() {
     @Serializable
     data class MathOperationParams(
         val a: Double,
-        val b: Double
+        val b: Double,
     )
 
     @Serializable
     data class EchoParams(
         val message: String,
-        val times: Int = 1
+        val times: Int = 1,
     )
 
     @Serializable
     data class GetTimeResult(
         val timestamp: Long,
-        val iso: String
+        val iso: String,
     )
 
     // Define individual RPC methods

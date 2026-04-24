@@ -2,8 +2,8 @@ package com.lightningkite.lightningserver.demo.endpoints
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
-import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.pathing.arg1
+import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.runtime.send
 import com.lightningkite.lightningserver.websockets.*
 import kotlinx.serialization.Serializable
@@ -23,31 +23,32 @@ import kotlin.uuid.Uuid
  * - Client-to-server and server-to-client messaging
  */
 object WebSocketExamplesEndpoints : ServerBuilder() {
-    
+
     /**
      * Topic for chat messages.
      * Topics allow pub/sub pattern - multiple clients can subscribe to receive messages.
      */
     val chatTopic = path.path("ws").path("chat-topic").topic(ChatMessage.serializer())
-    
+
     /**
      * GET /ws/chat/send/{message}
      *
      * HTTP endpoint to send a message to the chat topic.
      * Demonstrates how to send messages to WebSocket clients from HTTP endpoints.
      */
-    val sendChatMessage = path.path("ws").path("chat").path("send").arg<String>("message").get bind HttpHandler { request ->
-        val message = ChatMessage(
-            id = Uuid.random().toString(),
-            sender = "HTTP Client",
-            content = request.path.arg1,
-            timestamp = System.currentTimeMillis()
-        )
+    val sendChatMessage =
+        path.path("ws").path("chat").path("send").arg<String>("message").get bind HttpHandler { request ->
+            val message = ChatMessage(
+                id = Uuid.random().toString(),
+                sender = "HTTP Client",
+                content = request.path.arg1,
+                timestamp = System.currentTimeMillis()
+            )
 
-        chatTopic.send(message)
-        HttpResponse.plainText("Message sent to chat!")
-    }
-    
+            chatTopic.send(message)
+            HttpResponse.plainText("Message sent to chat!")
+        }
+
     /**
      * WebSocket /ws/chat
      *
@@ -107,23 +108,24 @@ object WebSocketExamplesEndpoints : ServerBuilder() {
             println("Chat client disconnected: $currentState")
         }
     )
-    
+
     /**
      * Topic for live updates (String messages).
      * Demonstrates a simpler topic with primitive types.
      */
     val updatesTopic = path.path("ws").path("updates-topic").topic(String.serializer())
-    
+
     /**
      * GET /ws/updates/broadcast/{message}
      *
      * Broadcast a simple text message to all connected update listeners.
      */
-    val broadcastUpdate = path.path("ws").path("updates").path("broadcast").arg<String>("message").get bind HttpHandler { request ->
-        updatesTopic.send(request.path.arg1)
-        HttpResponse.plainText("Update broadcasted!")
-    }
-    
+    val broadcastUpdate =
+        path.path("ws").path("updates").path("broadcast").arg<String>("message").get bind HttpHandler { request ->
+            updatesTopic.send(request.path.arg1)
+            HttpResponse.plainText("Update broadcasted!")
+        }
+
     /**
      * WebSocket /ws/updates
      *
@@ -151,7 +153,7 @@ object WebSocketExamplesEndpoints : ServerBuilder() {
             println("Updates client disconnected: $currentState")
         }
     )
-    
+
     /**
      * WebSocket /ws/multiplex
      *
@@ -160,7 +162,7 @@ object WebSocketExamplesEndpoints : ServerBuilder() {
      * Useful for complex applications with many simultaneous real-time data streams.
      */
     val multiplexSocket = path.path("ws").path("multiplex") bind MultiplexWebSocketHandler()
-    
+
     /**
      * WebSocket /ws/echo
      *
@@ -190,5 +192,5 @@ data class ChatMessage(
     val id: String,
     val sender: String,
     val content: String,
-    val timestamp: Long
+    val timestamp: Long,
 )

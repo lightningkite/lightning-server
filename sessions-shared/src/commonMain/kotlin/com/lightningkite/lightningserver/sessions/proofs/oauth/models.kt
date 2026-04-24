@@ -3,7 +3,6 @@ package com.lightningkite.lightningserver.sessions.proofs.oauth
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.UseContextualSerialization
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -261,7 +260,8 @@ public data class OauthCodeRequest(
  *                consent screens. If the user is not already authenticated or consent is needed,
  *                an error is returned instead. Used for silent authentication checks.
  */
-@Serializable public enum class OauthPromptType {
+@Serializable
+public enum class OauthPromptType {
     consent, select_account, none
 }
 
@@ -285,6 +285,7 @@ public data class OauthCodeRequest(
 public enum class OauthResponseMode {
     form_post, query
 }
+
 /**
  * Indicates whether the application needs offline access to the user's resources.
  *
@@ -326,7 +327,7 @@ public object OauthGrantTypes {
      *
      * Value: "authorization_code"
      */
-    public const val authorizationCode:String = "authorization_code"
+    public const val authorizationCode: String = "authorization_code"
 
     /**
      * The refresh token grant type.
@@ -337,5 +338,5 @@ public object OauthGrantTypes {
      *
      * Value: "refresh_token"
      */
-    public const val refreshToken:String = "refresh_token"
+    public const val refreshToken: String = "refresh_token"
 }

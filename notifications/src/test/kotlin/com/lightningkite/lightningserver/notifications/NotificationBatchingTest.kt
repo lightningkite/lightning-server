@@ -16,12 +16,7 @@ import com.lightningkite.services.sms.SMS
 import com.lightningkite.services.sms.TestSMS
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
 
@@ -253,8 +248,8 @@ class NotificationBatchingTest {
                 Notifications.Dispatcher.refreshNotifications()
 
                 // Everything should now be sent
-                assertTrue(testEmail!!.sentEmails.isNotEmpty(), "Emails should be sent after refresh")
-                assertTrue(testSms!!.messageHistory.isNotEmpty(), "SMS should be sent after refresh")
+                assertTrue(testEmail.sentEmails.isNotEmpty(), "Emails should be sent after refresh")
+                assertTrue(testSms.messageHistory.isNotEmpty(), "SMS should be sent after refresh")
             }
         }
     }

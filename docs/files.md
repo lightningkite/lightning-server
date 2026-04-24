@@ -4,7 +4,8 @@
 
 Storing, serving, and using user-provided files is a common requirement, and as such, is built-in directly.
 
-Valid file backends that have been built so far are Local, S3, and Azure Blob Storage.  SFTP is also partially supported - it doesn't support public URLs.
+Valid file backends that have been built so far are Local, S3, and Azure Blob Storage. SFTP is also partially
+supported - it doesn't support public URLs.
 
 The API is roughly based on Kotlin's built-in file functions.
 
@@ -50,7 +51,7 @@ rootFolder.list().forEach {
 
 ## Serving files
 
-These files have URLs that are signed for retrieval.  Performing an HTTP GET will result in the file.
+These files have URLs that are signed for retrieval. Performing an HTTP GET will result in the file.
 
 ```kotlin
 // Duration of the signature is determined by the file system settings
@@ -70,19 +71,24 @@ Performing an HTTP PUT with the file's contents will overwrite that file.
 
 ## Serialization
 
-`FileObject` is a file-system resolve object which can be used to read and write files.  They are purely internal to the server.
+`FileObject` is a file-system resolve object which can be used to read and write files. They are purely internal to the
+server.
 
-`ServerFile` is a wrapper around a string that contains a public URL for an object.  They are used in APIs and serialization.
+`ServerFile` is a wrapper around a string that contains a public URL for an object. They are used in APIs and
+serialization.
 
-You can switch between the two using `FileObject.serverFile` and `ServerFile.fileObject`.  
+You can switch between the two using `FileObject.serverFile` and `ServerFile.fileObject`.
 
 ### Security
 
-When a `ServerFile` is sent to a client, the url is automatically signed for reading.  Therefore, if you wish to keep a file in your file system secure, only serialize references to it for the people you want to read it.
+When a `ServerFile` is sent to a client, the url is automatically signed for reading. Therefore, if you wish to keep a
+file in your file system secure, only serialize references to it for the people you want to read it.
 
 ## Default File Upload Endpoints
 
-There is a pre-built upload endpoint for uploading files to use in subsequent requests.  It requires a reference to the intended file system to use, a database to track whether the file has been used (if it's unused, it is garbage collected), and a `JwtSigner` setting to secure file reuse.
+There is a pre-built upload endpoint for uploading files to use in subsequent requests. It requires a reference to the
+intended file system to use, a database to track whether the file has been used (if it's unused, it is garbage
+collected), and a `JwtSigner` setting to secure file reuse.
 
 This endpoint prevents abuse of your file system by returning two URLs: a `uploadUrl` and a `futureCallToken`.
 
@@ -92,7 +98,8 @@ This endpoint prevents abuse of your file system by returning two URLs: a `uploa
 
 Neither URL will allow reading of the file, and thus, you cannot abuse this endpoint as a file-sharing system.
 
-It is *strongly* recommended that you use this endpoint for handling files in your API rather than attempting to implement it yourself.
+It is *strongly* recommended that you use this endpoint for handling files in your API rather than attempting to
+implement it yourself.
 
 ```kotlin
 val upload = UploadEarlyEndpoint(path("early-upload"), files, database, signer)

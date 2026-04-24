@@ -5,9 +5,7 @@ import com.lightningkite.services.terraform.TerraformNeed
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.AES
 import dev.whyoleg.cryptography.algorithms.SHA256
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerializationException
+import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.EmptySerializersModule
@@ -149,7 +147,7 @@ public fun SecretSource.runGuiEditor(variables: List<TerraformNeed<*>>) {
             }
             val currentStr = try {
                 @Suppress("UNCHECKED_CAST")
-                current?.let { emitAny((v as TerraformNeed<Any?>).serializer as KSerializer<Any?>, it as Any) }
+                current?.let { emitAny((v as TerraformNeed<Any?>).serializer, it) }
             } catch (_: Exception) {
                 null
             }
@@ -181,9 +179,7 @@ public fun SecretSource.runGuiEditor(variables: List<TerraformNeed<*>>) {
                     @Suppress("UNCHECKED_CAST")
                     (selectedNeed as TerraformNeed<Any?>).serializer.let { s ->
                         currentVal?.let {
-                            (s as KSerializer<Any?>).emit(
-                                it
-                            )
+                            s.emit(it)
                         }
                     }
                 } catch (_: Exception) {
@@ -197,8 +193,8 @@ public fun SecretSource.runGuiEditor(variables: List<TerraformNeed<*>>) {
                         try {
                             @Suppress("UNCHECKED_CAST")
                             val defStr = emitAny(
-                                (selectedNeed as TerraformNeed<Any?>).serializer as KSerializer<Any?>,
-                                def as Any
+                                (selectedNeed as TerraformNeed<Any?>).serializer,
+                                def
                             )
                             append("Leave blank to default to $defStr\n")
                         } catch (_: Exception) {
@@ -216,7 +212,7 @@ public fun SecretSource.runGuiEditor(variables: List<TerraformNeed<*>>) {
                         (selectedNeed as TerraformNeed<Any?>).serializer.parse(input) as Any
                     }
                     @Suppress("UNCHECKED_CAST")
-                    pop.set(selectedNeed as TerraformNeed<Any>, typed as Any)
+                    pop.set(selectedNeed as TerraformNeed<Any>, typed)
                     JOptionPane.showMessageDialog(null, "Saved '${selectedNeed.name}' to ${pop.name}.")
                     break
                 } catch (e: IllegalArgumentException) {
@@ -258,8 +254,8 @@ public fun SecretSource.runGuiEditor(variables: List<TerraformNeed<*>>) {
                 @Suppress("UNCHECKED_CAST")
                 currentVal?.let {
                     emitAny(
-                        (selectedNeed as TerraformNeed<Any?>).serializer as KSerializer<Any?>,
-                        it as Any
+                        (selectedNeed as TerraformNeed<Any?>).serializer,
+                        it
                     )
                 } ?: "<unset>"
             } catch (_: Exception) {
@@ -459,7 +455,7 @@ public open class PasswordFetcher() {
                 println(prompt)
                 val password =
                     System.console()?.readPassword()?.toString() ?: JOptionPane.showInputDialog(null, prompt, "")
-                if(password == null){
+                if (password == null) {
                     throw IllegalStateException("No Input Provided")
                 }
                 try {

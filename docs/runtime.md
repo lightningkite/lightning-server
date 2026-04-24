@@ -1,6 +1,7 @@
 # Server Runtime
 
-The runtime system is the core execution environment for Lightning Server applications. It manages the lifecycle of your server, handles requests, executes tasks, and coordinates WebSocket subscriptions.
+The runtime system is the core execution environment for Lightning Server applications. It manages the lifecycle of your
+server, handles requests, executes tasks, and coordinates WebSocket subscriptions.
 
 ## Core Concepts
 
@@ -100,6 +101,7 @@ myTask("some data") // Queues task for execution
 ```
 
 The exact execution behavior depends on the runtime:
+
 - **SingleMachineEngine**: Executes in GlobalScope (fire-and-forget)
 - **TestRunner**: Executes inline (synchronous for testing)
 - **AWS Lambda**: Queues to SQS or similar service
@@ -130,6 +132,7 @@ userTopic.send(
 ## Compression
 
 The runtime automatically compresses HTTP responses when:
+
 - Client sends `Accept-Encoding: gzip` header
 - Response body is at least 256 bytes
 - Content type is compressible (not already compressed like images/video)
@@ -139,6 +142,7 @@ For payloads between 256-1024 bytes, compression is only applied if it reduces s
 ## Telemetry
 
 When telemetry is configured, the runtime automatically:
+
 - Traces HTTP requests with method, route, status code
 - Traces WebSocket events (connect, message, disconnect)
 - Traces task execution
@@ -174,7 +178,8 @@ fun testTimeDependent() {
 
 ## Best Practices
 
-1. **Use context receivers**: The runtime system heavily uses Kotlin context receivers for clean, implicit access to the runtime
+1. **Use context receivers**: The runtime system heavily uses Kotlin context receivers for clean, implicit access to the
+   runtime
 2. **Test with mock services**: Use JSON file databases and test implementations for deterministic tests
 3. **Access settings via invoke**: Use `setting()` not direct property access to get resolved values
 4. **Store endpoint references**: Always store endpoints in val constants for testing and internal calls

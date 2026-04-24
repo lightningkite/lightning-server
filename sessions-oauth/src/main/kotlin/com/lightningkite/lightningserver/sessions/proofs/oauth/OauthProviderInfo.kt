@@ -4,24 +4,20 @@ import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.location
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.serialization.FormDataFormat
-import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.sessions.proofs.oauth.OauthProviderInfo.Companion.apple
+import com.lightningkite.lightningserver.sessions.proofs.oauth.OauthProviderInfo.Companion.github
+import com.lightningkite.lightningserver.sessions.proofs.oauth.OauthProviderInfo.Companion.google
+import com.lightningkite.lightningserver.sessions.proofs.oauth.OauthProviderInfo.Companion.microsoft
 import com.lightningkite.services.http.client
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.nullable
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.boolean
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.*
 import kotlinx.serialization.modules.EmptySerializersModule
-import java.util.*
 import kotlin.uuid.Uuid
 
 /**
@@ -65,7 +61,8 @@ import kotlin.uuid.Uuid
 public class OauthProviderInfo(
     public val niceName: String,
     public val pathName: String = niceName.lowercase().map { if (it.isLetterOrDigit()) it else '-' }.joinToString(""),
-    public val identifierName: String = niceName.lowercase().map { if (it.isLetterOrDigit()) it else '_' }.joinToString(""),
+    public val identifierName: String = niceName.lowercase().map { if (it.isLetterOrDigit()) it else '_' }
+        .joinToString(""),
     public val loginUrl: String,
     public val tokenUrl: String,
     public val mode: OauthResponseMode = OauthResponseMode.form_post,
@@ -78,8 +75,10 @@ public class OauthProviderInfo(
         val read: context(ServerRuntime) (T) -> OauthProviderCredentials,
     ) {
         public companion object {
-            public val standard: SettingInfo<OauthProviderCredentials> = SettingInfo(OauthProviderCredentials.serializer()) { it }
-            public val apple: SettingInfo<OauthProviderCredentialsApple> = SettingInfo(OauthProviderCredentialsApple.serializer()) { it.toOauthProviderCredentials() }
+            public val standard: SettingInfo<OauthProviderCredentials> =
+                SettingInfo(OauthProviderCredentials.serializer()) { it }
+            public val apple: SettingInfo<OauthProviderCredentialsApple> =
+                SettingInfo(OauthProviderCredentialsApple.serializer()) { it.toOauthProviderCredentials() }
         }
     }
 
@@ -189,7 +188,8 @@ public class OauthProviderInfo(
             settings = SettingInfo.apple,
             getProfile = { response, credentials ->
                 val idToken = response.id_token ?: throw BadRequestException("No id_token found in response")
-                val clientId = credentials?.id ?: throw BadRequestException("Client credentials required for Apple ID token verification")
+                val clientId = credentials?.id
+                    ?: throw BadRequestException("Client credentials required for Apple ID token verification")
 
                 // Verify the JWT signature and extract claims securely using Apple's public keys
                 val claims = AppleJwtVerifier.verifyAppleIdToken(

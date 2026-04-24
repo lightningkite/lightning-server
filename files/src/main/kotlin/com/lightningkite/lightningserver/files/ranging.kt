@@ -1,14 +1,11 @@
 package com.lightningkite.lightningserver.files
 
-import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders
-import com.lightningkite.services.data.Data
-import com.lightningkite.services.data.TypedData
+import com.lightningkite.services.data.*
 import kotlinx.io.Sink
 import kotlinx.io.writeString
-import kotlin.use
 
 /**
  * Represents a single range value requested by a `Range` header.
@@ -56,14 +53,18 @@ public sealed interface HttpRange {
 }
 
 public fun HttpHeaders.httpRanges(
-    malformedRanges: HttpRange.MalformedBehavior = HttpRange.MalformedBehavior.IgnoreRangeRequest
+    malformedRanges: HttpRange.MalformedBehavior = HttpRange.MalformedBehavior.IgnoreRangeRequest,
 ): List<HttpRange>? = this
     .getMany(HttpHeader.Range)
     .takeUnless { it.isEmpty() }
     ?.mapIndexed { idx, value ->
         val rStr = if (idx == 0) {  // range header is submitted in format <unit>=<range> (,<range>)*
             val unit = value.root.substringBefore('=').trim()
-            if (!unit.equals("bytes", ignoreCase = true)) return null // RFC 9110 14.2: An origin server MUST ignore a Range header field that contains a range unit it does not understand.
+            if (!unit.equals(
+                    "bytes",
+                    ignoreCase = true
+                )
+            ) return null // RFC 9110 14.2: An origin server MUST ignore a Range header field that contains a range unit it does not understand.
             value.root.substringAfter('=')
         } else value.root
 
@@ -83,11 +84,10 @@ public fun HttpHeaders.httpRanges(
                 end == null -> HttpRange.UntilEnd(start)
                 else -> HttpRange.Bounded(start, end)
             }
-        } ?:
-            when (malformedRanges) {
-                HttpRange.MalformedBehavior.IgnoreRangeRequest -> return null
-                HttpRange.MalformedBehavior.BadRequest -> throw BadRequestException("Malformed range specifier: $rStr")
-            }
+        } ?: when (malformedRanges) {
+            HttpRange.MalformedBehavior.IgnoreRangeRequest -> return null
+            HttpRange.MalformedBehavior.BadRequest -> throw BadRequestException("Malformed range specifier: $rStr")
+        }
     }
 
 public fun List<HttpRange>.mergeOverlaps(resourceSize: Long): List<HttpRange> = this
@@ -144,7 +144,7 @@ public fun TypedData.getRange(range: HttpRange, dataSize: Long): TypedData =
 public fun TypedData.getRanges(
     ranges: List<HttpRange>,
     dataSize: Long,
-    rangeBoundary: String = "CONTENT_BOUNDARY"
+    rangeBoundary: String = "CONTENT_BOUNDARY",
 ): TypedData =
     TypedData(
         mediaType = MediaType.MultiPart.ByteRanges.copy(parameters = mapOf("boundary" to rangeBoundary)),
@@ -166,8 +166,7 @@ public fun TypedData.getRanges(
                     sink.writeString(LINE_FEED)
                 }
                 sink.writeString(rangeBoundary)
-            }
-            else data.source().use { source ->  // use source if possible
+            } else data.source().use { source ->  // use source if possible
                 var pos = 0L
                 for (range in ranges) {
                     sink.writeRangeHeaders(range)
@@ -179,6 +178,7 @@ public fun TypedData.getRanges(
                             pos = range.rangeEnd + 1
                             sink.writeString(LINE_FEED)
                         }
+
                         is HttpRange.Last, is HttpRange.UntilEnd -> {
                             source.transferTo(sink)
                             sink.writeString(LINE_FEED)

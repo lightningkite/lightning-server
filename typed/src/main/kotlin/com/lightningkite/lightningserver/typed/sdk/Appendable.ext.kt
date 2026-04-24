@@ -1,11 +1,10 @@
 package com.lightningkite.lightningserver.typed.sdk
 
 import com.lightningkite.services.data.ExperimentalLightningServer
-import com.lightningkite.services.data.KFile
+import com.lightningkite.services.kfile.KFile
 import kotlinx.io.Sink
 import kotlinx.io.writeString
 import java.lang.AutoCloseable
-import kotlin.use
 
 public fun Appendable.appendIdt(depth: Int): Appendable {
     repeat(depth) { append('\t') }
@@ -28,16 +27,19 @@ public fun Sink.asAppendable(): AppendableResource =
             sink.writeString(c.toString())
             return this
         }
+
         override fun append(csq: CharSequence?): Appendable {
             csq?.let(sink::writeString)
             return this
         }
+
         override fun append(csq: CharSequence?, start: Int, end: Int): Appendable {
             csq?.let {
                 sink.writeString(it, start, end)
             }
             return this
         }
+
         override fun close() {
             sink.close()
         }

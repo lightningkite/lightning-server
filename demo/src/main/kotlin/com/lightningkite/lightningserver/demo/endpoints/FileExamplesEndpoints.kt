@@ -3,11 +3,10 @@ package com.lightningkite.lightningserver.demo.endpoints
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.noAuth
+import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.arg1
-import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.route
 import com.lightningkite.services.database.Database
@@ -27,9 +26,9 @@ import kotlinx.serialization.Serializable
  */
 class FileExamplesEndpoints(
     private val files: Runtime<PublicFileSystem>,
-    private val database: Runtime<Database>
+    private val database: Runtime<Database>,
 ) : ServerBuilder() {
-    
+
     /**
      * POST /files/upload
      * 
@@ -50,13 +49,13 @@ class FileExamplesEndpoints(
             if (input.fileName.isBlank()) {
                 throw BadRequestException("File name is required")
             }
-            
+
             // Create a ServerFile reference
             // In practice, this would be created from the actual uploaded file
             val serverFile = ServerFile(
                 location = "uploads/${input.fileName}"
             )
-            
+
             val fileSystem = files.await()
             UploadFileResponse(
                 file = serverFile,
@@ -66,7 +65,7 @@ class FileExamplesEndpoints(
             )
         }
     )
-    
+
     /**
      * GET /files/{path}/info
      * 
@@ -93,7 +92,7 @@ class FileExamplesEndpoints(
             )
         }
     )
-    
+
     /**
      * GET /files/{path}/signed-url
      * 
@@ -120,7 +119,7 @@ class FileExamplesEndpoints(
             )
         }
     )
-    
+
     /**
      * DELETE /files/{path}
      * 
@@ -144,7 +143,7 @@ class FileExamplesEndpoints(
             fileRef.delete()
         }
     )
-    
+
     /**
      * POST /files/upload-image
      * 
@@ -176,7 +175,7 @@ class FileExamplesEndpoints(
                     "Image file size exceeds maximum allowed size"
                 )
             }
-            
+
             val serverFile = ServerFile(
                 location = "images/${input.fileName}"
             )
@@ -196,7 +195,7 @@ class FileExamplesEndpoints(
 @Serializable
 data class UploadFileRequest(
     val fileName: String,
-    val fileSize: Long = 0
+    val fileSize: Long = 0,
 )
 
 @Serializable
@@ -204,33 +203,33 @@ data class UploadFileResponse(
     val file: ServerFile,
     val signedUrl: String,
     val fileName: String,
-    val fileSize: Long
+    val fileSize: Long,
 )
 
 @Serializable
 data class FileInfoResponse(
     val path: String,
     val signedUrl: String,
-    val expiresIn: String
+    val expiresIn: String,
 )
 
 @Serializable
 data class SignedUrlResponse(
     val url: String,
     val expiresIn: String,
-    val path: String
+    val path: String,
 )
 
 @Serializable
 data class UploadImageRequest(
     val fileName: String,
     val fileSize: Long,
-    val mimeType: String
+    val mimeType: String,
 )
 
 @Serializable
 data class UploadImageResponse(
     val file: ServerFile,
     val signedUrl: String,
-    val thumbnailUrl: String
+    val thumbnailUrl: String,
 )

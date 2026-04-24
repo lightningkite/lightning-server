@@ -1,22 +1,15 @@
 package com.lightningkite.lightningserver.encryption
 
+import com.lightningkite.lightningserver.encryption.SecretBasis.Companion.BYTES
 import dev.whyoleg.cryptography.BinarySize
 import dev.whyoleg.cryptography.CryptographyProvider
-import dev.whyoleg.cryptography.algorithms.HKDF
-import dev.whyoleg.cryptography.algorithms.HMAC
-import dev.whyoleg.cryptography.algorithms.SHA512
-import dev.whyoleg.cryptography.materials.key.Key
-import dev.whyoleg.cryptography.materials.key.KeyDecoder
-import dev.whyoleg.cryptography.materials.key.KeyFormat
+import dev.whyoleg.cryptography.algorithms.*
+import dev.whyoleg.cryptography.materials.EncodingFormat
 import dev.whyoleg.cryptography.operations.SecretDerivation
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
-import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.*
+import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlin.io.encoding.Base64
@@ -87,8 +80,10 @@ public data class SecretBasis(public val string: String) {
 
     @Transient
     private val hmacLock = Any()
+
     @Transient
-    private val hmacMutex = Mutex() // I'm not sure if this mutex is necessary, but I'm including it because I do not want to deal with a subtle concurrency bug in the future.
+    private val hmacMutex =
+        Mutex() // I'm not sure if this mutex is necessary, but I'm including it because I do not want to deal with a subtle concurrency bug in the future.
 
     /**
      * Lazily initializes and returns the HMAC-SHA512 key for this [SecretBasis].
@@ -149,7 +144,7 @@ public data class SecretBasis(public val string: String) {
      */
     public suspend fun derive(
         key: ByteArray,
-        size: BinarySize? = null
+        size: BinarySize? = null,
     ): ByteArray = key()
         .signatureGenerator()
         .generateSignature(key)
@@ -170,7 +165,7 @@ public data class SecretBasis(public val string: String) {
      */
     public fun deriveBlocking(
         key: ByteArray,
-        size: BinarySize? = null
+        size: BinarySize? = null,
     ): ByteArray = keyBlocking()
         .signatureGenerator()
         .generateSignatureBlocking(key)
@@ -201,7 +196,8 @@ public data class SecretBasis(public val string: String) {
      * @param size Optional target size for the derived key
      * @return The derived key as a byte array
      */
-    public fun deriveBlocking(key: String, size: BinarySize? = null): ByteArray = deriveBlocking(key.encodeToByteArray(), size)
+    public fun deriveBlocking(key: String, size: BinarySize? = null): ByteArray =
+        deriveBlocking(key.encodeToByteArray(), size)
 
 
     /**
@@ -219,11 +215,11 @@ public data class SecretBasis(public val string: String) {
      * @param size Optional target size for the derived key material
      * @return A typed cryptographic key ready for use
      */
-    public suspend fun <KD : KeyDecoder<KF, K>, KF : KeyFormat, K : Key> deriveKey(
+    public suspend fun <KD : dev.whyoleg.cryptography.materials.Decoder<KF, K>, KF : EncodingFormat, K> deriveKey(
         decoder: KD,
         format: KF,
         variant: String,
-        size: BinarySize? = null
+        size: BinarySize? = null,
     ): K = decoder.decodeFromByteArray(
         format,
         derive(variant, size)
@@ -244,20 +240,22 @@ public data class SecretBasis(public val string: String) {
      * @param size Optional target size for the derived key material
      * @return A typed cryptographic key ready for use
      */
-    public fun <KD : KeyDecoder<KF, K>, KF : KeyFormat, K : Key> deriveKeyBlocking(
+    public fun <KD : dev.whyoleg.cryptography.materials.Decoder<KF, K>, KF : EncodingFormat, K> deriveKeyBlocking(
         decoder: KD,
         format: KF,
         variant: String,
-        size: BinarySize? = null
+        size: BinarySize? = null,
     ): K = decoder.decodeFromByteArrayBlocking(format, deriveBlocking(variant, size))
 
 
-
-    private object Serializer : KSerializer<SecretBasis> {
+    public object Serializer : KSerializer<SecretBasis> {
         override val descriptor: SerialDescriptor =
             PrimitiveSerialDescriptor("com.lightningkite.lightningserver.encryption.SecretBasis", PrimitiveKind.STRING)
+
         override fun deserialize(decoder: Decoder): SecretBasis = SecretBasis(decoder.decodeString())
-        override fun serialize(encoder: Encoder, value: SecretBasis) { encoder.encodeString(value.string) }
+        override fun serialize(encoder: Encoder, value: SecretBasis) {
+            encoder.encodeString(value.string)
+        }
     }
 }
 

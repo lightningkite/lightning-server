@@ -1,20 +1,15 @@
 // by Claude
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.http.HttpStatus
-import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.http.post
+import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
+import com.lightningkite.services.data.MediaType
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /**
  * Tests for the ApiDocs class which generates API documentation and SDKs.
@@ -182,8 +177,10 @@ class ApiDocsTest {
 
             assertNotNull(content)
             // The endpoint summary should appear in the docs
-            assertTrue(content.contains("Test endpoint") || content.contains("test"),
-                "Documentation should include test endpoint info")
+            assertTrue(
+                content.contains("Test endpoint") || content.contains("test"),
+                "Documentation should include test endpoint info"
+            )
         }
     }
 

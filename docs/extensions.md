@@ -1,6 +1,8 @@
 # Extension System
 
-The Lightning Server extension system provides a type-safe way to attach arbitrary data to server components without modifying their core interfaces. This system is defined in the `definition` package and is used throughout Lightning Server for attaching metadata to endpoints, builders, and definitions.
+The Lightning Server extension system provides a type-safe way to attach arbitrary data to server components without
+modifying their core interfaces. This system is defined in the `definition` package and is used throughout Lightning
+Server for attaching metadata to endpoints, builders, and definitions.
 
 ## Core Concepts
 
@@ -83,7 +85,8 @@ object Server : ServerBuilder() {
 
 ## Degrading Keys
 
-`DegradingKey` provides different types for read vs. write access. This is useful when you want mutable access during building, but read-only access at runtime.
+`DegradingKey` provides different types for read vs. write access. This is useful when you want mutable access during
+building, but read-only access at runtime.
 
 ### Example: Mutable List to Read-Only List
 
@@ -103,6 +106,7 @@ val ServerDefinition.arguments: List<String> by ArgumentsKey
 ```
 
 When building:
+
 ```kotlin
 object Server : ServerBuilder() {
     init {

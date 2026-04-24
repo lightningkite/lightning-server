@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.media
 
-import com.lightningkite.MediaType
+import com.lightningkite.services.data.MediaType
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.File

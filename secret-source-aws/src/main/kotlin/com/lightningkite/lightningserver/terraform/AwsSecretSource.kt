@@ -5,11 +5,7 @@ import kotlinx.serialization.json.Json
 import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient
-import software.amazon.awssdk.services.secretsmanager.model.CreateSecretRequest
-import software.amazon.awssdk.services.secretsmanager.model.GetSecretValueRequest
-import software.amazon.awssdk.services.secretsmanager.model.ResourceNotFoundException
-import software.amazon.awssdk.services.secretsmanager.model.SecretsManagerException
-import software.amazon.awssdk.services.secretsmanager.model.UpdateSecretRequest
+import software.amazon.awssdk.services.secretsmanager.model.*
 
 /**
  * Exception thrown when AWS Secrets Manager operations fail.
@@ -17,7 +13,7 @@ import software.amazon.awssdk.services.secretsmanager.model.UpdateSecretRequest
  * @param message Description of the failure
  * @param cause The underlying AWS SDK exception
  */
-public class AwsSecretException(message: String?, cause: Throwable?): Exception(message, cause)
+public class AwsSecretException(message: String?, cause: Throwable?) : Exception(message, cause)
 
 /**
  * A secret source that reads and writes secrets to AWS Secrets Manager.
@@ -51,7 +47,8 @@ public class AwsSecretException(message: String?, cause: Throwable?): Exception(
  * @see PopulatableSecretSource
  * @see TerraformNeed
  */
-public class AwsSecretSource(public val profile: String, private val idPrefix: String, region: Region): PopulatableSecretSource {
+public class AwsSecretSource(public val profile: String, private val idPrefix: String, region: Region) :
+    PopulatableSecretSource {
 
     private val json = Json
     private val client = SecretsManagerClient.builder()
@@ -70,36 +67,42 @@ public class AwsSecretSource(public val profile: String, private val idPrefix: S
     private fun getId(name: String) = "$idPrefix/$name"
 
     override fun <T> getOrNull(need: TerraformNeed<T>): T? {
-        return try{
-            val response = client.getSecretValue(GetSecretValueRequest.builder()
-                .secretId(getId(need.name))
-                .build())
+        return try {
+            val response = client.getSecretValue(
+                GetSecretValueRequest.builder()
+                    .secretId(getId(need.name))
+                    .build()
+            )
             json.decodeFromString(need.serializer, response.secretString())
-        } catch (e: ResourceNotFoundException){
+        } catch (e: ResourceNotFoundException) {
             null
-        } catch (e: SecretsManagerException){
+        } catch (e: SecretsManagerException) {
             throw AwsSecretException("Attempt to retrieve secret failed", e)
         }
     }
 
     override fun <T> set(need: TerraformNeed<T>, value: T) {
-        try{
-            client.getSecretValue(GetSecretValueRequest.builder()
-                .secretId(getId(need.name))
-                .build())
+        try {
+            client.getSecretValue(
+                GetSecretValueRequest.builder()
+                    .secretId(getId(need.name))
+                    .build()
+            )
 
-            client.updateSecret(UpdateSecretRequest.builder()
-                .secretId(getId(need.name))
-                .secretString(json.encodeToString(need.serializer, value))
-                .build()
+            client.updateSecret(
+                UpdateSecretRequest.builder()
+                    .secretId(getId(need.name))
+                    .secretString(json.encodeToString(need.serializer, value))
+                    .build()
             )
-        } catch (e: ResourceNotFoundException){
-            client.createSecret(CreateSecretRequest.builder()
-                .name(getId(need.name))
-                .secretString(json.encodeToString(need.serializer, value))
-                .build()
+        } catch (e: ResourceNotFoundException) {
+            client.createSecret(
+                CreateSecretRequest.builder()
+                    .name(getId(need.name))
+                    .secretString(json.encodeToString(need.serializer, value))
+                    .build()
             )
-        } catch (e: SecretsManagerException){
+        } catch (e: SecretsManagerException) {
             throw AwsSecretException("Attempt to save secret failed", e)
         }
     }

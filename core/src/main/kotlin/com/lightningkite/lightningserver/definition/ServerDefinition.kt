@@ -1,24 +1,13 @@
 package com.lightningkite.lightningserver.definition
 
-import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.InternalLightningServerApi
-import com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationError
-import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.builder.buildMapRegistry
-import com.lightningkite.lightningserver.definition.builder.include
+import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
-import com.lightningkite.lightningserver.serialization.MediaTypeDecoder
-import com.lightningkite.lightningserver.serialization.MediaTypeDecoderRegistry
-import com.lightningkite.lightningserver.serialization.MediaTypeEncoder
-import com.lightningkite.lightningserver.serialization.MediaTypeEncoderRegistry
-import com.lightningkite.lightningserver.websockets.WebSocketHandler
-import com.lightningkite.lightningserver.websockets.WebSocketHandlerInterceptor
-import com.lightningkite.lightningserver.websockets.WebSocketTopic
-import com.lightningkite.lightningserver.websockets.compileAndInstrument
+import com.lightningkite.lightningserver.serialization.*
+import com.lightningkite.lightningserver.websockets.*
+import com.lightningkite.services.data.*
 import com.lightningkite.services.database.validation.AnnotationValidators
-import com.lightningkite.toSealedList
-import com.lightningkite.toSealedMap
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.plus
 import kotlin.uuid.Uuid
@@ -168,12 +157,27 @@ public data class ServerDefinition(
                         get(path)
                             ?.let { previous ->
                                 val intersection = endpoints.http.keys.intersect(previous.http.keys)
-                                if (intersection.isNotEmpty()) throw DuplicateRegistrationError("Endpoints ${intersection.map { HttpEndpoint(path, it) }} already have registered handlers", previous.http, endpoints.http)
-                                if (previous.websocket != null && endpoints.websocket != null) throw DuplicateRegistrationError("Path $path already has a registered websocket", previous.websocket, endpoints.websocket)
-                                put(path, ServerPathEndpoints(
-                                    previous.http + endpoints.http,
-                                    previous.websocket ?: endpoints.websocket
-                                ))
+                                if (intersection.isNotEmpty()) throw DuplicateRegistrationError(
+                                    "Endpoints ${
+                                        intersection.map {
+                                            HttpEndpoint(
+                                                path,
+                                                it
+                                            )
+                                        }
+                                    } already have registered handlers", previous.http, endpoints.http
+                                )
+                                if (previous.websocket != null && endpoints.websocket != null) throw DuplicateRegistrationError(
+                                    "Path $path already has a registered websocket",
+                                    previous.websocket,
+                                    endpoints.websocket
+                                )
+                                put(
+                                    path, ServerPathEndpoints(
+                                        previous.http + endpoints.http,
+                                        previous.websocket ?: endpoints.websocket
+                                    )
+                                )
                             }
                             ?: put(path, endpoints)
                     }
@@ -219,36 +223,45 @@ public data class ServerDefinition(
             }
         }.associate { it }
     }
+
     @Suppress("UNCHECKED_CAST")
-    public fun <P: PathSpec> location(handler: HttpHandler<P>): HttpEndpoint<P>? = reverseLookupHttpHandler[handler]?.let { it as HttpEndpoint<P> }
+    public fun <P : PathSpec> location(handler: HttpHandler<P>): HttpEndpoint<P>? =
+        reverseLookupHttpHandler[handler]?.let { it as HttpEndpoint<P> }
 
     private val reverseLookupWebSocketHandler: Map<WebSocketHandler<*, *>, PathSpec> by lazy {
         endpoints.entries.mapNotNull {
             (it.value.websocket ?: return@mapNotNull null) to it.key
         }.associate { it }
     }
+
     @Suppress("UNCHECKED_CAST")
-    public fun <P: PathSpec> location(handler: WebSocketHandler<P, *>): P? = reverseLookupWebSocketHandler[handler]?.let { it as P }
+    public fun <P : PathSpec> location(handler: WebSocketHandler<P, *>): P? =
+        reverseLookupWebSocketHandler[handler]?.let { it as P }
 
     private val reverseLookupWebSocketTopic: Map<WebSocketTopic<*, *>, PathSpec> by lazy {
         webSocketTopics.entries.associate { it.value to it.key }
     }
+
     @Suppress("UNCHECKED_CAST")
-    public fun <P: PathSpec> location(handler: WebSocketTopic<P, *>): P? = reverseLookupWebSocketTopic[handler]?.let { it as P }
+    public fun <P : PathSpec> location(handler: WebSocketTopic<P, *>): P? =
+        reverseLookupWebSocketTopic[handler]?.let { it as P }
 
     private val reverseLookupTask: Map<Task<*>, PathSpec0> by lazy {
         tasks.entries.associate { it.value to it.key }
     }
+
     public fun location(handler: Task<*>): PathSpec0? = reverseLookupTask[handler]
 
     private val reverseLookupStartupTask: Map<StartupTask, PathSpec0> by lazy {
         startupTasks.entries.associate { it.value to it.key }
     }
+
     public fun location(handler: StartupTask): PathSpec0? = reverseLookupStartupTask[handler]
 
     private val reverseLookupScheduledTask: Map<ScheduledTask, PathSpec0> by lazy {
         schedules.entries.associate { it.value to it.key }
     }
+
     public fun location(handler: ScheduledTask): PathSpec0? = reverseLookupScheduledTask[handler]
 
     @OptIn(InternalLightningServerApi::class)
@@ -261,6 +274,9 @@ public data class ServerDefinition(
             put(PathSpec.root, this@ServerDefinition)
         }
     }
-    @OptIn(InternalLightningServerApi::class) public fun location(module: ServerDefinition): PathSpec0? = reverseLookupServerModule[module.thisLayer.moduleId]
-    @OptIn(InternalLightningServerApi::class) public fun location(module: ServerBuilder): PathSpec0? = reverseLookupServerModule[module.moduleId]
+
+    @OptIn(InternalLightningServerApi::class)
+    public fun location(module: ServerDefinition): PathSpec0? = reverseLookupServerModule[module.thisLayer.moduleId]
+    @OptIn(InternalLightningServerApi::class)
+    public fun location(module: ServerBuilder): PathSpec0? = reverseLookupServerModule[module.moduleId]
 }

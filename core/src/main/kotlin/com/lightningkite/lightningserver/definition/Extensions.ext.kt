@@ -2,13 +2,8 @@ package com.lightningkite.lightningserver.definition
 
 import com.lightningkite.lightningserver.definition.builder.ListRegistry
 import com.lightningkite.lightningserver.definition.builder.MapRegistry
-import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.toSealedList
-import com.lightningkite.toSealedMap
-import kotlin.collections.component1
-import kotlin.collections.component2
-import kotlin.collections.iterator
-import kotlin.properties.ReadWriteProperty
+import com.lightningkite.services.data.toSealedList
+import com.lightningkite.services.data.toSealedMap
 import kotlin.reflect.KProperty
 
 /**
@@ -32,7 +27,11 @@ public operator fun <T : Any> Extensions.Key<T>.getValue(thisRef: Extended, prop
  * @param thisRef the [Extendable] instance where the extension will be stored
  * @param value the value to associate with this key, or `null` to remove the key
  */
-public operator fun <T : Any> MutableExtensions.Key<T>.setValue(thisRef: Extendable, property: KProperty<*>, value: T?) {
+public operator fun <T : Any> MutableExtensions.Key<T>.setValue(
+    thisRef: Extendable,
+    property: KProperty<*>,
+    value: T?,
+) {
     thisRef.extensions[this] = value
 }
 
@@ -49,7 +48,8 @@ public operator fun <T : Any> MutableExtensions.Key<T>.setValue(thisRef: Extenda
  * @param default A function that computes the default value if the key is not present
  * @return The existing or newly computed value for this key
  */
-public inline fun <T : Any> MutableExtensions.getOrPut(key: MutableExtensions.Key<T>, default: () -> T): T = get(key) ?: default().also { set(key, it) }
+public inline fun <T : Any> MutableExtensions.getOrPut(key: MutableExtensions.Key<T>, default: () -> T): T =
+    get(key) ?: default().also { set(key, it) }
 
 /**
  * Enables property delegation for [MutableExtensions.WritableKey] on [Extendable] types.
@@ -61,7 +61,10 @@ public inline fun <T : Any> MutableExtensions.getOrPut(key: MutableExtensions.Ke
  * @param property the property being delegated (not used in implementation)
  * @return the mutable value of type [WRITE], creating a default if not present
  */
-public operator fun <WRITE : READ, READ : Any> MutableExtensions.WritableKey<WRITE, READ>.getValue(thisRef: Extendable, property: KProperty<*>): WRITE =
+public operator fun <WRITE : READ, READ : Any> MutableExtensions.WritableKey<WRITE, READ>.getValue(
+    thisRef: Extendable,
+    property: KProperty<*>,
+): WRITE =
     thisRef.extensions[this]
 
 /**
@@ -74,7 +77,10 @@ public operator fun <WRITE : READ, READ : Any> MutableExtensions.WritableKey<WRI
  * @param property the property being delegated (not used in implementation)
  * @return the read-only value of type [READ], or a new default instance if not present
  */
-public operator fun <WRITE : READ, READ : Any> MutableExtensions.WritableKey<WRITE, READ>.getValue(thisRef: Extended, property: KProperty<*>): READ =
+public operator fun <WRITE : READ, READ : Any> MutableExtensions.WritableKey<WRITE, READ>.getValue(
+    thisRef: Extended,
+    property: KProperty<*>,
+): READ =
     thisRef.extensions[this] ?: default()
 
 
@@ -99,6 +105,7 @@ public interface MapRegistryExtension<L, V> : MutableExtensions.WritableKey<MapR
     override fun MapRegistry<L, V>.include(other: Map<L, V>) {
         for ((key, value) in other) register(key, value)
     }
+
     override fun seal(data: Map<L, V>): Map<L, V> = data.toSealedMap()
 }
 
@@ -123,6 +130,7 @@ public interface ListRegistryExtension<V> : MutableExtensions.WritableKey<ListRe
     override fun ListRegistry<V>.include(other: List<V>) {
         for (value in other) register(value)
     }
+
     override fun seal(data: List<V>): List<V> = data.toSealedList()
 }
 

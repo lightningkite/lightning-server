@@ -2,38 +2,16 @@ package com.lightningkite.lightningserver.typed.jsonschema
 
 import com.lightningkite.lightningserver.typed.sdk.titleCase
 import com.lightningkite.services.data.*
-import com.lightningkite.services.database.ConditionSerializer
-import com.lightningkite.services.database.KSerializerKey
-import com.lightningkite.services.database.ModificationSerializer
-import com.lightningkite.services.database.WrappingSerializer
-import com.lightningkite.services.database.childSerializersOrNull
-import com.lightningkite.services.database.innerElement
-import com.lightningkite.services.database.innerElement2
-import com.lightningkite.services.database.nullElement
-import com.lightningkite.services.database.serializableProperties
+import com.lightningkite.services.database.*
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ArraySerializer
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
-import kotlin.collections.Iterable
-import kotlin.collections.List
-import kotlin.collections.Map
-import kotlin.collections.associate
-import kotlin.collections.filterIsInstance
-import kotlin.collections.firstOrNull
-import kotlin.collections.iterator
-import kotlin.collections.listOf
-import kotlin.collections.map
-import kotlin.collections.mapOf
-import kotlin.collections.mutableMapOf
-import kotlin.collections.mutableSetOf
-import kotlin.collections.plus
-import kotlin.collections.set
 import kotlin.reflect.KClass
 
-internal class JsonSchemaException(message: String? = null, cause: Throwable? = null): Exception(message, cause)
+internal class JsonSchemaException(message: String? = null, cause: Throwable? = null) : Exception(message, cause)
 
 
 @Serializable
@@ -69,7 +47,8 @@ internal object JavascriptCoreTypeWithNullabilitySerializer : KSerializer<Javasc
     val single = JavascriptCoreType.serializer()
 
     @OptIn(InternalSerializationApi::class)
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.lightningserver.jsonschema.JsonType3", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("com.lightningkite.lightningserver.jsonschema.JsonType3", PrimitiveKind.STRING)
 
     override fun serialize(encoder: Encoder, value: JavascriptCoreTypeWithNullability) {
         if (value.nullable) encoder.encodeSerializableValue(multi, arrayOf(value.inner, JavascriptCoreType.NULL))
@@ -79,7 +58,12 @@ internal object JavascriptCoreTypeWithNullabilitySerializer : KSerializer<Javasc
     override fun deserialize(decoder: Decoder): JavascriptCoreTypeWithNullability {
         (decoder as? JsonDecoder)?.let { input ->
             val element = input.decodeJsonElement()
-            return if (element is JsonArray) JavascriptCoreTypeWithNullability(decoder.json.decodeFromJsonElement(single, element[0]), true)
+            return if (element is JsonArray) JavascriptCoreTypeWithNullability(
+                decoder.json.decodeFromJsonElement(
+                    single,
+                    element[0]
+                ), true
+            )
             else JavascriptCoreTypeWithNullability(decoder.json.decodeFromJsonElement(single, element))
         }
         return JavascriptCoreTypeWithNullability(JavascriptCoreType.serializer().deserialize(decoder))
@@ -143,7 +127,7 @@ public fun Json.schema(type: KSerializer<*>): JsonSchemaDefinition {
 internal class JsonSchemaBuilder(
     val json: Json,
     val refString: String = "#/definitions/",
-    val useNullableProperty: Boolean = false
+    val useNullableProperty: Boolean = false,
 ) {
     val definitions = mutableMapOf<String, JsonSchemaType>()
     val defining = mutableSetOf<String>()
@@ -172,7 +156,7 @@ internal class JsonSchemaBuilder(
                         )
                     )
                 )
-            } catch (e: Exception){
+            } catch (e: Exception) {
                 throw JsonSchemaException("Failed to handle MultipleReferences annotation", e)
             }
         }
@@ -307,7 +291,10 @@ internal class JsonSchemaBuilder(
                     return JsonSchemaType(
                         oneOf = listOf(
                             inner.copy(title = title),
-                            JsonSchemaType(type = JavascriptCoreTypeWithNullability(JavascriptCoreType.NULL), title = "$title N/A")
+                            JsonSchemaType(
+                                type = JavascriptCoreTypeWithNullability(JavascriptCoreType.NULL),
+                                title = "$title N/A"
+                            )
                         )
                     )
                 }
@@ -331,23 +318,34 @@ internal class JsonSchemaBuilder(
                 return defining(ser) { it(ser) }.applyAnnotations(annos)
             }
             return when (ser.descriptor.kind) {
-                PrimitiveKind.BOOLEAN -> JsonSchemaType(type = JavascriptCoreTypeWithNullability(JavascriptCoreType.BOOLEAN)).applyAnnotations(annos)
+                PrimitiveKind.BOOLEAN -> JsonSchemaType(type = JavascriptCoreTypeWithNullability(JavascriptCoreType.BOOLEAN)).applyAnnotations(
+                    annos
+                )
+
                 PrimitiveKind.BYTE,
                 PrimitiveKind.SHORT,
                 PrimitiveKind.LONG,
-                PrimitiveKind.INT -> JsonSchemaType(type = JavascriptCoreTypeWithNullability(JavascriptCoreType.INTEGER)).applyAnnotations(annos)
+                PrimitiveKind.INT,
+                    -> JsonSchemaType(type = JavascriptCoreTypeWithNullability(JavascriptCoreType.INTEGER)).applyAnnotations(
+                    annos
+                )
 
                 PrimitiveKind.FLOAT,
                 PrimitiveKind.DOUBLE,
-                -> JsonSchemaType(type = JavascriptCoreTypeWithNullability(JavascriptCoreType.NUMBER)).applyAnnotations(annos)
+                    -> JsonSchemaType(type = JavascriptCoreTypeWithNullability(JavascriptCoreType.NUMBER)).applyAnnotations(
+                    annos
+                )
 
                 PrimitiveKind.CHAR,
                 PrimitiveKind.STRING,
-                -> JsonSchemaType(type = JavascriptCoreTypeWithNullability(JavascriptCoreType.STRING)).applyAnnotations(annos)
+                    -> JsonSchemaType(type = JavascriptCoreTypeWithNullability(JavascriptCoreType.STRING)).applyAnnotations(
+                    annos
+                )
 
                 SerialKind.ENUM -> defining(serializer) {
                     JsonSchemaType(
-                        title = ser.descriptor.serialName.substringBefore('/').substringBefore('<').substringAfterLast('.').titleCase(),
+                        title = ser.descriptor.serialName.substringBefore('/').substringBefore('<')
+                            .substringAfterLast('.').titleCase(),
                         type = JavascriptCoreTypeWithNullability(JavascriptCoreType.STRING),
                         oneOf = (0 until ser.descriptor.elementsCount)
                             .map {
@@ -376,13 +374,15 @@ internal class JsonSchemaBuilder(
 
                 StructureKind.CLASS -> defining(serializer) {
                     JsonSchemaType(
-                        title = ser.descriptor.serialName.substringBefore('/').substringBefore('<').substringAfterLast('.').titleCase(),
+                        title = ser.descriptor.serialName.substringBefore('/').substringBefore('<')
+                            .substringAfterLast('.').titleCase(),
                         type = JavascriptCoreTypeWithNullability(JavascriptCoreType.OBJECT),
                         properties = ser.serializableProperties?.associate {
                             val propTitle = it.name.titleCase()
                             it.name to get(
                                 it.serializer,
-                                ser.descriptor.getElementIndex(it.name).takeUnless { it == -1 }?.let { ser.descriptor.getElementAnnotations(it) } ?: listOf(),
+                                ser.descriptor.getElementIndex(it.name).takeUnless { it == -1 }
+                                    ?.let { ser.descriptor.getElementAnnotations(it) } ?: listOf(),
                                 propTitle
                             ).copy(
                                 title = propTitle
@@ -410,7 +410,7 @@ internal class JsonSchemaBuilder(
                 PolymorphicKind.OPEN -> throw Error("Cannot generate JSON Schema for polymorphic type ${ser.descriptor.serialName}")
                 SerialKind.CONTEXTUAL -> throw Error("This should not be reachable - ${ser.descriptor.serialName} could be unwrapped no further")
             }
-        } catch(e: Exception) {
+        } catch (e: Exception) {
             throw JsonSchemaException("Failed to get schema for ${serializer.descriptor.serialName}", e)
         }
     }
@@ -430,8 +430,8 @@ internal class JsonSchemaBuilder(
     @OptIn(ExperimentalSerializationApi::class)
     @Suppress("UNCHECKED_CAST")
     fun KSerializer<*>.unwrap(): KSerializer<*> {
-        return if(this.descriptor.isNullable) this.innerElement()
-        else if(this.descriptor.kind == SerialKind.CONTEXTUAL) return json.serializersModule.getContextual<Any>(this.descriptor.capturedKClass as KClass<Any>) as KSerializer<*>
+        return if (this.descriptor.isNullable) this.innerElement()
+        else if (this.descriptor.kind == SerialKind.CONTEXTUAL) return json.serializersModule.getContextual<Any>(this.descriptor.capturedKClass as KClass<Any>) as KSerializer<*>
         else this
     }
 

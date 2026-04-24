@@ -1,10 +1,7 @@
 // by Claude
 package com.lightningkite.lightningserver.websockets
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /**
  * Tests for WebSocketFrame sealed interface and implementations.
@@ -22,7 +19,6 @@ class WebSocketFrameTest {
     @Test
     fun `Text frame factory function`() {
         val frame = WebSocketFrame("Hello World")
-        assertTrue(frame is WebSocketFrame.Text)
         assertEquals("Hello World", frame.content)
     }
 
@@ -63,7 +59,6 @@ class WebSocketFrameTest {
     fun `Binary frame factory function`() {
         val bytes = byteArrayOf(0x0A, 0x0B, 0x0C)
         val frame = WebSocketFrame(bytes)
-        assertTrue(frame is WebSocketFrame.Binary)
         assertTrue(frame.content.contentEquals(bytes))
     }
 

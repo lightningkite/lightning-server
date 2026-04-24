@@ -9,10 +9,7 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.trailingSegments
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.services.files.FileInfo
-import com.lightningkite.services.files.FileObject
-import com.lightningkite.services.files.KotlinxIoPublicFileSystem
-import com.lightningkite.services.files.PublicFileSystem
+import com.lightningkite.services.files.*
 
 /**
  * HTTP endpoints for serving and uploading files backed by a PublicFileSystem.
@@ -24,7 +21,7 @@ import com.lightningkite.services.files.PublicFileSystem
  */
 public class FileSystemEndpoints(
     public val files: Runtime<PublicFileSystem>,
-    public val malformedRanges: HttpRange.MalformedBehavior = HttpRange.MalformedBehavior.IgnoreRangeRequest
+    public val malformedRanges: HttpRange.MalformedBehavior = HttpRange.MalformedBehavior.IgnoreRangeRequest,
 ) : ServerBuilder() {
     /**
      * The root file/directory of the configured PublicFileSystem for the current runtime.
@@ -36,8 +33,9 @@ public class FileSystemEndpoints(
      * Builds the internal path+query portion used to address files relative to the file system's root.
      */
     context(runtime: ServerRuntime)
-    private fun Request<*>.filePath(): String  {
-        val path = path.trailingSegments?.toString()?.removePrefix("/") ?: throw BadRequestException("No file to look up")
+    private fun Request<*>.filePath(): String {
+        val path =
+            path.trailingSegments?.toString()?.removePrefix("/") ?: throw BadRequestException("No file to look up")
         return if (queryParameters.isNotEmpty()) "$path?$queryParameters"
         else path
     }
@@ -79,7 +77,8 @@ public class FileSystemEndpoints(
         }
 
         var headCache: FileInfo? = null
-        suspend fun head() = headCache ?: file.head()?.also { headCache = it } ?: throw BadRequestException("No file $filePath found")
+        suspend fun head() =
+            headCache ?: file.head()?.also { headCache = it } ?: throw BadRequestException("No file $filePath found")
 
         val ranges = request.headers.httpRanges(malformedRanges = malformedRanges)?.let { ranges ->
             if (ranges.isEmpty()) return@let null

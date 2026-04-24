@@ -1,7 +1,6 @@
 // by Claude
 package com.lightningkite.lightningserver.auth
 
-import com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationError
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.serverRuntime
@@ -12,12 +11,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import org.junit.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.uuid.Uuid
 
 /**
@@ -30,7 +24,7 @@ class PrincipalTypeTest {
         override val _id: Uuid = Uuid.random(),
         val email: String = "",
         val phone: String = "",
-        val displayName: String = ""
+        val displayName: String = "",
     ) : HasId<Uuid> {
         companion object : PrincipalType<TestPrincipal, Uuid> {
             override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
@@ -65,7 +59,7 @@ class PrincipalTypeTest {
     @Serializable
     data class IntIdPrincipal(
         override val _id: Int = 0,
-        val name: String = ""
+        val name: String = "",
     ) : HasId<Int> {
         companion object : PrincipalType<IntIdPrincipal, Int> {
             override val idSerializer: KSerializer<Int> = Int.serializer()
@@ -82,7 +76,7 @@ class PrincipalTypeTest {
     @Serializable
     data class StringIdPrincipal(
         override val _id: String = "",
-        val label: String = ""
+        val label: String = "",
     ) : HasId<String> {
         companion object : PrincipalType<StringIdPrincipal, String> {
             override val idSerializer: KSerializer<String> = String.serializer()

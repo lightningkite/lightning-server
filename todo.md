@@ -7,21 +7,28 @@
 
 ## 🟠 MEDIUM PRIORITY Parsing Issues (Priority 7-9)
 
-- [ ] Fix HttpHeaderValue parsing for quoted values with semicolons: `filename="file; with; semicolons.txt"` (core/.../http/HttpHeaderValue.kt)
+- [ ] Fix HttpHeaderValue parsing for quoted values with semicolons: `filename="file; with; semicolons.txt"` (
+  core/.../http/HttpHeaderValue.kt)
 - [ ] Fix HttpHeaderValue cookie parsing for values without `=`
-- [ ] Fix ServerSettings properties parsing for values containing `=` (splits incorrectly) (core/.../settings/ServerSettings.ext.kt)
+- [ ] Fix ServerSettings properties parsing for values containing `=` (splits incorrectly) (
+  core/.../settings/ServerSettings.ext.kt)
 - [ ] Fix ServerSettings properties parsing for values containing `#` (comment handling too aggressive)
 
 ## 🟢 THREAD SAFETY (Priority 10-12)
 
-- [ ] (Claude) Make ServerSetting cached implementations thread-safe using lazy(LazyThreadSafetyMode.SYNCHRONIZED) (core/.../definition/ServerSetting.kt)
-- [ ] (Claude) Make SecretBasis.hmac field thread-safe or document single-threaded init requirement (core/.../encryption/SecretBasis.kt)
-- [ ] (Claude) Unify Task/ScheduledTask/StartupTask timeout defaults (currently 30s in interface, 5min in factories, should all be 5 minutes)
+- [ ] (Claude) Make ServerSetting cached implementations thread-safe using lazy(LazyThreadSafetyMode.SYNCHRONIZED) (
+  core/.../definition/ServerSetting.kt)
+- [ ] (Claude) Make SecretBasis.hmac field thread-safe or document single-threaded init requirement (
+  core/.../encryption/SecretBasis.kt)
+- [ ] (Claude) Unify Task/ScheduledTask/StartupTask timeout defaults (currently 30s in interface, 5min in factories,
+  should all be 5 minutes)
 
 ## 🔵 DESIGN & MAINTENANCE (Priority 13-16)
 
-- [ ] (Claude) Implement circular dependency detection in StartupTask dependency graphs (core/.../definition/StartupTask.kt)
-- [ ] Review and fix MediaPreviewOptions scaling logic when both needsRatio and needsScaling are true (media/.../MediaPreviewOptions.kt:131)
+- [ ] (Claude) Implement circular dependency detection in StartupTask dependency graphs (
+  core/.../definition/StartupTask.kt)
+- [ ] Review and fix MediaPreviewOptions scaling logic when both needsRatio and needsScaling are true (
+  media/.../MediaPreviewOptions.kt:131)
 
 ## 🔵 EXISTING TODOS
 
@@ -34,6 +41,7 @@
 ## 📋 API IMPROVEMENTS BY MODULE
 
 ### auth module
+
 - [ ] auth-shared/.../Scope.kt: Add validation for scope strings to prevent malformed scopes
 - [ ] auth/.../AuthEndpoints.kt: Consider supporting multiple simultaneous sessions per user
 - [ ] auth/.../AuthEndpoints.kt: Add audit logging for authentication events (login, logout, failed attempts)
@@ -42,15 +50,20 @@
 - [ ] auth/.../AuthInfo.kt: Add role-based access control (RBAC) helpers beyond simple hasPermission
 
 ### sessions module
+
 - [ ] sessions-oauth/.../OauthProofEndpoints.kt: Use URL builder utility instead of manual query parameter encoding
-- [ ] sessions-oauth/.../OauthProofEndpoints.kt: Document that continueUiAuthUrl should NOT include trailing '?' or existing query params
-- [ ] sessions-oauth/.../OauthProofEndpoints.kt: Add error handling for when profile.email is null with specific error messages
+- [ ] sessions-oauth/.../OauthProofEndpoints.kt: Document that continueUiAuthUrl should NOT include trailing '?' or
+  existing query params
+- [ ] sessions-oauth/.../OauthProofEndpoints.kt: Add error handling for when profile.email is null with specific error
+  messages
 - [ ] sessions-oauth/.../OauthProofEndpoints.kt: Document purpose of 'backend' query parameter or remove if unused
 - [ ] sessions-oauth/.../OauthProofEndpoints.kt: Add telemetry/metrics for OAuth login attempts, successes, and failures
 - [ ] sessions-oauth/.../OauthProofEndpoints.kt: Validate UUID state parameter in callback
-- [ ] sessions-oauth/.../oauth/OauthProviderInfo.kt: Collapse consecutive delimiters in pathName/identifierName transformations
+- [ ] sessions-oauth/.../oauth/OauthProviderInfo.kt: Collapse consecutive delimiters in pathName/identifierName
+  transformations
 - [ ] sessions-oauth/.../oauth/OauthProviderInfo.kt: Make 'all' list immutable (List instead of ArrayList)
-- [ ] sessions-oauth/.../oauth/OauthProviderInfo.kt: Document email verification guarantees across different OAuth providers
+- [ ] sessions-oauth/.../oauth/OauthProviderInfo.kt: Document email verification guarantees across different OAuth
+  providers
 - [ ] sessions-oauth/.../oauth/OauthProviderInfo.kt: Add validate() method to check required configuration is present
 - [ ] sessions-oauth/.../oauth/OauthProviderInfo.kt: Consider if GitHub provider needs two API calls or can be optimized
 - [ ] sessions-oauth/.../oauth/OauthProviderInfo.kt: Expose HTTP client configuration (timeouts, retries)
@@ -61,13 +74,18 @@
 - [ ] sessions/.../SessionAuthEndpoints.kt: Add session invalidation on password change
 
 ### engine modules
+
 - [ ] engine-netty/.../NettyEngine.kt: Extract magic numbers to named constants (120 seconds idle timeout, buffer sizes)
-- [ ] engine-netty/.../NettyEngine.kt: Fix toLightningHeaders() to handle Set-Cookie and other headers that shouldn't be split
-- [ ] engine-netty/.../NettyEngine.kt: Add metrics/telemetry for request/response timing, error rates, concurrent connections
-- [ ] engine-netty/.../NettyEngine.kt: Add streaming support for large responses instead of loading entire body into memory (line 489)
+- [ ] engine-netty/.../NettyEngine.kt: Fix toLightningHeaders() to handle Set-Cookie and other headers that shouldn't be
+  split
+- [ ] engine-netty/.../NettyEngine.kt: Add metrics/telemetry for request/response timing, error rates, concurrent
+  connections
+- [ ] engine-netty/.../NettyEngine.kt: Add streaming support for large responses instead of loading entire body into
+  memory (line 489)
 - [ ] engine-netty/.../NettyEngine.kt: Make idle timeout configurable via NettyRuntimeSettings
 - [ ] engine-netty/.../NettyEngine.kt: Add logging/metrics for WebSocket failures (line 387, 413)
-- [ ] engine-netty/.../NettyEngine.kt: Document thread safety characteristics of currentState in LocalWebSocketConnection
+- [ ] engine-netty/.../NettyEngine.kt: Document thread safety characteristics of currentState in
+  LocalWebSocketConnection
 - [ ] engine-netty/.../NettyEngine.kt: Remove unused TypeRetriever class if not referenced elsewhere
 - [ ] engine-netty/.../NettyRuntimeSettings.kt: Validate workerThreads is positive when non-null
 - [ ] engine-netty/.../NettyRuntimeSettings.kt: Add separate settings for boss thread count (currently hardcoded to 1)
@@ -75,7 +93,8 @@
 - [ ] engine-netty/.../NettyRuntimeSettings.kt: Document when to adjust recvBufBytes/sendBufBytes for performance tuning
 - [ ] engine-netty/.../NettyRuntimeSettings.kt: Add idle timeout configuration
 - [ ] engine-ktor/.../extensions.kt: Complete MultiPart support implementation or remove commented code
-- [ ] engine-ktor/.../extensions.kt: Fix Headers.adapt() to handle Set-Cookie properly (shouldn't split comma-separated values)
+- [ ] engine-ktor/.../extensions.kt: Fix Headers.adapt() to handle Set-Cookie properly (shouldn't split comma-separated
+  values)
 - [ ] engine-ktor/.../extensions.kt: Add error handling for invalid content types in adapt()
 - [ ] engine-ktor/.../extensions.kt: Fix typo "MutliPart" -> "MultiPart" in comments
 - [ ] engine-ktor/.../KtorEngine.kt: Document that start() uses runBlocking or provide suspending alternative
@@ -91,11 +110,15 @@
 - [ ] engine-aws-serverless: Add support for Lambda provisioned concurrency configuration
 
 ### core module
+
 - [ ] core/.../encryption/Signer.kt: Add helper methods for RSA signers similar to ECDSA helpers (ES256, ES384, ES512)
-- [ ] core/.../encryption/Signer.kt: Make verify() return Result type or throw exceptions on signature verification failure
-- [ ] core/.../encryption/SecretBasis.ciphers.kt: Consider using AES-GCM instead of AES-CBC for authenticated encryption (multiple locations)
+- [ ] core/.../encryption/Signer.kt: Make verify() return Result type or throw exceptions on signature verification
+  failure
+- [ ] core/.../encryption/SecretBasis.ciphers.kt: Consider using AES-GCM instead of AES-CBC for authenticated
+  encryption (multiple locations)
 - [ ] core/.../encryption/SecretBasis.ciphers.kt: Make cipher naming consistent (cipher() vs AES_GCM() patterns)
-- [ ] core/.../exceptions.kt: Add more common HTTP status exceptions (e.g., ConflictException for 409, GoneException for 410)
+- [ ] core/.../exceptions.kt: Add more common HTTP status exceptions (e.g., ConflictException for 409, GoneException for
+  410)
 - [ ] core/.../exceptions.kt: Add builder-style methods for adding headers to exceptions
 - [ ] core/.../exceptions.kt: Document LSError as public type if it isn't already
 - [ ] core/.../AnonType.kt: Make value() method throw more descriptive exception when deserialization fails
@@ -110,7 +133,8 @@
 - [ ] core/.../definition/Task.kt: Add support for task cancellation
 - [ ] core/.../definition/Task.kt: Add task progress reporting mechanism
 - [ ] core/.../definition/ScheduledTask.kt: Support cron-like expressions for complex schedules
-- [ ] core/.../definition/ScheduledTask.kt: Add distributed locking to prevent duplicate execution in multi-instance deployments
+- [ ] core/.../definition/ScheduledTask.kt: Add distributed locking to prevent duplicate execution in multi-instance
+  deployments
 - [ ] core/.../definition/StartupTask.kt: Add retry logic for failed startup tasks
 - [ ] core/.../definition/StartupTask.kt: Support parallel execution of independent startup tasks
 - [ ] core/.../http/HttpContent.kt: Add streaming support for large file uploads/downloads
@@ -122,6 +146,7 @@
 - [ ] core/.../terraform: Add support for more cloud providers (Azure, GCP)
 
 ### typed module
+
 - [ ] typed-shared/.../models.kt: Add cursor-based pagination support in addition to skip/limit
 - [ ] typed-shared/.../models.kt: Add timestamps (createdAt, updatedAt) to QueryResult
 - [ ] typed-shared/.../models.kt: Use stronger type than raw String for futureCallToken
@@ -148,6 +173,7 @@
 - [ ] typed/.../ModelRestEndpoints.kt: Add aggregation endpoints (count, sum, avg, etc.)
 
 ### database module
+
 - [ ] database: Complete Postgres implementation (currently partial)
 - [ ] database: Add connection pool monitoring and metrics
 - [ ] database: Add query performance logging and slow query detection
@@ -157,6 +183,7 @@
 - [ ] database: Support database sharding for horizontal scaling
 
 ### cache module
+
 - [ ] cache: Add cache statistics (hit rate, miss rate, eviction count)
 - [ ] cache: Add cache warming strategies on startup
 - [ ] cache: Support cache tags for bulk invalidation
@@ -164,6 +191,7 @@
 - [ ] cache: Support multiple cache backends simultaneously (L1/L2 cache)
 
 ### files module
+
 - [ ] files-shared/.../models.kt: Use stronger type than raw String for futureCallToken
 - [ ] files: Add image optimization on upload (resize, compress)
 - [ ] files: Add virus scanning integration
@@ -173,6 +201,7 @@
 - [ ] files: Add support for pre-signed URLs with custom expiration
 
 ### media module
+
 - [ ] media: Add support for video transcoding
 - [ ] media: Add thumbnail generation for videos
 - [ ] media: Add support for animated GIF optimization
@@ -181,6 +210,7 @@
 - [ ] media: Add EXIF data extraction and manipulation
 
 ### email module
+
 - [ ] email: Add email template system with variable substitution
 - [ ] email: Add support for email attachments
 - [ ] email: Add bounce handling and tracking
@@ -189,12 +219,14 @@
 - [ ] email: Support batch email sending with rate limiting
 
 ### sms module
+
 - [ ] sms: Add support for multiple SMS providers with failover
 - [ ] sms: Add SMS delivery status tracking
 - [ ] sms: Add support for MMS (multimedia messages)
 - [ ] sms: Add two-way SMS support (receiving messages)
 
 ### documentation
+
 - [ ] docs: Add architecture decision records (ADRs)
 - [ ] docs: Add deployment guides for each engine
 - [ ] docs: Add performance tuning guide
@@ -204,6 +236,7 @@
 - [ ] docs: Add video tutorials for getting started
 
 ### testing
+
 - [ ] Add integration tests for all service abstractions
 - [ ] Add performance benchmarks for critical paths
 - [ ] Add load testing examples and guidelines
@@ -212,6 +245,7 @@
 - [ ] Add contract tests for API backward compatibility
 
 ### build & tooling
+
 - [ ] Add code coverage reporting
 - [ ] Add static analysis tools (detekt, ktlint)
 - [ ] Add dependency vulnerability scanning
@@ -233,6 +267,7 @@
 **API Improvements:** 180+
 
 **Legend:**
+
 - 🔴 Critical Security - Fix immediately
 - 🟡 High Priority - Fix soon
 - 🟠 Medium Priority - Schedule in next sprint
@@ -242,4 +277,5 @@
 
 ---
 
-*This TODO list is generated from SECURITY_AND_QUALITY_ISSUES.md and API suggestions extracted from all Kotlin files in the codebase. API improvements are suggestions for future enhancements and do not indicate critical problems.*
+*This TODO list is generated from SECURITY_AND_QUALITY_ISSUES.md and API suggestions extracted from all Kotlin files in
+the codebase. API improvements are suggestions for future enhancements and do not indicate critical problems.*

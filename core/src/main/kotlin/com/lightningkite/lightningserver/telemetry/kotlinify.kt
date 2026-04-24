@@ -1,13 +1,8 @@
 package com.lightningkite.lightningserver.telemetry
 
 import com.lightningkite.services.OpenTelemetry
-import io.opentelemetry.api.metrics.BatchCallback
-import io.opentelemetry.api.metrics.Meter
-import io.opentelemetry.api.metrics.ObservableMeasurement
-import io.opentelemetry.api.trace.Span
-import io.opentelemetry.api.trace.SpanBuilder
-import io.opentelemetry.api.trace.StatusCode
-import io.opentelemetry.api.trace.Tracer
+import io.opentelemetry.api.metrics.*
+import io.opentelemetry.api.trace.*
 import io.opentelemetry.extension.kotlin.asContextElement
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
@@ -15,7 +10,6 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.slf4j.event.Level
 import org.slf4j.spi.LoggingEventBuilder
-import kotlin.coroutines.CoroutineContext
 
 
 public inline fun <R> SpanBuilder.useBlocking(block: (span: Span) -> R): R {
@@ -26,10 +20,10 @@ public inline fun <R> SpanBuilder.useBlocking(block: (span: Span) -> R): R {
             span.setStatus(StatusCode.OK)
             r
         }
-    } catch(t: CancellationException) {
+    } catch (t: CancellationException) {
         span.addEvent("Cancelled")
         throw t
-    } catch(t: Throwable) {
+    } catch (t: Throwable) {
         span.setStatus(StatusCode.ERROR)
         span.recordException(t)
         throw t
@@ -37,6 +31,7 @@ public inline fun <R> SpanBuilder.useBlocking(block: (span: Span) -> R): R {
         span.end()
     }
 }
+
 public suspend inline fun <R> SpanBuilder.use(crossinline block: suspend (span: Span) -> R): R {
     val span = startSpan()
     try {
@@ -45,10 +40,10 @@ public suspend inline fun <R> SpanBuilder.use(crossinline block: suspend (span: 
             span.setStatus(StatusCode.OK)
             r
         }
-    } catch(t: CancellationException) {
+    } catch (t: CancellationException) {
         span.addEvent("Cancelled")
         throw t
-    } catch(t: Throwable) {
+    } catch (t: Throwable) {
         span.setStatus(StatusCode.ERROR)
         span.recordException(t)
         throw t
@@ -56,13 +51,18 @@ public suspend inline fun <R> SpanBuilder.use(crossinline block: suspend (span: 
         span.end()
     }
 }
+
 public operator fun OpenTelemetry.get(key: String): OpenTelemetrySdkSub = OpenTelemetrySdkSub(this, key)
 public class OpenTelemetrySdkSub(
     public val meter: Meter,
     public val tracer: Tracer,
     public val logger: Logger,
-): Tracer by tracer, Meter by meter, Logger by logger {
-    public constructor(sdk: OpenTelemetry, key: String): this(sdk.getMeter(key), sdk.getTracer(key), LoggerFactory.getLogger(key))
+) : Tracer by tracer, Meter by meter, Logger by logger {
+    public constructor(sdk: OpenTelemetry, key: String) : this(
+        sdk.getMeter(key),
+        sdk.getTracer(key),
+        LoggerFactory.getLogger(key)
+    )
 
     override fun makeLoggingEventBuilder(level: Level?): LoggingEventBuilder? {
         return logger.makeLoggingEventBuilder(level)
@@ -99,7 +99,7 @@ public class OpenTelemetrySdkSub(
     override fun batchCallback(
         callback: Runnable,
         observableMeasurement: ObservableMeasurement,
-        vararg additionalMeasurements: ObservableMeasurement?
+        vararg additionalMeasurements: ObservableMeasurement?,
     ): BatchCallback? {
         return meter.batchCallback(callback, observableMeasurement, *additionalMeasurements)
     }

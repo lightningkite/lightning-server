@@ -4,8 +4,8 @@
 ##########
 
 variable "reporting_email" {
-    type = string
-    nullable = false
+  type     = string
+  nullable = false
 }
 
 ##########
@@ -33,7 +33,7 @@ data "aws_iam_policy_document" "email" {
 }
 
 resource "aws_iam_policy" "email" {
-  name = "demo-example-single-ec2-email-policy"
+  name        = "demo-example-single-ec2-email-policy"
   description = "Allows sending of e-mails via Simple Email Service"
   policy      = data.aws_iam_policy_document.email.json
 }
@@ -55,10 +55,10 @@ resource "aws_security_group" "email" {
   }
 }
 resource "aws_vpc_endpoint" "email" {
-  vpc_id = data.aws_vpc.main.id
-  service_name = "com.amazonaws.${var.deployment_location}.email-smtp"
+  vpc_id             = data.aws_vpc.main.id
+  service_name       = "com.amazonaws.${var.deployment_location}.email-smtp"
   security_group_ids = [aws_security_group.email.id]
-  vpc_endpoint_type = "Interface"
+  vpc_endpoint_type  = "Interface"
 }
 resource "aws_ses_domain_identity" "email" {
   domain = var.domain_name

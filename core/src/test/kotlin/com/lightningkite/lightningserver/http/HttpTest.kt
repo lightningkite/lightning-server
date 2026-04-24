@@ -1,11 +1,6 @@
 package com.lightningkite.lightningserver.http
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
-import kotlin.test.assertNull
-import kotlin.test.assertNotNull
+import kotlin.test.*
 
 /**
  * Unit tests for HTTP core classes in the http package.

@@ -42,8 +42,8 @@ public data class NotificationEventSubscription<UID : Comparable<UID>>(
     override val email: Frequency?,
     override val push: Frequency?,
     override val sms: Frequency?,
-    override val inApp: Frequency? = Frequency.immediately()
-): HasId<UserEventType<UID>>, ScheduledSendMethods<UID> {
+    override val inApp: Frequency? = Frequency.immediately(),
+) : HasId<UserEventType<UID>>, ScheduledSendMethods<UID> {
     override val user: UID get() = _id.user
 }
 
@@ -68,13 +68,13 @@ public data class NotificationSendMethods<UID : Comparable<UID>>(
     override val email: Frequency?,
     override val push: Frequency?,
     override val sms: Frequency?,
-    override val inApp: Frequency? = Frequency.immediately()
-): HasId<UserEventType<UID>>, ScheduledSendMethods<UID> {
+    override val inApp: Frequency? = Frequency.immediately(),
+) : HasId<UserEventType<UID>>, ScheduledSendMethods<UID> {
     override val user: UID get() = _id.user
 
     @Serializable
     public data class DbOrDefault<UID : Comparable<UID>>(
         val subscription: NotificationSendMethods<UID>,
-        val isDefault: Boolean
+        val isDefault: Boolean,
     )
 }

@@ -3,14 +3,10 @@ package com.lightningkite.lightningserver.demo
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.services.database.*
-import com.lightningkite.services.database.jsonfile.JsonFileDatabase.Companion.jsonFile
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class TestModelTest {
 

@@ -2,7 +2,9 @@
 
 Last updated October 29, 2025 (`version-5`)
 
-Lightning Server provides a comprehensive serialization system for handling multiple data formats in HTTP requests and responses. The serialization package enables automatic encoding/decoding of data using KotlinX Serialization with support for JSON, form data, and binary formats.
+Lightning Server provides a comprehensive serialization system for handling multiple data formats in HTTP requests and
+responses. The serialization package enables automatic encoding/decoding of data using KotlinX Serialization with
+support for JSON, form data, and binary formats.
 
 ## Overview
 
@@ -99,7 +101,8 @@ val fromMap = format.decodeFromMap(
 
 ### Primitive Type Wrapping
 
-**Important:** Primitive types and enums are automatically wrapped in a box object because the underlying Properties format requires structure-kind descriptors. This is transparent to users but may affect performance for simple types.
+**Important:** Primitive types and enums are automatically wrapped in a box object because the underlying Properties
+format requires structure-kind descriptors. This is transparent to users but may affect performance for simple types.
 
 ```kotlin
 // Primitive values are automatically wrapped
@@ -181,7 +184,8 @@ val serializer = serializerOrContextual<MyData>()
 val customSerializer = serializerOrContextual<CustomType>()
 ```
 
-**Note:** This uses `EmptySerializersModule` for lookup, so custom serializers registered in your module will fall back to `ContextualSerializer`.
+**Note:** This uses `EmptySerializersModule` for lookup, so custom serializers registered in your module will fall back
+to `ContextualSerializer`.
 
 ## Advanced Topics
 

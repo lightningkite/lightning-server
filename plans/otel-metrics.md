@@ -3,6 +3,7 @@
 ## Objective
 
 Add OpenTelemetry metrics tracking for HTTP handlers to measure:
+
 - Status code distribution (histogram/counter per status code)
 - Success/error rates
 - Request duration (histogram)
@@ -11,16 +12,19 @@ Add OpenTelemetry metrics tracking for HTTP handlers to measure:
 ## Current State
 
 ### Existing Telemetry
+
 - **Spans/Traces**: Fully implemented in `implementationHelpers.kt`
 - **Span Attributes**: `http.method`, `http.route`, `http.target`, `http.status_code`, etc.
 - **Metrics**: **Not implemented** - only tracing exists
 
 ### Key Files
+
 - `core/src/main/kotlin/com/lightningkite/lightningserver/runtime/implementationHelpers.kt` - Main request handling
 - `core/src/main/kotlin/com/lightningkite/lightningserver/telemetry/kotlinify.kt` - OpenTelemetry helpers
 - `core/src/main/kotlin/com/lightningkite/lightningserver/runtime/ServerRuntime.kt` - Runtime interface
 
 ### Available Infrastructure
+
 - `OpenTelemetrySdkSub` class implements `Meter` interface (via delegation)
 - Access via `runtime.openTelemetry?.get("key")` returns an object with both `Tracer` and `Meter`
 - OpenTelemetry Meter API available: `counterBuilder()`, `histogramBuilder()`, `gaugeBuilder()`
@@ -119,6 +123,7 @@ Add a lazy-initialized metrics property to `ServerRuntimeBase`:
 **File: `core/src/main/kotlin/com/lightningkite/lightningserver/runtime/ServerRuntimeBase.kt`**
 
 Add property:
+
 ```kotlin
 /**
  * HTTP metrics for OpenTelemetry. Lazily initialized when first accessed.
@@ -281,12 +286,12 @@ class WebSocketMetrics(meter: Meter) {
 
 ## Metrics Summary
 
-| Metric Name | Type | Description | Attributes |
-|-------------|------|-------------|------------|
-| `http.server.request.duration` | Histogram | Request duration in ms | method, route, status_code |
-| `http.server.request.count` | Counter | Total request count | method, route, status_code |
-| `http.server.response.status.category` | Counter | Responses by category | method, route, status_category |
-| `http.server.errors` | Counter | Error count | method, route, error_type |
+| Metric Name                            | Type      | Description            | Attributes                     |
+|----------------------------------------|-----------|------------------------|--------------------------------|
+| `http.server.request.duration`         | Histogram | Request duration in ms | method, route, status_code     |
+| `http.server.request.count`            | Counter   | Total request count    | method, route, status_code     |
+| `http.server.response.status.category` | Counter   | Responses by category  | method, route, status_category |
+| `http.server.errors`                   | Counter   | Error count            | method, route, error_type      |
 
 ## Testing
 

@@ -1,16 +1,12 @@
 package com.lightningkite.lightningserver.serialization
 
-import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
-import kotlinx.serialization.DeserializationStrategy
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.SerializationException
-import kotlinx.serialization.SerializationStrategy
+import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
-import kotlin.collections.List
 
 /**
  * Registry of media type encoders.
@@ -21,7 +17,7 @@ import kotlin.collections.List
  * Implements Map interface for read access while providing mutation methods for registration.
  */
 public class MediaTypeEncoderRegistry(
-    private val registry: HashMap<MediaType, ArrayList<MediaTypeEncoder>> = HashMap()
+    private val registry: HashMap<MediaType, ArrayList<MediaTypeEncoder>> = HashMap(),
 ) : Map<MediaType, List<MediaTypeEncoder>> by registry {
     /**
      * Registers a new encoder.
@@ -58,7 +54,7 @@ public class MediaTypeEncoderRegistry(
  * Implements Map interface for read access while providing mutation methods for registration.
  */
 public class MediaTypeDecoderRegistry(
-    private val registry: HashMap<MediaType, ArrayList<MediaTypeDecoder>> = HashMap()
+    private val registry: HashMap<MediaType, ArrayList<MediaTypeDecoder>> = HashMap(),
 ) : Map<MediaType, List<MediaTypeDecoder>> by registry {
     /**
      * Registers a new decoder.
@@ -121,7 +117,8 @@ context(serverRuntime: ServerRuntime)
 public val defaultEncoder: Pair<MediaType, MediaTypeEncoder>
     get() = (serverRuntime.server.mediaTypeEncoders.values.asSequence().flatten().maxByOrNull { it.priority }
         .let {
-            it ?: throw IllegalStateException("No encoders found - you need to register some media coders.  Try adding `init { registerBasicMediaTypeCoders() }` to your server builder.")
+            it
+                ?: throw IllegalStateException("No encoders found - you need to register some media coders.  Try adding `init { registerBasicMediaTypeCoders() }` to your server builder.")
         }
         .let { it.mediaType to it })
 
@@ -151,7 +148,7 @@ public suspend fun <T> TypedData.parse(serializer: DeserializationStrategy<T>): 
         ?: throw BadRequestException("No media type decoder found supporting $mediaType")
     return try {
         format(this, serializer)
-    } catch(e: SerializationException) {
+    } catch (e: SerializationException) {
         throw BadRequestException(e.message ?: "Unknown formatting error", cause = e.cause)
     }
 }
@@ -164,8 +161,9 @@ public suspend fun <T> TypedData.parse(serializer: DeserializationStrategy<T>): 
  * @param accepts List of acceptable media types (e.g., from Accept header)
  * @return The serialized TypedData
  */
-context(serverRuntime: ServerRuntime) public suspend inline fun <reified T> T.toTypedData(accepts: List<MediaType>): TypedData
-    = toTypedData(accepts, serializerOrContextual())
+context(serverRuntime: ServerRuntime)
+public suspend inline fun <reified T> T.toTypedData(accepts: List<MediaType>): TypedData =
+    toTypedData(accepts, serializerOrContextual())
 
 /**
  * Serializes this value to TypedData using an encoder from the accepts list.

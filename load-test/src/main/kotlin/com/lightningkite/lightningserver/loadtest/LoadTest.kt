@@ -4,7 +4,6 @@ package com.lightningkite.lightningserver.loadtest
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.serialization.FormDataFormat
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -19,10 +18,10 @@ import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
 import java.net.URI
 import java.net.http.HttpClient
-import java.net.http.HttpRequest as JdkHttpRequest
-import java.net.http.HttpResponse as JdkHttpResponse
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import java.net.http.HttpRequest as JdkHttpRequest
+import java.net.http.HttpResponse as JdkHttpResponse
 
 /**
  * A named, weighted scenario for load testing.

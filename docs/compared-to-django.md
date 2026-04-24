@@ -4,44 +4,47 @@
 
 Last updated January 2025 (`version-5`)
 
-If you're coming from Django, welcome! This guide maps your existing Django knowledge to Lightning Server concepts. While the frameworks have different philosophies, many patterns will feel familiar.
+If you're coming from Django, welcome! This guide maps your existing Django knowledge to Lightning Server concepts.
+While the frameworks have different philosophies, many patterns will feel familiar.
 
 ## Philosophy Differences
 
 Before diving in, it's helpful to understand the key philosophical differences:
 
-| Aspect | Django | Lightning Server |
-|--------|--------|------------------|
-| Language | Python | Kotlin |
-| Primary focus | Full-stack web framework | API-first backend framework |
-| Database default | SQL (PostgreSQL, MySQL, SQLite) | MongoDB (with SQL support) |
-| Templating | Built-in (Django templates, Jinja2) | API-focused (JSON responses) |
-| Admin panel | Built-in | Provided via lightning-server-kiteui |
-| Type safety | Runtime (with type hints) | Compile-time (Kotlin's type system) |
-| Deployment | WSGI/ASGI servers | Multiple engines (Ktor, Netty, AWS Lambda) |
+| Aspect           | Django                              | Lightning Server                           |
+|------------------|-------------------------------------|--------------------------------------------|
+| Language         | Python                              | Kotlin                                     |
+| Primary focus    | Full-stack web framework            | API-first backend framework                |
+| Database default | SQL (PostgreSQL, MySQL, SQLite)     | MongoDB (with SQL support)                 |
+| Templating       | Built-in (Django templates, Jinja2) | API-focused (JSON responses)               |
+| Admin panel      | Built-in                            | Provided via lightning-server-kiteui       |
+| Type safety      | Runtime (with type hints)           | Compile-time (Kotlin's type system)        |
+| Deployment       | WSGI/ASGI servers                   | Multiple engines (Ktor, Netty, AWS Lambda) |
 
 ## Feature Comparison Quick Reference
 
-| Django Feature | Lightning Server Equivalent |
-|----------------|---------------------------|
-| Django Admin | Admin UI in lightning-server-kiteui |
-| Django ORM | Type-safe query DSL with `condition {}` and `modification {}` |
-| Models | `@Serializable` data classes with `@GenerateDataClassPaths` |
-| Signals | Database lifecycle hooks (`postCreate`, `postChange`, `postDelete`) |
-| Named URLs / `reverse()` | Endpoint constants with type-safe path construction |
-| Forms | KiteUI form renderers (40+ built-in types) |
-| Django REST Framework | Typed endpoints with auto SDK generation |
-| Middleware | `HttpInterceptor` system |
-| Authentication | JWT, email magic links, PIN codes, SMS, OAuth |
-| Settings | `settings.json` with typed data classes |
+| Django Feature           | Lightning Server Equivalent                                         |
+|--------------------------|---------------------------------------------------------------------|
+| Django Admin             | Admin UI in lightning-server-kiteui                                 |
+| Django ORM               | Type-safe query DSL with `condition {}` and `modification {}`       |
+| Models                   | `@Serializable` data classes with `@GenerateDataClassPaths`         |
+| Signals                  | Database lifecycle hooks (`postCreate`, `postChange`, `postDelete`) |
+| Named URLs / `reverse()` | Endpoint constants with type-safe path construction                 |
+| Forms                    | KiteUI form renderers (40+ built-in types)                          |
+| Django REST Framework    | Typed endpoints with auto SDK generation                            |
+| Middleware               | `HttpInterceptor` system                                            |
+| Authentication           | JWT, email magic links, PIN codes, SMS, OAuth                       |
+| Settings                 | `settings.json` with typed data classes                             |
 
 ---
 
 ## The Admin Panel
 
-One of Django's most beloved features is its auto-generated admin interface. Lightning Server has this too, and it's quite capable.
+One of Django's most beloved features is its auto-generated admin interface. Lightning Server has this too, and it's
+quite capable.
 
 ### Django Admin
+
 ```python
 # admin.py
 from django.contrib import admin
@@ -56,7 +59,8 @@ class PostAdmin(admin.ModelAdmin):
 
 ### Lightning Server Admin (via lightning-server-kiteui)
 
-The admin UI is automatically generated from your server schema at runtime. You customize it through annotations on your models:
+The admin UI is automatically generated from your server schema at runtime. You customize it through annotations on your
+models:
 
 ```kotlin
 @Serializable
@@ -80,6 +84,7 @@ data class Post(
 ```
 
 **Admin Features:**
+
 - Full CRUD auto-generated from server schema
 - Advanced filtering with full Condition DSL (more powerful than Django's)
 - Multi-field sorting and column selection
@@ -92,6 +97,7 @@ data class Post(
 - Works on mobile (Kotlin Multiplatform)
 
 Available annotations:
+
 - `@AdminTableColumns([...])` - Columns to show in table view
 - `@AdminHidden` - Hide field from admin panel
 - `@Multiline` - Render as textarea
@@ -104,6 +110,7 @@ Available annotations:
 ## Models and the ORM
 
 ### Django Models
+
 ```python
 # models.py
 from django.db import models
@@ -120,6 +127,7 @@ class Post(models.Model):
 ```
 
 ### Lightning Server Models
+
 ```kotlin
 import kotlinx.serialization.*
 import com.lightningkite.services.database.HasId
@@ -141,6 +149,7 @@ data class Post(
 ```
 
 **Key differences:**
+
 - Models are Kotlin data classes with `@Serializable`
 - `@GenerateDataClassPaths` enables the type-safe query DSL
 - Primary key is explicitly defined via `HasId<T>`
@@ -149,6 +158,7 @@ data class Post(
 ### Querying
 
 **Django:**
+
 ```python
 # Get all posts by an author
 posts = Post.objects.filter(author='user@example.com')
@@ -167,6 +177,7 @@ Post.objects.filter(author='user@example.com').delete()
 ```
 
 **Lightning Server:**
+
 ```kotlin
 val posts = database().table<Post>()
 
@@ -193,26 +204,28 @@ posts.deleteMany(condition { it.author eq "user@example.com" })
 
 ### Common Query Operations
 
-| Django | Lightning Server |
-|--------|------------------|
-| `filter(field=value)` | `condition { it.field eq value }` |
-| `exclude(field=value)` | `condition { it.field neq value }` |
-| `filter(field__gt=value)` | `condition { it.field gt value }` |
-| `filter(field__gte=value)` | `condition { it.field gte value }` |
-| `filter(field__lt=value)` | `condition { it.field lt value }` |
-| `filter(field__in=[...])` | `condition { it.field inside listOf(...) }` |
-| `filter(field__contains='x')` | `condition { it.field contains "x" }` |
+| Django                         | Lightning Server                                |
+|--------------------------------|-------------------------------------------------|
+| `filter(field=value)`          | `condition { it.field eq value }`               |
+| `exclude(field=value)`         | `condition { it.field neq value }`              |
+| `filter(field__gt=value)`      | `condition { it.field gt value }`               |
+| `filter(field__gte=value)`     | `condition { it.field gte value }`              |
+| `filter(field__lt=value)`      | `condition { it.field lt value }`               |
+| `filter(field__in=[...])`      | `condition { it.field inside listOf(...) }`     |
+| `filter(field__contains='x')`  | `condition { it.field contains "x" }`           |
 | `filter(field__icontains='x')` | `condition { it.field containsIgnoreCase "x" }` |
-| `Q(a) \| Q(b)` | `(conditionA) or (conditionB)` |
-| `Q(a) & Q(b)` | `(conditionA) and (conditionB)` |
+| `Q(a) \| Q(b)`                 | `(conditionA) or (conditionB)`                  |
+| `Q(a) & Q(b)`                  | `(conditionA) and (conditionB)`                 |
 
 ---
 
 ## Signals (Lifecycle Hooks)
 
-Django signals let you run code when models are saved, deleted, etc. Lightning Server has lifecycle hooks that serve the same purpose.
+Django signals let you run code when models are saved, deleted, etc. Lightning Server has lifecycle hooks that serve the
+same purpose.
 
 ### Django Signals
+
 ```python
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
@@ -230,6 +243,7 @@ def post_deleted(sender, instance, **kwargs):
 ```
 
 ### Lightning Server Lifecycle Hooks
+
 ```kotlin
 val collection = database().table<Post>()
     .interceptCreate { value ->
@@ -249,6 +263,7 @@ val collection = database().table<Post>()
 ```
 
 **Available hooks:**
+
 - `interceptCreate` - Modify value before creation
 - `interceptChange` - Modify a modification before application
 - `postCreate` - Called after successful creation
@@ -256,13 +271,15 @@ val collection = database().table<Post>()
 - `postDelete` - Called after successful deletion
 - `postNewValue` - Called after creation or update
 
-Lightning Server also has a full **Notifications System** with PubSub support (Redis, MQTT, AWS SNS backends) for more complex event-driven architectures.
+Lightning Server also has a full **Notifications System** with PubSub support (Redis, MQTT, AWS SNS backends) for more
+complex event-driven architectures.
 
 ---
 
 ## URL Routing / Named URLs
 
 ### Django URLs
+
 ```python
 # urls.py
 from django.urls import path
@@ -280,6 +297,7 @@ url = reverse('post-detail', args=[123])  # '/posts/123/'
 ```
 
 ### Lightning Server Endpoints
+
 ```kotlin
 object Server : ServerBuilder() {
     // Endpoints are stored as constants
@@ -306,6 +324,7 @@ val url = Server.postDetail.path.toString(123)  // "/posts/123"
 ```
 
 **Key differences:**
+
 - Endpoints are stored as constants, enabling type-safe references
 - Path arguments are type-safe (`arg<Int>("pk")` ensures `arg1` is an `Int`)
 - No string-based lookup; you reference the endpoint directly
@@ -315,6 +334,7 @@ val url = Server.postDetail.path.toString(123)  // "/posts/123"
 ## Views / Endpoints
 
 ### Django Views
+
 ```python
 # views.py
 from django.http import JsonResponse
@@ -332,6 +352,7 @@ class PostListView(View):
 ```
 
 ### Lightning Server Endpoints
+
 ```kotlin
 object PostEndpoints : ServerBuilder() {
     val list = path.get bind HttpHandler {
@@ -353,9 +374,11 @@ object PostEndpoints : ServerBuilder() {
 
 ## Django REST Framework Equivalent
 
-DRF provides serializers, viewsets, and automatic API documentation. Lightning Server's typed endpoints offer similar capabilities with compile-time type safety.
+DRF provides serializers, viewsets, and automatic API documentation. Lightning Server's typed endpoints offer similar
+capabilities with compile-time type safety.
 
 ### Django REST Framework
+
 ```python
 # serializers.py
 from rest_framework import serializers
@@ -375,6 +398,7 @@ class PostViewSet(viewsets.ModelViewSet):
 ```
 
 ### Lightning Server Typed Endpoints
+
 ```kotlin
 @Serializable
 data class CreatePostRequest(
@@ -408,6 +432,7 @@ object PostApi : ServerBuilder() {
 ```
 
 This automatically creates:
+
 - `GET /posts` - Query/list posts
 - `POST /posts` - Create post
 - `GET /posts/{id}` - Get post by ID
@@ -418,12 +443,14 @@ This automatically creates:
 - `POST /posts/aggregate` - Aggregate numeric fields
 
 **Additional features:**
+
 - OpenAPI/Swagger schema auto-generation
 - Auto-generated TypeScript and Kotlin client SDKs
 - WebSocket support for real-time updates
 - Input validation via annotations
 
 ### Custom Typed Endpoint
+
 ```kotlin
 val createPost = path.path("posts").post bind ApiHttpHandler<_, User?, CreatePostRequest, Post>(
     summary = "Create a new post",
@@ -451,6 +478,7 @@ val createPost = path.path("posts").post bind ApiHttpHandler<_, User?, CreatePos
 ## Middleware
 
 ### Django Middleware
+
 ```python
 # middleware.py
 class LoggingMiddleware:
@@ -465,6 +493,7 @@ class LoggingMiddleware:
 ```
 
 ### Lightning Server Interceptors
+
 ```kotlin
 val loggingInterceptor = HttpInterceptor { request, cont ->
     val start = Clock.System.now()
@@ -484,6 +513,7 @@ object Server : ServerBuilder() {
 ```
 
 Interceptors can:
+
 - Modify requests before passing to handlers
 - Short-circuit and return responses early
 - Modify responses after handler execution
@@ -494,6 +524,7 @@ Interceptors can:
 ## Authentication
 
 ### Django Authentication
+
 ```python
 from django.contrib.auth.decorators import login_required
 
@@ -505,6 +536,7 @@ def protected_view(request):
 ### Lightning Server Authentication
 
 Lightning Server supports multiple authentication methods:
+
 - JWT tokens
 - Email magic links (PIN codes)
 - SMS verification
@@ -559,6 +591,7 @@ object Server : ServerBuilder() {
 ## Settings / Configuration
 
 ### Django Settings
+
 ```python
 # settings.py
 DEBUG = True
@@ -586,6 +619,7 @@ object Server : ServerBuilder() {
 ```
 
 Configuration lives in `settings.json`:
+
 ```json
 {
   "database": { "url": "mongodb://localhost:27017/mydb" },
@@ -595,9 +629,11 @@ Configuration lives in `settings.json`:
 }
 ```
 
-**Key principle:** Lightning Server generates `settings.json` with working defaults on first run. Your application should work out-of-the-box with the generated file.
+**Key principle:** Lightning Server generates `settings.json` with working defaults on first run. Your application
+should work out-of-the-box with the generated file.
 
 **Additional features:**
+
 - Encrypted settings files (OpenSSL)
 - Chained configuration files (defaults inheritance)
 - Properties file format support
@@ -607,9 +643,11 @@ Configuration lives in `settings.json`:
 
 ## Forms
 
-Django forms provide validation and HTML rendering. Lightning Server (via KiteUI) has a sophisticated form system focused on programmatic form generation.
+Django forms provide validation and HTML rendering. Lightning Server (via KiteUI) has a sophisticated form system
+focused on programmatic form generation.
 
 ### Django Forms
+
 ```python
 from django import forms
 
@@ -642,6 +680,7 @@ data class PostForm(
 ```
 
 The admin panel and KiteUI automatically render appropriate form fields based on:
+
 - Field type (String, Int, Boolean, Instant, etc.)
 - Annotations (`@Multiline`, `@MimeType`, `@References`)
 - Built-in renderers for 40+ types
@@ -651,12 +690,14 @@ The admin panel and KiteUI automatically render appropriate form fields based on
 ## Database Backends
 
 ### Django Database Backends
+
 - PostgreSQL
 - MySQL
 - SQLite
 - Oracle
 
 ### Lightning Server Database Backends
+
 - **MongoDB** (recommended, fully supported)
 - **PostgreSQL** (partial support)
 - **In-Memory** (for testing)
@@ -681,6 +722,7 @@ The admin panel and KiteUI automatically render appropriate form fields based on
 ## Migrations
 
 Django requires migrations for schema changes. Lightning Server's MongoDB support is schemaless, meaning:
+
 - No migrations needed for field additions
 - Field removals are handled gracefully
 - Type changes may require data migration scripts
@@ -692,6 +734,7 @@ For PostgreSQL, schema changes would need manual handling (the PostgreSQL suppor
 ## Testing
 
 ### Django Tests
+
 ```python
 from django.test import TestCase, Client
 
@@ -706,6 +749,7 @@ class PostTests(TestCase):
 ```
 
 ### Lightning Server Tests
+
 ```kotlin
 class PostTests {
     companion object {
@@ -734,7 +778,8 @@ Unit tests use mock services (`JsonFileDatabase`, RAM cache) to avoid external d
 
 ## Internationalization (i18n)
 
-Django has built-in i18n support. Lightning Server, being API-focused, typically leaves translation to clients. For server-side text (emails, notifications), you can implement i18n per-project:
+Django has built-in i18n support. Lightning Server, being API-focused, typically leaves translation to clients. For
+server-side text (emails, notifications), you can implement i18n per-project:
 
 ```kotlin
 // Example approach
@@ -752,11 +797,13 @@ object Messages {
 ## Deployment
 
 ### Django Deployment
+
 - WSGI servers (Gunicorn, uWSGI)
 - ASGI servers (Daphne, Uvicorn)
 - Traditional VM/container deployment
 
 ### Lightning Server Deployment
+
 - **Ktor Engine** - Traditional server, good for development
 - **Netty Engine** - High-performance traditional server
 - **JDK Server Engine** - Pure JDK HTTP server
@@ -773,7 +820,8 @@ fun main() {
 }
 ```
 
-For AWS Lambda deployment, the framework generates Terraform configuration automatically, handling Lambda functions, API Gateway, DynamoDB tables, and S3 buckets.
+For AWS Lambda deployment, the framework generates Terraform configuration automatically, handling Lambda functions, API
+Gateway, DynamoDB tables, and S3 buckets.
 
 ---
 
@@ -781,7 +829,8 @@ For AWS Lambda deployment, the framework generates Terraform configuration autom
 
 1. **The admin panel exists and is powerful** - Don't miss `lightning-server-kiteui`'s auto-generated admin UI.
 
-2. **Type safety is your friend** - Kotlin's type system catches errors at compile time that Django would catch at runtime (or not at all).
+2. **Type safety is your friend** - Kotlin's type system catches errors at compile time that Django would catch at
+   runtime (or not at all).
 
 3. **Models are simpler** - Data classes with annotations, no complex ORM metaclasses.
 

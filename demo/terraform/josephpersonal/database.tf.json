@@ -1,66 +1,66 @@
 {
-    "resource": {
-        "mongodbatlas_project_ip_access_list": {
-            "database": {
-                "project_id": "${mongodbatlas_project.database.id}",
-                "cidr_block": "0.0.0.0/0",
-                "comment": "Anywhere"
-            }
+  "resource": {
+    "mongodbatlas_project_ip_access_list": {
+      "database": {
+        "project_id": "${mongodbatlas_project.database.id}",
+        "cidr_block": "0.0.0.0/0",
+        "comment": "Anywhere"
+      }
+    },
+    "mongodbatlas_database_user": {
+      "database": {
+        "password": "${random_password.database.result}",
+        "project_id": "${mongodbatlas_project.database.id}",
+        "auth_database_name": "admin",
+        "roles": [
+          {
+            "role_name": "readWrite",
+            "database_name": "default"
+          },
+          {
+            "role_name": "readAnyDatabase",
+            "database_name": "admin"
+          }
+        ],
+        "username": "josephpersonalexampledatabase-main"
+      }
+    },
+    "random_password": {
+      "database": {
+        "special": true,
+        "length": 32,
+        "override_special": "-_"
+      }
+    },
+    "mongodbatlas_advanced_cluster": {
+      "database": {
+        "replication_specs": {
+          "zone_name": "Zone 1",
+          "region_configs": {
+            "backing_provider_name": "AWS",
+            "electable_specs": {
+              "instance_size": "M0"
+            },
+            "region_name": "US_WEST_2",
+            "priority": 7,
+            "provider_name": "TENANT"
+          }
         },
-        "mongodbatlas_database_user": {
-            "database": {
-                "password": "${random_password.database.result}",
-                "project_id": "${mongodbatlas_project.database.id}",
-                "auth_database_name": "admin",
-                "roles": [
-                    {
-                        "role_name": "readWrite",
-                        "database_name": "default"
-                    },
-                    {
-                        "role_name": "readAnyDatabase",
-                        "database_name": "admin"
-                    }
-                ],
-                "username": "josephpersonalexampledatabase-main"
-            }
-        },
-        "random_password": {
-            "database": {
-                "special": true,
-                "length": 32,
-                "override_special": "-_"
-            }
-        },
-        "mongodbatlas_advanced_cluster": {
-            "database": {
-                "replication_specs": {
-                    "zone_name": "Zone 1",
-                    "region_configs": {
-                        "backing_provider_name": "AWS",
-                        "electable_specs": {
-                            "instance_size": "M0"
-                        },
-                        "region_name": "US_WEST_2",
-                        "priority": 7,
-                        "provider_name": "TENANT"
-                    }
-                },
-                "project_id": "${mongodbatlas_project.database.id}",
-                "name": "josephpersonalexampledatabase",
-                "cluster_type": "REPLICASET"
-            }
-        },
-        "mongodbatlas_project": {
-            "database": {
-                "is_collect_database_specifics_statistics_enabled": true,
-                "is_performance_advisor_enabled": true,
-                "is_schema_advisor_enabled": true,
-                "org_id": "6323a65c43d66b56a2ea5aea",
-                "name": "josephpersonalexampledatabase",
-                "is_data_explorer_enabled": true,
-                "is_realtime_performance_panel_enabled": true
-            }
-        }
+        "project_id": "${mongodbatlas_project.database.id}",
+        "name": "josephpersonalexampledatabase",
+        "cluster_type": "REPLICASET"
+      }
+    },
+    "mongodbatlas_project": {
+      "database": {
+        "is_collect_database_specifics_statistics_enabled": true,
+        "is_performance_advisor_enabled": true,
+        "is_schema_advisor_enabled": true,
+        "org_id": "6323a65c43d66b56a2ea5aea",
+        "name": "josephpersonalexampledatabase",
+        "is_data_explorer_enabled": true,
+        "is_realtime_performance_panel_enabled": true
+      }
     }
+  }
 }

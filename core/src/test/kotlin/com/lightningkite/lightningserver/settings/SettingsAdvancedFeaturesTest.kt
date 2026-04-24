@@ -1,15 +1,13 @@
 package com.lightningkite.lightningserver.settings
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.services.data.workingDirectory
+import com.lightningkite.services.kfile.workingDirectory
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.modules.EmptySerializersModule
 import org.junit.After
 import org.junit.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /**
  * Tests for advanced settings features including chained defaults,
@@ -35,7 +33,7 @@ class SettingsAdvancedFeaturesTest {
 
     @Test
     fun testPropertiesWithComments() {
-        testRoot.mkdirs()
+        testRoot.createDirectories()
         val file = testRoot.then("test.properties").also {
             it.writeString(
                 """
@@ -62,7 +60,7 @@ class SettingsAdvancedFeaturesTest {
 
     @Test
     fun testPropertiesWithInlineComments() {
-        testRoot.mkdirs()
+        testRoot.createDirectories()
         val file = testRoot.then("test.properties").also {
             it.writeString(
                 """
@@ -85,7 +83,7 @@ class SettingsAdvancedFeaturesTest {
 
     @Test
     fun testPropertiesWithEmptyLines() {
-        testRoot.mkdirs()
+        testRoot.createDirectories()
         val file = testRoot.then("test.properties").also {
             it.writeString(
                 """
@@ -110,7 +108,7 @@ class SettingsAdvancedFeaturesTest {
 
     @Test
     fun testDefaultsChainJson() {
-        testRoot.mkdirs()
+        testRoot.createDirectories()
 
         // Create base config
         val baseFile = testRoot.then("base.json").also {
@@ -158,7 +156,7 @@ class SettingsAdvancedFeaturesTest {
 
     @Test
     fun testDefaultsChainProperties() {
-        testRoot.mkdirs()
+        testRoot.createDirectories()
 
         // Create base config as properties
         val baseFile = testRoot.then("base.properties").also {
@@ -199,7 +197,7 @@ class SettingsAdvancedFeaturesTest {
 
     @Test
     fun testDefaultsChainMultipleLevels() {
-        testRoot.mkdirs()
+        testRoot.createDirectories()
 
         // Level 1: Base
         testRoot.then("level1.json").writeString(
@@ -246,7 +244,7 @@ class SettingsAdvancedFeaturesTest {
 
     @Test
     fun testCircularDependencyDetected() {
-        testRoot.mkdirs()
+        testRoot.createDirectories()
 
         // File A references B
         testRoot.then("fileA.json").writeString(
@@ -281,7 +279,7 @@ class SettingsAdvancedFeaturesTest {
 
     @Test
     fun testSelfReferenceDetected() {
-        testRoot.mkdirs()
+        testRoot.createDirectories()
 
         // File references itself
         val file = testRoot.then("self.json").also {
@@ -306,7 +304,7 @@ class SettingsAdvancedFeaturesTest {
 
     @Test
     fun testMissingDefaultsFileError() {
-        testRoot.mkdirs()
+        testRoot.createDirectories()
 
         val file = testRoot.then("main.json").also {
             it.writeString(
@@ -331,11 +329,11 @@ class SettingsAdvancedFeaturesTest {
 
     @Test
     fun testRelativeDefaultsPaths() {
-        testRoot.mkdirs()
+        testRoot.createDirectories()
 
         // Create subdirectory
         val subdir = testRoot.then("configs")
-        subdir.mkdirs()
+        subdir.createDirectories()
 
         // Create base in subdirectory
         subdir.then("base.json").writeString(
@@ -372,7 +370,7 @@ class SettingsAdvancedFeaturesTest {
 
     @Test
     fun testTildeExpansionInDefaults() {
-        testRoot.mkdirs()
+        testRoot.createDirectories()
 
         // Create a file in the test directory that we'll reference with a path
         // (We can't actually test ~ expansion to home without writing to home directory,
@@ -403,7 +401,7 @@ class SettingsAdvancedFeaturesTest {
 
     @Test
     fun testPropertiesFormatExtensionDetection() {
-        testRoot.mkdirs()
+        testRoot.createDirectories()
 
         // Test that .properties extension is detected
         val propsFile = testRoot.then("test.properties").also {
@@ -426,7 +424,7 @@ class SettingsAdvancedFeaturesTest {
 
     @Test
     fun testJsonFormatForOtherExtensions() {
-        testRoot.mkdirs()
+        testRoot.createDirectories()
 
         // Test that other extensions use JSON format
         val configFile = testRoot.then("test.config").also {
@@ -453,7 +451,7 @@ class SettingsAdvancedFeaturesTest {
 
     @Test
     fun testDefaultsOverridesPriority() {
-        testRoot.mkdirs()
+        testRoot.createDirectories()
 
         // Base defines all three settings
         testRoot.then("base.json").writeString(

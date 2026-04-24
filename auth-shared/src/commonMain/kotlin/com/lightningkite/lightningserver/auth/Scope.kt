@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.auth
 
+import com.lightningkite.lightningserver.auth.GrantedScope.Companion.root
+import com.lightningkite.lightningserver.auth.RequiredScope.Companion.root
 import kotlinx.serialization.Serializable
 import kotlin.jvm.JvmInline
 

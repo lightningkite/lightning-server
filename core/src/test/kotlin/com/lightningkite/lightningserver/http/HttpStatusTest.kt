@@ -1,10 +1,7 @@
 // by Claude
 package com.lightningkite.lightningserver.http
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /**
  * Tests for HttpStatus value class.

@@ -2,27 +2,22 @@ package com.lightningkite.lightningserver.sessions.proofs
 
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.auth.noAuth
-import com.lightningkite.lightningserver.definition.RuntimeDeferred
+import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.generalSettings
-import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.redirectToGet
-import com.lightningkite.services.database.HasId
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
-import com.lightningkite.lightningserver.sessions.proofs.oauth.OauthCallbackEndpoint
-import com.lightningkite.lightningserver.sessions.proofs.oauth.OauthProviderCredentials
-import com.lightningkite.lightningserver.sessions.proofs.oauth.OauthProviderInfo
-import com.lightningkite.lightningserver.sessions.proofs.oauth.oauthCallback
-import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.lightningserver.sessions.proofs.oauth.*
+import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.sdk.SdkModule
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
 import com.lightningkite.lightningserver.typed.sdk.sdkSettings
+import com.lightningkite.services.database.HasId
 import io.ktor.http.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
@@ -68,7 +63,7 @@ public class OauthProofEndpoints(
     override val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
     override val proofExpiration: Duration = 1.hours,
     private val credentials: () -> OauthProviderCredentials,
-    private val continueUiAuthUrl: ()->String
+    private val continueUiAuthUrl: () -> String,
 ) : ServerBuilder(), ExternalProofMethod {
 
     init {
@@ -93,15 +88,17 @@ public class OauthProofEndpoints(
     ) { response, _ ->
         val profile = provider.getProfile(response, credentials())
         val email = profile.email ?: throw BadRequestException("No email was found for this profile.")
-        HttpResponse.redirectToGet(continueUiAuthUrl() + "?proof=${
-            serverRuntime.externalSerialization.json.encodeToString(
-                Proof.serializer(), 
-                proofSigner.await().makeProof(
-                    property = "email",
-                    value = email,
-                )
-            ).encodeURLQueryComponent()
-        }&backend=${generalSettings().publicUrl.encodeURLQueryComponent()}")
+        HttpResponse.redirectToGet(
+            continueUiAuthUrl() + "?proof=${
+                serverRuntime.externalSerialization.json.encodeToString(
+                    Proof.serializer(),
+                    proofSigner.await().makeProof(
+                        property = "email",
+                        value = email,
+                    )
+                ).encodeURLQueryComponent()
+            }&backend=${generalSettings().publicUrl.encodeURLQueryComponent()}"
+        )
     }
 
     public val openEndpoint: HttpHandler<*> = path.path("open").get bind HttpHandler {
@@ -109,24 +106,26 @@ public class OauthProofEndpoints(
     }
 
     context(_: ServerRuntime)
-    public val loginApi: ApiHttpHandler<*, *, Unit, String> get() = path.path("login").get bind ApiHttpHandler(
-        auth = noAuth,
-        summary = "Log In via ${provider.niceName}",
-        description = "Returns a URL which, when opened in a browser, will allow you to log into the system with ${provider.niceName}.",
-        errorCases = listOf(),
-        successCode = HttpStatus.OK,
-        examples = listOf(
-            ApiHttpHandler.Example(
-                input = Unit,
-                output = "${provider.loginUrl}?someparams=x"
-            )
-        ),
-        implementation = { _: Unit ->
-            callback.loginUrl(Uuid.random())
-        }
-    )
+    public val loginApi: ApiHttpHandler<*, *, Unit, String>
+        get() = path.path("login").get bind ApiHttpHandler(
+            auth = noAuth,
+            summary = "Log In via ${provider.niceName}",
+            description = "Returns a URL which, when opened in a browser, will allow you to log into the system with ${provider.niceName}.",
+            errorCases = listOf(),
+            successCode = HttpStatus.OK,
+            examples = listOf(
+                ApiHttpHandler.Example(
+                    input = Unit,
+                    output = "${provider.loginUrl}?someparams=x"
+                )
+            ),
+            implementation = { _: Unit ->
+                callback.loginUrl(Uuid.random())
+            }
+        )
 
-    override val start: ApiHttpHandler<PathSpec0, HasId<*>?, String, String> = path.path("start").get bind ApiHttpHandler(
+    override val start: ApiHttpHandler<PathSpec0, HasId<*>?, String, String> =
+        path.path("start").get bind ApiHttpHandler(
             auth = noAuth,
             summary = "Log In via ${provider.niceName}",
             description = "Returns a URL which, when opened in a browser, will allow you to log into the system with ${provider.niceName}.",

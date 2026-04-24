@@ -6,7 +6,6 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.services.pubsub.PubSub
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 
@@ -24,7 +23,7 @@ class CoroutineWebsocketHandlerSimpleTest {
                 request: WebSocketConnectRequest<PathSpec0>,
                 waitForFullConnect: suspend () -> Unit,
                 incoming: Flow<WebSocketFrame>,
-                send: suspend (WebSocketFrame) -> Unit
+                send: suspend (WebSocketFrame) -> Unit,
             ) {
                 println("[SimpleTest] handle() called")
                 // Signal ready

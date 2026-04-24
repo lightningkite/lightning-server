@@ -4,7 +4,8 @@ Cross-platform (multiplatform) authentication scope definitions for Lightning Se
 
 ## Overview
 
-This package provides the core scope-based authorization primitives used throughout Lightning Server's authentication system. These types are platform-agnostic and can be used in both JVM and shared multiplatform code.
+This package provides the core scope-based authorization primitives used throughout Lightning Server's authentication
+system. These types are platform-agnostic and can be used in both JVM and shared multiplatform code.
 
 ## Files
 
@@ -12,8 +13,10 @@ This package provides the core scope-based authorization primitives used through
 
 Defines the scope hierarchy system for fine-grained access control:
 
-- **RequiredScope** - Represents a scope required to access a resource. Hierarchical scopes use `:` as delimiter (e.g., `admin:users:write`)
-- **GrantedScope** - Represents a scope granted to an authenticated entity. Determines what resources the entity can access
+- **RequiredScope** - Represents a scope required to access a resource. Hierarchical scopes use `:` as delimiter (e.g.,
+  `admin:users:write`)
+- **GrantedScope** - Represents a scope granted to an authenticated entity. Determines what resources the entity can
+  access
 - **Subscope** - Building block for constructing hierarchical scope paths. Can be combined using `+` operator
 
 #### Key Functions
@@ -26,6 +29,7 @@ Defines the scope hierarchy system for fine-grained access control:
 ## Scope Hierarchy
 
 Scopes follow a hierarchical containment model:
+
 - Broader scopes grant access to narrower subscopes
 - `admin` grants access to `admin:users`, `admin:posts`, etc.
 - `admin:users` does NOT grant access to `admin`

@@ -1,6 +1,7 @@
 # Data Utilities
 
-The `com.lightningkite.lightningserver.data` package provides several utility classes and functions for common server-side data handling needs.
+The `com.lightningkite.lightningserver.data` package provides several utility classes and functions for common
+server-side data handling needs.
 
 ## SerializableCache
 

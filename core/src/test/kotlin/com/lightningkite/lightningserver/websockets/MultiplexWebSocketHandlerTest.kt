@@ -2,7 +2,6 @@ package com.lightningkite.lightningserver.websockets
 
 import com.lightningkite.lightningserver.MultiplexMessage
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.deprecations.websocket
 import com.lightningkite.lightningserver.runtime.send
 import com.lightningkite.lightningserver.runtime.test.test
 import kotlinx.coroutines.runBlocking
@@ -41,7 +40,7 @@ class MultiplexWebSocketHandlerTest {
     @Test
     fun multiplex_basic_flow() = runBlocking {
         TestServer.test(settings = {}) {
-                    val mux = TestServer.multiplex.test()
+            val mux = TestServer.multiplex.test()
             val json = mux.server.externalSerialization.json
             var last: WebSocketFrame? = null
             mux.onMessageSent = { last = it }
@@ -81,7 +80,7 @@ class MultiplexWebSocketHandlerTest {
             TestServer.broadcast.send("topic!")
             val tEcho = json.decodeFromString(MultiplexMessage.serializer(), (last as WebSocketFrame.Text).text)
             // last received could be either for a or b depending on order; ensure it's one of them and content matches
-            assert(listOf("a","b").contains(tEcho.channel))
+            assert(listOf("a", "b").contains(tEcho.channel))
             assertEquals("topic!", tEcho.data)
 
             // End channel a

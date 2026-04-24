@@ -1,19 +1,9 @@
 package com.lightningkite.lightningserver.sessions.token
 
-import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.auth.GrantedScope
-import com.lightningkite.lightningserver.auth.PrincipalType
-import com.lightningkite.lightningserver.auth.id
+import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.data.SerializableCache
-import com.lightningkite.lightningserver.definition.Runtime
-import com.lightningkite.lightningserver.definition.RuntimeDeferred
-import com.lightningkite.lightningserver.definition.generalSettings
-import com.lightningkite.lightningserver.definition.map
-import com.lightningkite.lightningserver.definition.secretBasis
-import com.lightningkite.lightningserver.encryption.Signer
-import com.lightningkite.lightningserver.encryption.signer
-import com.lightningkite.lightningserver.encryption.sign
-import com.lightningkite.lightningserver.encryption.verify
+import com.lightningkite.lightningserver.definition.*
+import com.lightningkite.lightningserver.encryption.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.services.database.HasId
@@ -27,19 +17,24 @@ public class JwtTokenFormat(
     public val hasher: RuntimeDeferred<Signer> = secretBasis.signer("jwt"),
     public val expiration: Duration = 5.minutes,
     public val issuer: Runtime<String> = generalSettings.map { it.publicUrl },
-    public val audience: Runtime<String> = generalSettings.map { it.publicUrl }
+    public val audience: Runtime<String> = generalSettings.map { it.publicUrl },
 ) : TokenFormat {
 
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> create(
         principal: PrincipalType<SUBJECT, ID>,
-        auth: Authentication<SUBJECT>
+        auth: Authentication<SUBJECT>,
     ): String =
         hasher.await().signJwt(
             JwtClaims(
                 iss = issuer(),
                 sid = auth.sessionId,
-                sub = "${principal.name}|${server.internalSerialization.json.encodeToString(principal.idSerializer, auth.id)}",
+                sub = "${principal.name}|${
+                    server.internalSerialization.json.encodeToString(
+                        principal.idSerializer,
+                        auth.id
+                    )
+                }",
                 aud = audience(),
                 exp = now().plus(expiration).epochSeconds,
                 iat = auth.issuedAt.epochSeconds,
@@ -53,7 +48,7 @@ public class JwtTokenFormat(
     context(server: ServerRuntime)
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> read(
         principal: PrincipalType<SUBJECT, ID>,
-        value: String
+        value: String,
     ): Authentication<SUBJECT>? {
         val prefix = "${principal.name}|"
         val claims = hasher.await().verifyJwt(value, audience()) ?: return null
@@ -105,14 +100,16 @@ public class JwtTokenFormat(
 
         val signature = decoder.decode(parts[2])
 
-        val header: JwtHeader = server.internalSerialization.json.decodeFromString(decoder.decode(parts[0]).toString(Charsets.UTF_8))
+        val header: JwtHeader =
+            server.internalSerialization.json.decodeFromString(decoder.decode(parts[0]).toString(Charsets.UTF_8))
 
         // Prevent algorithm confusion attacks by validating the algorithm matches what we expect
         if (header.alg != name) {
             throw JwtSignatureException("Algorithm mismatch: expected $name, got ${header.alg}")
         }
 
-        val claims: JwtClaims = server.internalSerialization.json.decodeFromString(decoder.decode(parts[1]).toString(Charsets.UTF_8))
+        val claims: JwtClaims =
+            server.internalSerialization.json.decodeFromString(decoder.decode(parts[1]).toString(Charsets.UTF_8))
 
         requiredAudience?.let { if (claims.aud != it) return null }  // It's for someone else.  Ignore it.
 

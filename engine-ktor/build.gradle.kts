@@ -1,8 +1,7 @@
-import com.lightningkite.deployhelpers.*
+import com.lightningkite.deployhelpers.lkLibrary
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
-    alias(libs.plugins.ksp)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.dokka)
     id("signing")
@@ -16,7 +15,7 @@ dependencies {
     api(libs.services.cache)
     api(libs.services.pubsub)
     api(libs.kotlin.reflect)
-    
+
     // Ktor dependencies
     api(libs.ktor.core)
     api(libs.ktor.netty)
@@ -34,9 +33,6 @@ dependencies {
     testImplementation(libs.ktor.client.websockets.jvm)
 }
 
-ksp {
-    arg("generateFields", "true")
-}
 
 kotlin {
     explicitApi()
@@ -45,14 +41,12 @@ kotlin {
         optIn.add("kotlin.uuid.ExperimentalUuidApi")
         freeCompilerArgs.add("-Xcontext-parameters")
     }
-    sourceSets.main {
-        kotlin.srcDir("build/generated/ksp/main/kotlin")
-    }
-    sourceSets.test {
-        kotlin.srcDir("build/generated/ksp/test/kotlin")
-    }
 }
 
-lkLibrary("lightningkite", "lightning-server") {
+lkLibrary(
+    "lightningkite",
+    "lightning-server",
+    mavenAutomaticRelease = project.findProperty("mavenAutomaticRelease") as? Boolean ?: false
+) {
     description.set("A Ktor engine implementation for Lightning Server.")
 }

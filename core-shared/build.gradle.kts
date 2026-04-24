@@ -1,9 +1,8 @@
-import com.lightningkite.deployhelpers.*
+import com.lightningkite.deployhelpers.lkLibrary
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.ksp)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.androidLibrary)
     alias(libs.plugins.dokka)
@@ -30,7 +29,7 @@ kotlin {
     jvm {
         compilations.all {
             compileTaskProvider.configure {
-                compilerOptions{
+                compilerOptions {
                     jvmTarget = JvmTarget.JVM_1_8
                 }
             }
@@ -42,7 +41,6 @@ kotlin {
     iosX64()
     iosArm64()
     iosSimulatorArm64()
-    macosX64()
     macosArm64()
 
     sourceSets {
@@ -51,36 +49,16 @@ kotlin {
                 api(libs.kotlinx.datetime)
                 api(libs.services.database.shared)
             }
-            kotlin {
-                srcDir(file("build/generated/ksp/common/commonMain/kotlin"))
-            }
         }
         val commonTest by getting {
             dependencies {
                 implementation(libs.kotlin.test)
-            }
-            kotlin {
-                srcDir(file("build/generated/ksp/common/commonTest/kotlin"))
+                implementation(libs.kotlinx.serialization.json)
             }
         }
-        val jvmMain by getting {
-            dependencies {
-            }
-        }
-        val jvmTest by getting {
-
-        }
+        val jvmMain by getting {}
+        val jvmTest by getting {}
     }
-}
-
-dependencies {
-    configurations.filter { it.name.startsWith("ksp") }.forEach {
-        add(it.name, libs.services.database.processor)
-    }
-}
-
-lkLibrary("lightningkite", "lightning-server") {
-    description.set("A set of tools to fill in/replace what Ktor is lacking in.")
 }
 
 android {
@@ -98,4 +76,12 @@ android {
     dependencies {
         coreLibraryDesugaring(libs.androidDesugaring)
     }
+}
+
+lkLibrary(
+    "lightningkite",
+    "lightning-server",
+    mavenAutomaticRelease = project.findProperty("mavenAutomaticRelease") as? Boolean ?: false
+) {
+    description.set("A set of models that can be shared between the client and the server projects.")
 }

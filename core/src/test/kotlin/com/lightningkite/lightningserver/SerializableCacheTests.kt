@@ -105,7 +105,8 @@ class SerializableCacheTests {
                 println("Before serialization: $cache")
 
                 val serialized = serverRuntime.internalSerialization.json.encodeToString(cache)
-                val deserialized = serverRuntime.internalSerialization.json.decodeFromString<SerializableCache>(serialized)
+                val deserialized =
+                    serverRuntime.internalSerialization.json.decodeFromString<SerializableCache>(serialized)
 
                 println("After serialization: $deserialized")
 

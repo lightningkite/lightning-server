@@ -12,10 +12,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /**
  * Tests for SettingsSerializer which handles dynamic serialization/deserialization
@@ -35,7 +32,8 @@ class SettingsSerializerTest {
     // Helper settings for testing
     private val stringSetting = ServerSetting("stringValue", "default-string", String.serializer())
     private val intSetting = ServerSetting("intValue", 42, Int.serializer())
-    private val optionalSetting = ServerSetting("optionalValue", "optional-default", String.serializer(), optional = true)
+    private val optionalSetting =
+        ServerSetting("optionalValue", "optional-default", String.serializer(), optional = true)
     private val boolSetting = ServerSetting("boolValue", false, Boolean.serializer())
 
     @Test

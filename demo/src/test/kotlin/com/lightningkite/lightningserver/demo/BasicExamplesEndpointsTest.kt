@@ -1,9 +1,9 @@
 package com.lightningkite.lightningserver.demo
 
-import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -20,7 +20,7 @@ class BasicExamplesEndpointsTest {
             assertEquals("Welcome to Lightning Server Demo!", response.body?.text())
         }
     }
-    
+
     @Test
     fun testHelloWithName() = runBlocking {
         TestHelper.testServer {
@@ -63,10 +63,12 @@ class BasicExamplesEndpointsTest {
     fun testGreetWithQueryNameAndTitle() = runBlocking {
         TestHelper.testServer {
             val response = Server.basic.greetWithQuery.test(
-                queryParameters = QueryParameters(listOf(
-                    "name" to "Smith",
-                    "title" to "Dr"
-                ))
+                queryParameters = QueryParameters(
+                    listOf(
+                        "name" to "Smith",
+                        "title" to "Dr"
+                    )
+                )
             )
             assertEquals(HttpStatus.OK, response.status)
             assertEquals("Hello, Dr Smith!", response.body?.text())

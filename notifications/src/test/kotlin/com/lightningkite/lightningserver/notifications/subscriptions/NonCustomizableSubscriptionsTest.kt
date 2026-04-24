@@ -9,17 +9,14 @@ import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.setStatic
 import com.lightningkite.lightningserver.typed.sdk.module
 import com.lightningkite.services.cache.Cache
-import com.lightningkite.services.database.*
+import com.lightningkite.services.database.Database
+import com.lightningkite.services.database.insertOne
 import com.lightningkite.services.email.EmailService
 import com.lightningkite.services.email.TestEmailService
 import com.lightningkite.services.sms.SMS
 import com.lightningkite.services.sms.TestSMS
 import kotlinx.coroutines.runBlocking
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.uuid.Uuid
 
 /**

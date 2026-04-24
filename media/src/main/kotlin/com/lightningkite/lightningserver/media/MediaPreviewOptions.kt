@@ -1,13 +1,9 @@
 package com.lightningkite.lightningserver.media
 
-import com.lightningkite.MediaType
+import com.lightningkite.services.data.MediaType
 import com.sksamuel.scrimage.ImmutableImage
 import com.sksamuel.scrimage.metadata.Orientation
-import com.sksamuel.scrimage.nio.BmpWriter
-import com.sksamuel.scrimage.nio.GifWriter
-import com.sksamuel.scrimage.nio.JpegWriter
-import com.sksamuel.scrimage.nio.PngWriter
-import com.sksamuel.scrimage.nio.TiffWriter
+import com.sksamuel.scrimage.nio.*
 import com.sksamuel.scrimage.webp.WebpWriter
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.File
@@ -43,6 +39,7 @@ public data class MediaPreviewOptions(
         require(forceRatio == null || forceRatio in 0.00001..10000.0) { "forceRatio must be positive" }
         require(quality == null || quality in 0.0..1.0) { "quality must be between 0.0 and 1.0" }
     }
+
     public companion object {
         /**
          * A preview option that only corrects EXIF orientation and other image metadata issues
@@ -119,7 +116,8 @@ public fun ImmutableImage.apply(
     val canSkip = !needsScaling &&
             !needsRatio &&
             (options.type == null || originalType == options.type) &&
-            ((options.type ?: originalType) != MediaType.Image.JPEG || this.metadata.orientation?.getOrNull().let { it == Orientation.Zero || it == null })
+            ((options.type ?: originalType) != MediaType.Image.JPEG || this.metadata.orientation?.getOrNull()
+                .let { it == Orientation.Zero || it == null })
 
     if (canSkip) return null
 

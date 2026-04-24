@@ -1,24 +1,15 @@
 // by Claude
 package com.lightningkite.lightningserver.http
 
-import com.lightningkite.lightningserver.BadRequestException
-import com.lightningkite.lightningserver.HttpStatusException
-import com.lightningkite.lightningserver.LSError
-import com.lightningkite.lightningserver.NotFoundException
-import com.lightningkite.lightningserver.UnauthorizedException
+import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.definition.GeneralServerSettings
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
-import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.Json
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /**
  * Tests for DefaultExceptionHttpHandler behavior.
@@ -135,8 +126,10 @@ class DefaultExceptionHttpHandlerTest {
 
                 // Should contain stack trace in debug mode
                 val body = response.body?.text() ?: ""
-                assertTrue(body.contains("stackTrace") || body.contains("RuntimeException"),
-                    "Debug mode should include exception details")
+                assertTrue(
+                    body.contains("stackTrace") || body.contains("RuntimeException"),
+                    "Debug mode should include exception details"
+                )
             }
         }
     }

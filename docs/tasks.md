@@ -39,4 +39,5 @@ To call your async task, simply treat it like a function.
 
 Tasks can have any input type that is serializable.
 
-Note that if you are deploying to AWS Lambda that you need to be aware of time-limits for the execution of your function.
+Note that if you are deploying to AWS Lambda that you need to be aware of time-limits for the execution of your
+function.

@@ -1,4 +1,4 @@
-import com.lightningkite.deployhelpers.*
+import com.lightningkite.deployhelpers.lkLibrary
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -30,7 +30,7 @@ kotlin {
     jvm {
         compilations.all {
             compileTaskProvider.configure {
-                compilerOptions{
+                compilerOptions {
                     jvmTarget = JvmTarget.JVM_1_8
                 }
             }
@@ -42,7 +42,6 @@ kotlin {
     iosX64()
     iosArm64()
     iosSimulatorArm64()
-    macosX64()
     macosArm64()
 
     sourceSets {
@@ -50,7 +49,7 @@ kotlin {
             dependencies {
                 api(project(":core-shared"))
                 api(project(":typed-shared"))
-                api(libs.kotlinx.json)
+                api(libs.kotlinx.serialization.json)
                 api(libs.kotlinx.datetime)
                 api(libs.services.database)
                 api(libs.services.data)
@@ -68,13 +67,8 @@ kotlin {
                 srcDir(file("build/generated/ksp/common/commonTest/kotlin"))
             }
         }
-        val jvmMain by getting {
-            dependencies {
-            }
-        }
-        val jvmTest by getting {
-
-        }
+        val jvmMain by getting {}
+        val jvmTest by getting {}
     }
 }
 
@@ -82,10 +76,6 @@ dependencies {
     configurations.filter { it.name.startsWith("ksp") }.forEach {
         add(it.name, libs.services.database.processor)
     }
-}
-
-lkLibrary("lightningkite", "lightning-server") {
-    description.set("A set of tools to fill in/replace what Ktor is lacking in.")
 }
 
 android {
@@ -103,4 +93,12 @@ android {
     dependencies {
         coreLibraryDesugaring(libs.androidDesugaring)
     }
+}
+
+lkLibrary(
+    "lightningkite",
+    "lightning-server",
+    mavenAutomaticRelease = project.findProperty("mavenAutomaticRelease") as? Boolean ?: false
+) {
+    description.set("A set of classes shared between the server and client for user notifications.")
 }

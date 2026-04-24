@@ -1,19 +1,15 @@
 // by Claude
 package com.lightningkite.lightningserver.serialization
 
-import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.SerializationStrategy
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /**
  * Tests for MediaTypeEncoderRegistry and MediaTypeDecoderRegistry.
@@ -190,7 +186,7 @@ class MediaTypeRegistryTest {
 
     private class TestEncoder(
         override val mediaType: MediaType,
-        override val priority: Float = 0f
+        override val priority: Float = 0f,
     ) : MediaTypeEncoder {
         context(runtime: ServerRuntime)
         override fun accepts(parameters: Map<String, String>): Boolean = true
@@ -199,13 +195,13 @@ class MediaTypeRegistryTest {
         override suspend fun <T> invoke(
             mediaType: MediaType,
             serializer: SerializationStrategy<T>,
-            value: T
+            value: T,
         ): TypedData = TypedData.text("test", mediaType)
     }
 
     private class TestDecoder(
         override val mediaType: MediaType,
-        override val priority: Float = 0f
+        override val priority: Float = 0f,
     ) : MediaTypeDecoder {
         context(runtime: ServerRuntime)
         override fun accepts(parameters: Map<String, String>): Boolean = true

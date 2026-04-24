@@ -3,7 +3,6 @@ package com.lightningkite.lightningserver.notifications
 import kotlinx.datetime.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant

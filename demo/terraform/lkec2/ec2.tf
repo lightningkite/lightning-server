@@ -4,33 +4,33 @@
 ##########
 
 variable "serve_command" {
-    type = string
-    default = "serve"
-    nullable = false
-    description = "The command to use to begin serving."
+  type        = string
+  default     = "serve"
+  nullable    = false
+  description = "The command to use to begin serving."
 }
 variable "instance_ubuntu_version" {
-    type = string
-    default = "24.04"
-    nullable = false
-    description = "The ubuntu LTS version to use"
+  type        = string
+  default     = "24.04"
+  nullable    = false
+  description = "The ubuntu LTS version to use"
 }
 variable "instance_size" {
-    type = string
-    default = "t3.micro"
-    nullable = false
-    description = "The instance size to use; defaults to t2.micro"
+  type        = string
+  default     = "t3.micro"
+  nullable    = false
+  description = "The instance size to use; defaults to t2.micro"
 }
 variable "admin_ip" {
-    type = string
-    default = "0.0.0.0/32"
-    nullable = false
-    description = "Permits SSH from this address"
+  type        = string
+  default     = "0.0.0.0/32"
+  nullable    = false
+  description = "Permits SSH from this address"
 }
 variable "admins" {
-    type = list(object({ username=string, name=string, site=string, phone1=string, phone2=string, email=string, keys=list(string) }))
-    nullable = false
-    description = "Keys for administrative access"
+  type        = list(object({ username = string, name = string, site = string, phone1 = string, phone2 = string, email = string, keys = list(string) }))
+  nullable    = false
+  description = "Keys for administrative access"
 }
 
 ##########
@@ -38,8 +38,8 @@ variable "admins" {
 ##########
 
 output "private_key" {
-    value = tls_private_key.main.private_key_pem
-    sensitive = true
+  value     = tls_private_key.main.private_key_pem
+  sensitive = true
 }
 
 ##########
@@ -50,40 +50,40 @@ output "private_key" {
 resource "local_sensitive_file" "settings_raw" {
   content = jsonencode({
     general = {
-        projectName = var.display_name
-        publicUrl = "https://${var.domain_name}"
-        wsUrl = "wss://ws.${var.domain_name}"
-        debug = var.debug
-        cors = var.cors
-        host = "127.0.0.1"
+      projectName = var.display_name
+      publicUrl   = "https://${var.domain_name}"
+      wsUrl       = "wss://ws.${var.domain_name}"
+      debug       = var.debug
+      cors        = var.cors
+      host        = "127.0.0.1"
     }
     database = {
       url = "mongodb+srv://demoexamplesingleec2database-main:${random_password.database.result}@${replace(mongodbatlas_serverless_instance.database.connection_strings_standard_srv, "mongodb+srv://", "")}/default?retryWrites=true&w=majority"
     }
     cache = {
-        url = "dynamodb://${var.deployment_location}/demo_example_single_ec2"
+      url = "dynamodb://${var.deployment_location}/demo_example_single_ec2"
     }
     secretBasis = random_password.secretBasis.result
     jwt = {
-        expiration = var.jwt_expiration 
-        emailExpiration = var.jwt_emailExpiration 
-        secret = random_password.jwt.result
+      expiration      = var.jwt_expiration
+      emailExpiration = var.jwt_emailExpiration
+      secret          = random_password.jwt.result
     }
-    sms = var.sms
+    sms     = var.sms
     logging = var.logging
     files = {
-        storageUrl = "s3://${aws_s3_bucket.files.id}.s3-${aws_s3_bucket.files.region}.amazonaws.com"
-        signedUrlExpiration = var.files_expiry
+      storageUrl          = "s3://${aws_s3_bucket.files.id}.s3-${aws_s3_bucket.files.region}.amazonaws.com"
+      signedUrlExpiration = var.files_expiry
     }
     metrics = {
-        url = "cloudwatch://${var.deployment_location}/${var.metrics_namespace}"
-        trackingByEntryPoint = var.metrics_tracked
+      url                  = "cloudwatch://${var.deployment_location}/${var.metrics_namespace}"
+      trackingByEntryPoint = var.metrics_tracked
     }
     exceptions = var.exceptions
     email = {
-        url = "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.${var.deployment_location}.amazonaws.com:587" 
-        fromEmail = "noreply@${var.domain_name}"
-    }})
+      url       = "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.${var.deployment_location}.amazonaws.com:587"
+      fromEmail = "noreply@${var.domain_name}"
+  } })
   filename = "${path.module}/build/raw-settings.json"
 }
 
@@ -98,7 +98,7 @@ resource "aws_iam_role" "main_exec" {
         Service = "ec2.amazonaws.com"
       }
       Effect = "Allow"
-      Sid = ""
+      Sid    = ""
     }]
   })
 }
@@ -148,8 +148,8 @@ resource "tls_private_key" "main" {
   rsa_bits  = 4096
 }
 resource "aws_key_pair" "main" {
-    key_name = "demo-example-single-ec2-terraform-deploy-key"
-    public_key = tls_private_key.main.public_key_openssh
+  key_name   = "demo-example-single-ec2-terraform-deploy-key"
+  public_key = tls_private_key.main.public_key_openssh
 }
 resource "aws_security_group" "main" {
   name        = "demo-example-single-ec2-main"
@@ -184,18 +184,18 @@ resource "aws_vpc_security_group_ingress_rule" "allow_tls_ipv4" {
 resource "aws_vpc_security_group_egress_rule" "allow_tls_ipv4" {
   security_group_id = aws_security_group.main.id
   cidr_ipv4         = "0.0.0.0/0"
-  ip_protocol = "-1"
+  ip_protocol       = "-1"
 }
 
 resource "aws_instance" "main" {
-  ami = data.aws_ami.ubuntu.id
-  instance_type = var.instance_size
+  ami                  = data.aws_ami.ubuntu.id
+  instance_type        = var.instance_size
   iam_instance_profile = aws_iam_instance_profile.main_exec.name
-  key_name = aws_key_pair.main.key_name
+  key_name             = aws_key_pair.main.key_name
 
   # vpc = data.aws_vpc.main.arn
   vpc_security_group_ids = [aws_security_group.main.id]
-  subnet_id     = data.aws_subnet.private["subnet-e2838d94"].id
+  subnet_id              = data.aws_subnet.private["subnet-e2838d94"].id
 
   tags = {
     Name = "demo-example-single-ec2"
@@ -204,13 +204,13 @@ resource "aws_instance" "main" {
 
 resource "ssh_resource" "main_install_resources" {
   depends_on = [aws_instance.main]
-  host = aws_eip.main.public_ip
+  host       = aws_eip.main.public_ip
   triggers = {
     instanceid = aws_instance.main.id
-    admins = jsonencode(var.admins)
+    admins     = jsonencode(var.admins)
   }
-  user = "ubuntu"
-  password = ""
+  user        = "ubuntu"
+  password    = ""
   private_key = tls_private_key.main.private_key_openssh
   commands = [
     "sudo apt update -y",
@@ -221,17 +221,17 @@ resource "ssh_resource" "main_install_resources" {
 }
 resource "ssh_resource" "main_install_efs" {
   depends_on = [aws_instance.main, ssh_resource.main_install_resources]
-  host = aws_eip.main.public_ip
+  host       = aws_eip.main.public_ip
   triggers = {
     instanceid = aws_instance.main.id
-    admins = jsonencode(var.admins)
+    admins     = jsonencode(var.admins)
   }
-  user = "ubuntu"
-  password = ""
+  user        = "ubuntu"
+  password    = ""
   private_key = tls_private_key.main.private_key_openssh
   file {
     destination = "install-efs.sh"
-    content = <<EOF
+    content     = <<EOF
       #!/bin/bash
       # EFS utils install
       if ! dpkg -s amazon-efs-utils &>/dev/null; then
@@ -262,28 +262,28 @@ resource "aws_eip" "main" {
 }
 resource "aws_route53_record" "main" {
   zone_id = data.aws_route53_zone.main.zone_id
-  name = var.domain_name
-  type = "A"
+  name    = var.domain_name
+  type    = "A"
   records = [aws_eip.main.public_ip]
-  ttl = "300"
+  ttl     = "300"
 }
 resource "aws_route53_record" "ws" {
   zone_id = data.aws_route53_zone.main.zone_id
-  name = "ws.${var.domain_name}"
-  type = "A"
+  name    = "ws.${var.domain_name}"
+  type    = "A"
   records = [aws_eip.main.public_ip]
-  ttl = "300"
+  ttl     = "300"
 }
 
 resource "ssh_resource" "main_users" {
   depends_on = [aws_instance.main]
-  host = aws_eip.main.public_ip
+  host       = aws_eip.main.public_ip
   triggers = {
     instanceid = aws_instance.main.id
-    admins = jsonencode(var.admins)
+    admins     = jsonencode(var.admins)
   }
-  user = "ubuntu"
-  password = ""
+  user        = "ubuntu"
+  password    = ""
   private_key = tls_private_key.main.private_key_openssh
   commands = flatten([for x in var.admins : [
     "sudo adduser ${x.username} --gecos \"${x.name},${x.site},${x.phone1},${x.phone2},${x.email}\" || true",
@@ -300,13 +300,13 @@ resource "ssh_resource" "main_users" {
 
 resource "ssh_resource" "main_mount_efs" {
   depends_on = [ssh_resource.main_install_efs]
-  host = aws_eip.main.public_ip
+  host       = aws_eip.main.public_ip
   triggers = {
     instanceid = aws_instance.main.id
-    systemid = aws_efs_file_system.main.id
+    systemid   = aws_efs_file_system.main.id
   }
-  user = "ubuntu"
-  password = ""
+  user        = "ubuntu"
+  password    = ""
   private_key = tls_private_key.main.private_key_openssh
   commands = [
     "sudo [ -d /mnt/efs ] || sudo mkdir /mnt/efs",
@@ -316,9 +316,9 @@ resource "ssh_resource" "main_mount_efs" {
 }
 
 resource "aws_efs_mount_target" "main" {
-  for_each = data.aws_subnet.private
-  file_system_id = aws_efs_file_system.main.id
-  subnet_id      = data.aws_subnet.private[each.key].id
+  for_each        = data.aws_subnet.private
+  file_system_id  = aws_efs_file_system.main.id
+  subnet_id       = data.aws_subnet.private[each.key].id
   security_groups = [aws_security_group.main_efs.id]
   # TODO: Add security group with port 2049, internal only
 }
@@ -328,16 +328,16 @@ resource "aws_security_group" "main_efs" {
   vpc_id = data.aws_vpc.main.id
 
   ingress {
-    description     = "EFS"
-    from_port       = 2049
-    to_port         = 2049
-    protocol        = "tcp"
+    description = "EFS"
+    from_port   = 2049
+    to_port     = 2049
+    protocol    = "tcp"
     cidr_blocks = [data.aws_vpc.main.cidr_block]
   }
   egress {
-    from_port       = 0
-    to_port         = 0
-    protocol        = "-1"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = [data.aws_vpc.main.cidr_block]
   }
 }
@@ -350,16 +350,16 @@ resource "aws_efs_file_system" "main" {
 
 resource "ssh_resource" "upload_executable" {
   depends_on = [ssh_resource.main_install_resources, ssh_resource.main_install_efs, ssh_resource.main_mount_efs]
-  host = aws_eip.main.public_ip
+  host       = aws_eip.main.public_ip
   triggers = {
     systemid = aws_efs_file_system.main.id
-    index = filesha512("../../build/distributions/server.zip")
+    index    = filesha512("../../build/distributions/server.zip")
   }
-  user = "ubuntu"
-  password = ""
+  user        = "ubuntu"
+  password    = ""
   private_key = tls_private_key.main.private_key_openssh
   file {
-    source = "../../build/distributions/server.zip"
+    source      = "../../build/distributions/server.zip"
     destination = "${var.domain_name}.zip"
   }
   commands = [
@@ -374,17 +374,17 @@ resource "ssh_resource" "upload_executable" {
 
 resource "ssh_resource" "upload_settings" {
   depends_on = [ssh_resource.main_install_resources, ssh_resource.main_mount_efs, ssh_resource.upload_executable]
-  host = aws_eip.main.public_ip
+  host       = aws_eip.main.public_ip
   triggers = {
-    instanceid = aws_instance.main.id
-    systemid = aws_efs_file_system.main.id
+    instanceid   = aws_instance.main.id
+    systemid     = aws_efs_file_system.main.id
     settingshash = local_sensitive_file.settings_raw.content_base64sha512
   }
-  user = "ubuntu"
-  password = ""
+  user        = "ubuntu"
+  password    = ""
   private_key = tls_private_key.main.private_key_openssh
   file {
-    source = local_sensitive_file.settings_raw.filename
+    source      = local_sensitive_file.settings_raw.filename
     destination = "${var.domain_name}.settings.json"
   }
   commands = [
@@ -399,15 +399,15 @@ resource "ssh_resource" "upload_settings" {
 
 resource "ssh_resource" "setup_nginx" {
   depends_on = [ssh_resource.main_install_resources, ssh_resource.main_mount_efs, ssh_resource.upload_executable, aws_route53_record.main]
-  host = aws_eip.main.public_ip
+  host       = aws_eip.main.public_ip
   triggers = {
     instanceid = aws_instance.main.id
   }
-  user = "ubuntu"
-  password = ""
+  user        = "ubuntu"
+  password    = ""
   private_key = tls_private_key.main.private_key_openssh
   file {
-    content = <<EOF
+    content     = <<EOF
     user www-data;
     worker_processes auto;
     pid /run/nginx.pid;
@@ -474,7 +474,7 @@ resource "ssh_resource" "setup_nginx" {
     destination = "top-nginx.conf"
   }
   file {
-    content = <<EOF
+    content     = <<EOF
     server {
       listen 80;
       server_name ${var.domain_name};
@@ -503,7 +503,7 @@ resource "ssh_resource" "setup_nginx" {
     destination = "http.conf"
   }
   file {
-    content = <<EOF
+    content     = <<EOF
     server {
       listen 80;
       server_name ws.${var.domain_name};
@@ -545,15 +545,15 @@ resource "ssh_resource" "setup_nginx" {
 
 resource "ssh_resource" "setup_supervisor" {
   depends_on = [ssh_resource.main_mount_efs]
-  host = aws_eip.main.public_ip
+  host       = aws_eip.main.public_ip
   triggers = {
     instanceid = aws_instance.main.id
   }
-  user = "ubuntu"
-  password = ""
+  user        = "ubuntu"
+  password    = ""
   private_key = tls_private_key.main.private_key_openssh
   file {
-    content = <<EOF
+    content     = <<EOF
       [program:${var.domain_name}]
       directory=/mnt/efs/${var.domain_name}/server/bin
       user=server_runner
@@ -574,15 +574,15 @@ resource "ssh_resource" "setup_supervisor" {
 
 resource "ssh_resource" "restart_server" {
   depends_on = [ssh_resource.setup_supervisor, ssh_resource.upload_executable, ssh_resource.upload_settings]
-  host = aws_eip.main.public_ip
+  host       = aws_eip.main.public_ip
   triggers = {
     instanceid = aws_instance.main.id
-    systemid = aws_efs_file_system.main.id
-    index = filesha512("../../build/distributions/server.zip")
-    settings = local_sensitive_file.settings_raw.content_base64sha512
+    systemid   = aws_efs_file_system.main.id
+    index      = filesha512("../../build/distributions/server.zip")
+    settings   = local_sensitive_file.settings_raw.content_base64sha512
   }
-  user = "ubuntu"
-  password = ""
+  user        = "ubuntu"
+  password    = ""
   private_key = tls_private_key.main.private_key_openssh
   commands = [
     "sudo supervisorctl restart ${var.domain_name}",

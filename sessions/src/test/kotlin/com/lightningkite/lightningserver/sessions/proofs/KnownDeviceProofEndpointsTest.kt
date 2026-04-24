@@ -11,25 +11,17 @@ import com.lightningkite.lightningserver.encryption.SecretBasis
 import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
-import com.lightningkite.lightningserver.sessions.KnownDeviceSecret
 import com.lightningkite.lightningserver.sessions.proofs.extensions.verify
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.cache.Cache
-import com.lightningkite.services.database.Condition
-import com.lightningkite.services.database.Database
-import com.lightningkite.services.database.HasId
+import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import org.junit.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertNotEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
@@ -42,7 +34,7 @@ class KnownDeviceProofEndpointsTest {
     @Serializable
     data class TestUser(
         override val _id: Uuid = Uuid.random(),
-        val email: String = ""
+        val email: String = "",
     ) : HasId<Uuid> {
         companion object : PrincipalType<TestUser, Uuid> {
             override val idSerializer: KSerializer<Uuid> = Uuid.serializer()

@@ -1,29 +1,19 @@
 package com.lightningkite.lightningserver.engine.awsserverless
 
-import com.amazonaws.services.lambda.runtime.ClientContext
-import com.amazonaws.services.lambda.runtime.CognitoIdentity
-import com.amazonaws.services.lambda.runtime.Context
-import com.amazonaws.services.lambda.runtime.LambdaLogger
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.services.cache.dynamodb.embeddedDynamo
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.async
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.serialization.json.Json
 import software.amazon.awssdk.core.SdkBytes
 import software.amazon.awssdk.http.SdkHttpResponse
 import software.amazon.awssdk.regions.Region
-import software.amazon.awssdk.services.apigatewaymanagementapi.model.DeleteConnectionRequest
-import software.amazon.awssdk.services.apigatewaymanagementapi.model.DeleteConnectionResponse
-import software.amazon.awssdk.services.apigatewaymanagementapi.model.PostToConnectionRequest
-import software.amazon.awssdk.services.apigatewaymanagementapi.model.PostToConnectionResponse
+import software.amazon.awssdk.services.apigatewaymanagementapi.model.*
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
-import software.amazon.awssdk.services.lambda.model.InvocationType
-import software.amazon.awssdk.services.lambda.model.InvokeRequest
-import software.amazon.awssdk.services.lambda.model.InvokeResponse
+import software.amazon.awssdk.services.lambda.model.*
 import java.io.ByteArrayOutputStream
 
-class TestAwsAdapter(server: ServerDefinition): AwsAdapter(server) {
+class TestAwsAdapter(server: ServerDefinition) : AwsAdapter(server) {
     override val dynamo: DynamoDbAsyncClient
         get() = embeddedDynamo()
 
@@ -62,8 +52,9 @@ class TestAwsAdapter(server: ServerDefinition): AwsAdapter(server) {
         }.build()
     }
 
+    @OptIn(DelicateCoroutinesApi::class)
     override suspend fun invokeLambda(invokeRequest: InvokeRequest): InvokeResponse {
-        if(invokeRequest.invocationType() == InvocationType.EVENT) {
+        if (invokeRequest.invocationType() == InvocationType.EVENT) {
             GlobalScope.async {
                 val out = ByteArrayOutputStream()
                 this@TestAwsAdapter.handleRequest(
@@ -91,5 +82,7 @@ class TestAwsAdapter(server: ServerDefinition): AwsAdapter(server) {
         handleRequest(input.inputStream(), out, TestLambdaContext())
         return out.toByteArray()
     }
-    inline fun <reified T: AwsLambdaInput> handleRequest(input: T): ByteArray = handleRequest(Json.encodeToString<T>(input).toByteArray())
+
+    inline fun <reified T : AwsLambdaInput> handleRequest(input: T): ByteArray =
+        handleRequest(Json.encodeToString<T>(input).toByteArray())
 }

@@ -3,9 +3,7 @@ package com.lightningkite.lightningserver.settings
 import java.security.MessageDigest
 import javax.crypto.Cipher
 import javax.crypto.SecretKeyFactory
-import javax.crypto.spec.IvParameterSpec
-import javax.crypto.spec.PBEKeySpec
-import javax.crypto.spec.SecretKeySpec
+import javax.crypto.spec.*
 
 /**
  * Internal utility for decrypting OpenSSL-encrypted settings files.
@@ -25,6 +23,7 @@ import javax.crypto.spec.SecretKeySpec
 internal object OpenSsl {
     private const val OPENSSL_MAGIC = "Salted__"
     private const val PBKDF2_DEFAULT_ITERATIONS = 10000
+
     /**
      * Decrypts a byte array using AES-CBC with PKCS5 padding.
      *
@@ -99,7 +98,7 @@ internal object OpenSsl {
                 // Both methods failed
                 throw Exception(
                     "Failed to decrypt file with both PBKDF2 and EVP_BytesToKey methods. " +
-                    "PBKDF2 error: ${e.message}, EVP_BytesToKey error: ${e2.message}",
+                            "PBKDF2 error: ${e.message}, EVP_BytesToKey error: ${e2.message}",
                     e
                 )
             }
@@ -119,7 +118,7 @@ internal object OpenSsl {
     private fun deriveKeyAndIvPbkdf2(
         password: ByteArray,
         salt: ByteArray,
-        iterations: Int = PBKDF2_DEFAULT_ITERATIONS
+        iterations: Int = PBKDF2_DEFAULT_ITERATIONS,
     ): Pair<ByteArray, ByteArray> {
         val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
         val spec = PBEKeySpec(

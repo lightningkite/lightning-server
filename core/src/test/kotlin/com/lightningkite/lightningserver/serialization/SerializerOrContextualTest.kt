@@ -1,9 +1,7 @@
 package com.lightningkite.lightningserver.serialization
 
 import kotlinx.serialization.Serializable
-import kotlin.test.Test
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /**
  * Tests for serializerOrContextual utility functions.

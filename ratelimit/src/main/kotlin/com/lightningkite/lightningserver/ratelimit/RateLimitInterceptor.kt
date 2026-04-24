@@ -145,18 +145,18 @@ public class RateLimitInterceptor(
     ): RateLimitInfo? {
         contract { callsInPlace(action, InvocationKind.EXACTLY_ONCE) }
         val start = now()
-        val cacheKey = "rateLimiter-${settings.rateLimiterId}-${limits.key}"
+        val cacheKey = "rateLimiter-${settings.rateLimiterId}-${limits.key}:"
         val stoppedUntil = cache().get<Long>(cacheKey)
         val stoppedUntilTime = stoppedUntil?.let { Instant.fromEpochMilliseconds(it) }
 
         logger.trace {
-            """stoppedUntilTime: ${stoppedUntilTime?.let { "$it (rel ${it - now()})" }}
-               borrowedValue: ${limits.borrowTime}""".trimMargin()
+            """${limits.key}: stoppedUntilTime: ${stoppedUntilTime?.let { "$it (rel ${it - now()})" }}
+               ${limits.key}: borrowedValue: ${limits.borrowTime}""".trimMargin()
         }
 
         val stoppedUntilNew: Long = if (stoppedUntilTime == null || start - stoppedUntilTime > limits.leeway) {
             logger.trace {
-                "stoppedUntilTime virtual before borrow: ${
+                "${limits.key}: stoppedUntilTime virtual before borrow: ${
                     start.minus(limits.leeway).let { "$it (rel ${it - now()})" }
                 }"
             }
@@ -186,7 +186,7 @@ public class RateLimitInterceptor(
 
         logger.trace {
             val time = Instant.fromEpochMilliseconds(stoppedUntilNew)
-            "stoppedUntilTime after borrow: $time (rel ${time - now()})"
+            "${limits.key}: stoppedUntilTime after borrow: $time (rel ${time - now()})"
         }
 
         var issue: Throwable? = null
@@ -203,10 +203,10 @@ public class RateLimitInterceptor(
         val final = Instant.fromEpochMilliseconds(afterRefund)
 
         logger.trace {
-            """time taken: ${done - start}
-               takenValue: $takenValue
-               valueToReturn: $valueToReturn
-               "stoppedUntilTime after return: $final (rel ${final - now()})"""".trimMargin()
+            """${limits.key}: time taken: ${done - start}
+               ${limits.key}: takenValue: $takenValue
+               ${limits.key}: valueToReturn: $valueToReturn
+               ${limits.key}: stoppedUntilTime after return: $final (rel ${final - now()})""".trimMargin()
         }
 
         issue?.let { throw it }

@@ -1,19 +1,24 @@
 # Core Shared Module
 
-The `core-shared` module contains fundamental data structures and types that are shared between client and server in Lightning Server applications. This is a Kotlin Multiplatform module, meaning these types can be used in both JVM server code and client applications (including JavaScript, iOS, Android, etc.).
+The `core-shared` module contains fundamental data structures and types that are shared between client and server in
+Lightning Server applications. This is a Kotlin Multiplatform module, meaning these types can be used in both JVM server
+code and client applications (including JavaScript, iOS, Android, etc.).
 
 ## Overview
 
 The core-shared module provides:
+
 - **LSError**: A standardized error response format for all API endpoints
 - **HttpMethod**: A type-safe representation of HTTP methods
 - **MultiplexMessage**: Support for multiplexed WebSocket communications
 
-These types are designed to be serializable with KotlinX Serialization, making them suitable for network communication between client and server.
+These types are designed to be serializable with KotlinX Serialization, making them suitable for network communication
+between client and server.
 
 ## LSError
 
-`LSError` provides a consistent error response format across all Lightning Server endpoints. This standardization makes it easy for clients to handle errors uniformly.
+`LSError` provides a consistent error response format across all Lightning Server endpoints. This standardization makes
+it easy for clients to handle errors uniformly.
 
 ### Structure
 
@@ -73,17 +78,22 @@ val myEndpoint = path.path("resource").get.api(
 
 ### Best Practices
 
-1. **Use consistent detail codes**: Establish a standard set of detail codes across your API (e.g., "not-found", "validation-failed", "unauthorized")
+1. **Use consistent detail codes**: Establish a standard set of detail codes across your API (e.g., "not-found", "
+   validation-failed", "unauthorized")
 
-2. **Message for humans, detail for code**: The `message` field should be suitable for displaying to end users, while `detail` is for programmatic error handling
+2. **Message for humans, detail for code**: The `message` field should be suitable for displaying to end users, while
+   `detail` is for programmatic error handling
 
-3. **Only include stack traces in development**: Never expose stack traces in production environments as they may leak sensitive information
+3. **Only include stack traces in development**: Never expose stack traces in production environments as they may leak
+   sensitive information
 
-4. **Use the data field for structured errors**: When you need to return structured error information (like validation errors for multiple fields), encode it as JSON in the `data` field
+4. **Use the data field for structured errors**: When you need to return structured error information (like validation
+   errors for multiple fields), encode it as JSON in the `data` field
 
 ## HttpMethod
 
-`HttpMethod` is a type-safe, zero-overhead value class representing HTTP methods. It prevents typos and provides compile-time safety while maintaining performance.
+`HttpMethod` is a type-safe, zero-overhead value class representing HTTP methods. It prevents typos and provides
+compile-time safety while maintaining performance.
 
 ### Standard Methods
 
@@ -136,7 +146,8 @@ when (request.method) {
 
 ## MultiplexMessage
 
-`MultiplexMessage` enables multiplexing multiple logical communication channels over a single WebSocket connection. This is useful for applications that need multiple concurrent streams of data without opening multiple WebSocket connections.
+`MultiplexMessage` enables multiplexing multiple logical communication channels over a single WebSocket connection. This
+is useful for applications that need multiple concurrent streams of data without opening multiple WebSocket connections.
 
 ### Structure
 
@@ -242,15 +253,18 @@ when {
 
 ### Best Practices
 
-1. **Unique channel identifiers**: Use descriptive, unique channel IDs to avoid conflicts (e.g., "user-123-notifications", "chat-room-general")
+1. **Unique channel identifiers**: Use descriptive, unique channel IDs to avoid conflicts (e.g., "
+   user-123-notifications", "chat-room-general")
 
 2. **Validate state transitions**: Ensure channels are started before sending data, and properly closed when finished
 
 3. **Only one of data or error**: A message should contain either `data` or `error`, not both
 
-4. **Path and queryParams only on start**: Only include `path` and `queryParams` in start messages, not in regular data messages
+4. **Path and queryParams only on start**: Only include `path` and `queryParams` in start messages, not in regular data
+   messages
 
-5. **Handle errors gracefully**: When receiving an error message, clean up channel state and inform the user appropriately
+5. **Handle errors gracefully**: When receiving an error message, clean up channel state and inform the user
+   appropriately
 
 ## Serialization
 

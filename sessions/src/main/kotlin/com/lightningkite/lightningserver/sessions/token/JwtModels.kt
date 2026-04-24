@@ -1,7 +1,6 @@
 package com.lightningkite.lightningserver.sessions.token
 
 import kotlinx.serialization.Serializable
-import kotlin.uuid.Uuid
 
 @Serializable
 public data class JwtHeader(val typ: String = "JWT", val alg: String = "HS256")

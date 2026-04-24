@@ -5,10 +5,7 @@ import com.lightningkite.lightningserver.definition.builder.DuplicateRegistratio
 import com.lightningkite.services.data.StringArrayFormat
 import kotlinx.serialization.modules.EmptySerializersModule
 import org.junit.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
+import kotlin.test.*
 
 /**
  * Tests for PathSpecRegistry functionality including registration, duplicate detection,

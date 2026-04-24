@@ -1,10 +1,7 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
 import com.lightningkite.lightningserver.HttpMethod
-import com.lightningkite.lightningserver.sessions.IdAndAuthMethods
-import com.lightningkite.lightningserver.sessions.LogInRequest
-import com.lightningkite.lightningserver.sessions.ProofsCheckResult
-import com.lightningkite.lightningserver.sessions.SubSessionRequest
+import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.typed.Fetcher
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.KSerializer
@@ -16,7 +13,7 @@ public class LiveAuthClientEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
     public val fetcher: Fetcher,
     public val subpath: String,
     public val subjectSerializer: KSerializer<USER>,
-    public val idSerializer: KSerializer<ID>
+    public val idSerializer: KSerializer<ID>,
 ) : AuthClientEndpoints<USER, ID> {
     override suspend fun logIn(input: List<Proof>): IdAndAuthMethods<ID> = fetcher(
         url = "$subpath/login",

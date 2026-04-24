@@ -2,14 +2,13 @@
 package com.lightningkite.lightningserver.loadtest
 
 import com.lightningkite.lightningserver.definition.ServerDefinition
-import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.services.data.StringArrayFormat
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
 import java.net.http.HttpClient
-import java.time.Duration as JavaDuration
 import kotlin.time.Duration
 import kotlin.time.TimeSource
+import java.time.Duration as JavaDuration
 
 /**
  * Runs the load test with the given configuration.

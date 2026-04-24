@@ -1,13 +1,7 @@
 package com.lightningkite.lightningserver.auth
 
-import com.lightningkite.lightningserver.BadRequestException
-import com.lightningkite.lightningserver.ForbiddenException
-import com.lightningkite.lightningserver.UnauthorizedException
-import com.lightningkite.lightningserver.data.Caching
-import com.lightningkite.lightningserver.data.Request
-import com.lightningkite.lightningserver.data.SerializableCache
-import com.lightningkite.lightningserver.data.getOrPut
-import com.lightningkite.lightningserver.definition.ListRegistryExtension
+import com.lightningkite.lightningserver.*
+import com.lightningkite.lightningserver.data.*
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.HasId
@@ -281,6 +275,7 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
 
     @Deprecated("Dont cache auth within itself.", level = DeprecationLevel.ERROR)
     public operator fun get(key: CacheKey): Authentication<*> = throw NotImplementedError()
+
     @Deprecated("Dont cache auth within itself.", level = DeprecationLevel.ERROR)
     public fun get(key: CacheKey, input: Request<*>): Authentication<*> = throw NotImplementedError()
 
@@ -382,7 +377,11 @@ context(server: ServerRuntime)
 public val <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication<SUBJECT>.id: ID
     get() = untypedId as ID
 
-@Suppress("UNCHECKED_CAST")
+@Suppress("UNCHECKED_CAST", "UPPER_BOUND_VIOLATED_IN_TYPE_OPERATOR_OR_PARAMETER_BOUNDS_WARNING")
 context(server: ServerRuntime)
 public suspend fun <SUBJECT : HasId<*>> Authentication<SUBJECT>.fetch(): SUBJECT =
-    cache.getOrPut(untypedPrincipal.subjectCacheKey) { (untypedPrincipal as PrincipalType<SUBJECT, Comparable<*>>).fetch(untypedId) }
+    cache.getOrPut(untypedPrincipal.subjectCacheKey) {
+        (untypedPrincipal as PrincipalType<SUBJECT, Comparable<*>>).fetch(
+            untypedId
+        )
+    }

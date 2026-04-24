@@ -3,17 +3,12 @@ package com.lightningkite.lightningserver.sessions.proofs
 
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.NotFoundException
-import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.services.cache.Cache
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertNotEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Duration.Companion.minutes
 
 /**
@@ -28,7 +23,7 @@ class PinHandlerTest {
     private fun createPinHandler(
         length: Int = 6,
         maxAttempts: Int = 5,
-        availableCharacters: List<Char> = ('A'..'Z').toList() - setOf('I', 'O')
+        availableCharacters: List<Char> = ('A'..'Z').toList() - setOf('I', 'O'),
     ): PinHandler {
         return PinHandler(
             cache = TestServer.cache,

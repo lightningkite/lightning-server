@@ -1,15 +1,11 @@
 // by Claude
 package com.lightningkite.lightningserver
 
-import com.lightningkite.services.data.KotlinBytesFormat
-import kotlinx.serialization.builtins.serializer
+import com.lightningkite.services.serializers.KotlinBytesFormat
 import kotlinx.serialization.builtins.nullable
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.modules.EmptySerializersModule
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotEquals
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /**
  * Tests for AnonType class.
@@ -250,7 +246,10 @@ class AnonTypeTest {
         val areEqual = directInstance == bytesInstance
         // Note: This test documents behavior, not correctness
         // The result depends on implementation details of the equals method
-        assertFalse(areEqual, "Direct instance without serialization should not equal bytes instance via bytes comparison since serializedBytes is null")
+        assertFalse(
+            areEqual,
+            "Direct instance without serialization should not equal bytes instance via bytes comparison since serializedBytes is null"
+        )
     }
 
     @Test

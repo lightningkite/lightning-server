@@ -4,19 +4,13 @@ import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.notifications.events.EventRegistry.Companion.events
-import com.lightningkite.lightningserver.notifications.events.EventType
 import com.lightningkite.lightningserver.notifications.query
 import com.lightningkite.lightningserver.notifications.withPermissions
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.serverRuntime
-import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.lightningserver.typed.AuthAccess
-import com.lightningkite.lightningserver.typed.explicitApiHttpHandler
-import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.ModelPermissions
-import com.lightningkite.services.database.Query
-import com.lightningkite.services.database.comparator
+import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.services.database.*
 import kotlinx.serialization.builtins.ListSerializer
 
 /**
@@ -32,9 +26,10 @@ import kotlinx.serialization.builtins.ListSerializer
  */
 public class EventEndpoints<AUTH : HasId<*>?>(
     public val auth: AuthRequirement<AUTH>,
-    public val permissions: suspend context(ServerRuntime) AuthAccess<AUTH>.() -> ModelPermissions<EventType>
+    public val permissions: suspend context(ServerRuntime) AuthAccess<AUTH>.() -> ModelPermissions<EventType>,
 ) : ServerBuilder() {
-    private fun <T> Sequence<T>.sortedWithNullable(comparator: Comparator<T>?): Sequence<T> = if (comparator == null) this else sortedWith(comparator)
+    private fun <T> Sequence<T>.sortedWithNullable(comparator: Comparator<T>?): Sequence<T> =
+        if (comparator == null) this else sortedWith(comparator)
 
     /**
      * Endpoint to query registered event types.

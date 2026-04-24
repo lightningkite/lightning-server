@@ -32,11 +32,11 @@ source "amazon-ebs" "main" {
       virtualization-type = "hvm"
     }
     most_recent = true
-    owners      = ["099720109477"]
+    owners = ["099720109477"]
   }
   ssh_username = "ubuntu"
-  vpc_id = "vpc-96e035f1"
-  subnet_id = "subnet-e2838d94"
+  vpc_id       = "vpc-96e035f1"
+  subnet_id    = "subnet-e2838d94"
 }
 
 # a build block invokes sources and runs provisioning steps on them.
@@ -58,7 +58,7 @@ build {
     ]
   }
   provisioner "file" {
-    content = <<EOF
+    content     = <<EOF
       [Unit]
       Description=MyServer
 

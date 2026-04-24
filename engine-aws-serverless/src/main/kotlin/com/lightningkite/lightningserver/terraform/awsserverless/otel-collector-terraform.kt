@@ -7,7 +7,6 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
 import software.amazon.awssdk.services.lambda.model.Architecture
-import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -23,6 +22,7 @@ public enum class OtlpProtocol(
 ) {
     /** gRPC protocol (default). More efficient but requires HTTP/2 support. */
     GRPC("grpc", 4317, "otlp-grpc"),
+
     /** HTTP with protobuf encoding. Use when gRPC isn't supported or going through HTTP-only proxies. */
     HTTP("http/protobuf", 4318, "otlp-http"),
 }
@@ -104,7 +104,8 @@ public fun TerraformNeed<OpenTelemetrySettings?>.otelCollector(
     // Service identification
     val effectiveServiceName = serviceName ?: emitter.handler.qualifiedName ?: emitter.projectPrefix
     emitter.lambdaEnvironment["OTEL_SERVICE_NAME"] = effectiveServiceName
-    emitter.lambdaEnvironment["OTEL_RESOURCE_ATTRIBUTES"] = "service.name=$effectiveServiceName,deployment.environment=${emitter.projectPrefix}"
+    emitter.lambdaEnvironment["OTEL_RESOURCE_ATTRIBUTES"] =
+        "service.name=$effectiveServiceName,deployment.environment=${emitter.projectPrefix}"
 
     // Determine if using X-Ray (no custom endpoint)
     val usingXRay = otlpEndpoint == null
@@ -112,7 +113,8 @@ public fun TerraformNeed<OpenTelemetrySettings?>.otelCollector(
     // Configure OTLP exporter endpoint
     if (otlpEndpoint != null) {
         // User wants to export to a custom OTLP endpoint
-        emitter.lambdaEnvironment["OTEL_EXPORTER_OTLP_ENDPOINT"] = if (otlpEndpoint.startsWith("http")) otlpEndpoint else "https://$otlpEndpoint"
+        emitter.lambdaEnvironment["OTEL_EXPORTER_OTLP_ENDPOINT"] =
+            if (otlpEndpoint.startsWith("http")) otlpEndpoint else "https://$otlpEndpoint"
         emitter.lambdaEnvironment["OTEL_EXPORTER_OTLP_PROTOCOL"] = otlpProtocol.envValue
 
         // Add authentication headers if provided
@@ -158,7 +160,9 @@ public fun TerraformNeed<OpenTelemetrySettings?>.otelCollector(
     // Configure the app's OpenTelemetry settings to use the local collector
     // Use HTTP on port 4318 or gRPC on port 4317 depending on protocol
     val localCollectorUrl = "${otlpProtocol.urlScheme}://localhost:${otlpProtocol.defaultPort}"
-    emitter.fulfillSetting(name, Json.encodeToJsonElement(OpenTelemetrySettings(
+    emitter.fulfillSetting(
+        name, Json.encodeToJsonElement(
+        OpenTelemetrySettings(
         url = localCollectorUrl,
         serviceName = effectiveServiceName,
         batching = OpenTelemetrySettings.BatchingRules(
@@ -241,7 +245,8 @@ public fun TerraformNeed<OpenTelemetrySettings?>.otelGrafanaCloud(
         override val name: String = "grafana_cloud_api_key"
         override val serializer: KSerializer<String> = String.serializer()
         override val default: String? = null
-        override val instructions: String = "Get an API key from Grafana Cloud: https://grafana.com/docs/grafana-cloud/account-management/authentication-and-permissions/access-policies/"
+        override val instructions: String =
+            "Get an API key from Grafana Cloud: https://grafana.com/docs/grafana-cloud/account-management/authentication-and-permissions/access-policies/"
     })
     emitter.emit("variables") {
         "variable.grafana_cloud_api_key" {}

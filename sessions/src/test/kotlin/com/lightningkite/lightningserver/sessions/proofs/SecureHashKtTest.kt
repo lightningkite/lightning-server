@@ -1,20 +1,14 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
-import com.lightningkite.lightningserver.encryption.checkAgainstHash
-import com.lightningkite.lightningserver.encryption.fastHash
-import com.lightningkite.lightningserver.encryption.isSlowHash
-import com.lightningkite.lightningserver.encryption.secureHash
+import com.lightningkite.lightningserver.encryption.*
 import kotlinx.coroutines.runBlocking
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotEquals
-import org.junit.Assert.assertTrue
+import org.junit.Assert.*
 import org.junit.Test
 import kotlin.system.measureTimeMillis
 
 class SecureHashKtTest {
     @Test
-    fun secureHashTest():Unit = runBlocking {
+    fun secureHashTest(): Unit = runBlocking {
         val hash = "asdf".secureHash()
         println("PBKDF2 Hash is $hash")
         assertTrue("Hash should start with PBKDF2 prefix", hash.startsWith("PBKDF2WithHmacSHA512."))
@@ -27,7 +21,7 @@ class SecureHashKtTest {
     }
 
     @Test
-    fun fastHashTest():Unit = runBlocking  {
+    fun fastHashTest(): Unit = runBlocking {
         val hash = "asdf".fastHash()
         println("SHA256 Hash is $hash")
         assertTrue("Hash should start with SHA256 prefix", hash.startsWith("SHA256."))
@@ -40,7 +34,7 @@ class SecureHashKtTest {
     }
 
     @Test
-    fun fastHashPerformance():Unit = runBlocking  {
+    fun fastHashPerformance(): Unit = runBlocking {
         // Fast hash should be significantly faster than secure hash
         val fastTime = measureTimeMillis {
             repeat(100) {
@@ -53,7 +47,7 @@ class SecureHashKtTest {
     }
 
     @Test
-    fun crossHashVerificationFails():Unit = runBlocking  {
+    fun crossHashVerificationFails(): Unit = runBlocking {
         // Verify that a PBKDF2 hash doesn't validate against fast hash check and vice versa
         val secureHash = "asdf".secureHash()
         val fastHash = "asdf".fastHash()
@@ -68,14 +62,14 @@ class SecureHashKtTest {
     }
 
     @Test
-    fun emptyStringHandling():Unit = runBlocking  {
+    fun emptyStringHandling(): Unit = runBlocking {
         assertEquals("Empty input should return empty hash", "", "".secureHash())
         assertEquals("Empty input should return empty hash", "", "".fastHash())
         assertFalse("Empty hash should never validate", "anything".checkAgainstHash(""))
     }
 
     @Test
-    fun isSlowHashTest():Unit = runBlocking  {
+    fun isSlowHashTest(): Unit = runBlocking {
         val secureHash = "asdf".secureHash()
         val fastHash = "asdf".fastHash()
 
@@ -84,7 +78,7 @@ class SecureHashKtTest {
     }
 
     @Test
-    fun idempotentHashTest():Unit = runBlocking  {
+    fun idempotentHashTest(): Unit = runBlocking {
         // If already hashed, should return unchanged
         val secureHash = "asdf".secureHash()
         val fastHash = "asdf".fastHash()
@@ -94,14 +88,14 @@ class SecureHashKtTest {
     }
 
     @Test
-    fun unknownPrefixFails():Unit = runBlocking  {
+    fun unknownPrefixFails(): Unit = runBlocking {
         // Unknown prefix should fail validation
         assertFalse("asdf".checkAgainstHash("UNKNOWN.salt.hash"))
         assertFalse("asdf".checkAgainstHash("randomgarbage"))
     }
 
     @Test
-    fun differentSaltsProduceDifferentHashes():Unit = runBlocking  {
+    fun differentSaltsProduceDifferentHashes(): Unit = runBlocking {
         val hash1 = "asdf".fastHash()
         val hash2 = "asdf".fastHash()
         assertNotEquals("Same input should produce different hashes due to random salt", hash1, hash2)

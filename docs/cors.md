@@ -4,9 +4,12 @@ Last updated January 2025 (`version-5`)
 
 ## Overview
 
-Cross-Origin Resource Sharing (CORS) is a security mechanism that allows your Lightning Server application to safely handle requests from web applications hosted on different domains. Without CORS configuration, browsers will block cross-origin requests by default.
+Cross-Origin Resource Sharing (CORS) is a security mechanism that allows your Lightning Server application to safely
+handle requests from web applications hosted on different domains. Without CORS configuration, browsers will block
+cross-origin requests by default.
 
 Lightning Server provides a `CorsInterceptor` that handles all CORS logic, including:
+
 - Origin validation with flexible pattern matching
 - Automatic preflight (OPTIONS) request handling
 - CORS header injection
@@ -56,6 +59,7 @@ limitToDomains = listOf("*")
 ```
 
 **Pattern Matching:**
+
 - `https://example.com` - Exact match with scheme
 - `*.example.com` - Matches any subdomain with any scheme
 - `https://*.example.com` - Matches any subdomain with HTTPS only
@@ -117,7 +121,8 @@ allowCredentials = true
 allowCredentials = false
 ```
 
-**Warning:** When `allowCredentials = true`, you cannot use wildcard (`*`) for `limitToDomains`. You must specify exact origins or patterns.     <!-TODO-------------------------->
+**Warning:** When `allowCredentials = true`, you cannot use wildcard (`*`) for `limitToDomains`. You must specify exact
+origins or patterns.     <!-TODO-------------------------->
 
 ### cacheLength
 
@@ -146,7 +151,8 @@ forbidOnMatchFail = true
 forbidOnMatchFail = false
 ```
 
-When `false`, the request proceeds normally but without CORS headers, meaning the browser will block the response. This can be useful to avoid revealing endpoint existence.
+When `false`, the request proceeds normally but without CORS headers, meaning the browser will block the response. This
+can be useful to avoid revealing endpoint existence.
 
 **Note:** WebSocket connections always fail on origin mismatch, regardless of this setting.
 
@@ -158,7 +164,8 @@ When `false`, the request proceeds normally but without CORS headers, meaning th
 val corsSettings = setting("cors", CorsSettings.forDevelopment())
 ```
 
-This uses the built-in `forDevelopment` preset that mirrors all origins, headers, and methods. **Never use this in production.**
+This uses the built-in `forDevelopment` preset that mirrors all origins, headers, and methods. **Never use this in
+production.**
 
 ### Production (Single Origin)
 
@@ -188,7 +195,8 @@ val corsSettings = setting("cors", CorsSettings(
 
 ## How Preflight Requests Work
 
-When a browser makes a "complex" cross-origin request (with custom headers, methods other than GET/POST, etc.), it first sends a preflight OPTIONS request.
+When a browser makes a "complex" cross-origin request (with custom headers, methods other than GET/POST, etc.), it first
+sends a preflight OPTIONS request.
 
 The `CorsInterceptor` automatically handles preflight requests:
 
@@ -240,9 +248,11 @@ val wsEndpoint = path.path("chat") bind WebSocketHandler(
 )
 ```
 
-The `CorsInterceptor` validates the `Origin` header during the WebSocket handshake. If the origin doesn't match, the connection is rejected with 403 Forbidden.
+The `CorsInterceptor` validates the `Origin` header during the WebSocket handshake. If the origin doesn't match, the
+connection is rejected with 403 Forbidden.
 
-**Important:** WebSocket connections always enforce origin checking, even if `forbidOnMatchFail = false`. This is because browsers themselves do not verify CORS for WebSocket connections.
+**Important:** WebSocket connections always enforce origin checking, even if `forbidOnMatchFail = false`. This is
+because browsers themselves do not verify CORS for WebSocket connections.
 
 ## Settings File Configuration
 
@@ -315,6 +325,7 @@ limitToDomains = listOf("https://app.example.com")
 ### 2. Be Careful with Credentials
 
 When `allowCredentials = true`, browsers include cookies and authorization headers. Make sure:
+
 - You specify exact origins (no wildcards)
 - You validate authentication properly
 - You use HTTPS in production
@@ -352,7 +363,8 @@ Make sure you control all subdomains, or attackers could register malicious subd
 
 ### Browser shows "CORS error" but server logs nothing
 
-This usually means the preflight request failed. Check that your `limitToHeaders` and `limitToMethods` include what the browser is requesting.
+This usually means the preflight request failed. Check that your `limitToHeaders` and `limitToMethods` include what the
+browser is requesting.
 
 ### Request works in Postman but fails in browser
 
@@ -361,6 +373,7 @@ Postman doesn't enforce CORS. Browsers do. Make sure your origin is in `limitToD
 ### Credentials not being sent
 
 Check that:
+
 1. `allowCredentials = true` in your CORS settings
 2. Your frontend code uses `credentials: 'include'` (fetch) or `withCredentials: true` (axios)
 3. Your origin is exact (not a wildcard)

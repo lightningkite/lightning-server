@@ -1,68 +1,29 @@
 package com.lightningkite.lightningserver.notifications
 
-import com.lightningkite.EmailAddress
-import com.lightningkite.PhoneNumber
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.data.Schedule
-import com.lightningkite.lightningserver.definition.Runtime
-import com.lightningkite.lightningserver.definition.ScheduledTask
-import com.lightningkite.lightningserver.definition.Task
+import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.launch
-import com.lightningkite.lightningserver.notifications.events.EventRegistry
-import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.invoke
-import com.lightningkite.lightningserver.runtime.location
-import com.lightningkite.lightningserver.runtime.now
-import com.lightningkite.lightningserver.typed.ModelInfo
-import com.lightningkite.lightningserver.typed.ModelRestEndpoints
-import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebsocket
-import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebsocket.Companion.plus
-import com.lightningkite.lightningserver.typed.ModelRestUpdatesWebsocket
-import com.lightningkite.lightningserver.typed.explicitModelInfo
+import com.lightningkite.lightningserver.runtime.*
+import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
 import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.services.cache.Cache
-import com.lightningkite.services.data.GenerateDataClassPaths
-import com.lightningkite.services.database.Condition
-import com.lightningkite.services.database.DataClassPath
-import com.lightningkite.services.database.DataClassPathSelf
-import com.lightningkite.services.database.Database
-import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.ModelPermissions
-import com.lightningkite.services.database.SerializableProperty
-import com.lightningkite.services.database.SortBuilder
-import com.lightningkite.services.database.SortPart
-import com.lightningkite.services.database.andNotNull
-import com.lightningkite.services.database.eq
-import com.lightningkite.services.database.findOne
-import com.lightningkite.services.database.getMany
-import com.lightningkite.services.database.gt
-import com.lightningkite.services.database.insertMany
-import com.lightningkite.services.database.insertOne
-import com.lightningkite.services.database.inside
-import com.lightningkite.services.database.lte
-import com.lightningkite.services.database.modification
-import com.lightningkite.services.database.notNull
+import com.lightningkite.services.data.*
+import com.lightningkite.services.database.*
 import com.lightningkite.services.email.Email
 import com.lightningkite.services.email.EmailService
-import com.lightningkite.services.notifications.NotificationData
-import com.lightningkite.services.notifications.NotificationSendResult
-import com.lightningkite.services.notifications.NotificationService
+import com.lightningkite.services.notifications.*
 import com.lightningkite.services.sms.SMS
 import io.github.oshai.kotlinlogging.KLogger
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.github.oshai.kotlinlogging.slf4j.logger
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
+import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
-import kotlin.math.log
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -103,8 +64,8 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
     public val push: (Runtime<NotificationService>)? = null,
     public val refreshSchedule: Schedule = Schedule.Frequency(1.minutes),
     public val timeout: Duration = 5.minutes,
-    websocketKey: SerializableProperty<Notification<UID, CONTENT>, *>? = info.serializer.fieldInApp
-): ServerBuilder(), NotificationEndpoints.Dispatcher<UID, CONTENT> {
+    websocketKey: SerializableProperty<Notification<UID, CONTENT>, *>? = info.serializer.fieldInApp,
+) : ServerBuilder(), NotificationEndpoints.Dispatcher<UID, CONTENT> {
     init {
         sdkSettings.defaultInfo = SdkModule.Info("NotificationsApi")
     }
@@ -113,20 +74,23 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
      * Returns the email address for a user, or null if email notifications are not enabled for this user.
      * @param user The user to get the email address for
      */
-    context(server: ServerRuntime) public abstract suspend fun email(user: USER): EmailAddress?
+    context(server: ServerRuntime)
+    public abstract suspend fun email(user: USER): EmailAddress?
 
     /**
      * Returns the phone number for a user, or null if SMS notifications are not enabled for this user.
      * @param user The user to get the phone number for
      */
-    context(server: ServerRuntime) public abstract suspend fun phone(user: USER): PhoneNumber?
+    context(server: ServerRuntime)
+    public abstract suspend fun phone(user: USER): PhoneNumber?
 
     /**
      * Returns the set of FCM (Firebase Cloud Messaging) tokens for a user's devices.
      * @param user The user to get FCM tokens for
      * @return Set of FCM tokens, or empty set if push notifications are not enabled
      */
-    context(server: ServerRuntime) public abstract suspend fun fcmTokens(user: USER): Set<String>
+    context(server: ServerRuntime)
+    public abstract suspend fun fcmTokens(user: USER): Set<String>
 
     /**
      * Called when FCM tokens are detected as invalid or expired.
@@ -134,9 +98,11 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
      * @param user The user whose tokens are dead
      * @param deadTokens The set of tokens that are no longer valid
      */
-    context(server: ServerRuntime) public abstract suspend fun onFcmTokensDead(user: USER, deadTokens: Set<String>)
+    context(server: ServerRuntime)
+    public abstract suspend fun onFcmTokensDead(user: USER, deadTokens: Set<String>)
 
-    internal val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.notifications.NotificationBulkDispatcher")
+    internal val logger: KLogger =
+        KotlinLogging.logger("com.lightningkite.lightningserver.notifications.NotificationBulkDispatcher")
 
     /**
      * Additional condition to apply when querying for notifications to send.
@@ -154,7 +120,10 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
      * @return A list of `Email` to be sent.
      * */
     context(runtime: ServerRuntime)
-    public abstract suspend fun makeEmailNotifications(user: USER, notifications: List<Notification<UID, CONTENT>>): List<Email>
+    public abstract suspend fun makeEmailNotifications(
+        user: USER,
+        notifications: List<Notification<UID, CONTENT>>,
+    ): List<Email>
 
     /**
      * Generates a list of SMS messages to be sent to the user based on the provided notifications.
@@ -166,7 +135,10 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
      * @return A list of SMS messages as strings to be sent.
      * */
     context(runtime: ServerRuntime)
-    public abstract suspend fun makeSmsNotifications(user: USER, notifications: List<Notification<UID, CONTENT>>): List<String>
+    public abstract suspend fun makeSmsNotifications(
+        user: USER,
+        notifications: List<Notification<UID, CONTENT>>,
+    ): List<String>
 
     /**
      * Creates a list of push notifications to be sent to the user based on the provided notifications.
@@ -178,8 +150,10 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
      * @return A list of `NotificationData` objects representing the push notifications to be sent.
      */
     context(runtime: ServerRuntime)
-    public abstract suspend fun makePushNotifications(user: USER, notifications: List<Notification<UID, CONTENT>>): List<NotificationData>
-
+    public abstract suspend fun makePushNotifications(
+        user: USER,
+        notifications: List<Notification<UID, CONTENT>>,
+    ): List<NotificationData>
 
 
     private fun SendInfo?.needsSending(at: Instant) = this != null && !sent && sendAt <= at
@@ -192,7 +166,9 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
 
         notifications
             .filter {
-                it.email.needsSending(now) || it.sms.needsSending(now) || it.push.needsSending(now) || it.inApp.needsSending(now)
+                it.email.needsSending(now) || it.sms.needsSending(now) || it.push.needsSending(now) || it.inApp.needsSending(
+                    now
+                )
             }
             .takeIf { it.isNotEmpty() }
             ?.let { sendNotifications(it) }
@@ -271,7 +247,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
         notificationData.forEach {
             val r = push.send(allTokens.toList(), it)
             r.forEach { (a, b) ->
-                when(b) {
+                when (b) {
                     NotificationSendResult.DeadToken -> deadTokens.add(a)
                     NotificationSendResult.Failure -> {}
                     NotificationSendResult.Success -> {}
@@ -298,9 +274,9 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
      * @property notifications The notifications to send
      */
     @Serializable
-    public data class NotificationPager<USER:HasId<UID>, UID:Comparable<UID>, CONTENT>(
+    public data class NotificationPager<USER : HasId<UID>, UID : Comparable<UID>, CONTENT>(
         val users: Map<UID, USER>,
-        val notifications: List<Notification<UID, CONTENT>>
+        val notifications: List<Notification<UID, CONTENT>>,
     )
 
     /**
@@ -312,18 +288,25 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
      * with the remaining notifications.
      */
     public val sendNotifications: Task<NotificationPager<USER, UID, CONTENT>> =
-        path.path("send-notifs") bind Task(NotificationPager.serializer(users.serializer, users.idSerializer, contentSerializer)) { startInfo ->
+        path.path("send-notifs") bind Task(
+            NotificationPager.serializer(
+                users.serializer,
+                users.idSerializer,
+                contentSerializer
+            )
+        ) { startInfo ->
             val byUser = startInfo.notifications.groupBy { it.user }
 
             val now = now()
 
             val unsent = runForEach(timeout, byUser.entries) { (userId, userNotifs) ->
                 try {
-                    val user = startInfo.users[userId] ?: throw NotFoundException("User could not be found to send notifications: $userId")
+                    val user = startInfo.users[userId]
+                        ?: throw NotFoundException("User could not be found to send notifications: $userId")
 
                     supervisorScope {
                         launch {
-                            val toEmail = userNotifs.filter { it.email.needsSending(now)  }
+                            val toEmail = userNotifs.filter { it.email.needsSending(now) }
                             if (toEmail.isEmpty()) return@launch
                             try {
                                 sendEmailNotifications(user, toEmail)
@@ -338,7 +321,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
                             }
                         }
                         launch {
-                            val toSms = userNotifs.filter { it.sms.needsSending(now)  }
+                            val toSms = userNotifs.filter { it.sms.needsSending(now) }
                             if (toSms.isEmpty()) return@launch
                             try {
                                 sendSmsNotifications(user, toSms)
@@ -414,8 +397,8 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
      */
     @Serializable
     @GenerateDataClassPaths
-    public data class RunInstant(val instant: Instant) : HasId<String> {
-        public companion object{
+    public data class RunInstant(val instant: kotlin.time.Instant) : HasId<String> {
+        public companion object {
             /** The singleton ID for this record */
             public const val ID: String = "SINGLETON"
         }
@@ -438,9 +421,10 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
     context(_: ServerRuntime)
     private val scheduleLockKey get() = "${refreshNotifications.location}.lockKey"
 
-    private fun <K> DataClassPath<K, SendInfo>.shouldBeSentNow(lower: Instant, upper: Instant) = Condition.And(sent eq false, sendAt gt lower, sendAt lte upper)
+    private fun <K> DataClassPath<K, SendInfo>.shouldBeSentNow(lower: Instant, upper: Instant) =
+        Condition.And(sent eq false, sendAt gt lower, sendAt lte upper)
 
-    private suspend fun <T> runFor(timeout: Duration, startingValue: T, action: suspend (T) -> T?):T?{
+    private suspend fun <T> runFor(timeout: Duration, startingValue: T, action: suspend (T) -> T?): T? {
         val loopStart = TimeSource.Monotonic.markNow()
         var value = startingValue
 
@@ -451,15 +435,14 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
         return value
     }
 
-    private suspend fun <T> runForEach(timeout: Duration, items: Collection<T>, action: suspend (T)->Unit): List<T> {
+    private suspend fun <T> runForEach(timeout: Duration, items: Collection<T>, action: suspend (T) -> Unit): List<T> {
         val loopStart = TimeSource.Monotonic.markNow()
 
         val remaining = items.toMutableList()
         while (loopStart.elapsedNow() < timeout && remaining.isNotEmpty()) {
             try {
                 action(remaining.removeFirst())
-            }
-            catch (e: Throwable) {
+            } catch (e: Throwable) {
                 logger.error(e) { "Error encountered in runForEach" }
             }
         }
@@ -467,9 +450,12 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
         return remaining
     }
 
-    private fun <T> sort(path: DataClassPath<T, T>, setup: SortBuilder<T>.(DataClassPath<T, T>) -> Unit): List<SortPart<T>> =
+    private fun <T> sort(
+        path: DataClassPath<T, T>,
+        setup: SortBuilder<T>.(DataClassPath<T, T>) -> Unit,
+    ): List<SortPart<T>> =
         SortBuilder<T>().apply { setup(path) }.build()
-    
+
     /**
      * Task that queries for pending notifications and dispatches them.
      *
@@ -528,9 +514,8 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
 
             if (endPage != null) {
                 launch(BasicPager(endPage, startInfo.pageLimit))
-            }
-            else cache().remove(scheduleLockKey)
-        } catch (e:Exception) {
+            } else cache().remove(scheduleLockKey)
+        } catch (e: Exception) {
             cache().remove(scheduleLockKey)
             throw e
         }
@@ -551,7 +536,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
      */
     public val autoRefreshNotifications: ScheduledTask =
         path.path("refresh-notifs") bind ScheduledTask(refreshSchedule, timeout) {
-            val acquiredLock = cache().setIfNotExists(scheduleLockKey, "lock", String.serializer(), timeout*16)
+            val acquiredLock = cache().setIfNotExists(scheduleLockKey, "lock", String.serializer(), timeout * 16)
             if (acquiredLock) refreshNotifications()
         }
 }

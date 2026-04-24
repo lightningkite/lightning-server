@@ -12,15 +12,8 @@ import com.lightningkite.lightningserver.typed.sdk.SDK.processToModules
 import com.lightningkite.lightningserver.typed.sdk.SDK.sdk
 import com.lightningkite.lightningserver.typed.sdk.SDK.writeUsingDefaultSettings
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.withSdkInfo
-import com.lightningkite.services.data.KFile
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.serializer
-import java.io.ByteArrayOutputStream
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import com.lightningkite.services.kfile.KFile
+import kotlin.test.*
 
 /**
  * Tests for SDK generation utilities, casing functions, and module processing.
@@ -94,8 +87,10 @@ class SdkGenerationTest {
         assertEquals("helloworld", "hello!@#world".functionCase())
         // $ is filtered, leaving "testfunction"
         val result = "test\$function".functionCase()
-        assertTrue(result.contains("test") && result.contains("function"),
-            "Should contain test and function, got: $result")
+        assertTrue(
+            result.contains("test") && result.contains("function"),
+            "Should contain test and function, got: $result"
+        )
     }
 
     @Test
@@ -182,8 +177,10 @@ class SdkGenerationTest {
             val module = data.processToModules()
 
             val functionNames = module.functions.map { it.functionName }
-            assertTrue(functionNames.contains("getRoot") || functionNames.contains("doAction"),
-                "Should contain expected function names, got: $functionNames")
+            assertTrue(
+                functionNames.contains("getRoot") || functionNames.contains("doAction"),
+                "Should contain expected function names, got: $functionNames"
+            )
         }
     }
 

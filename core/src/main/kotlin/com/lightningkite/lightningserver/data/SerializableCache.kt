@@ -5,9 +5,7 @@ import com.lightningkite.lightningserver.data.SerializableCache.Key
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.ByteArraySerializer
-import kotlinx.serialization.builtins.MapSerializer
-import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.builtins.*
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
@@ -265,7 +263,7 @@ public class SerializableCache private constructor(
         ): Key<T> = KeyData(id, serializer, expireAfter, localOnly)
     }
 
-    private object Serializer : KSerializer<SerializableCache> {
+    public object Serializer : KSerializer<SerializableCache> {
         private val defer = MapSerializer(String.serializer(), ByteArraySerializer())
 
         override val descriptor: SerialDescriptor

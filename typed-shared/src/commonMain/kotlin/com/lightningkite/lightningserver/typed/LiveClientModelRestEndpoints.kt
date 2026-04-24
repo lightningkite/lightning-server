@@ -1,25 +1,9 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.HttpMethod
-import com.lightningkite.services.database.AggregateQuery
-import com.lightningkite.services.database.CollectionUpdates
-import com.lightningkite.services.database.Condition
-import com.lightningkite.services.database.EntryChange
-import com.lightningkite.services.database.GroupAggregateQuery
-import com.lightningkite.services.database.GroupCountQuery
-import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.MassModification
-import com.lightningkite.services.database.ModelPermissions
-import com.lightningkite.services.database.Modification
-import com.lightningkite.services.database.Partial
-import com.lightningkite.services.database.PartialSerializer
-import com.lightningkite.services.database.Query
-import com.lightningkite.services.database.QueryPartial
+import com.lightningkite.services.database.*
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.builtins.MapSerializer
-import kotlinx.serialization.builtins.nullable
-import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.builtins.*
 
 /**
  * Live HTTP implementation of [ClientModelRestEndpoints] that makes actual REST API calls.
@@ -62,7 +46,7 @@ public open class LiveClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID
     public val subpath: String,
     public val serializer: KSerializer<T>,
     public val idSerializer: KSerializer<ID>,
-): ClientModelRestEndpoints<T, ID> {
+) : ClientModelRestEndpoints<T, ID> {
     override suspend fun default(): T = fetcher(
         "$subpath/_default_",
         HttpMethod.GET,
@@ -232,7 +216,7 @@ public open class LiveClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID
         input,
         MapSerializer(String.serializer(), Double.serializer().nullable)
     )
-    
+
     private fun ID.url() = fetcher.url(this, idSerializer)
 }
 
@@ -255,7 +239,11 @@ public open class LiveClientModelRestUpdatesWebsocket<T : HasId<ID>, ID : Compar
     public val idSerializer: KSerializer<ID>,
 ) : ClientModelRestUpdatesWebsocket<T, ID> {
     override fun updates(): ClientWebSocket<Condition<T>, CollectionUpdates<T, ID>> =
-        fetcher.websocket(subpath, Condition.serializer(serializer), CollectionUpdates.serializer(serializer, idSerializer))
+        fetcher.websocket(
+            subpath,
+            Condition.serializer(serializer),
+            CollectionUpdates.serializer(serializer, idSerializer)
+        )
 }
 
 /**
@@ -276,5 +264,10 @@ public class LiveClientModelRestEndpointsAndUpdatesWebsocket<T : HasId<ID>, ID :
     public val serializer: KSerializer<T>,
     public val idSerializer: KSerializer<ID>,
 ) : ClientModelRestEndpointsAndUpdatesWebsocket<T, ID>,
-        ClientModelRestEndpoints<T, ID> by LiveClientModelRestEndpoints(fetcher, subpath, serializer, idSerializer),
-        ClientModelRestUpdatesWebsocket<T, ID> by LiveClientModelRestUpdatesWebsocket(fetcher, subpath, serializer, idSerializer)
+    ClientModelRestEndpoints<T, ID> by LiveClientModelRestEndpoints(fetcher, subpath, serializer, idSerializer),
+    ClientModelRestUpdatesWebsocket<T, ID> by LiveClientModelRestUpdatesWebsocket(
+        fetcher,
+        subpath,
+        serializer,
+        idSerializer
+    )

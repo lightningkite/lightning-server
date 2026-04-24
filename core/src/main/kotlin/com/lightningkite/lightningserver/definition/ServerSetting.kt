@@ -4,15 +4,10 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.Setting
 import com.lightningkite.services.SettingContext
 import com.lightningkite.services.terraform.TerraformNeed
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.KSerializer
 import java.lang.ref.WeakReference
-import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 /**
@@ -43,8 +38,10 @@ public fun interface RuntimeDeferred<out T> {
      */
     @OptIn(ExperimentalAtomicApi::class)
     public data class Cached<out T>(private val wraps: RuntimeDeferred<T>) : RuntimeDeferred<T> {
-        @kotlin.concurrent.Volatile private var cache: NullWrapper<T>? = null
+        @kotlin.concurrent.Volatile
+        private var cache: NullWrapper<T>? = null
         private val mutex = Mutex()
+
         context(server: ServerRuntime)
         override suspend fun await(): T =
             cache?.value ?: mutex.withLock {
@@ -101,7 +98,9 @@ public fun interface Runtime<out T> : RuntimeDeferred<T> {
             val runtime: WeakReference<ServerRuntime>,
             val result: T,
         )
-        @Volatile private var cache: Computed<T>? = null
+
+        @Volatile
+        private var cache: Computed<T>? = null
         private val lock = Any()
 
         context(server: ServerRuntime)
@@ -124,7 +123,7 @@ public fun interface Runtime<out T> : RuntimeDeferred<T> {
         context(server: ServerRuntime)
         override operator fun invoke(): T = value
 
-        public operator fun invoke(): T = value
+//        public operator fun invoke(): T = value
     }
 }
 
@@ -221,7 +220,7 @@ private data class BasicServerSetting<SETTING, RESULT>(
     override val serializer: KSerializer<SETTING>,
     override val instructions: String = "No instructions",
     override val optional: Boolean,
-    private val getter: SettingContext.(SETTING) -> RESULT
+    private val getter: SettingContext.(SETTING) -> RESULT,
 ) : ServerSetting<SETTING, RESULT> {
     context(settings: SettingContext)
     override fun get(setting: SETTING): RESULT = getter(settings, setting)
@@ -260,8 +259,8 @@ public fun <SETTING, RESULT> ServerSetting(
     serializer: KSerializer<SETTING>,
     instructions: String = "No instructions",
     optional: Boolean = false,
-    getter: SettingContext.(SETTING) -> RESULT
-) : ServerSetting<SETTING, RESULT> =
+    getter: SettingContext.(SETTING) -> RESULT,
+): ServerSetting<SETTING, RESULT> =
     BasicServerSetting(name, default, serializer, instructions, optional, getter)
 
 /**
@@ -281,7 +280,7 @@ public fun <SETTING : Setting<RESULT>, RESULT> ServerSetting(
     default: SETTING,
     serializer: KSerializer<SETTING>,
     instructions: String = "No instructions",
-    optional: Boolean = false
+    optional: Boolean = false,
 ): ServerSetting<SETTING, RESULT> =
     ServerSetting(name, default, serializer, instructions, optional) { it.invoke(name, this) }
 
@@ -323,8 +322,8 @@ public fun <SETTING> ServerSetting(
     default: SETTING,
     serializer: KSerializer<SETTING>,
     instructions: String = "No instructions",
-    optional: Boolean = false
-) : ServerSetting.Direct<SETTING> =
+    optional: Boolean = false,
+): ServerSetting.Direct<SETTING> =
     BasicDirectServerSetting(name, default, serializer, instructions, optional)
 
 /*

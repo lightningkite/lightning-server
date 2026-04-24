@@ -1,8 +1,6 @@
 package com.lightningkite.lightningserver.cors
 
-import kotlin.test.Test
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /**
  * Unit tests for the originMatches function.

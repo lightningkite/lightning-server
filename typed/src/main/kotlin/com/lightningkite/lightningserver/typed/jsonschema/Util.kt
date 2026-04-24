@@ -1,14 +1,11 @@
 package com.lightningkite.lightningserver.typed.jsonschema
 
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.*
 
 private fun <K, V> MutableMap<K, V>.remapMerge(
     key: K,
     value: V,
-    remap: (V, V) -> V?
+    remap: (V, V) -> V?,
 ): V? {
     val oldValue: V? = this[key]
     val newValue: V? = if (oldValue == null) value else remap(oldValue, value)

@@ -1,12 +1,8 @@
 package com.lightningkite.lightningserver.notifications.events
 
 import com.lightningkite.services.data.GenerateDataClassPaths
-import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.TypedId
-import com.lightningkite.services.database.serializerOrContextual
-import kotlinx.serialization.DeserializationStrategy
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerializationStrategy
+import com.lightningkite.services.database.*
+import kotlinx.serialization.*
 import kotlinx.serialization.json.Json
 import kotlin.jvm.JvmInline
 import kotlin.time.Instant
@@ -26,7 +22,7 @@ import kotlin.uuid.Uuid
 @GenerateDataClassPaths
 public data class EventType(
     val name: Name,
-    val tags: Set<String> = emptySet()
+    val tags: Set<String> = emptySet(),
 ) {
     @Serializable
     @JvmInline
@@ -56,15 +52,17 @@ public data class EventData(
     override val _id: Uuid,
     val timestamp: Instant,
     val type: EventType,
-    val subject: IdJsonEncoded
-): HasId<Uuid> {
+    val subject: IdJsonEncoded,
+) : HasId<Uuid> {
     @Serializable
     @JvmInline
     public value class IdJsonEncoded private constructor(public val rawJson: String) {
-        public fun <ID> decode(json: Json, serializer: DeserializationStrategy<ID>): ID = json.decodeFromString(serializer, rawJson)
+        public fun <ID> decode(json: Json, serializer: DeserializationStrategy<ID>): ID =
+            json.decodeFromString(serializer, rawJson)
 
         public companion object {
-            public fun <ID> encode(json: Json, serializer: SerializationStrategy<ID>, id: ID): IdJsonEncoded = IdJsonEncoded(json.encodeToString(serializer, id))
+            public fun <ID> encode(json: Json, serializer: SerializationStrategy<ID>, id: ID): IdJsonEncoded =
+                IdJsonEncoded(json.encodeToString(serializer, id))
         }
     }
 
@@ -86,7 +84,7 @@ public data class EventData(
 @GenerateDataClassPaths
 public data class UserEventType<UID : Comparable<UID>>(
     val user: UID,
-    val event: EventType.Name
+    val event: EventType.Name,
 ) : Comparable<UserEventType<UID>> {
     override fun compareTo(other: UserEventType<UID>): Int =
         user.compareTo(other.user).takeIf { it != 0 } ?: event.compareTo(other.event)

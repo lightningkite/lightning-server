@@ -1,8 +1,7 @@
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.DataSize.Companion.bytes
-import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.*
+import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -13,17 +12,16 @@ import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.typed.jsonschema.openApiDescription
 import com.lightningkite.lightningserver.typed.kschema.lightningServerKSchema
-import com.lightningkite.services.HealthStatus
 import com.lightningkite.services.Service
 import com.lightningkite.services.cache.Cache
-import com.lightningkite.services.data.TypedData
+import com.lightningkite.services.data.*
+import com.lightningkite.services.data.DataSize.Companion.bytes
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.http.client
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.contentType
+import io.ktor.http.*
 import kotlinx.coroutines.*
 import kotlinx.html.*
 import kotlinx.serialization.builtins.serializer
@@ -114,7 +112,10 @@ public class MetaEndpoints(
                                             key = key,
                                             value = it,
                                             serializer = HealthStatus.serializer(),
-                                            timeToLive = if (it.level == HealthStatus.Level.OK) checkable.healthCheckFrequency else minOf(checkable.healthCheckFrequency, 10.seconds)
+                                            timeToLive = if (it.level == HealthStatus.Level.OK) checkable.healthCheckFrequency else minOf(
+                                                checkable.healthCheckFrequency,
+                                                10.seconds
+                                            )
                                         )
                                     }
                                 ?: HealthStatus(
@@ -137,7 +138,8 @@ public class MetaEndpoints(
             )
         }
 
-    public class LsKuiAdminModule(public val deployment: String = "https://ls5admin.cs.lightningkite.com"): ServerBuilder() {
+    public class LsKuiAdminModule(public val deployment: String = "https://ls5admin.cs.lightningkite.com") :
+        ServerBuilder() {
         context(runtime: ServerRuntime)
         private suspend fun openAdmin(): HttpResponse {
             val publicUrl = generalSettings().publicUrl
@@ -145,7 +147,7 @@ public class MetaEndpoints(
                 put("url", publicUrl)
             }
             val response = client.get(deployment)
-            if(response.status != HttpStatusCode.OK) {
+            if (response.status != HttpStatusCode.OK) {
                 return HttpResponse(
                     body = TypedData.bytes(
                         response.bodyAsBytes(),
@@ -190,7 +192,8 @@ public class MetaEndpoints(
 
     public val admin: LsKuiAdminModule = path.path("admin") include LsKuiAdminModule()
     public val admin2: LsKuiAdminModule = path.path("admin2") include LsKuiAdminModule()
-    public val adminBeta: LsKuiAdminModule = path.path("admin-beta") include LsKuiAdminModule("https://beta.lsadmin.cs.lightningkite.com")
+    public val adminBeta: LsKuiAdminModule =
+        path.path("admin-beta") include LsKuiAdminModule("https://beta.lsadmin.cs.lightningkite.com")
 
     public val openApi: HttpHandler<PathSpec0> =
         path.path("openapi").get bind HttpHandler {
@@ -395,7 +398,8 @@ public class MetaEndpoints(
                             val split = request.path.split("?")
                             val properRequest = originalRequest.copyWithNewPathType(
                                 path = RawHttpEndpoint(split[0], method = HttpMethod(request.method)),
-                                queryParameters = split.getOrNull(1)?.let { QueryParameters.parse(it) } ?: QueryParameters.EMPTY,
+                                queryParameters = split.getOrNull(1)?.let { QueryParameters.parse(it) }
+                                    ?: QueryParameters.EMPTY,
                                 body = request.body?.let { TypedData.text(it, MediaType.Application.Json) }
                             )
                             try {

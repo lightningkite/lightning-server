@@ -1,16 +1,11 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
-import com.lightningkite.lightningserver.definition.Runtime
-import com.lightningkite.lightningserver.definition.RuntimeDeferred
-import com.lightningkite.lightningserver.definition.secretBasis
+import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.typed.sdk.SdkModule
+import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
-import com.lightningkite.lightningserver.typed.sdk.clientInterface
-import com.lightningkite.lightningserver.typed.sdk.info
-import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.services.email.Email
 import com.lightningkite.services.email.EmailService
 import kotlin.time.Duration
@@ -71,7 +66,7 @@ public class EmailProofEndpoints(
      */
     context(_: ServerRuntime)
     override suspend fun send(to: String, pin: String) {
-        if(verifyEmail(to))
+        if (verifyEmail(to))
             email().send(emailTemplate(to, pin))
     }
 
@@ -89,9 +84,9 @@ public class EmailProofEndpoints(
      * Security: The email address mismatch check prevents accidentally sending proofs to wrong addresses.
      */
     context(_: ServerRuntime)
-    public suspend fun send(destination: String, content: (Proof)->Email) {
+    public suspend fun send(destination: String, content: (Proof) -> Email) {
         email().send(content(issueProof(destination)).also {
-            if(it.to.singleOrNull()?.value?.equals(destination) != true) {
+            if (it.to.singleOrNull()?.value?.equals(destination) != true) {
                 throw IllegalArgumentException("Email mismatch")
             }
         })

@@ -1,6 +1,8 @@
 # Encryption and Cryptography
 
-Lightning Server provides a comprehensive cryptography package for secure key management, encryption, signing, and password hashing. The package is built on the `dev.whyoleg.cryptography` library and provides a simplified API tailored for server applications.
+Lightning Server provides a comprehensive cryptography package for secure key management, encryption, signing, and
+password hashing. The package is built on the `dev.whyoleg.cryptography` library and provides a simplified API tailored
+for server applications.
 
 ## Overview
 
@@ -13,7 +15,8 @@ The encryption package (`com.lightningkite.lightningserver.encryption`) provides
 
 ## SecretBasis: Master Key Management
 
-`SecretBasis` is a 512-bit master secret that serves as the foundation for all cryptographic operations. It uses HMAC-SHA512 for key derivation, ensuring that each variant produces a cryptographically independent key.
+`SecretBasis` is a 512-bit master secret that serves as the foundation for all cryptographic operations. It uses
+HMAC-SHA512 for key derivation, ensuring that each variant produces a cryptographically independent key.
 
 ### Creating a SecretBasis
 
@@ -27,7 +30,8 @@ val cipher = secretBasis().cipher("user-tokens")
 val signer = secretBasis().signer("session-auth")
 ```
 
-The global `secretBasis` is automatically generated on first run and stored in your `settings.json` file. **This is the recommended approach** as it ensures a single master secret is used consistently across your application.
+The global `secretBasis` is automatically generated on first run and stored in your `settings.json` file. **This is the
+recommended approach** as it ensures a single master secret is used consistently across your application.
 
 Alternatively, you can create your own SecretBasis settings for specific purposes:
 
@@ -44,17 +48,21 @@ object Server : ServerBuilder() {
 
 ### Best Practices
 
-1. **Use the global `secretBasis`**: Unless you have specific module isolation requirements, use the built-in global setting
+1. **Use the global `secretBasis`**: Unless you have specific module isolation requirements, use the built-in global
+   setting
 2. **Generate once, store securely**: The secret is auto-generated on first run and stored in `settings.json`
-3. **Use variants for different purposes**: Derive different keys for different use cases (tokens, sessions, cookies, etc.)
+3. **Use variants for different purposes**: Derive different keys for different use cases (tokens, sessions, cookies,
+   etc.)
 4. **Never hardcode secrets**: Always load from configuration
 5. **Never commit `settings.json`**: Add it to `.gitignore` to prevent exposing secrets
 
-**⚠️ Warning**: Changing the secret basis will invalidate all existing encrypted data and active user sessions. Only change this value during initial setup or in controlled migration scenarios.
+**⚠️ Warning**: Changing the secret basis will invalidate all existing encrypted data and active user sessions. Only
+change this value during initial setup or in controlled migration scenarios.
 
 ## Encryption with Ciphers
 
-Lightning Server supports AES encryption in multiple modes. **AES-GCM is recommended** as it provides both confidentiality and authentication (AEAD - Authenticated Encryption with Associated Data).
+Lightning Server supports AES encryption in multiple modes. **AES-GCM is recommended** as it provides both
+confidentiality and authentication (AEAD - Authenticated Encryption with Associated Data).
 
 ### Quick Start
 
@@ -90,6 +98,7 @@ val ctrKey = basis.AES_CTR("variant", AES_KeySize.B256)
 ### Key Sizes
 
 AES supports three key sizes:
+
 - `AES_KeySize.B128` - 128-bit keys (sufficient for most uses)
 - `AES_KeySize.B192` - 192-bit keys
 - `AES_KeySize.B256` - 256-bit keys (recommended, default)
@@ -114,7 +123,8 @@ fun useBlocking(basis: SecretBasis) {
 
 ## Digital Signatures
 
-Signers provide cryptographic signature generation and verification, commonly used for JWTs, API authentication, and data integrity verification.
+Signers provide cryptographic signature generation and verification, commonly used for JWTs, API authentication, and
+data integrity verification.
 
 ### HMAC Signatures (Symmetric)
 
@@ -382,7 +392,8 @@ object Server : ServerBuilder() {
 
 **Cause**: The ciphertext was tampered with or encrypted with a different key.
 
-**Solution**: 
+**Solution**:
+
 - Verify you're using the same variant name for encryption and decryption
 - Check that the `SecretBasis` hasn't changed
 - Handle as an authentication failure
@@ -392,6 +403,7 @@ object Server : ServerBuilder() {
 **Cause**: This is intentional - PBKDF2 uses 100,000 iterations.
 
 **Solution**:
+
 - Use caching (sessions/tokens) to avoid repeated hashing
 - Don't call `secureHash()` or `checkAgainstHash()` multiple times per request
 - Consider using async/background processing for non-critical paths
@@ -401,6 +413,7 @@ object Server : ServerBuilder() {
 **Cause**: Using different signers or variants.
 
 **Solution**:
+
 - Ensure the same variant is used for signing and verification
 - Check that the `SecretBasis` is consistent
 - Verify both signer and verifier use the same algorithm (HS256 vs HS512, etc.)

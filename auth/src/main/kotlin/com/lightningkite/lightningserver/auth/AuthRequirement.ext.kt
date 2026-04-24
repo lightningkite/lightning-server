@@ -22,7 +22,7 @@ public suspend fun AuthRequirement<*>.accepts(auth: Authentication<*>?): Boolean
  * */
 context(server: ServerRuntime)
 public suspend fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.assert(
-    auth: Authentication<*>?
+    auth: Authentication<*>?,
 ): Authentication<SUBJECT & Any>? =
     when (val r = check(auth)) {
         is AuthRequirement.Result.Rejected -> throw ForbiddenException(
@@ -32,12 +32,16 @@ public suspend fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.assert(
                 Failed On: ${r.reason}
             """.trimIndent()
         )
+
         is AuthRequirement.Result.Accepted<SUBJECT> -> r.auth
     }
 
 
-public fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.subscope(subscope: Subscope): AuthRequirement<SUBJECT> = subscope(listOf(subscope))
-public fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.subscope(subscope: String): AuthRequirement<SUBJECT> = subscope(listOf(Subscope(subscope)))
+public fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.subscope(subscope: Subscope): AuthRequirement<SUBJECT> =
+    subscope(listOf(subscope))
+
+public fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.subscope(subscope: String): AuthRequirement<SUBJECT> =
+    subscope(listOf(Subscope(subscope)))
 
 
 public val noAuth: AuthRequirement.None get() = AuthRequirement.None
@@ -57,7 +61,7 @@ public val recentRootAuth: AuthRequirement.Authenticated =
 public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.require(
     scopes: Set<RequiredScope>,
     maxAge: Duration? = null,
-    requirement: (suspend context(ServerRuntime) (Authentication<SUBJECT>) -> Boolean)? = null
+    requirement: (suspend context(ServerRuntime) (Authentication<SUBJECT>) -> Boolean)? = null,
 ): AuthRequirement<SUBJECT> =
     AuthRequirement.AuthenticatedAs(this, scopes, maxAge, requirement)
 
@@ -68,7 +72,7 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>
 public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> PrincipalType<SUBJECT, ID>.require(
     scope: RequiredScope = RequiredScope.root,
     maxAge: Duration? = null,
-    requirement: (suspend context(ServerRuntime) (Authentication<SUBJECT>) -> Boolean)? = null
+    requirement: (suspend context(ServerRuntime) (Authentication<SUBJECT>) -> Boolean)? = null,
 ): AuthRequirement<SUBJECT> =
     AuthRequirement.AuthenticatedAs(this, setOf(scope), maxAge, requirement)
 
@@ -77,33 +81,30 @@ public fun <T : HasId<*>?> AuthRequirement<T>.options(): Set<AuthRequirement<T>>
     if (this is Options) options else setOf(this)
 
 public infix fun <SUBJECT : HasId<*>?> AuthRequirement<SUBJECT>.or(
-    other: AuthRequirement<SUBJECT>
+    other: AuthRequirement<SUBJECT>,
 ): AuthRequirement<SUBJECT> =
     Options(options() + other.options())
-
-
-public val AuthRequirement.Companion.isSuperUser: AuthRequirement<HasId<*>>
-    get() = AuthRequirement.IsSuperUser
-public val AuthRequirement.Companion.isAdmin: AuthRequirement<HasId<*>>
-    get() = AuthRequirement.IsAdmin
-public val AuthRequirement.Companion.isDeveloper: AuthRequirement<HasId<*>>
-    get() = AuthRequirement.IsDeveloper
 
 context(builder: ServerBuilder)
 public var AuthRequirement.Companion.isSuperUser: AuthRequirement<HasId<*>>
     get() = AuthRequirement.IsSuperUser
-    set(value) { AuthRequirement.IsSuperUser set value }
+    set(value) {
+        AuthRequirement.IsSuperUser set value
+    }
 
 context(builder: ServerBuilder)
 public var AuthRequirement.Companion.isAdmin: AuthRequirement<HasId<*>>
     get() = AuthRequirement.IsAdmin
-    set(value) { AuthRequirement.IsAdmin set value }
+    set(value) {
+        AuthRequirement.IsAdmin set value
+    }
 
 context(builder: ServerBuilder)
 public var AuthRequirement.Companion.isDeveloper: AuthRequirement<HasId<*>>
     get() = AuthRequirement.IsDeveloper
-    set(value) { AuthRequirement.IsDeveloper set value }
-
+    set(value) {
+        AuthRequirement.IsDeveloper set value
+    }
 
 
 context(_: ServerRuntime)

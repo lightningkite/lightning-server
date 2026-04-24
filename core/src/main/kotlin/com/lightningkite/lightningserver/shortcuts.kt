@@ -1,12 +1,9 @@
 package com.lightningkite.lightningserver
 
-import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.definition.generalSettings
-import com.lightningkite.lightningserver.http.HttpHeader
-import com.lightningkite.lightningserver.http.HttpHeaders
-import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.HttpStatus
+import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
 import kotlinx.html.HTML
 import kotlinx.html.html
@@ -25,10 +22,11 @@ import kotlinx.io.writeString
  * @return An HttpResponse with status 303 and Location header
  */
 context(serverRuntime: ServerRuntime)
-public fun HttpResponse.Companion.redirectToGet(to: String, headers: HttpHeaders = HttpHeaders.EMPTY): HttpResponse = HttpResponse(
-    status = HttpStatus.SeeOther,
-    headers = headers.copy { add(HttpHeader.Location, generalSettings().absolutePathAdjustment(to)) },
-)
+public fun HttpResponse.Companion.redirectToGet(to: String, headers: HttpHeaders = HttpHeaders.EMPTY): HttpResponse =
+    HttpResponse(
+        status = HttpStatus.SeeOther,
+        headers = headers.copy { add(HttpHeader.Location, generalSettings().absolutePathAdjustment(to)) },
+    )
 
 /**
  * Creates an HTTP response indicating the resource has temporarily moved (307 Temporary Redirect).
@@ -39,10 +37,11 @@ public fun HttpResponse.Companion.redirectToGet(to: String, headers: HttpHeaders
  * @return An HttpResponse with status 307 and Location header
  */
 context(serverRuntime: ServerRuntime)
-public fun HttpResponse.Companion.pathMoved(to: String, headers: HttpHeaders = HttpHeaders.EMPTY): HttpResponse = HttpResponse(
-    status = HttpStatus.TemporaryRedirect,
-    headers = headers.copy { add(HttpHeader.Location, generalSettings().absolutePathAdjustment(to)) },
-)
+public fun HttpResponse.Companion.pathMoved(to: String, headers: HttpHeaders = HttpHeaders.EMPTY): HttpResponse =
+    HttpResponse(
+        status = HttpStatus.TemporaryRedirect,
+        headers = headers.copy { add(HttpHeader.Location, generalSettings().absolutePathAdjustment(to)) },
+    )
 
 /**
  * Creates an HTTP response indicating the resource has moved (302 Found).
@@ -53,10 +52,11 @@ public fun HttpResponse.Companion.pathMoved(to: String, headers: HttpHeaders = H
  * @return An HttpResponse with status 302 and Location header
  */
 context(serverRuntime: ServerRuntime)
-public fun HttpResponse.Companion.pathMovedOld(to: String, headers: HttpHeaders = HttpHeaders.EMPTY): HttpResponse = HttpResponse(
-    status = HttpStatus.Found,
-    headers = headers.copy { add(HttpHeader.Location, generalSettings().absolutePathAdjustment(to)) },
-)
+public fun HttpResponse.Companion.pathMovedOld(to: String, headers: HttpHeaders = HttpHeaders.EMPTY): HttpResponse =
+    HttpResponse(
+        status = HttpStatus.Found,
+        headers = headers.copy { add(HttpHeader.Location, generalSettings().absolutePathAdjustment(to)) },
+    )
 
 /**
  * Creates an HTTP response indicating the resource has permanently moved (308 Permanent Redirect).
@@ -67,7 +67,10 @@ public fun HttpResponse.Companion.pathMovedOld(to: String, headers: HttpHeaders 
  * @return An HttpResponse with status 308 and Location header
  */
 context(serverRuntime: ServerRuntime)
-public fun HttpResponse.Companion.pathMovedPermanently(to: String, headers: HttpHeaders = HttpHeaders.EMPTY): HttpResponse = HttpResponse(
+public fun HttpResponse.Companion.pathMovedPermanently(
+    to: String,
+    headers: HttpHeaders = HttpHeaders.EMPTY,
+): HttpResponse = HttpResponse(
     status = HttpStatus.PermanentRedirect,
     headers = headers.copy { add(HttpHeader.Location, generalSettings().absolutePathAdjustment(to)) },
 )
@@ -83,7 +86,7 @@ public fun HttpResponse.Companion.pathMovedPermanently(to: String, headers: Http
 public fun HttpResponse.Companion.html(
     status: HttpStatus = HttpStatus.OK,
     headers: HttpHeaders = HttpHeaders.EMPTY,
-    builder: HTML.() -> Unit
+    builder: HTML.() -> Unit,
 ): HttpResponse = HttpResponse(
     body = TypedData.html(builder),
     status = status,
@@ -101,7 +104,7 @@ public fun HttpResponse.Companion.html(
 public fun HttpResponse.Companion.html(
     status: HttpStatus = HttpStatus.OK,
     headers: HttpHeaders = HttpHeaders.EMPTY,
-    content: String
+    content: String,
 ): HttpResponse = HttpResponse(
     body = TypedData.text(content, MediaType.Text.Html),
     status = status,
@@ -119,7 +122,7 @@ public fun HttpResponse.Companion.html(
 public fun HttpResponse.Companion.plainText(
     text: String,
     status: HttpStatus = HttpStatus.OK,
-    headers: HttpHeaders = HttpHeaders.EMPTY
+    headers: HttpHeaders = HttpHeaders.EMPTY,
 ): HttpResponse = HttpResponse(
     body = TypedData.text(text, MediaType.Text.Plain),
     status = status,
@@ -138,7 +141,7 @@ public fun TypedData.Companion.html(
 ): TypedData = TypedData.sink(
     mediaType = MediaType.Text.Html,
     emit = { sink ->
-        val appendable = object: Appendable {
+        val appendable = object : Appendable {
             override fun append(csq: CharSequence): Appendable {
                 sink.writeString(csq)
                 return this
@@ -179,7 +182,7 @@ public fun TypedData.Companion.html(
 public fun TypedData.Companion.path(
     path: Path,
     fileSystem: FileSystem,
-    type: MediaType = MediaType.fromExtension(path.name.substringAfterLast('.'))
+    type: MediaType = MediaType.fromExtension(path.name.substringAfterLast('.')),
 ): TypedData {
     return TypedData.source(
         source = fileSystem.source(path).buffered(),

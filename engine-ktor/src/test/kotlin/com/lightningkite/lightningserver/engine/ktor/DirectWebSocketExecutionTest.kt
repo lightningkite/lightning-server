@@ -4,20 +4,15 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.settings.set
-import com.lightningkite.lightningserver.websockets.CoroutineWebsocketHandler
-import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
-import com.lightningkite.lightningserver.websockets.WebSocketFrame
+import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.pubsub.PubSub
 import io.ktor.client.plugins.websocket.*
 import io.ktor.server.testing.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withTimeout
-import kotlin.test.Ignore
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import kotlin.test.*
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Tests for DirectExecutableWebSocketHandler optimization in KtorEngine.
@@ -40,7 +35,7 @@ class DirectWebSocketExecutionTest {
                 request: WebSocketConnectRequest<PathSpec0>,
                 waitForFullConnect: suspend () -> Unit,
                 incoming: Flow<WebSocketFrame>,
-                send: suspend (WebSocketFrame) -> Unit
+                send: suspend (WebSocketFrame) -> Unit,
             ) {
                 waitForFullConnect()
                 incoming.collect { frame ->
@@ -58,7 +53,7 @@ class DirectWebSocketExecutionTest {
                 request: WebSocketConnectRequest<PathSpec0>,
                 waitForFullConnect: suspend () -> Unit,
                 incoming: Flow<WebSocketFrame>,
-                send: suspend (WebSocketFrame) -> Unit
+                send: suspend (WebSocketFrame) -> Unit,
             ) {
                 waitForFullConnect()
                 send(WebSocketFrame.Text("Hello from server!"))
@@ -75,7 +70,7 @@ class DirectWebSocketExecutionTest {
                 request: WebSocketConnectRequest<PathSpec0>,
                 waitForFullConnect: suspend () -> Unit,
                 incoming: Flow<WebSocketFrame>,
-                send: suspend (WebSocketFrame) -> Unit
+                send: suspend (WebSocketFrame) -> Unit,
             ) {
                 waitForFullConnect()
                 send(WebSocketFrame.Text("One"))
@@ -103,13 +98,14 @@ class DirectWebSocketExecutionTest {
         return engine
     }
 
-    private fun runWithEngine(forcePubSub: Boolean, block: suspend ApplicationTestBuilder.(KtorEngine) -> Unit) = testApplication {
-        val engine = createEngine(forcePubSub)
-        application {
-            with(engine) { adapt() }
+    private fun runWithEngine(forcePubSub: Boolean, block: suspend ApplicationTestBuilder.(KtorEngine) -> Unit) =
+        testApplication {
+            val engine = createEngine(forcePubSub)
+            application {
+                with(engine) { adapt() }
+            }
+            block(engine)
         }
-        block(engine)
-    }
 
     // ============= DIRECT EXECUTION TESTS (default) =============
 
@@ -124,9 +120,9 @@ class DirectWebSocketExecutionTest {
             send(Frame.Text("Hello Direct!"))
 
             // Receive echo
-            val response = withTimeout(5000) { incoming.receive() }
+            val response = withTimeout(5000.milliseconds) { incoming.receive() }
             assertTrue(response is Frame.Text)
-            assertEquals("Hello Direct!", (response as Frame.Text).readText())
+            assertEquals("Hello Direct!", response.readText())
         }
     }
 
@@ -142,9 +138,9 @@ class DirectWebSocketExecutionTest {
             send(Frame.Binary(true, data))
 
             // Receive echo
-            val response = withTimeout(5000) { incoming.receive() }
+            val response = withTimeout(5000.milliseconds) { incoming.receive() }
             assertTrue(response is Frame.Binary)
-            assertTrue(data.contentEquals((response as Frame.Binary).data))
+            assertTrue(data.contentEquals(response.data))
         }
     }
 
@@ -156,9 +152,9 @@ class DirectWebSocketExecutionTest {
 
         client.webSocket("/greeting?path=/greeting") {
             // Should receive greeting
-            val response = withTimeout(5000) { incoming.receive() }
+            val response = withTimeout(5000.milliseconds) { incoming.receive() }
             assertTrue(response is Frame.Text)
-            assertEquals("Hello from server!", (response as Frame.Text).readText())
+            assertEquals("Hello from server!", response.readText())
         }
     }
 
@@ -173,7 +169,7 @@ class DirectWebSocketExecutionTest {
 
             // Receive all messages
             repeat(3) {
-                val response = withTimeout(5000) { incoming.receive() }
+                val response = withTimeout(5000.milliseconds) { incoming.receive() }
                 if (response is Frame.Text) {
                     messages.add(response.readText())
                 }
@@ -192,9 +188,9 @@ class DirectWebSocketExecutionTest {
         client.webSocket("/echo?path=/echo") {
             repeat(5) { i ->
                 send(Frame.Text("Message $i"))
-                val response = withTimeout(5000) { incoming.receive() }
+                val response = withTimeout(5000.milliseconds) { incoming.receive() }
                 assertTrue(response is Frame.Text)
-                assertEquals("Message $i", (response as Frame.Text).readText())
+                assertEquals("Message $i", response.readText())
             }
         }
     }
@@ -213,9 +209,9 @@ class DirectWebSocketExecutionTest {
             send(Frame.Text("Hello PubSub!"))
 
             // Receive echo - may need longer timeout due to pub/sub latency
-            val response = withTimeout(10000) { incoming.receive() }
+            val response = withTimeout(10000.milliseconds) { incoming.receive() }
             assertTrue(response is Frame.Text)
-            assertEquals("Hello PubSub!", (response as Frame.Text).readText())
+            assertEquals("Hello PubSub!", response.readText())
         }
     }
 
@@ -228,9 +224,9 @@ class DirectWebSocketExecutionTest {
 
         client.webSocket("/greeting?path=/greeting") {
             // Should receive greeting - may need longer timeout due to pub/sub latency
-            val response = withTimeout(10000) { incoming.receive() }
+            val response = withTimeout(10000.milliseconds) { incoming.receive() }
             assertTrue(response is Frame.Text)
-            assertEquals("Hello from server!", (response as Frame.Text).readText())
+            assertEquals("Hello from server!", response.readText())
         }
     }
 }

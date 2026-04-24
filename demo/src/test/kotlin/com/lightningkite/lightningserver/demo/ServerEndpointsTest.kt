@@ -1,9 +1,7 @@
 package com.lightningkite.lightningserver.demo
 
-import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.runtime.test.test
-import com.lightningkite.services.data.TypedData
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import kotlin.test.assertEquals

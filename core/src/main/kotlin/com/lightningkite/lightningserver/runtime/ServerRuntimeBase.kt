@@ -1,23 +1,12 @@
 package com.lightningkite.lightningserver.runtime
 
-import ch.qos.logback.classic.Level
-import ch.qos.logback.classic.LoggerContext
-import ch.qos.logback.classic.encoder.PatternLayoutEncoder
-import ch.qos.logback.classic.spi.ILoggingEvent
-import ch.qos.logback.core.ConsoleAppender
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.telemetry.HttpMetrics
 import com.lightningkite.services.OpenTelemetry
 import com.lightningkite.services.SharedResources
-import com.lightningkite.services.otel.applyToLogback
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.joinAll
-import kotlinx.coroutines.launch
-import org.slf4j.LoggerFactory
-import kotlin.collections.setOf
+import kotlinx.coroutines.*
 
 /**
  * Base implementation of [ServerRuntime] providing common functionality.
@@ -39,7 +28,7 @@ import kotlin.collections.setOf
  *
  * @param server The server definition to run
  */
-public abstract class ServerRuntimeBase(override val server: ServerDefinition): ServerRuntime {
+public abstract class ServerRuntimeBase(override val server: ServerDefinition) : ServerRuntime {
     /**
      * Settings manager with automatically included system settings.
      *
@@ -114,15 +103,16 @@ public abstract class ServerRuntimeBase(override val server: ServerDefinition): 
         val taskToJob = server.startupTasks.values.associateWith { CompletableDeferred<Unit>() }
         server.startupTasks.entries.map { (location, task) ->
             launch {
-                for(dep in task.dependencies) {
-                    (taskToJob[dep] ?: throw IllegalStateException("Dependency '${dep.location}' marked, but not registered to server.")).await()
+                for (dep in task.dependencies) {
+                    (taskToJob[dep]
+                        ?: throw IllegalStateException("Dependency '${dep.location}' marked, but not registered to server.")).await()
                 }
                 // This can't ever be null - see taskToJob definition in connection with loop.
                 val job = taskToJob[task]!!
                 try {
                     task.executeWithMetrics(location)
                     job.complete(Unit)
-                } catch(e: Exception) {
+                } catch (e: Exception) {
                     job.completeExceptionally(e)
                 }
             }

@@ -23,6 +23,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 public data class OauthProviderCredentials(
     val id: String,
-    val secret: String
+    val secret: String,
 )
 

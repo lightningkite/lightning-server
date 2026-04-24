@@ -10,15 +10,9 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
-import kotlin.time.Duration.Companion.minutes
+import kotlin.test.*
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.Uuid
 
 /**
@@ -30,7 +24,7 @@ class AuthRequirementTest {
     data class TestUser(
         override val _id: Uuid = Uuid.random(),
         val email: String = "",
-        val isVerified: Boolean = false
+        val isVerified: Boolean = false,
     ) : HasId<Uuid> {
         companion object : PrincipalType<TestUser, Uuid> {
             override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
@@ -46,7 +40,7 @@ class AuthRequirementTest {
     @Serializable
     data class AdminUser(
         override val _id: Uuid = Uuid.random(),
-        val name: String = ""
+        val name: String = "",
     ) : HasId<Uuid> {
         companion object : PrincipalType<AdminUser, Uuid> {
             override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
@@ -71,7 +65,7 @@ class AuthRequirementTest {
         TestServer.test({}) {
             val result = noAuth.check(null)
             assertTrue(result is AuthRequirement.Result.Accepted)
-            assertNull((result as AuthRequirement.Result.Accepted).auth)
+            assertNull(result.auth)
         }
     }
 
@@ -103,7 +97,7 @@ class AuthRequirementTest {
             val req = anyAuth
             val result = req.check(null)
             assertTrue(result is AuthRequirement.Result.Rejected)
-            assertTrue((result as AuthRequirement.Result.Rejected).reason.contains("required"))
+            assertTrue(result.reason.contains("required"))
         }
     }
 
@@ -124,7 +118,7 @@ class AuthRequirementTest {
 
             val result = req.check(auth)
             assertTrue(result is AuthRequirement.Result.Rejected)
-            assertTrue((result as AuthRequirement.Result.Rejected).reason.contains("scopes"))
+            assertTrue(result.reason.contains("scopes"))
         }
     }
 
@@ -155,7 +149,7 @@ class AuthRequirementTest {
 
             val result = req.check(auth)
             assertTrue(result is AuthRequirement.Result.Rejected)
-            assertTrue((result as AuthRequirement.Result.Rejected).reason.contains("max age"))
+            assertTrue(result.reason.contains("max age"))
         }
     }
 
@@ -181,7 +175,7 @@ class AuthRequirementTest {
 
             val result = req.check(auth)
             assertTrue(result is AuthRequirement.Result.Rejected)
-            assertTrue((result as AuthRequirement.Result.Rejected).reason.contains("additional requirement"))
+            assertTrue(result.reason.contains("additional requirement"))
         }
     }
 
@@ -236,7 +230,7 @@ class AuthRequirementTest {
 
             val result = req.check(auth)
             assertTrue(result is AuthRequirement.Result.Rejected)
-            assertTrue((result as AuthRequirement.Result.Rejected).reason.contains("not of type"))
+            assertTrue(result.reason.contains("not of type"))
         }
     }
 
@@ -368,7 +362,7 @@ class AuthRequirementTest {
             assertTrue(result is AuthRequirement.Result.Accepted)
             // If noAuth was checked first, it would still return Accepted(null)
             // but with the actual auth, so this should return the TestUser auth
-            assertNotNull((result as AuthRequirement.Result.Accepted).auth)
+            assertNotNull(result.auth)
         }
     }
 
@@ -443,7 +437,7 @@ class AuthRequirementTest {
             val exception = assertFailsWith<ForbiddenException> {
                 req.assert(null)
             }
-            assertTrue(exception.message?.contains("authorization criteria") == true)
+            assertTrue(exception.message.contains("authorization criteria"))
         }
     }
 
@@ -474,13 +468,11 @@ class AuthRequirementTest {
 
     @Test
     fun `anyAuth constant is Authenticated with empty scopes`() {
-        assertTrue(anyAuth is AuthRequirement.Authenticated)
         assertTrue(anyAuth.scopes.isEmpty())
     }
 
     @Test
     fun `recentRootAuth has root scope and maxAge`() {
-        assertTrue(recentRootAuth is AuthRequirement.Authenticated)
         assertTrue(recentRootAuth.scopes.contains(RequiredScope.root))
         assertNotNull(recentRootAuth.maxAge)
     }
@@ -516,8 +508,7 @@ class AuthRequirementTest {
     @Test
     fun `AuthSetting Scoped wraps setting with subscopes`() {
         val scoped = AuthRequirement.IsSuperUser.subscope(listOf(Subscope("test")))
-        assertTrue(scoped is AuthRequirement.AuthSetting.Scoped)
-        assertEquals(AuthRequirement.IsSuperUser, (scoped as AuthRequirement.AuthSetting.Scoped).wraps)
+        assertEquals(AuthRequirement.IsSuperUser, scoped.wraps)
     }
 
     // ========== naturalLanguage Tests ==========
@@ -580,7 +571,7 @@ class AuthRequirementTest {
     fun `Options requiredScopes combines all options`() = runBlocking {
         TestServer.test({}) {
             val req = TestUser.require(scope = RequiredScope("read")) or
-                      AdminUser.require(scope = RequiredScope("admin"))
+                    AdminUser.require(scope = RequiredScope("admin"))
             val scopes = req.requiredScopes()
             assertTrue(scopes.contains(RequiredScope("read")))
             assertTrue(scopes.contains(RequiredScope("admin")))

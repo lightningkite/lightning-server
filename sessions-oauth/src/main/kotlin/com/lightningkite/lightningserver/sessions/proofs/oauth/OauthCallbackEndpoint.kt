@@ -19,8 +19,8 @@ public class OauthCallbackEndpoint<STATE>(
     public val onError: suspend context(ServerRuntime) (OauthCode) -> HttpResponse = {
         throw Exception("Got Oauth error from ${oauthProviderInfo.niceName}: ${it}")
     },
-    public val onAccess: suspend context(ServerRuntime) (OauthResponse, STATE) -> HttpResponse
-): ServerBuilder() {
+    public val onAccess: suspend context(ServerRuntime) (OauthResponse, STATE) -> HttpResponse,
+) : ServerBuilder() {
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -33,7 +33,7 @@ public class OauthCallbackEndpoint<STATE>(
         scope: String = defaultScope,
         accessType: OauthAccessType = defaultAccessType,
         loginHint: String? = null,
-    ):String = oauthProviderInfo.loginUrl(
+    ): String = oauthProviderInfo.loginUrl(
         credentials = credentials,
         callback = callback,
         scope = scope,
@@ -63,7 +63,8 @@ public class OauthCallbackEndpoint<STATE>(
     }
 
     context(runtime: ServerRuntime)
-    public suspend fun accessToken(refreshToken: String): OauthResponse = oauthProviderInfo.accessToken(credentials, refreshToken)
+    public suspend fun accessToken(refreshToken: String): OauthResponse =
+        oauthProviderInfo.accessToken(credentials, refreshToken)
 }
 
 context(builder: ServerBuilder)
@@ -75,8 +76,8 @@ public inline fun <reified STATE> HttpEndpoint<PathSpec0>.oauthCallback(
     noinline onError: suspend context(ServerRuntime) (OauthCode) -> HttpResponse = {
         throw Exception("Got Oauth error from ${oauthProviderInfo.niceName}: ${it}")
     },
-    noinline onAccess: suspend context(ServerRuntime) (OauthResponse, STATE) -> HttpResponse
-):OauthCallbackEndpoint<STATE> = OauthCallbackEndpoint(
+    noinline onAccess: suspend context(ServerRuntime) (OauthResponse, STATE) -> HttpResponse,
+): OauthCallbackEndpoint<STATE> = OauthCallbackEndpoint(
     path = path,
     stateSerializer = serializerOrContextual<STATE>(),
     oauthProviderInfo = oauthProviderInfo,

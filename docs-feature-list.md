@@ -26,7 +26,8 @@ familiar with the library.
 - `prepareModels()`
 - `HasId` - provides a data class with an id
 - `HasEmail` - provides a data class with an email address
-- 
+-
+
 ### Annotations
 
 - `@file:UseContextualSerialization()` - enables contextual serialization for the file

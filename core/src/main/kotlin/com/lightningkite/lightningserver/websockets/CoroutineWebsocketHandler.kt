@@ -1,39 +1,23 @@
 package com.lightningkite.lightningserver.websockets
 
 import com.lightningkite.lightningserver.HttpStatusException
-import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.Task
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpec1
-import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.invoke
-import com.lightningkite.lightningserver.runtime.send
+import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.websockets.CoroutineWebsocketHandler.SerializableWebSocketFrame.Companion.serializable
 import com.lightningkite.lightningserver.websockets.CoroutineWebsocketHandler.SerializableWebSocketFrame.Companion.standard
 import com.lightningkite.services.pubsub.PubSub
 import com.lightningkite.services.pubsub.PubSubChannel
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.consumeEach
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapNotNull
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.Contextual
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.Serializable
+import kotlinx.coroutines.flow.*
+import kotlinx.serialization.*
 import kotlin.uuid.Uuid
 
 private val logger = KotlinLogging.logger("CoroutineWebsocketHandler")
@@ -44,7 +28,7 @@ public abstract class CoroutineWebsocketHandler : ServerBuilder() {
     @Serializable
     public data class Storage(
         val id: Uuid = Uuid.random(),
-        val request: WebSocketConnectRequest<@Contextual PathSpec0>
+        val request: WebSocketConnectRequest<@Contextual PathSpec0>,
     )
 
     // Scope for background task execution (in tests, tasks need to run asynchronously)
@@ -97,7 +81,7 @@ public abstract class CoroutineWebsocketHandler : ServerBuilder() {
         request: WebSocketConnectRequest<PathSpec0>,
         waitForFullConnect: suspend () -> Unit,
         incoming: Flow<WebSocketFrame>,
-        send: suspend (WebSocketFrame) -> Unit
+        send: suspend (WebSocketFrame) -> Unit,
     )
 
     public val outboundTopic: WebSocketTopic<PathSpec1<Uuid>, SerializableWebSocketFrame> =
@@ -162,7 +146,7 @@ public abstract class CoroutineWebsocketHandler : ServerBuilder() {
                 request: WebSocketConnectRequest<PathSpec0>,
                 incoming: ReceiveChannel<WebSocketFrame>,
                 send: suspend (WebSocketFrame) -> Unit,
-                close: suspend (WebSocketClose) -> Unit
+                close: suspend (WebSocketClose) -> Unit,
             ) {
                 logger.info { "handleDirect: starting direct execution (bypassing pub/sub)" }
                 try {

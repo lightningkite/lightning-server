@@ -3,7 +3,7 @@
 package com.lightningkite.lightningserver.engine.awsserverless
 
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
-import com.lightningkite.services.data.KotlinBytesFormat
+import com.lightningkite.services.serializers.KotlinBytesFormat
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.reactive.asFlow
@@ -13,16 +13,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.builtins.NothingSerializer
 import software.amazon.awssdk.core.SdkBytes
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue
-import software.amazon.awssdk.services.dynamodb.model.BillingMode
-import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException
-import software.amazon.awssdk.services.dynamodb.model.KeyType
-import software.amazon.awssdk.services.dynamodb.model.KeysAndAttributes
-import software.amazon.awssdk.services.dynamodb.model.ProjectionType
-import software.amazon.awssdk.services.dynamodb.model.ScalarAttributeType
-import kotlin.collections.component1
-import kotlin.collections.component2
-import kotlin.collections.set
+import software.amazon.awssdk.services.dynamodb.model.*
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.measureTime
@@ -30,7 +21,7 @@ import kotlin.time.measureTime
 internal class AwsWebSocketDynamoDb(
     val client: DynamoDbAsyncClient,
     val baseTableName: String,
-    val encoding: KotlinBytesFormat
+    val encoding: KotlinBytesFormat,
 ) {
     class StateAndConnectRequest(val state: ByteArray, val connectRequest: WebSocketConnectRequest<*>)
 
@@ -40,7 +31,8 @@ internal class AwsWebSocketDynamoDb(
     private val tableStates = "$baseTableName-ws-state"
 
     companion object {
-        internal val logger = KotlinLogging.logger("com.lightningkite.lightningserver.engine.awsserverless.AwsWebSocketDynamoDb")
+        internal val logger =
+            KotlinLogging.logger("com.lightningkite.lightningserver.engine.awsserverless.AwsWebSocketDynamoDb")
 
         // Everything is prefixed with 'ws' because dynamoDB has an absurd amount of reserved keywords.
         private const val socketIdKey = "wsSocketId"
@@ -53,7 +45,8 @@ internal class AwsWebSocketDynamoDb(
     }
 
     private val initMutex = Mutex()
-    @Volatile private var initialized = false
+    @Volatile
+    private var initialized = false
 
     internal suspend fun ensureTables() {
         if (initialized) return
@@ -149,7 +142,9 @@ internal class AwsWebSocketDynamoDb(
                         topicKey to AttributeValue.fromS(topic),
                         socketIdKey to AttributeValue.fromS(socketId),
                         pathKey to AttributeValue.fromS(path),
-                        expireKey to AttributeValue.fromN(Clock.System.now().plus(socketExpiration).epochSeconds.toString())
+                        expireKey to AttributeValue.fromN(
+                            Clock.System.now().plus(socketExpiration).epochSeconds.toString()
+                        )
                     )
                 )
             }.await()
@@ -220,7 +215,10 @@ internal class AwsWebSocketDynamoDb(
             it.items()?.forEach {
                 out[it[socketIdKey]!!.s()] = StateAndConnectRequest(
                     it[stateKey]!!.b().asByteArray(),
-                    encoding.decodeFromByteArray(WebSocketConnectRequest.serializer(NothingSerializer()), it[requestKey]!!.b().asByteArray())
+                    encoding.decodeFromByteArray(
+                        WebSocketConnectRequest.serializer(NothingSerializer()),
+                        it[requestKey]!!.b().asByteArray()
+                    )
                 )
             }
         }
@@ -238,7 +236,10 @@ internal class AwsWebSocketDynamoDb(
             }.await().item()?.let {
                 StateAndConnectRequest(
                     it[stateKey]!!.b().asByteArray(),
-                    encoding.decodeFromByteArray(WebSocketConnectRequest.serializer(NothingSerializer()), it.get(requestKey)!!.b().asByteArray()),
+                    encoding.decodeFromByteArray(
+                        WebSocketConnectRequest.serializer(NothingSerializer()),
+                        it.get(requestKey)!!.b().asByteArray()
+                    ),
                 )
             }
         }.also { logger.debug { "AwsWebSocketDynamoDb.state($id) took $it" } }
@@ -276,7 +277,10 @@ internal class AwsWebSocketDynamoDb(
                 it.responses()?.get(tableStates)?.forEach {
                     out[it[socketIdKey]!!.s()] = StateAndConnectRequest(
                         it[stateKey]!!.b().asByteArray(),
-                        encoding.decodeFromByteArray(WebSocketConnectRequest.serializer(NothingSerializer()), it[requestKey]!!.b().asByteArray())
+                        encoding.decodeFromByteArray(
+                            WebSocketConnectRequest.serializer(NothingSerializer()),
+                            it[requestKey]!!.b().asByteArray()
+                        )
                     )
                 }
             }
@@ -302,7 +306,9 @@ internal class AwsWebSocketDynamoDb(
                                 )
                             )
                         ),
-                        expireKey to AttributeValue.fromN(Clock.System.now().plus(socketExpiration).epochSeconds.toString())
+                        expireKey to AttributeValue.fromN(
+                            Clock.System.now().plus(socketExpiration).epochSeconds.toString()
+                        )
                     )
                 )
             }.await()
@@ -320,7 +326,9 @@ internal class AwsWebSocketDynamoDb(
                         mapOf(
                             ":$fromStateKey" to AttributeValue.fromB(SdkBytes.fromByteArray(fromState)),
                             ":$stateKey" to AttributeValue.fromB(SdkBytes.fromByteArray(toState)),
-                            ":$expireKey" to AttributeValue.fromN(Clock.System.now().plus(socketExpiration).epochSeconds.toString()),
+                            ":$expireKey" to AttributeValue.fromN(
+                                Clock.System.now().plus(socketExpiration).epochSeconds.toString()
+                            ),
                         )
                     )
                     it.conditionExpression("$stateKey = :$fromStateKey")

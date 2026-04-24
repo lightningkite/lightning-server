@@ -2,10 +2,7 @@ package com.lightningkite.lightningserver.data
 
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.QueryParameters
-import com.lightningkite.lightningserver.pathing.ResolvedPath
-import com.lightningkite.lightningserver.pathing.HasContextualPath
-import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 
 /**
@@ -18,7 +15,7 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
  *
  * @param PATH The path specification type for this request
  */
-public abstract class Request<out PATH: PathSpec>: HasContextualPath<PATH>, Caching {
+public abstract class Request<out PATH : PathSpec> : HasContextualPath<PATH>, Caching {
     /** The resolved path information for this request. */
     public abstract val path: HasContextualPath<PATH>
 

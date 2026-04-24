@@ -1,19 +1,13 @@
 package com.lightningkite.lightningserver.runtime.test
 
+import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.Task
-import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
 import com.lightningkite.lightningserver.settings.ServerSettings
-import com.lightningkite.lightningserver.websockets.WebSocketClose
-import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
-import com.lightningkite.lightningserver.websockets.WebSocketConnection
-import com.lightningkite.lightningserver.websockets.WebSocketFrame
-import com.lightningkite.lightningserver.websockets.WebSocketHandler
-import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
-import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
+import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.SettingContext
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.ConcurrentHashMap
@@ -52,26 +46,29 @@ import kotlin.time.Clock
  * @param serverBuilder The server definition to test
  * @param clockGet Optional clock provider for testing time-dependent code
  */
-public class TestRunner<SERVER: ServerBuilder> @Deprecated("Please use SERVER.test() instead.") constructor (
+public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.test() instead.") constructor(
     public val serverBuilder: SERVER,
-    private val clockGet: () -> Clock = { Clock.System }  // TODO: always use mock clock, build in advancement features
+    private val clockGet: () -> Clock = { Clock.System },  // TODO: always use mock clock, build in advancement features
 ) : ServerRuntimeBase(serverBuilder.build()) {
 
     public companion object {
         internal val logger = KotlinLogging.logger("com.lightningkite.lightningserver.TestRunner")
     }
 
-    public override val serverId:String = "Test Server"
-    public override val serverVersion:String =  "N/A"
+    public override val serverId: String = "Test Server"
+    public override val serverVersion: String = "N/A"
 
     override val clock: Clock
         get() = clockGet()
 
     private val settingsCache = HashMap<ServerSetting<*, *>, Any?>()
 
-    private val subscriptions = ConcurrentHashMap<WebSocketSubscriptionRequest<*, *>, ArrayList<suspend (WebSocketSubscriptionMessage<*, *>)->Unit>>()
+    private val subscriptions =
+        ConcurrentHashMap<WebSocketSubscriptionRequest<*, *>, ArrayList<suspend (WebSocketSubscriptionMessage<*, *>) -> Unit>>()
+
     override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>) {
-        val subscribers = subscriptions[WebSocketSubscriptionRequest(topic = event.topic, rawPathArguments = event.rawPathArguments)]
+        val subscribers =
+            subscriptions[WebSocketSubscriptionRequest(topic = event.topic, rawPathArguments = event.rawPathArguments)]
 //        /*logger.debug*/run { "'${event.path()}': ${event.value} (${subscribers?.size ?: 0} subscribers)" }.let(::println)
         subscribers?.forEach {
             it(event)
@@ -98,13 +95,13 @@ public class TestRunner<SERVER: ServerBuilder> @Deprecated("Please use SERVER.te
      * @param currentState The current connection state (mutable for inspection)
      * @param name Display name for debug output (default: "Client")
      */
-    public inner class TestWebSocket<PATH: PathSpec, STORAGE>(
+    public inner class TestWebSocket<PATH : PathSpec, STORAGE>(
         private val handler: WebSocketHandler<PATH, STORAGE>,
         public val request: WebSocketConnectRequest<PATH>,
         public var currentState: STORAGE,
-        public val name: String = "Client"
+        public val name: String = "Client",
     ) {
-        public var onMessageSent: (frame: WebSocketFrame)->Unit = {}
+        public var onMessageSent: (frame: WebSocketFrame) -> Unit = {}
         public suspend fun close() {
             /*logger.debug*/run { "$name --> <close>" }.let(::println)
             server.close(WebSocketClose.NORMAL)
@@ -120,8 +117,9 @@ public class TestRunner<SERVER: ServerBuilder> @Deprecated("Please use SERVER.te
         }
 
         public val server: ServerSide = ServerSide()
-        public inner class ServerSide(): WebSocketConnection<PATH, STORAGE>, ServerRuntime by this@TestRunner {
-            private val changeQueue = ArrayList<(STORAGE)->STORAGE>()
+
+        public inner class ServerSide() : WebSocketConnection<PATH, STORAGE>, ServerRuntime by this@TestRunner {
+            private val changeQueue = ArrayList<(STORAGE) -> STORAGE>()
             private val sub: suspend (WebSocketSubscriptionMessage<*, *>) -> Unit = {
                 handler.messageFromSubscription(it)
                 flush()
@@ -131,6 +129,7 @@ public class TestRunner<SERVER: ServerBuilder> @Deprecated("Please use SERVER.te
                 get() = this@TestWebSocket.currentState
             override val request: WebSocketConnectRequest<PATH>
                 get() = this@TestWebSocket.request
+
             override suspend fun repullState(): STORAGE = currentState
 
             override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE) {
@@ -138,7 +137,7 @@ public class TestRunner<SERVER: ServerBuilder> @Deprecated("Please use SERVER.te
             }
 
             override suspend fun updateStateImmediately(modification: (STORAGE) -> STORAGE): STORAGE {
-                while(changeQueue.isNotEmpty()) {
+                while (changeQueue.isNotEmpty()) {
                     this@TestWebSocket.currentState = changeQueue.removeFirst()(currentState)
                 }
                 this@TestWebSocket.currentState = modification(currentState)
@@ -146,20 +145,20 @@ public class TestRunner<SERVER: ServerBuilder> @Deprecated("Please use SERVER.te
             }
 
             internal fun flush() {
-                while(changeQueue.isNotEmpty()) {
+                while (changeQueue.isNotEmpty()) {
                     this@TestWebSocket.currentState = changeQueue.removeFirst()(currentState)
                 }
             }
 
             private val topics = HashSet<WebSocketSubscriptionRequest<*, *>>()
             override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-                if(topics.add(topic)) {
+                if (topics.add(topic)) {
                     subscriptions.getOrPut(topic) { ArrayList() }.add(sub)
                 }
             }
 
             override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-                if(topics.remove(topic)) {
+                if (topics.remove(topic)) {
                     subscriptions.getOrPut(topic) { ArrayList() }.remove(sub)
                 }
             }
@@ -175,7 +174,7 @@ public class TestRunner<SERVER: ServerBuilder> @Deprecated("Please use SERVER.te
             }
 
             internal fun clean() {
-                for(topic in topics) {
+                for (topic in topics) {
                     subscriptions[topic]?.remove(sub)
                 }
                 topics.clear()
@@ -208,10 +207,10 @@ public class TestRunner<SERVER: ServerBuilder> @Deprecated("Please use SERVER.te
  * @param settings Configuration block for server settings
  * @param action Test code to execute with the test runner as context
  */
-public inline fun <SERVER: ServerBuilder> SERVER.test(
+public inline fun <SERVER : ServerBuilder> SERVER.test(
     settings: context(ServerSettings) SERVER.(SettingContext) -> Unit,
     noinline clock: () -> Clock = { Clock.System },
-    action: context(TestRunner<SERVER>) SERVER.()->Unit
+    action: context(TestRunner<SERVER>) SERVER.() -> Unit,
 ) {
     @Suppress("DEPRECATION") val runner = TestRunner(this, clock)
     with(runner) {

@@ -1,9 +1,7 @@
 package com.lightningkite.lightningserver.terraform.awsserverless
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import java.io.File
+import kotlin.test.*
 
 /**
  * Tests for the CloudFront Function JavaScript that transforms URI paths to query parameters.
@@ -40,6 +38,7 @@ class CloudFrontWsPathTransformTest {
                             append("{\"value\":\"${mv["value"]}\"}")
                         }
                     }
+
                     else -> append("{\"value\":\"$value\"}")
                 }
             }

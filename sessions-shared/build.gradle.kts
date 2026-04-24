@@ -1,4 +1,4 @@
-import com.lightningkite.deployhelpers.*
+import com.lightningkite.deployhelpers.lkLibrary
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -30,7 +30,7 @@ kotlin {
     jvm {
         compilations.all {
             compileTaskProvider.configure {
-                compilerOptions{
+                compilerOptions {
                     jvmTarget = JvmTarget.JVM_1_8
                 }
             }
@@ -42,7 +42,6 @@ kotlin {
     iosX64()
     iosArm64()
     iosSimulatorArm64()
-    macosX64()
     macosArm64()
 
     sourceSets {
@@ -51,9 +50,9 @@ kotlin {
                 api(project(":core-shared"))
                 api(project(":auth-shared"))
                 api(project(":typed-shared"))
-                api(libs.kotlinx.json)
+                api(libs.kotlinx.serialization.json)
                 api(libs.kotlinx.datetime)
-                api(libs.services.database)
+                api(libs.services.database.shared)
             }
             kotlin {
                 srcDir(file("build/generated/ksp/common/commonMain/kotlin"))
@@ -84,10 +83,6 @@ dependencies {
     }
 }
 
-lkLibrary("lightningkite", "lightning-server") {
-    description.set("A set of tools to fill in/replace what Ktor is lacking in.")
-}
-
 android {
     namespace = "com.lightningkite.lightningserver"
     compileSdk = 36
@@ -103,4 +98,12 @@ android {
     dependencies {
         coreLibraryDesugaring(libs.androidDesugaring)
     }
+}
+
+lkLibrary(
+    "lightningkite",
+    "lightning-server",
+    mavenAutomaticRelease = project.findProperty("mavenAutomaticRelease") as? Boolean ?: false
+) {
+    description.set("A set of classes shared between the server and client for authenticating with the server.")
 }

@@ -1,14 +1,11 @@
 package com.lightningkite.lightningserver.websockets
 
-import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.data.Request
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.QueryParameters
-import com.lightningkite.lightningserver.pathing.ResolvedPath
-import com.lightningkite.lightningserver.pathing.HasContextualPath
-import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.RawWebsocketPath
+import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.location
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -27,8 +24,8 @@ import kotlinx.serialization.Serializable
  * @param T The type of messages published to this topic
  * @property type The serializer for message type T
  */
-public class WebSocketTopic<PATH: PathSpec, T> internal constructor(
-    public val type: KSerializer<T>
+public class WebSocketTopic<PATH : PathSpec, T> internal constructor(
+    public val type: KSerializer<T>,
 )
 
 /**
@@ -41,10 +38,10 @@ public class WebSocketTopic<PATH: PathSpec, T> internal constructor(
  * @property topic The topic to subscribe to
  * @property rawPathArguments The path parameter values for this subscription
  */
-public data class WebSocketSubscriptionRequest<PATH: PathSpec, T>(
+public data class WebSocketSubscriptionRequest<PATH : PathSpec, T>(
     val topic: WebSocketTopic<PATH, T>,
     val rawPathArguments: List<Any?>,
-): HasContextualPath<PATH> {
+) : HasContextualPath<PATH> {
     context(server: ServerRuntime)
     override val pathInContext: ResolvedPath<PATH> get() = ResolvedPath(topic.location, rawPathArguments)
 }
@@ -61,11 +58,11 @@ public data class WebSocketSubscriptionRequest<PATH: PathSpec, T>(
  * @property rawPathArguments The path parameters identifying which subscriptions to notify
  * @property value The actual message payload
  */
-public data class WebSocketSubscriptionMessage<PATH: PathSpec, T>(
+public data class WebSocketSubscriptionMessage<PATH : PathSpec, T>(
     val topic: WebSocketTopic<PATH, T>,
     val rawPathArguments: List<Any?>,
-    val value: T
-): HasContextualPath<PATH> {
+    val value: T,
+) : HasContextualPath<PATH> {
     context(server: ServerRuntime)
     override val pathInContext: ResolvedPath<PATH> get() = ResolvedPath(topic.location, rawPathArguments)
 }
@@ -80,7 +77,7 @@ public data class WebSocketSubscriptionMessage<PATH: PathSpec, T>(
  * @param PATH The PathSpec type for this WebSocket endpoint
  */
 @Serializable
-public data class WebSocketConnectRequest<PATH: PathSpec>(
+public data class WebSocketConnectRequest<PATH : PathSpec>(
     override val path: RawWebsocketPath<PATH>,
     override val queryParameters: QueryParameters = QueryParameters.EMPTY,
     override val headers: HttpHeaders = HttpHeaders.EMPTY,
@@ -117,7 +114,7 @@ public data class WebSocketConnectRequest<PATH: PathSpec>(
  * @param PATH The PathSpec type for this WebSocket endpoint
  * @param STORAGE The type of state object maintained for this connection
  */
-public interface WebSocketConnection<PATH: PathSpec, STORAGE>: ServerRuntime {
+public interface WebSocketConnection<PATH : PathSpec, STORAGE> : ServerRuntime {
     /** The original connection request */
     public val request: WebSocketConnectRequest<PATH>
 

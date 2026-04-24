@@ -2,9 +2,7 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
 import com.lightningkite.lightningserver.BadRequestException
-import com.lightningkite.lightningserver.auth.PrincipalType
-import com.lightningkite.lightningserver.auth.idString
-import com.lightningkite.lightningserver.auth.register
+import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.encryption.SecretBasis
@@ -18,13 +16,8 @@ import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.and
-import com.lightningkite.services.database.condition
-import com.lightningkite.services.database.eq
 import dev.turingcomplete.kotlinonetimepassword.HmacAlgorithm
 import dev.turingcomplete.kotlinonetimepassword.TimeBasedOneTimePasswordConfig
-import kotlinx.coroutines.flow.count
-import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -32,11 +25,7 @@ import kotlinx.serialization.builtins.serializer
 import org.bouncycastle.util.encoders.Base32
 import org.junit.Test
 import java.util.concurrent.TimeUnit
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
@@ -50,7 +39,7 @@ class TimeBasedOTPProofEndpointsTest {
     @Serializable
     data class TestUser(
         override val _id: Uuid = Uuid.random(),
-        val email: String = ""
+        val email: String = "",
     ) : HasId<Uuid> {
         companion object : PrincipalType<TestUser, Uuid> {
             override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
@@ -134,12 +123,14 @@ class TimeBasedOTPProofEndpointsTest {
                 val currentCode = totpSecret.code
 
                 // Prove with the valid code
-                val proof = server.totpEndpoints.prove.test(null, IdentificationAndPassword(
-                    type = "TestUser",
-                    property = "TestUser/_id",
-                    value = userId.toString(),
-                    password = currentCode
-                ))
+                val proof = server.totpEndpoints.prove.test(
+                    null, IdentificationAndPassword(
+                        type = "TestUser",
+                        property = "TestUser/_id",
+                        value = userId.toString(),
+                        password = currentCode
+                    )
+                )
 
                 assertNotNull(proof)
                 assertEquals("TestUser/_id", proof.property)
@@ -192,12 +183,14 @@ class TimeBasedOTPProofEndpointsTest {
 
                 // Try with an invalid code
                 assertFailsWith<BadRequestException>("Invalid TOTP code should be rejected") {
-                    server.totpEndpoints.prove.test(null, IdentificationAndPassword(
-                        type = "TestUser",
-                        property = "TestUser/_id",
-                        value = userId.toString(),
-                        password = "000000"  // Likely invalid code
-                    ))
+                    server.totpEndpoints.prove.test(
+                        null, IdentificationAndPassword(
+                            type = "TestUser",
+                            property = "TestUser/_id",
+                            value = userId.toString(),
+                            password = "000000"  // Likely invalid code
+                        )
+                    )
                 }
             }
         }
@@ -252,12 +245,14 @@ class TimeBasedOTPProofEndpointsTest {
 
                 // After proving (which sets lastUsedAt), should return true
                 val currentCode = totpSecret.code
-                server.totpEndpoints.prove.test(null, IdentificationAndPassword(
-                    type = "TestUser",
-                    property = "TestUser/_id",
-                    value = userId.toString(),
-                    password = currentCode
-                ))
+                server.totpEndpoints.prove.test(
+                    null, IdentificationAndPassword(
+                        type = "TestUser",
+                        property = "TestUser/_id",
+                        value = userId.toString(),
+                        password = currentCode
+                    )
+                )
 
                 // Now should return true
                 assertTrue(server.totpEndpoints.established(TestUser, user))
@@ -312,12 +307,14 @@ class TimeBasedOTPProofEndpointsTest {
 
                 // Should fail because the secret is disabled
                 assertFailsWith<BadRequestException>("Disabled TOTP should be rejected") {
-                    server.totpEndpoints.prove.test(null, IdentificationAndPassword(
-                        type = "TestUser",
-                        property = "TestUser/_id",
-                        value = userId.toString(),
-                        password = currentCode
-                    ))
+                    server.totpEndpoints.prove.test(
+                        null, IdentificationAndPassword(
+                            type = "TestUser",
+                            property = "TestUser/_id",
+                            value = userId.toString(),
+                            password = currentCode
+                        )
+                    )
                 }
             }
         }
@@ -435,32 +432,38 @@ class TimeBasedOTPProofEndpointsTest {
 
                 // User1's code should work for user1
                 val code1 = totpSecret1.code
-                val proof1 = server.totpEndpoints.prove.test(null, IdentificationAndPassword(
-                    type = "TestUser",
-                    property = "TestUser/_id",
-                    value = userId1.toString(),
-                    password = code1
-                ))
+                val proof1 = server.totpEndpoints.prove.test(
+                    null, IdentificationAndPassword(
+                        type = "TestUser",
+                        property = "TestUser/_id",
+                        value = userId1.toString(),
+                        password = code1
+                    )
+                )
                 assertNotNull(proof1)
 
                 // User1's code should NOT work for user2
                 assertFailsWith<BadRequestException>("User1's code should not work for user2") {
-                    server.totpEndpoints.prove.test(null, IdentificationAndPassword(
-                        type = "TestUser",
-                        property = "TestUser/_id",
-                        value = userId2.toString(),
-                        password = code1
-                    ))
+                    server.totpEndpoints.prove.test(
+                        null, IdentificationAndPassword(
+                            type = "TestUser",
+                            property = "TestUser/_id",
+                            value = userId2.toString(),
+                            password = code1
+                        )
+                    )
                 }
 
                 // User2's code should work for user2
                 val code2 = totpSecret2.code
-                val proof2 = server.totpEndpoints.prove.test(null, IdentificationAndPassword(
-                    type = "TestUser",
-                    property = "TestUser/_id",
-                    value = userId2.toString(),
-                    password = code2
-                ))
+                val proof2 = server.totpEndpoints.prove.test(
+                    null, IdentificationAndPassword(
+                        type = "TestUser",
+                        property = "TestUser/_id",
+                        value = userId2.toString(),
+                        password = code2
+                    )
+                )
                 assertNotNull(proof2)
             }
         }

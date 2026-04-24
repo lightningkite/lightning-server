@@ -1,13 +1,12 @@
 package com.lightningkite.lightningserver
 
-import com.lightningkite.services.data.KotlinBytesFormat
+import com.lightningkite.services.serializers.KotlinBytesFormat
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ByteArraySerializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlinx.serialization.modules.SerializersModule
 
 /**
  * A type-erased serializable container that can hold any value with its serializer.

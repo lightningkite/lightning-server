@@ -11,19 +11,9 @@ package com.lightningkite.lightningserver.encryption
 
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
-import com.lightningkite.lightningserver.definition.map
-import com.lightningkite.lightningserver.definition.mapSuspending
-import dev.whyoleg.cryptography.BinarySize
-import dev.whyoleg.cryptography.CryptographyAlgorithmId
-import dev.whyoleg.cryptography.CryptographyProvider
-import dev.whyoleg.cryptography.CryptographyProviderApi
+import dev.whyoleg.cryptography.*
 import dev.whyoleg.cryptography.algorithms.AES
-import dev.whyoleg.cryptography.algorithms.Digest
-import dev.whyoleg.cryptography.algorithms.RSA
-import dev.whyoleg.cryptography.algorithms.SHA512
-import dev.whyoleg.cryptography.operations.Cipher
-import dev.whyoleg.cryptography.operations.Decryptor
-import dev.whyoleg.cryptography.operations.Encryptor
+import dev.whyoleg.cryptography.operations.*
 
 
 /**
@@ -45,7 +35,8 @@ public suspend fun SecretBasis.cipher(variant: String): Cipher = AES_GCM(variant
  * @param variant The variant identifier for key derivation
  * @return A RuntimeDeferred containing the cipher
  */
-public fun Runtime<SecretBasis>.cipher(variant: String): RuntimeDeferred<Cipher> = RuntimeDeferred.Cached { this().cipher(variant) }
+public fun Runtime<SecretBasis>.cipher(variant: String): RuntimeDeferred<Cipher> =
+    RuntimeDeferred.Cached { this().cipher(variant) }
 
 /**
  * Derives an AES-GCM cipher for the specified variant (blocking version).
@@ -65,7 +56,8 @@ public fun SecretBasis.cipherBlocking(variant: String): Cipher = AES_GCM_Blockin
  * @param variant The variant identifier for key derivation
  * @return A Runtime containing the cipher
  */
-public fun Runtime<SecretBasis>.cipherBlocking(variant: String): Runtime<Cipher> = Runtime.Cached { this().cipherBlocking(variant) }
+public fun Runtime<SecretBasis>.cipherBlocking(variant: String): Runtime<Cipher> =
+    Runtime.Cached { this().cipherBlocking(variant) }
 
 
 /**
@@ -101,13 +93,15 @@ public enum class AES_KeySize(public val size: BinarySize) {
  */
 public suspend fun SecretBasis.AES_CBC(
     variant: String,
-    size: AES_KeySize = AES_KeySize.B256
-): AES.CBC.Key = deriveKey(
-    CryptographyProvider.Default.get(AES.CBC).keyDecoder(),
-    AES.Key.Format.RAW,
-    variant,
-    size.size
-)
+    size: AES_KeySize = AES_KeySize.B256,
+): AES.CBC.Key {
+    return deriveKey(
+        CryptographyProvider.Default.get(AES.CBC).keyDecoder(),
+        AES.Key.Format.RAW,
+        variant,
+        size.size
+    )
+}
 
 /**
  * Derives an AES-CBC mode key from this SecretBasis (blocking version).
@@ -121,7 +115,7 @@ public suspend fun SecretBasis.AES_CBC(
  */
 public fun SecretBasis.AES_CBC_Blocking(
     variant: String,
-    size: AES_KeySize = AES_KeySize.B256
+    size: AES_KeySize = AES_KeySize.B256,
 ): AES.CBC.Key = deriveKeyBlocking(
     CryptographyProvider.Default.get(AES.CBC).keyDecoder(),
     AES.Key.Format.RAW,
@@ -141,7 +135,7 @@ public fun SecretBasis.AES_CBC_Blocking(
  */
 public suspend fun SecretBasis.AES_CTR(
     variant: String,
-    size: AES_KeySize = AES_KeySize.B256
+    size: AES_KeySize = AES_KeySize.B256,
 ): AES.CTR.Key = deriveKey(
     CryptographyProvider.Default.get(AES.CTR).keyDecoder(),
     AES.Key.Format.RAW,
@@ -161,7 +155,7 @@ public suspend fun SecretBasis.AES_CTR(
  */
 public fun SecretBasis.AES_CTR_Blocking(
     variant: String,
-    size: AES_KeySize = AES_KeySize.B256
+    size: AES_KeySize = AES_KeySize.B256,
 ): AES.CTR.Key = deriveKeyBlocking(
     CryptographyProvider.Default.get(AES.CTR).keyDecoder(),
     AES.Key.Format.RAW,
@@ -181,7 +175,7 @@ public fun SecretBasis.AES_CTR_Blocking(
  */
 public suspend fun SecretBasis.AES_GCM(
     variant: String,
-    size: AES_KeySize = AES_KeySize.B256
+    size: AES_KeySize = AES_KeySize.B256,
 ): AES.GCM.Key = deriveKey(
     CryptographyProvider.Default.get(AES.GCM).keyDecoder(),
     AES.Key.Format.RAW,
@@ -201,7 +195,7 @@ public suspend fun SecretBasis.AES_GCM(
  */
 public fun SecretBasis.AES_GCM_Blocking(
     variant: String,
-    size: AES_KeySize = AES_KeySize.B256
+    size: AES_KeySize = AES_KeySize.B256,
 ): AES.GCM.Key = deriveKeyBlocking(
     CryptographyProvider.Default.get(AES.GCM).keyDecoder(),
     AES.Key.Format.RAW,
@@ -217,8 +211,8 @@ public fun SecretBasis.AES_GCM_Blocking(
 @OptIn(CryptographyProviderApi::class)
 private data class CipherFromParts(
     val encryptor: Encryptor,
-    val decryptor: Decryptor
-): Cipher, Encryptor by encryptor, Decryptor by decryptor
+    val decryptor: Decryptor,
+) : Cipher, Encryptor by encryptor, Decryptor by decryptor
 
 /**
  * Creates a Cipher from separate Encryptor and Decryptor instances.

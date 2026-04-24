@@ -1,14 +1,11 @@
 package com.lightningkite.lightningserver.demo
 
-import com.lightningkite.PhoneNumber
-import kotlinx.serialization.Serializable
-import kotlin.time.Instant
 import com.lightningkite.services.data.*
-import com.lightningkite.services.database.HasEmail
-import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.HasPassword
+import com.lightningkite.services.database.*
 import com.lightningkite.services.files.ServerFile
+import kotlinx.serialization.Serializable
 import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 @Serializable
@@ -26,13 +23,15 @@ data class TestModel(
     @MultipleReferences(TestModel::class) val comments: List<Uuid> = listOf(),
     val privateInfo: String? = null,
     val status: Status = Status.DRAFT,
-    @AdminHidden val hiddenField: Boolean = false
+    @AdminHidden val hiddenField: Boolean = false,
 ) : HasId<Uuid>
 
 @Serializable
 enum class Status {
-    @DisplayName("Draft") DRAFT,
-    @DisplayName("Published") PUBLISHED
+    @DisplayName("Draft")
+    DRAFT,
+    @DisplayName("Published")
+    PUBLISHED
 }
 
 @Serializable
@@ -49,5 +48,5 @@ data class User(
 @GenerateDataClassPaths
 data class UserAlt(
     override val _id: Uuid = Uuid.random(),
-    override val email: String
+    override val email: String,
 ) : HasId<Uuid>, HasEmail

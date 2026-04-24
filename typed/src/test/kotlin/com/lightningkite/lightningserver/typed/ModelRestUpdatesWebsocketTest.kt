@@ -4,8 +4,8 @@ import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.GeneralServerSettings
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
-import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.runtime.send
+import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.websockets.WebSocketFrame
@@ -15,10 +15,7 @@ import com.lightningkite.services.database.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class ModelRestUpdatesWebsocketTest {
 
@@ -30,7 +27,10 @@ class ModelRestUpdatesWebsocketTest {
         )
         val rest = path.path("model") include ModelRestEndpoints(info)
         val ws = path.path("model").path("updates") include ModelRestUpdatesWebsocket(info)
-        init { registerBasicMediaTypeCoders() }
+
+        init {
+            registerBasicMediaTypeCoders()
+        }
     }
 
     @Test
@@ -54,7 +54,10 @@ class ModelRestUpdatesWebsocketTest {
             // but onMessageSent after assignment will capture the next ones. So resend a no-op condition to get a predictable frame
             socket.send(WebSocketFrame.Text(frameText))
             val echoed = last as WebSocketFrame.Text
-            val echoedUpdates = json.decodeFromString(CollectionUpdates.serializer(Sample.serializer(), String.serializer()), echoed.text)
+            val echoedUpdates = json.decodeFromString(
+                CollectionUpdates.serializer(Sample.serializer(), String.serializer()),
+                echoed.text
+            )
             assertNotNull(echoedUpdates.condition)
             assertTrue(echoedUpdates.condition is Condition.Always)
 
@@ -63,7 +66,10 @@ class ModelRestUpdatesWebsocketTest {
             TestServer.info.table().insert(listOf(inserted))
 
             val afterInsert = last as WebSocketFrame.Text
-            val updates = json.decodeFromString(CollectionUpdates.serializer(Sample.serializer(), String.serializer()), afterInsert.text)
+            val updates = json.decodeFromString(
+                CollectionUpdates.serializer(Sample.serializer(), String.serializer()),
+                afterInsert.text
+            )
             assertEquals(setOf(inserted), updates.updates)
             assertEquals(emptySet<String>(), updates.remove)
 
@@ -72,7 +78,10 @@ class ModelRestUpdatesWebsocketTest {
             TestServer.ws.generalTopic.send(removalChanges)
 
             val afterRemove = last as WebSocketFrame.Text
-            val removal = json.decodeFromString(CollectionUpdates.serializer(Sample.serializer(), String.serializer()), afterRemove.text)
+            val removal = json.decodeFromString(
+                CollectionUpdates.serializer(Sample.serializer(), String.serializer()),
+                afterRemove.text
+            )
             assertEquals(setOf(inserted._id), removal.remove)
         }
     }
@@ -95,10 +104,12 @@ class ModelRestUpdatesWebsocketTest {
             assertEquals(1, count) // initial echo
 
             // Send changes that should be filtered out entirely
-            val changes = CollectionChanges(listOf(
-                EntryChange(old = null, new = Sample("2", "X")),
-                EntryChange(old = Sample("3", "Y"), new = null)
-            ))
+            val changes = CollectionChanges(
+                listOf(
+                    EntryChange(old = null, new = Sample("2", "X")),
+                    EntryChange(old = Sample("3", "Y"), new = null)
+                )
+            )
             TestServer.ws.generalTopic.send(changes)
             assertEquals(1, count) // still only the echo
         }
@@ -125,7 +136,8 @@ class ModelRestUpdatesWebsocketTest {
             TestServer.ws.generalTopic.send(changes)
 
             val got = last as WebSocketFrame.Text
-            val upd = json.decodeFromString(CollectionUpdates.serializer(Sample.serializer(), String.serializer()), got.text)
+            val upd =
+                json.decodeFromString(CollectionUpdates.serializer(Sample.serializer(), String.serializer()), got.text)
             assertTrue(upd.overload == true)
         }
     }
@@ -133,4 +145,4 @@ class ModelRestUpdatesWebsocketTest {
 
 @Serializable
 @GenerateDataClassPaths
-data class Sample(override val _id: String, val name: String): HasId<String>
+data class Sample(override val _id: String, val name: String) : HasId<String>

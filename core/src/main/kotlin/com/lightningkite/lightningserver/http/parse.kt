@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.http
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.Decoder
@@ -48,12 +49,12 @@ public value class PathSegments(public val segments: List<String>) : List<String
         )
     }
 
-    private object Serializer : kotlinx.serialization.KSerializer<PathSegments> {
+    public object Serializer : KSerializer<PathSegments> {
         override val descriptor: SerialDescriptor =
             PrimitiveSerialDescriptor("com.lightningkite.lightningserver.http.PathSegments", PrimitiveKind.STRING)
 
         override fun deserialize(decoder: Decoder): PathSegments = parse(decoder.decodeString())
-        override fun serialize(encoder: Encoder, value: PathSegments) = encoder.encodeString(value.toString())
+        override fun serialize(encoder: Encoder, value: PathSegments): Unit = encoder.encodeString(value.toString())
     }
 }
 
@@ -113,12 +114,12 @@ public value class QueryParameters(public val entries: List<Pair<String, String>
         }
     }
 
-    private object Serializer : kotlinx.serialization.KSerializer<QueryParameters> {
+    public object Serializer : KSerializer<QueryParameters> {
         override val descriptor: SerialDescriptor =
             PrimitiveSerialDescriptor("com.lightningkite.lightningserver.http.QueryParameters", PrimitiveKind.STRING)
 
         override fun deserialize(decoder: Decoder): QueryParameters = parse(decoder.decodeString())
-        override fun serialize(encoder: Encoder, value: QueryParameters) = encoder.encodeString(value.toString())
+        override fun serialize(encoder: Encoder, value: QueryParameters): Unit = encoder.encodeString(value.toString())
     }
 }
 

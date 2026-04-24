@@ -85,7 +85,7 @@ private fun TerraformEmitterAws.vpc(
         "resource.aws_vpc_endpoint.s3" {
             "vpc_id" - expression("module.vpc.vpc_id")
             "service_name" - "com.amazonaws.${this@vpc.applicationRegion}.s3"
-            "route_table_ids"  - expression("module.vpc.public_route_table_ids")
+            "route_table_ids" - expression("module.vpc.public_route_table_ids")
         }
         "resource.aws_vpc_endpoint.execute_api" {
             "vpc_id" - expression("module.vpc.vpc_id")

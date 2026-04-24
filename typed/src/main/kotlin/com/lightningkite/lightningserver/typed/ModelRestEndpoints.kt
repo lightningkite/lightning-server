@@ -1,31 +1,18 @@
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.lightningserver.BadRequestException
-import com.lightningkite.lightningserver.ForbiddenException
-import com.lightningkite.lightningserver.LSError
-import com.lightningkite.lightningserver.NotFoundException
+import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.subscope
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.pathing.PathSpec.Segment
-import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.pathing.PathSpec1
-import com.lightningkite.lightningserver.pathing.arg1
 import com.lightningkite.lightningserver.runtime.serverRuntime
-import com.lightningkite.lightningserver.typed.sdk.SdkModule
+import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
-import com.lightningkite.lightningserver.typed.sdk.clientInterface
-import com.lightningkite.lightningserver.typed.sdk.pascalCase
-import com.lightningkite.lightningserver.typed.sdk.sdkSettings
-import com.lightningkite.lightningserver.typed.sdk.titleCase
-import com.lightningkite.lightningserver.typed.sdk.info
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.builtins.MapSerializer
-import kotlinx.serialization.builtins.nullable
-import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.builtins.*
 
 public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     public val info: ModelInfo<USER, T, ID>,

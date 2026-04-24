@@ -3,15 +3,12 @@ package com.lightningkite.lightningserver.websockets
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.data.set
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.deprecations.websocket
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.runtime.test.test
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.builtins.serializer
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
+import kotlin.test.*
 
 class QueryParamWebSocketHandlerTest {
 
@@ -19,7 +16,8 @@ class QueryParamWebSocketHandlerTest {
         val broadcast = path.path("broadcast").topic(String.serializer())
 
         // Used to observe which path and params the underlying handler actually received
-        @Volatile var lastRequest: WebSocketConnectRequest<*>? = null
+        @Volatile
+        var lastRequest: WebSocketConnectRequest<*>? = null
 
         val mirror = path.path("mirror") bind WebSocketHandler(
             storageSerializer = Unit.serializer(),
@@ -63,10 +61,12 @@ class QueryParamWebSocketHandlerTest {
     fun routes_by_query_param_and_fixes_inner_query(): Unit = runBlocking {
         TestServer.test(settings = { }) {
             val ws = TestServer.qp.test(
-                queryParameters = QueryParameters(listOf(
-                    "path" to "/mirror?foo=1",
-                    "extra" to "z"
-                ))
+                queryParameters = QueryParameters(
+                    listOf(
+                        "path" to "/mirror?foo=1",
+                        "extra" to "z"
+                    )
+                )
             )
             // Underlying should have received a request to /mirror and extracted foo=1 from the path query
             val seen = TestServer.lastRequest!!
@@ -124,7 +124,7 @@ class QueryParamWebSocketHandlerTest {
             // Trigger cache write in underlying handler
             ws.send(WebSocketFrame.Text("cache"))
             // After the message finishes, finalize() should have propagated the updated request back
-            val outer = ws.currentState as QueryParamWebSocketHandlerData
+            val outer = ws.currentState
             val value = with(ws.server) { outer.request.cache[TestServer.CacheKey] }
             assertEquals("yes", value)
             ws.close()

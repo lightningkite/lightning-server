@@ -1,6 +1,7 @@
 # Notifications
 
-The notifications module provides a complete event-driven notification system for Lightning Server applications. It supports multiple delivery channels (email, SMS, push, in-app) with flexible scheduling and user customization options.
+The notifications module provides a complete event-driven notification system for Lightning Server applications. It
+supports multiple delivery channels (email, SMS, push, in-app) with flexible scheduling and user customization options.
 
 ## Overview
 
@@ -72,6 +73,7 @@ The notifications module provides three subscription strategies:
 All subscription logic is defined in code. Users cannot customize their notification preferences.
 
 **Use when:**
+
 - Notifications are mandatory (e.g., security alerts)
 - You want complete control over notification delivery
 - You don't want to manage subscription state in the database
@@ -92,9 +94,11 @@ subscriptions.addEventListener(
 
 ### FrequencyCustomizableSubscriptions
 
-Users can customize delivery frequencies but not which events they receive. The logic for determining interested users is defined in code.
+Users can customize delivery frequencies but not which events they receive. The logic for determining interested users
+is defined in code.
 
 **Use when:**
+
 - Event logic is complex or security-sensitive
 - You want users to control *how* but not *what* they're notified about
 - You want programmatic control over subscription logic
@@ -126,6 +130,7 @@ val rest = notificationDispatcher.rest  // Auto-generated REST endpoints
 Users have complete control over both filtering conditions and delivery frequencies.
 
 **Use when:**
+
 - Users need maximum flexibility
 - You trust users to create their own subscription filters
 - Your application has complex filtering requirements
@@ -153,6 +158,7 @@ subscriptions.setDefaultSubscription(
 ```
 
 **Important:** FullyCustomizableSubscriptions automatically manages default subscriptions:
+
 - New users get all default subscriptions
 - When defaults change, existing subscriptions are updated based on `DefaultSubscriptionUpdateBehavior`
 - Read permissions are automatically enforced (users only see events they have permission to view)
@@ -225,7 +231,8 @@ abstract class NotificationBulkDispatcher<USER, UID, CONTENT>(
 
 ### Notification Bulking
 
-When multiple notifications for the same user are scheduled at the same time, they're grouped together. You control how they're formatted:
+When multiple notifications for the same user are scheduled at the same time, they're grouped together. You control how
+they're formatted:
 
 ```kotlin
 override suspend fun makeEmailNotifications(

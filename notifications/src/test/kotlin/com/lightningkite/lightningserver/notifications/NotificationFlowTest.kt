@@ -2,7 +2,6 @@
 package com.lightningkite.lightningserver.notifications
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.notifications.events.EventRegistry
 import com.lightningkite.lightningserver.notifications.events.UserEventType
 import com.lightningkite.lightningserver.notifications.events.event
 import com.lightningkite.lightningserver.notifications.subscriptions.*
@@ -17,11 +16,7 @@ import com.lightningkite.services.sms.SMS
 import com.lightningkite.services.sms.TestSMS
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
 
@@ -101,7 +96,7 @@ class NotificationFlowTest {
 
                 // Verify email sent
                 assertTrue(testEmail!!.sentEmails.isNotEmpty())
-                assertEquals("Created: E2EModel", testEmail!!.sentEmails.last().subject)
+                assertEquals("Created: E2EModel", testEmail.sentEmails.last().subject)
 
                 // Verify SMS sent
                 assertTrue(testSms!!.messageHistory.isNotEmpty())
@@ -222,7 +217,7 @@ class NotificationFlowTest {
                 kotlin.test.assertNull(userNotif.email)
 
                 // No additional email should have been sent
-                assertEquals(initialEmailCount, testEmail!!.sentEmails.size)
+                assertEquals(initialEmailCount, testEmail.sentEmails.size)
             }
         }
     }
@@ -326,7 +321,7 @@ class NotificationFlowTest {
 
                 // The subscriber generator returns a set with the ownerId,
                 // but since no user is found, no notification should be dispatched successfully
-                assertEquals(initialEmailCount, testEmail!!.sentEmails.size)
+                assertEquals(initialEmailCount, testEmail.sentEmails.size)
             }
         }
     }
@@ -444,7 +439,7 @@ class NotificationFlowTest {
                 TimeTravelNotifications.Dispatcher.refreshNotifications()
 
                 // SMS should now be sent
-                assertTrue(testSms!!.messageHistory.isNotEmpty(), "SMS should send after time travel")
+                assertTrue(testSms.messageHistory.isNotEmpty(), "SMS should send after time travel")
             }
         }
     }

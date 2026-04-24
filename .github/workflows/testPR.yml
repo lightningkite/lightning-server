@@ -3,7 +3,6 @@ name: TestPullRequest
 on:
   pull_request:
     branches: version-*
-  workflow_dispatch:
 
 jobs:
   test_project:
@@ -29,7 +28,10 @@ jobs:
       - name: Clean
         run: ./gradlew clean
 
-      - name: Run Tests
+      - name: Test (Multiplatform code, JVM only)
+        run: ./gradlew jvmTest
+
+      - name: Test (normal)
         run: ./gradlew test
 
       - uses: actions/upload-artifact@v4

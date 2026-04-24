@@ -1,109 +1,109 @@
 {
-    "resource": {
-        "aws_apigatewayv2_api": {
-            "http": {
-                "protocol_type": "HTTP",
-                "name": "LightningServerDemo-http"
-            }
+  "resource": {
+    "aws_apigatewayv2_api": {
+      "http": {
+        "protocol_type": "HTTP",
+        "name": "LightningServerDemo-http"
+      }
+    },
+    "aws_apigatewayv2_integration": {
+      "http": {
+        "api_id": "${aws_apigatewayv2_api.http.id}",
+        "integration_uri": "${aws_lambda_alias.main.invoke_arn}",
+        "integration_method": "POST",
+        "integration_type": "AWS_PROXY"
+      }
+    },
+    "aws_cloudwatch_log_group": {
+      "http_api": {
+        "retention_in_days": 30,
+        "name": "LightningServerDemo-http-gateway-log"
+      }
+    },
+    "aws_lambda_permission": {
+      "api_gateway_http": {
+        "principal": "apigateway.amazonaws.com",
+        "lifecycle": {
+          "create_before_destroy": true
         },
-        "aws_apigatewayv2_integration": {
-            "http": {
-                "api_id": "${aws_apigatewayv2_api.http.id}",
-                "integration_uri": "${aws_lambda_alias.main.invoke_arn}",
-                "integration_method": "POST",
-                "integration_type": "AWS_PROXY"
-            }
+        "function_name": "${aws_lambda_alias.main.function_name}",
+        "qualifier": "${aws_lambda_alias.main.name}",
+        "action": "lambda:InvokeFunction",
+        "source_arn": "${aws_apigatewayv2_api.http.execution_arn}/*/*"
+      }
+    },
+    "aws_route53_record": {
+      "http": {
+        "zone_id": "${data.aws_route53_zone.main.zone_id}",
+        "records": [
+          "${tolist(aws_acm_certificate.http.domain_validation_options)[0].resource_record_value}"
+        ],
+        "name": "${tolist(aws_acm_certificate.http.domain_validation_options)[0].resource_record_name}",
+        "type": "${tolist(aws_acm_certificate.http.domain_validation_options)[0].resource_record_type}",
+        "ttl": "300"
+      },
+      "httpAccess": {
+        "zone_id": "${data.aws_route53_zone.main.zone_id}",
+        "name": "${aws_apigatewayv2_domain_name.http.domain_name}",
+        "alias": {
+          "zone_id": "${aws_apigatewayv2_domain_name.http.domain_name_configuration[0].hosted_zone_id}",
+          "evaluate_target_health": false,
+          "name": "${aws_apigatewayv2_domain_name.http.domain_name_configuration[0].target_domain_name}"
         },
-        "aws_cloudwatch_log_group": {
-            "http_api": {
-                "retention_in_days": 30,
-                "name": "LightningServerDemo-http-gateway-log"
-            }
-        },
-        "aws_lambda_permission": {
-            "api_gateway_http": {
-                "principal": "apigateway.amazonaws.com",
-                "lifecycle": {
-                    "create_before_destroy": true
-                },
-                "function_name": "${aws_lambda_alias.main.function_name}",
-                "qualifier": "${aws_lambda_alias.main.name}",
-                "action": "lambda:InvokeFunction",
-                "source_arn": "${aws_apigatewayv2_api.http.execution_arn}/*/*"
-            }
-        },
-        "aws_route53_record": {
-            "http": {
-                "zone_id": "${data.aws_route53_zone.main.zone_id}",
-                "records": [
-                    "${tolist(aws_acm_certificate.http.domain_validation_options)[0].resource_record_value}"
-                ],
-                "name": "${tolist(aws_acm_certificate.http.domain_validation_options)[0].resource_record_name}",
-                "type": "${tolist(aws_acm_certificate.http.domain_validation_options)[0].resource_record_type}",
-                "ttl": "300"
-            },
-            "httpAccess": {
-                "zone_id": "${data.aws_route53_zone.main.zone_id}",
-                "name": "${aws_apigatewayv2_domain_name.http.domain_name}",
-                "alias": {
-                    "zone_id": "${aws_apigatewayv2_domain_name.http.domain_name_configuration[0].hosted_zone_id}",
-                    "evaluate_target_health": false,
-                    "name": "${aws_apigatewayv2_domain_name.http.domain_name_configuration[0].target_domain_name}"
-                },
-                "type": "A"
-            }
-        },
-        "aws_acm_certificate_validation": {
-            "http": {
-                "certificate_arn": "${aws_acm_certificate.http.arn}",
-                "validation_record_fqdns": [
-                    "${aws_route53_record.http.fqdn}"
-                ]
-            }
-        },
-        "aws_apigatewayv2_route": {
-            "http": {
-                "api_id": "${aws_apigatewayv2_api.http.id}",
-                "route_key": "$default",
-                "target": "integrations/${aws_apigatewayv2_integration.http.id}"
-            }
-        },
-        "aws_apigatewayv2_domain_name": {
-            "http": {
-                "domain_name": "lightningserver.cs.lightningkite.com",
-                "depends_on": [
-                    "aws_acm_certificate_validation.http"
-                ],
-                "domain_name_configuration": {
-                    "endpoint_type": "REGIONAL",
-                    "security_policy": "TLS_1_2",
-                    "certificate_arn": "${aws_acm_certificate.http.arn}"
-                }
-            }
-        },
-        "aws_apigatewayv2_api_mapping": {
-            "http": {
-                "api_id": "${aws_apigatewayv2_stage.http.api_id}",
-                "domain_name": "${aws_apigatewayv2_domain_name.http.domain_name}",
-                "stage": "${aws_apigatewayv2_stage.http.id}"
-            }
-        },
-        "aws_apigatewayv2_stage": {
-            "http": {
-                "api_id": "${aws_apigatewayv2_api.http.id}",
-                "access_log_settings": {
-                    "format": "{\"requestTime\":\"$context.requestTime\",\"protocol\":\"$context.protocol\",\"sourceIp\":\"$context.identity.sourceIp\",\"routeKey\":\"$context.routeKey\",\"requestId\":\"$context.requestId\",\"resourcePath\":\"$context.resourcePath\",\"responseLength\":\"$context.responseLength\",\"integrationErrorMessage\":\"$context.integrationErrorMessage\",\"httpMethod\":\"$context.httpMethod\",\"status\":\"$context.status\"}",
-                    "destination_arn": "${aws_cloudwatch_log_group.http_api.arn}"
-                },
-                "auto_deploy": true,
-                "name": "LightningServerDemo-gateway-stage"
-            }
-        },
-        "aws_acm_certificate": {
-            "http": {
-                "domain_name": "lightningserver.cs.lightningkite.com",
-                "validation_method": "DNS"
-            }
+        "type": "A"
+      }
+    },
+    "aws_acm_certificate_validation": {
+      "http": {
+        "certificate_arn": "${aws_acm_certificate.http.arn}",
+        "validation_record_fqdns": [
+          "${aws_route53_record.http.fqdn}"
+        ]
+      }
+    },
+    "aws_apigatewayv2_route": {
+      "http": {
+        "api_id": "${aws_apigatewayv2_api.http.id}",
+        "route_key": "$default",
+        "target": "integrations/${aws_apigatewayv2_integration.http.id}"
+      }
+    },
+    "aws_apigatewayv2_domain_name": {
+      "http": {
+        "domain_name": "lightningserver.cs.lightningkite.com",
+        "depends_on": [
+          "aws_acm_certificate_validation.http"
+        ],
+        "domain_name_configuration": {
+          "endpoint_type": "REGIONAL",
+          "security_policy": "TLS_1_2",
+          "certificate_arn": "${aws_acm_certificate.http.arn}"
         }
+      }
+    },
+    "aws_apigatewayv2_api_mapping": {
+      "http": {
+        "api_id": "${aws_apigatewayv2_stage.http.api_id}",
+        "domain_name": "${aws_apigatewayv2_domain_name.http.domain_name}",
+        "stage": "${aws_apigatewayv2_stage.http.id}"
+      }
+    },
+    "aws_apigatewayv2_stage": {
+      "http": {
+        "api_id": "${aws_apigatewayv2_api.http.id}",
+        "access_log_settings": {
+          "format": "{\"requestTime\":\"$context.requestTime\",\"protocol\":\"$context.protocol\",\"sourceIp\":\"$context.identity.sourceIp\",\"routeKey\":\"$context.routeKey\",\"requestId\":\"$context.requestId\",\"resourcePath\":\"$context.resourcePath\",\"responseLength\":\"$context.responseLength\",\"integrationErrorMessage\":\"$context.integrationErrorMessage\",\"httpMethod\":\"$context.httpMethod\",\"status\":\"$context.status\"}",
+          "destination_arn": "${aws_cloudwatch_log_group.http_api.arn}"
+        },
+        "auto_deploy": true,
+        "name": "LightningServerDemo-gateway-stage"
+      }
+    },
+    "aws_acm_certificate": {
+      "http": {
+        "domain_name": "lightningserver.cs.lightningkite.com",
+        "validation_method": "DNS"
+      }
     }
+  }
 }

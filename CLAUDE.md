@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Lightning Server is a Kotlin-based server framework that drastically speeds up server development, comparable to Django for Python. It's built to work across multiple serverless platforms with extensive abstraction layers for databases, caching, file storage, email, SMS, and more.
+Lightning Server is a Kotlin-based server framework that drastically speeds up server development, comparable to Django
+for Python. It's built to work across multiple serverless platforms with extensive abstraction layers for databases,
+caching, file storage, email, SMS, and more.
 
 **Current Version**: `version-5-SNAPSHOT`
 
@@ -51,12 +53,14 @@ This is a Gradle-based multi-module Kotlin project.
 ### Testing
 
 Unit tests use mock services to avoid external dependencies. Tests should:
+
 - Use `LocalEngine` for testing endpoints
 - Use `JsonFileDatabase` or similar mock implementations for services
 - Be runnable without any external service dependencies
 - Test endpoints using the `.test(engine)` extension function
 
 Example test pattern:
+
 ```kotlin
 class ServerTest {
     companion object {
@@ -78,11 +82,16 @@ class ServerTest {
 
 #### Common Testing Pitfalls
 
-**Duplicate UploadEarlyEndpoint declarations**: If you create multiple instances of `UploadEarlyEndpoint` (e.g., in different modules or test files), they will have conflicting declarations for how `ServerFile` is serialized. This causes runtime serialization errors that manifest as `500 Internal Server Error` responses in tests, even though the code compiles successfully.
+**Duplicate UploadEarlyEndpoint declarations**: If you create multiple instances of `UploadEarlyEndpoint` (e.g., in
+different modules or test files), they will have conflicting declarations for how `ServerFile` is serialized. This
+causes runtime serialization errors that manifest as `500 Internal Server Error` responses in tests, even though the
+code compiles successfully.
 
-**Solution**: Only instantiate `UploadEarlyEndpoint` once in your server definition and reference it from tests. Do not create separate instances for testing.
+**Solution**: Only instantiate `UploadEarlyEndpoint` once in your server definition and reference it from tests. Do not
+create separate instances for testing.
 
-**Avoiding DuplicateRegistrationError**: When writing tests that use `Server.build()`, ensure the server is only built once across all tests. Create a shared `TestHelper` object with a lazy-initialized `TestRunner` instance:
+**Avoiding DuplicateRegistrationError**: When writing tests that use `Server.build()`, ensure the server is only built
+once across all tests. Create a shared `TestHelper` object with a lazy-initialized `TestRunner` instance:
 
 ```kotlin
 object TestHelper {
@@ -104,20 +113,23 @@ class MyTest {
 
 ### Module Structure
 
-The project follows a **paired module pattern**: most features have both a JVM module and a `-shared` multiplatform module:
+The project follows a **paired module pattern**: most features have both a JVM module and a `-shared` multiplatform
+module:
 
 - **Core modules** (`core`, `core-shared`): Base server definitions, HTTP handling, settings, serialization
-- **Typed modules** (`typed`, `typed-shared`): Type-safe API endpoint definitions with auto-generated documentation and SDKs
+- **Typed modules** (`typed`, `typed-shared`): Type-safe API endpoint definitions with auto-generated documentation and
+  SDKs
 - **Auth modules** (`auth`, `auth-shared`): Pre-built authentication functionality
-- **Session modules** (`sessions`, `sessions-shared`, `sessions-email`, `sessions-sms`): Session management with various authentication methods (email magic links, PIN codes, SMS, OAuth)
+- **Session modules** (`sessions`, `sessions-shared`, `sessions-email`, `sessions-sms`): Session management with various
+  authentication methods (email magic links, PIN codes, SMS, OAuth)
 - **File modules** (`files`, `files-shared`): File upload/download handling with multiple backend support
 - **Media modules** (`media`, `media-shared`): Media processing capabilities
 - **Engine modules**: Different deployment targets
-  - `engine-local`: For unit testing
-  - `engine-ktor`: Ktor-based HTTP server (recommended for development)
-  - `engine-netty`: Netty-based HTTP server
-  - `engine-jdk-server`: Pure JDK HTTP server
-  - `engine-aws-serverless`: AWS Lambda deployment with Terraform generation
+    - `engine-local`: For unit testing
+    - `engine-ktor`: Ktor-based HTTP server (recommended for development)
+    - `engine-netty`: Netty-based HTTP server
+    - `engine-jdk-server`: Pure JDK HTTP server
+    - `engine-aws-serverless`: AWS Lambda deployment with Terraform generation
 - **Secret sources** (`secret-source-aws`): Integration with AWS Secrets Manager
 
 ### Server Definition Pattern
@@ -125,6 +137,7 @@ The project follows a **paired module pattern**: most features have both a JVM m
 All Lightning Server applications follow this pattern:
 
 1. **Define a ServerBuilder object** - This is your central server definition:
+
 ```kotlin
 object Server : ServerBuilder() {
     // Settings
@@ -141,6 +154,7 @@ object Server : ServerBuilder() {
 ```
 
 2. **Create endpoint groups** - Organize related endpoints into separate objects:
+
 ```kotlin
 object ApiEndpoints : ServerBuilder() {
     val example = path.path("example").get bind HttpHandler {
@@ -150,6 +164,7 @@ object ApiEndpoints : ServerBuilder() {
 ```
 
 3. **Set up an engine** - Choose an engine based on deployment target:
+
 ```kotlin
 fun main() {
     val built = Server.build()
@@ -253,13 +268,15 @@ The framework provides abstractions for common services that can be swapped via 
 - **Email**: SMTP, Amazon SES, console mock
 - **SMS**: Twilio, console mock
 
-Services are configured via `settings.json` which is automatically generated on first run. The framework principle is that applications should work out-of-the-box with the generated settings file.
+Services are configured via `settings.json` which is automatically generated on first run. The framework principle is
+that applications should work out-of-the-box with the generated settings file.
 
 ## Development Workflow
 
 ### Initial Setup
 
 When setting up a new Lightning Server project, running the application twice is standard:
+
 1. First run generates `settings.json` with defaults
 2. Second run uses the settings file and starts normally
 
@@ -293,13 +310,15 @@ The AWS serverless engine generates Terraform configuration automatically:
 
 ## Important Principles
 
-1. **Settings file should work out-of-the-box**: Generated `settings.json` should allow the application to run immediately without manual configuration
+1. **Settings file should work out-of-the-box**: Generated `settings.json` should allow the application to run
+   immediately without manual configuration
 2. **Use abstractions**: Prefer service abstractions over direct implementations to maintain deployment flexibility
 3. **Test with mocks**: Unit tests should use mock service implementations (JsonFileDatabase, RAM cache, etc.)
 4. **Store endpoint references**: Always store endpoint definitions in constants for testing and internal calls
 5. **Group endpoints logically**: Use separate ServerBuilder objects for different API sections
 6. **Type safety**: Use `@GenerateDataClassPaths` on all database models for type-safe queries
-7. **Document typed endpoints**: Use the typed endpoint API with good summaries and descriptions for auto-generated documentation
+7. **Document typed endpoints**: Use the typed endpoint API with good summaries and descriptions for auto-generated
+   documentation
 
 ## Key Files to Reference
 
@@ -343,4 +362,5 @@ throw UnauthorizedException("Authentication required")
 
 ### Middleware/Interceptors
 
-The framework supports interceptors for cross-cutting concerns like CORS, authentication, logging, etc. These are configured in your ServerBuilder.
+The framework supports interceptors for cross-cutting concerns like CORS, authentication, logging, etc. These are
+configured in your ServerBuilder.

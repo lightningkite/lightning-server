@@ -1,21 +1,7 @@
 package com.lightningkite.lightningserver.telemetry
 
-import io.opentelemetry.api.common.AttributeKey
 import io.opentelemetry.api.common.Attributes
-import io.opentelemetry.api.metrics.LongCounter
-import io.opentelemetry.api.metrics.LongHistogram
-import io.opentelemetry.api.metrics.Meter
-import io.opentelemetry.api.metrics.MeterBuilder
-import io.opentelemetry.api.metrics.MeterProvider
-import io.opentelemetry.api.metrics.LongCounterBuilder
-import io.opentelemetry.api.metrics.LongHistogramBuilder
-import io.opentelemetry.api.metrics.ObservableDoubleGauge
-import io.opentelemetry.api.metrics.ObservableLongGauge
-import io.opentelemetry.api.metrics.ObservableLongCounter
-import io.opentelemetry.api.metrics.ObservableDoubleMeasurement
-import io.opentelemetry.api.metrics.ObservableLongMeasurement
-import io.opentelemetry.api.metrics.BatchCallback
-import io.opentelemetry.api.metrics.ObservableMeasurement
+import io.opentelemetry.api.metrics.*
 import org.junit.Test
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.test.assertEquals
@@ -74,7 +60,9 @@ class HttpMetricsTest {
                     override fun setUnit(unit: String) = this
                     override fun ofDoubles() = throw UnsupportedOperationException()
                     override fun buildObserver() = throw UnsupportedOperationException()
-                    override fun buildWithCallback(callback: java.util.function.Consumer<ObservableLongMeasurement>) = throw UnsupportedOperationException()
+                    override fun buildWithCallback(callback: java.util.function.Consumer<ObservableLongMeasurement>) =
+                        throw UnsupportedOperationException()
+
                     override fun build(): LongCounter {
                         return object : LongCounter {
                             override fun add(value: Long) {
@@ -84,8 +72,13 @@ class HttpMetricsTest {
                                     "http.server.errors" -> errorCountValue.addAndGet(value)
                                 }
                             }
+
                             override fun add(value: Long, attributes: Attributes) = add(value)
-                            override fun add(value: Long, attributes: Attributes, context: io.opentelemetry.context.Context) = add(value)
+                            override fun add(
+                                value: Long,
+                                attributes: Attributes,
+                                context: io.opentelemetry.context.Context,
+                            ) = add(value)
                         }
                     }
                 }
@@ -103,13 +96,21 @@ class HttpMetricsTest {
                             override fun setExplicitBucketBoundariesAdvice(buckets: MutableList<Long>) = this
                             override fun build(): LongHistogram {
                                 return object : LongHistogram {
-                                    override fun record(value: Long) { durationValue.set(value) }
+                                    override fun record(value: Long) {
+                                        durationValue.set(value)
+                                    }
+
                                     override fun record(value: Long, attributes: Attributes) = record(value)
-                                    override fun record(value: Long, attributes: Attributes, context: io.opentelemetry.context.Context) = record(value)
+                                    override fun record(
+                                        value: Long,
+                                        attributes: Attributes,
+                                        context: io.opentelemetry.context.Context,
+                                    ) = record(value)
                                 }
                             }
                         }
                     }
+
                     override fun build() = throw UnsupportedOperationException()
                 }
             }
@@ -119,7 +120,7 @@ class HttpMetricsTest {
             override fun batchCallback(
                 callback: Runnable,
                 observableMeasurement: ObservableMeasurement,
-                vararg additionalMeasurements: ObservableMeasurement?
+                vararg additionalMeasurements: ObservableMeasurement?,
             ): BatchCallback = throw UnsupportedOperationException()
         }
 
@@ -204,13 +205,22 @@ class HttpMetricsTest {
                     override fun setUnit(unit: String) = this
                     override fun ofDoubles() = throw UnsupportedOperationException()
                     override fun buildObserver() = throw UnsupportedOperationException()
-                    override fun buildWithCallback(callback: java.util.function.Consumer<ObservableLongMeasurement>) = throw UnsupportedOperationException()
+                    override fun buildWithCallback(callback: java.util.function.Consumer<ObservableLongMeasurement>) =
+                        throw UnsupportedOperationException()
+
                     override fun build(): LongCounter {
                         val counter = getCounter(name)
                         return object : LongCounter {
-                            override fun add(value: Long) { counter.addAndGet(value) }
+                            override fun add(value: Long) {
+                                counter.addAndGet(value)
+                            }
+
                             override fun add(value: Long, attributes: Attributes) = add(value)
-                            override fun add(value: Long, attributes: Attributes, context: io.opentelemetry.context.Context) = add(value)
+                            override fun add(
+                                value: Long,
+                                attributes: Attributes,
+                                context: io.opentelemetry.context.Context,
+                            ) = add(value)
                         }
                     }
                 }
@@ -230,11 +240,17 @@ class HttpMetricsTest {
                                 return object : LongHistogram {
                                     override fun record(value: Long) {}
                                     override fun record(value: Long, attributes: Attributes) {}
-                                    override fun record(value: Long, attributes: Attributes, context: io.opentelemetry.context.Context) {}
+                                    override fun record(
+                                        value: Long,
+                                        attributes: Attributes,
+                                        context: io.opentelemetry.context.Context,
+                                    ) {
+                                    }
                                 }
                             }
                         }
                     }
+
                     override fun build() = throw UnsupportedOperationException()
                 }
             }
@@ -244,7 +260,7 @@ class HttpMetricsTest {
             override fun batchCallback(
                 callback: Runnable,
                 observableMeasurement: ObservableMeasurement,
-                vararg additionalMeasurements: ObservableMeasurement?
+                vararg additionalMeasurements: ObservableMeasurement?,
             ): BatchCallback = throw UnsupportedOperationException()
         }
     }

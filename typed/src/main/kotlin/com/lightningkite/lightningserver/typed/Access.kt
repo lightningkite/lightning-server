@@ -1,17 +1,14 @@
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.lightningserver.auth.AuthRequirement
-import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.auth.assert
+import com.lightningkite.lightningserver.ForbiddenException
+import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.data.get
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.pathing.ResolvedPath
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
-import com.lightningkite.lightningserver.ForbiddenException
-import com.lightningkite.lightningserver.auth.accepts
-import com.lightningkite.lightningserver.pathing.ResolvedPath
 import com.lightningkite.services.database.HasId
 
 /**
@@ -24,7 +21,7 @@ import com.lightningkite.services.database.HasId
 @ConsistentCopyVisibility
 public data class Access<out REQ : Request<PATH>?, out PATH : PathSpec, SUBJECT : HasId<*>?> internal constructor(
     public val request: REQ,
-    public val authOrNull: Authentication<SUBJECT & Any>?
+    public val authOrNull: Authentication<SUBJECT & Any>?,
 )
 
 public typealias HttpAccess<PATH, SUBJECT> = Access<HttpRequest<PATH>, PATH, SUBJECT>
@@ -52,7 +49,7 @@ public val <SUBJECT : HasId<*>> Access<*, *, SUBJECT>.auth: Authentication<SUBJE
  * */
 context(server: ServerRuntime)
 public suspend fun <REQUEST : Request<PATH>, PATH : PathSpec, SUBJECT : HasId<*>?> REQUEST.access(
-    requirement: AuthRequirement<SUBJECT>
+    requirement: AuthRequirement<SUBJECT>,
 ): Access<REQUEST, PATH, SUBJECT> =
     Access(
         request = this,
@@ -66,7 +63,7 @@ public suspend fun <REQUEST : Request<PATH>, PATH : PathSpec, SUBJECT : HasId<*>
  * */
 context(server: ServerRuntime)
 public suspend fun <REQUEST : Request<PATH>, PATH : PathSpec, SUBJECT : HasId<*>?> REQUEST.accessOrNull(
-    requirement: AuthRequirement<SUBJECT>
+    requirement: AuthRequirement<SUBJECT>,
 ): Access<REQUEST, PATH, SUBJECT>? =
     when (val r = requirement.check(this[Authentication.CacheKey])) {
         is AuthRequirement.Result.Accepted<SUBJECT> -> Access(this, r.auth)
@@ -74,24 +71,27 @@ public suspend fun <REQUEST : Request<PATH>, PATH : PathSpec, SUBJECT : HasId<*>
     }
 
 @JvmName("AuthAccessNullable")
-public fun <SUBJECT : HasId<*>?> AuthAccess(auth: Authentication<SUBJECT & Any>?): AuthAccess<SUBJECT> = Access<Nothing?, Nothing, SUBJECT>(null, auth)
-public fun <SUBJECT : HasId<*>> AuthAccess(auth: Authentication<SUBJECT>): AuthAccess<SUBJECT> = Access<Nothing?, Nothing, SUBJECT>(null, auth)
+public fun <SUBJECT : HasId<*>?> AuthAccess(auth: Authentication<SUBJECT & Any>?): AuthAccess<SUBJECT> =
+    Access<Nothing?, Nothing, SUBJECT>(null, auth)
+
+public fun <SUBJECT : HasId<*>> AuthAccess(auth: Authentication<SUBJECT>): AuthAccess<SUBJECT> =
+    Access<Nothing?, Nothing, SUBJECT>(null, auth)
 
 
 @JvmName("authNullable")
 context(server: ServerRuntime)
-public suspend fun <SUBJECT: HasId<*>> Request<*>.auth(auth: AuthRequirement<SUBJECT?>): Authentication<SUBJECT>? {
+public suspend fun <SUBJECT : HasId<*>> Request<*>.auth(auth: AuthRequirement<SUBJECT?>): Authentication<SUBJECT>? {
     return auth.assert(this[Authentication.CacheKey])
 }
 
 @JvmName("auth")
 context(server: ServerRuntime)
-public suspend fun <SUBJECT: HasId<*>> Request<*>.auth(auth: AuthRequirement<SUBJECT>): Authentication<SUBJECT> {
+public suspend fun <SUBJECT : HasId<*>> Request<*>.auth(auth: AuthRequirement<SUBJECT>): Authentication<SUBJECT> {
     return auth.assert(this[Authentication.CacheKey])!!
 }
 
 context(server: ServerRuntime)
-public suspend fun <SUBJECT: HasId<*>?> Request<*>.tryAuth(auth: AuthRequirement<SUBJECT>): AuthRequirement.Result<SUBJECT> =
+public suspend fun <SUBJECT : HasId<*>?> Request<*>.tryAuth(auth: AuthRequirement<SUBJECT>): AuthRequirement.Result<SUBJECT> =
     auth.check(this[Authentication.CacheKey])
 
 context(server: ServerRuntime, access: Access<*, *, *>)

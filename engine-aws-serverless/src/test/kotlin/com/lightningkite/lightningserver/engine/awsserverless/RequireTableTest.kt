@@ -7,10 +7,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.dynamodb.model.*
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
-import kotlin.test.assertFalse
+import kotlin.test.*
 
 /**
  * Tests to identify why AwsWebSocketDynamoDb tables might be getting recreated,
@@ -90,8 +87,10 @@ class RequireTableTest {
         // Note: The embedded DynamoDB might have slightly different behavior than real DynamoDB
         // but this demonstrates the potential issue
         if (ttlEnabledDescription.timeToLiveStatus() == TimeToLiveStatus.ENABLED) {
-            assertEquals("expireAt", ttlEnabledDescription.attributeName(),
-                "TTL attribute name should be returned when ENABLED")
+            assertEquals(
+                "expireAt", ttlEnabledDescription.attributeName(),
+                "TTL attribute name should be returned when ENABLED"
+            )
         }
 
         // Now disable TTL
@@ -128,9 +127,11 @@ class RequireTableTest {
         // If this assertion fails with wouldTableBeRecreated = true,
         // we've found the bug!
         if (wouldTableBeRecreated) {
-            println("⚠️ BUG IDENTIFIED: When TTL is DISABLED, the attributeName() returns " +
-                    "'$actualTtlAttributeName' instead of '$desiredTtlAttributeName'. " +
-                    "This causes requireTable() to delete and recreate the table!")
+            println(
+                "⚠️ BUG IDENTIFIED: When TTL is DISABLED, the attributeName() returns " +
+                        "'$actualTtlAttributeName' instead of '$desiredTtlAttributeName'. " +
+                        "This causes requireTable() to delete and recreate the table!"
+            )
         }
     }
 
@@ -174,9 +175,11 @@ class RequireTableTest {
 
         // If status is ENABLING, document the behavior
         if (immediateDescription.timeToLiveStatus() == TimeToLiveStatus.ENABLING) {
-            println("⚠️ POTENTIAL ISSUE: TTL is in ENABLING status. " +
-                    "If a Lambda cold start happens during this transition, " +
-                    "the TTL comparison might behave unexpectedly.")
+            println(
+                "⚠️ POTENTIAL ISSUE: TTL is in ENABLING status. " +
+                        "If a Lambda cold start happens during this transition, " +
+                        "the TTL comparison might behave unexpectedly."
+            )
         }
     }
 
@@ -209,10 +212,12 @@ class RequireTableTest {
         // Insert test data
         client.putItem {
             it.tableName(testTableName)
-            it.item(mapOf(
-                "pk" to AttributeValue.fromS("test-item-1"),
-                "data" to AttributeValue.fromS("important-data")
-            ))
+            it.item(
+                mapOf(
+                    "pk" to AttributeValue.fromS("test-item-1"),
+                    "data" to AttributeValue.fromS("important-data")
+                )
+            )
         }.await()
 
         // Verify data exists
@@ -251,12 +256,16 @@ class RequireTableTest {
 
         // If this fails, data was lost due to table recreation!
         if (itemAfter.item().isEmpty()) {
-            println("⚠️ BUG CONFIRMED: Table was recreated on second requireTable() call, " +
-                    "causing data loss! Check the isBroken comparison logic.")
+            println(
+                "⚠️ BUG CONFIRMED: Table was recreated on second requireTable() call, " +
+                        "causing data loss! Check the isBroken comparison logic."
+            )
         }
 
-        assertNotNull(itemAfter.item()["data"],
-            "Test data should still exist after second requireTable call - table was recreated!")
+        assertNotNull(
+            itemAfter.item()["data"],
+            "Test data should still exist after second requireTable call - table was recreated!"
+        )
     }
 
     /**
@@ -279,18 +288,22 @@ class RequireTableTest {
                     println("  - attributeName() should return the configured attribute name")
                     println("  - requireTable() comparison should PASS")
                 }
+
                 TimeToLiveStatus.DISABLED -> {
                     println("  - attributeName() might return null or empty string")
                     println("  - requireTable() comparison might FAIL -> TABLE DELETED!")
                 }
+
                 TimeToLiveStatus.ENABLING -> {
                     println("  - Transitional state, attributeName() behavior uncertain")
                     println("  - requireTable() comparison might FAIL -> TABLE DELETED!")
                 }
+
                 TimeToLiveStatus.DISABLING -> {
                     println("  - Transitional state, attributeName() behavior uncertain")
                     println("  - requireTable() comparison might FAIL -> TABLE DELETED!")
                 }
+
                 TimeToLiveStatus.UNKNOWN_TO_SDK_VERSION -> {
                     println("  - Unknown status from future SDK version")
                     println("  - requireTable() comparison behavior unknown")
@@ -335,9 +348,11 @@ class RequireTableTest {
         }
 
         // This assertion demonstrates the bug exists
-        assertTrue(isBrokenDueToTtl,
+        assertTrue(
+            isBrokenDueToTtl,
             "BUG: When TTL is DISABLED, the comparison incorrectly returns true, " +
-            "causing the table to be deleted even though only TTL status changed, not table structure")
+                    "causing the table to be deleted even though only TTL status changed, not table structure"
+        )
     }
 
     /**
@@ -487,8 +502,10 @@ class RequireTableTest {
                 // Individual comparisons
                 val keySchemaMatch = desired.keySchema() == matchingExisting.keySchema()
                 val projectionMatch = desired.projection() == matchingExisting.projection()
-                val projTypeMatch = desired.projection().projectionType() == matchingExisting.projection().projectionType()
-                val nonKeyAttrsMatch = desired.projection().nonKeyAttributes() == matchingExisting.projection().nonKeyAttributes()
+                val projTypeMatch =
+                    desired.projection().projectionType() == matchingExisting.projection().projectionType()
+                val nonKeyAttrsMatch =
+                    desired.projection().nonKeyAttributes() == matchingExisting.projection().nonKeyAttributes()
 
                 println("\n   Comparison results:")
                 println("      keySchema match: $keySchemaMatch")
@@ -605,8 +622,10 @@ class RequireTableTest {
         }
 
         // This assertion expects them to NOT be equal, demonstrating the bug
-        assertFalse(projection1 == projection2,
-            "This test expects projection comparison to be order-sensitive (which is the bug)")
+        assertFalse(
+            projection1 == projection2,
+            "This test expects projection comparison to be order-sensitive (which is the bug)"
+        )
     }
 
     /**

@@ -1,19 +1,9 @@
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.lightningserver.BadRequestException
-import com.lightningkite.lightningserver.ForbiddenException
-import com.lightningkite.lightningserver.NotFoundException
+import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.services.database.CollectionChanges
-import com.lightningkite.services.database.Condition
-import com.lightningkite.services.database.EntryChange
-import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.Modification
-import com.lightningkite.services.database.SortPart
-import com.lightningkite.services.database.Table
-import com.lightningkite.services.database._id
+import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.serialization.serializer
 
 /**
  * Retrieves the [Model] with [id], or throws a [NotFoundException] with the provided [message] if not found.
@@ -51,7 +41,7 @@ public suspend fun <Model : HasId<ID>, ID : Comparable<ID>> Table<Model>.getOrFo
 
 public context(server: ServerRuntime)
 fun <Model : HasId<ID>, ID : Comparable<ID>> Table<Model>.withServerRuntimeChangeListeners(
-    changeListeners: List<suspend context(ServerRuntime) (CollectionChanges<Model>) -> Unit>
+    changeListeners: List<suspend context(ServerRuntime) (CollectionChanges<Model>) -> Unit>,
 ): Table<Model> = object : Table<Model> by this@withServerRuntimeChangeListeners {
     override val wraps = this@withServerRuntimeChangeListeners
 
@@ -73,27 +63,27 @@ fun <Model : HasId<ID>, ID : Comparable<ID>> Table<Model>.withServerRuntimeChang
     override suspend fun replaceOne(
         condition: Condition<Model>,
         model: Model,
-        orderBy: List<SortPart<Model>>
+        orderBy: List<SortPart<Model>>,
     ): EntryChange<Model> = wraps.replaceOne(condition, model, orderBy)
         .also { changed(listOf(it)) }
 
     override suspend fun updateOne(
         condition: Condition<Model>,
         modification: Modification<Model>,
-        orderBy: List<SortPart<Model>>
+        orderBy: List<SortPart<Model>>,
     ): EntryChange<Model> = wraps.updateOne(condition, modification, orderBy)
         .also { changed(listOf(it)) }
 
     override suspend fun upsertOne(
         condition: Condition<Model>,
         modification: Modification<Model>,
-        model: Model
+        model: Model,
     ): EntryChange<Model> = wraps.upsertOne(condition, modification, model)
         .also { changed(listOf(it)) }
 
     override suspend fun updateMany(
         condition: Condition<Model>,
-        modification: Modification<Model>
+        modification: Modification<Model>,
     ): CollectionChanges<Model> = wraps.updateMany(condition, modification)
         .also { changed(it.changes) }
 
@@ -101,7 +91,7 @@ fun <Model : HasId<ID>, ID : Comparable<ID>> Table<Model>.withServerRuntimeChang
     override suspend fun replaceOneIgnoringResult(
         condition: Condition<Model>,
         model: Model,
-        orderBy: List<SortPart<Model>>
+        orderBy: List<SortPart<Model>>,
     ): Boolean =
         if (changeListeners.isEmpty()) wraps.replaceOneIgnoringResult(condition, model, orderBy) else replaceOne(
             condition,
@@ -112,7 +102,7 @@ fun <Model : HasId<ID>, ID : Comparable<ID>> Table<Model>.withServerRuntimeChang
     override suspend fun upsertOneIgnoringResult(
         condition: Condition<Model>,
         modification: Modification<Model>,
-        model: Model
+        model: Model,
     ): Boolean =
         if (changeListeners.isEmpty()) wraps.upsertOneIgnoringResult(condition, modification, model) else upsertOne(
             condition,
@@ -123,7 +113,7 @@ fun <Model : HasId<ID>, ID : Comparable<ID>> Table<Model>.withServerRuntimeChang
     override suspend fun updateOneIgnoringResult(
         condition: Condition<Model>,
         modification: Modification<Model>,
-        orderBy: List<SortPart<Model>>
+        orderBy: List<SortPart<Model>>,
     ): Boolean =
         if (changeListeners.isEmpty()) wraps.updateOneIgnoringResult(condition, modification, orderBy) else updateOne(
             condition,
@@ -133,7 +123,7 @@ fun <Model : HasId<ID>, ID : Comparable<ID>> Table<Model>.withServerRuntimeChang
 
     override suspend fun updateManyIgnoringResult(
         condition: Condition<Model>,
-        modification: Modification<Model>
+        modification: Modification<Model>,
     ): Int = if (changeListeners.isEmpty()) wraps.updateManyIgnoringResult(
         condition,
         modification
@@ -141,7 +131,7 @@ fun <Model : HasId<ID>, ID : Comparable<ID>> Table<Model>.withServerRuntimeChang
 
     override suspend fun deleteOneIgnoringOld(
         condition: Condition<Model>,
-        orderBy: List<SortPart<Model>>
+        orderBy: List<SortPart<Model>>,
     ): Boolean = if (changeListeners.isEmpty()) wraps.deleteOneIgnoringOld(condition, orderBy) else deleteOne(
         condition,
         orderBy

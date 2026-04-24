@@ -1,14 +1,10 @@
 package com.lightningkite.lightningserver.demo
 
 import com.lightningkite.lightningserver.demo.endpoints.*
-import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.typed.test
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class TypedApiTest {
 
@@ -25,7 +21,7 @@ class TypedApiTest {
             assertTrue(result.operation.contains("15.0"))
         }
     }
-    
+
     @Test
     fun testCalculatorSubtraction() = runBlocking {
         TestHelper.testServer {

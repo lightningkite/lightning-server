@@ -3,22 +3,19 @@ package com.lightningkite.lightningserver.notifications.subscriptions
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.notifications.*
-import com.lightningkite.lightningserver.notifications.events.Event
-import com.lightningkite.lightningserver.notifications.events.UserEventType
-import com.lightningkite.lightningserver.notifications.events.event
+import com.lightningkite.lightningserver.notifications.events.*
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.setStatic
 import com.lightningkite.lightningserver.typed.sdk.module
 import com.lightningkite.services.cache.Cache
-import com.lightningkite.services.database.*
+import com.lightningkite.services.database.Database
+import com.lightningkite.services.database.insertOne
 import com.lightningkite.services.email.EmailService
 import com.lightningkite.services.email.TestEmailService
 import com.lightningkite.services.sms.SMS
 import com.lightningkite.services.sms.TestSMS
 import kotlinx.coroutines.runBlocking
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNull
+import kotlin.test.*
 import kotlin.uuid.Uuid
 
 /**
@@ -240,7 +237,12 @@ class FrequencyCustomizableSubscriptionsTest {
                 Notifications.subs.info.table().insertOne(
                     NotificationSendMethods(
                         _id = UserEventType(user._id, Notifications.modelDeleted.event.name),
-                        email = Frequency.weekly(kotlinx.datetime.DayOfWeek.FRIDAY, 10, 0, kotlinx.datetime.TimeZone.UTC),
+                        email = Frequency.weekly(
+                            kotlinx.datetime.DayOfWeek.FRIDAY,
+                            10,
+                            0,
+                            kotlinx.datetime.TimeZone.UTC
+                        ),
                         sms = null,
                         push = Frequency.immediately(),
                         inApp = Frequency.immediately()

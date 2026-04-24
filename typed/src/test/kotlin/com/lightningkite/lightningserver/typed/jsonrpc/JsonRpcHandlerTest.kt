@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.typed.jsonrpc
 
-import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.HttpStatus
@@ -8,6 +7,7 @@ import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
+import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
@@ -20,24 +20,24 @@ class JsonRpcHandlerTest {
     @Serializable
     data class AddParams(
         val a: Int,
-        val b: Int
+        val b: Int,
     )
 
     @Serializable
     data class GreetParams(
-        val name: String
+        val name: String,
     )
 
     @Serializable
     data class GreetResult(
-        val message: String
+        val message: String,
     )
 
     @Serializable
     data class ComplexData(
         val id: String,
         val values: List<Int>,
-        val metadata: Map<String, String>
+        val metadata: Map<String, String>,
     )
 
     object TestServer : ServerBuilder() {
@@ -100,14 +100,16 @@ class JsonRpcHandlerTest {
     fun testAddMethod() = runBlocking {
         TestServer.test({}) {
             val response = TestServer.rpcEndpoint.test(
-                body = TypedData.text("""
+                body = TypedData.text(
+                    """
                     {
                         "jsonrpc": "2.0",
                         "method": "add",
                         "params": {"a": 5, "b": 3},
                         "id": 1
                     }
-                """.trimIndent(), MediaType.Application.Json)
+                """.trimIndent(), MediaType.Application.Json
+                )
             )
 
             assertEquals(HttpStatus.OK, response.status)
@@ -122,14 +124,16 @@ class JsonRpcHandlerTest {
     fun testGreetMethod() = runBlocking {
         TestServer.test({}) {
             val response = TestServer.rpcEndpoint.test(
-                body = TypedData.text("""
+                body = TypedData.text(
+                    """
                     {
                         "jsonrpc": "2.0",
                         "method": "greet",
                         "params": {"name": "Alice"},
                         "id": 2
                     }
-                """.trimIndent(), MediaType.Application.Json)
+                """.trimIndent(), MediaType.Application.Json
+                )
             )
 
             assertEquals(HttpStatus.OK, response.status)
@@ -143,7 +147,8 @@ class JsonRpcHandlerTest {
     fun testComplexDataMethod() = runBlocking {
         TestServer.test({}) {
             val response = TestServer.rpcEndpoint.test(
-                body = TypedData.text("""
+                body = TypedData.text(
+                    """
                     {
                         "jsonrpc": "2.0",
                         "method": "processComplex",
@@ -154,7 +159,8 @@ class JsonRpcHandlerTest {
                         },
                         "id": 3
                     }
-                """.trimIndent(), MediaType.Application.Json)
+                """.trimIndent(), MediaType.Application.Json
+                )
             )
 
             assertEquals(HttpStatus.OK, response.status)
@@ -171,14 +177,16 @@ class JsonRpcHandlerTest {
     fun testNullableMethodWithValue() = runBlocking {
         TestServer.test({}) {
             val response = TestServer.rpcEndpoint.test(
-                body = TypedData.text("""
+                body = TypedData.text(
+                    """
                     {
                         "jsonrpc": "2.0",
                         "method": "maybeUpper",
                         "params": "hello",
                         "id": 4
                     }
-                """.trimIndent(), MediaType.Application.Json)
+                """.trimIndent(), MediaType.Application.Json
+                )
             )
 
             assertEquals(HttpStatus.OK, response.status)
@@ -191,14 +199,16 @@ class JsonRpcHandlerTest {
     fun testNullableMethodWithNull() = runBlocking {
         TestServer.test({}) {
             val response = TestServer.rpcEndpoint.test(
-                body = TypedData.text("""
+                body = TypedData.text(
+                    """
                     {
                         "jsonrpc": "2.0",
                         "method": "maybeUpper",
                         "params": null,
                         "id": 5
                     }
-                """.trimIndent(), MediaType.Application.Json)
+                """.trimIndent(), MediaType.Application.Json
+                )
             )
 
             println("response: ${response.body?.text()}")
@@ -212,14 +222,16 @@ class JsonRpcHandlerTest {
     fun testMethodNotFound() = runBlocking {
         TestServer.test({}) {
             val response = TestServer.rpcEndpoint.test(
-                body = TypedData.text("""
+                body = TypedData.text(
+                    """
                     {
                         "jsonrpc": "2.0",
                         "method": "nonexistent",
                         "params": {},
                         "id": 6
                     }
-                """.trimIndent(), MediaType.Application.Json)
+                """.trimIndent(), MediaType.Application.Json
+                )
             )
 
             assertEquals(HttpStatus.OK, response.status)
@@ -234,14 +246,16 @@ class JsonRpcHandlerTest {
     fun testInvalidParams() = runBlocking {
         TestServer.test({}) {
             val response = TestServer.rpcEndpoint.test(
-                body = TypedData.text("""
+                body = TypedData.text(
+                    """
                     {
                         "jsonrpc": "2.0",
                         "method": "add",
                         "params": {"a": "not a number", "b": 3},
                         "id": 7
                     }
-                """.trimIndent(), MediaType.Application.Json)
+                """.trimIndent(), MediaType.Application.Json
+                )
             )
 
             assertEquals(HttpStatus.OK, response.status)
@@ -254,14 +268,16 @@ class JsonRpcHandlerTest {
     fun testInvalidJsonRpcVersion() = runBlocking {
         TestServer.test({}) {
             val response = TestServer.rpcEndpoint.test(
-                body = TypedData.text("""
+                body = TypedData.text(
+                    """
                     {
                         "jsonrpc": "1.0",
                         "method": "add",
                         "params": {"a": 1, "b": 2},
                         "id": 8
                     }
-                """.trimIndent(), MediaType.Application.Json)
+                """.trimIndent(), MediaType.Application.Json
+                )
             )
 
             assertEquals(HttpStatus.OK, response.status)
@@ -275,9 +291,11 @@ class JsonRpcHandlerTest {
     fun testParseError() = runBlocking {
         TestServer.test({}) {
             val response = TestServer.rpcEndpoint.test(
-                body = TypedData.text("""
+                body = TypedData.text(
+                    """
                     {invalid json
-                """.trimIndent(), MediaType.Application.Json)
+                """.trimIndent(), MediaType.Application.Json
+                )
             )
 
             assertEquals(HttpStatus.OK, response.status)
@@ -304,14 +322,16 @@ class JsonRpcHandlerTest {
         TestServer.test({}) {
             // Test with string ID
             val response1 = TestServer.rpcEndpoint.test(
-                body = TypedData.text("""
+                body = TypedData.text(
+                    """
                     {
                         "jsonrpc": "2.0",
                         "method": "add",
                         "params": {"a": 1, "b": 2},
                         "id": "my-string-id"
                     }
-                """.trimIndent(), MediaType.Application.Json)
+                """.trimIndent(), MediaType.Application.Json
+                )
             )
 
             val jsonResponse1 = Json.decodeFromString<JsonRpcResponse>(response1.body!!.text())
@@ -319,13 +339,15 @@ class JsonRpcHandlerTest {
 
             // Test with null ID (notification)
             val response2 = TestServer.rpcEndpoint.test(
-                body = TypedData.text("""
+                body = TypedData.text(
+                    """
                     {
                         "jsonrpc": "2.0",
                         "method": "add",
                         "params": {"a": 1, "b": 2}
                     }
-                """.trimIndent(), MediaType.Application.Json)
+                """.trimIndent(), MediaType.Application.Json
+                )
             )
 
             assertNull(response2.body)

@@ -3,10 +3,7 @@ package com.lightningkite.lightningserver.notifications.subscriptions
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.notifications.*
-import com.lightningkite.lightningserver.notifications.events.Event
-import com.lightningkite.lightningserver.notifications.events.EventRegistry
-import com.lightningkite.lightningserver.notifications.events.UserEventType
-import com.lightningkite.lightningserver.notifications.events.event
+import com.lightningkite.lightningserver.notifications.events.*
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.setStatic
 import com.lightningkite.lightningserver.typed.sdk.module
@@ -17,11 +14,7 @@ import com.lightningkite.services.email.TestEmailService
 import com.lightningkite.services.sms.SMS
 import com.lightningkite.services.sms.TestSMS
 import kotlinx.coroutines.runBlocking
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.uuid.Uuid
 
 /**
@@ -296,10 +289,14 @@ class FullyCustomizableSubscriptionsTest {
 
                 Server.userInfo.table().deleteOneById(user1._id)
 
-                assertNull(Notifications.subs.info.table()
-                    .get(UserEventType(user1._id, eventType.name)))
-                assertNotNull(Notifications.subs.info.table()
-                    .get(UserEventType(user2._id, eventType.name)))
+                assertNull(
+                    Notifications.subs.info.table()
+                        .get(UserEventType(user1._id, eventType.name))
+                )
+                assertNotNull(
+                    Notifications.subs.info.table()
+                        .get(UserEventType(user2._id, eventType.name))
+                )
             }
         }
     }
@@ -358,7 +355,14 @@ class FullyCustomizableSubscriptionsTest {
 
                 Notifications.subs.info.table().replaceOneById(
                     subscriptionId,
-                    existing.copy(email = Frequency.weekly(kotlinx.datetime.DayOfWeek.MONDAY, 9, 0, kotlinx.datetime.TimeZone.UTC))
+                    existing.copy(
+                        email = Frequency.weekly(
+                            kotlinx.datetime.DayOfWeek.MONDAY,
+                            9,
+                            0,
+                            kotlinx.datetime.TimeZone.UTC
+                        )
+                    )
                 )
 
                 // Verify customization

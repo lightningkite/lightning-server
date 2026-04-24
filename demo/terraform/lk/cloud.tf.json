@@ -1,9 +1,9 @@
 {
-    "data": {
-        "aws_route53_zone": {
-            "main": {
-                "name": "cs.lightningkite.com"
-            }
-        }
+  "data": {
+    "aws_route53_zone": {
+      "main": {
+        "name": "cs.lightningkite.com"
+      }
     }
+  }
 }

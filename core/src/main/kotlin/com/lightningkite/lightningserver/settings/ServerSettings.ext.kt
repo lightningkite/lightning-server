@@ -5,16 +5,12 @@ package com.lightningkite.lightningserver.settings
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.data.toJavaFile
 import com.lightningkite.lightningserver.definition.ServerSetting
-import com.lightningkite.services.data.KFile
-import kotlinx.serialization.DeserializationStrategy
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.SerializationStrategy
-import kotlinx.serialization.StringFormat
+import com.lightningkite.services.kfile.KFile
+import kotlinx.serialization.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.properties.Properties
-import kotlin.io.path.Path
 
 /**
  * Context-aware extension to set a setting's serializable value.
@@ -116,7 +112,8 @@ public fun ServerSettings.loadFromFile(
 ) {
     val format: StringFormat = settingsFormat(file.extension, module)
 
-    val serializer = SettingsSerializer((settings - overrides.keys).sortedBy { it.name }, module, file.toJavaFile().parentFile)
+    val serializer =
+        SettingsSerializer((settings - overrides.keys).sortedBy { it.name }, module, file.toJavaFile().parentFile)
 
     if (!file.exists()) {
         file.writeString(format.encodeToString(serializer, settings.associateWith { it.default }))
@@ -177,6 +174,7 @@ internal fun settingsFormat(extension: String, module: SerializersModule): Strin
                 }
             }
         }
+
         else -> Json {
             isLenient = true
             ignoreUnknownKeys = true

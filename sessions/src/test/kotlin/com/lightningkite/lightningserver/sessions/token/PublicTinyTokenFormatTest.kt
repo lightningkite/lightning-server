@@ -1,11 +1,7 @@
 // by Claude
 package com.lightningkite.lightningserver.sessions.token
 
-import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.auth.GrantedScope
-import com.lightningkite.lightningserver.auth.PrincipalType
-import com.lightningkite.lightningserver.auth.id
-import com.lightningkite.lightningserver.auth.register
+import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.encryption.HS256
@@ -18,10 +14,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import org.junit.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
+import kotlin.test.*
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
@@ -64,7 +57,7 @@ class PublicTinyTokenFormatTest {
 
     private fun createPublicTinyTokenFormat(
         basis: SecretBasis = testBasis,
-        expiration: kotlin.time.Duration = 5.minutes
+        expiration: kotlin.time.Duration = 5.minutes,
     ): PublicTinyTokenFormat {
         return PublicTinyTokenFormat(
             hasher = RuntimeDeferred.Cached { basis.HS256("public-tiny-token-test") },

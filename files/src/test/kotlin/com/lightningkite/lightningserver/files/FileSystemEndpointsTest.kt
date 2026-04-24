@@ -1,19 +1,15 @@
 package com.lightningkite.lightningserver.files
 
-import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.http.HttpHeader
-import com.lightningkite.lightningserver.http.HttpHeaders
-import com.lightningkite.lightningserver.http.QueryParameters
-import com.lightningkite.lightningserver.http.post
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
+import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.files.PublicFileSystem
@@ -25,7 +21,7 @@ import kotlin.uuid.Uuid
 
 class FileSystemEndpointsTest {
 
-    object Server: ServerBuilder() {
+    object Server : ServerBuilder() {
         val files = setting("files", PublicFileSystem.Settings())
         val database = setting("database", Database.Settings())
         val served = path.path("files") include FileSystemEndpoints(files)
@@ -41,6 +37,7 @@ class FileSystemEndpointsTest {
                 file
             }
         )
+
         init {
             registerBasicMediaTypeCoders()
         }
@@ -58,7 +55,10 @@ class FileSystemEndpointsTest {
             file.put(TypedData.text("Hello world!", MediaType.Text.Plain))
             println(file.url)
             println(file.signedUrl)
-            val serialized = serverRuntime.externalSerialization.stringArrayFormat.encodeToString(uploadEarly.serializer(), ServerFile(file.url))
+            val serialized = serverRuntime.externalSerialization.stringArrayFormat.encodeToString(
+                uploadEarly.serializer(),
+                ServerFile(file.url)
+            )
             println("Serialized: $serialized")
             files().parseExternalUrl(serialized)!!
             println("Url parse successful")
@@ -125,7 +125,10 @@ class FileSystemEndpointsTest {
                 TypedData.text(List(1000) { it }.joinToString(""), MediaType.Text.Plain)
             )
 
-            val serialized = serverRuntime.externalSerialization.stringArrayFormat.encodeToString(uploadEarly.serializer(), ServerFile(file.url))
+            val serialized = serverRuntime.externalSerialization.stringArrayFormat.encodeToString(
+                uploadEarly.serializer(),
+                ServerFile(file.url)
+            )
 
             files().parseExternalUrl(serialized)!!
 

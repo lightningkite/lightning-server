@@ -11,7 +11,7 @@ import com.lightningkite.services.database.nullElement
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 
-public class SDKException(message: String? = null, cause: Throwable? = null): Exception(message, cause)
+public class SDKException(message: String? = null, cause: Throwable? = null) : Exception(message, cause)
 
 internal val SDK.Data.Node.docGroup: String?
     get() = (ancestors + layer).drop(1).takeUnless { it.isEmpty() }?.joinToString(".") { it.info.interfaceName }
@@ -35,7 +35,7 @@ public fun SDK.Module.ensureUniqueNames(): SDK.Module = copy(
         .values
         .flatMap { similar ->
             similar.mapIndexed { idx, it ->
-                if(it.functionName.isBlank()) throw SDKException("Endpoint at path ${it.path} has an empty name.")
+                if (it.functionName.isBlank()) throw SDKException("Endpoint at path ${it.path} has an empty name.")
                 if (idx == 0) it
                 else when (it) {
                     is SDK.Function.Endpoint -> it.copy(functionName = it.functionName + (idx + 1))
@@ -66,7 +66,7 @@ public class TypingGenerationException internal constructor(
     name: String,
     path: Any,
     type: KSerializer<*>,
-    cause: Throwable
+    cause: Throwable,
 ) : IllegalStateException(
     "Failed to generate typing for $name $path with type ${type.descriptor.serialName}",
     cause
@@ -96,13 +96,23 @@ public fun ServerRuntime.usedTypes(): Collection<KSerializer<*>> {
             try {
                 registerRecursive(handler.inputType)
             } catch (e: Exception) {
-                throw TypingGenerationException("input of \"${handler.summary}\" at", HttpEndpoint(path, http), handler.inputType, e)
+                throw TypingGenerationException(
+                    "input of \"${handler.summary}\" at",
+                    HttpEndpoint(path, http),
+                    handler.inputType,
+                    e
+                )
             }
 
             try {
                 registerRecursive(handler.outputType)
             } catch (e: Exception) {
-                throw TypingGenerationException("output of \"${handler.summary}\" at", HttpEndpoint(path, http), handler.outputType, e)
+                throw TypingGenerationException(
+                    "output of \"${handler.summary}\" at",
+                    HttpEndpoint(path, http),
+                    handler.outputType,
+                    e
+                )
             }
         }
         endpoints.websocket?.let { handler ->
@@ -111,13 +121,23 @@ public fun ServerRuntime.usedTypes(): Collection<KSerializer<*>> {
             try {
                 registerRecursive(handler.inputType)
             } catch (e: Exception) {
-                throw TypingGenerationException("input of \"${handler.summary}\" at", HttpEndpoint(path, HttpMethod.WEBSOCKET), handler.inputType, e)
+                throw TypingGenerationException(
+                    "input of \"${handler.summary}\" at",
+                    HttpEndpoint(path, HttpMethod.WEBSOCKET),
+                    handler.inputType,
+                    e
+                )
             }
 
             try {
                 registerRecursive(handler.outputType)
             } catch (e: Exception) {
-                throw TypingGenerationException("output of \"${handler.summary}\" at", HttpEndpoint(path, HttpMethod.WEBSOCKET), handler.outputType, e)
+                throw TypingGenerationException(
+                    "output of \"${handler.summary}\" at",
+                    HttpEndpoint(path, HttpMethod.WEBSOCKET),
+                    handler.outputType,
+                    e
+                )
             }
         }
     }

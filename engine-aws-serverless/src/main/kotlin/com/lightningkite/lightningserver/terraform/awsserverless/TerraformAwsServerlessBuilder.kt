@@ -1,17 +1,13 @@
 package com.lightningkite.lightningserver.terraform.awsserverless
 
-import com.lightningkite.DataSize
-import com.lightningkite.DataSize.Companion.gibibytes
-import com.lightningkite.EmailAddress
 import com.lightningkite.lightningserver.data.Schedule
-import com.lightningkite.lightningserver.definition.ServerSetting
+import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.generalSettings
-import com.lightningkite.lightningserver.definition.loggingSettings
-import com.lightningkite.lightningserver.definition.secretBasis
-import com.lightningkite.lightningserver.definition.telemetrySettings
 import com.lightningkite.lightningserver.engine.awsserverless.AwsAdapter
 import com.lightningkite.lightningserver.terraform.*
+import com.lightningkite.services.data.DataSize
+import com.lightningkite.services.data.DataSize.Companion.gibibytes
+import com.lightningkite.services.data.EmailAddress
 import com.lightningkite.services.terraform.*
 import kotlinx.serialization.json.*
 import software.amazon.awssdk.regions.Region
@@ -91,6 +87,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
      * - null: No tracing_config block (default)
      */
     public var lambdaTracingMode: LambdaTracingMode? = null
+
     public enum class LambdaTracingMode { Active, PassThrough }
 
     /**
@@ -116,7 +113,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
 
     override fun finalize() {
 
-        if(projectPrefix.any { !it.isLetterOrDigit() && !(it == '-' || it == '_') })
+        if (projectPrefix.any { !it.isLetterOrDigit() && !(it == '-' || it == '_') })
             throw IllegalArgumentException("The projectPrefix has illegal characters in it. It can only contain: Letters, Digits, '-', and '_'.")
 
         super.finalize()
@@ -138,7 +135,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
             put(
                 "wsUrl",
                 (emitter as? TerraformEmitterAwsDomain)?.domain?.let {
-                    if(useCloudFrontForWebSocket) "wss://ws.$it"
+                    if (useCloudFrontForWebSocket) "wss://ws.$it"
                     else "wss://ws.$it?path="
                 }
                     ?: $$"${aws_apigatewayv2_stage.ws.invoke_url}")
@@ -562,10 +559,13 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                     "apply_on" - "PublishedVersions"
                 }
 
-                if(emitter is TerraformEmitterAwsVpc){
+                if (emitter is TerraformEmitterAwsVpc) {
                     "vpc_config" {
                         "subnet_ids" - expression("module.vpc.private_subnets")
-                        "security_group_ids" - listOf(expression("aws_security_group.internal.id"), expression("aws_security_group.access_outside.id"))
+                        "security_group_ids" - listOf(
+                            expression("aws_security_group.internal.id"),
+                            expression("aws_security_group.access_outside.id")
+                        )
                     }
                 }
 

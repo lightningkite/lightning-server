@@ -20,12 +20,14 @@ for Lightning Server deployments. It handles:
 Abstract base class for Terraform configuration generation.
 
 Key responsibilities:
+
 - Coordinates Terraform file generation from server settings
 - Manages provider requirements and variables
 - Provides deployment workflows (init, plan, apply)
 - Handles secret retrieval and environment preparation
 
 Key methods:
+
 - `write()`: Generate .tf.json files in terraformRoot
 - `deploy()`: Full deployment workflow with confirmation
 - `editVars()`: Interactive secret editor
@@ -33,6 +35,7 @@ Key methods:
 - `prepareTerraform()`: Prepare environment variables for Terraform
 
 Implementations must provide:
+
 - `builder`: The ServerBuilder instance to deploy
 - `secretsSource`: Source for retrieving secrets
 - `terraformRoot`: Directory for generated Terraform files
@@ -52,16 +55,19 @@ Interfaces and implementations for managing deployment secrets.
 
 **`SecretSource`**
 Base interface for retrieving secrets.
+
 - `name`: Display name for this source
 - `getOrNull(need)`: Retrieve a secret, or null if not found
 - `get(need)`: Retrieve a secret, throwing if not found
 
 **`InteractiveSecretSource`**
 Secret source that can prompt users for missing values.
+
 - `prompt(need)`: Interactively prompt for a secret value
 
 **`PopulatableSecretSource`**
 Secret source that can both retrieve and store secrets.
+
 - `set(need, value)`: Store a secret value
 - Implements `get()` to prompt and store if value not found
 
@@ -75,10 +81,12 @@ Example: `LS_SECRET_AWS_ACCESS_KEY_ID` for the AWS_ACCESS_KEY_ID secret.
 Stores secrets in an AES-256 encrypted JSON file, protected by a password.
 
 Constructor:
+
 - `EncryptedFileSecretSource(file, name, passwordFetcher)`: Explicit file location
 - `EncryptedFileSecretSource(name)`: Uses ~/.lightningserver/{name}.json.enc
 
 Security Features (Version 2):
+
 - AES-256-CBC encryption
 - PBKDF2-HMAC-SHA256 key derivation (100,000 iterations)
 - Random 32-byte salt per file

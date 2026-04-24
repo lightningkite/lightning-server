@@ -3,11 +3,7 @@ package com.lightningkite.lightningserver.encryption
 import kotlinx.coroutines.runBlocking
 import kotlin.io.encoding.Base64
 import kotlin.random.Random
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotEquals
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.measureTime
 
 /**
@@ -37,7 +33,8 @@ class HashTests {
      * Performance comparison between Kotlin cryptography library
      * and Java javax.crypto implementations.
      */
-    @Test fun hashPerformance(): Unit = runBlocking {
+    @Test
+    fun hashPerformance(): Unit = runBlocking {
         measureTime { repeat(5) { "asdfa".secureHash() } }.also { println("Kotlin: $it") }
         measureTime { repeat(5) { "asdfa".secureHashJava() } }.also { println("Java: $it") }
         val hash = "asdfa".secureHash()

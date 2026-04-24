@@ -14,10 +14,7 @@ import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.builtins.serializer
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertNull
+import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -28,15 +25,17 @@ import kotlin.time.Duration.Companion.seconds
 class CorsInterceptorTest {
 
     object TestServer : ServerBuilder() {
-        val corsSettings = setting("cors", CorsSettings(
-            limitToDomains = listOf("https://example.com", "https://*.trusted.com"),
-            limitToHeaders = listOf("Content-Type", "Authorization"),
-            limitToMethods = listOf("GET", "POST", "PUT", "DELETE"),
-            exposedHeaders = listOf("X-Custom-Header"),
-            allowCredentials = true,
-            cacheLength = 3600.seconds,
-            forbidOnMatchFail = true
-        ))
+        val corsSettings = setting(
+            "cors", CorsSettings(
+                limitToDomains = listOf("https://example.com", "https://*.trusted.com"),
+                limitToHeaders = listOf("Content-Type", "Authorization"),
+                limitToMethods = listOf("GET", "POST", "PUT", "DELETE"),
+                exposedHeaders = listOf("X-Custom-Header"),
+                allowCredentials = true,
+                cacheLength = 3600.seconds,
+                forbidOnMatchFail = true
+            )
+        )
 
         init {
             registerBasicMediaTypeCoders()
@@ -124,7 +123,10 @@ class CorsInterceptorTest {
                     }
                 )
                 assertEquals(HttpStatus.OK, response.status)
-                assertEquals("https://subdomain.trusted.com", response.headers[HttpHeader.AccessControlAllowOrigin]?.root)
+                assertEquals(
+                    "https://subdomain.trusted.com",
+                    response.headers[HttpHeader.AccessControlAllowOrigin]?.root
+                )
             }
         }
     }
@@ -193,13 +195,15 @@ class CorsInterceptorTest {
 class CorsInterceptorPermissiveTest {
 
     object PermissiveServer : ServerBuilder() {
-        val corsSettings = setting("cors", CorsSettings(
-            limitToDomains = listOf("*"), // Allow all origins
-            limitToHeaders = listOf("*"), // Mirror headers
-            limitToMethods = listOf("*"), // Mirror methods
-            allowCredentials = false,
-            forbidOnMatchFail = false
-        ))
+        val corsSettings = setting(
+            "cors", CorsSettings(
+                limitToDomains = listOf("*"), // Allow all origins
+                limitToHeaders = listOf("*"), // Mirror headers
+                limitToMethods = listOf("*"), // Mirror methods
+                allowCredentials = false,
+                forbidOnMatchFail = false
+            )
+        )
 
         init {
             registerBasicMediaTypeCoders()
@@ -237,13 +241,15 @@ class CorsInterceptorPermissiveTest {
 class CorsInterceptorRestrictiveTest {
 
     object RestrictiveServer : ServerBuilder() {
-        val corsSettings = setting("cors", CorsSettings(
-            limitToDomains = emptyList(), // No origins allowed
-            limitToHeaders = emptyList(),
-            limitToMethods = emptyList(),
-            allowCredentials = false,
-            forbidOnMatchFail = true
-        ))
+        val corsSettings = setting(
+            "cors", CorsSettings(
+                limitToDomains = emptyList(), // No origins allowed
+                limitToHeaders = emptyList(),
+                limitToMethods = emptyList(),
+                allowCredentials = false,
+                forbidOnMatchFail = true
+            )
+        )
 
         init {
             registerBasicMediaTypeCoders()
@@ -278,10 +284,12 @@ class CorsInterceptorRestrictiveTest {
 class CorsInterceptorNonBlockingTest {
 
     object NonBlockingServer : ServerBuilder() {
-        val corsSettings = setting("cors", CorsSettings(
-            limitToDomains = listOf("https://example.com"),
-            forbidOnMatchFail = false // Don't block, just omit CORS headers
-        ))
+        val corsSettings = setting(
+            "cors", CorsSettings(
+                limitToDomains = listOf("https://example.com"),
+                forbidOnMatchFail = false // Don't block, just omit CORS headers
+            )
+        )
 
         init {
             install(CorsInterceptor(corsSettings))

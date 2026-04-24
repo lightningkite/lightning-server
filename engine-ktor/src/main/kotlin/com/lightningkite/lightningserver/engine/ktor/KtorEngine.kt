@@ -144,8 +144,9 @@ public class KtorEngine(
                         .flatMap {
                             if (it.first == "path" && it.second.contains('?')) {
                                 listOf(it.first to it.second.substringBefore('?')) +
-                                        QueryParameters.parse(it.second.substringAfter('?')
-                                ).entries
+                                        QueryParameters.parse(
+                                            it.second.substringAfter('?')
+                                        ).entries
                             } else
                                 listOf(it)
                         })

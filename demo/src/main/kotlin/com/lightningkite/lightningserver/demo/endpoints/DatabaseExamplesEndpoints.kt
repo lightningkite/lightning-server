@@ -1,28 +1,19 @@
 package com.lightningkite.lightningserver.demo.endpoints
 
-import com.lightningkite.lightningserver.BadRequestException
-import com.lightningkite.lightningserver.LSError
-import com.lightningkite.lightningserver.NotFoundException
+import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.noAuth
-import com.lightningkite.lightningserver.auth.require
+import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.demo.models.*
+import com.lightningkite.lightningserver.demo.models.status
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.arg1
-import com.lightningkite.lightningserver.definition.Runtime
-import com.lightningkite.lightningserver.demo.Server
-import com.lightningkite.lightningserver.demo.TestModel
-import com.lightningkite.lightningserver.demo.models.status
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.lightningserver.typed.ModelRestEndpoints
-import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebsocket.Companion.plus
-import com.lightningkite.lightningserver.typed.ModelRestUpdatesWebsocket
-import com.lightningkite.lightningserver.typed.modelInfo
 import com.lightningkite.lightningserver.typed.route
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
-import kotlin.time.Clock
 import kotlinx.serialization.Serializable
+import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
@@ -60,7 +51,7 @@ import kotlin.uuid.Uuid
  * - Special validation or transformation logic
  */
 class DatabaseExamplesEndpoints(
-    private val database: Runtime<Database>
+    private val database: Runtime<Database>,
 ) : ServerBuilder() {
 
     /**
@@ -218,29 +209,30 @@ class DatabaseExamplesEndpoints(
      * Delete a blog post and all its comments.
      * Demonstrates: deleteOne operation, cascading deletes
      */
-    val deletePost = path.path("blog").path("posts").arg<Uuid>("id").delete bind ApiHttpHandler<_, Nothing?, Unit, Unit>(
-        summary = "Delete a blog post",
-        description = "Deletes a blog post and all associated comments",
-        auth = noAuth,
-        errorCases = listOf(
-            LSError(http = 404, detail = "not-found", message = "Blog post not found")
-        ),
-        successCode = HttpStatus.NoContent,
-        implementation = { _: Unit ->
-            val id = route.arg1
-            val posts = database().table<BlogPost>()
-            val comments = database().table<Comment>()
+    val deletePost =
+        path.path("blog").path("posts").arg<Uuid>("id").delete bind ApiHttpHandler<_, Nothing?, Unit, Unit>(
+            summary = "Delete a blog post",
+            description = "Deletes a blog post and all associated comments",
+            auth = noAuth,
+            errorCases = listOf(
+                LSError(http = 404, detail = "not-found", message = "Blog post not found")
+            ),
+            successCode = HttpStatus.NoContent,
+            implementation = { _: Unit ->
+                val id = route.arg1
+                val posts = database().table<BlogPost>()
+                val comments = database().table<Comment>()
 
-            // Check if post exists
-            posts.get(id) ?: throw NotFoundException("Blog post not found")
+                // Check if post exists
+                posts.get(id) ?: throw NotFoundException("Blog post not found")
 
-            // Delete all comments for this post
-            comments.deleteMany(condition { it.postId eq id })
+                // Delete all comments for this post
+                comments.deleteMany(condition { it.postId eq id })
 
-            // Delete the post
-            posts.deleteOne(condition { it._id eq id })
-        }
-    )
+                // Delete the post
+                posts.deleteOne(condition { it._id eq id })
+            }
+        )
 
     /**
      * POST /blog/posts/{id}/comments
@@ -338,7 +330,7 @@ class DatabaseExamplesEndpoints(
             val filtered = if (input.query.isNotBlank()) {
                 allResults.filter { post ->
                     post.title.contains(input.query, ignoreCase = true) ||
-                    post.content.contains(input.query, ignoreCase = true)
+                            post.content.contains(input.query, ignoreCase = true)
                 }
             } else {
                 allResults
@@ -357,7 +349,7 @@ data class CreatePostRequest(
     val content: String,
     val excerpt: String = "",
     val authorId: Uuid,
-    val tags: List<String> = listOf()
+    val tags: List<String> = listOf(),
 )
 
 @Serializable
@@ -366,7 +358,7 @@ data class UpdatePostRequest(
     val content: String? = null,
     val excerpt: String? = null,
     val tags: List<String>? = null,
-    val status: PostStatus? = null
+    val status: PostStatus? = null,
 )
 
 @Serializable
@@ -374,18 +366,18 @@ data class ListPostsResponse(
     val posts: List<BlogPost>,
     val total: Int,
     val page: Int,
-    val pageSize: Int
+    val pageSize: Int,
 )
 
 @Serializable
 data class CreateCommentRequest(
     val authorId: Uuid,
     val content: String,
-    val parentCommentId: Uuid? = null
+    val parentCommentId: Uuid? = null,
 )
 
 @Serializable
 data class SearchPostsRequest(
     val query: String = "",
-    val tags: List<String> = listOf()
+    val tags: List<String> = listOf(),
 )

@@ -7,10 +7,7 @@ import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.sessions.TotpSecret
 import com.lightningkite.lightningserver.sessions.proofs.TotpHashAlgorithm
 import com.lightningkite.services.data.ExperimentalLightningServer
-import dev.turingcomplete.kotlinonetimepassword.HmacAlgorithm
-import dev.turingcomplete.kotlinonetimepassword.OtpAuthUriBuilder
-import dev.turingcomplete.kotlinonetimepassword.TimeBasedOneTimePasswordConfig
-import dev.turingcomplete.kotlinonetimepassword.TimeBasedOneTimePasswordGenerator
+import dev.turingcomplete.kotlinonetimepassword.*
 import org.bouncycastle.util.encoders.Base32
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.days

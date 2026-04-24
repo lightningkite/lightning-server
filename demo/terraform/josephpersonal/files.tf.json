@@ -1,45 +1,45 @@
 {
-    "resource": {
-        "aws_s3_bucket_cors_configuration": {
-            "files": {
-                "bucket": "${aws_s3_bucket.files.bucket}",
-                "cors_rule": [
-                    {
-                        "allowed_methods": [
-                            "PUT",
-                            "POST"
-                        ],
-                        "allowed_headers": [
-                            "*"
-                        ],
-                        "expose_headers": [
-                            "ETag"
-                        ],
-                        "max_age_seconds": 3000,
-                        "allowed_origins": [
-                            "*"
-                        ]
-                    },
-                    {
-                        "allowed_methods": [
-                            "GET",
-                            "HEAD"
-                        ],
-                        "allowed_headers": [
-                            "*"
-                        ],
-                        "allowed_origins": [
-                            "*"
-                        ]
-                    }
-                ]
-            }
-        },
-        "aws_s3_bucket": {
-            "files": {
-                "force_destroy": true,
-                "bucket_prefix": "josephpersonal-example-files"
-            }
-        }
+  "resource": {
+    "aws_s3_bucket_cors_configuration": {
+      "files": {
+        "bucket": "${aws_s3_bucket.files.bucket}",
+        "cors_rule": [
+          {
+            "allowed_methods": [
+              "PUT",
+              "POST"
+            ],
+            "allowed_headers": [
+              "*"
+            ],
+            "expose_headers": [
+              "ETag"
+            ],
+            "max_age_seconds": 3000,
+            "allowed_origins": [
+              "*"
+            ]
+          },
+          {
+            "allowed_methods": [
+              "GET",
+              "HEAD"
+            ],
+            "allowed_headers": [
+              "*"
+            ],
+            "allowed_origins": [
+              "*"
+            ]
+          }
+        ]
+      }
+    },
+    "aws_s3_bucket": {
+      "files": {
+        "force_destroy": true,
+        "bucket_prefix": "josephpersonal-example-files"
+      }
     }
+  }
 }

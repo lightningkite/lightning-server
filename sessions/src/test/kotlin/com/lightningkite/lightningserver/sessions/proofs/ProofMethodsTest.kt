@@ -1,9 +1,7 @@
 // by Claude
 package com.lightningkite.lightningserver.sessions.proofs
 
-import com.lightningkite.lightningserver.auth.PrincipalType
-import com.lightningkite.lightningserver.auth.Subscope
-import com.lightningkite.lightningserver.auth.register
+import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.encryption.SecretBasis
@@ -17,10 +15,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import org.junit.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -36,7 +31,7 @@ class ProofMethodsTest {
     data class TestUser(
         override val _id: Uuid = Uuid.random(),
         val email: String = "",
-        val phone: String? = null
+        val phone: String? = null,
     ) : HasId<Uuid> {
         companion object : PrincipalType<TestUser, Uuid> {
             override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
@@ -51,7 +46,7 @@ class ProofMethodsTest {
                 return if (property == "email") value.lowercase() else value
             }
 
-            context(_: ServerRuntime)
+            context(server: ServerRuntime)
             override fun getProperty(principal: TestUser, property: String): String? {
                 return when (property) {
                     "email" -> principal.email.takeIf { it.isNotEmpty() }
@@ -80,7 +75,7 @@ class ProofMethodsTest {
         override val proofExpiration: Duration,
         via: String = "test",
         property: String? = null,
-        strength: Int = 1
+        strength: Int = 1,
     ) : ProofMethod {
         override val info: ProofMethodInfo = ProofMethodInfo(
             via = via,

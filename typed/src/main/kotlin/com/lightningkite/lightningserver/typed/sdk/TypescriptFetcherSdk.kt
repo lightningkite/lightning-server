@@ -7,22 +7,10 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.sdk.SDK.processToModules
 import com.lightningkite.lightningserver.typed.sdk.SDK.sdk
 import com.lightningkite.services.data.ExperimentalLightningServer
-import com.lightningkite.services.database.MySealedClassSerializer
-import com.lightningkite.services.database.childSerializersOrNull
-import com.lightningkite.services.database.listElement
-import com.lightningkite.services.database.mapValueElement
-import com.lightningkite.services.database.nullElement
-import com.lightningkite.services.database.serializableProperties
-import com.lightningkite.services.database.typeParametersSerializersOrNull
+import com.lightningkite.services.database.*
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.descriptors.PolymorphicKind
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.SerialKind
-import kotlinx.serialization.descriptors.StructureKind
-import kotlin.collections.fold
-import kotlin.collections.plus
+import kotlinx.serialization.descriptors.*
 
 
 /**
@@ -125,7 +113,7 @@ public class TypescriptFetcherSdk(
         liveFilename = "Live${rootInfo.interfaceName}.ts"
     ),
     public val includeDocComments: Boolean = true,
-    public val erasableTypes: Boolean = false
+    public val erasableTypes: Boolean = false,
 ) : SDK.Format {
     /**
      * File organization strategies for generated TypeScript code.
@@ -140,7 +128,7 @@ public class TypescriptFetcherSdk(
         public data class MultipleFiles(
             val modelsFilename: String,
             val interfaceFilename: String,
-            val liveFilename: String
+            val liveFilename: String,
         ) : Structure
     }
 
@@ -171,13 +159,20 @@ public class TypescriptFetcherSdk(
                 writeLive(processed)
             }
         }
+
         is Structure.MultipleFiles -> {
             val processed = server.server.sdk(rootInfo).processToModules().ensureUniqueNames()
 
             val models = server.models()
 
             fun Appendable.appendModelImports() =
-                appendLine("import type { ${models.joinToString { it.tsType().substringBefore('<') }} } from './${fileStructure.modelsFilename}'")
+                appendLine(
+                    "import type { ${
+                        models.joinToString {
+                            it.tsType().substringBefore('<')
+                        }
+                    } } from './${fileStructure.modelsFilename}'"
+                )
 
             archive.appendableEntry(fileStructure.modelsFilename) {
                 appendLsImports()
@@ -305,7 +300,11 @@ public class TypescriptFetcherSdk(
                         if (func.summary.isNotBlank()) line(func.summary)
                         if (func.description.isNotBlank()) line(func.description)
 
-                        add("**Auth Requirements:** ${func.auth.naturalLanguage(true).replace("[", "[[").replace("]", "]]")}")
+                        add(
+                            "**Auth Requirements:** ${
+                                func.auth.naturalLanguage(true).replace("[", "[[").replace("]", "]]")
+                            }"
+                        )
                     }
 
                     appendIdtLine(depth + 1, "/**")
@@ -360,8 +359,7 @@ public class TypescriptFetcherSdk(
                 appendIdt(1).appendLine("}")
 
                 appendLine()
-            }
-            else {
+            } else {
                 appendIdt(depth)
                 if (depth == 1) append("readonly ")
                 append(module.info.valueName)
@@ -369,8 +367,7 @@ public class TypescriptFetcherSdk(
                     append(": Api")
                     for (mod in ancestors.drop(1) + module) append("[\"${mod.info.valueName}\"]")
                     append(" = {")
-                }
-                else append(": {")
+                } else append(": {")
                 appendLine()
             }
 
@@ -396,6 +393,7 @@ public class TypescriptFetcherSdk(
                         if (depth > 0) append(',')
                         appendLine()
                     }
+
                     is SDK.Function.Websocket -> {
                         // websockets not supported yet
                     }
@@ -444,10 +442,12 @@ public class TypescriptFetcherSdk(
                 PrimitiveKind.INT,
                 PrimitiveKind.LONG,
                 PrimitiveKind.FLOAT,
-                PrimitiveKind.DOUBLE -> append("number")
+                PrimitiveKind.DOUBLE,
+                    -> append("number")
 
                 PrimitiveKind.CHAR,
-                PrimitiveKind.STRING -> {
+                PrimitiveKind.STRING,
+                    -> {
                     val cleanName = descriptor.simpleSerialName
                     if (cleanName != "String") {
                         append(cleanName)
@@ -472,7 +472,8 @@ public class TypescriptFetcherSdk(
                 is PolymorphicKind,
                 StructureKind.OBJECT,
                 SerialKind.ENUM,
-                StructureKind.CLASS -> {
+                StructureKind.CLASS,
+                    -> {
                     if (descriptor.serialName == "com.lightningkite.serialization.Partial") {
                         append("DeepPartial")
                     } else {
@@ -494,7 +495,8 @@ public class TypescriptFetcherSdk(
         is PolymorphicKind,
         StructureKind.OBJECT,
         SerialKind.ENUM,
-        StructureKind.CLASS -> typeParametersSerializersOrNull()
+        StructureKind.CLASS,
+            -> typeParametersSerializersOrNull()
 
         else -> null
     }

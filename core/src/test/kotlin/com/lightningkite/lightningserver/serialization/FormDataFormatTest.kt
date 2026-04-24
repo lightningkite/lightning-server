@@ -1,11 +1,9 @@
 package com.lightningkite.lightningserver.serialization
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.builtins.serializer
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import kotlinx.serialization.modules.EmptySerializersModule
+import kotlin.test.*
 
 /**
  * Tests for FormDataFormat encoding/decoding.
@@ -22,7 +20,7 @@ class FormDataFormatTest {
         val text: String,
         val number: Int,
         val flag: Boolean,
-        val optional: String? = null
+        val optional: String? = null,
     )
 
     @Serializable
