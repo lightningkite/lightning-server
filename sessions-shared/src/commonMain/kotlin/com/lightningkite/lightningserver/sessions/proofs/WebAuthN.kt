@@ -95,7 +95,7 @@ public object WebAuthN {
 
     public object PublicKeyAlgorithmSerializer : KSerializer<PublicKeyAlgorithm> {
 
-        override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("PublicKeyAlgorithm", PrimitiveKind.INT)
+        override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.lightningserver.sessions.proofs.WebAuthN.PublicKeyAlgorithm", PrimitiveKind.INT)
 
         override fun serialize(encoder: Encoder, value: PublicKeyAlgorithm) {
             encoder.encodeInt(value.coseAlgorithmId)

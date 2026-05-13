@@ -267,7 +267,7 @@ public class SerializableCache private constructor(
         private val defer = MapSerializer(String.serializer(), ByteArraySerializer())
 
         override val descriptor: SerialDescriptor
-            get() = SerialDescriptor("com.lightningkite.lightningserver.SerializableCache", defer.descriptor)
+            get() = SerialDescriptor("com.lightningkite.lightningserver.data.SerializableCache", defer.descriptor)
 
         override fun serialize(encoder: Encoder, value: SerializableCache) {
             defer.serialize(encoder, value.bytes)

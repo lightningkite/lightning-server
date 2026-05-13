@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.typed.sdk
 
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.services.data.serialNameFQN
 import com.lightningkite.services.database.*
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.*
@@ -12,7 +13,7 @@ public fun KSerializer<*>.kotlinTypeString(): String {
         StructureKind.MAP -> "Map<String, ${this.mapValueElement()!!.kotlinTypeString()}>"
 
         StructureKind.LIST -> "List<${this.listElement()!!.kotlinTypeString()}>"
-        SerialKind.CONTEXTUAL -> descriptor.capturedKClass?.qualifiedName ?: descriptor.serialName.substringBefore('/')
+        SerialKind.CONTEXTUAL -> descriptor.capturedKClass?.qualifiedName ?: descriptor.serialNameFQN()
         else -> {
             descriptor.serialName.substringBefore('/').substringBefore('<') +
                     (typeParametersSerializersOrNull()

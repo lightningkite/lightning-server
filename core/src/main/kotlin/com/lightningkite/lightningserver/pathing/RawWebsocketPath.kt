@@ -13,7 +13,7 @@ import kotlinx.serialization.encoding.Encoder
  */
 public class PathSerializer<T : PathSpec>(ignored: KSerializer<T>) : KSerializer<RawWebsocketPath<T>> {
     override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("com.lightningkite.lightningserver.Path", PrimitiveKind.STRING)
+        PrimitiveSerialDescriptor(" com.lightningkite.lightningserver.pathing.RawWebsocketPath", PrimitiveKind.STRING)
 
     override fun serialize(
         encoder: Encoder,
