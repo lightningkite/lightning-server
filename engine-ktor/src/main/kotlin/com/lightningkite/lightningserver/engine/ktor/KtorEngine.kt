@@ -10,7 +10,11 @@ import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawWebsocketPath
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.didConnectWithMetrics
+import com.lightningkite.lightningserver.runtime.disconnectWithMetrics
 import com.lightningkite.lightningserver.runtime.handle
+import com.lightningkite.lightningserver.runtime.messageFromClientWithMetrics
+import com.lightningkite.lightningserver.runtime.willConnectWithMetrics
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.Data
@@ -222,7 +226,7 @@ public class KtorEngine(
                     @Suppress("UNCHECKED_CAST")
                     socketHandler as WebSocketHandler<PathSpec, Any?>
 
-                    val startingState = socketHandler.willConnect(request)
+                    val startingState = socketHandler.willConnectWithMetrics(match.pathSpec, this@KtorEngine, request)
                     var closingMid: WebSocketConnection<PathSpec, Any?>? = null
                     try {
 
@@ -249,7 +253,7 @@ public class KtorEngine(
                         }
                         closingMid = mid
 
-                        context(mid) { socketHandler.didConnect() }
+                        socketHandler.didConnectWithMetrics(match.pathSpec, mid)
 
                         for (incoming in this.incoming) {
                             val m = when (incoming) {
@@ -259,20 +263,20 @@ public class KtorEngine(
                                 is Frame.Ping -> continue
                                 is Frame.Pong -> continue
                             }
-                            context(mid) { socketHandler.messageFromClient(m) }
+                            socketHandler.messageFromClientWithMetrics(match.pathSpec, mid, m)
                         }
 
                         closingMid.let { mid ->
-                            context(mid) { socketHandler.disconnect(WebSocketClose.NORMAL) }
+                            socketHandler.disconnectWithMetrics(match.pathSpec, mid, WebSocketClose.NORMAL)
                         }
                     } catch (e: Throwable) {
                         closingMid?.let { mid ->
-                            with(mid) {
-                                socketHandler.disconnect(
-                                    ((e as? HttpStatusException)?.status
-                                        ?: HttpStatus.InternalServerError).bestWebsocketCloseCode
-                                )
-                            }
+                            socketHandler.disconnectWithMetrics(
+                                match.pathSpec,
+                                mid,
+                                ((e as? HttpStatusException)?.status
+                                    ?: HttpStatus.InternalServerError).bestWebsocketCloseCode
+                            )
                         }
                     }
                 }

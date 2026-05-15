@@ -197,26 +197,35 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
             @Suppress("OPT_IN_USAGE")
             scope.launch {
                 while (true) {
-                    val upcomingRun = cache.get<Long>("$name-nextRun") ?: run {
-                        val time = it.schedule.calculateNextRun(clock.now())
-                        cache.set<Long>("$name-nextRun", time)
-                        time
+                    val upcomingRun = instrument("schedule.poll $name") { span ->
+                        span?.setAttribute("schedule.name", name)
+                        cache.get<Long>("$name-nextRun") ?: run {
+                            val time = it.schedule.calculateNextRun(clock.now())
+                            cache.set<Long>("$name-nextRun", time)
+                            time
+                        }
                     }
                     delay((upcomingRun - System.currentTimeMillis()).coerceAtLeast(1L))
                     val nextRun = it.schedule.calculateNextRun(clock.now())
-                    if (cache.setIfNotExists("$name-lock", true)) {
-                        cache.set("$name-lock", true, 1.hours)
-                        try {
-                            logger.debug { "Running Schedule: $name" }
-                            it.executeWithMetrics(location)
-                        } catch (e: Exception) {
-                            /*squish; already reported*/
+                    val lockAcquired = instrument("schedule.tick $name") { span ->
+                        span?.setAttribute("schedule.name", name)
+                        if (cache.setIfNotExists("$name-lock", true)) {
+                            cache.set("$name-lock", true, 1.hours)
+                            try {
+                                logger.debug { "Running Schedule: $name" }
+                                it.executeWithMetrics(location)
+                            } catch (e: Exception) {
+                                /*squish; already reported*/
+                            }
+                            cache.set<Long>("$name-nextRun", nextRun)
+                            cache.remove("$name-lock")
+                            true
+                        } else {
+                            span?.setAttribute("schedule.lockHeld", true)
+                            false
                         }
-                        cache.set<Long>("$name-nextRun", nextRun)
-                        cache.remove("$name-lock")
-                    } else {
-                        delay(1000L)
                     }
+                    if (!lockAcquired) delay(1000L)
                 }
             }
         }
