@@ -17,9 +17,9 @@ import com.lightningkite.services.kfile.KFile
  */
 public class IncompleteSettingsException(
     public val missing: Set<ServerSetting<*, *>>,
-    public val suggestedFile: KFile,
+    public val suggestedFile: KFile?,
 ) :
-    Exception("Missing keys ${missing.joinToString { it.name }}. Created suggested settings at ${suggestedFile.resolved.path}")
+    Exception("Missing keys ${missing.joinToString { it.name }}." + if(suggestedFile != null) " Created suggested settings at ${suggestedFile.resolved.path}" else "")
 
 /**
  * Exception thrown when attempting to load a settings file that does not exist.

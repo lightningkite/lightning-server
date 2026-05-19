@@ -10,8 +10,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
 import com.lightningkite.lightningserver.runtime.location
-import com.lightningkite.lightningserver.settings.ServerSettings
-import com.lightningkite.lightningserver.settings.SettingsSerializer
+import com.lightningkite.lightningserver.settings.*
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.Service
 import com.lightningkite.services.aws.AwsConnections
@@ -73,12 +72,24 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
                     OpenSsl.decryptAesCbcPkcs5Sha256(bytes, sha256Password.toByteArray())
                 }
                 ?: bytes
-            this.settings.include(
-                internalSerialization.json.decodeFromString(
-                    SettingsSerializer(settings.settings.toList(), internalSerialization.serializersModule, null),
-                    decryptedBytes.toString(Charsets.UTF_8)
-                )
-            )
+            val loaded: MutableMap<ServerSetting<*, *>, Any?> = internalSerialization.json.decodeFromString(
+                SettingsSerializer(settings.settings.toList(), internalSerialization.serializersModule, null),
+                decryptedBytes.toString(Charsets.UTF_8)
+            ).toMutableMap()
+            val missingKeys = HashSet<ServerSetting<*, *>>()
+            for (key in settings.settings) {
+                if (key !in loaded && !settings.overrides.containsKey(key)) {
+                    if (key.optional) {
+                        loaded[key] = key.default
+                    } else {
+                        missingKeys += key
+                    }
+                }
+            }
+            if (missingKeys.isNotEmpty()) {
+                throw IncompleteSettingsException(missingKeys, null)
+            }
+            this.settings.include(loaded)
             this.settings.ready()
             runBlocking { runStartupTasks() }
             Core.getGlobalContext().register(this)

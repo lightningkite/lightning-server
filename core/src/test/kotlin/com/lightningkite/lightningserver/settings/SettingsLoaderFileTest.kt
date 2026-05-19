@@ -89,8 +89,8 @@ class SettingsLoaderFileTest {
                 .allSerializable()
                 .forEach { println("${it.key.name}: ${it.value}") }
         } catch (e: IncompleteSettingsException) {
-            println("---SUGGESTED---\n${e.suggestedFile.readString()}\n")
-            e.suggestedFile.copyTo(file, overwrite = true)
+            println("---SUGGESTED---\n${e.suggestedFile?.readString()}\n")
+            e.suggestedFile?.copyTo(file, overwrite = true)
         }
         ServerSettings(allSettings)
             .apply { loadFromFile(file, EmptySerializersModule()) }
@@ -111,8 +111,8 @@ class SettingsLoaderFileTest {
                 .allSerializable()
                 .forEach { println("${it.key.name}: ${it.value}") }
         } catch (e: IncompleteSettingsException) {
-            println("---SUGGESTED---\n${e.suggestedFile.readString()}\n")
-            e.suggestedFile.copyTo(file, overwrite = true)
+            println("---SUGGESTED---\n${e.suggestedFile?.readString()}\n")
+            e.suggestedFile?.copyTo(file, overwrite = true)
         }
         ServerSettings(allSettings)
             .apply { loadFromFile(file, EmptySerializersModule()) }

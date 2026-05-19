@@ -155,6 +155,21 @@ public class ServerSettings private constructor(
     }
 
     /**
+     * Includes a single key value, typically from a configuration file.
+     *
+     * This is called internally when instantiating settings but can also be used to programmatically
+     * load settings from other sources.
+     *
+     * @param key A ServerSetting.
+     * @param value The value to fulfill the setting with.
+     * @throws IllegalStateException if settings are already marked as ready
+     */
+    public fun include(key: ServerSetting<*, *>, value:Any?) {
+        if (ready) throw IllegalStateException("Settings are marked as ready.")
+        serializable.register(key, value)
+    }
+
+    /**
      * Marks settings as ready without validation, using defaults for any unset settings.
      *
      * **Warning**: This bypasses all validation and transformation. It's primarily intended
