@@ -4,6 +4,7 @@ package com.lightningkite.lightningserver.sessions.proofs
 
 import com.lightningkite.services.data.*
 import com.lightningkite.services.database.HasId
+import com.lightningkite.services.database.KSerializerWithDefault
 import kotlinx.serialization.*
 import kotlinx.serialization.EncodeDefault.Mode
 import kotlinx.serialization.descriptors.*
@@ -93,7 +94,10 @@ public object WebAuthN {
         }
     }
 
-    public object PublicKeyAlgorithmSerializer : KSerializer<PublicKeyAlgorithm> {
+    public object PublicKeyAlgorithmSerializer : KSerializerWithDefault<PublicKeyAlgorithm> {
+
+        override val default: PublicKeyAlgorithm
+            get() = PublicKeyAlgorithm.ES256
 
         override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.lightningserver.sessions.proofs.WebAuthN.PublicKeyAlgorithm", PrimitiveKind.INT)
 
