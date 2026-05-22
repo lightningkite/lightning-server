@@ -1,6 +1,7 @@
 // by Claude
 package com.lightningkite.lightningserver.sessions
 
+import com.lightningkite.lightningserver.ForbiddenException
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -30,6 +31,7 @@ class SessionManagerTest {
     data class SessionTestUser(
         override val _id: Uuid = Uuid.random(),
         val email: String = "",
+        val active: Boolean = true,
     ) : HasId<Uuid> {
         companion object : PrincipalType<SessionTestUser, Uuid> {
             override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
@@ -54,6 +56,9 @@ class SessionManagerTest {
         context(server: ServerRuntime)
         override suspend fun sessionExpiration(subject: SessionTestUser): Instant? =
             expirationDuration?.let { com.lightningkite.lightningserver.runtime.now() + it }
+
+        context(server: ServerRuntime)
+        override suspend fun permitAuthentication(subject: SessionTestUser): Boolean = subject.active
 
         context(server: ServerRuntime)
         override suspend fun sessionStaleAfter(subject: SessionTestUser): Duration? = staleDuration
@@ -132,6 +137,29 @@ class SessionManagerTest {
                 // Try with invalid refresh token
                 assertFailsWith<Exception>("Invalid refresh token should be rejected") {
                     server.sessions.tokenSimple.test(null, "invalid_token_string")
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `tokenSimple rejects not active user`() = runBlocking {
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        val user = SessionTestUser(userId, "test@example.com")
+        SessionTestUser.users[userId] = user
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(database = database)
+        }.let { server ->
+            server.test({}) {
+                val (_, refreshToken) = server.sessions.newSession(userId)
+
+                SessionTestUser.users[userId] = user.copy(active = false)
+                assertFailsWith<ForbiddenException>("Inactive User's refresh token should be rejected") {
+                    server.sessions.tokenSimple.test(null, refreshToken.string)
                 }
             }
         }
@@ -236,6 +264,25 @@ class SessionManagerTest {
                 )
 
                 assertEquals(parentSession._id, childSession.derivedFrom)
+            }
+        }
+    }
+
+    @Test
+    fun `newSession is blocked when not active`() = runBlocking {
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        val user = SessionTestUser(userId, "test@example.com", false)
+        SessionTestUser.users[userId] = user
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(database = database)
+        }.let { server ->
+            server.test({}) {
+                // Create parent session
+                assertFailsWith<ForbiddenException> { server.sessions.newSession(userId) }
             }
         }
     }

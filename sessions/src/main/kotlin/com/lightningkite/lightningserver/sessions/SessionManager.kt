@@ -108,6 +108,19 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     }
 
     /**
+     * Determines if a subject is allowed to authenticate with the system.
+     *
+     * This method allows customizing what subjects are allowed to create new sessions and use existing sessions.
+     *
+     * If this returns false, using an existing refresh token and creating new sessions should result in 403 Forbidden
+     *
+     * @param subject The subject attempting to authenticate
+     * @return If the subject should be allowed to authenticate.
+     */
+    context(server: ServerRuntime)
+    public open suspend fun permitAuthentication(subject: SUBJECT): Boolean = true
+
+    /**
      * Determines the hard expiration time for a new session.
      *
      * This is an absolute deadline after which the session cannot be used, regardless of activity.
@@ -272,6 +285,10 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         // Generate a cryptographically secure 24-byte random secret
         val secret = Base64.encode(CryptographyRandom.nextBytes(24))
 
+        if(!permitAuthentication(principal.fetch(subjectId))){
+            throw ForbiddenException()
+        }
+
         return Session<SUBJECT, ID>(
             secretHash = secret.fastHash(),  // SECURITY: Only the hash is stored, never the plaintext. Using fast hash since session tokens are high-entropy.
             subjectId = subjectId,
@@ -344,9 +361,15 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             if (generalSettings().debug) println("Auth failed because type != handler.name")
             return null
         }
+
         val session = sessionInfo.table().get(_id) ?: run {
             if (generalSettings().debug) println("No such session")
             throw UnauthorizedException("No such session")
+        }
+        val subject = principal.fetch(session.subjectId)
+        if(!permitAuthentication(subject)){
+            if (generalSettings().debug) println("Permit Authentication failed")
+            throw ForbiddenException()
         }
         // SECURITY: Constant-time hash comparison to prevent timing attacks
         if (!plainTextSecret.checkAgainstHash(session.secretHash)) {
@@ -376,7 +399,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             it.ips addAll setOf(request?.sourceIp ?: "test")
 
             // Reset staleness window on each use (sliding expiration)
-            sessionStaleAfter(principal.fetch(session.subjectId))?.let { length ->
+            sessionStaleAfter(subject)?.let { length ->
                 it.stale assign now() + length
             }
 

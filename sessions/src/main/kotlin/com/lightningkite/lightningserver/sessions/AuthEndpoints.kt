@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.sessions
 
-import com.lightningkite.lightningserver.LSError
+import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.http.get
@@ -10,7 +10,6 @@ import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.sessions.proofs.*
 import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.sessions.token.TokenFormat
-import com.lightningkite.lightningserver.toException
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
@@ -366,7 +365,6 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             summary = "Check Proofs",
             description = "Check if you can log in as a ${principal.name} using various proofs.",
             errorCases = errors,
-//            belongsToInterface = belongsToInterface,
             implementation = { proofs: List<Proof> ->
                 proofs.forEach { proof ->
                     if (serverRuntime.proofMethods.find { it.info.via == proof.via }?.isValid(proof) != true)
@@ -379,18 +377,21 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 val subject = subjects.singleOrNull() ?: run {
                     val properties = proofs.map { it.property }.toSet()
                     throw errorNoSingleUser.toException(
-                        message = listOfNotNull(
-                            if (subjects.isEmpty()) "No user was" else "Multiple users were",
-                            "found with the",
-                            if (properties.size > 1) "properties" else null,
+                        message = buildString {
+                            if (subjects.isEmpty()) append("No user was found ") else append("Multiple users were found ")
+                            if (properties.size > 1) append("with the properties ") else append("with ")
                             proofs
                                 .groupBy { it.property }
                                 .toList()
-                                .joinToString(", ") { pair ->
+                                .joinTo(this, ", ") { pair ->
                                     "${pair.first} [${pair.second.map { it.value }.distinct().joinToString()}]"
                                 }
-                        ).joinToString(" "),
+                        },
                     )
+                }
+
+                if (!permitAuthentication(subject)) {
+                    throw ForbiddenException()
                 }
 
                 proofs.forEach {

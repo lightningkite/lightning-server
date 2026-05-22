@@ -1,6 +1,7 @@
 // by Claude
 package com.lightningkite.lightningserver.sessions
 
+import com.lightningkite.lightningserver.ForbiddenException
 import com.lightningkite.lightningserver.auth.GrantedScope
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.definition.Runtime
@@ -40,6 +41,7 @@ class AuthEndpointsIntegrationTest {
         val email: String = "",
         val phone: String = "",
         val isAdmin: Boolean = false,
+        val active:Boolean = true,
     ) : HasId<Uuid> {
         companion object : PrincipalType<AuthTestUser, Uuid> {
             override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
@@ -83,6 +85,9 @@ class AuthEndpointsIntegrationTest {
 
         context(server: ServerRuntime)
         override suspend fun sessionStaleAfter(subject: AuthTestUser): Duration? = 7.days
+
+        context(server: ServerRuntime)
+        override suspend fun permitAuthentication(subject: AuthTestUser): Boolean = subject.active
 
         context(server: ServerRuntime)
         override suspend fun requiredProofStrengthFor(subject: AuthTestUser): Int =
@@ -429,6 +434,48 @@ class AuthEndpointsIntegrationTest {
                 assertTrue(result.readyToLogIn, "User should be ready when proof meets capped required strength")
                 // The strength required should be capped at what's achievable (password strength = 10)
                 assertTrue(result.strengthRequired > 0, "Should have positive strength requirement")
+            }
+        }
+    }
+
+    @Test
+    fun `proofsCheck fails when user is not active`() = runBlocking {
+        AuthTestUser.users.clear()
+        val userId = Uuid.random()
+        val user = AuthTestUser(userId, "test@example.com", "555-1234", isAdmin = true)
+        AuthTestUser.users[userId] = user
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
+
+            val passwordEndpoints = path.path("proof").path("password") include PasswordProofEndpoints(
+                database = database,
+                cache = cache,
+                proofSigner = RuntimeDeferred.Cached { testBasis.signer("proof") },
+                proofExpiration = 1.hours
+            )
+
+            val authEndpoints = path.path("auth") include TestAuthEndpoints(database = database)
+        }.let { server ->
+            server.test({}) {
+                // Establish password
+                server.passwordEndpoints.establish(AuthTestUser, userId, EstablishPassword("adminPassword"))
+
+                // Get password proof
+                val proof = server.passwordEndpoints.prove.test(
+                    null, IdentificationAndPassword(
+                        type = "AuthTestUser",
+                        property = "email",
+                        value = "test@example.com",
+                        password = "adminPassword"
+                    )
+                )
+
+                AuthTestUser.users[userId] = user.copy(active = false)
+
+                // Check proofs for admin user
+                assertFailsWith<ForbiddenException>{ server.authEndpoints.proofsCheck.test(null, listOf(proof)) }
             }
         }
     }
