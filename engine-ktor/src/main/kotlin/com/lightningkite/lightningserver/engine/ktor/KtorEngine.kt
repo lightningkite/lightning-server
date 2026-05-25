@@ -29,9 +29,11 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.util.*
+import io.ktor.utils.io.asSink
 import io.ktor.websocket.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.io.buffered
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlin.time.Clock
@@ -135,7 +137,9 @@ public class KtorEngine(
                         when (body) {
                             is Data.Bytes -> call.respondBytes(body.data, type, code)
                             is Data.Text -> call.respondText(body.data, type, code)
-                            is Data.Sink -> body.source().use { call.respondSource(it, type, code, body.size) }
+                            is Data.Sink -> call.respondBytesWriter(contentType = type, status = code) {
+                                this.asSink().buffered().use { body.emit(it) }
+                            }
                             is Data.Source -> body.source.use { call.respondSource(it, type, code, body.size) }
                         }
                 }

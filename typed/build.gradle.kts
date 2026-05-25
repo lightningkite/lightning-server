@@ -21,6 +21,7 @@ dependencies {
     ksp(libs.services.database.processor)
 
     testImplementation(libs.kotlin.test.junit)
+    testImplementation(libs.openTelemetry.sdk.testing)
 }
 
 
