@@ -24,6 +24,7 @@ dependencies {
     api(project(":sessions-shared"))
     api(project(":secret-source-aws"))
     api(project(":sessions-sms"))
+    api(project(":sessions-oauth"))
     api(project(":files"))
     api(libs.services.pubsub)
     api(libs.services.pubsub.redis)
