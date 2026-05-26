@@ -43,157 +43,128 @@ import java.util.zip.GZIPOutputStream
  * @param request The HTTP request to handle
  * @return The HTTP response, potentially compressed
  */
-public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpResponse {
-    val startTime = System.currentTimeMillis()
-    val method = request.path.method.toString()
-    // Resolve the path pattern up front so the root span carries the route, not the concrete URL.
-    // For unmatched requests we name the span after the literal path so it remains useful.
-    val route = try {
-        request.path.match.path.pathSpec.toString()
-    } catch (_: Exception) {
-        "/" + request.path.pathSegments.toString()
-    }
-
-    return instrument("$method $route") { span ->
-        span?.setAttribute("http.method", method)
-        span?.setAttribute("http.route", route)
-        span?.setAttribute("http.target", "/" + request.path.pathSegments.toString())
-        span?.setAttribute("http.scheme", request.protocol)
-        span?.setAttribute("http.host", request.domain)
-        span?.setAttribute("net.peer.ip", request.sourceIp)
-
-        var errorType: String? = null
-        val response = try {
-            server.compiledHttpInterceptors.intercept(request) { req ->
-                this.logger.info { "${request.path} accessed by ${request.sourceIp}" }
-                val result = try {
-                    instrument("handler") {
-                        @Suppress("UNCHECKED_CAST")
-                        (req.path.match.value as HttpHandler<PathSpec>).handle(req as HttpRequest<PathSpec>)
-                    }
-                } catch (notFound: RouteNotFoundException) {
-                    when (req.path.method) {
-                        HttpMethod.HEAD -> {
-                            // OK, we'll do a get and remove the body.
-                            val getRequest = req.copyWithNewPathType(path = req.path.copy(method = HttpMethod.GET))
-
-                            val getResult = instrument("handler") {
-                                @Suppress("UNCHECKED_CAST")
-                                (getRequest.path.match.value as HttpHandler<PathSpec>).handle(getRequest)
-                            }
-                            getResult.copy(
-                                body = null,
-                                status = if (getResult.status.success) HttpStatus.NoContent else getResult.status,
-                            )
-                        }
-
-                        else -> {
-                            this.logger.debug {
-                                "Not found: ${req.path.pathSegments.segments.map { "'$it'" }}, looking for slashes"
-                            }
-                            if (request.path.pathSegments.isNotEmpty()) {
-                                // Let's see if they just got their ending slash wrong.
-                                val altSlashEndpoint = req.path.copy(pathSegments = req.path.pathSegments.segments.let {
-                                    if (it.lastOrNull() == "") it.dropLast(1) else it + ""
-                                }.let(::PathSegments))
-                                try {
-                                    altSlashEndpoint.match
-                                    HttpResponse.pathMoved(to = "/" + altSlashEndpoint.pathSegments.toString())
-                                } catch (_: RouteNotFoundException) {
-                                    throw notFound
-                                }
-                            } else throw notFound
-                        }
-                    }
+public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpResponse = instrumentHttpRequest(request) {
+    var errorType: String? = null
+    val response = try {
+        server.compiledHttpInterceptors.intercept(request) { req ->
+            this.logger.info { "${request.path} accessed by ${request.sourceIp}" }
+            val result = try {
+                instrument("handler") {
+                    @Suppress("UNCHECKED_CAST")
+                    (req.path.match.value as HttpHandler<PathSpec>).handle(req as HttpRequest<PathSpec>)
                 }
-                if (result.body == null || request.headers[HttpHeader.AcceptEncoding] == null) return@intercept result
+            } catch (notFound: RouteNotFoundException) {
+                when (req.path.method) {
+                    HttpMethod.HEAD -> {
+                        // OK, we'll do a get and remove the body.
+                        val getRequest = req.copyWithNewPathType(path = req.path.copy(method = HttpMethod.GET))
 
-                val acceptedEncodings = request.headers.getMany(HttpHeader.AcceptEncoding)
-                if (acceptedEncodings.isEmpty()) return@intercept result
-
-                val accepts = acceptedEncodings
-                    .map { it.root.lowercase().substringBefore(';').trim() }
-
-                // Accept-Encoding negotiation (gzip only for now)
-                if (!accepts.contains("gzip")) return@intercept result
-
-                // Content-Type denylist (skip already-compressed types)
-                if (result.body.mediaType.type in setOf("image", "audio", "video") ||
-                    (result.body.mediaType.type == "application" &&
-                            result.body.mediaType.subtype in
-                            setOf("zip", "gzip", "x-gzip", "x-7z-compressed", "x-bzip2", "x-tar", "pdf")
-                            ) ||
-                    (result.body.mediaType.type == "font" && result.body.mediaType.subtype in setOf("woff", "woff2"))
-                ) return@intercept result
-
-                // Lower compress limit. Either not worth the effort, or likely will inflate a little.
-                if (result.body.data.size?.let { it < 256 } == true) return@intercept result
-
-                val (newData, compressed) = when (val data = result.body.data) {
-                    is Data.Sink -> {
-                        Data.Sink { outSink ->
-                            data.write(GZIPOutputStream(outSink.asOutputStream()).asSink().buffered())
-                        } to true
-                    }
-
-                    is Data.Source -> {
-                        Data.Sink { outSink ->
-                            GZIPOutputStream(outSink.asOutputStream()).asSink().buffered().use { gzOut ->
-                                data.write(gzOut)
-                            }
-                        } to true
+                        val getResult = instrument("handler") {
+                            @Suppress("UNCHECKED_CAST")
+                            (getRequest.path.match.value as HttpHandler<PathSpec>).handle(getRequest)
+                        }
+                        getResult.copy(
+                            body = null,
+                            status = if (getResult.status.success) HttpStatus.NoContent else getResult.status,
+                        )
                     }
 
                     else -> {
-                        // 1024 Grey area. It likely will compress fine, but if not send the original
-                        val s = data.size
-                        if (s?.let { it <= 1024 } == true) {
-                            val og = data.bytes()
-                            val gz = og.gzip()
-                            if (gz.size < s)
-                                Data.Bytes(gz) to true
-                            else
-                                Data.Bytes(og) to false
-                        } else
-                            Data.Bytes(data.bytes().gzip()) to true
+                        this.logger.debug {
+                            "Not found: ${req.path.pathSegments.segments.map { "'$it'" }}, looking for slashes"
+                        }
+                        if (request.path.pathSegments.isNotEmpty()) {
+                            // Let's see if they just got their ending slash wrong.
+                            val altSlashEndpoint = req.path.copy(pathSegments = req.path.pathSegments.segments.let {
+                                if (it.lastOrNull() == "") it.dropLast(1) else it + ""
+                            }.let(::PathSegments))
+                            try {
+                                altSlashEndpoint.match
+                                HttpResponse.pathMoved(to = "/" + altSlashEndpoint.pathSegments.toString())
+                            } catch (_: RouteNotFoundException) {
+                                throw notFound
+                            }
+                        } else throw notFound
                     }
                 }
-                result.copy(
-                    headers = if (compressed) result.headers.copy {
-                        add(HttpHeader.ContentEncoding, "gzip")
-                    } else result.headers,
-                    body = TypedData(newData, result.body.mediaType)
+            }
+            if (result.body == null || request.headers[HttpHeader.AcceptEncoding] == null) return@intercept result
+
+            val acceptedEncodings = request.headers.getMany(HttpHeader.AcceptEncoding)
+            if (acceptedEncodings.isEmpty()) return@intercept result
+
+            val accepts = acceptedEncodings
+                .map { it.root.lowercase().substringBefore(';').trim() }
+
+            // Accept-Encoding negotiation (gzip only for now)
+            if (!accepts.contains("gzip")) return@intercept result
+
+            // Content-Type denylist (skip already-compressed types)
+            if (result.body.mediaType.type in setOf("image", "audio", "video") ||
+                (result.body.mediaType.type == "application" &&
+                        result.body.mediaType.subtype in
+                        setOf("zip", "gzip", "x-gzip", "x-7z-compressed", "x-bzip2", "x-tar", "pdf")
+                        ) ||
+                (result.body.mediaType.type == "font" && result.body.mediaType.subtype in setOf("woff", "woff2"))
+            ) return@intercept result
+
+            // Lower compress limit. Either not worth the effort, or likely will inflate a little.
+            if (result.body.data.size?.let { it < 256 } == true) return@intercept result
+
+            val (newData, compressed) = when (val data = result.body.data) {
+                is Data.Sink -> {
+                    Data.Sink { outSink ->
+                        GZIPOutputStream(outSink.asOutputStream()).asSink().buffered().use { gzOut ->
+                            data.write(gzOut)
+                        }
+                    } to true
+                }
+
+                is Data.Source -> {
+                    Data.Sink { outSink ->
+                        GZIPOutputStream(outSink.asOutputStream()).asSink().buffered().use { gzOut ->
+                            data.write(gzOut)
+                        }
+                    } to true
+                }
+
+                else -> {
+                    // 1024 Grey area. It likely will compress fine, but if not send the original
+                    val s = data.size
+                    if (s?.let { it <= 1024 } == true) {
+                        val og = data.bytes()
+                        val gz = og.gzip()
+                        if (gz.size < s)
+                            Data.Bytes(gz) to true
+                        else
+                            Data.Bytes(og) to false
+                    } else
+                        Data.Bytes(data.bytes().gzip()) to true
+                }
+            }
+            result.copy(
+                headers = if (compressed) result.headers.copy {
+                    add(HttpHeader.ContentEncoding, "gzip")
+                } else result.headers,
+                body = TypedData(newData, result.body.mediaType)
+            )
+        }
+    } catch (e: Exception) {
+        errorType = e::class.simpleName
+        try {
+            this.logger.error(e) { "Exception in HTTP" }
+            instrument("exceptionHandler") {
+                server.exceptionHandler.handle(
+                    request,
+                    e
                 )
             }
-        } catch (e: Exception) {
-            errorType = e::class.simpleName
-            try {
-                this.logger.error(e) { "Exception in HTTP" }
-                instrument("exceptionHandler") {
-                    server.exceptionHandler.handle(
-                        request,
-                        e
-                    )
-                }
-            } catch (_: Exception) {
-                errorType = "unhandled_exception"
-                HttpResponse(status = HttpStatus.InternalServerError)
-            }
+        } catch (_: Exception) {
+            errorType = "unhandled_exception"
+            HttpResponse(status = HttpStatus.InternalServerError)
         }
-
-        span?.setAttribute("http.status_code", response.status.code.toLong())
-
-        val durationMs = System.currentTimeMillis() - startTime
-        (this as? ServerRuntimeBase)?.httpMetrics?.record(
-            method = method,
-            route = route,
-            statusCode = response.status.code,
-            durationMs = durationMs,
-            errorType = errorType,
-        )
-
-        response
     }
+    HttpInstrumentationResult(response, response.status.code, errorType)
 }
 
 
@@ -392,6 +363,69 @@ public suspend inline fun <T> instrument(name: String, crossinline action: suspe
             throw t
         }
     } else action(null)
+}
+
+/**
+ * Carries the response value plus the bookkeeping [instrumentHttpRequest] needs to close the span.
+ *
+ * @param value The value returned from [instrumentHttpRequest] (the HttpResponse for plain requests,
+ *   or a domain-specific wrapper such as a `BulkResponse` for handlers that re-dispatch).
+ * @param statusCode The HTTP status code to record on the span and in metrics.
+ * @param errorType Optional simple class name of an exception the action handled, used only for
+ *   5xx error counters in [HttpMetrics].
+ */
+public data class HttpInstrumentationResult<out T>(
+    public val value: T,
+    public val statusCode: Int,
+    public val errorType: String? = null,
+)
+
+/**
+ * Wraps an HTTP request flow with the standard root-span attributes and metrics.
+ *
+ * Resolves the route pattern from the request (falling back to the literal target if the route
+ * is not matched), opens a span named "$method $route", sets the standard `http.*` attributes,
+ * runs the action, then records `http.status_code` on the span and the request to [HttpMetrics].
+ *
+ * Used both by [handle] for top-level HTTP request handling and by handlers that re-dispatch
+ * inner requests (for example the bulk endpoint in `MetaEndpoints`), so that each sub-request
+ * gets the same observability treatment as a normal request.
+ */
+context(runtime: ServerRuntime)
+public suspend inline fun <T> instrumentHttpRequest(
+    request: HttpRequest<*>,
+    crossinline action: suspend (Span?) -> HttpInstrumentationResult<T>,
+): T {
+    val startTime = System.currentTimeMillis()
+    val method = request.path.method.toString()
+    val route = try {
+        request.path.match.path.pathSpec.toString()
+    } catch (_: Exception) {
+        "/" + request.path.pathSegments.toString()
+    }
+    return instrument("$method $route") { span ->
+        span?.setAttribute("http.method", method)
+        span?.setAttribute("http.route", route)
+        span?.setAttribute("http.target", "/" + request.path.pathSegments.toString())
+        span?.setAttribute("http.scheme", request.protocol)
+        span?.setAttribute("http.host", request.domain)
+        span?.setAttribute("net.peer.ip", request.sourceIp)
+
+        val result = action(span)
+
+        span?.setAttribute("http.status_code", result.statusCode.toLong())
+
+        val durationMs = System.currentTimeMillis() - startTime
+        (runtime as? ServerRuntimeBase)?.httpMetrics?.record(
+            method = method,
+            route = route,
+            statusCode = result.statusCode,
+            durationMs = durationMs,
+            errorType = result.errorType,
+        )
+
+        result.value
+    }
 }
 
 /*

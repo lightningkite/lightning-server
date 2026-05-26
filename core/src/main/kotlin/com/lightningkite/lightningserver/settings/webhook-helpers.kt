@@ -9,19 +9,23 @@ import com.lightningkite.lightningserver.pathing.fullUrl
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.services.webhooksubservice.HttpAdapter
-import com.lightningkite.services.webhooksubservice.WebhookSubserviceWithResponse
+import com.lightningkite.services.webhooksubservice.WebhookAdapter
+import com.lightningkite.services.webhooksubservice.WebhookAdapterWithResponse
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 @Deprecated("This is hard to read; consider using the top level serviceWebhook function instead.")
-public operator fun <Input, Output> Runtime<WebhookSubserviceWithResponse<Input, Output>>.invoke(
+public operator fun <Input, Output> Runtime<WebhookAdapterWithResponse<Input, Output>>.invoke(
     frequency: Duration = 1.minutes,
     handler: suspend context(ServerRuntime) (Input) -> Output,
 ): WebhookServer<Input, Output> =
     WebhookServer(this, handler, frequency)
 
 public class WebhookServer<Input, Output>(
-    private val rt: Runtime<WebhookSubserviceWithResponse<Input, Output>>,
+    private val rt: Runtime<WebhookAdapterWithResponse<Input, Output>>,
     private val handler: suspend context(ServerRuntime) (Input) -> Output,
     private val frequency: Duration,
 ) : ServerBuilder() {
@@ -31,7 +35,9 @@ public class WebhookServer<Input, Output>(
         rt().configureWebhook(webhook.location.path.resolved().fullUrl())
     }
     public val schedule: ScheduledTask = path.path("schedule") bind ScheduledTask(frequency, handler = {
-        rt().onSchedule()
+        coroutineScope {
+            (rt() as? WebhookAdapter<Input>)?.pull()?.map { async { handler(it) } }?.awaitAll()
+        }
     })
 }
 
@@ -64,10 +70,10 @@ public operator fun <Input, Output> Runtime<HttpAdapter<Input, Output>>.invoke(h
     }
 
 /**
- * Creates a webhook server module for a particular WebhookSubserviceWithResponse.
+ * Creates a webhook server module for a particular WebhookAdapterWithResponse.
  */
 public fun <Input, Output> serviceWebhook(
-    forThing: context(ServerRuntime) () -> WebhookSubserviceWithResponse<Input, Output>,
+    forThing: context(ServerRuntime) () -> WebhookAdapterWithResponse<Input, Output>,
     frequency: Duration = 1.minutes,
     handler: suspend context(ServerRuntime) (Input) -> Output,
 ): WebhookServer<Input, Output> =
@@ -75,7 +81,7 @@ public fun <Input, Output> serviceWebhook(
 
 //private object SampleUsage: ServerBuilder() {
 //    class Container {
-//        val x: WebhookSubserviceWithResponse<String, String> = TODO()
+//        val x: WebhookAdapterWithResponse<String, String> = TODO()
 //    }
 //    val someSetting: ServerSetting<Unit, Container> = TODO()
 //    val oldcrap = path.path("x") include Runtime.Cached { someSetting().x }.invoke { it }

@@ -394,28 +394,29 @@ public class MetaEndpoints(
                     requests.entries.map { entry ->
                         async {
                             val start = TimeSource.Monotonic.markNow()
-                            val request = entry.value
-                            val split = request.path.split("?")
+                            val sub = entry.value
+                            val split = sub.path.split("?")
                             val properRequest = originalRequest.copyWithNewPathType(
-                                path = RawHttpEndpoint(split[0], method = HttpMethod(request.method)),
+                                path = RawHttpEndpoint(split[0], method = HttpMethod(sub.method)),
                                 queryParameters = split.getOrNull(1)?.let { QueryParameters.parse(it) }
                                     ?: QueryParameters.EMPTY,
-                                body = request.body?.let { TypedData.text(it, MediaType.Application.Json) }
+                                body = sub.body?.let { TypedData.text(it, MediaType.Application.Json) }
                             )
-                            try {
-                                entry.key to instrument(properRequest.path.toString()) {
-                                    (@Suppress("UNCHECKED_CAST")
-                                    (properRequest.path.match.value as HttpHandler<PathSpec>).handle(properRequest))
-                                }.let {
-                                    BulkResponse(
-                                        durationMs = start.elapsedNow().inWholeMilliseconds,
-                                        result = it.body?.text()
+                            entry.key to instrumentHttpRequest(properRequest) {
+                                try {
+                                    val result = instrument("handler") {
+                                        @Suppress("UNCHECKED_CAST")
+                                        (properRequest.path.match.value as HttpHandler<PathSpec>).handle(properRequest)
+                                    }
+                                    HttpInstrumentationResult(
+                                        value = BulkResponse(
+                                            durationMs = start.elapsedNow().inWholeMilliseconds,
+                                            result = result.body?.text()
+                                        ),
+                                        statusCode = result.status.code,
                                     )
-                                }
-                            } catch (e: Exception) {
-                                entry.key to BulkResponse(
-                                    durationMs = start.elapsedNow().inWholeMilliseconds,
-                                    error = when (e) {
+                                } catch (e: Exception) {
+                                    val lsError = (when (e) {
                                         is HttpStatusException -> e.toLSError()
                                         else -> LSError(
                                             500,
@@ -424,10 +425,18 @@ public class MetaEndpoints(
                                                 ?: "An unknown server error occurred." else "An unknown server error occurred.",
                                             if (generalSettings().debug) e.stackTraceToString() else ""
                                         )
-                                    }.let {
+                                    }).let {
                                         if (generalSettings().debug) it.copy(stackTrace = e.stackTraceToString()) else it
                                     }
-                                )
+                                    HttpInstrumentationResult(
+                                        value = BulkResponse(
+                                            durationMs = start.elapsedNow().inWholeMilliseconds,
+                                            error = lsError,
+                                        ),
+                                        statusCode = lsError.http,
+                                        errorType = e::class.simpleName,
+                                    )
+                                }
                             }
                         }
                     }.awaitAll().associate { it }
