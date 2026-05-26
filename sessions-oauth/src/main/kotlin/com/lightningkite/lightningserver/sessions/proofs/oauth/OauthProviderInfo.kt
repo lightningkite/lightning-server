@@ -279,12 +279,7 @@ public class OauthProviderInfo(
 
 context(runtime: ServerRuntime)
 private suspend inline fun <reified T> io.ktor.client.statement.HttpResponse.internalBody(): T = bodyAsText().let {
-    try {
-        runtime.externalSerialization.json.decodeFromString(it)
-    } catch(e: Exception) {
-        println("FAILED TO PARSE $it")
-        throw e
-    }
+    runtime.externalSerialization.json.decodeFromString(it)
 }
 
 
