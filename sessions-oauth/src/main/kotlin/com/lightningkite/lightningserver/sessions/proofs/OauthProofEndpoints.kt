@@ -10,9 +10,10 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.redirectToGet
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.sessions.proofs.oauth.*
+import com.lightningkite.lightningserver.sessions.proofs.oauth.OauthCallbackEndpoint
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.sdk.SdkModule
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
@@ -62,8 +63,8 @@ public class OauthProofEndpoints(
     private val provider: OauthProviderInfo,
     override val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
     override val proofExpiration: Duration = 1.hours,
-    private val credentials: () -> OauthProviderCredentials,
-    private val continueUiAuthUrl: () -> String,
+    private val credentials: Runtime<OauthProviderCredentials>,
+    private val continueUiAuthUrl: context(ServerRuntime) (Proof) -> String,
 ) : ServerBuilder(), ExternalProofMethod {
 
     init {
@@ -82,22 +83,21 @@ public class OauthProofEndpoints(
         strength = 10
     )
 
-    public val callback: OauthCallbackEndpoint<Uuid> = path.path("callback").post.oauthCallback<Uuid>(
+    public val callback: OauthCallbackEndpoint<Uuid> = path.path("callback") include OauthCallbackEndpoint(
+        path = path,
+        stateSerializer = serializerOrContextual<Uuid>(),
         oauthProviderInfo = provider,
-        credentials = credentials
-    ) { response, _ ->
+        credentials = credentials,
+    ) { response: OauthResponse, _: Uuid ->
         val profile = provider.getProfile(response, credentials())
         val email = profile.email ?: throw BadRequestException("No email was found for this profile.")
         HttpResponse.redirectToGet(
-            continueUiAuthUrl() + "?proof=${
-                serverRuntime.externalSerialization.json.encodeToString(
-                    Proof.serializer(),
-                    proofSigner.await().makeProof(
-                        property = "email",
-                        value = email,
-                    )
-                ).encodeURLQueryComponent()
-            }&backend=${generalSettings().publicUrl.encodeURLQueryComponent()}"
+            continueUiAuthUrl(
+                proofSigner.await().makeProof(
+                    property = "email",
+                    value = email,
+                )
+            )
         )
     }
 

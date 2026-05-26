@@ -1,9 +1,13 @@
 package com.lightningkite.lightningserver.sessions.proofs.oauth
 
 import com.lightningkite.lightningserver.BadRequestException
+import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.HttpHandler
+import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.pathing.fullUrl
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.serialization.FormDataFormat
 import com.lightningkite.lightningserver.sessions.proofs.oauth.OauthProviderInfo.Companion.apple
@@ -13,6 +17,7 @@ import com.lightningkite.lightningserver.sessions.proofs.oauth.OauthProviderInfo
 import com.lightningkite.services.http.client
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -84,22 +89,23 @@ public class OauthProviderInfo(
 
     context(runtime: ServerRuntime)
     public fun loginUrl(
-        credentials: () -> OauthProviderCredentials,
-        callback: HttpHandler<*>,
+        credentials: Runtime<OauthProviderCredentials>,
+        redirectUri: String,
         state: String = Uuid.random().toString(),
         scope: String = scopeForProfile,
         accessType: OauthAccessType = OauthAccessType.online,
+        prompt: OauthPromptType? = if (accessType == OauthAccessType.offline) OauthPromptType.consent else null,
         loginHint: String? = null,
     ): String {
         val params = OauthCodeRequest(
             response_type = "code",
             scope = scope,
             state = state,
-            redirect_uri = generalSettings().publicUrl + callback.location.path.toString(),
+            redirect_uri = redirectUri,
             client_id = credentials().id,
             response_mode = mode,
             access_type = accessType,
-            prompt = if (accessType == OauthAccessType.offline) OauthPromptType.consent else null,
+            prompt = prompt,
             login_hint = loginHint,
         ).let { FormDataFormat(EmptySerializersModule()).encodeToString(OauthCodeRequest.serializer(), it) }
         return "$loginUrl?$params"
@@ -107,8 +113,8 @@ public class OauthProviderInfo(
 
     context(runtime: ServerRuntime)
     public suspend fun accessToken(
-        credentials: () -> OauthProviderCredentials,
-        callback: PathSpec,
+        credentials: Runtime<OauthProviderCredentials>,
+        redirectUri: String,
         oauth: OauthCode,
     ): OauthResponse {
         oauth.error?.let {
@@ -122,20 +128,20 @@ public class OauthProviderInfo(
                             code = code,
                             client_id = credentials().id,
                             client_secret = credentials().secret,
-                            redirect_uri = generalSettings().publicUrl + callback.toString(),
+                            redirect_uri = redirectUri,
                             grant_type = OauthGrantTypes.authorizationCode,
                         )
                     )
                 )
                 contentType(ContentType.Application.FormUrlEncoded)
                 accept(ContentType.Application.Json)
-            }.body<OauthResponse>()
+            }.internalBody<OauthResponse>()
         }
         throw BadRequestException("Code is empty")
     }
 
     context(runtime: ServerRuntime)
-    public suspend fun accessToken(credentials: () -> OauthProviderCredentials, refreshToken: String): OauthResponse {
+    public suspend fun accessToken(credentials: Runtime<OauthProviderCredentials>, refreshToken: String): OauthResponse {
         return client.post(tokenUrl) {
             setBody(
                 FormDataFormat(EmptySerializersModule()).encodeToString(
@@ -150,7 +156,7 @@ public class OauthProviderInfo(
             )
             contentType(ContentType.Application.FormUrlEncoded)
             accept(ContentType.Application.Json)
-        }.body<OauthResponse>()
+        }.internalBody<OauthResponse>()
     }
 
 
@@ -171,7 +177,7 @@ public class OauthProviderInfo(
                     headers {
                         append("Authorization", "${response.token_type} ${response.access_token}")
                     }
-                }.body<GoogleResponse2>()
+                }.internalBody<GoogleResponse2>()
                 ExternalProfile(
                     email = if (response2.verified_email) response2.email else null,
                     image = response2.picture?.takeUnless { it.isEmpty() },
@@ -247,7 +253,7 @@ public class OauthProviderInfo(
                         headers {
                             append("Authorization", "${response.token_type} ${response.access_token}")
                         }
-                    }.body<GithubUser>()
+                    }.internalBody<GithubUser>()
                 }
                 val email = run {
                     val response2: List<GithubEmail> = client.get("https://api.github.com/user/emails") {
@@ -268,6 +274,16 @@ public class OauthProviderInfo(
                 )
             }
         ).also { all.add(it) }
+    }
+}
+
+context(runtime: ServerRuntime)
+private suspend inline fun <reified T> io.ktor.client.statement.HttpResponse.internalBody(): T = bodyAsText().let {
+    try {
+        runtime.externalSerialization.json.decodeFromString(it)
+    } catch(e: Exception) {
+        println("FAILED TO PARSE $it")
+        throw e
     }
 }
 
