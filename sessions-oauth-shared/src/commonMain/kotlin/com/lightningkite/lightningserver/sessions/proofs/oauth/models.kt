@@ -79,6 +79,7 @@ public data class OauthTokenRequest(
     val client_secret: String,
     val redirect_uri: String? = null,
     val grant_type: String = "authorization_code",
+    val code_verifier: String? = null,
 )
 
 @Serializable
@@ -101,6 +102,9 @@ public data class OauthCodeRequest(
     val prompt: OauthPromptType? = null,
     val login_hint: String? = null,
     val sessionExpiration: Instant? = null,
+    val nonce: String? = null,
+    val code_challenge: String? = null,
+    val code_challenge_method: String? = null,
 )
 
 @Serializable

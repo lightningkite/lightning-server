@@ -246,6 +246,15 @@ object Server : ServerBuilder() {
         credentials = githubOauth,
         continueUiAuthUrl = { autosignIn.location.path.resolved().fullUrl() + "?proof=" + serverRuntime.externalSerialization.json.encodeToString(Proof.serializer(), it).encodeURLQueryComponent() + "&backend=" + generalSettings().publicUrl.encodeURLQueryComponent() }
     )
+    val proofOidc = path.path("proof").path("oidc") module OidcMultiTenantProofEndpoints(
+        database = database,
+        cache = cache,
+        continueUiAuthUrl = {
+            autosignIn.location.path.resolved().fullUrl() +
+                    "?proof=" + serverRuntime.externalSerialization.json.encodeToString(Proof.serializer(), it).encodeURLQueryComponent() +
+                    "&backend=" + generalSettings().publicUrl.encodeURLQueryComponent()
+        }
+    )
     val autosignIn = path.path("auth").path("autosignin").get bind HttpHandler {
         val proof = it.queryParameters["proof"]!!.decodeURLQueryComponent().let { serverRuntime.externalSerialization.json.decodeFromString(Proof.serializer(), it) }
         HttpResponse.plainText("OK")

@@ -74,7 +74,24 @@ public class OauthProviderInfo(
     public val settings: SettingInfo<*> = SettingInfo.standard,
     public val scopeForProfile: String,
     public val getProfile: suspend context(ServerRuntime) (OauthResponse, OauthProviderCredentials?) -> ExternalProfile,
+    /**
+     * Optional dynamic override for [loginUrl] / [tokenUrl]. When set, these are invoked at
+     * request time and their result is used instead of the static fields. Used by
+     * [fromOidcDiscovery] to lazily resolve endpoints from the IdP's discovery document.
+     */
+    public val resolveEndpoints: (suspend context(ServerRuntime) () -> Endpoints)? = null,
 ) {
+    public data class Endpoints(val loginUrl: String, val tokenUrl: String)
+
+    context(runtime: ServerRuntime)
+    private suspend fun effectiveEndpoints(): Endpoints? = resolveEndpoints?.let { it() }
+
+    context(runtime: ServerRuntime)
+    private suspend fun effectiveLoginUrl(): String = effectiveEndpoints()?.loginUrl ?: loginUrl
+
+    context(runtime: ServerRuntime)
+    private suspend fun effectiveTokenUrl(): String = effectiveEndpoints()?.tokenUrl ?: tokenUrl
+
     public data class SettingInfo<T : Any>(
         val serializer: KSerializer<T>,
         val read: context(ServerRuntime) (T) -> OauthProviderCredentials,
@@ -88,7 +105,7 @@ public class OauthProviderInfo(
     }
 
     context(runtime: ServerRuntime)
-    public fun loginUrl(
+    public suspend fun loginUrl(
         credentials: Runtime<OauthProviderCredentials>,
         redirectUri: String,
         state: String = Uuid.random().toString(),
@@ -96,6 +113,9 @@ public class OauthProviderInfo(
         accessType: OauthAccessType = OauthAccessType.online,
         prompt: OauthPromptType? = if (accessType == OauthAccessType.offline) OauthPromptType.consent else null,
         loginHint: String? = null,
+        nonce: String? = null,
+        codeChallenge: String? = null,
+        codeChallengeMethod: String? = if (codeChallenge != null) "S256" else null,
     ): String {
         val params = OauthCodeRequest(
             response_type = "code",
@@ -107,8 +127,11 @@ public class OauthProviderInfo(
             access_type = accessType,
             prompt = prompt,
             login_hint = loginHint,
+            nonce = nonce,
+            code_challenge = codeChallenge,
+            code_challenge_method = codeChallengeMethod,
         ).let { FormDataFormat(EmptySerializersModule()).encodeToString(OauthCodeRequest.serializer(), it) }
-        return "$loginUrl?$params"
+        return "${effectiveLoginUrl()}?$params"
     }
 
     context(runtime: ServerRuntime)
@@ -116,11 +139,12 @@ public class OauthProviderInfo(
         credentials: Runtime<OauthProviderCredentials>,
         redirectUri: String,
         oauth: OauthCode,
+        codeVerifier: String? = null,
     ): OauthResponse {
         oauth.error?.let {
             throw BadRequestException("Got error code '${it}' from $niceName.")
         } ?: oauth.code?.let { code ->
-            return client.post(tokenUrl) {
+            return client.post(effectiveTokenUrl()) {
                 setBody(
                     FormDataFormat(EmptySerializersModule()).encodeToString(
                         OauthTokenRequest.serializer(),
@@ -130,6 +154,7 @@ public class OauthProviderInfo(
                             client_secret = credentials().secret,
                             redirect_uri = redirectUri,
                             grant_type = OauthGrantTypes.authorizationCode,
+                            code_verifier = codeVerifier,
                         )
                     )
                 )
@@ -142,7 +167,7 @@ public class OauthProviderInfo(
 
     context(runtime: ServerRuntime)
     public suspend fun accessToken(credentials: Runtime<OauthProviderCredentials>, refreshToken: String): OauthResponse {
-        return client.post(tokenUrl) {
+        return client.post(effectiveTokenUrl()) {
             setBody(
                 FormDataFormat(EmptySerializersModule()).encodeToString(
                     OauthTokenRequest.serializer(),

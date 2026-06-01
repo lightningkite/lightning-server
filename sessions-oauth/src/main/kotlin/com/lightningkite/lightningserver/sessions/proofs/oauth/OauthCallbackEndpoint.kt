@@ -23,22 +23,39 @@ public class OauthCallbackEndpoint<STATE>(
     public val onError: suspend context(ServerRuntime) (OauthCode) -> HttpResponse = {
         throw Exception("Got Oauth error from ${oauthProviderInfo.niceName}: ${it}")
     },
+    /**
+     * Optional lookup for the PKCE `code_verifier` associated with the decoded state.
+     *
+     * If returning non-null, the verifier is sent in the token exchange. Implementations
+     * typically pull from a server-side store (cache) populated when [loginUrl] was called.
+     * The verifier MUST NEVER round-trip through the IdP — that's the whole point of PKCE.
+     */
+    public val pkceVerifierLookup: (suspend context(ServerRuntime) (STATE) -> String?)? = null,
     public val onAccess: suspend context(ServerRuntime) (OauthResponse, STATE) -> HttpResponse,
 ) : ServerBuilder() {
 
     context(runtime: ServerRuntime)
     public suspend fun handle(code: OauthCode): HttpResponse {
         code.error?.let { onError(code) }
-        val response = oauthProviderInfo.accessToken(credentials, callback.location.path.resolved().fullUrl(), code)
-        return onAccess(response, runtime.externalSerialization.json.decodeFromString(stateSerializer, code.state!!))
+        val decodedState = runtime.externalSerialization.json.decodeFromString(stateSerializer, code.state!!)
+        val verifier = pkceVerifierLookup?.let { it(decodedState) }
+        val response = oauthProviderInfo.accessToken(
+            credentials = credentials,
+            redirectUri = callback.location.path.resolved().fullUrl(),
+            oauth = code,
+            codeVerifier = verifier,
+        )
+        return onAccess(response, decodedState)
     }
 
     context(runtime: ServerRuntime)
-    public fun loginUrl(
+    public suspend fun loginUrl(
         state: STATE,
         scope: String = defaultScope,
         accessType: OauthAccessType = defaultAccessType,
         loginHint: String? = null,
+        nonce: String? = null,
+        codeChallenge: String? = null,
     ): String = oauthProviderInfo.loginUrl(
         credentials = credentials,
         redirectUri = callback.location.path.resolved().fullUrl(),
@@ -46,7 +63,9 @@ public class OauthCallbackEndpoint<STATE>(
         state = runtime.externalSerialization.json.encodeToString(stateSerializer, state),
         accessType = accessType,
         loginHint = loginHint,
-        prompt = OauthPromptType.select_account
+        prompt = OauthPromptType.select_account,
+        nonce = nonce,
+        codeChallenge = codeChallenge,
     )
 
     public val callback: HttpHandler<PathSpec0> = when (oauthProviderInfo.mode) {
