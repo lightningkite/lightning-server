@@ -298,7 +298,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             scopes = scopes,
             createdAt = now(),
             lastUsed = now(),
-//            oauthClient = oauthClient,  TODO: OAuth
+            oauthClient = oauthClient,
             derivedFrom = derivedFrom,
         ).also { sessionInfo.table().insertOne(it) }.let {
             it to RefreshToken(principal.name, it._id, secret)
@@ -322,13 +322,27 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         scopes = scopes,
     )
 
+    /**
+     * Terminates a session by marking it terminated (the same mechanism used by [sessionTerminate]).
+     *
+     * After this, the session's refresh token no longer works; already-issued access tokens remain
+     * valid until they expire (they are self-contained). The record is kept for audit, not deleted.
+     * This is the building block reused by OAuth/OpenID logout flows.
+     *
+     * @param id The session id to terminate
+     */
+    context(server: ServerRuntime)
+    public suspend fun terminate(id: Uuid) {
+        sessionInfo.table().updateOneById(id, modification(spath) { it.terminated assign now() })
+    }
+
     context(server: ServerRuntime)
     private suspend fun terminateSessionById(id: Uuid, requireOwnershipOf: ID?) {
         if (requireOwnershipOf != null) {
             val owner = sessionInfo.table().get(id)?.subjectId ?: throw ForbiddenException()
             if (owner != requireOwnershipOf) throw ForbiddenException()
         }
-        sessionInfo.table().updateOneById(id, modification(spath) { it.terminated assign now() })
+        terminate(id)
     }
 
     /**
@@ -572,36 +586,34 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             }
         )
 
-//    context(_: ServerRuntime)
-//    public suspend fun presignToken(
-//        session: Session<SUBJECT, ID>,
-//        scopes: Set<GrantedScope> = setOf(GrantedScope.root),
-//    ): String {
-//        return tokenFormat().create(
-//            principal, Authentication(
-//                principalType = principal,
-//                id = session.subjectId,
-//                sessionId = session._id,
-//                issuedAt = now(),
-//                scopes = scopes
-//            )
-//        )
-//    }
-//
-//    context(_: ServerRuntime)
-//    public suspend fun presignToken(
-//        id: ID,
-//        scopes: Set<GrantedScope> = setOf(GrantedScope.root),
-//    ): String {
-//        return tokenFormat().create(
-//            principal, Authentication(
-//                principalType = principal,
-//                id = id,
-//                issuedAt = now(),
-//                scopes = scopes
-//            )
-//        )
-//    }
+    /**
+     * Creates an access token (e.g. JWT) for an existing session without requiring its refresh token.
+     *
+     * This is the building block for flows that have already established a session and need to hand
+     * out a short-lived access token bound to it — most notably the OpenID Connect provider, which
+     * creates a session via [newSession] and then issues the access token here. The token carries the
+     * given [scopes] (which should be a subset of the session's scopes) and the session id, so it can
+     * be validated and revoked like any other session token.
+     *
+     * @param session The session to bind the token to
+     * @param scopes The scopes to embed in the token (defaults to full access)
+     * @return An access token string in the configured [tokenFormat]
+     */
+    context(_: ServerRuntime)
+    public suspend fun presignToken(
+        session: Session<SUBJECT, ID>,
+        scopes: Set<GrantedScope> = session.scopes,
+    ): String {
+        return tokenFormat().create(
+            principal, Authentication(
+                principalType = principal,
+                id = session.subjectId,
+                sessionId = session._id,
+                issuedAt = now(),
+                scopes = scopes
+            )
+        )
+    }
 }
 
 /*

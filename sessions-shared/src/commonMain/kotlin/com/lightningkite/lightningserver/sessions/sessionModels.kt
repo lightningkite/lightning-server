@@ -65,7 +65,9 @@ public data class Session<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     val ips: Set<String> = setOf(),
     val userAgents: Set<String> = setOf(),
     val scopes: Set<GrantedScope> = setOf(GrantedScope.root),
-//    @References(OauthClient::class) val oauthClient: String? = null,
+    // The OAuth/OpenID client this session was issued to, if it was created via the OpenID provider flow.
+    // Not annotated with @References to avoid a circular module dependency on the provider module.
+    val oauthClient: String? = null,
 ) : HasId<Uuid>
 
 /**

@@ -69,26 +69,8 @@ public class JwtTokenFormat(
 
 
     context(server: ServerRuntime)
-    private suspend fun Signer.signJwt(claims: JwtClaims): String = buildString {
-        val withDefaults = Json(server.internalSerialization.json) { encodeDefaults = true; explicitNulls = false }
-        val encoder = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
-
-        append(
-            encoder.encode(
-                withDefaults.encodeToString(JwtHeader(alg = name)).encodeToByteArray()
-            )
-        )
-        append('.')
-        append(
-            encoder.encode(
-                withDefaults.encodeToString(claims).encodeToByteArray()
-            )
-        )
-        val soFar = this.toString()
-        val signature = encoder.encode(sign(soFar.encodeToByteArray()))
-        append('.')
-        append(signature)
-    }
+    private suspend fun Signer.signJwt(claims: JwtClaims): String =
+        signJwt(claims, JwtClaims.serializer())
 
     context(server: ServerRuntime)
     private suspend fun Signer.verifyJwt(token: String, requiredAudience: String? = null): JwtClaims? {

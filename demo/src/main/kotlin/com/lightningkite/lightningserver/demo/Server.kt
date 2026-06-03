@@ -19,6 +19,7 @@ import com.lightningkite.lightningserver.serialization.StandardWithExternalModul
 import com.lightningkite.lightningserver.serialization.queryParameters
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.sessions.*
+import com.lightningkite.lightningserver.sessions.openid.*
 import com.lightningkite.lightningserver.sessions.proofs.*
 import com.lightningkite.lightningserver.sessions.proofs.oauth.OauthProviderCredentials
 import com.lightningkite.lightningserver.sessions.proofs.oauth.OauthProviderInfo
@@ -263,6 +264,31 @@ object Server : ServerBuilder() {
         context(server: ServerRuntime)
         override suspend fun sessionStaleAfter(subject: User): Duration? = null
     }
+
+    /**
+     * OpenID Connect provider: lets third-party apps "Sign in with this demo".
+     * Client apps are registered via [oauthClients]; the authorization UI is owned by the host
+     * frontend (here pointed at a placeholder route), per the API-only design.
+     *
+     * The ID-token signing key (ES256) is derived deterministically from the server's secret basis,
+     * so it persists across restarts without separate key storage — issued ID tokens stay valid.
+     */
+    val oauthClients = path.path("oauth-clients") module OauthClientEndpoints(database)
+    val openId = path.path("oauth") module OpenIdProviderEndpoints(
+        sessions = subjects,
+        database = database,
+        cache = cache,
+        signingKey = secretBasis.oidcSigner(),
+        getUserClaims = { user ->
+            IdTokenClaims(
+                iss = "", sub = user._id.toString(), aud = "", exp = 0, iat = 0,
+                email = user.email,
+            )
+        },
+        issuerUrl = Runtime { generalSettings().publicUrl },
+        oauthBaseUrl = Runtime { generalSettings().publicUrl + "/oauth" },
+        authorizationUiUrl = Runtime { generalSettings().publicUrl + "/authorize" },
+    )
 
     init {
         registerBasicMediaTypeCoders()

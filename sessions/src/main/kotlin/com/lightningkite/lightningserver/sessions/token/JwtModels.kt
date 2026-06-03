@@ -3,7 +3,7 @@ package com.lightningkite.lightningserver.sessions.token
 import kotlinx.serialization.Serializable
 
 @Serializable
-public data class JwtHeader(val typ: String = "JWT", val alg: String = "HS256")
+public data class JwtHeader(val typ: String = "JWT", val alg: String = "HS256", val kid: String? = null)
 
 @Serializable
 public data class JwtClaims(

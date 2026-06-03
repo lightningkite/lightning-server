@@ -33,6 +33,8 @@ include(":sessions-shared")
 include(":sessions-email")
 include(":sessions-oauth")
 include(":sessions-oauth-shared")
+include(":sessions-openid-provider")
+include(":sessions-openid-provider-shared")
 include(":sessions-sms")
 
 include(":notifications")
