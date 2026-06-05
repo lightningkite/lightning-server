@@ -208,7 +208,15 @@ public data class LightningServerKSchema(
     val aliases: Map<String, VirtualAlias> = mapOf(),
     val endpoints: List<LightningServerKSchemaEndpoint>,
     val interfaces: List<LightningServerKSchemaInterface>,
-)
+) {
+    public fun sorted(): LightningServerKSchema = copy(
+        structures = mapOf(*this.structures.entries.sortedBy { it.key }.map { it.key to it.value }.toTypedArray()),
+        sealedStructures = mapOf(*this.sealedStructures.entries.sortedBy { it.key }.map { it.key to it.value }.toTypedArray()),
+        enums = mapOf(*this.enums.entries.sortedBy { it.key }.map { it.key to it.value }.toTypedArray()),
+        aliases = mapOf(*this.aliases.entries.sortedBy { it.key }.map { it.key to it.value }.toTypedArray()),
+        endpoints = this.endpoints.sortedWith(compareBy({ it.path }, { it.method })),
+    )
+}
 
 /**
  * Describes a client interface definition for SDK generation.

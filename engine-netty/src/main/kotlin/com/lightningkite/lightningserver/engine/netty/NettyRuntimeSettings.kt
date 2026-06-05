@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.engine.netty
 
 import com.lightningkite.lightningserver.definition.ServerSetting
+import com.lightningkite.lightningserver.engine.local.EngineReliabilitySettings
 import com.lightningkite.services.data.DataSize
 import com.lightningkite.services.data.DataSize.Companion.bytes
 import com.lightningkite.services.data.DataSize.Companion.mebibytes
@@ -23,6 +24,11 @@ import kotlinx.serialization.Serializable
  * @property recvBufBytes Optional TCP receive buffer size. If null, uses system default
  * @property sendBufBytes Optional TCP send buffer size. If null, uses system default
  * @property autoRead Whether to automatically read data from the channel (defaults to true). Set to false for manual flow control
+ * @property reliability Shared engine reliability settings (request timeout, idle timeout, graceful
+ *   shutdown drain, WebSocket backpressure). See [EngineReliabilitySettings]. Note: Netty's request
+ *   body cap is governed by [maxAggregatedContentLength] (enforced by its HTTP aggregator), not by
+ *   [EngineReliabilitySettings.maxBodySize]; and Netty manages its own worker pool via [workerThreads],
+ *   so [EngineReliabilitySettings.workerThreads] is ignored here.
  */
 @Serializable
 public data class NettyRuntimeSettings(
@@ -36,6 +42,7 @@ public data class NettyRuntimeSettings(
     val recvBufBytes: DataSize? = null,
     val sendBufBytes: DataSize? = null,
     val autoRead: Boolean = true,
+    val reliability: EngineReliabilitySettings = EngineReliabilitySettings(),
 )
 
 /**

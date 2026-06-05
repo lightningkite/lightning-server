@@ -3,31 +3,44 @@ name: release
 on:
   push:
     tags:
-      - '*'
+      # Only publish on version tags (e.g. v5.1.0). Previously triggered on ANY
+      # tag, so an arbitrary tag push could publish to Maven Central by accident.
+      - 'v*'
+
+# Publishing needs no write access to the repo itself; secrets are injected per-step.
+permissions:
+  contents: read
+
+# Never run two releases for the same tag at once. Releases must NOT be
+# cancelled mid-flight, so cancel-in-progress is left false.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   release:
     name: Test and Upload Release
     runs-on: macos-26
+    timeout-minutes: 90
     steps:
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
         with:
           java-version: '17'
           distribution: 'adopt'
           cache: gradle
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@94baf225fe0a508e581a564467443d0e2379123b # v4.3.0
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: |
             ~/.konan
@@ -42,7 +55,7 @@ jobs:
       - name: Test (normal)
         run: ./gradlew test
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         if: failure()
         with:
           name: test_results

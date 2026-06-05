@@ -13,11 +13,14 @@ import com.lightningkite.services.LoggingSettings
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
 import io.github.oshai.kotlinlogging.Level
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.io.writeString
 import java.io.ByteArrayInputStream
 import java.util.zip.GZIPInputStream
 import kotlin.test.*
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 class ImplementationHelpersHandleTest {
 
@@ -71,6 +74,17 @@ class ImplementationHelpersHandleTest {
         // Partial content response at /partial
         val partialGet = path.path("partial").get bind HttpHandler<PathSpec0> {
             HttpResponse.plainText("y".repeat(5_000), status = HttpStatus.PartialContent)
+        }
+
+        // Handler that intentionally runs longer than its own short per-handler timeout.
+        val slow = path.path("slow").get bind HttpHandler<PathSpec0>(timeout = 100.milliseconds) {
+            delay(5.seconds)
+            HttpResponse.plainText("done")
+        }
+
+        // Fast handler with the same short timeout to confirm normal completion is unaffected.
+        val fast = path.path("fast").get bind HttpHandler<PathSpec0>(timeout = 100.milliseconds) {
+            HttpResponse.plainText("quick")
         }
 
         init {
@@ -332,6 +346,47 @@ class ImplementationHelpersHandleTest {
 
         val empty = PathSegments.parse("")
         assertEquals(listOf(""), empty.segments, "Empty string parses to single empty segment")
+    }
+
+    @Test
+    fun handler_exceeding_its_timeout_returns_408() {
+        // The timeout now lives in core: ServerRuntime.handle enforces HttpHandler.timeout and maps an
+        // exceeded handler to 408, regardless of which engine runs it.
+        TestServer.test(settings = {}) {
+            runBlocking {
+                val resp = serverRuntime.handle(
+                    HttpRequest<PathSpec>(
+                        path = RawHttpEndpoint(asString = "/slow", method = HttpMethod.GET),
+                        queryParameters = QueryParameters.EMPTY,
+                        headers = HttpHeaders.EMPTY,
+                        domain = "example.com",
+                        protocol = "https",
+                        sourceIp = "local",
+                    )
+                )
+                assertEquals(HttpStatus.RequestTimeout, resp.status)
+            }
+        }
+    }
+
+    @Test
+    fun fast_handler_completes_within_its_timeout() {
+        TestServer.test(settings = {}) {
+            runBlocking {
+                val resp = serverRuntime.handle(
+                    HttpRequest<PathSpec>(
+                        path = RawHttpEndpoint(asString = "/fast", method = HttpMethod.GET),
+                        queryParameters = QueryParameters.EMPTY,
+                        headers = HttpHeaders.EMPTY,
+                        domain = "example.com",
+                        protocol = "https",
+                        sourceIp = "local",
+                    )
+                )
+                assertEquals(HttpStatus.OK, resp.status)
+                assertEquals("quick", resp.body?.text())
+            }
+        }
     }
 
     @Test

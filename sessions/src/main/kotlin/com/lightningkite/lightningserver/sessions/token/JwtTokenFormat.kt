@@ -51,7 +51,7 @@ public class JwtTokenFormat(
         value: String,
     ): Authentication<SUBJECT>? {
         val prefix = "${principal.name}|"
-        val claims = hasher.await().verifyJwt(value, audience()) ?: return null
+        val claims = hasher.await().verifyJwt(value, audience(), issuer()) ?: return null
 
         val rawSub = claims.sub!!
         val sub = if (rawSub.startsWith(prefix)) rawSub.removePrefix(prefix) else return null
@@ -91,7 +91,7 @@ public class JwtTokenFormat(
     }
 
     context(server: ServerRuntime)
-    private suspend fun Signer.verifyJwt(token: String, requiredAudience: String? = null): JwtClaims? {
+    private suspend fun Signer.verifyJwt(token: String, requiredAudience: String? = null, requiredIssuer: String? = null): JwtClaims? {
         val decoder = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
 
         val parts = token.split('.')
@@ -112,6 +112,7 @@ public class JwtTokenFormat(
             server.internalSerialization.json.decodeFromString(decoder.decode(parts[1]).toString(Charsets.UTF_8))
 
         requiredAudience?.let { if (claims.aud != it) return null }  // It's for someone else.  Ignore it.
+        requiredIssuer?.let { if (claims.iss != it) return null }  // It's from a different issuer.  Ignore it.
 
         if (now() > Instant.fromEpochSeconds(claims.exp)) throw TokenException("JWT has expired.")
         if (claims.nbf?.let { now() < Instant.fromEpochSeconds(it) } == true) throw TokenException("Token not valid yet")

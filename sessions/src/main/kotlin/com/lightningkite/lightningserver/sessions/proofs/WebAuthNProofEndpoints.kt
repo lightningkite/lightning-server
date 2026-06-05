@@ -11,6 +11,7 @@ import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.*
+import com.lightningkite.lightningserver.sessions.proofs.extensions.claimOnce
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.typed.sdk.*
@@ -227,6 +228,10 @@ public class WebAuthNProofEndpoints(
                 val cacheKey = challengeCacheKey(challengeId)
                 val fromCache = cache().get<RegistrationCache>(cacheKey)
                     ?: throw BadRequestException("No Challenge available")
+                // Atomically claim this challenge for single use, closing the race where two concurrent
+                // requests both read it before either removes it (get+remove is not atomic on its own).
+                if (!cache().claimOnce("${cacheKey}_used", 15.minutes))
+                    throw BadRequestException("No Challenge available")
                 cache().remove(cacheKey)
 
                 if (fromCache.challenge != WebAuthN.base64Decoder.decode(clientData.challenge).decodeToString())
@@ -389,6 +394,10 @@ public class WebAuthNProofEndpoints(
                 val cacheKey = challengeCacheKey(challengeId)
                 val fromCache = cache().get<AuthenticationCache>(cacheKey)
                     ?: throw BadRequestException("No Challenge available")
+                // Atomically claim this challenge for single use, closing the race where two concurrent
+                // requests both read it before either removes it (get+remove is not atomic on its own).
+                if (!cache().claimOnce("${cacheKey}_used", 15.minutes))
+                    throw BadRequestException("No Challenge available")
                 cache().remove(cacheKey)
 
                 if (fromCache.challenge != WebAuthN.base64Decoder.decode(clientData.challenge).decodeToString())
@@ -443,6 +452,11 @@ public class WebAuthNProofEndpoints(
                     throw BadRequestException("Failed to verify Authenticator")
                 }
 
+                // TODO(1.9, hardening audit): revisit sign-count rollback handling with the module's local
+                //  expert. Today webauthn4j (createNonStrictWebAuthnManager) throws MaliciousCounterValueException
+                //  on rollback only when sign-counts are nonzero; synced passkeys reset to 0 (so are exempt), and
+                //  whether LS should add an explicit guard and Reject-vs-Flag policy needs more consideration
+                //  (passkey lock-out risk, clone detection, multi-device). Deferred intentionally.
                 modelInfo.table().updateOneById(
                     publicKeyCredential._id,
                     modification {

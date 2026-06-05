@@ -11,6 +11,8 @@ import com.lightningkite.services.data.Data
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.otel.get
 import io.opentelemetry.api.trace.Span
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
 import kotlinx.io.*
 import java.util.zip.GZIPOutputStream
 
@@ -49,9 +51,18 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
         server.compiledHttpInterceptors.intercept(request) { req ->
             this.logger.info { "${request.path} accessed by ${request.sourceIp}" }
             val result = try {
+                // Route resolution must live inside this try so that a RouteNotFoundException (e.g. a HEAD
+                // request with no HEAD handler, or a missing trailing slash) is caught below and recovered
+                // via the HEAD->GET fallback / slash-redirect logic rather than escaping as a bare 404.
+                @Suppress("UNCHECKED_CAST")
+                val handler = req.path.match.value as HttpHandler<PathSpec>
                 instrument("handler") {
-                    @Suppress("UNCHECKED_CAST")
-                    (req.path.match.value as HttpHandler<PathSpec>).handle(req as HttpRequest<PathSpec>)
+                    // Per-handler request timeout (HttpHandler.timeout, default 30s), enforced at this single
+                    // choke point shared by every engine instead of being duplicated (and high-risk) in each
+                    // engine adapter. Cooperative cancellation: only interrupts at suspension points.
+                    withTimeout(handler.timeout) {
+                        handler.handle(req as HttpRequest<PathSpec>)
+                    }
                 }
             } catch (notFound: RouteNotFoundException) {
                 when (req.path.method) {
@@ -59,9 +70,10 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
                         // OK, we'll do a get and remove the body.
                         val getRequest = req.copyWithNewPathType(path = req.path.copy(method = HttpMethod.GET))
 
+                        @Suppress("UNCHECKED_CAST")
+                        val headHandler = getRequest.path.match.value as HttpHandler<PathSpec>
                         val getResult = instrument("handler") {
-                            @Suppress("UNCHECKED_CAST")
-                            (getRequest.path.match.value as HttpHandler<PathSpec>).handle(getRequest)
+                            withTimeout(headHandler.timeout) { headHandler.handle(getRequest) }
                         }
                         getResult.copy(
                             body = null,
@@ -147,6 +159,22 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
                     add(HttpHeader.ContentEncoding, "gzip")
                 } else result.headers,
                 body = TypedData(newData, result.body.mediaType)
+            )
+        }
+    } catch (timeout: TimeoutCancellationException) {
+        // A handler exceeded its HttpHandler.timeout. Map to 408 through the normal exception handler so the
+        // error body is formatted consistently. (Other CancellationExceptions — e.g. client disconnect — are
+        // NOT caught here and fall through unchanged.)
+        errorType = "timeout"
+        this.logger.warn { "Request to ${request.path} exceeded its handler timeout." }
+        instrument("exceptionHandler") {
+            server.exceptionHandler.handle(
+                request,
+                HttpStatusException(
+                    status = HttpStatus.RequestTimeout,
+                    detail = "timeout",
+                    message = "The request handler exceeded its timeout.",
+                ),
             )
         }
     } catch (e: Exception) {

@@ -253,6 +253,7 @@ object Server : ServerBuilder() {
     val subjects = path.path("auth") module object : AuthEndpoints<User, Uuid>(
         principal = UserAuth,
         database = database,
+        cache = cache,
     ) {
         context(server: ServerRuntime)
         override suspend fun requiredProofStrengthFor(subject: User): Int = 5

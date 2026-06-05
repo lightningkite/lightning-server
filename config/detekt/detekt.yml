@@ -1,0 +1,28 @@
+# Detekt configuration for Lightning Server.
+#
+# Phase 1: REPORT-ONLY. The build never fails on detekt findings yet
+# (`build.failThreshold` is set very high and the Gradle task `ignoreFailures`).
+# A committed baseline (config/detekt/baseline.xml) suppresses any pre-existing
+# findings so newly introduced ones surface in reports.
+#
+# To start gating: lower `build.failThreshold`, flip `ignoreFailures = false`
+# in the root build, and regenerate the baseline with `./gradlew detektBaseline`.
+
+build:
+  maxIssues: -1            # never derive a failure count from issues
+  excludeCorrectable: false
+
+config:
+  validation: true
+  warningsAsErrors: false
+  checkExhaustiveness: false
+
+processors:
+  active: true
+
+console-reports:
+  active: true
+
+# All rule sets keep detekt's sensible defaults. We intentionally avoid
+# customizing thresholds in phase 1 so the baseline captures the real state of
+# the codebase; tune individual rules here once gating is turned on.

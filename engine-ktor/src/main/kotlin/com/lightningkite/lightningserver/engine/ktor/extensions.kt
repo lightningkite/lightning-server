@@ -3,6 +3,8 @@ package com.lightningkite.lightningserver.engine.ktor
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
+import com.lightningkite.lightningserver.engine.local.BodyTooLargeException
+import com.lightningkite.lightningserver.engine.local.copyLimited
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
@@ -34,7 +36,7 @@ internal fun Headers.adapt(): HttpHeaders = HttpHeaders(flattenEntries())
  * Falls back to the origin remote address if the header is not present.
  */
 context(server: ServerRuntimeBase)
-internal suspend fun ApplicationCall.adapt(): HttpRequest<PathSpec> {
+internal suspend fun ApplicationCall.adapt(maxBody: Long): HttpRequest<PathSpec> {
     return HttpRequest(
         path = RawHttpEndpoint(request.path().decodeURLPart(), HttpMethod(request.httpMethod.value)),
         queryParameters = QueryParameters(request.queryParameters.flattenEntries()),
@@ -50,7 +52,7 @@ internal suspend fun ApplicationCall.adapt(): HttpRequest<PathSpec> {
             val stream = receiveStream()
 
             TypedData.sink(request.contentType().adapt(), request.contentLength() ?: -1) {
-                it.transferFrom(stream.asSource())
+                copyLimited(stream, maxBody) { b, off, len -> it.write(b, off, len) }
             }
         },
     )

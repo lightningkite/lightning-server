@@ -5,7 +5,9 @@ import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.engine.local.LocalEngine
+import com.lightningkite.lightningserver.engine.local.WsOversizePolicy
 import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
+import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
@@ -60,7 +62,8 @@ import io.netty.handler.codec.http.HttpHeaders as NettyHttpHeaders
  * - Configurable worker thread pool
  * - Graceful shutdown support
  * - Real IP header support for proxy deployments
- * - Idle connection timeout (120 seconds)
+ * - Idle connection timeout (configurable via [NettyRuntimeSettings.reliability]; default 120 seconds)
+ * - Per-request timeout (cooperative, default 30 seconds) and graceful SIGTERM drain
  *
  * **Performance characteristics:**
  * - Uses pooled byte buffer allocation for memory efficiency
@@ -210,7 +213,9 @@ public class NettyEngine(
                     p.addLast(HttpObjectAggregator(maxContentLength))
                     p.addLast(ChunkedWriteHandler())
                     if (cfg.websocketCompression) p.addLast(WebSocketServerCompressionHandler())
-                    p.addLast(IdleStateHandler(0, 0, 120))
+                    // 2.3: idle-connection timeout (Netty-only). Closes connections with no read/write
+                    // activity within reliability.idleTimeout.
+                    p.addLast(IdleStateHandler(0, 0, cfg.reliability.idleTimeout.inWholeSeconds.coerceIn(0, Int.MAX_VALUE.toLong()).toInt()))
                     p.addLast(NettyServerHandler(cfg))
                 }
             })
@@ -222,6 +227,8 @@ public class NettyEngine(
         val local = ch.localAddress() as? InetSocketAddress
         this@NettyEngine.boundAddress = local
         logger.info { "NettyEngine started on http://${cfg.host}:${local?.port ?: cfg.port}" }
+        // 2.4: graceful shutdown on SIGTERM/SIGINT — drain in-flight requests then disconnect services.
+        registerShutdownHook { shutdown() }
         ch.closeFuture().addListener { _ ->
             shutdown()
         }.sync()
@@ -231,14 +238,34 @@ public class NettyEngine(
     /**
      * Initiates a graceful shutdown of the Netty server.
      *
-     * This method shuts down both the worker and boss event loop groups, allowing
-     * in-flight requests to complete before fully terminating.
+     * Cancels schedules, stops accepting connections and drains in-flight requests by gracefully
+     * shutting down the boss/worker event loop groups (bounded by
+     * [EngineReliabilitySettings.shutdownDrainTimeout]), disconnects all services, then cancels the
+     * engine scope. Idempotent — safe to call from both the SIGTERM hook and the channel close
+     * listener.
      */
     public fun shutdown() {
-        try {
-            workerGroup.shutdownGracefully()
-            bossGroup.shutdownGracefully()
-        } catch (_: Throwable) {
+        val drain = if (::scope.isInitialized) nettyRunConfig().reliability.shutdownDrainTimeout else null
+        if (drain == null) {
+            // Never started; nothing to drain.
+            return
+        }
+        gracefulShutdown(drain) { timeout ->
+            // shutdownGracefully drains in-flight work over its quiet/timeout window. We do NOT block
+            // (.sync()) here: this drain may run on a Netty event-loop thread (via the channel
+            // close-future listener), and waiting for the worker group to terminate from one of its
+            // own threads would deadlock. The graceful window bounds the drain.
+            try {
+                val quietMillis = 0L
+                val timeoutMillis = timeout.inWholeMilliseconds.coerceAtLeast(quietMillis)
+                if (::bossGroup.isInitialized) {
+                    bossGroup.shutdownGracefully(quietMillis, timeoutMillis, java.util.concurrent.TimeUnit.MILLISECONDS)
+                }
+                if (::workerGroup.isInitialized) {
+                    workerGroup.shutdownGracefully(quietMillis, timeoutMillis, java.util.concurrent.TimeUnit.MILLISECONDS)
+                }
+            } catch (_: Throwable) {
+            }
         }
     }
 
@@ -257,6 +284,7 @@ public class NettyEngine(
                         scope.launch(ctx.executor().asCoroutineDispatcher()) {
                             try {
                                 try {
+                                    // Request timeout is enforced centrally in ServerRuntime.handle (per-handler HttpHandler.timeout).
                                     val result: HttpResponse = this@NettyEngine.handle(request)
                                     val nettyRes = result.toNettyResponse(msg.protocolVersion())
                                     val keepAlive = HttpUtil.isKeepAlive(msg)
@@ -298,14 +326,7 @@ public class NettyEngine(
                     val directChannel = ctx.channel().attr(DIRECT_CHANNEL_KEY).get()
                     val m = LkWebSocketFrame(msg.text())
                     if (directChannel != null) {
-                        // Direct mode - send to channel
-                        scope.launch(ctx.executor().asCoroutineDispatcher()) {
-                            try {
-                                directChannel.send(m)
-                            } catch (_: Exception) {
-                                // Channel closed
-                            }
-                        }
+                        deliverDirect(ctx, directChannel, m)
                     } else {
                         // Standard pub/sub mode
                         val mid = ctx.channel().attr(MID_KEY).get() ?: return
@@ -329,14 +350,7 @@ public class NettyEngine(
                     val bytes = ByteBufUtil.getBytes(msg.content())
                     val m = LkWebSocketFrame(bytes)
                     if (directChannel != null) {
-                        // Direct mode - send to channel
-                        scope.launch(ctx.executor().asCoroutineDispatcher()) {
-                            try {
-                                directChannel.send(m)
-                            } catch (_: Exception) {
-                                // Channel closed
-                            }
-                        }
+                        deliverDirect(ctx, directChannel, m)
                     } else {
                         // Standard pub/sub mode
                         val mid = ctx.channel().attr(MID_KEY).get() ?: return
@@ -390,6 +404,36 @@ public class NettyEngine(
             }
         }
 
+        /**
+         * 2.10: delivers an inbound WebSocket frame to the direct handler's bounded channel,
+         * applying [EngineReliabilitySettings.webSocketOversizePolicy] on overflow. For
+         * [WsOversizePolicy.CLOSE] a full buffer means the peer is outrunning the handler, so the
+         * socket is closed with code 1009 (message too big). DROP_OLDEST and SUSPEND are handled by
+         * the channel's own BufferOverflow policy via a (possibly suspending) send.
+         */
+        private fun deliverDirect(
+            ctx: ChannelHandlerContext,
+            directChannel: SendChannel<LkWebSocketFrame>,
+            frame: LkWebSocketFrame,
+        ) {
+            if (cfg.reliability.webSocketOversizePolicy == WsOversizePolicy.CLOSE) {
+                val result = directChannel.trySend(frame)
+                if (result.isFailure && !result.isClosed) {
+                    ctx.writeAndFlush(
+                        CloseWebSocketFrame(WebSocketClose.TOO_BIG.code.toInt(), "WebSocket inbound buffer overflow")
+                    ).addListener(ChannelFutureListener.CLOSE)
+                }
+            } else {
+                scope.launch(ctx.executor().asCoroutineDispatcher()) {
+                    try {
+                        directChannel.send(frame)
+                    } catch (_: Exception) {
+                        // Channel closed
+                    }
+                }
+            }
+        }
+
         private suspend fun handleWebSocketStartup(ctx: ChannelHandlerContext, req: FullHttpRequest) {
             val wsRequest = try {
                 req.toLightningWebSocketConnectRequest(ctx, cfg)
@@ -427,8 +471,8 @@ public class NettyEngine(
                 @Suppress("UNCHECKED_CAST")
                 val directHandler = socketHandler as DirectExecutableWebSocketHandler<PathSpec>
 
-                // Create channel for incoming frames
-                val incomingChannel = Channel<LkWebSocketFrame>(Channel.UNLIMITED)
+                // 2.10: bounded inbound channel with backpressure instead of Channel.UNLIMITED.
+                val incomingChannel = newWebSocketInboundChannel<LkWebSocketFrame>(cfg.reliability)
                 ctx.channel().attr(DIRECT_CHANNEL_KEY).set(incomingChannel)
 
                 // Complete handshake and then run direct handler

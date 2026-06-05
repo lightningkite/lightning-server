@@ -197,6 +197,64 @@ class TimeBasedOTPProofEndpointsTest {
     }
 
     @Test
+    fun `prove rejects a reused TOTP code (single-use)`() = runBlocking {
+        TestUser.users.clear()
+        val userId = Uuid.random()
+        val user = TestUser(userId, "test@example.com")
+        TestUser.users[userId] = user
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
+
+            init {
+                register(TestUser)
+            }
+
+            val totpEndpoints = path.path("auth").path("totp") include TimeBasedOTPProofEndpoints(
+                database = database,
+                cache = cache,
+                proofSigner = RuntimeDeferred.Cached { testBasis.signer("proof") },
+                proofExpiration = 1.hours,
+                config = testConfig
+            )
+        }.let { server ->
+            server.test({}) {
+                val table = server.totpEndpoints.modelInfo.table()
+                val totpSecret = TotpSecret(
+                    subjectId = TestUser.idString(userId),
+                    subjectType = TestUser.name,
+                    secretBase32 = testSecretBase32,
+                    label = "test",
+                    issuer = "TestApp",
+                    period = 30.seconds,
+                    digits = 6,
+                    algorithm = TotpHashAlgorithm.SHA1,
+                    establishedAt = Clock.System.now(),
+                    lastUsedAt = Clock.System.now()
+                )
+                table.insert(listOf(totpSecret))
+
+                val input = IdentificationAndPassword(
+                    type = "TestUser",
+                    property = "TestUser/_id",
+                    value = userId.toString(),
+                    password = totpSecret.code
+                )
+
+                // First use of the code succeeds.
+                assertNotNull(server.totpEndpoints.prove.test(null, input))
+
+                // Replaying the same code within its time-step is rejected (single-use, RFC 6238 §5.2),
+                // with the same opaque error as a wrong code.
+                assertFailsWith<BadRequestException>("Reused TOTP code should be rejected") {
+                    server.totpEndpoints.prove.test(null, input)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `established returns true only when lastUsedAt is set`() = runBlocking {
         TestUser.users.clear()
         val userId = Uuid.random()

@@ -10,7 +10,7 @@ caching, file storage, email, SMS, and more.
 
 **Current Version**: `version-5-SNAPSHOT`
 
-**Main Branch**: `master` (PRs should target this)
+**Main Branch**: `version-5` (PRs should target this; this is the default branch — formerly `version-X`)
 
 ## Build System
 
