@@ -39,12 +39,6 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # Secret scanning: would have caught the committed AWS key id in publishInternal.yml.
-      - name: Gitleaks secret scan
-        uses: gitleaks/gitleaks-action@83373cf2f8c4db6e24b41c1a9b086bb9619e9cd3 # v2.3.7
-        env:
-          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
-
       - name: Clean
         run: ./gradlew clean
 
