@@ -83,7 +83,7 @@ class WebSocketSpanTest {
         // Flush — SimpleSpanProcessor exports immediately, but disconnect can fire after testApplication
         // returns. Wait briefly for the disconnect span to land.
         val deadline = System.currentTimeMillis() + 2_000
-        val expected = setOf("WILLCONNECT", "DIDCONNECT", "MESSAGE", "DISCONNECT")
+        val expected = setOf("willConnect", "didConnect", "messageFromClient", "disconnect")
         while (System.currentTimeMillis() < deadline) {
             val seen = exporter.finishedSpanItems
                 .mapNotNull { span -> expected.firstOrNull { span.name.contains(it) } }

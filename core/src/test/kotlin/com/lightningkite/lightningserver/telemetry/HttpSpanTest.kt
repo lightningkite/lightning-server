@@ -14,6 +14,7 @@ import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.services.otel.OpenTelemetrySettings
 import io.opentelemetry.api.trace.SpanId
+import io.opentelemetry.sdk.trace.data.SpanData
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -68,9 +69,9 @@ class HttpSpanTest {
                 ?: fail("Expected exactly one root span. Got: ${spans.map { it.name }}")
 
             assertEquals(
-                "GET /users/{id}",
+                "lightningserver.GET /users/{id}",
                 root.name,
-                "Root span name should be \"$/{METHOD} \$/{route-pattern}\"",
+                "Root span name should be \"lightningserver.\$METHOD \$route-pattern\"",
             )
             assertEquals("GET", root.attributes.asMap().entries.first { it.key.key == "http.method" }.value)
             assertEquals(
@@ -83,7 +84,7 @@ class HttpSpanTest {
             )
             assertEquals(200L, root.attributes.asMap().entries.first { it.key.key == "http.status_code" }.value)
 
-            val cors = spans.singleOrNull { it.name == "CORS" }
+            val cors = spans.singleOrNull { it.name == "lightningserver.CORS" }
                 ?: fail("Expected a CORS interceptor span. Got: ${spans.map { it.name }}")
             assertEquals(
                 root.spanContext.spanId,
@@ -118,11 +119,11 @@ class HttpSpanTest {
             val root = spans.firstOrNull { it.parentSpanContext.spanId == SpanId.getInvalid() }
                 ?: fail("Expected a root span even for unmatched routes. Got: ${spans.map { it.name }}")
 
-            // For unmatched paths we fall back to using the literal target as the route name —
-            // the important thing is that we still produce a single top-level HTTP span.
+            // For unmatched paths the literal target is used as the route — what matters is a
+            // single top-level HTTP span with the correct verb.
             assertTrue(
-                root.name.startsWith("GET "),
-                "Root span should still start with the verb, was \"${root.name}\"",
+                root.name.startsWith("lightningserver.GET "),
+                "Root span should start with \"lightningserver.GET \", was \"${root.name}\"",
             )
             assertNotNull(
                 root.attributes.asMap().entries.firstOrNull { it.key.key == "http.method" }?.value,

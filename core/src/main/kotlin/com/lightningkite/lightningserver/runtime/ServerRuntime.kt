@@ -6,7 +6,7 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.DirectWebSocketSender
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
-import com.lightningkite.services.OpenTelemetry
+import com.lightningkite.services.Namespaced
 import com.lightningkite.services.SettingContext
 import kotlinx.serialization.modules.SerializersModule
 import kotlin.time.Clock
@@ -30,7 +30,13 @@ import kotlin.time.Clock
  * - Handling WebSocket connections and subscriptions
  *
  */
-public interface ServerRuntime : SettingContext {
+public interface ServerRuntime : SettingContext, Namespaced {
+    /** Fixed namespace used when naming spans in the metrics backend. */
+    override val name: String get() = "lightningserver"
+
+    /** This runtime is the SettingContext for all its services. */
+    override val context: SettingContext get() = this
+
     /**
      * The server definition containing all routes, handlers, settings, and tasks.
      */
@@ -60,15 +66,6 @@ public interface ServerRuntime : SettingContext {
      * Serialization configuration for internal use (database storage, caching, etc.).
      */
     public val internalSerialization: Serialization
-
-    /**
-     * OpenTelemetry instance for distributed tracing and metrics.
-     *
-     * Currently returns null by default. Implementations should override this
-     * to provide telemetry support.
-     */
-    override val openTelemetry: OpenTelemetry?
-        get() = null // TODO
 
     /**
      * Clock used for time-based operations.

@@ -122,9 +122,9 @@ class WebSocketSpanTest {
         check(echoed == "ping")
         ws.close(1000, "done")
 
-        // Wait briefly for the DISCONNECT span to land after socket close.
+        // Wait briefly for the disconnect span to land after socket close.
         val deadline = System.currentTimeMillis() + 2_000
-        val expected = setOf("WILLCONNECT", "DIDCONNECT", "MESSAGE", "DISCONNECT")
+        val expected = setOf("willConnect", "didConnect", "messageFromClient", "disconnect")
         while (System.currentTimeMillis() < deadline) {
             val seen = exporter.finishedSpanItems
                 .mapNotNull { span -> expected.firstOrNull { span.name.contains(it) } }

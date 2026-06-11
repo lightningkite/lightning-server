@@ -10,6 +10,8 @@ import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
+import com.lightningkite.services.telemetry.TelemetryAttributes
+import com.lightningkite.services.telemetry.TelemetryKey
 import com.lightningkite.services.Service
 import com.lightningkite.services.cache.*
 import com.lightningkite.services.pubsub.PubSub
@@ -22,6 +24,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
+
+private val scheduleNameKey = TelemetryKey.OfString("schedule.name")
 
 /**
  * Server setting for configuring the PubSub implementation used by the local engine.
@@ -211,8 +215,7 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
             @Suppress("OPT_IN_USAGE")
             val job = scope.launch {
                 while (true) {
-                    val upcomingRun = instrument("schedule.poll $name") { span ->
-                        span?.setAttribute("schedule.name", name)
+                    val upcomingRun = instrument("schedule.poll $name", TelemetryAttributes { put(scheduleNameKey, name) }) {
                         cache.get<Long>("$name-nextRun") ?: run {
                             val time = it.schedule.calculateNextRun(clock.now())
                             cache.set<Long>("$name-nextRun", time)
@@ -221,8 +224,7 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
                     }
                     delay((upcomingRun - System.currentTimeMillis()).coerceAtLeast(1L))
                     val nextRun = it.schedule.calculateNextRun(clock.now())
-                    val lockAcquired = instrument("schedule.tick $name") { span ->
-                        span?.setAttribute("schedule.name", name)
+                    val lockAcquired = instrument("schedule.tick $name", TelemetryAttributes { put(scheduleNameKey, name) }) {
                         if (cache.setIfNotExists("$name-lock", true)) {
                             cache.set("$name-lock", true, 1.hours)
                             try {
@@ -245,7 +247,6 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
                             }
                             true
                         } else {
-                            span?.setAttribute("schedule.lockHeld", true)
                             false
                         }
                     }

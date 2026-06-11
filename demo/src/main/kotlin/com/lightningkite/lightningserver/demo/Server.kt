@@ -25,6 +25,7 @@ import com.lightningkite.lightningserver.sessions.proofs.oauth.OauthProviderInfo
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.typed.sdk.module
 import com.lightningkite.lightningserver.websockets.*
+import com.lightningkite.services.LoggingTelemetryBackend
 import com.lightningkite.services.cache.*
 import com.lightningkite.services.cache.dynamodb.*
 import com.lightningkite.services.cache.memcached.*
@@ -89,6 +90,7 @@ object Server : ServerBuilder() {
         SesEmailInboundService
         TwilioSmsInboundService
         TwilioSMS
+        LoggingTelemetryBackend
         TwilioPhoneCallService
         JsonFileDatabase
         DynamoDbCache

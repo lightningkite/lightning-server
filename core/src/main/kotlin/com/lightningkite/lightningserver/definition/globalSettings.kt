@@ -2,7 +2,7 @@ package com.lightningkite.lightningserver.definition
 
 import com.lightningkite.lightningserver.encryption.SecretBasis
 import com.lightningkite.services.LoggingSettings
-import com.lightningkite.services.OpenTelemetry
+import com.lightningkite.services.telemetry.TelemetryBackend
 import com.lightningkite.services.otel.OpenTelemetrySettings
 import kotlinx.serialization.builtins.nullable
 
@@ -31,16 +31,18 @@ public val generalSettings: ServerSetting.Direct<GeneralServerSettings> =
     ServerSetting("general", GeneralServerSettings(), GeneralServerSettings.serializer())
 
 /**
- * Global setting for OpenTelemetry configuration.
+ * Global setting for telemetry (distributed tracing and metrics) configuration.
  *
- * When configured, enables distributed tracing and metrics collection via OpenTelemetry.
- * If null (the default), telemetry is disabled. Configure this to send traces to services
- * like Jaeger, Zipkin, or cloud observability platforms.
+ * When null (the default), telemetry is disabled (no-op). Configure with an [OpenTelemetrySettings]
+ * to export traces and metrics via OpenTelemetry. Common URL schemes: `log`, `dev`,
+ * `otlp-grpc://host:port`, `otlp-https://host:port`. For custom batching or sampling use the
+ * full [OpenTelemetrySettings] properties.
  *
  * @see OpenTelemetrySettings
+ * @see TelemetryBackend
  */
-public val telemetrySettings: ServerSetting<OpenTelemetrySettings?, OpenTelemetry?> =
-    ServerSetting("telemetry", null, OpenTelemetrySettings.serializer().nullable) { it?.invoke("telemetry", this) }
+public val telemetrySettings: ServerSetting<TelemetryBackend.Settings, TelemetryBackend> =
+    ServerSetting("telemetry", TelemetryBackend.Settings(), TelemetryBackend.Settings.serializer()) { it("telemetry", this) }
 
 /**
  * Global setting for logging configuration.

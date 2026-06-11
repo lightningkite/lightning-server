@@ -226,12 +226,8 @@ public class WebAuthNProofEndpoints(
                 )
 
                 val cacheKey = challengeCacheKey(challengeId)
-                val fromCache = cache().get<RegistrationCache>(cacheKey)
+                val fromCache = cache().getAndRemove<RegistrationCache>(cacheKey)
                     ?: throw BadRequestException("No Challenge available")
-                // Atomically claim this challenge for single use, closing the race where two concurrent
-                // requests both read it before either removes it (get+remove is not atomic on its own).
-                if (!cache().claimOnce("${cacheKey}_used", 15.minutes))
-                    throw BadRequestException("No Challenge available")
                 cache().remove(cacheKey)
 
                 if (fromCache.challenge != WebAuthN.base64Decoder.decode(clientData.challenge).decodeToString())
@@ -392,12 +388,8 @@ public class WebAuthNProofEndpoints(
                 )
 
                 val cacheKey = challengeCacheKey(challengeId)
-                val fromCache = cache().get<AuthenticationCache>(cacheKey)
+                val fromCache = cache().getAndRemove<AuthenticationCache>(cacheKey)
                     ?: throw BadRequestException("No Challenge available")
-                // Atomically claim this challenge for single use, closing the race where two concurrent
-                // requests both read it before either removes it (get+remove is not atomic on its own).
-                if (!cache().claimOnce("${cacheKey}_used", 15.minutes))
-                    throw BadRequestException("No Challenge available")
                 cache().remove(cacheKey)
 
                 if (fromCache.challenge != WebAuthN.base64Decoder.decode(clientData.challenge).decodeToString())

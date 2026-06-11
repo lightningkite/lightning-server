@@ -5,16 +5,29 @@ import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.telemetry.use
 import com.lightningkite.lightningserver.websockets.*
+import com.lightningkite.services.telemetry.TelemetryAttributes
+import com.lightningkite.services.telemetry.TelemetryKey
+import com.lightningkite.services.telemetry.TelemetryKeys
+import com.lightningkite.services.telemetry.TelemetryTrace
 import com.lightningkite.services.data.Data
 import com.lightningkite.services.data.TypedData
-import com.lightningkite.services.otel.get
-import io.opentelemetry.api.trace.Span
+import com.lightningkite.services.telemetry.telemetryTrace
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 import kotlinx.io.*
 import java.util.zip.GZIPOutputStream
+
+// Pre-allocated TelemetryKey instances for custom WebSocket and task attributes (backend caches by equality).
+private val wsRoute = TelemetryKey.OfString("ws.route")
+private val wsFrameType = TelemetryKey.OfString("ws.frame.type")
+private val wsFrameSize = TelemetryKey.OfLong("ws.frame.size")
+private val wsSubscriptionTopic = TelemetryKey.OfString("ws.subscription.topic")
+private val wsDisconnectCode = TelemetryKey.OfLong("ws.disconnect.code")
+private val wsDisconnectReason = TelemetryKey.OfString("ws.disconnect.reason")
+private val taskType = TelemetryKey.OfString("task.type")
+private val taskRoute = TelemetryKey.OfString("task.route")
+private val errorType = TelemetryKey.OfString("error.type")
 
 /**
  * Handles an HTTP request through the server's routing and middleware system.
@@ -210,10 +223,10 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.wi
     request: WebSocketConnectRequest<PATH>,
 ): STORAGE {
     return with(serverRuntime) {
-        instrument("WEBSOCKET.WILLCONNECT $location") { span ->
-            span?.setAttribute("ws.event", "willConnect")
-            span?.setAttribute("ws.route", location.toString())
-            span?.setAttribute("net.peer.ip", request.sourceIp)
+        instrument("willConnect", TelemetryAttributes {
+            put(wsRoute, location.toString())
+            put(TelemetryKeys.Net.peerIp, request.sourceIp)
+        }) {
             willConnect(request)
         }
     }
@@ -230,10 +243,10 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
     connection: WebSocketConnection<PATH, STORAGE>,
 ) {
     return with(connection) {
-        instrument("WEBSOCKET.DIDCONNECT $location") { span ->
-            span?.setAttribute("ws.event", "didConnect")
-            span?.setAttribute("ws.route", location.toString())
-            span?.setAttribute("net.peer.ip", request.sourceIp)
+        instrument("didConnect", TelemetryAttributes {
+            put(wsRoute, location.toString())
+            put(TelemetryKeys.Net.peerIp, request.sourceIp)
+        }) {
             didConnect()
         }
     }
@@ -254,22 +267,18 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
     frame: WebSocketFrame,
 ) {
     return with(connection) {
-        instrument("WEBSOCKET.MESSAGE $location") { span ->
-            span?.setAttribute("ws.event", "messageFromClient")
-            span?.setAttribute("ws.route", location.toString())
-            span?.setAttribute("net.peer.ip", request.sourceIp)
-            span?.setAttribute(
-                "ws.frame.type", when (frame) {
-                    is WebSocketFrame.Text -> "text"
-                    is WebSocketFrame.Binary -> "binary"
-                }
-            )
-            span?.setAttribute(
-                "ws.frame.size", when (frame) {
-                    is WebSocketFrame.Text -> frame.content.length.toLong()
-                    is WebSocketFrame.Binary -> frame.content.size.toLong()
-                }
-            )
+        instrument("messageFromClient", TelemetryAttributes {
+            put(wsRoute, location.toString())
+            put(TelemetryKeys.Net.peerIp, request.sourceIp)
+            put(wsFrameType, when (frame) {
+                is WebSocketFrame.Text -> "text"
+                is WebSocketFrame.Binary -> "binary"
+            })
+            put(wsFrameSize, when (frame) {
+                is WebSocketFrame.Text -> frame.content.length.toLong()
+                is WebSocketFrame.Binary -> frame.content.size.toLong()
+            })
+        }) {
             messageFromClient(frame)
         }
     }
@@ -288,11 +297,11 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
     topic: WebSocketSubscriptionMessage<*, *>,
 ) {
     return with(connection) {
-        instrument("WEBSOCKET.SUBSCRIPTION $location") { span ->
-            span?.setAttribute("ws.event", "messageFromSubscription")
-            span?.setAttribute("ws.route", location.toString())
-            span?.setAttribute("net.peer.ip", request.sourceIp)
-            span?.setAttribute("ws.subscription.topic", topic.topic.location.toString())
+        instrument("messageFromSubscription", TelemetryAttributes {
+            put(wsRoute, location.toString())
+            put(TelemetryKeys.Net.peerIp, request.sourceIp)
+            put(wsSubscriptionTopic, topic.topic.location.toString())
+        }) {
             messageFromSubscription(topic)
         }
     }
@@ -311,12 +320,12 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
     reason: WebSocketClose,
 ) {
     return with(connection) {
-        instrument("WEBSOCKET.DISCONNECT $location") { span ->
-            span?.setAttribute("ws.event", "disconnect")
-            span?.setAttribute("ws.route", location.toString())
-            span?.setAttribute("net.peer.ip", request.sourceIp)
-            span?.setAttribute("ws.disconnect.code", reason.code.toLong())
-            span?.setAttribute("ws.disconnect.reason", reason.name)
+        instrument("disconnect", TelemetryAttributes {
+            put(wsRoute, location.toString())
+            put(TelemetryKeys.Net.peerIp, request.sourceIp)
+            put(wsDisconnectCode, reason.code.toLong())
+            put(wsDisconnectReason, reason.name)
+        }) {
             disconnect(reason)
         }
     }
@@ -330,9 +339,10 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
  */
 context(serverRuntime: ServerRuntime)
 public suspend fun <T> Task<T>.executeWithMetrics(location: PathSpec0, input: T) {
-    return instrument("TASK $location") { span ->
-        span?.setAttribute("task.type", "TASK")
-        span?.setAttribute("task.route", location.toString())
+    return instrument("task", TelemetryAttributes {
+        put(taskType, "TASK")
+        put(taskRoute, location.toString())
+    }) {
         with(serverRuntime) {
             this@executeWithMetrics.executeInline(input)
         }
@@ -346,9 +356,10 @@ public suspend fun <T> Task<T>.executeWithMetrics(location: PathSpec0, input: T)
  */
 context(serverRuntime: ServerRuntime)
 public suspend fun ScheduledTask.executeWithMetrics(location: PathSpec0) {
-    return instrument("SCHEDULE $location") { span ->
-        span?.setAttribute("task.type", "SCHEDULE")
-        span?.setAttribute("task.route", location.toString())
+    return instrument("schedule", TelemetryAttributes {
+        put(taskType, "SCHEDULE")
+        put(taskRoute, location.toString())
+    }) {
         with(serverRuntime) {
             this@executeWithMetrics.execute()
         }
@@ -362,45 +373,40 @@ public suspend fun ScheduledTask.executeWithMetrics(location: PathSpec0) {
  */
 context(serverRuntime: ServerRuntime)
 public suspend fun StartupTask.executeWithMetrics(location: PathSpec0) {
-    return instrument("STARTUP $location") { span ->
-        span?.setAttribute("task.type", "STARTUP")
-        span?.setAttribute("task.route", location.toString())
+    return instrument("startup", TelemetryAttributes {
+        put(taskType, "STARTUP")
+        put(taskRoute, location.toString())
+    }) {
         execute()
     }
 }
 
 /**
- * Instruments a code block with OpenTelemetry tracing.
+ * Instruments a suspend block with the metrics backend, creating a named child span.
  *
- * If telemetry is enabled, creates a span with the given name and executes the action within it.
- * If an exception occurs, records it in the telemetry before re-throwing.
- * If telemetry is not enabled, executes the action directly without overhead.
+ * All [attributes] are attached to the span at start. If telemetry is not configured the
+ * call is a transparent no-op. Errors are recorded and re-thrown automatically by the backend.
  *
- * @param name The name of the telemetry span
- * @param action The code block to execute, receiving an optional Span
- * @return The result of the action
+ * @param name Short operation name (e.g. "handler", "willConnect")
+ * @param attributes Initial attributes attached to the span
+ * @param action The code to run inside the span
+ * @return The result of [action]
  */
 context(runtime: ServerRuntime)
-public suspend inline fun <T> instrument(name: String, crossinline action: suspend (Span?) -> T): T {
-    val tel = runtime.openTelemetry?.get("com.lightningkite.lightningserver")
-    return if (tel != null) tel.spanBuilder(name).use {
-        try {
-            action(it)
-        } catch (t: Throwable) {
-            tel.error("Context $name failed", t)
-            throw t
-        }
-    } else action(null)
-}
+public suspend fun <T> instrument(
+    name: String,
+    attributes: TelemetryAttributes = TelemetryAttributes.empty,
+    action: suspend () -> T,
+): T = runtime.telemetryTrace(name, attributes) { action() }
 
 /**
- * Carries the response value plus the bookkeeping [instrumentHttpRequest] needs to close the span.
+ * Carries the response value plus the HTTP status code and optional error class name that
+ * [instrumentHttpRequest] enriches onto the span after the action completes.
  *
- * @param value The value returned from [instrumentHttpRequest] (the HttpResponse for plain requests,
- *   or a domain-specific wrapper such as a `BulkResponse` for handlers that re-dispatch).
- * @param statusCode The HTTP status code to record on the span and in metrics.
- * @param errorType Optional simple class name of an exception the action handled, used only for
- *   5xx error counters in [HttpMetrics].
+ * @param value The value returned from [instrumentHttpRequest] (the HttpResponse for plain
+ *   requests, or a domain-specific wrapper such as a `BulkResponse` for handlers that re-dispatch).
+ * @param statusCode The HTTP status code to record on the span.
+ * @param errorType Optional simple class name of an exception the action handled (e.g. "timeout").
  */
 public data class HttpInstrumentationResult<out T>(
     public val value: T,
@@ -409,49 +415,39 @@ public data class HttpInstrumentationResult<out T>(
 )
 
 /**
- * Wraps an HTTP request flow with the standard root-span attributes and metrics.
+ * Wraps an HTTP request flow with the standard root-span attributes and RED metrics.
  *
- * Resolves the route pattern from the request (falling back to the literal target if the route
- * is not matched), opens a span named "$method $route", sets the standard `http.*` attributes,
- * runs the action, then records `http.status_code` on the span and the request to [HttpMetrics].
+ * Resolves the route pattern from the request (falling back to the literal target if unmatched),
+ * opens a span named "$method $route" with standard `http.*` attributes, runs the action, then
+ * enriches the span with `http.status_code` and (when present) `error.type`.
  *
- * Used both by [handle] for top-level HTTP request handling and by handlers that re-dispatch
- * inner requests (for example the bulk endpoint in `MetaEndpoints`), so that each sub-request
- * gets the same observability treatment as a normal request.
+ * Used by [handle] for top-level requests and by bulk-endpoint handlers that re-dispatch inner
+ * requests, giving each sub-request the same observability treatment as a normal request.
  */
 context(runtime: ServerRuntime)
-public suspend inline fun <T> instrumentHttpRequest(
+public suspend fun <T> instrumentHttpRequest(
     request: HttpRequest<*>,
-    crossinline action: suspend (Span?) -> HttpInstrumentationResult<T>,
+    action: suspend () -> HttpInstrumentationResult<T>,
 ): T {
-    val startTime = System.currentTimeMillis()
     val method = request.path.method.toString()
     val route = try {
         request.path.match.path.pathSpec.toString()
     } catch (_: Exception) {
         "/" + request.path.pathSegments.toString()
     }
-    return instrument("$method $route") { span ->
-        span?.setAttribute("http.method", method)
-        span?.setAttribute("http.route", route)
-        span?.setAttribute("http.target", "/" + request.path.pathSegments.toString())
-        span?.setAttribute("http.scheme", request.protocol)
-        span?.setAttribute("http.host", request.domain)
-        span?.setAttribute("net.peer.ip", request.sourceIp)
-
-        val result = action(span)
-
-        span?.setAttribute("http.status_code", result.statusCode.toLong())
-
-        val durationMs = System.currentTimeMillis() - startTime
-        (runtime as? ServerRuntimeBase)?.httpMetrics?.record(
-            method = method,
-            route = route,
-            statusCode = result.statusCode,
-            durationMs = durationMs,
-            errorType = result.errorType,
-        )
-
+    return runtime.telemetryTrace("$method $route", TelemetryAttributes {
+        put(TelemetryKeys.Http.method, method)
+        put(TelemetryKeys.Http.route, route)
+        put(TelemetryKeys.Http.target, "/" + request.path.pathSegments.toString())
+        put(TelemetryKeys.Http.scheme, request.protocol)
+        put(TelemetryKeys.Http.host, request.domain)
+        put(TelemetryKeys.Net.peerIp, request.sourceIp)
+    }) { span ->
+        val result = action()
+        span.enrich(TelemetryAttributes {
+            put(TelemetryKeys.Http.statusCode, result.statusCode.toLong())
+            result.errorType?.let { put(errorType, it) }
+        })
         result.value
     }
 }

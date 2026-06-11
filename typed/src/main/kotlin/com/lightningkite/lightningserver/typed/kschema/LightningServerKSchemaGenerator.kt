@@ -29,6 +29,7 @@ private fun InterfaceInfo.virtualTypeReference(registry: SerializationRegistry):
  */
 public val ServerBuilder.lightningServerKSchemaFromDefaultRuntime: LightningServerKSchema get() = SDK.withDefaultRuntime(this) { lightningServerKSchema }
 
+
 public context(runtime: ServerRuntime)
 val lightningServerKSchema: LightningServerKSchema
     get() {

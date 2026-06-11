@@ -118,15 +118,15 @@ class BulkSpanTest {
 
             val spans = Memory.finishedSpans()
 
-            val okSpan = spans.singleOrNull { it.name == "GET /ok" }
-                ?: fail("Expected per-sub-request span 'GET /ok'. Got: ${spans.map { it.name }}")
+            val okSpan = spans.singleOrNull { it.name == "lightningserver.GET /ok" }
+                ?: fail("Expected per-sub-request span 'lightningserver.GET /ok'. Got: ${spans.map { it.name }}")
             assertEquals("GET", okSpan.attributes.asMap().entries.first { it.key.key == "http.method" }.value)
             assertEquals("/ok", okSpan.attributes.asMap().entries.first { it.key.key == "http.route" }.value)
             assertEquals("/ok", okSpan.attributes.asMap().entries.first { it.key.key == "http.target" }.value)
             assertEquals(200L, okSpan.attributes.asMap().entries.first { it.key.key == "http.status_code" }.value)
 
-            val missingSpan = spans.singleOrNull { it.name == "GET /missing" }
-                ?: fail("Expected per-sub-request span 'GET /missing'. Got: ${spans.map { it.name }}")
+            val missingSpan = spans.singleOrNull { it.name == "lightningserver.GET /missing" }
+                ?: fail("Expected per-sub-request span 'lightningserver.GET /missing'. Got: ${spans.map { it.name }}")
             assertEquals(
                 404L,
                 missingSpan.attributes.asMap().entries.first { it.key.key == "http.status_code" }.value,
@@ -135,18 +135,18 @@ class BulkSpanTest {
 
             // The bulk request itself still produces its own root span and reports success
             // because the endpoint always returns a 200 with per-sub-request results in the body.
-            val bulkRoot = spans.singleOrNull { it.name == "POST /meta/bulk" }
-                ?: fail("Expected root span 'POST /meta/bulk'. Got: ${spans.map { it.name }}")
+            val bulkRoot = spans.singleOrNull { it.name == "lightningserver.POST /meta/bulk" }
+                ?: fail("Expected root span 'lightningserver.POST /meta/bulk'. Got: ${spans.map { it.name }}")
             assertEquals(200L, bulkRoot.attributes.asMap().entries.first { it.key.key == "http.status_code" }.value)
 
-            // The inner "handler" span for the failing sub-request gets ERROR status from the
-            // SpanBuilder.use{} extension because the exception propagated through it.
+            // The inner "handler" span for the failing sub-request should be marked ERROR
+            // because the exception propagated through telemetryTrace.
             val failingHandlerSpan = spans
-                .filter { it.name == "handler" }
+                .filter { it.name == "lightningserver.handler" }
                 .firstOrNull { it.status.statusCode == StatusCode.ERROR }
             assertTrue(
                 failingHandlerSpan != null,
-                "Expected the inner 'handler' span for the failing sub-request to be marked ERROR",
+                "Expected the inner 'lightningserver.handler' span for the failing sub-request to be marked ERROR",
             )
         }
     }

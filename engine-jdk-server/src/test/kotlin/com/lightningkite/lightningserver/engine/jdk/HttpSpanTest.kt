@@ -112,6 +112,6 @@ class HttpSpanTest {
         val spans = exporter.finishedSpanItems
         val root = spans.singleOrNull { it.parentSpanContext.spanId == SpanId.getInvalid() }
             ?: fail("Expected a single root span. Got: ${spans.map { it.name }}")
-        assertEquals("GET /things/{id}", root.name, "JDK engine should produce a route-pattern root span")
+        assertEquals("lightningserver.GET /things/{id}", root.name, "JDK engine should produce a route-pattern root span")
     }
 }

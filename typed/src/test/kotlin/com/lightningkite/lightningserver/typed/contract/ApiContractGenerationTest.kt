@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.LightningServerKSchema
+import com.lightningkite.lightningserver.typed.kschema.lightningServerKSchemaFromDefaultRuntime
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.database.Database
@@ -71,8 +72,8 @@ class ApiContractGenerationTest {
 
     @Test
     fun captureIsDeterministic() {
-        val a = BaselineServer.captureApiSchema()
-        val b = BaselineServer.captureApiSchema()
+        val a = BaselineServer.lightningServerKSchemaFromDefaultRuntime.canonicalize()
+        val b = BaselineServer.lightningServerKSchemaFromDefaultRuntime.canonicalize()
         assertEquals(
             apiBaselineJson.encodeToString(LightningServerKSchema.serializer(), a),
             apiBaselineJson.encodeToString(LightningServerKSchema.serializer(), b),
@@ -82,8 +83,8 @@ class ApiContractGenerationTest {
 
     @Test
     fun mutationProducesBreakingChanges() {
-        val baseline = BaselineServer.captureApiSchema()
-        val current = MutatedServer.captureApiSchema()
+        val baseline = BaselineServer.lightningServerKSchemaFromDefaultRuntime.canonicalize()
+        val current = MutatedServer.lightningServerKSchemaFromDefaultRuntime.canonicalize()
         val report = diffApiContract(baseline, current)
         val codes = report.changes.map { it.code }.toSet()
         assertTrue(ApiChangeCode.ENDPOINT_REMOVED in codes, "Removing /ping should be ENDPOINT_REMOVED; got $codes")
@@ -97,8 +98,8 @@ class ApiContractGenerationTest {
 
     @Test
     fun identicalServerHasNoBreakingChanges() {
-        val baseline = BaselineServer.captureApiSchema()
-        val current = BaselineServer.captureApiSchema()
+        val baseline = BaselineServer.lightningServerKSchemaFromDefaultRuntime.canonicalize()
+        val current = BaselineServer.lightningServerKSchemaFromDefaultRuntime.canonicalize()
         val report = diffApiContract(baseline, current)
         assertEquals(0, report.changes.size, "Identical server should produce no changes")
     }
