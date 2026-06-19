@@ -57,12 +57,18 @@ plugins:
 nav:
   - Home: index.md
   - Guide:
+    - Overview: overview.md
     - Your First Endpoint: first-endpoint.md
+    - Running Your Server: running.md
     - Routing: routing.md
     - Typed Endpoints: typed-endpoints.md
     - Services & Settings: services.md
     - Database & Query DSL: database.md
     - Authentication & Sessions: auth.md
+    - Proof & Session: proof-session.md
+    - WebSockets: websockets.md
+    - Tasks: tasks.md
+    - Schedules: schedules.md
     - Testing: testing.md
     - Deploying to AWS: aws-deployment.md
   # The Dokka API reference is a pre-built HTML site dropped into site/api/
