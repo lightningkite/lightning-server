@@ -12,7 +12,7 @@ import com.lightningkite.lightningserver.runtime.handle
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.set
-import com.lightningkite.services.otel.OpenTelemetrySettings
+import com.lightningkite.services.telemetry.TelemetryBackend
 import io.opentelemetry.api.trace.SpanId
 import io.opentelemetry.sdk.trace.data.SpanData
 import kotlinx.coroutines.runBlocking
@@ -48,7 +48,7 @@ class HttpSpanTest {
         TestServer.test(
             settings = {
                 InMemoryTelemetry  // ensure "memory" URL scheme is registered
-                telemetrySettings.set(OpenTelemetrySettings(url = "memory"))
+                telemetrySettings.set(TelemetryBackend.Settings(url = "memory"))
             }
         ) {
             runBlocking {
@@ -99,7 +99,7 @@ class HttpSpanTest {
         TestServer.test(
             settings = {
                 InMemoryTelemetry  // ensure "memory" URL scheme is registered
-                telemetrySettings.set(OpenTelemetrySettings(url = "memory"))
+                telemetrySettings.set(TelemetryBackend.Settings(url = "memory"))
             }
         ) {
             runBlocking {
