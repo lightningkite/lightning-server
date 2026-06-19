@@ -16,36 +16,27 @@ This chapter covers the practical core: defining a principal type, requiring
 auth on an endpoint, reading the authenticated user inside a handler, and
 testing authenticated endpoints.
 
-> **How these examples work.**  Every code block is a named region from a
-> compiled, tested Kotlin source file.  `./gradlew :docs-guide:test` asserts
-> byte-equality between what you read here and the running source, so the
-> examples can never silently break.
-
 ## Imports
 
 All examples in this chapter use the following imports:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/AuthSamples.kt#auth-imports -->
 ```kotlin
-import com.lightningkite.lightningserver.NotFoundException
+import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
-import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.http.HttpStatus
-import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.test.test
-import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
-import com.lightningkite.lightningserver.settings.set
-import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.lightningserver.typed.auth
-import com.lightningkite.lightningserver.typed.test
-import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.lightningserver.definition.builder.*
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.runtime.*
+import com.lightningkite.lightningserver.runtime.test.*
+import com.lightningkite.lightningserver.serialization.*
+import com.lightningkite.lightningserver.settings.*
+import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.services.data.*
 import com.lightningkite.services.database.*
-import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.Serializable
+import kotlinx.coroutines.*
+import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
-import kotlin.uuid.Uuid
+import kotlin.uuid.*
 ```
 
 Non-obvious import locations:
@@ -53,11 +44,10 @@ Non-obvious import locations:
 - `com.lightningkite.lightningserver.auth.*` brings in `PrincipalType`,
   `AuthRequirement`, `noAuth`, `testAuth`, `fetch`, `id`, and the `register`
   extension on `ServerBuilder`.
-- `com.lightningkite.lightningserver.typed.auth` is the `auth` property
+- `com.lightningkite.lightningserver.typed.*` also brings in the `auth` property
   extension on `HttpAccess` — needed to read `auth` inside an
   `ApiHttpHandler` implementation lambda.
-- `com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders`
-  registers JSON (and other standard) media type encoders/decoders.  Required
+- `com.lightningkite.lightningserver.serialization.*` registers JSON (and other standard) media type encoders/decoders.  Required
   when testing through the full HTTP pipeline (`HttpHandler.test()`), including
   error response serialization.
 - `kotlinx.serialization.builtins.serializer` is imported (not
