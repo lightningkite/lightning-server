@@ -7,7 +7,6 @@ buildscript {
     dependencies {
         classpath(libs.lkGradleHelpers)
         classpath(libs.proguard)
-        classpath(libs.knit)
     }
 }
 
