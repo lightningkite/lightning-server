@@ -1,21 +1,19 @@
 package com.lightningkite.lightningserver.guide.samples
 
 // region db-imports
-import com.lightningkite.lightningserver.auth.noAuth
-import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.http.HttpStatus
-import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.http.post
-import com.lightningkite.lightningserver.runtime.test.test
-import com.lightningkite.lightningserver.settings.set
-import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.lightningserver.typed.test
-import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.lightningserver.*
+import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.definition.builder.*
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.runtime.test.*
+import com.lightningkite.lightningserver.settings.*
+import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.services.data.*
 import com.lightningkite.services.database.*
-import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.Serializable
-import kotlin.uuid.Uuid
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
+import kotlinx.serialization.*
+import kotlin.uuid.*
 // endregion db-imports
 
 // region note-model

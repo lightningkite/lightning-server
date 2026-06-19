@@ -5,11 +5,6 @@ Every query is expressed as a Kotlin lambda — the compiler rejects invalid fie
 references at build time, and refactoring a model field name automatically
 updates all queries.
 
-> **How these examples work.**  Every code block is a named region from a
-> compiled, tested Kotlin source file.  `./gradlew :docs-guide:test` asserts
-> byte-equality between what you read here and the running source, so the
-> examples can never silently break.
-
 ## Before You Begin
 
 > **Before you begin — KSP plugin required.**  `@GenerateDataClassPaths` is
@@ -32,32 +27,20 @@ All examples in this chapter use the following imports:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/DatabaseSamples.kt#db-imports -->
 ```kotlin
-import com.lightningkite.lightningserver.auth.noAuth
-import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.http.HttpStatus
-import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.http.post
-import com.lightningkite.lightningserver.runtime.test.test
-import com.lightningkite.lightningserver.settings.set
-import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.lightningserver.typed.test
-import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.lightningserver.*
+import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.definition.builder.*
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.runtime.test.*
+import com.lightningkite.lightningserver.settings.*
+import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.services.data.*
 import com.lightningkite.services.database.*
-import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.Serializable
-import kotlin.uuid.Uuid
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
+import kotlinx.serialization.*
+import kotlin.uuid.*
 ```
-
-Non-obvious import locations:
-
-- `GenerateDataClassPaths` is in `com.lightningkite.services.data` (the
-  `data-shared` module), not in the database package.
-- `com.lightningkite.services.database.*` brings in `HasId`, `Database`,
-  `Condition`, `condition {}`, `modification {}`, `SortPart`, and the
-  `Table` extension functions (`insertOne`, `get`, `find`, etc.).
-- `toList` is `kotlinx.coroutines.flow.toList` — `find()` returns a `Flow`,
-  not a `List`.
 
 ## Defining a Model
 
