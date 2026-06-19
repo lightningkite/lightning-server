@@ -274,28 +274,12 @@ val isAdminValue: Boolean = UserAuth.isAdmin[auth]   // suspends; cache miss →
 > Unit-assertable sample regions cannot be added here because verifying the
 > caching behavior requires an external cache service.
 
-## The Proof/Session Flow (conceptual)
+## How users log in
 
-The examples above show how to *consume* an `Authentication` token in an
-endpoint.  Establishing that token in the first place — logging a user in —
-requires a separate proof-and-session flow:
+The examples above show how to *consume* an `Authentication` token in an endpoint.
+Establishing that token — logging a user in — is handled by the `sessions` and
+`sessions-email` / `sessions-sms` / `sessions-oauth` modules.
 
-1. **Collect a proof** — the user submits evidence (e.g. an email PIN entered
-   via the `sessions-email` endpoints).  The server validates it and returns a
-   signed `Proof` object.
-2. **Exchange proof for a session** — the client posts the `Proof` to an auth
-   endpoint that verifies it meets the required strength, creates a
-   server-side session record, and returns a signed bearer token.
-3. **Use the bearer token** — subsequent requests carry the token in the
-   `Authorization: Bearer ...` header.  The framework's `Authentication.Reader`
-   verifies and deserializes it into an `Authentication<SUBJECT>` which is then
-   available in the handler via `auth`.
-
-The `sessions`, `sessions-email`, `sessions-sms`, and related modules provide
-ready-made proof endpoints; `AuthEndpoints` provides the session exchange
-endpoint.  The demo server (`demo/src/main/kotlin/.../Server.kt`) shows how to
-wire these together.
-
-> These steps involve substantial module setup and are not reproduced as
-> compiled samples here — the above description is illustrative.  See the demo
-> server for a complete working example.
+See [Proof & Session Authentication](proof-session.md) for the full flow: how proofs
+accumulate, how `AuthEndpoints` issues a session, and how the bearer token reaches your
+handler as `auth`.
