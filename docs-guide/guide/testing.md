@@ -5,57 +5,35 @@ runtime — no running server, no network, no external services — exercises yo
 endpoints exactly as production code does.  This chapter is the canonical
 reference for all the testing patterns used throughout the guide.
 
-> **How these examples work.**  Every code block is a named region from a
-> compiled, tested Kotlin source file.  `./gradlew :docs-guide:test` asserts
-> byte-equality between what you read here and the running source, so the
-> examples can never silently break.
-
 ## Imports
 
 All examples in this chapter use the following imports:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-imports -->
 ```kotlin
-import com.lightningkite.lightningserver.BadRequestException
-import com.lightningkite.lightningserver.HttpStatusException
-import com.lightningkite.lightningserver.LSError
+import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
-import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.HttpStatus
-import com.lightningkite.lightningserver.http.HttpHandler
-import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.http.post
-import com.lightningkite.lightningserver.plainText
-import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.test.test
-import com.lightningkite.lightningserver.settings.set
-import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.lightningserver.typed.auth
-import com.lightningkite.lightningserver.typed.test
-import com.lightningkite.services.cache.Cache
-import com.lightningkite.services.database.HasId
-import kotlin.test.Test
-import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.Serializable
+import com.lightningkite.lightningserver.definition.builder.*
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.runtime.*
+import com.lightningkite.lightningserver.runtime.test.*
+import com.lightningkite.lightningserver.settings.*
+import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.services.cache.*
+import com.lightningkite.services.database.*
+import kotlin.test.*
+import kotlinx.coroutines.*
+import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
-import kotlin.uuid.Uuid
+import kotlin.uuid.*
 ```
 
-Non-obvious import locations:
+Notes:
 
-- `com.lightningkite.lightningserver.plainText` — `HttpResponse.plainText()`
-  is an extension on `HttpResponse.Companion` defined in the top-level
-  `com.lightningkite.lightningserver` package (not in `...http`).
-- `com.lightningkite.lightningserver.runtime.test.test` — the `SERVER.test {
-  }` block that creates an ephemeral runtime.
-- `com.lightningkite.lightningserver.typed.test` — the `ApiHttpHandler.test()`
-  call that returns typed output.  These two are different imports; both are
-  needed when you use both styles.
-- `com.lightningkite.lightningserver.typed.auth` — the `auth` property on the
-  handler's `HttpAccess` receiver, used inside authenticated implementation
-  lambdas.
+- `kotlinx.serialization.builtins.serializer` must stay explicit — the wildcard
+  `kotlinx.serialization.*` brings in a top-level reified `serializer()` that
+  conflicts with the companion-generated `serializer()` inside `@Serializable`
+  classes when you call e.g. `Uuid.serializer()` directly.
 - `com.lightningkite.lightningserver.auth.*` brings in `PrincipalType`,
   `noAuth`, `require`, `testAuth`, `fetch`, and the `register` extension on
   `ServerBuilder`.

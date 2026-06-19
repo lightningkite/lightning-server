@@ -1,31 +1,21 @@
 package com.lightningkite.lightningserver.guide.samples
 
 // region testing-imports
-import com.lightningkite.lightningserver.BadRequestException
-import com.lightningkite.lightningserver.HttpStatusException
-import com.lightningkite.lightningserver.LSError
+import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
-import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.HttpStatus
-import com.lightningkite.lightningserver.http.HttpHandler
-import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.http.post
-import com.lightningkite.lightningserver.plainText
-import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.test.test
-import com.lightningkite.lightningserver.settings.set
-import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.lightningserver.typed.auth
-import com.lightningkite.lightningserver.typed.test
-import com.lightningkite.services.cache.Cache
-import com.lightningkite.services.database.HasId
-import kotlin.test.Test
-import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.Serializable
+import com.lightningkite.lightningserver.definition.builder.*
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.runtime.*
+import com.lightningkite.lightningserver.runtime.test.*
+import com.lightningkite.lightningserver.settings.*
+import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.services.cache.*
+import com.lightningkite.services.database.*
+import kotlin.test.*
+import kotlinx.coroutines.*
+import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
-import kotlin.uuid.Uuid
+import kotlin.uuid.*
 // endregion testing-imports
 
 // region testing-server-types
