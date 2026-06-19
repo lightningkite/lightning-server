@@ -47,3 +47,13 @@ lkLibrary(
 ) {
     description.set("A set of tools for typing, documenting, and requiring authentication in endpoints.")
 }
+
+// Wire the docs-guide compiled samples into Dokka so @sample references resolve.
+// The samples source set in docs-guide/src/samples/kotlin is compiled independently
+// by docs-guide; here we add it as a Dokka samples source root so that @sample
+// tags in this module's KDoc can reference functions defined there.
+dokka {
+    dokkaSourceSets.configureEach {
+        samples.from(rootProject.file("docs-guide/src/samples/kotlin"))
+    }
+}
