@@ -20,6 +20,7 @@ import com.lightningkite.lightningserver.typed.auth
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.database.HasId
+import kotlin.test.Test
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -176,3 +177,31 @@ fun runBlockingExplanation() = runBlocking {
     }
 }
 // endregion testing-runblocking
+
+// region testing-full-example
+// A complete, copy-pasteable test class.
+// @Test marks each method for the test runner. runBlocking {} is required because
+// test {} is inline (not suspend), so the outer coroutine scope must be provided explicitly.
+class GreetServerTest {
+    @Test
+    fun `greet returns greeting for valid name`() = runBlocking {
+        TestingServer.test(settings = { cache set Cache.Settings("ram") }) {
+            val result = TestingServer.greet.test(null, GreetRequest("Alice"))
+            check(result.greeting == "Hello, Alice!")
+        }
+    }
+
+    @Test
+    fun `greet rejects blank name`() = runBlocking {
+        TestingServer.test(settings = { cache set Cache.Settings("ram") }) {
+            try {
+                TestingServer.greet.test(null, GreetRequest(""))
+                error("Expected exception")
+            } catch (e: HttpStatusException) {
+                check(e.status.code == 400)
+                check(e.detail == "empty-name")
+            }
+        }
+    }
+}
+// endregion testing-full-example

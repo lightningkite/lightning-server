@@ -35,6 +35,7 @@ import com.lightningkite.lightningserver.typed.auth
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.database.HasId
+import kotlin.test.Test
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -290,6 +291,50 @@ fun errorPathTest() = runBlocking {
 > is not exercised.  To test that path, drive the `HttpHandler` layer with
 > `HttpHandler.test()` and inspect `response.status.code`.
 
+## A Complete Test Class
+
+A test function must be annotated with `@Test` (`kotlin.test.Test`) for the
+test runner to discover and execute it.  Functions without `@Test` compile and
+can be called manually, but the runner silently ignores them.
+
+Here is a complete, copy-pasteable test class that wires all the patterns
+together:
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-full-example -->
+```kotlin
+// A complete, copy-pasteable test class.
+// @Test marks each method for the test runner. runBlocking {} is required because
+// test {} is inline (not suspend), so the outer coroutine scope must be provided explicitly.
+class GreetServerTest {
+    @Test
+    fun `greet returns greeting for valid name`() = runBlocking {
+        TestingServer.test(settings = { cache set Cache.Settings("ram") }) {
+            val result = TestingServer.greet.test(null, GreetRequest("Alice"))
+            check(result.greeting == "Hello, Alice!")
+        }
+    }
+
+    @Test
+    fun `greet rejects blank name`() = runBlocking {
+        TestingServer.test(settings = { cache set Cache.Settings("ram") }) {
+            try {
+                TestingServer.greet.test(null, GreetRequest(""))
+                error("Expected exception")
+            } catch (e: HttpStatusException) {
+                check(e.status.code == 400)
+                check(e.detail == "empty-name")
+            }
+        }
+    }
+}
+```
+
+Key points:
+- `@Test` is `kotlin.test.Test` — import `kotlin.test.Test`.
+- Each `@Test` method wraps its `SERVER.test {}` call in `runBlocking {}`.
+- Methods are inside a class (standard JUnit requirement).
+- The `settings` lambda resets state per test — each test gets a fresh `"ram"` cache.
+
 ## Quick Reference
 
 | What you're testing | Method | Returns | Auth argument |
@@ -302,6 +347,7 @@ fun errorPathTest() = runBlocking {
 
 | Symbol | Import |
 |---|---|
+| `@Test` annotation | `kotlin.test.Test` |
 | `SERVER.test {}` block | `com.lightningkite.lightningserver.runtime.test.test` |
 | `ApiHttpHandler.test()` | `com.lightningkite.lightningserver.typed.test` |
 | `HttpHandler.test()` | same as `runtime.test.test` (included) |

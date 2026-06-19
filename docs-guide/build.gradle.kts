@@ -27,7 +27,9 @@ dependencies {
     implementation(libs.services.cache)
     ksp(libs.services.database.processor)
 
-    testImplementation(libs.kotlin.test)
+    // kotlin.test.junit is promoted to implementation so @Test is available in src/samples/kotlin
+    // (the drift-checked sample source), letting guide examples show complete annotated test classes.
+    implementation(libs.kotlin.test.junit)
     testImplementation(libs.kotlin.test.junit)
 }
 
