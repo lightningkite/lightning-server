@@ -4,41 +4,19 @@ This chapter covers the building blocks for structuring URL routes: nested
 paths, every supported HTTP method, multiple typed path arguments, grouping
 endpoints into sub-builders, and reading query parameters.
 
-> **How these examples work.**  Every code block is a named region from a
-> compiled, tested Kotlin source file.  `./gradlew :docs-guide:test` asserts
-> byte-equality between what you read here and the running source, so the
-> examples can never silently break.
-
 ## Imports
 
 All examples in this chapter use the following imports:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/RoutingSamples.kt#routing-imports -->
 ```kotlin
-import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.http.HttpHandler
-import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.QueryParameters
-import com.lightningkite.lightningserver.http.delete
-import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.http.patch
-import com.lightningkite.lightningserver.http.put
-import com.lightningkite.lightningserver.pathing.arg1
-import com.lightningkite.lightningserver.pathing.arg2
-import com.lightningkite.lightningserver.plainText
-import com.lightningkite.lightningserver.runtime.test.test
-import kotlinx.coroutines.runBlocking
+import com.lightningkite.lightningserver.*
+import com.lightningkite.lightningserver.definition.builder.*
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.runtime.test.*
+import kotlinx.coroutines.*
 ```
-
-A few non-obvious paths to note:
-
-- `.get`, `.put`, `.patch`, `.delete` are extension properties defined in
-  `com.lightningkite.lightningserver.http` — import them explicitly.
-- `arg1` and `arg2` are extension properties on the resolved path object,
-  imported from `com.lightningkite.lightningserver.pathing`.
-- `QueryParameters` lives in `com.lightningkite.lightningserver.http`.
-- `bind` and `include` are members of `ServerBuilder` — no import needed
-  inside the object body.
 
 ## Nested Paths
 
@@ -119,10 +97,8 @@ fun httpMethodsTest() = runBlocking {
 
 ## Multiple Path Arguments
 
-Chain `.arg<T>("name")` calls for each variable segment.  The first produces
-`PathSpec1<A>`; chaining a second produces `PathSpec2<A, B>`.  Access them as
-`request.path.arg1` and `request.path.arg2` respectively.  (A third `.arg`
-produces `PathSpec3`, with `arg3`.)
+Chain `.arg<T>("name")` calls for each variable segment.  Access the parsed
+values as `request.path.arg1`, `request.path.arg2`, etc.:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/RoutingSamples.kt#multi-arg-server -->
 ```kotlin

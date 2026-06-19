@@ -1,19 +1,12 @@
 package com.lightningkite.lightningserver.guide.samples
 
 // region routing-imports
-import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.http.HttpHandler
-import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.QueryParameters
-import com.lightningkite.lightningserver.http.delete
-import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.http.patch
-import com.lightningkite.lightningserver.http.put
-import com.lightningkite.lightningserver.pathing.arg1
-import com.lightningkite.lightningserver.pathing.arg2
-import com.lightningkite.lightningserver.plainText
-import com.lightningkite.lightningserver.runtime.test.test
-import kotlinx.coroutines.runBlocking
+import com.lightningkite.lightningserver.*
+import com.lightningkite.lightningserver.definition.builder.*
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.runtime.test.*
+import kotlinx.coroutines.*
 // endregion routing-imports
 
 // region nested-paths
