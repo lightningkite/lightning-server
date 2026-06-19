@@ -27,6 +27,29 @@ definition is data, the same object can be:
 
 ---
 
+## A note on Kotlin context parameters
+
+Throughout Lightning Server's API you will see a `context(server: ServerRuntime)` (or
+`context(settings: SettingContext)`) annotation on functions:
+
+```kotlin
+context(server: ServerRuntime)
+override suspend fun requiredProofStrengthFor(subject: User): Int = 5
+```
+
+These are **Kotlin context parameters** — the compiler requires that a value of the named type
+is in scope at the call site, but you never pass it explicitly.  The framework supplies the
+`ServerRuntime` automatically whenever your code runs inside a handler body, a task body, a
+scheduled task body, or a `.test {}` block.  That is why you can call `cache()`, `database()`,
+`auth.fetch()`, and similar service accessors anywhere in those contexts without threading a
+parameter through your code.
+
+If you call a context-requiring function outside of one of these provided contexts — e.g. during
+object initialization — the compiler will tell you a required context is missing.  The fix is
+always to move the call inside a handler, task, test, or other framework-managed scope.
+
+---
+
 ## The smallest possible server
 
 These imports and this server are the verified sample this guide will build on:
