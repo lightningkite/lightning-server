@@ -4,11 +4,6 @@ Lightning Server is a Kotlin server framework that lets you define endpoints,
 route handlers, and typed APIs with minimal boilerplate.  This chapter walks
 you from an empty server definition to a tested, typed API endpoint.
 
-> **How these examples work.**  Every code block in this chapter is a named
-> region from a compiled, tested Kotlin source file.  The drift-check test
-> (`./gradlew :docs-guide:test`) asserts the Markdown is byte-identical to
-> the source, so the examples can never silently break.
-
 ## Imports
 
 All examples in this chapter use the following imports.  Copy them to the top
@@ -16,34 +11,16 @@ of your file:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/FirstEndpointSamples.kt#imports -->
 ```kotlin
-import com.lightningkite.lightningserver.auth.noAuth
-import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.http.HttpHandler
-import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.http.post
-import com.lightningkite.lightningserver.pathing.arg1
-import com.lightningkite.lightningserver.plainText
-import com.lightningkite.lightningserver.runtime.test.test
-import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.lightningserver.typed.test
-import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.Serializable
+import com.lightningkite.lightningserver.*
+import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.definition.builder.*
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.runtime.test.*
+import com.lightningkite.lightningserver.typed.*
+import kotlinx.coroutines.*
+import kotlinx.serialization.*
 ```
-
-A few non-obvious paths to note:
-
-- `ServerBuilder` is in `definition.builder`, not the root package.
-- `.get` / `.post` on a path are extension properties from `http` — import
-  them explicitly since the `http.*` wildcard does not always pull them in.
-- `HttpResponse.plainText` is a top-level extension imported from
-  `com.lightningkite.lightningserver.plainText`, not from `http`.
-- `arg1` (and `arg2`, `arg3`) are extension properties on the path object,
-  imported from `pathing`.
-- The `SERVER.test {}` block comes from `runtime.test`; the typed
-  `ApiHttpHandler.test()` overload comes from `typed`.
-- `bind` is a member of `ServerBuilder` — it is available inside the object
-  body without a separate import.
 
 ## The ServerBuilder
 

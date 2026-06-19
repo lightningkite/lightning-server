@@ -1,19 +1,15 @@
 package com.lightningkite.lightningserver.guide.samples
 
 // region imports
-import com.lightningkite.lightningserver.auth.noAuth
-import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.http.HttpHandler
-import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.http.post
-import com.lightningkite.lightningserver.pathing.arg1
-import com.lightningkite.lightningserver.plainText
-import com.lightningkite.lightningserver.runtime.test.test
-import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.lightningserver.typed.test
-import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.Serializable
+import com.lightningkite.lightningserver.*
+import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.definition.builder.*
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.runtime.test.*
+import com.lightningkite.lightningserver.typed.*
+import kotlinx.coroutines.*
+import kotlinx.serialization.*
 // endregion imports
 
 // region hello-server
@@ -92,6 +88,7 @@ fun echoServerTest() = runBlocking {
     }
 }
 // endregion echo-server-test
+
 
 // Top-level function referenced by @sample in ApiHttpHandler KDoc.
 fun echoServerSample() = runBlocking {
