@@ -23,3 +23,8 @@ local.auto.tfvars
 .fork
 .claude/worktrees
 
+# MkDocs generated site output
+site/
+# Python venv used for mkdocs builds
+tmp/mkdocs-venv/
+

@@ -1,0 +1,73 @@
+site_name: Lightning Server
+site_description: Kotlin server framework — typed endpoints, swappable services, and derived AWS infrastructure.
+site_url: https://lightningkite.github.io/lightning-server/
+repo_url: https://github.com/lightningkite/lightning-server
+repo_name: lightningkite/lightning-server
+
+# All guide chapters live in docs-guide/guide/; index.md acts as the Home page.
+docs_dir: docs-guide/guide
+
+theme:
+  name: material
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - Guide:
+    - Your First Endpoint: first-endpoint.md
+    - Routing: routing.md
+    - Typed Endpoints: typed-endpoints.md
+    - Services & Settings: services.md
+    - Database & Query DSL: database.md
+    - Authentication & Sessions: auth.md
+    - Testing: testing.md
+    - Deploying to AWS: aws-deployment.md
+  # The Dokka API reference is a pre-built HTML site dropped into site/api/
+  # during the build process. It is linked here as an external nav entry so
+  # readers can navigate to it from the sidebar.
+  # To regenerate: ./gradlew dokkaHtmlMultiModule  (or :core:dokkaGeneratePublicationHtml for a single module)
+  # Then copy build/dokka/htmlMultiModule/ → site/api/  (see CI sketch in tmp/release-readiness-plan.md)
+  - API Reference: api/index.html
