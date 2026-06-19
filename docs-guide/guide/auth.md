@@ -56,15 +56,11 @@ Non-obvious import locations:
   `serializer<T>()` reified function from the `kotlinx-serialization-core`
   artifact.
 
-## Defining a Principal Type
+## Defining a Model and a PrincipalType
 
-A **principal type** is a data class that implements `HasId` and whose
-`companion object` implements `PrincipalType<SUBJECT, ID>`.  The companion
-tells the framework three things:
-
-1. How to serialize the ID (`idSerializer`)
-2. How to serialize the full subject (`subjectSerializer`)
-3. How to fetch a subject by ID from durable storage (`fetch`)
+The **model** is a plain `@Serializable` data class.  It carries no server
+dependencies, which means it can live in a shared/models module alongside the
+client code:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/AuthSamples.kt#user-model -->
 ```kotlin
@@ -74,38 +70,48 @@ data class UserProfile(
     override val _id: Uuid = Uuid.random(),
     val name: String,
     val email: String,
-) : HasId<Uuid> {
-    // The companion implements PrincipalType so this type can be used as an auth subject.
-    // It tells the framework how to serialize IDs and how to load a subject from storage.
-    companion object : PrincipalType<UserProfile, Uuid> {
-        override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
-        override val subjectSerializer: KSerializer<UserProfile> = serializer()
+) : HasId<Uuid>
+```
 
-        context(server: ServerRuntime)
-        override suspend fun fetch(id: Uuid): UserProfile =
-            UserProfileServer.database().table<UserProfile>().get(id)
-                ?: throw NotFoundException("User not found")
-    }
+The **principal type** is a *separate object* that tells the framework how to
+work with this model as an auth subject.  Keeping it separate is important: if
+your models live in a shared Kotlin Multiplatform module that has no server
+dependency, putting `PrincipalType` on the companion would pull in server code
+into that module.  A separate object in the server module avoids this:
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/AuthSamples.kt#user-auth -->
+```kotlin
+// PrincipalType lives separately from the model so UserProfile can reside in a
+// shared/models module that carries no server dependencies.
+object UserAuth : PrincipalType<UserProfile, Uuid> {
+    override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
+    override val subjectSerializer: KSerializer<UserProfile> = UserProfile.serializer()
+
+    context(server: ServerRuntime)
+    override suspend fun fetch(id: Uuid): UserProfile =
+        UserProfileServer.database().table<UserProfile>().get(id)
+            ?: throw NotFoundException("User not found")
 }
 ```
 
-`fetch` is a context extension on `ServerRuntime` — it has access to all
-registered services via the runtime.  It should throw `NotFoundException` (not
-return `null`) when the ID does not exist, so callers receive a clean 404 rather
-than a NullPointerException.
+`PrincipalType<SUBJECT, ID>` tells the framework three things:
 
-`@GenerateDataClassPaths` is optional on principals but is included here
-because `fetch` accesses the database table directly, and the query DSL
-requires it for condition/modification lambdas (see the previous chapter).
+1. How to serialize the ID (`idSerializer`)
+2. How to serialize the full subject (`subjectSerializer`)
+3. How to fetch a subject by ID from durable storage (`fetch`)
+
+`fetch` has a `ServerRuntime` context receiver — it has access to all
+registered services.  It should throw `NotFoundException` (not return `null`)
+when the ID does not exist.
 
 ## Registering the Principal Type and Requiring Auth
 
-Call `register(UserProfile)` in your `ServerBuilder.init {}` block.
+Call `register(UserAuth)` in your `ServerBuilder.init {}` block.
 Registration makes the framework aware of this principal so that
 `Authentication<UserProfile>` tokens can be deserialized back to the correct
 type when the server restarts.
 
-Use `UserProfile.require()` as the `auth` argument to `ApiHttpHandler` to
+Use `UserAuth.require()` as the `auth` argument to `ApiHttpHandler` to
 declare that the endpoint requires a `UserProfile` token.  Compare this to
 `noAuth` (`AuthRequirement.None`) used in earlier chapters for public endpoints.
 
@@ -116,7 +122,7 @@ object UserProfileServer : ServerBuilder() {
 
     init {
         // register() makes this principal type discoverable when deserializing tokens.
-        register(UserProfile)
+        register(UserAuth)
         // registerBasicMediaTypeCoders() enables JSON serialization of HTTP request/response bodies,
         // including error responses. Required when testing via HttpHandler.test() (the full HTTP pipeline).
         registerBasicMediaTypeCoders()
@@ -125,9 +131,9 @@ object UserProfileServer : ServerBuilder() {
     // GET /profile — requires a UserProfile authentication token
     val getProfile = path.path("profile").get bind ApiHttpHandler(
         summary = "Get current user profile",
-        // UserProfile.require() returns an AuthRequirement that accepts only tokens issued for UserProfile.
+        // UserAuth.require() returns an AuthRequirement that accepts only tokens issued for UserProfile.
         // Compare to noAuth (AuthRequirement.None) used in earlier chapters.
-        auth = UserProfile.require(),
+        auth = UserAuth.require(),
         successCode = HttpStatus.OK,
         errorCases = emptyList(),
         implementation = { _: Unit ->
@@ -176,7 +182,7 @@ fun authTest() = runBlocking {
 
         // testAuth() creates an Authentication<UserProfile> for use in tests.
         // It must be called inside a test {} block because it needs a ServerRuntime in context.
-        val aliceAuth = UserProfile.testAuth(alice)
+        val aliceAuth = UserAuth.testAuth(alice)
 
         // Pass the auth token as the first argument to the typed .test() call.
         val profile = UserProfileServer.getProfile.test(aliceAuth, Unit)
@@ -219,6 +225,54 @@ fun authRejectionTest() = runBlocking {
     }
 }
 ```
+
+## Auth Caching Keys
+
+`auth.fetch()` is already cached on the `Authentication` object for the
+lifetime of a single request — repeated calls within one request are free.
+But sometimes you want to cache *derived* values (e.g., role flags, computed
+permissions, or expensive lookups) across requests.
+
+`AuthCacheKey<SUBJECT, T>` is a typealias for
+`SerializableCache.CalculatingKey<Authentication<SUBJECT>, T>`.  Create one
+as a property on your `PrincipalType` object:
+
+```kotlin
+// Illustrative — not a drift-checked sample.
+// AuthCacheKey caches a derived value keyed by Authentication<UserProfile>.
+// The value is recomputed on cache miss and stored for the TTL.
+val isAdmin: AuthCacheKey<UserProfile, Boolean> = authCacheKey(
+    serializer = Boolean.serializer(),
+    ttl = 5.minutes,
+) { auth ->
+    // `auth` is the Authentication<UserProfile> the value is derived from.
+    // Run any suspension here — database queries, etc.
+    UserProfileServer.database().table<UserProfile>()
+        .count(condition { it._id eq auth.id } and condition { it.role eq "admin" }) > 0
+}
+```
+
+Use the key inside a handler:
+
+```kotlin
+// Illustrative.
+val isAdminValue: Boolean = UserAuth.isAdmin[auth]   // suspends; cache miss → recomputes
+```
+
+`PrincipalType` also exposes two caching helpers out of the box:
+
+- **`subjectCacheKey`** — a pre-built `AuthCacheKey` that caches the result of
+  `fetch()` for 5 minutes in a local (in-process) cache.  `auth.fetch()` uses
+  this automatically, so you get per-request caching for free with no extra
+  setup.
+- **`precache`** — a `List<AuthCacheKey<SUBJECT, *>>` on your `PrincipalType`
+  object.  Any key you add here is eagerly populated on login, so the first
+  handler invocation after login never pays a cache-miss cost.
+
+> The code above is illustrative; authCacheKey helpers and exact generics are
+> verified against the source in `/auth/src/main/kotlin/.../Authentication.ext.kt`.
+> Unit-assertable sample regions cannot be added here because verifying the
+> caching behavior requires an external cache service.
 
 ## The Proof/Session Flow (conceptual)
 

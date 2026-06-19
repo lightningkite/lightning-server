@@ -25,20 +25,22 @@ data class UserProfile(
     override val _id: Uuid = Uuid.random(),
     val name: String,
     val email: String,
-) : HasId<Uuid> {
-    // The companion implements PrincipalType so this type can be used as an auth subject.
-    // It tells the framework how to serialize IDs and how to load a subject from storage.
-    companion object : PrincipalType<UserProfile, Uuid> {
-        override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
-        override val subjectSerializer: KSerializer<UserProfile> = serializer()
-
-        context(server: ServerRuntime)
-        override suspend fun fetch(id: Uuid): UserProfile =
-            UserProfileServer.database().table<UserProfile>().get(id)
-                ?: throw NotFoundException("User not found")
-    }
-}
+) : HasId<Uuid>
 // endregion user-model
+
+// region user-auth
+// PrincipalType lives separately from the model so UserProfile can reside in a
+// shared/models module that carries no server dependencies.
+object UserAuth : PrincipalType<UserProfile, Uuid> {
+    override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
+    override val subjectSerializer: KSerializer<UserProfile> = UserProfile.serializer()
+
+    context(server: ServerRuntime)
+    override suspend fun fetch(id: Uuid): UserProfile =
+        UserProfileServer.database().table<UserProfile>().get(id)
+            ?: throw NotFoundException("User not found")
+}
+// endregion user-auth
 
 // region auth-server
 object UserProfileServer : ServerBuilder() {
@@ -46,7 +48,7 @@ object UserProfileServer : ServerBuilder() {
 
     init {
         // register() makes this principal type discoverable when deserializing tokens.
-        register(UserProfile)
+        register(UserAuth)
         // registerBasicMediaTypeCoders() enables JSON serialization of HTTP request/response bodies,
         // including error responses. Required when testing via HttpHandler.test() (the full HTTP pipeline).
         registerBasicMediaTypeCoders()
@@ -55,9 +57,9 @@ object UserProfileServer : ServerBuilder() {
     // GET /profile — requires a UserProfile authentication token
     val getProfile = path.path("profile").get bind ApiHttpHandler(
         summary = "Get current user profile",
-        // UserProfile.require() returns an AuthRequirement that accepts only tokens issued for UserProfile.
+        // UserAuth.require() returns an AuthRequirement that accepts only tokens issued for UserProfile.
         // Compare to noAuth (AuthRequirement.None) used in earlier chapters.
-        auth = UserProfile.require(),
+        auth = UserAuth.require(),
         successCode = HttpStatus.OK,
         errorCases = emptyList(),
         implementation = { _: Unit ->
@@ -78,7 +80,7 @@ fun authTest() = runBlocking {
 
         // testAuth() creates an Authentication<UserProfile> for use in tests.
         // It must be called inside a test {} block because it needs a ServerRuntime in context.
-        val aliceAuth = UserProfile.testAuth(alice)
+        val aliceAuth = UserAuth.testAuth(alice)
 
         // Pass the auth token as the first argument to the typed .test() call.
         val profile = UserProfileServer.getProfile.test(aliceAuth, Unit)
