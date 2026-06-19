@@ -7,41 +7,21 @@ works at both the definition and implementation level, how to write tests that
 assert error responses, and how the framework turns all of this into a
 generated client SDK.
 
-> **How these examples work.**  Every code block is a named region from a
-> compiled, tested Kotlin source file.  `./gradlew :docs-guide:test` asserts
-> byte-equality between what you read here and the running source, so the
-> examples can never silently break.
-
 ## Imports
 
 All examples in this chapter use the following imports:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/TypedEndpointsSamples.kt#typed-imports -->
 ```kotlin
-import com.lightningkite.lightningserver.BadRequestException
-import com.lightningkite.lightningserver.HttpStatusException
-import com.lightningkite.lightningserver.LSError
-import com.lightningkite.lightningserver.auth.noAuth
-import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.http.HttpStatus
-import com.lightningkite.lightningserver.http.post
-import com.lightningkite.lightningserver.runtime.test.test
-import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.lightningserver.typed.test
-import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.Serializable
+import com.lightningkite.lightningserver.*
+import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.definition.builder.*
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.runtime.test.*
+import com.lightningkite.lightningserver.typed.*
+import kotlinx.coroutines.*
+import kotlinx.serialization.*
 ```
-
-Non-obvious import locations:
-
-- `LSError` and `BadRequestException`/`HttpStatusException` are in the root
-  package `com.lightningkite.lightningserver`, not in `http`.
-- `HttpStatus` (the value class for status codes) lives in `http`.
-- The typed `.test()` extension on `ApiHttpHandler` comes from
-  `com.lightningkite.lightningserver.typed`, separate from the `HttpHandler`
-  `.test()` in `runtime.test`.
-
-> **Two `test` imports:** `com.lightningkite.lightningserver.runtime.test.test` provides the `SERVER.test {}` block; `com.lightningkite.lightningserver.typed.test` provides `ApiHttpHandler.test()`.
 
 ## Data Types
 
