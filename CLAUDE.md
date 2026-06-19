@@ -10,7 +10,7 @@ caching, file storage, email, SMS, and more.
 
 **Current Version**: `version-5-SNAPSHOT`
 
-**Main Branch**: `version-5` (PRs should target this; this is the default branch — formerly `version-X`)
+**Main Branch**: `master` (PRs should target this)
 
 ## Build System
 
@@ -54,31 +54,49 @@ This is a Gradle-based multi-module Kotlin project.
 
 Unit tests use mock services to avoid external dependencies. Tests should:
 
-- Use `LocalEngine` for testing endpoints
+- Use the `ServerBuilder.test { }` extension for testing endpoints
 - Use `JsonFileDatabase` or similar mock implementations for services
 - Be runnable without any external service dependencies
-- Test endpoints using the `.test(engine)` extension function
+- Test typed endpoints using `apiHandler.test(auth = ..., input = ...)` inside a `test { }` block
+- Test raw HTTP handlers using `handler.test()` inside a `test { }` block
 
 Example test pattern:
 
 ```kotlin
 class ServerTest {
-    companion object {
-        @BeforeAll
-        @JvmStatic
-        fun setup() {
-            JsonFileDatabase // Ensure service implementations are loaded
-        }
-    }
-
     @Test
-    fun testEndpoint(): Unit = runBlocking {
-        val engine = LocalEngine(Server.build())
-        val response = Server.someEndpoint.test(engine)
-        assertEquals(expectedValue, response.body!!.text())
+    fun testEndpoint() {
+        Server.test(
+            settings = {
+                // configure settings, e.g.: database.set(Database.Settings("ram"))
+            }
+        ) {
+            runBlocking {
+                val response = Server.someEndpoint.test()
+                assertEquals(expectedValue, response.body!!.text())
+            }
+        }
     }
 }
 ```
+
+For typed endpoints requiring authentication:
+
+```kotlin
+Server.test(settings = {}) {
+    runBlocking {
+        val user = User(email = "test@example.com")
+        Server.userInfo.table().insertOne(user)
+
+        val auth = Server.userPrincipal.testAuth(user)
+        val result = Server.someProtectedEndpoint.test(auth = auth, input = Unit)
+        assertEquals(expectedValue, result)
+    }
+}
+```
+
+`testAuth` is a `context(server: ServerRuntime)` extension on `PrincipalType`, so it must be called
+inside a `test { }` block where a `ServerRuntime` is in context.
 
 #### Common Testing Pitfalls
 
@@ -89,25 +107,6 @@ code compiles successfully.
 
 **Solution**: Only instantiate `UploadEarlyEndpoint` once in your server definition and reference it from tests. Do not
 create separate instances for testing.
-
-**Avoiding DuplicateRegistrationError**: When writing tests that use `Server.build()`, ensure the server is only built
-once across all tests. Create a shared `TestHelper` object with a lazy-initialized `TestRunner` instance:
-
-```kotlin
-object TestHelper {
-    val testRunner by lazy { TestRunner(Server.build()) }
-}
-
-class MyTest {
-    @Test
-    fun testSomething() = runBlocking {
-        with(TestHelper.testRunner) {
-            val response = Server.someEndpoint.test()
-            assertEquals(expectedValue, response.body!!.text())
-        }
-    }
-}
-```
 
 ## Architecture
 
