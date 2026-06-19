@@ -13,6 +13,7 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ksp)
 }
 
 dependencies {
@@ -24,6 +25,7 @@ dependencies {
     implementation(libs.services.database.jsonfile)
     implementation(libs.services.database)
     implementation(libs.services.cache)
+    ksp(libs.services.database.processor)
 
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
@@ -42,6 +44,8 @@ kotlin {
     sourceSets.main {
         // Natural sample functions live here; compiled and exercised from tests
         kotlin.srcDir("src/samples/kotlin")
+        // KSP-generated code for @GenerateDataClassPaths (used in Ch5 database samples)
+        kotlin.srcDir("build/generated/ksp/main/kotlin")
     }
 }
 
