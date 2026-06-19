@@ -92,6 +92,61 @@ A few things to note:
   `PublicFileSystem.Settings()`, `EmailService.Settings()` — one `setting()`
   declaration per service, one URL string in settings.json.
 
+## Using Non-Default Backends: Reference Them Early
+
+The default URL for every service type (`"ram"` for Cache, `"ram"` for
+Database, `"local"` for files, etc.) is built into the core module and
+registers itself automatically.  Non-default backends — MongoDB, Redis,
+Memcached, DynamoDB, S3, SES, Twilio — live in separate modules.  Each
+backend's companion object (or top-level object) registers a URL scheme
+handler when it is first referenced by the JVM class loader.
+
+**If the backend object is never referenced, its URL scheme is never
+registered**, and a `settings.json` that points at that backend (e.g.
+`"mongodb://…"`) will fail to parse at startup with an
+`UnknownUrlScheme`-style error.
+
+The fix is to touch each backend object you might use in an `init {}` block
+inside your `ServerBuilder`, *before* settings are loaded:
+
+```kotlin
+// Illustrative — from demo/src/main/kotlin/.../Server.kt.
+// The sole purpose of these statements is to ensure each companion initializer
+// runs so that its URL scheme handler is registered before settings.json loads.
+// None of these objects need to be assigned to a variable.
+object Server : ServerBuilder() {
+    val database = setting("database", Database.Settings())
+    val cache = setting("cache", Cache.Settings())
+    val files = setting("files", PublicFileSystem.Settings())
+
+    init {
+        MongoDatabase       // registers "mongodb://"
+        MemcachedCache      // registers "memcached://"
+        DynamoDbCache       // registers "dynamodb://"
+        S3PublicFileSystem  // registers "s3://"
+        JsonFileDatabase    // registers "jsonfile://"
+        // ... and so on for any backend your settings.json might name
+    }
+}
+```
+
+A few details:
+
+- **Order matters** — the `init {}` block runs when the `object` is first
+  accessed, which happens before `loadFromFile` is called.  Referencing
+  backend objects anywhere before settings load is fine; `init {}` is the
+  canonical place.
+- **You don't have to reference ALL backends** — only those you might
+  configure in `settings.json`.  The demo server references all of them so
+  that any settings file works without a code change.
+- **Tests that use `"ram"`** never need this, because the RAM backends are
+  always registered.
+
+> This is illustrative prose; the URL-scheme registration mechanism is
+> verified against `demo/src/main/kotlin/.../Server.kt` (init block, lines
+> ~87–102).  No compiled sample region is added here because the backends
+> (MongoDatabase, S3, etc.) are not available in the docs-guide module.
+
 ## The settings.json File
 
 When you run your server for the first time with `loadFromFile(KFile("settings.json"), ...)`,
