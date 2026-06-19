@@ -2,10 +2,12 @@ buildscript {
     repositories {
         mavenLocal()
         maven("https://lightningkite-maven.s3.us-west-2.amazonaws.com")
+        mavenCentral()
     }
     dependencies {
         classpath(libs.lkGradleHelpers)
         classpath(libs.proguard)
+        classpath(libs.knit)
     }
 }
 

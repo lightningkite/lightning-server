@@ -1,0 +1,8 @@
+<!-- Suppresses all logging during knit tests so captured stdout matches expected output exactly -->
+<configuration>
+    <statusListener class="ch.qos.logback.core.status.NopStatusListener"/>
+    <appender name="NULL" class="ch.qos.logback.core.helpers.NullAppender"/>
+    <root level="OFF">
+        <appender-ref ref="NULL"/>
+    </root>
+</configuration>
