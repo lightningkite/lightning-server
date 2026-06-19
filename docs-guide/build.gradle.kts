@@ -44,3 +44,12 @@ kotlin {
         kotlin.srcDir("src/samples/kotlin")
     }
 }
+
+// Declare the guide Markdown directory as an input to the test task so that
+// editing a .md file invalidates the Gradle test cache and re-runs DriftCheckTest
+// automatically — no --rerun-tasks needed.
+tasks.named<Test>("test") {
+    inputs.dir(layout.projectDirectory.dir("guide"))
+        .withPropertyName("guideMarkdown")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+}
