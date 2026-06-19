@@ -255,45 +255,97 @@ code can know whether a request requires a session token.
 
 ## SDK Generation
 
-Every typed endpoint participates in SDK generation.  When you run:
+Every typed endpoint participates in SDK generation.  Lightning Server ships
+two built-in generators:
+
+- **`FetcherSdk`** — Kotlin/Multiplatform client (suspend functions,
+  kotlinx.serialization)
+- **`TypescriptFetcherSdk`** — TypeScript client (Fetcher-based HTTP)
+
+The generators work by introspecting the `ServerBuilder` definition (all
+`ApiHttpHandler` instances, their metadata, and their type information) and
+writing a type-safe client library.  Both generators expose the same interface.
+The typical entry point is a CLI action that calls the generator directly:
+
+```kotlin
+// Illustrative — from demo/src/main/kotlin/.../main.kt; not a drift-checked sample.
+// KFile is from com.lightningkite.services.kfile.KFile.
+fun sdk() {
+    // FetcherSdk(packageName) creates a Kotlin/Multiplatform generator.
+    // writeUsingDefaultSettings spins up a throw-away runtime with default
+    // settings (no external service connections needed) and writes the SDK files.
+    FetcherSdk("com.example.api").writeUsingDefaultSettings(
+        Server,
+        KFile("output/sdk/kotlin")
+    )
+
+    // TypescriptFetcherSdk creates a TypeScript generator; same interface.
+    TypescriptFetcherSdk().writeUsingDefaultSettings(
+        Server,
+        KFile("output/sdk/typescript")
+    )
+}
+```
+
+Wire this up as a CLI subcommand in your `main()`:
+
+```kotlin
+// Illustrative.
+fun main(args: Array<String>) {
+    when (args.firstOrNull()) {
+        "sdk" -> sdk()
+        else -> serve()
+    }
+}
+```
+
+Then run it:
 
 ```
 ./gradlew :your-module:run --args="sdk"
 ```
 
-the framework introspects all `ApiHttpHandler` instances registered in your
-`ServerBuilder`, collects their `summary`, `description`, `errorCases`,
-`examples`, and type information, and writes a type-safe client library.
-
-Two built-in formats ship with Lightning Server:
-
-- **`FetcherSdk`** — Kotlin/Multiplatform client (suspend functions, kotlinx.serialization)
-- **`TypescriptFetcherSdk`** — TypeScript client (Fetcher-based HTTP)
-
-A minimal SDK generation call (the pattern the demo uses):
-
-> **Note:** `KFile` is imported from `com.lightningkite.services.kfile.KFile`.
-
-```kotlin
-FetcherSdk("com.example.api").writeUsingDefaultSettings(
-    Server,
-    KFile("output/sdk")
-)
-```
-
-`writeUsingDefaultSettings` spins up a throw-away runtime with default
-settings (no external service connections), generates the SDK files, and writes
-them to the specified directory.  You can call this from a CLI entry point or a
-Gradle task.
-
 > **SDK generation is not unit-assertable** in the compiled-samples system.
 > Generation writes files to a directory and requires the full compiled server
 > definition; there is no in-process assertion that makes sense here.  The
-> command and its output format are verified manually and described accurately
-> above.  If your project has a committed SDK output, a CI step that runs the
-> generator and diffs the output is the appropriate correctness gate — the demo
-> project does this via `./gradlew :demo:run --args="sdk"` and a git status
-> check.
+> API above is verified against the source in `typed/src/main/kotlin/.../sdk/`.
+> If your project has a committed SDK output, a CI step that runs the generator
+> and diffs the output is the appropriate correctness gate.
+
+## Meta Endpoints (Auto-generated Docs and OpenAPI)
+
+Beyond the SDK files you generate at build time, Lightning Server can expose
+live documentation and SDK downloads *at runtime* through `MetaEndpoints`.  Add
+it to your server with:
+
+```kotlin
+// Illustrative.
+// MetaEndpoints and ApiDocs are in com.lightningkite.lightningserver.typed.
+val meta = path.path("meta") include MetaEndpoints(Server)
+```
+
+`MetaEndpoints` exposes the following paths:
+
+| Path | Description |
+|---|---|
+| `/meta/health` | Health check — returns 200 when the server is running |
+| `/meta/paths` | JSON list of all registered endpoint paths |
+| `/meta/openapi` / `/meta/openapi.json` | OpenAPI 3.0 spec for all typed endpoints |
+| `/meta/bulk` | Bulk request endpoint — send multiple API calls in one HTTP request |
+| `/meta/ws-tester` | WebSocket test UI |
+| `/meta/docs` | Interactive API documentation UI (`ApiDocs`) |
+| `/meta/docs/sdk.ts` / `.zip` | Live TypeScript SDK download |
+| `/meta/docs/sdk.kt` / `.zip` | Live Kotlin SDK download |
+
+The `ApiDocs` sub-tree (rooted at `/meta/docs`) is particularly useful during
+development: point a browser at `/meta/docs` to see all your typed endpoints
+with their summaries, error cases, examples, and request/response schemas, and
+download a generated SDK from `/meta/docs/sdk.ts` without any build step.
+
+> The paths above are illustrative; the exact structure depends on where you
+> mount `MetaEndpoints` in your server's path hierarchy.  The endpoint names
+> are verified against `typed/src/main/kotlin/.../MetaEndpoints.kt` and
+> `typed/src/main/kotlin/.../ApiDocs.kt`.
 
 ## What's Next
 
