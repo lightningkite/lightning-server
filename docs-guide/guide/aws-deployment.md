@@ -6,15 +6,10 @@ file store), and the framework derives the complete Terraform infrastructure fro
 that description automatically.  Add a service setting; get the matching AWS
 resource for free.
 
-> **How these examples work.**  Every _Kotlin_ code block in this chapter is a
-> named region from a compiled, tested source file; `./gradlew :docs-guide:test`
-> asserts byte-equality so it can never silently drift.
->
-> The Lambda handler, the deployment object, the Terraform configuration, and
-> the CLI commands are all **illustrative** — they write files or require AWS
-> credentials at runtime and cannot be unit-asserted in-process.  They are
-> described accurately and marked clearly.  See [Known Limitations](#known-limitations) for the
-> underlying constraint.
+> **Note:** The Lambda handler, the deployment object, the Terraform configuration,
+> and the CLI commands in this chapter are **illustrative** — they write files or
+> require AWS credentials at runtime.  The server definition section is a
+> fully-verified compiled example.  See [Known Limitations](#known-limitations) for details.
 
 ---
 
@@ -64,14 +59,11 @@ Add the imports and declare your server:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/AwsDeploymentSamples.kt#aws-server-imports -->
 ```kotlin
-import com.lightningkite.lightningserver.auth.noAuth
-import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.http.HttpHandler
-import com.lightningkite.lightningserver.plainText
-import com.lightningkite.services.cache.Cache
-import com.lightningkite.services.database.Database
+import com.lightningkite.lightningserver.*
+import com.lightningkite.lightningserver.definition.builder.*
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.services.cache.*
+import com.lightningkite.services.database.*
 ```
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/AwsDeploymentSamples.kt#aws-server-definition -->

@@ -1,14 +1,11 @@
 package com.lightningkite.lightningserver.guide.samples
 
 // region aws-server-imports
-import com.lightningkite.lightningserver.auth.noAuth
-import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.http.HttpHandler
-import com.lightningkite.lightningserver.plainText
-import com.lightningkite.services.cache.Cache
-import com.lightningkite.services.database.Database
+import com.lightningkite.lightningserver.*
+import com.lightningkite.lightningserver.definition.builder.*
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.services.cache.*
+import com.lightningkite.services.database.*
 // endregion aws-server-imports
 
 // region aws-server-definition
