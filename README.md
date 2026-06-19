@@ -36,8 +36,24 @@ are still possible.  The nightly badge above tracks the latest published build.
 
 ## Quick Start
 
+Add these imports at the top of your file:
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/FirstEndpointSamples.kt#imports -->
+```kotlin
+import com.lightningkite.lightningserver.*
+import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.definition.builder.*
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.runtime.test.*
+import com.lightningkite.lightningserver.typed.*
+import kotlinx.coroutines.*
+import kotlinx.serialization.*
+```
+
 The minimal server is a `ServerBuilder` object:
 
+<!-- sample: com/lightningkite/lightningserver/guide/samples/FirstEndpointSamples.kt#hello-server -->
 ```kotlin
 object HelloServer : ServerBuilder() {
 
@@ -50,6 +66,7 @@ object HelloServer : ServerBuilder() {
 
 Test it without starting a server:
 
+<!-- sample: com/lightningkite/lightningserver/guide/samples/FirstEndpointSamples.kt#hello-server-test -->
 ```kotlin
 fun helloServerTest() = runBlocking {
     HelloServer.test(settings = {}) {
@@ -58,10 +75,6 @@ fun helloServerTest() = runBlocking {
     }
 }
 ```
-
-> These snippets are extracted from compiled, tested source files in
-> `docs-guide/`.  `./gradlew :docs-guide:test` asserts byte-equality so they
-> can never silently drift.
 
 For the full walkthrough — imports, typed endpoints, auth, database, testing,
 and AWS deployment — start with the guide:
