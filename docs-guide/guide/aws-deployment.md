@@ -13,8 +13,18 @@ resource for free.
 > The Lambda handler, the deployment object, the Terraform configuration, and
 > the CLI commands are all **illustrative** — they write files or require AWS
 > credentials at runtime and cannot be unit-asserted in-process.  They are
-> described accurately and marked clearly.  See [W5/W12](#warts) for the
+> described accurately and marked clearly.  See [Known Limitations](#known-limitations) for the
 > underlying constraint.
+
+---
+
+## Before You Begin
+
+The following tools and accounts are required before you can deploy:
+
+- **Terraform or OpenTofu CLI** — download from [terraform.io](https://www.terraform.io/) or [opentofu.org](https://opentofu.org/).  The framework calls `terraform` (or `tofu`) on your PATH during `deploy()`.
+- **AWS CLI** — install and run `aws configure` (or set the `AWS_PROFILE` env var) so the deployment object can authenticate.
+- **MongoDB Atlas account + organisation ID** — required only if you use `mongodbAtlasFree()` or `mongodbAtlas()`.  Create a free account at [mongodb.com/atlas](https://www.mongodb.com/cloud/atlas).
 
 ---
 
@@ -95,7 +105,7 @@ etc.).  The server code itself never changes.
 > **Illustrative — not drift-checked.**  This file requires `engine-aws-serverless`
 > on the classpath and AWS credentials at instantiation time.
 
-Add `engine-aws-serverless` to your module's dependencies:
+Copy this into your module's `dependencies {}` block in `build.gradle.kts`:
 
 ```kotlin
 // build.gradle.kts
@@ -183,7 +193,9 @@ object Production : TerraformAwsServerlessDomainBuilder<ApiServer>(ApiServer) {
     override val debug: Boolean = false
 
     // How credentials and secrets are retrieved/stored during deployment.
-    // AwsSecretSource reads from AWS Secrets Manager and caches locally.
+    // EncryptedFileSecretSource stores secrets in an AES-encrypted local file (good for solo
+    // development or CI); AwsSecretSource stores them in AWS Secrets Manager (better for teams —
+    // secrets are shared and auditable).
     override val secretsSource: SecretSource =
         AwsSecretSource(profile = "my-aws-profile", idPrefix = "my-api", region = region)
 
@@ -204,6 +216,8 @@ object Production : TerraformAwsServerlessDomainBuilder<ApiServer>(ApiServer) {
 
         // secretBasis.generated() emits a random_password resource and fulfills
         // the secret basis setting used for signing tokens.
+        // secretBasis is a built-in TerraformNeed provided automatically by BaseTerraformEmitter —
+        // you do not need to declare it in your ServerBuilder.
         secretBasis.generated()
     }
 }
@@ -380,21 +394,21 @@ appear in plaintext on disk after deploy.
 
 ---
 
-## Warts {#warts}
+## Known Limitations {#known-limitations}
 
-**W5 (extends) — Terraform generation is not unit-assertable.**  The deployment
+**Terraform generation is not unit-assertable.**  The deployment
 object calls `builder.build()` internally, which requires all service libraries
 on the classpath and may attempt network connections.  The emitted `.tf.json`
 files must be reviewed manually.  Treat `write()` + a committed diff in CI as
 the correctness gate, not a unit test.
 
-**W12 — `AwsAdapter` instantiates at Lambda init, not at class-load time.**
+**`AwsAdapter` instantiates at Lambda init, not at class-load time.**
 The `loadSettings()` call in `AwsAdapter.init {}` reads environment variables and
 may call AWS APIs.  You cannot instantiate `AwsAdapter` in a unit test without
 mocking the Lambda environment.  Use `LocalEngine` for all functional testing
-(see Ch7) and reserve `AwsAdapter` for the production entry point.
+(see the Testing chapter) and reserve `AwsAdapter` for the production entry point.
 
-**W13 — `engine-aws-serverless` carries significant transitive weight.**  The
+**`engine-aws-serverless` carries significant transitive weight.**  The
 artifact pulls in the full AWS SDK v2 (`dynamodb`, `s3`, `apigateway`,
 `secretsmanager`, `lambda`) and CRaC.  Keep it in a separate `:deploy` or
 `:lambda` module if compile times in your main module matter.

@@ -57,7 +57,9 @@ object NestedServer : ServerBuilder() {
 ```
 
 The endpoint is mounted at the full path `/api/v1/status`.  Test it exactly
-as you would a root endpoint — the path is resolved automatically:
+as you would a root endpoint — the path is resolved automatically.
+
+> To wrap these examples in a test class, annotate your test methods with `@Test` — see [Testing Your Server](testing.md) for the complete `@Test` + `runBlocking` pattern.
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/RoutingSamples.kt#nested-paths-test -->
 ```kotlin

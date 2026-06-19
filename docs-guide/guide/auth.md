@@ -34,6 +34,7 @@ import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.auth
@@ -55,9 +56,15 @@ Non-obvious import locations:
 - `com.lightningkite.lightningserver.typed.auth` is the `auth` property
   extension on `HttpAccess` — needed to read `auth` inside an
   `ApiHttpHandler` implementation lambda.
-- `kotlinx.serialization.builtins.serializer` is imported so that the
-  companion-generated `serializer()` function is in scope for
-  `subjectSerializer`.
+- `com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders`
+  registers JSON (and other standard) media type encoders/decoders.  Required
+  when testing through the full HTTP pipeline (`HttpHandler.test()`), including
+  error response serialization.
+- `kotlinx.serialization.builtins.serializer` is imported (not
+  `kotlinx.serialization.serializer`) because `@Serializable` classes generate
+  a companion-scoped `serializer()` that conflicts with the top-level
+  `serializer<T>()` reified function from the `kotlinx-serialization-core`
+  artifact.
 
 ## Defining a Principal Type
 
@@ -120,6 +127,9 @@ object UserProfileServer : ServerBuilder() {
     init {
         // register() makes this principal type discoverable when deserializing tokens.
         register(UserProfile)
+        // registerBasicMediaTypeCoders() enables JSON serialization of HTTP request/response bodies,
+        // including error responses. Required when testing via HttpHandler.test() (the full HTTP pipeline).
+        registerBasicMediaTypeCoders()
     }
 
     // GET /profile — requires a UserProfile authentication token
@@ -152,13 +162,19 @@ Inside the implementation lambda:
 Both `auth.id` and `auth.fetch()` are context extensions on `ServerRuntime`,
 which is already in scope inside the implementation lambda.
 
+Note that `fetch()` must call the service owned by whichever `ServerBuilder`
+declares the `database` setting — in this chapter that is
+`UserProfileServer.database()`.
+
 ## Testing an Authenticated Endpoint
 
 `PrincipalType.testAuth(subject)` creates a synthetic `Authentication<SUBJECT>`
 for testing.  It must be called inside a `test {}` block because it needs a
 `ServerRuntime` in context (to capture the current clock time as `issuedAt`).
 
-Pass the resulting auth token as the first argument to the typed `.test()` call:
+Pass the resulting auth token as the first argument to the typed `.test()` call.
+
+> To wrap these examples in a test class, annotate your test methods with `@Test` — see [Testing Your Server](testing.md) for the complete `@Test` + `runBlocking` pattern.
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/AuthSamples.kt#auth-test -->
 ```kotlin
@@ -189,6 +205,30 @@ external infrastructure is needed.
 
 Note: `settings` is a context extension on `ServerRuntime` (same as in the
 Services chapter).
+
+## Testing: the Rejection Path
+
+When a protected endpoint is called without any credentials, the framework's
+`assert()` function throws `ForbiddenException` (HTTP 403).  Note that 403
+("you're not allowed") rather than 401 ("who are you?") is used here because
+no auth token was presented at all.  The `HttpHandler.test()` extension exercises
+the full HTTP pipeline including the exception handler, so the exception is
+serialized to an `HttpResponse` — inspect `.status.code` on the returned value:
+
+<!-- sample: com/lightningkite/lightningserver/guide/samples/AuthSamples.kt#auth-rejection-test -->
+```kotlin
+fun authRejectionTest() = runBlocking {
+    UserProfileServer.test(settings = { database set Database.Settings("ram") }) {
+        // Drive the endpoint as an HttpHandler (not ApiHttpHandler.test()) so the full
+        // auth-checking pipeline runs. The framework serializes the rejection into an HTTP
+        // response; inspect .status.code on the returned HttpResponse.
+        // Note: the framework throws ForbiddenException (403) when no credentials are
+        // supplied, which is distinct from an invalid token (401).
+        val response = UserProfileServer.getProfile.test()
+        check(response.status.code == 403)
+    }
+}
+```
 
 ## The Proof/Session Flow (conceptual)
 

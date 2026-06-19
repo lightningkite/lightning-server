@@ -174,7 +174,7 @@ fun runBlockingExplanation() = runBlocking {
 }
 ```
 
-> **Wart W2:** Making `action` a `suspend` lambda would remove this
+> **Note:** Making `action` a `suspend` lambda would remove this
 > boilerplate — every example and test would become cleaner.  A future PR
 > could make this change since `test {}` is `inline` and the Kotlin compiler
 > handles inline + suspend correctly.  For now, `runBlocking {}` is the
@@ -285,7 +285,7 @@ fun errorPathTest() = runBlocking {
 }
 ```
 
-> **Wart W7:** `ApiHttpHandler.test()` bypasses the HTTP exception-to-response
+> **Note:** `ApiHttpHandler.test()` bypasses the HTTP exception-to-response
 > serialization path.  The raw exception is more convenient for assertions
 > (`.status.code`, `.detail`), but it means the JSON serialization of errors
 > is not exercised.  To test that path, drive the `HttpHandler` layer with

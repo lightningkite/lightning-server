@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.auth
@@ -50,6 +51,9 @@ object UserProfileServer : ServerBuilder() {
     init {
         // register() makes this principal type discoverable when deserializing tokens.
         register(UserProfile)
+        // registerBasicMediaTypeCoders() enables JSON serialization of HTTP request/response bodies,
+        // including error responses. Required when testing via HttpHandler.test() (the full HTTP pipeline).
+        registerBasicMediaTypeCoders()
     }
 
     // GET /profile — requires a UserProfile authentication token
@@ -88,3 +92,17 @@ fun authTest() = runBlocking {
     }
 }
 // endregion auth-test
+
+// region auth-rejection-test
+fun authRejectionTest() = runBlocking {
+    UserProfileServer.test(settings = { database set Database.Settings("ram") }) {
+        // Drive the endpoint as an HttpHandler (not ApiHttpHandler.test()) so the full
+        // auth-checking pipeline runs. The framework serializes the rejection into an HTTP
+        // response; inspect .status.code on the returned HttpResponse.
+        // Note: the framework throws ForbiddenException (403) when no credentials are
+        // supplied, which is distinct from an invalid token (401).
+        val response = UserProfileServer.getProfile.test()
+        check(response.status.code == 403)
+    }
+}
+// endregion auth-rejection-test

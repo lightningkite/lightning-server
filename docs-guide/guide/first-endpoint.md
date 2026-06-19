@@ -69,6 +69,8 @@ it.
 
 To exercise this endpoint call `SERVER.test {}`:
 
+> To wrap these examples in a test class, annotate your test methods with `@Test` — see [Testing Your Server](testing.md) for the complete `@Test` + `runBlocking` pattern.
+
 <!-- sample: com/lightningkite/lightningserver/guide/samples/FirstEndpointSamples.kt#hello-server-test -->
 ```kotlin
 fun helloServerTest() = runBlocking {

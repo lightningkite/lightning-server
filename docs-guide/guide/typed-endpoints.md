@@ -41,6 +41,8 @@ Non-obvious import locations:
   `com.lightningkite.lightningserver.typed`, separate from the `HttpHandler`
   `.test()` in `runtime.test`.
 
+> **Two `test` imports:** `com.lightningkite.lightningserver.runtime.test.test` provides the `SERVER.test {}` block; `com.lightningkite.lightningserver.typed.test` provides `ApiHttpHandler.test()`.
+
 ## Data Types
 
 Declare input and output as `@Serializable` data classes.  The framework
@@ -126,7 +128,10 @@ For anything else, throw `HttpStatusException` directly with the code you need.
 ## Testing: the Success Path
 
 The typed `.test()` extension calls `handle()` directly and returns the typed
-output — no HTTP serialisation round-trip:
+output — no HTTP serialisation round-trip.  The first argument to
+`ApiHttpHandler.test()` is the auth token; pass `null` for `noAuth` endpoints.
+
+> To wrap these examples in a test class, annotate your test methods with `@Test` — see [Testing Your Server](testing.md) for the complete `@Test` + `runBlocking` pattern.
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/TypedEndpointsSamples.kt#divide-success-test -->
 ```kotlin
@@ -227,6 +232,8 @@ documentation-only: they appear in the generated OpenAPI spec and SDK, but the
 framework does not execute or assert them automatically.  Pair any example you
 provide with a real test:
 
+`EchoRequest` and `EchoResponse` are defined in Chapter 1 (`FirstEndpointSamples.kt`).
+
 <!-- sample: com/lightningkite/lightningserver/guide/samples/TypedEndpointsSamples.kt#examples-field -->
 ```kotlin
 object ExamplesServer : ServerBuilder() {
@@ -284,6 +291,8 @@ Two built-in formats ship with Lightning Server:
 - **`TypescriptFetcherSdk`** — TypeScript client (Fetcher-based HTTP)
 
 A minimal SDK generation call (the pattern the demo uses):
+
+> **Note:** `KFile` is imported from `com.lightningkite.services.kfile.KFile`.
 
 ```kotlin
 FetcherSdk("com.example.api").writeUsingDefaultSettings(

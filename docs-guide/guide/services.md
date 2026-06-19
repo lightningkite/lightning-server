@@ -130,7 +130,9 @@ point at a real backend — the server code never changes.
 
 The `test {}` block's `settings` lambda gives you a `ServerSettings` receiver
 in which you can override any declared setting before the runtime starts.  Use
-the infix `set` to supply a settings value:
+the infix `set` to supply a settings value.
+
+> To wrap these examples in a test class, annotate your test methods with `@Test` — see [Testing Your Server](testing.md) for the complete `@Test` + `runBlocking` pattern.
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/ServicesSamples.kt#counter-test -->
 ```kotlin
@@ -155,6 +157,8 @@ The `cache set Cache.Settings("ram")` call explicitly sets the `cache` setting
 to the in-memory backend.  This is slightly redundant for `Cache` because its
 default is already `"ram"`, but being explicit protects the test from breaking
 if the `ServerBuilder` default ever changes to a production backend.
+Spelling it out makes the `"ram"` URL visible in the test itself, so the reader
+can see at a glance which backend is active.
 
 Each `test {}` call creates a fresh runtime — a fresh `MapCache` instance in
 this case — so tests never share state.  No cleanup code needed.

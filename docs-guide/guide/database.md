@@ -10,6 +10,22 @@ updates all queries.
 > byte-equality between what you read here and the running source, so the
 > examples can never silently break.
 
+## Before You Begin
+
+> **Before you begin — KSP plugin required.**  `@GenerateDataClassPaths` is
+> processed at build time by the KSP plugin.  Add these two lines to your
+> module's `build.gradle.kts` before using this chapter's examples:
+>
+> ```kotlin
+> // build.gradle.kts
+> plugins {
+>     alias(libs.plugins.ksp)
+> }
+> dependencies {
+>     ksp(libs.services.database.processor)
+> }
+> ```
+
 ## Imports
 
 All examples in this chapter use the following imports:
@@ -121,7 +137,12 @@ Key points:
 
 The `settings` lambda overrides the `database` setting to the `"ram"` backend,
 giving each test run a fresh, empty in-process database.  The same lambda is
-used in all previous chapters for the cache setting:
+used in all previous chapters for the cache setting.  As in previous chapters,
+the first argument to `ApiHttpHandler.test()` is the auth token; `null` is
+correct for `noAuth` endpoints.  The infix `set` extension comes from
+`com.lightningkite.lightningserver.settings` and is already in the imports list.
+
+> To wrap these examples in a test class, annotate your test methods with `@Test` — see [Testing Your Server](testing.md) for the complete `@Test` + `runBlocking` pattern.
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/DatabaseSamples.kt#db-test -->
 ```kotlin
@@ -182,6 +203,10 @@ fun databaseTest() = runBlocking {
 
 **`table.get(id)`**
 - Looks up a single document by `_id`.  Returns `null` if not found.
+
+**`table.count(condition)`**
+- Returns the number of documents matching a condition.  Call `count()` with no
+  argument (or `Condition.Always`) to count all documents.
 
 ## Switching Backends
 
