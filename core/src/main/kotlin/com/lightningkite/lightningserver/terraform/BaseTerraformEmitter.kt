@@ -140,7 +140,7 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
      *
      * @throws IllegalStateException if any required settings are missing
      */
-    protected open fun finalize() {
+    protected open fun prepareForWrite() {
         builder.settings()
         val built = builder.build()
         ServerSettings(built)   // run checks for conflicts & circular references
@@ -150,19 +150,19 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
         if (missing.isNotEmpty()) throw IllegalStateException("Missing settings for deployment ${projectPrefix}: $missing")
     }
 
-    private var finalized = false
+    private var preparedForWrite = false
 
     /**
      * Generates and writes Terraform JSON files to [terraformRoot].
-     * Automatically calls [finalize] on first invocation to validate configuration.
+     * Automatically calls [prepareForWrite] on first invocation to validate configuration.
      *
      * **Important**: This will delete any existing .tf.json files in the terraformRoot directory
      * before writing new ones, ensuring a clean slate for each generation.
      */
     public fun write() {
-        if (!finalized) {
-            finalize()
-            finalized = true
+        if (!preparedForWrite) {
+            prepareForWrite()
+            preparedForWrite = true
         }
         terraformRoot.mkdirs()
         val prettyJson = Json { prettyPrint = true }

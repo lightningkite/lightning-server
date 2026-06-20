@@ -1,406 +1,186 @@
 # deploy-aws-ec2
 
-AWS EC2 deployment module for Lightning Server with Auto Scaling and Application Load Balancing.
+Terraform generators for deploying a Lightning Server application to AWS EC2, as an alternative
+to the serverless Lambda deployment in `engine-aws-serverless`.
 
-This module generates Terraform configuration for deploying Lightning Server applications to traditional EC2 instances, as an alternative to the serverless Lambda deployment in `engine-aws-serverless`.
+Two deployment styles are provided:
 
-## Module Structure
+| Builder | Shape | Use it when |
+|---------|-------|-------------|
+| `TerraformAwsSingleEc2Builder` | One EC2 instance with an Elastic IP; on-box Angie terminates TLS via Let's Encrypt and reverse-proxies to the app. | Cheapest option; low/predictable traffic; no horizontal scaling needed. |
+| `TerraformAwsScalingEc2Builder` | Application Load Balancer (ACM TLS) in front of an Auto Scaling Group of instances in private subnets, booting from a golden AMI. | You need horizontal scaling, zero-downtime rolling deploys, and load balancing. |
 
-```
-deploy-aws-ec2/
-├── build.gradle.kts                    # Module dependencies
-├── README.md                           # This file
-└── src/main/kotlin/com/lightningkite/lightningserver/
-    ├── terraform/awsec2/
-    │   ├── TerraformAwsEc2Builder.kt   # Main Terraform generator
-    │   ├── otel-collector-terraform.kt # OpenTelemetry extensions
-    │   └── extensions.kt               # Helper extensions
-    └── sqs/
-        └── SqsScheduleHandler.kt       # SQS-based scheduled task handler
-```
+Both share a common base (`TerraformAwsEc2BuilderBase`) for the artifact bucket, IAM, encrypted
+settings pipeline, the on-instance deploy script, and the user-data fragments.
 
-## Architecture Overview
-
-### Why EC2 Instead of Lambda?
-
-Lambda is excellent for many workloads, but EC2 provides benefits for certain scenarios:
-
-| Concern | Lambda | EC2 |
-|---------|--------|-----|
-| **Cold starts** | 1-10+ seconds for JVM | None after boot |
-| **Execution limit** | 15 minutes max | Unlimited |
-| **Memory** | Up to 10GB | Instance-dependent |
-| **WebSockets** | Limited (API Gateway WS) | Full support |
-| **Cost at scale** | Pay per invocation | Predictable monthly cost |
-| **Network** | NAT required for VPC | Full VPC control |
-
-This module targets workloads where cold starts are unacceptable, long-running processes are needed, or predictable traffic makes reserved capacity cost-effective.
-
-### Infrastructure Design
+## Module structure
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                                    VPC                                       │
-│  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │                         Public Subnets (3 AZs)                        │   │
-│  │    ┌─────────────────────────────────────────────────────────────┐   │   │
-│  │    │              Application Load Balancer (ALB)                 │   │   │
-│  │    │         HTTPS:443 → HTTP:8080 (TLS 1.3 termination)         │   │   │
-│  │    └─────────────────────────────────────────────────────────────┘   │   │
-│  │                              │                                        │   │
-│  │    ┌─────────────────────────┴─────────────────────┐                 │   │
-│  │    │              NAT Gateway                       │                 │   │
-│  │    └─────────────────────────┬─────────────────────┘                 │   │
-│  └──────────────────────────────┼───────────────────────────────────────┘   │
-│                                 │                                            │
-│  ┌──────────────────────────────┼───────────────────────────────────────┐   │
-│  │                         Private Subnets (3 AZs)                       │   │
-│  │    ┌─────────────────────────▼─────────────────────────────────┐     │   │
-│  │    │              Auto Scaling Group (ASG)                      │     │   │
-│  │    │  ┌─────────┐  ┌─────────┐  ┌─────────┐                    │     │   │
-│  │    │  │  EC2    │  │  EC2    │  │  EC2    │   (min: 1-N)       │     │   │
-│  │    │  │ :8080   │  │ :8080   │  │ :8080   │                    │     │   │
-│  │    │  └────┬────┘  └────┬────┘  └────┬────┘                    │     │   │
-│  │    │       │            │            │                          │     │   │
-│  │    │       └────────────┼────────────┘                          │     │   │
-│  │    │                    │                                        │     │   │
-│  │    │            ┌───────▼───────┐                               │     │   │
-│  │    │            │  SQS Queue    │  (scheduled tasks)            │     │   │
-│  │    │            └───────────────┘                               │     │   │
-│  │    └────────────────────────────────────────────────────────────┘     │   │
-│  └───────────────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-External Services:
-  ├── EventBridge (schedules → SQS)
-  ├── CloudWatch (logs, metrics, alarms)
-  ├── S3 (deployment artifacts)
-  ├── Route53 (DNS)
-  └── ACM (TLS certificates)
+deploy-aws-ec2/src/main/kotlin/com/lightningkite/lightningserver/terraform/awsec2/
+├── TerraformAwsEc2BuilderBase.kt      # Shared config, deployment resources, user-data fragments
+├── TerraformAwsSingleEc2Builder.kt    # Single instance + Angie/Let's Encrypt + Elastic IP
+├── TerraformAwsScalingEc2Builder.kt   # ALB + ACM + Auto Scaling Group + golden AMI
+└── extensions.kt                      # IAM path helper
 ```
 
-## Design Decisions & Rationale
+## Single-instance builder
 
-### 1. Private Subnets for EC2 Instances
+One instance behind on-box Angie (nginx fork) which terminates TLS with the built-in Let's
+Encrypt ACME client and proxies to the app on `:8080`. Route53 A/AAAA records point straight at
+the instance's Elastic IP. Code/settings updates are pushed in-place to that one instance via
+SSM Run Command (`redeploy.sh` → on-instance `lightning-server-redeploy`).
 
-**Decision**: EC2 instances run in private subnets, not public.
-
-**Rationale**:
-- Reduces attack surface - instances not directly reachable from internet
-- All traffic flows through ALB, which provides DDoS protection
-- Outbound traffic goes through NAT gateway for auditability
-- Follows AWS Well-Architected Framework security pillar
-
-**Trade-off**: Requires NAT gateway (~$32/month) for outbound internet access.
-
-### 2. Single NAT Gateway (Default)
-
-**Decision**: Use one NAT gateway instead of one per AZ.
-
-**Rationale**:
-- Saves ~$30-45/month per additional NAT gateway
-- Acceptable for most workloads where brief outbound connectivity loss is tolerable
-- Can be overridden for high-availability requirements
-
-**Trade-off**: If the NAT gateway's AZ fails, instances in other AZs lose outbound internet access until it recovers.
-
-### 3. SQS for Scheduled Tasks (Not Lambda)
-
-**Decision**: Use SQS queue polled by EC2 instances instead of separate Lambda functions.
-
-**Rationale**:
-- **Single deployment artifact**: All code runs in one place
-- **No cold starts**: Tasks start immediately on warm instances
-- **Natural load distribution**: SQS visibility timeout ensures exactly-once processing
-- **Simplified debugging**: All logs in one place per instance
-- **Cost efficiency**: No additional Lambda invocations
-
-**How it works**:
-1. EventBridge rules trigger on schedule
-2. EventBridge sends message to SQS queue
-3. `SqsScheduleHandler` on each EC2 instance polls the queue
-4. First instance to receive message processes it
-5. SQS visibility timeout prevents duplicate processing
-
-### 4. IMDSv2 Required
-
-**Decision**: Instance metadata service v2 (IMDSv2) is required, not optional.
-
-**Rationale**:
-- Prevents SSRF attacks from reaching instance metadata
-- IMDSv1 allows any process to query metadata with a simple HTTP request
-- IMDSv2 requires a session token, preventing most SSRF exploitation
-- AWS recommends IMDSv2 for all new deployments
-
-### 5. ARM/Graviton Default Instance Type
-
-**Decision**: Default to `t4g.medium` (ARM/Graviton) instead of `t3.medium` (x86).
-
-**Rationale**:
-- 20-40% better price/performance ratio
-- Corretto JVM has excellent ARM support
-- Most applications are architecture-agnostic
-- AWS is investing heavily in Graviton
-
-**Trade-off**: Some native libraries may not have ARM builds. The instance type is easily overridden.
-
-### 6. Settings Encrypted with PBKDF2 + AES-256
-
-**Decision**: Encrypt the settings file before uploading to S3.
-
-**Rationale**:
-- Settings contain sensitive data (database URLs, API keys)
-- Even though S3 bucket has server-side encryption, this adds defense-in-depth
-- EC2 instance only has the decryption password in user-data (which is ephemeral)
-- PBKDF2 with 100,000 iterations makes brute-force impractical
-
-**How it works**:
-1. Terraform encrypts settings with `openssl enc -aes-256-cbc -pbkdf2 -iter 100000`
-2. Encrypted file uploaded to S3
-3. EC2 instance downloads and decrypts during boot
-4. Encrypted file deleted after successful decryption
-5. Decrypted settings file is chmod 600
-
-### 7. Rolling Updates (Default Deployment Strategy)
-
-**Decision**: Use ASG instance refresh with rolling updates.
-
-**Rationale**:
-- Zero-downtime deployments
-- Simple to understand and debug
-- No additional infrastructure (CodeDeploy, etc.)
-- Configurable min/max healthy percentages
-
-**Trade-off**: Slower than blue-green for large fleets. Blue-green option available but requires more setup.
-
-### 8. Systemd for Process Management
-
-**Decision**: Run the application as a systemd service.
-
-**Rationale**:
-- Native to Amazon Linux 2023
-- Automatic restart on crash (`Restart=always`)
-- Proper logging integration with journald
-- Clean shutdown handling
-- Dependency ordering (`After=network.target`)
-
-### 9. Journal Logs → CloudWatch
-
-**Decision**: Collect logs from systemd journal, not log files.
-
-**Rationale**:
-- Application uses `StandardOutput=journal`
-- Journal provides structured metadata (timestamps, priority, unit)
-- CloudWatch agent has native journald support
-- Avoids file rotation complexity
-
-**Implementation detail**: CloudWatch agent configured with `journald` collector filtering on `lightning-server.service` unit.
-
-## File-by-File Explanation
-
-### TerraformAwsEc2Builder.kt
-
-The main builder class (~1300 lines) that generates all Terraform resources.
-
-**Key sections**:
-
-1. **Configuration properties** (lines 81-234): User-overridable settings for instance types, scaling, health checks, etc.
-
-2. **`finalize()`** (lines 249-285): Main entry point that calls all `emit*` methods to generate Terraform.
-
-3. **`emitVpcResources()`** (lines 287-290): Triggers VPC module creation via lazy property.
-
-4. **`emitSecurityGroupResources()`** (lines 292-347): Creates ALB and EC2 security groups with minimal required access.
-
-5. **`emitAlbResources()`** (lines 349-424): Application Load Balancer, target group, HTTP→HTTPS redirect, HTTPS listener.
-
-6. **`emitDeploymentResources()`** (lines 426-611): S3 bucket, IAM roles, encrypted settings, JAR upload.
-
-7. **`emitAsgResources()`** (lines 613-753): Launch template, Auto Scaling Group, scaling policies.
-
-8. **`emitSqsScheduleResources()`** (lines 755-819): SQS queue, DLQ, EventBridge rules for each scheduled task.
-
-9. **`emitDnsResources()`** (lines 821-873): Route53 records, ACM certificate with DNS validation.
-
-10. **`emitMonitoringResources()`** (lines 875-944): CloudWatch log groups, SNS topic, alarms.
-
-11. **`generateUserData()`** (lines 969-1182): Bash script for instance initialization:
-    - Install packages (Java, CloudWatch agent)
-    - Download and decrypt application
-    - Configure systemd service
-    - Configure CloudWatch agent for journal collection
-    - Start services with verification
-
-12. **`validateUserDataInputs()`** (lines 1212-1256): Security validation to prevent shell injection.
-
-### SqsScheduleHandler.kt
-
-Handles scheduled task execution by polling an SQS queue.
-
-**Design**:
-- Long-polling (20 seconds) to minimize API calls
-- Visibility timeout (5 minutes) ensures task runs on only one instance
-- Automatic retry via SQS (message becomes visible again on failure)
-- Dead letter queue after 3 failures
-
-**Usage in application**:
 ```kotlin
-System.getenv("SQS_SCHEDULE_QUEUE_URL")?.let { queueUrl ->
-    SqsScheduleHandler(queueUrl = queueUrl, runtime = engine).start()
+object MyDeployment : TerraformAwsSingleEc2Builder<Server>(Server) {
+    override val storageBucket = "my-terraform-state"
+    override val region = Region.US_WEST_2
+    override val displayName = "My Server"
+    override val domainZone = "example.com"
+    override val domain = "api.example.com"
+    override val debug = false
+    override val emergencyContact = "ops@example.com".toEmailAddress()
+    override val instanceType = "t4g.medium"
+    override val instanceArchitecture = CPUArchitecture.Arm
+    override val applicationVpc = AwsVpc.Default
+
+    override fun Server.settings() {
+        database.need.mongoDbAtlas(...)
+        cache.need.awsElasticacheMemcached(...)
+        files.need.awsS3(...)
+    }
 }
 ```
 
-### otel-collector-terraform.kt
+## Scaling (ALB + Auto Scaling Group) builder
 
-Extension functions for OpenTelemetry configuration.
+### Architecture
 
-**Pattern**: Uses Kotlin context receivers to provide a fluent API:
+```
+                Route53 (alias A/AAAA)
+                          │
+                          ▼
+        ┌─────────────────────────────────┐
+        │  Application Load Balancer (ALB) │  HTTPS:443 (ACM, TLS 1.3) → app
+        │  public subnets · HTTP→HTTPS     │  HTTP:80 → 301 redirect
+        └─────────────────────────────────┘
+                          │  (only the ALB SG may reach the app port)
+                          ▼
+        ┌─────────────────────────────────┐
+        │      Auto Scaling Group          │  private subnets · no public IP · SSM only
+        │   ┌──────┐  ┌──────┐  ┌──────┐   │  golden AMI (EC2 Image Builder)
+        │   │ app  │  │ app  │  │ app  │   │  IMDSv2 required · target-tracking CPU scaling
+        │   └──────┘  └──────┘  └──────┘   │
+        └─────────────────────────────────┘
+                          │ outbound via NAT / S3 gateway endpoint
+```
+
+### Key design points
+
+- **TLS at the ALB:** an ACM certificate (DNS-validated through Route53, auto-renewing)
+  terminates TLS at the load balancer using a TLS 1.3 policy; HTTP is redirected to HTTPS. No
+  on-box reverse proxy. WebSockets are supported natively (high `idle_timeout`).
+- **Private instances:** instances run in private subnets with no public IP and no SSH key.
+  The instance security group accepts traffic only from the ALB security group on the app port;
+  administrative access is via SSM Session Manager.
+- **IMDSv2 required:** the launch template sets `http_tokens = "required"` to mitigate
+  SSRF-based credential theft. (The single-instance builder does the same on its instance.)
+- **Golden AMI for fast scale-out:** EC2 Image Builder bakes the JVM, agents, the on-instance
+  redeploy script, and the systemd unit into an AMI, so a scaling instance boots in well under a
+  minute. The application JAR and encrypted settings are **not** baked — they are fetched from S3
+  at boot — so ordinary app deploys never re-bake the AMI. The AMI re-bakes only when the install
+  script changes (its content hash drives the Image Builder component version) or when
+  `baseImageSalt` is bumped.
+- **Health check = liveness, autodetected:** the ALB target health check defaults to the server's
+  `/meta/online` liveness endpoint (autodetected from the built server — see `detectedOnlinePath`),
+  not the deep `/meta/health`, so a slow downstream service can't make the ALB drain the whole
+  fleet. Override `healthCheckPath` if needed.
+- **Rolling, validated deploys:** on a JAR/settings change, `redeploy-fleet.sh` updates the fleet
+  in batches of `redeployBatchSize` (default 1). It suspends the ASG processes that would fight it
+  (`HealthCheck`/`ReplaceUnhealthy` so it can't kill a drained instance, plus
+  `AddToLoadBalancer`/`AZRebalance`), then for each instance: drain from the ALB, redeploy via SSM,
+  and return to service only once the ALB reports it healthy. The on-instance script validates the
+  new build against the local `/meta/online` endpoint and **self-rolls-back** if it fails to start
+  *or* comes up unhealthy. Any failure halts the rollout and fails the `terraform apply`. An EXIT
+  trap always resumes the suspended processes and re-registers every instance, so even an abrupt
+  termination leaves the fleet serving. Set `LS_REDEPLOY_BATCH` at apply time for an emergency
+  faster rollout.
+- **Scaling on CPU (plus optional request count):** a target-tracking policy holds average CPU at
+  `scalingCpuTargetPercent` — the right primary signal here because downstream/I/O work parks
+  coroutines cheaply and costs little CPU, so we don't scale in response to it. Optionally set
+  `scalingRequestsPerTarget` to add a *second, simultaneous* policy on ALB requests-per-instance
+  (the ASG scales out on the max of the two, in only when both agree), which catches I/O-bound
+  concurrency saturation that CPU misses. Memory is intentionally an alarm, not a scaling signal
+  (the JVM heap is fixed via `-Xmx`, so RAM is near-constant under load).
+- **OS patching:** the bake runs `apt-get upgrade` from the latest Ubuntu base, so re-baking ships
+  a fully patched image. Drive `baseImageSalt` from a date (e.g. `get() = "2026-06"`) to rebuild on
+  a schedule, and set `maxInstanceLifetimeSeconds` to force the fleet to rotate onto new AMIs.
+- **Scheduled tasks need no extra infrastructure:** Lightning Server's long-running engines
+  coordinate scheduled tasks across the fleet through the **shared cache** (a distributed lock per
+  schedule). Therefore the scaling builder **requires a distributed cache** (Redis / Memcached /
+  DynamoDB) and rejects a per-instance RAM cache at build time. No SQS queue is involved.
+
+### Failure recovery
+
+- A new/scaled instance that never passes the ALB health check is terminated and replaced by the
+  ASG automatically (a CloudWatch alarm on unhealthy-host count notifies the emergency contact).
+- AMI/user-data changes roll out via ASG instance refresh with `auto_rollback = true`.
+- A failed in-place redeploy halts the rollout, self-heals the instance to the previous version,
+  and surfaces the error to `terraform apply`.
+- A failed AMI bake fails the apply while the ASG keeps running the previously-built AMI.
+
+### Usage
+
 ```kotlin
-override fun Server.settings() {
-    otelHoneycomb(apiKey = "...")
+object MyScaledDeployment : TerraformAwsScalingEc2Builder<Server>(Server) {
+    override val storageBucket = "my-terraform-state"
+    override val region = Region.US_WEST_2
+    override val displayName = "My Server"
+    override val domainZone = "example.com"
+    override val domain = "api.example.com"
+    override val debug = false
+    override val emergencyContact = "ops@example.com".toEmailAddress()
+    override val instanceType = "t4g.medium"
+    override val instanceArchitecture = CPUArchitecture.Arm
+
+    // Must provide private subnets + NAT egress (Default VPC is not sufficient).
+    override val applicationVpc = AwsVpc.TFManaged(
+        ipPrefix = "10.0",
+        availabilityZones = listOf("us-west-2a", "us-west-2b", "us-west-2c"),
+        natGateway = AwsVpc.NatGateway.Single,
+    )
+
+    override val minSize = 2
+    override val maxSize = 8
+    override val desiredCapacity = 2
+    // healthCheckPath autodetects /meta/online; override only if your liveness path differs.
+    override val scalingRequestsPerTarget = 400   // optional: scale on requests/instance too
+
+    override fun Server.settings() {
+        database.need.mongoDbAtlas(...)
+        cache.need.awsElasticacheRedis(...)    // distributed cache REQUIRED
+        files.need.awsS3(...)
+    }
 }
 ```
 
-**Available integrations**:
-- `otelXRay()` - AWS X-Ray
-- `otelHoneycomb(apiKey)` - Honeycomb
-- `otelGrafanaCloud(endpoint, instanceId, apiKey)` - Grafana Cloud
-- `otelCustomEndpoint(endpoint, headers)` - Any OTLP endpoint
+## Testing changes
 
-### extensions.kt
+```bash
+# Compile
+./gradlew :deploy-aws-ec2:compileKotlin
 
-Simple helper extension for IAM path generation:
-```kotlin
-val TerraformEmitter.projectPrefixPath: String
-    get() = projectPrefix.lowercase().replace("-", "/").replace("_", "")
+# Generation tests (build both builders to build/test-terraform and assert resources)
+./gradlew :deploy-aws-ec2:test
 ```
 
-## Security Considerations
+To validate the generated Terraform against provider schemas (requires Terraform-registry
+network access, which the CI sandbox does not have):
 
-### Input Validation
-
-All user-provided inputs that end up in the user-data script are validated:
-
-- **Package names**: Must match `^[a-zA-Z0-9._-]+$`
-- **JVM arguments**: No shell metacharacters (`` ` $ | ; & > < ``)
-- **Server command**: Same as JVM arguments
-- **Instance file paths**: Must be absolute, no `..`, no sensitive paths
-- **Environment variable names**: Must match `^[a-zA-Z_][a-zA-Z0-9_]*$`
-
-### Instance Files
-
-Instance files use base64 encoding instead of heredocs to prevent injection:
-```kotlin
-// Bad (vulnerable to heredoc injection):
-cat > /path << 'EOF'
-$userContent
-EOF
-
-// Good (safe):
-echo 'base64content' | base64 -d > /path
+```bash
+cd <generated terraform dir>
+terraform init -backend=false
+terraform validate
 ```
 
-### S3 Bucket Hardening
-
-The deployment bucket has:
-- Public access blocked
-- Server-side encryption (AES-256)
-- Versioning enabled
-- IAM-only access (no bucket policy)
-
-### Network Security
-
-- EC2 instances in private subnets (no public IP)
-- Security group allows only ALB → EC2 on port 8080
-- Outbound traffic through NAT gateway
-- ALB accepts only HTTPS (HTTP redirects to HTTPS)
-- TLS 1.3 minimum (`ELBSecurityPolicy-TLS13-1-2-2021-06`)
-
-## Operational Notes
-
-### Boot Timing
-
-The user-data script logs timing information:
-```
-[INFO] User data script started at <timestamp>
-...
-[INFO] User data script completed in <N> seconds
-```
-
-Typical boot time is 3-5 minutes including package updates.
-
-### Debugging Failed Instances
-
-1. **Check user-data logs**:
-   ```bash
-   aws ssm start-session --target i-xxxxx
-   sudo cat /var/log/user-data.log
-   ```
-
-2. **Check application logs**:
-   ```bash
-   sudo journalctl -u lightning-server -n 100
-   ```
-
-3. **Check CloudWatch** (if agent started):
-   - Log group: `/ec2/<project>/application`
-   - Streams: `<instance-id>/journal`, `<instance-id>/user-data`
-
-### Common Issues
-
-| Symptom | Likely Cause | Solution |
-|---------|--------------|----------|
-| Instances keep replacing | Health check fails | Check `healthCheckPath` returns 200 |
-| S3 download fails | IAM not ready | Retry logic handles this (5 attempts) |
-| App starts then crashes | Settings error | Check journal for startup exceptions |
-| No CloudWatch logs | Agent failed | Check `/var/log/amazon-cloudwatch-agent.log` |
-
-## Testing Changes
-
-After modifying Terraform generation:
-
-1. **Compile**:
-   ```bash
-   ./gradlew :deploy-aws-ec2:compileKotlin
-   ```
-
-2. **Generate Terraform** (in a test project):
-   ```bash
-   ./gradlew run --args="TestDeployMain"
-   ```
-
-3. **Validate Terraform**:
-   ```bash
-   cd terraform/test
-   terraform init
-   terraform validate
-   terraform plan
-   ```
-
-4. **Test in non-production** before production deployment.
-
-## Dependencies
-
-```kotlin
-dependencies {
-    api(project(":core"))
-    api(libs.serviceAbstractionsAwsClient)  // AWS SDK common
-    api(libs.awsS3)                          // S3 for artifacts
-    api(libs.awsSecretsManager)              // Optional secrets
-    api("software.amazon.awssdk:sqs:2.40.3") // SQS for schedules
-    implementation(libs.coroutinesReactive)
-    implementation(libs.coroutinesJdk)
-    api(libs.kotlinReflect)                  // For mainClass KClass
-}
-```
-
-## Future Enhancements
-
-Potential improvements not yet implemented:
-
-1. **Spot instance support**: For non-production cost savings
-2. **Custom AMI**: Pre-bake Java and dependencies for faster boot
-3. **EFS integration**: Shared file system across instances
-4. **Blue-green with CodeDeploy**: For instant rollback capability
-5. **Multi-NAT gateway option**: Property to enable HA NAT
-6. **Instance connect**: Alternative to SSM for SSH access
+Full `plan` / `apply` additionally requires AWS credentials and is out of scope for automated
+testing.

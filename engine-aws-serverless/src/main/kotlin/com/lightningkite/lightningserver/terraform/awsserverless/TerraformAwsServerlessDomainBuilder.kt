@@ -15,11 +15,11 @@ public abstract class TerraformAwsServerlessDomainBuilder<S : ServerBuilder>(
     override val domainZoneId: String by lazy { domainZoneId(domainZone) }
 
 
-    override fun finalize() {
+    override fun prepareForWrite() {
         (applicationVpc as? AwsVpc.TFManaged)?.also {
             emitVpc(it)
         }
-        super.finalize()
+        super.prepareForWrite()
     }
 }
 
