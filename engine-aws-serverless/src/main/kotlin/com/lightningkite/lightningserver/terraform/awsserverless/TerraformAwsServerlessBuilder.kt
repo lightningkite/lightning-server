@@ -111,12 +111,12 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
      */
     public open val useCloudFrontForWebSocket: Boolean get() = false
 
-    override fun finalize() {
+    override fun prepareForWrite() {
 
         if (projectPrefix.any { !it.isLetterOrDigit() && !(it == '-' || it == '_') })
             throw IllegalArgumentException("The projectPrefix has illegal characters in it. It can only contain: Letters, Digits, '-', and '_'.")
 
-        super.finalize()
+        super.prepareForWrite()
         require(TerraformProviderImport.aws)
         require(
             TerraformProvider(
