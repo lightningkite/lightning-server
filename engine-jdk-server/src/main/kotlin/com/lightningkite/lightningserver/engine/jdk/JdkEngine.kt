@@ -112,10 +112,10 @@ public class JdkEngine(
         // Prepare configuration and lifecycle
         this.settings.ready()
         runBlocking { runStartupTasks() }
-        startSchedules()
 
         val cfg = jdkRunConfig()
         val reliability = cfg.reliability
+        startSchedules(reliability.scheduleLockTtl)
         val maxBody = reliability.maxBodySize.bytes
         val server = HttpServer.create(InetSocketAddress(cfg.host, cfg.port), 0)
         this.httpServer = server

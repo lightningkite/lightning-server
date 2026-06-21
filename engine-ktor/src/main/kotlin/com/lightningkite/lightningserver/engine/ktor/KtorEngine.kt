@@ -344,8 +344,8 @@ public class KtorEngine(
     public fun <TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.Configuration> start(factory: ApplicationEngineFactory<TEngine, TConfiguration>) {
         this.settings.ready()
         runBlocking { runStartupTasks() }
-        startSchedules()
         val reliability = ktorRunConfig().reliability
+        startSchedules(reliability.scheduleLockTtl)
         val drainMillis = reliability.shutdownDrainTimeout.inWholeMilliseconds
         val server = embeddedServer(
             factory = factory,

@@ -180,8 +180,12 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
      * instances to coordinate without duplicate execution.
      *
      * The schedule's next run time is stored in cache to persist across server restarts.
+     *
+     * @param scheduleLockTtl Expiry of the per-tick distributed lock (see
+     *   [EngineReliabilitySettings.scheduleLockTtl]). The lock is released as soon as the tick
+     *   finishes or on graceful shutdown, so this only matters as a backstop after a hard crash.
      */
-    protected fun startSchedules() {
+    protected fun startSchedules(scheduleLockTtl: Duration = 1.hours) {
         server.schedules.forEach { locationed ->
             val location = locationed.key
             val it = locationed.value
@@ -226,7 +230,7 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
                     val nextRun = it.schedule.calculateNextRun(clock.now())
                     val lockAcquired = instrument("schedule.tick $name", TelemetryAttributes { put(scheduleNameKey, name) }) {
                         if (cache.setIfNotExists("$name-lock", true)) {
-                            cache.set("$name-lock", true, 1.hours)
+                            cache.set("$name-lock", true, scheduleLockTtl)
                             try {
                                 logger.debug { "Running Schedule: $name" }
                                 it.executeWithMetrics(location)
@@ -239,7 +243,7 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
                                 /*squish; already reported*/
                             } finally {
                                 // Always release the lock, even if the tick was cancelled, so a mid-tick shutdown
-                                // can't leave "$name-lock" stuck until its 1h TTL. NonCancellable guards ONLY this
+                                // can't leave "$name-lock" stuck until its TTL expires. NonCancellable guards ONLY this
                                 // fast cleanup — the task itself stays cooperatively cancellable, so a tick longer
                                 // than the shutdown window is interrupted (not run to completion uninterruptibly,
                                 // which would just be hard-killed dirty when the process exits).
@@ -360,10 +364,9 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
  *    or providing a way to override it for testing
  * 2. The startSchedules() function launches infinite loops but provides no way to stop them. Consider
  *    adding a shutdown/cleanup method
- * 3. The 1-hour lock timeout in startSchedules() is hardcoded - consider making this configurable
- * 4. Consider adding a method to manually trigger a schedule for testing purposes
- * 5. The schedule lock mechanism could lead to missed executions if a task takes longer than 1 hour.
- *    Consider documenting this limitation or adding monitoring
+ * 3. Consider adding a method to manually trigger a schedule for testing purposes
+ * 4. The schedule lock mechanism could lead to missed executions if a task takes longer than the
+ *    configured scheduleLockTtl. Consider documenting this limitation or adding monitoring
  * 6. GlobalScope usage is marked as DelicateCoroutinesApi - consider providing guidance on when/how
  *    to override the scope property for proper structured concurrency
  */

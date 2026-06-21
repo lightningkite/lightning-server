@@ -179,7 +179,7 @@ public class NettyEngine(
         DIRECT_CHANNEL_KEY = AttributeKey.valueOf("DIRECT_CHANNEL")
 
         runBlocking { runStartupTasks() }
-        startSchedules()
+        startSchedules(cfg.reliability.scheduleLockTtl)
 
         val maxContentLength = cfg.maxAggregatedContentLength.bytes.coerceIn(0, Int.MAX_VALUE.toLong()).toInt()
         if (cfg.maxAggregatedContentLength.bytes > Int.MAX_VALUE.toLong())

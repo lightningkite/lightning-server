@@ -4,6 +4,7 @@ import com.lightningkite.services.data.DataSize
 import com.lightningkite.services.data.DataSize.Companion.mebibytes
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -50,6 +51,12 @@ public enum class WsOversizePolicy {
  * @property workerThreads Size of the request-processing thread pool for engines that run a managed
  *   pool (currently the JDK engine). If null, the engine picks a default
  *   (`availableProcessors() * 2`). Ignored by Ktor and Netty, which manage their own event loops.
+ * @property scheduleLockTtl Expiry of the distributed lock a server instance holds while running a
+ *   scheduled task, preventing other instances from running the same tick concurrently. The lock is
+ *   normally released as soon as the tick finishes (and on graceful shutdown), so this TTL only acts
+ *   as a backstop after a hard crash. A scheduled task that runs longer than this may be started
+ *   concurrently on another instance once the lock expires — keep ticks shorter than this value, or
+ *   raise it. Defaults to 1 hour.
  */
 @Serializable
 public data class EngineReliabilitySettings(
@@ -59,4 +66,5 @@ public data class EngineReliabilitySettings(
     val webSocketInboundBuffer: Int = 256,
     val webSocketOversizePolicy: WsOversizePolicy = WsOversizePolicy.CLOSE,
     val workerThreads: Int? = null,
+    val scheduleLockTtl: Duration = 1.hours,
 )
