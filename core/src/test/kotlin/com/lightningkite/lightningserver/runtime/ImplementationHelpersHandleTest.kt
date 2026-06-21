@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.runtime.test.testBlocking
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.services.LoggingSettings
@@ -122,6 +123,26 @@ class ImplementationHelpersHandleTest {
                 assertNotNull(resp.body)
                 assertEquals("pong", resp.body.text())
             }
+        }
+    }
+
+    // Verifies the testBlocking variant: a suspend action body can call suspending APIs
+    // (serverRuntime.handle, resp.body.text()) directly, with no inner runBlocking wrapper.
+    @Test
+    fun test_blocking_runs_suspend_body_without_run_blocking() {
+        TestServer.testBlocking(settings = {}) {
+            val resp = serverRuntime.handle(
+                HttpRequest<PathSpec>(
+                    path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
+                    queryParameters = QueryParameters.EMPTY,
+                    headers = HttpHeaders.EMPTY,
+                    domain = "example.com",
+                    protocol = "https",
+                    sourceIp = "local",
+                )
+            )
+            assertEquals(HttpStatus.OK, resp.status)
+            assertEquals("pong", resp.body!!.text())
         }
     }
 
