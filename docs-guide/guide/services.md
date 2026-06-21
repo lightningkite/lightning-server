@@ -21,7 +21,6 @@ import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.services.cache.*
 import kotlinx.coroutines.*
 import kotlinx.serialization.*
-import kotlinx.serialization.builtins.serializer
 ```
 
 ## Declaring a Service Setting
@@ -70,8 +69,8 @@ object CounterServer : ServerBuilder() {
         successCode = HttpStatus.OK,
         errorCases = emptyList(),
         implementation = { input: CounterRequest ->
-            // Cache.get() returns null when the key is absent; coerce to 0.
-            val value = cache().get("counter:${input.name}", Long.serializer()) ?: 0L
+            // Cache.get<T>() returns null when the key is absent; coerce to 0.
+            val value = cache().get<Long>("counter:${input.name}") ?: 0L
             CounterResponse(name = input.name, value = value)
         }
     )

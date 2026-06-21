@@ -7,11 +7,10 @@ import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.runtime.test.*
-import com.lightningkite.services.cache.Cache
+import com.lightningkite.services.cache.*
 import kotlin.test.*
 import kotlinx.coroutines.*
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.serializer
 import kotlin.time.Duration.Companion.minutes
 // endregion tasks-imports
 
@@ -32,7 +31,7 @@ object TaskServer : ServerBuilder() {
     val sendWelcomeEmail = path.path("tasks").path("send-welcome-email") bind Task { input: WelcomeEmailInput ->
         println("Sending welcome email to ${input.address} (name=${input.name})")
         // Record the work in cache so tests can observe the effect.
-        cache().set("last-welcome-email", input.address, String.serializer(), 5.minutes)
+        cache().set("last-welcome-email", input.address, 5.minutes)
     }
 
     // HTTP endpoint that launches the task.
@@ -56,7 +55,7 @@ fun taskTest() = runBlocking {
         // visible in the next line.
         TaskServer.sendWelcomeEmail.launch(WelcomeEmailInput("alice@example.com", "Alice"))
 
-        val logged = TaskServer.cache().get("last-welcome-email", String.serializer())
+        val logged = TaskServer.cache().get<String>("last-welcome-email")
         assertEquals("alice@example.com", logged)
     }
 }

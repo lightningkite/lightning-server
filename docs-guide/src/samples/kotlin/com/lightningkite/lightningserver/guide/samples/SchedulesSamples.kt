@@ -8,11 +8,10 @@ import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.runtime.test.*
-import com.lightningkite.services.cache.Cache
+import com.lightningkite.services.cache.*
 import kotlin.test.*
 import kotlinx.coroutines.*
 import kotlinx.datetime.*
-import kotlinx.serialization.builtins.serializer
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 // endregion schedules-imports
@@ -31,7 +30,7 @@ object ScheduleServer : ServerBuilder() {
         // Delete expired sessions, purge stale cache entries, compact logs, etc.
         val count = 42  // illustrative; in production, query and delete from a database
         println("Cleanup ran: removed $count expired records")
-        cache().set("cleanup:last-count", count, Int.serializer(), 2.hours)
+        cache().set("cleanup:last-count", count, 2.hours)
     }
 }
 // endregion schedule-server
@@ -48,7 +47,7 @@ fun scheduleTest() = runBlocking {
         // Call execute() directly — same as what the engine does when the timer fires.
         ScheduleServer.cleanup.execute()
 
-        val count = ScheduleServer.cache().get("cleanup:last-count", Int.serializer())
+        val count = ScheduleServer.cache().get<Int>("cleanup:last-count")
         assertEquals(42, count)
     }
 }
