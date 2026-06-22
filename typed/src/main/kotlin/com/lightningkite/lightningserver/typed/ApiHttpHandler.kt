@@ -8,8 +8,11 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.serialization.*
 import com.lightningkite.lightningserver.typed.sdk.SDK
 import com.lightningkite.services.database.HasId
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
+
+private val errorCaseLogger = KotlinLogging.logger("com.lightningkite.lightningserver.typed.ApiHttpHandler")
 
 /**
  * Typed HTTP endpoint handler with automatic serialization, validation, and documentation.
@@ -99,7 +102,21 @@ public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT
 
         server.validators.assertValidOrBadRequest(inputType, input)
 
-        val result = handle(request.access(auth), input)
+        val result = try {
+            handle(request.access(auth), input)
+        } catch (e: HttpStatusException) {
+            // W6 (advisory only — does NOT change the response): the thrown error slug isn't among the
+            // declared errorCases, so generated SDKs/docs won't advertise it. Warn so the contract can
+            // be kept in sync; the exception is rethrown unchanged.
+            if (e.detail.isNotBlank() && errorCases.none { it.detail == e.detail && it.http == e.status.code }) {
+                errorCaseLogger.warn {
+                    "Endpoint threw HttpStatusException(status=${e.status.code}, detail=\"${e.detail}\") " +
+                        "not present in its declared errorCases ${errorCases.map { "${it.http}:${it.detail}" }}. " +
+                        "Add it to errorCases or align the thrown detail so clients/docs stay accurate."
+                }
+            }
+            throw e
+        }
 
         return HttpResponse(
             body = if (result == Unit) null else result.toTypedData(request.headers.accept, outputType),
