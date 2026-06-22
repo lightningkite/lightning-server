@@ -245,8 +245,8 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
                     val masquerade = header.root
 
                     val validEncodings = mapOf(
-                        "str-array" to server.internalSerialization.stringArrayFormat,
-                        "json" to server.internalSerialization.json
+                        "str-array" to server.externalSerialization.stringArrayFormat,
+                        "json" to server.externalSerialization.json
                     )
 
                     if (!masquerade.contains('/')) throw BadRequestException(
@@ -279,30 +279,17 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
                         )
                     }
 
-                    val mask = Authentication<HasId<*>>(
+                    val mask = Authentication(
                         principalType = principal,
                         id = id,
-                        rawId = principal.idString(id),
-                        sessionId = ,
-                        issuedAt,
-                        expiration,
-                        scopes,
-                        fromMasquerade,
-                        cache,
-                        principal = principal,
-                        rawId = masquerade.substringAfter('/'),
+                        rawId = idString,
                         sessionId = null,
                         issuedAt = server.clock.now(),
                         expiration = auth.expiration,
                         scopes = auth.scopes,
                         fromMasquerade = auth,
+                        cache = auth.cache,
                     )
-
-                    try {
-                        mask.untypedId
-                    } catch (_: SerializationException) {
-                        throw BadRequestException(message = "Invalid masquerade id", data = mask.rawId)
-                    }
 
                     if (principal.permitMasquerade(auth, mask)) return mask
                     else throw ForbiddenException("You are not allowed to masquerade as $masquerade")
