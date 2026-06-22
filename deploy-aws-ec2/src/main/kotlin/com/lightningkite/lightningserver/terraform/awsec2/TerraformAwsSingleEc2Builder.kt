@@ -63,6 +63,9 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
     public open val ec2InitScriptsRaw: List<String> = emptyList()
     public open val ec2InitScripts: List<KFile> = emptyList()
 
+    /** Direct application only accessible internally; we force using Angie. */
+    override val appExposedPublicly: Boolean get() = false
+
     override fun registerProviders() {
         require(TerraformProviderImport.tls)
     }
@@ -538,11 +541,11 @@ apt install -y openjdk-17-jre-headless openssl curl gnupg ca-certificates unzip
             systemD()
 
             // The single instance fills the bucket name via terraform templatefile() and the
-            // region is a compile-time constant. The app listens on 8080 behind Angie.
+            // region is a compile-time constant. The app listens on appPort behind Angie.
             instanceRedeployScript(
                 $$"""BUCKET="${deployment_bucket}"
 REGION="$$applicationRegion"""",
-                localHealthUrl = "http://localhost:8080${detectedOnlinePath ?: "/meta/online"}",
+                localHealthUrl = "http://localhost:$appPort${detectedOnlinePath ?: "/meta/online"}",
             )
 
             if (instanceFiles.isNotEmpty() || instanceFilesRaw.isNotEmpty())
@@ -678,7 +681,7 @@ map $http_upgrade $connection_upgrade {
 }
 
 upstream app {
-    server 127.0.0.1:8080;
+    server 127.0.0.1:$${appPort};
     keepalive 32;
     keepalive_timeout 45s;
     keepalive_requests 1000;

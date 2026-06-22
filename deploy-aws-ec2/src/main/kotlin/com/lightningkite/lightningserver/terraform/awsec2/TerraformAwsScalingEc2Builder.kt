@@ -53,8 +53,8 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
     /** Desired (starting) number of instances. */
     public open val desiredCapacity: Int get() = 2
 
-    /** Port the application listens on (the ALB forwards here). */
-    public open val appPort: Int get() = 8080
+    /** Exposed publicly for the ALB to reach */
+    override val appExposedPublicly: Boolean get() = true
 
     /**
      * Health-check path the ALB polls; must return 2xx/3xx when the app is alive. Defaults to the

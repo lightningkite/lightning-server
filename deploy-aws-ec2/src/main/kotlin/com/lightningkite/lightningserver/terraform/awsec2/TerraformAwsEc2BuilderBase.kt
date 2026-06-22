@@ -48,6 +48,12 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     /** Human-readable display name for the deployment. */
     public abstract val displayName: String
 
+    /** Port the application listens on (the ALB forwards here). */
+    public open val appPort: Int get() = 8080
+
+    /** Whether the application is hosted publicly for direct access.  True when a different machine is proxying. */
+    public abstract val appExposedPublicly: Boolean
+
     public override val deploymentTag: String get() = displayName
     public override val projectPrefix: String
         get() = displayName.lowercase().replace(" ", "-").filter { it.isLetterOrDigit() || it == '-' }
@@ -107,7 +113,7 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
 
     /**
      *  The CPU architecture of the instance. This is entirely dependent on the instanceType.
-     *  There are too many Instance types in AWS to keep track of so we force the end user to set this value.
+     *  There are too many Instance types in AWS to keep track of, so we force the end user to set this value.
      *  */
     public abstract val instanceArchitecture: CPUArchitecture
 
@@ -240,6 +246,22 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
             put("wsUrl", "wss://$wsDomain")
             put("debug", debug)
             put("emergencyContact", emergencyContact.raw)
+        })
+
+        // Force certain ktor settings
+        fulfillSetting("ktorRunConfig", buildJsonObject {
+            settings["ktorRunConfig"]?.let { it as? JsonObject }?.entries?.forEach { put(it.key, it.value) }
+            put("host", if (appExposedPublicly) "0.0.0.0" else "127.0.0.1")
+            put("port", appPort)
+            put("realIpHeader", "X-Forwarded-For")
+        })
+
+        // Force certain netty settings
+        fulfillSetting("nettyRunConfig", buildJsonObject {
+            settings["nettyRunConfig"]?.let { it as? JsonObject }?.entries?.forEach { put(it.key, it.value) }
+            put("host", if(appExposedPublicly) "0.0.0.0" else "127.0.0.1")
+            put("port", appPort)
+            put("realIpHeader", "X-Forwarded-For")
         })
 
         emitMainTerraformConfig()
