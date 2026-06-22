@@ -178,32 +178,32 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
      *
      * @property default The fallback requirement if not explicitly configured
      */
-    public abstract class AuthSetting(
-        public val default: AuthRequirement<HasId<*>>? = null,
-    ) : AuthRequirement<HasId<*>>, MutableExtensions.Key<AuthRequirement<HasId<*>>> {
+    public abstract class AuthSetting<SUBJECT : HasId<*>?>(
+        public val default: AuthRequirement<SUBJECT>? = null,
+    ) : AuthRequirement<SUBJECT>, MutableExtensions.Key<AuthRequirement<SUBJECT>> {
         context(server: ServerRuntime)
-        public fun setting(): AuthRequirement<HasId<*>>? = server.server.extensions[this]
+        public fun setting(): AuthRequirement<SUBJECT>? = server.server.extensions[this]
 
-        override val requiredScopes: Runtime<Set<RequiredScope>> = Runtime { setting()?.requiredScopes() ?: emptySet() }
-        override fun subscope(subscopes: Iterable<Subscope>): Scoped = Scoped(this, subscopes)
+        override val requiredScopes: Runtime<Set<RequiredScope>> = Runtime { setting()?.requiredScopes() ?: default?.requiredScopes() ?: emptySet() }
+        override fun subscope(subscopes: Iterable<Subscope>): Scoped<SUBJECT> = Scoped(this, subscopes)
 
         context(runtime: ServerRuntime)
-        override suspend fun check(auth: Authentication<*>?): Result<HasId<*>> =
+        override suspend fun check(auth: Authentication<*>?): Result<SUBJECT> =
             setting()?.check(auth) ?: default?.check(auth)
             ?: Result.Rejected("AuthSetting $this has no set value or default")
 
-        public data class Scoped(
-            val wraps: AuthSetting,
+        public data class Scoped<SUBJECT : HasId<*>?>(
+            val wraps: AuthSetting<SUBJECT>,
             val subscopes: Iterable<Subscope>,
-        ) : AuthRequirement<HasId<*>> {
+        ) : AuthRequirement<SUBJECT> {
             override val requiredScopes: Runtime<Set<RequiredScope>> =
-                Runtime { wraps.setting()?.requiredScopes()?.subscope(subscopes) ?: emptySet() }
+                Runtime { wraps.requiredScopes().subscope(subscopes) }
 
-            override fun subscope(subscopes: Iterable<Subscope>): Scoped =
+            override fun subscope(subscopes: Iterable<Subscope>): Scoped<SUBJECT> =
                 copy(subscopes = this.subscopes + subscopes)
 
             context(runtime: ServerRuntime)
-            override suspend fun check(auth: Authentication<*>?): Result<HasId<*>> =
+            override suspend fun check(auth: Authentication<*>?): Result<SUBJECT> =
                 wraps.setting()?.subscope(subscopes)?.check(auth) ?: wraps.default?.subscope(subscopes)?.check(auth)
                 ?: Result.Rejected("AuthSetting $wraps has no set value or default")
         }
@@ -214,21 +214,21 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
      *
      * This represents the highest level of access and has no default fallback.
      */
-    public data object IsSuperUser : AuthSetting()
+    public data object IsSuperUser : AuthSetting<HasId<*>>()
 
     /**
      * Predefined [AuthSetting] for administrative access.
      *
      * Defaults to [IsSuperUser] if not explicitly configured.
      */
-    public data object IsAdmin : AuthSetting(default = IsSuperUser)
+    public data object IsAdmin : AuthSetting<HasId<*>>(default = IsSuperUser)
 
     /**
      * Predefined [AuthSetting] for developer/debug access.
      *
      * Defaults to [IsSuperUser] if not explicitly configured.
      */
-    public data object IsDeveloper : AuthSetting(default = IsSuperUser)
+    public data object IsDeveloper : AuthSetting<HasId<*>>(default = IsSuperUser)
 
     /**
      * Requires any valid authentication, regardless of principal type.

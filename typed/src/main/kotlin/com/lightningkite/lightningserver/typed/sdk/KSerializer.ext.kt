@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.data.serialNameFQN
 import com.lightningkite.services.database.*
 import kotlinx.serialization.*
+import kotlinx.serialization.builtins.NothingSerializer
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.internal.GeneratedSerializer
 
@@ -40,13 +41,13 @@ public fun KSerializer<*>.kotlinSerializer(): String {
             this.typeParametersSerializersOrNull()?.joinToString(", ") { it.kotlinSerializer() } ?: ""
         }))"
 
-        else -> {
-            descriptor.serialName
+        else ->
+            if (descriptor.serialName == "kotlin.Nothing") "kotlinx.serialization.builtins.NothingSerializer()"
+            else descriptor.serialName
                 .substringBefore('/')
                 .substringBefore('<')
                 .plus(".serializer")
                 .plus(typeParametersSerializersOrNull()?.joinToString(", ", "(", ")") { it.kotlinSerializer() } ?: "()")
-        }
     }
 }
 

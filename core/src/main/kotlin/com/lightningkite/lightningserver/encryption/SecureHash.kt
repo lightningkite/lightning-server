@@ -10,6 +10,7 @@ package com.lightningkite.lightningserver.encryption
 import dev.whyoleg.cryptography.BinarySize.Companion.bits
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.PBKDF2
+import dev.whyoleg.cryptography.algorithms.SHA256
 import dev.whyoleg.cryptography.algorithms.SHA512
 import dev.whyoleg.cryptography.random.CryptographyRandom
 import kotlinx.io.bytestring.encodeToByteString
@@ -74,12 +75,18 @@ public suspend fun String.secureHash(): String {
 public fun String.fastHash(): String {
     if (this.startsWith(sha256Prefix)) return this
     if (this.isEmpty()) return ""
-    val salt = ByteArray(16)
-    SecureRandom().nextBytes(salt)
-    val digest = MessageDigest.getInstance("SHA-256")
-    digest.update(salt)
-    digest.update(this.toByteArray(Charsets.UTF_8))
-    return sha256Prefix + Base64.encode(salt) + "." + Base64.encode(digest.digest())
+
+    val salt = CryptographyRandom.nextBytes(16)
+
+    return CryptographyProvider.Default
+        .get(SHA256)
+        .hasher()
+        .createHashFunction().use { digest ->
+            digest.update(salt)
+            digest.update(this.toByteArray(Charsets.UTF_8))
+
+            sha256Prefix + Base64.encode(salt) + "." + Base64.encode(digest.hashToByteArray())
+        }
 }
 
 /**

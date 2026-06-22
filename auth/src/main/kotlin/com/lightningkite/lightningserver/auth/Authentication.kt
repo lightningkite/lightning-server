@@ -241,14 +241,55 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
             for (reader in server.server.authReaders.sortedByDescending { it.priority }) {
                 val auth = reader.read(input) ?: continue
 
-                input.headers[HttpHeader.XMasquerade]?.root?.let { masquerade ->
-                    val principal = masquerade.substringBefore('/')
+                input.headers[HttpHeader.XMasquerade]?.let { header ->
+                    val masquerade = header.root
 
-                    val handler = server.server.principalTypes[principal] as? PrincipalType<HasId<*>, *>
-                        ?: throw BadRequestException("Principal type $principal is unrecognized for masquerade")
+                    val validEncodings = mapOf(
+                        "str-array" to server.internalSerialization.stringArrayFormat,
+                        "json" to server.internalSerialization.json
+                    )
+
+                    if (!masquerade.contains('/')) throw BadRequestException(
+                        """Invalid masquerade value. Expected to be in the form: <principal-name>/<subject-id> (; encoding=[${
+                            validEncodings.keys.withIndex().joinToString("|") { (idx, enc) -> 
+                                if (idx == 0) "${enc}(default)"
+                                else enc
+                            }
+                        }])"""
+                    )
+
+                    val principalName = masquerade.substringBefore('/')
+                    val principal = server.server.principalTypes[principalName] as? PrincipalType<HasId<*>, *>
+                        ?: throw BadRequestException("Principal type $principalName is unrecognized for masquerade")
+
+                    val encoding = header.parameters["encoding"]
+                        ?.let {
+                            validEncodings[it] ?: throw BadRequestException("Invalid encoding type. Supported types are ${validEncodings.keys}")
+                        }
+                        ?: validEncodings.values.first()
+
+                    val idString = masquerade.substringAfter('/')
+                    val id = try {
+                        encoding.decodeFromString(principal.idSerializer, idString)
+                    } catch (e: SerializationException) {
+                        throw BadRequestException(
+                            message = "Invalid masquerade id: ${e.message}",
+                            data = idString,
+                            cause = e
+                        )
+                    }
 
                     val mask = Authentication<HasId<*>>(
-                        principal,
+                        principalType = principal,
+                        id = id,
+                        rawId = principal.idString(id),
+                        sessionId = ,
+                        issuedAt,
+                        expiration,
+                        scopes,
+                        fromMasquerade,
+                        cache,
+                        principal = principal,
                         rawId = masquerade.substringAfter('/'),
                         sessionId = null,
                         issuedAt = server.clock.now(),
@@ -263,7 +304,7 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
                         throw BadRequestException(message = "Invalid masquerade id", data = mask.rawId)
                     }
 
-                    if (handler.permitMasquerade(auth, mask)) return mask
+                    if (principal.permitMasquerade(auth, mask)) return mask
                     else throw ForbiddenException("You are not allowed to masquerade as $masquerade")
                 }
 

@@ -203,9 +203,6 @@ public interface PrincipalType<SUBJECT : HasId<ID>, ID : Comparable<ID>> {
  *    )
  *    ```
  *
- * 2. The subjectCacheKey has hard-coded expiration (5 minutes) and localOnly (true).
- *    Consider making these configurable per principal type for different use cases.
- *
  * 3. The hasProperty and getProperty methods use reflection-like behavior through serialization.
  *    For performance-critical paths, consider adding a compile-time code generation approach.
  *

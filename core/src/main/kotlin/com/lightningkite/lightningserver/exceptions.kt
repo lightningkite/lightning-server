@@ -30,7 +30,7 @@ public fun LSError.toException(
 public open class HttpStatusException(
     public val status: HttpStatus,
     public val detail: String = "",
-    message: String = "",
+    override val message: String = "",
     public val data: String = "",
     cause: Throwable? = null,
 ) : Exception(message, cause) {
@@ -41,7 +41,6 @@ public open class HttpStatusException(
         data = lsError.data,
     )
 
-    override val message: String get() = super.message!!
     public fun toLSError(): LSError = LSError(
         http = status.code,
         detail = detail,
