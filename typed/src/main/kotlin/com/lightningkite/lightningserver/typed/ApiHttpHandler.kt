@@ -94,7 +94,13 @@ public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT
             HttpMethod.GET, HttpMethod.HEAD -> request.queryParameters(inputType)
             else ->
                 if (inputType == Unit.serializer()) Unit as INPUT
-                else request.body?.parse(inputType) ?: throw BadRequestException("No request body provided")
+                else request.body.let {
+                    if (it == null) {
+                        if (inputType.descriptor.isNullable) null as INPUT
+                        else throw BadRequestException("No request body provided")
+                    }
+                    else it.parse(inputType)
+                }
         }
 
         server.validators.assertValidOrBadRequest(inputType, input)
