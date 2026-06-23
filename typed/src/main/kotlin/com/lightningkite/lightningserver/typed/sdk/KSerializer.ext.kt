@@ -40,13 +40,13 @@ public fun KSerializer<*>.kotlinSerializer(): String {
             this.typeParametersSerializersOrNull()?.joinToString(", ") { it.kotlinSerializer() } ?: ""
         }))"
 
-        else -> {
-            descriptor.serialName
+        else ->
+            if (descriptor.serialName == "kotlin.Nothing") "kotlinx.serialization.builtins.NothingSerializer()"
+            else descriptor.serialName
                 .substringBefore('/')
                 .substringBefore('<')
                 .plus(".serializer")
                 .plus(typeParametersSerializersOrNull()?.joinToString(", ", "(", ")") { it.kotlinSerializer() } ?: "()")
-        }
     }
 }
 
