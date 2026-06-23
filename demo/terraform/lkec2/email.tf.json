@@ -17,7 +17,7 @@
         "aws_ses_domain_mail_from": {
             "email": {
                 "domain": "${aws_ses_domain_identity.email.domain}",
-                "mail_from_domain": "mail.lightningserver.cs.lightningkite.com"
+                "mail_from_domain": "mail.lightningserver2.cs.lightningkite.com"
             }
         },
         "aws_iam_access_key": {
@@ -35,7 +35,7 @@
         },
         "aws_iam_policy": {
             "email": {
-                "name": "LightningServerDemo-email-policy",
+                "name": "LightningServerEC2SDemo-email-policy",
                 "description": "Allows sending of e-mails via Simple Email Service",
                 "policy": "${data.aws_iam_policy_document.email.json}"
             }
@@ -46,7 +46,7 @@
                 "records": [
                     "${aws_ses_domain_identity.email.verification_token}"
                 ],
-                "name": "_amazonses.lightningserver.cs.lightningkite.com",
+                "name": "_amazonses.lightningserver2.cs.lightningkite.com",
                 "type": "TXT",
                 "ttl": "600"
             },
@@ -74,7 +74,7 @@
                     "${element(aws_ses_domain_dkim.email_dkim.dkim_tokens, count.index)}.dkim.amazonses.com"
                 ],
                 "count": 3,
-                "name": "${element(aws_ses_domain_dkim.email_dkim.dkim_tokens, count.index)}._domainkey.lightningserver.cs.lightningkite.com",
+                "name": "${element(aws_ses_domain_dkim.email_dkim.dkim_tokens, count.index)}._domainkey.lightningserver2.cs.lightningkite.com",
                 "type": "CNAME",
                 "ttl": "600"
             },
@@ -83,7 +83,7 @@
                 "records": [
                     "v=DMARC1;p=quarantine;pct=75;rua=mailto:joseph@lightningkite.com"
                 ],
-                "name": "_dmarc.lightningserver.cs.lightningkite.com",
+                "name": "_dmarc.lightningserver2.cs.lightningkite.com",
                 "type": "TXT",
                 "ttl": "300"
             },
@@ -92,7 +92,7 @@
                 "records": [
                     "v=spf1 include:amazonses.com -all"
                 ],
-                "name": "lightningserver.cs.lightningkite.com",
+                "name": "lightningserver2.cs.lightningkite.com",
                 "type": "TXT",
                 "ttl": "300"
             }
@@ -103,14 +103,41 @@
                 "user": "${aws_iam_user.email.name}"
             }
         },
+        "aws_vpc_endpoint": {
+            "email": {
+                "private_dns_enabled": true,
+                "vpc_id": "${module.vpc.vpc_id}",
+                "vpc_endpoint_type": "Interface",
+                "service_name": "com.amazonaws.us-west-2.email-smtp",
+                "subnet_ids": "${module.vpc.private_subnets}",
+                "security_group_ids": [
+                    "${aws_security_group.email.id}"
+                ]
+            }
+        },
+        "aws_security_group": {
+            "email": {
+                "vpc_id": "${module.vpc.vpc_id}",
+                "name": "LightningServerEC2SDemo-email-security-group"
+            }
+        },
+        "aws_vpc_security_group_ingress_rule": {
+            "email": {
+                "cidr_ipv4": "10.7.0.0/16",
+                "security_group_id": "${aws_security_group.email.id}",
+                "to_port": 587,
+                "from_port": 587,
+                "ip_protocol": "tcp"
+            }
+        },
         "aws_iam_user": {
             "email": {
-                "name": "LightningServerDemo-email-user"
+                "name": "LightningServerEC2SDemo-email-user"
             }
         },
         "aws_ses_domain_identity": {
             "email": {
-                "domain": "lightningserver.cs.lightningkite.com"
+                "domain": "lightningserver2.cs.lightningkite.com"
             }
         },
         "aws_ses_domain_dkim": {

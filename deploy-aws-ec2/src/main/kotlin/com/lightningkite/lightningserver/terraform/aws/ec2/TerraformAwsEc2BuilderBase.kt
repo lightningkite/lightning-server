@@ -1,9 +1,10 @@
-package com.lightningkite.lightningserver.terraform.awsec2
+package com.lightningkite.lightningserver.terraform.aws.ec2
 
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.terraform.*
+import com.lightningkite.lightningserver.terraform.aws.VpcInfoTerraformManaged
 import com.lightningkite.services.data.DataSize
 import com.lightningkite.services.data.DataSize.Companion.mebibytes
 import com.lightningkite.services.data.EmailAddress
@@ -14,6 +15,7 @@ import kotlinx.serialization.json.*
 import software.amazon.awssdk.regions.Region
 import java.io.File
 import java.util.*
+import kotlin.collections.iterator
 
 /**
  * Shared base for the EC2 Terraform builders ([TerraformAwsSingleEc2Builder] and
@@ -52,13 +54,36 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     public open val appPort: Int get() = 8080
 
     /** Whether the application is hosted publicly for direct access.  True when a different machine is proxying. */
-    public abstract val appExposedPublicly: Boolean
+    public abstract val appBindsAllNetworkInterfaces: Boolean
 
     public override val deploymentTag: String get() = displayName
     public override val projectPrefix: String
         get() = displayName.lowercase().replace(" ", "-").filter { it.isLetterOrDigit() || it == '-' }
     public open val storageBucketPath: String get() = projectPrefix
     public open val storageEncryptionEnabled: Boolean get() = true
+
+    /**
+     * When true, a dedicated customer-managed KMS key is created and used to encrypt the mutable-domain
+     * resources (EBS, S3 buckets, CloudWatch logs, SNS, the SSM settings password). Off by default — the
+     * resources are still encrypted at rest with AWS-managed keys, so existing deployments are unaffected.
+     * Note: DocumentDB's key is chosen separately (its key is immutable at creation); see `awsDocumentDb`.
+     */
+    public open val customerManagedKey: Boolean get() = false
+
+    /**
+     * Whether to create the `AWSServiceRoleForAutoScaling` service-linked role. The customer-managed key
+     * policy names that role as a principal, and KMS rejects a policy whose principal doesn't yet exist — so
+     * on a brand-new account (one that has never launched an Auto Scaling group) key creation would fail.
+     * Defaults to false because the role already exists in any account that has used Auto Scaling before;
+     * set to true for a first-ever deployment in a fresh account. Ignored unless [customerManagedKey] is on.
+     */
+    public open val createAutoScalingServiceLinkedRole: Boolean get() = false
+
+    /** ARN expression of the shared customer-managed key, or null when [customerManagedKey] is off. */
+    protected val sharedKmsKeyArn: String? get() = if (customerManagedKey) expression("aws_kms_key.main.arn") else null
+
+    final override val encryptionKey: KmsKeySource
+        get() = sharedKmsKeyArn?.let { KmsKeySource.Existing(it) } ?: KmsKeySource.AwsManaged
 
     override val terraformRoot: File get() = File("terraform/$projectPrefix")
     override val secretsSource: SecretSource by lazy {
@@ -251,7 +276,7 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
         // Force certain ktor settings
         fulfillSetting("ktorRunConfig", buildJsonObject {
             settings["ktorRunConfig"]?.let { it as? JsonObject }?.entries?.forEach { put(it.key, it.value) }
-            put("host", if (appExposedPublicly) "0.0.0.0" else "127.0.0.1")
+            put("host", if (appBindsAllNetworkInterfaces) "0.0.0.0" else "127.0.0.1")
             put("port", appPort)
             put("realIpHeader", "X-Forwarded-For")
         })
@@ -259,7 +284,7 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
         // Force certain netty settings
         fulfillSetting("nettyRunConfig", buildJsonObject {
             settings["nettyRunConfig"]?.let { it as? JsonObject }?.entries?.forEach { put(it.key, it.value) }
-            put("host", if(appExposedPublicly) "0.0.0.0" else "127.0.0.1")
+            put("host", if(appBindsAllNetworkInterfaces) "0.0.0.0" else "127.0.0.1")
             put("port", appPort)
             put("realIpHeader", "X-Forwarded-For")
         })
@@ -299,6 +324,35 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
      */
     protected open fun emitDeploymentResources() {
         val emitter = this@TerraformAwsEc2BuilderBase
+
+        if (customerManagedKey) {
+            emit("kms") {
+                "data.aws_caller_identity.current" {}
+                if (createAutoScalingServiceLinkedRole) {
+                    "resource.aws_iam_service_linked_role.autoscaling" {
+                        "aws_service_name" - "autoscaling.amazonaws.com"
+                    }
+                }
+                "resource.aws_kms_key.main" {
+                    "description" - "Customer-managed key for $displayName"
+                    "enable_key_rotation" - true
+                    "policy" - kmsKeyPolicyJson()
+                    // Ensure the SLR named in the key policy exists before the policy is validated.
+                    if (createAutoScalingServiceLinkedRole) {
+                        "depends_on" - listOf("aws_iam_service_linked_role.autoscaling")
+                    }
+                }
+                "resource.aws_kms_alias.main" {
+                    "name" - "alias/$projectPrefix"
+                    "target_key_id" - expression("aws_kms_key.main.id")
+                }
+            }
+            // Instances read CMK-encrypted S3 objects (deployment + files buckets) and the SecureString param.
+            policyStatements += AwsPolicyStatement(
+                action = listOf("kms:Decrypt", "kms:GenerateDataKey*", "kms:DescribeKey"),
+                resource = listOf(expression("aws_kms_key.main.arn"))
+            )
+        }
 
         // Add S3 permissions for EC2 instances to download JAR and Settings
         policyStatements += AwsPolicyStatement(
@@ -355,8 +409,12 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
                 "bucket" - expression("aws_s3_bucket.deployment.id")
                 "rule" {
                     "apply_server_side_encryption_by_default" {
-                        "sse_algorithm" - "AES256"
+                        sharedKmsKeyArn?.let {
+                            "sse_algorithm" - "aws:kms"
+                            "kms_master_key_id" - it
+                        } ?: run { "sse_algorithm" - "AES256" }
                     }
+                    if (sharedKmsKeyArn != null) "bucket_key_enabled" - true
                 }
             }
 
@@ -462,6 +520,7 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
                 "name" - "/$projectPrefix/settings-password"
                 "type" - "SecureString"
                 "value" - expression("random_password.settings.result")
+                if (sharedKmsKeyArn != null) "key_id" - expression("aws_kms_key.main.arn")
                 "description" - "AES-256 passphrase used to encrypt/decrypt the $displayName settings bundle"
             }
 
@@ -480,7 +539,7 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
                     "settings_hash" - expression("local_sensitive_file.settings_raw.content_sha256")
                 }
                 "provisioner.local-exec" {
-                    "command" - $$"openssl enc -aes-256-cbc -pbkdf2 -iter 100000 -md sha256 -in \"${local_sensitive_file.settings_raw.filename}\" -out \"${path.module}/build/settings.enc\" -passin env:SETTINGS_PASS"
+                    "command" - $$"openssl enc -aes-256-cbc -pbkdf2 -iter 100000 -md sha256 -in \"${local_sensitive_file.settings_raw.filename}\" -out \"${path.module}/build/settings.enc\" -pass env:SETTINGS_PASS"
                     "environment" {
                         "SETTINGS_PASS" - expression("random_password.settings.result")
                     }
@@ -559,7 +618,17 @@ fi
         )
     }
 
+    /** Install + configure the CloudWatch agent in one step (used by the boot-time single-instance path). */
     protected fun StringBuilder.cloudwatchAgent(applicationRegion: String) {
+        cloudwatchAgentInstall(applicationRegion)
+        cloudwatchAgentConfig()
+    }
+
+    /**
+     * Download + install the CloudWatch agent .deb. The Image Builder path installs the agent via the
+     * AWS-managed `amazon-cloudwatch-agent-linux` component instead, so it only needs [cloudwatchAgentConfig].
+     */
+    protected fun StringBuilder.cloudwatchAgentInstall(applicationRegion: String) {
         appendLine(
             $$"""
 # === Install CloudWatch Agent ===
@@ -572,7 +641,14 @@ curl $${
             } -o cw_agent.deb
 dpkg -i cw_agent.deb
 rm -f cw_agent.deb
+"""
+        )
+    }
 
+    /** Write the CloudWatch agent config (log groups + metrics) and enable the service. */
+    protected fun StringBuilder.cloudwatchAgentConfig() {
+        appendLine(
+            $$"""
 # === CloudWatch Agent Configuration ===
 echo "[INFO] Creating amazon-cloudwatch-agent.json for CloudWatch $(date)"
 cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json << EOF
@@ -855,6 +931,62 @@ echo "[INFO] Creating Lightning Server Redeploy Script - DONE"
     }
 
     /**
+     * Key policy for the shared customer-managed key. Grants: the account root full control (so IAM policies
+     * on principals like the instance role can grant use); the Auto Scaling service-linked role (required or
+     * the ASG cannot launch instances with CMK-encrypted EBS); the CloudWatch Logs service (to encrypt the log
+     * group); and the SNS service (to encrypt topic messages).
+     */
+    protected open fun kmsKeyPolicyJson(): String {
+        val account = expression("data.aws_caller_identity.current.account_id")
+        return Json.encodeToString(buildJsonObject {
+            put("Version", "2012-10-17")
+            putJsonArray("Statement") {
+                addJsonObject {
+                    put("Sid", "EnableRootAndIam")
+                    put("Effect", "Allow")
+                    put("Principal", buildJsonObject { put("AWS", "arn:aws:iam::$account:root") })
+                    put("Action", "kms:*")
+                    put("Resource", "*")
+                }
+                addJsonObject {
+                    put("Sid", "AllowAutoScalingServiceLinkedRole")
+                    put("Effect", "Allow")
+                    put("Principal", buildJsonObject {
+                        put("AWS", "arn:aws:iam::$account:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling")
+                    })
+                    putJsonArray("Action") {
+                        listOf("kms:Encrypt", "kms:Decrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:DescribeKey", "kms:CreateGrant")
+                            .forEach { add(it) }
+                    }
+                    put("Resource", "*")
+                }
+                addJsonObject {
+                    put("Sid", "AllowCloudWatchLogs")
+                    put("Effect", "Allow")
+                    put("Principal", buildJsonObject { put("Service", "logs.$applicationRegion.amazonaws.com") })
+                    putJsonArray("Action") {
+                        listOf("kms:Encrypt", "kms:Decrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:DescribeKey")
+                            .forEach { add(it) }
+                    }
+                    put("Resource", "*")
+                    put("Condition", buildJsonObject {
+                        put("ArnLike", buildJsonObject {
+                            put("kms:EncryptionContext:aws:logs:arn", "arn:aws:logs:$applicationRegion:$account:log-group:*")
+                        })
+                    })
+                }
+                addJsonObject {
+                    put("Sid", "AllowSns")
+                    put("Effect", "Allow")
+                    put("Principal", buildJsonObject { put("Service", "sns.amazonaws.com") })
+                    putJsonArray("Action") { listOf("kms:Decrypt", "kms:GenerateDataKey*").forEach { add(it) } }
+                    put("Resource", "*")
+                }
+            }
+        })
+    }
+
+    /**
      * Escapes a string for safe use in shell commands by wrapping in single quotes
      * and escaping any existing single quotes.
      */
@@ -878,7 +1010,7 @@ echo "[INFO] Creating Lightning Server Redeploy Script - DONE"
  * Shared by both EC2 builders.
  */
 internal fun TerraformEmitterAws.emitVpc(
-    info: AwsVpc.TFManaged,
+    info: VpcInfoTerraformManaged,
     enableIPv6: Boolean,
 ) {
     val cidr = "${info.ipPrefix}.0.0/16"

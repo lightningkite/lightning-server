@@ -1,0 +1,297 @@
+{
+    "data": {
+        "external": {
+            "jar_hash": {
+                "program": [
+                    "bash",
+                    "-c",
+                    "f=$(ls \"${path.module}/../../build/distributions/server.zip\" | head -1) && hash=$(sha256sum \"$f\" | cut -d' ' -f1) && printf '{\"hash\":\"%s\",\"path\":\"%s\"}' \"$hash\" \"$f\""
+                ]
+            }
+        }
+    },
+    "resource": {
+        "aws_s3_bucket_server_side_encryption_configuration": {
+            "deployment": {
+                "bucket": "${aws_s3_bucket.deployment.id}",
+                "rule": {
+                    "apply_server_side_encryption_by_default": {
+                        "sse_algorithm": "AES256"
+                    }
+                }
+            }
+        },
+        "aws_s3_bucket_lifecycle_configuration": {
+            "deployment": {
+                "bucket": "${aws_s3_bucket.deployment.id}",
+                "depends_on": [
+                    "aws_s3_bucket_versioning.deployment"
+                ],
+                "rule": [
+                    {
+                        "id": "expire-noncurrent-versions",
+                        "noncurrent_version_expiration": {
+                            "noncurrent_days": 30
+                        },
+                        "status": "Enabled"
+                    },
+                    {
+                        "abort_incomplete_multipart_upload": {
+                            "days_after_initiation": 7
+                        },
+                        "id": "abort-incomplete-multipart-uploads",
+                        "status": "Enabled"
+                    }
+                ]
+            }
+        },
+        "null_resource": {
+            "upload_jar": {
+                "provisioner": {
+                    "local-exec": {
+                        "command": "aws s3 cp \"${data.external.jar_hash.result.path}\" s3://${aws_s3_bucket.deployment.id}/server.zip --region us-west-2"
+                    }
+                },
+                "depends_on": [
+                    "aws_s3_bucket.deployment"
+                ],
+                "triggers": {
+                    "jar_hash": "${data.external.jar_hash.result.hash}"
+                }
+            },
+            "encrypt_settings": {
+                "provisioner": {
+                    "local-exec": {
+                        "environment": {
+                            "SETTINGS_PASS": "${random_password.settings.result}"
+                        },
+                        "command": "openssl enc -aes-256-cbc -pbkdf2 -iter 100000 -md sha256 -in \"${local_sensitive_file.settings_raw.filename}\" -out \"${path.module}/build/settings.enc\" -pass env:SETTINGS_PASS"
+                    }
+                },
+                "depends_on": [
+                    "local_sensitive_file.settings_raw"
+                ],
+                "triggers": {
+                    "settings_hash": "${local_sensitive_file.settings_raw.content_sha256}"
+                }
+            },
+            "upload_settings": {
+                "provisioner": {
+                    "local-exec": {
+                        "command": "aws s3 cp \"${path.module}/build/settings.enc\" s3://${aws_s3_bucket.deployment.id}/settings.enc --region us-west-2"
+                    }
+                },
+                "depends_on": [
+                    "null_resource.encrypt_settings",
+                    "aws_s3_bucket.deployment"
+                ],
+                "triggers": {
+                    "settings_hash": "${local_sensitive_file.settings_raw.content_sha256}"
+                }
+            }
+        },
+        "aws_ssm_parameter": {
+            "settings_password": {
+                "name": "/LightningServerEC2SDemo/settings-password",
+                "description": "AES-256 passphrase used to encrypt/decrypt the Lightning Server Demo settings bundle",
+                "type": "SecureString",
+                "value": "${random_password.settings.result}"
+            }
+        },
+        "aws_iam_role": {
+            "ec2": {
+                "name": "LightningServerEC2SDemo-ec2-role",
+                "assume_role_policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ec2.amazonaws.com\"}}]}"
+            }
+        },
+        "aws_iam_instance_profile": {
+            "ec2": {
+                "role": "${aws_iam_role.ec2.name}",
+                "name": "LightningServerEC2SDemo-ec2-profile"
+            }
+        },
+        "local_sensitive_file": {
+            "settings_raw": {
+                "filename": "${path.module}/build/raw-settings.json",
+                "content": "${jsonencode(local.settings_raw)}"
+            }
+        },
+        "aws_s3_bucket_public_access_block": {
+            "deployment": {
+                "bucket": "${aws_s3_bucket.deployment.id}",
+                "block_public_policy": true,
+                "block_public_acls": true,
+                "ignore_public_acls": true,
+                "restrict_public_buckets": true
+            }
+        },
+        "aws_iam_role_policy_attachment": {
+            "ssm": {
+                "policy_arn": "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+                "role": "${aws_iam_role.ec2.name}"
+            },
+            "servicesAccess": {
+                "policy_arn": "${aws_iam_policy.servicesAccess.arn}",
+                "role": "${aws_iam_role.ec2.name}"
+            },
+            "cloudwatch_agent": {
+                "policy_arn": "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy",
+                "role": "${aws_iam_role.ec2.name}"
+            }
+        },
+        "aws_iam_policy": {
+            "servicesAccess": {
+                "path": "/lightningserverec2sdemo/servicesAccess/",
+                "name": "LightningServerEC2SDemo-servicesAccess",
+                "description": "Access to Lightning Server Demo services",
+                "policy": "${jsonencode(local.servicesAccessPolicy)}"
+            }
+        },
+        "random_password": {
+            "settings": {
+                "special": true,
+                "length": 32,
+                "override_special": "-_"
+            }
+        },
+        "aws_s3_bucket_versioning": {
+            "deployment": {
+                "bucket": "${aws_s3_bucket.deployment.id}",
+                "versioning_configuration": {
+                    "status": "Enabled"
+                }
+            }
+        },
+        "aws_s3_bucket": {
+            "deployment": {
+                "force_destroy": true,
+                "bucket_prefix": "lightningserverec2sdemo-deploy"
+            }
+        }
+    },
+    "locals": {
+        "settings_raw": {
+            "cache": "redis://${element(aws_elasticache_cluster.redis.cache_nodes, 0).address}:${element(aws_elasticache_cluster.redis.cache_nodes, 0).port}/0",
+            "cors": {
+                "limitToDomains": [
+                    "*"
+                ],
+                "limitToHeaders": [
+                    "*"
+                ],
+                "limitToMethods": [
+                    "*"
+                ],
+                "exposedHeaders": [
+                    "*"
+                ],
+                "allowCredentials": true,
+                "cacheLength": "PT5S",
+                "forbidOnMatchFail": false
+            },
+            "secretBasis": "${random_password.secretBasis.result}",
+            "ktorRunConfig": {
+                "host": "0.0.0.0",
+                "port": 8080,
+                "realIpHeader": "X-Forwarded-For"
+            },
+            "engine-cache": "redis://${element(aws_elasticache_cluster.redis.cache_nodes, 0).address}:${element(aws_elasticache_cluster.redis.cache_nodes, 0).port}/0",
+            "phoneCall": "${var.phoneCall}",
+            "githubOauth": "${var.githubOauth}",
+            "engine-pubSub": "redis://${element(aws_elasticache_cluster.redis.cache_nodes, 0).address}:${element(aws_elasticache_cluster.redis.cache_nodes, 0).port}/0",
+            "nettyRunConfig": {
+                "host": "0.0.0.0",
+                "port": 8080,
+                "realIpHeader": "X-Forwarded-For"
+            },
+            "general": {
+                "projectName": "Lightning Server Demo",
+                "publicUrl": "https://lightningserver2.cs.lightningkite.com",
+                "wsUrl": "wss://lightningserver2.cs.lightningkite.com",
+                "debug": true,
+                "emergencyContact": "joseph@lightningkite.com"
+            },
+            "database": "mongodb://master:${random_password.database.result}@${aws_docdb_cluster.database.endpoint}:${aws_docdb_cluster.database.port}/default?replicaSet=rs0&retryWrites=false&tls=true",
+            "emailInbound": "ses://",
+            "sms": "${var.sms}",
+            "files": "s3://${aws_s3_bucket.files.bucket}.s3-${aws_s3_bucket.files.region}.amazonaws.com/?signedUrlDuration=1d",
+            "logging": {
+                "default": {
+                    "filePattern": null,
+                    "toConsole": true,
+                    "level": "INFO",
+                    "additive": false
+                },
+                "logger": {
+                    "org.mongodb": {
+                        "filePattern": null,
+                        "toConsole": true,
+                        "level": "WARN",
+                        "additive": false
+                    }
+                }
+            },
+            "telemetry": null,
+            "someSecret": "${var.someSecret}",
+            "voiceAgent": "${var.voiceAgent}",
+            "smsInbound": "${var.smsInbound}",
+            "email": "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587?fromEmail=noreply@lightningserver2.cs.lightningkite.com",
+            "pubSub": "redis://${element(aws_elasticache_cluster.redis.cache_nodes, 0).address}:${element(aws_elasticache_cluster.redis.cache_nodes, 0).port}/0"
+        },
+        "servicesAccessPolicy": {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Action": [
+                        "s3:ListBucket",
+                        "s3:GetBucketLocation"
+                    ],
+                    "Effect": "Allow",
+                    "Resource": [
+                        "${aws_s3_bucket.files.arn}"
+                    ]
+                },
+                {
+                    "Action": [
+                        "s3:GetObject",
+                        "s3:PutObject",
+                        "s3:DeleteObject"
+                    ],
+                    "Effect": "Allow",
+                    "Resource": [
+                        "${aws_s3_bucket.files.arn}/*"
+                    ]
+                },
+                {
+                    "Action": [
+                        "s3:GetObject"
+                    ],
+                    "Effect": "Allow",
+                    "Resource": [
+                        "${aws_s3_bucket.deployment.arn}/*"
+                    ]
+                },
+                {
+                    "Action": [
+                        "logs:CreateLogStream",
+                        "logs:PutLogEvents",
+                        "logs:DescribeLogStreams"
+                    ],
+                    "Effect": "Allow",
+                    "Resource": [
+                        "${aws_cloudwatch_log_group.application.arn}:*"
+                    ]
+                },
+                {
+                    "Action": [
+                        "ssm:GetParameter"
+                    ],
+                    "Effect": "Allow",
+                    "Resource": [
+                        "${aws_ssm_parameter.settings_password.arn}"
+                    ]
+                }
+            ]
+        }
+    }
+}

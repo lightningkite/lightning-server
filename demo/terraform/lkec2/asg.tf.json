@@ -1,0 +1,100 @@
+{
+    "resource": {
+        "aws_launch_template": {
+            "app": {
+                "name_prefix": "LightningServerEC2SDemo-",
+                "block_device_mappings": {
+                    "device_name": "/dev/sda1",
+                    "ebs": {
+                        "volume_type": "gp3",
+                        "encrypted": true,
+                        "volume_size": 20,
+                        "delete_on_termination": true
+                    }
+                },
+                "iam_instance_profile": {
+                    "name": "${aws_iam_instance_profile.ec2.name}"
+                },
+                "update_default_version": true,
+                "metadata_options": {
+                    "http_endpoint": "enabled",
+                    "http_tokens": "required",
+                    "http_put_response_hop_limit": 1
+                },
+                "tag_specifications": {
+                    "resource_type": "instance",
+                    "tags": {
+                        "Name": "Lightning Server Demo"
+                    }
+                },
+                "vpc_security_group_ids": [
+                    "${aws_security_group.instance.id}",
+                    "${aws_security_group.internal.id}"
+                ],
+                "user_data": "${base64encode(templatefile(\"${path.module}/boot.sh\", { deployment_bucket = aws_s3_bucket.deployment.id, aws_region = \"us-west-2\" }))}",
+                "image_id": "${tolist(aws_imagebuilder_image.this.output_resources[0].amis)[0].image}",
+                "instance_type": "t4g.micro"
+            }
+        },
+        "aws_autoscaling_policy": {
+            "cpu": {
+                "autoscaling_group_name": "${aws_autoscaling_group.app.name}",
+                "policy_type": "TargetTrackingScaling",
+                "name": "LightningServerEC2SDemo-cpu-target",
+                "target_tracking_configuration": {
+                    "predefined_metric_specification": {
+                        "predefined_metric_type": "ASGAverageCPUUtilization"
+                    },
+                    "target_value": 50
+                }
+            }
+        },
+        "aws_autoscaling_group": {
+            "app": {
+                "target_group_arns": [
+                    "${aws_lb_target_group.app.arn}"
+                ],
+                "depends_on": [
+                    "null_resource.upload_jar",
+                    "null_resource.upload_settings",
+                    "aws_ssm_parameter.settings_password"
+                ],
+                "health_check_grace_period": 300,
+                "instance_refresh": {
+                    "preferences": {
+                        "min_healthy_percentage": 90,
+                        "auto_rollback": true
+                    },
+                    "strategy": "Rolling"
+                },
+                "max_size": 6,
+                "lifecycle": {
+                    "ignore_changes": [
+                        "desired_capacity"
+                    ]
+                },
+                "name_prefix": "LightningServerEC2SDemo-",
+                "health_check_type": "ELB",
+                "desired_capacity": 2,
+                "vpc_zone_identifier": "${module.vpc.private_subnets}",
+                "min_size": 2,
+                "tag": [
+                    {
+                        "propagate_at_launch": true,
+                        "value": "Lightning Server Demo",
+                        "key": "Name"
+                    },
+                    {
+                        "propagate_at_launch": true,
+                        "value": "LightningServerEC2SDemo",
+                        "key": "lightning-server-asg"
+                    }
+                ],
+                "launch_template": {
+                    "id": "${aws_launch_template.app.id}",
+                    "version": "${aws_launch_template.app.latest_version}"
+                }
+            }
+        }
+    }
+}
