@@ -4,7 +4,6 @@ import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.terraform.*
-import com.lightningkite.lightningserver.terraform.aws.VpcInfoTerraformManaged
 import com.lightningkite.services.data.DataSize
 import com.lightningkite.services.data.DataSize.Companion.mebibytes
 import com.lightningkite.services.data.EmailAddress
