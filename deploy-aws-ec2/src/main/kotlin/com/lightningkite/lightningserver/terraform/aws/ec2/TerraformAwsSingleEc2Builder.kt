@@ -1,11 +1,10 @@
-package com.lightningkite.lightningserver.terraform.awsec2
+package com.lightningkite.lightningserver.terraform.aws.ec2
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.terraform.*
+import com.lightningkite.lightningserver.terraform.aws.VpcInfoTerraformManaged
 import com.lightningkite.services.Untested
 import com.lightningkite.services.kfile.KFile
 import com.lightningkite.services.terraform.*
-import com.lightningkite.services.terraform.TerraformJsonObject.Companion.expression
 
 
 /**
@@ -64,7 +63,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
     public open val ec2InitScripts: List<KFile> = emptyList()
 
     /** Direct application only accessible internally; we force using Angie. */
-    override val appExposedPublicly: Boolean get() = false
+    override val appBindsAllNetworkInterfaces: Boolean get() = false
 
     override fun registerProviders() {
         require(TerraformProviderImport.tls)
@@ -73,7 +72,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
     override fun emitDeploymentSpecific() {
         emitSshKeyPair()
         emitNetworkResources()
-        (applicationVpc as? AwsVpc.TFManaged)?.also {
+        (applicationVpc as? VpcInfoTerraformManaged)?.also {
             emitVpc(it, enableIPv6)
         }
         if (enableIPv4)

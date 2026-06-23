@@ -6,6 +6,12 @@ import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.definition.telemetrySettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.terraform.aws.VpcInfoTerraformManaged
+import com.lightningkite.lightningserver.terraform.aws.ec2.TerraformAwsEc2BuilderBase
+import com.lightningkite.lightningserver.terraform.aws.ec2.StigLevel
+import com.lightningkite.lightningserver.terraform.aws.ec2.TerraformAwsScalingEc2Builder
+import com.lightningkite.lightningserver.terraform.aws.ec2.stigBuildLinux
+import com.lightningkite.lightningserver.terraform.aws.ec2.TerraformAwsSingleEc2Builder
 import com.lightningkite.services.data.EmailAddress
 import com.lightningkite.services.terraform.AwsVpc
 import kotlinx.serialization.json.*
@@ -39,7 +45,7 @@ class Ec2BuilderGenerationTest {
         if (cacheUrl != null) fulfillSetting("cache", JsonPrimitive(cacheUrl))
     }
 
-    private val managedVpc = AwsVpc.TFManaged(
+    private val managedVpc = VpcInfoTerraformManaged(
         ipPrefix = "10.0",
         availabilityZones = listOf("us-west-2a", "us-west-2b"),
         natGateway = AwsVpc.NatGateway.Single,
@@ -94,6 +100,24 @@ class Ec2BuilderGenerationTest {
         override fun OnlineServer.settings() = fulfillGlobals()
     }
 
+    inner class CmkScalingDeployment : TerraformAwsScalingEc2Builder<TestServer>(TestServer) {
+        override val storageBucket = "test-tf-state"
+        override val region: Region = Region.US_WEST_2
+        override val displayName = "Cmk Test"
+        override val domainZone = "example.com"
+        override val domain = "cmk.example.com"
+        override val debug = true
+        override val emergencyContact = EmailAddress("ops@example.com")
+        override val instanceType = "t4g.medium"
+        override val instanceArchitecture = CPUArchitecture.Arm
+        override val applicationVpc = managedVpc
+        override val customerManagedKey = true
+        override val wafEnabled = true
+        override val hardeningComponents = listOf(stigBuildLinux(StigLevel.Low))
+        override val terraformRoot = File(tmpRoot, "cmk")
+        override fun TestServer.settings() = fulfillGlobals("redis://cache:6379")
+    }
+
     /** Finds a single resource block (`resource.<type>.<name>`) across all generated files. */
     private fun File.findResource(type: String, name: String): JsonObject? {
         listFiles { f -> f.name.endsWith(".tf.json") }?.forEach { file ->
@@ -109,6 +133,36 @@ class Ec2BuilderGenerationTest {
             (Json.parseToJsonElement(file.readText()).jsonObject["resource"] as? JsonObject)
                 ?.keys?.let { addAll(it) }
         }
+    }
+
+    @Test
+    fun customerManagedKeyAndWafGenerate() {
+        val d = CmkScalingDeployment()
+        d.write()
+        val types = d.terraformRoot.resourceTypes()
+        // The shared CMK and the WAF are emitted.
+        assertContains(types, "aws_kms_key")
+        assertContains(types, "aws_wafv2_web_acl")
+        assertContains(types, "aws_wafv2_web_acl_association")
+        // EBS volumes, the log group, and the deployment-bucket SSE all reference the key.
+        val ebs = d.terraformRoot.findResource("aws_launch_template", "app")!!
+            .let { it["block_device_mappings"]!!.jsonObject["ebs"]!!.jsonObject }
+        assertNotNull(ebs["kms_key_id"])
+        val logGroup = d.terraformRoot.findResource("aws_cloudwatch_log_group", "application")!!
+        assertNotNull(logGroup["kms_key_id"])
+        val deploymentSse = d.terraformRoot.findResource("aws_s3_bucket_server_side_encryption_configuration", "deployment")!!
+            .let { it["rule"]!!.jsonObject["apply_server_side_encryption_by_default"]!!.jsonObject }
+        assertEquals("aws:kms", deploymentSse["sse_algorithm"]!!.jsonPrimitive.content)
+        // The key policy must grant the Auto Scaling service-linked role, or the ASG can't launch instances.
+        val keyPolicy = d.terraformRoot.findResource("aws_kms_key", "main")!!["policy"]!!.jsonPrimitive.content
+        assertContains(keyPolicy, "AWSServiceRoleForAutoScaling")
+        assertContains(keyPolicy, "logs.us-west-2.amazonaws.com")
+        // The parameterized STIG component is present with its Level parameter.
+        val components = d.terraformRoot.findResource("aws_imagebuilder_image_recipe", "this")!!["component"]!!.jsonArray
+        val stig = components.map { it.jsonObject }.single { it["component_arn"]!!.jsonPrimitive.content.contains("stig-build-linux") }
+        assertContains(stig["component_arn"]!!.jsonPrimitive.content, "component/stig-build-linux/x.x.x")
+        val levelParam = stig["parameter"]!!.jsonArray.map { it.jsonObject }.single { it["name"]!!.jsonPrimitive.content == "Level" }
+        assertEquals("Low", levelParam["value"]!!.jsonPrimitive.content)
     }
 
     @Test

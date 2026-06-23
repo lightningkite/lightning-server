@@ -143,7 +143,7 @@ object MyScaledDeployment : TerraformAwsScalingEc2Builder<Server>(Server) {
     override val instanceArchitecture = CPUArchitecture.Arm
 
     // Must provide private subnets + NAT egress (Default VPC is not sufficient).
-    override val applicationVpc = AwsVpc.TFManaged(
+    override val applicationVpc = VpcInfoTFManaged(
         ipPrefix = "10.0",
         availabilityZones = listOf("us-west-2a", "us-west-2b", "us-west-2c"),
         natGateway = AwsVpc.NatGateway.Single,

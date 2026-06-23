@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.terraform.awsserverless
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.terraform.aws.VpcInfoTerraformManaged
 import com.lightningkite.services.terraform.*
 import com.lightningkite.services.terraform.TerraformJsonObject.Companion.expression
 
@@ -16,7 +17,7 @@ public abstract class TerraformAwsServerlessDomainBuilder<S : ServerBuilder>(
 
 
     override fun prepareForWrite() {
-        (applicationVpc as? AwsVpc.TFManaged)?.also {
+        (applicationVpc as? VpcInfoTerraformManaged)?.also {
             emitVpc(it)
         }
         super.prepareForWrite()
@@ -34,7 +35,7 @@ private fun TerraformEmitterAws.domainZoneId(domainZone: String): String {
 }
 
 private fun TerraformEmitterAws.emitVpc(
-    info: AwsVpc.TFManaged
+    info: VpcInfoTerraformManaged
 ) {
     emit("cloud") {
         "module.vpc" {

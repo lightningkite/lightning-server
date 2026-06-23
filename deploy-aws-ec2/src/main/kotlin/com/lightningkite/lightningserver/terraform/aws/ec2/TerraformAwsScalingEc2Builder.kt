@@ -1,6 +1,7 @@
-package com.lightningkite.lightningserver.terraform.awsec2
+package com.lightningkite.lightningserver.terraform.aws.ec2
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.terraform.aws.VpcInfoTerraformManaged
 import com.lightningkite.services.Untested
 import com.lightningkite.services.terraform.*
 import com.lightningkite.services.terraform.TerraformJsonObject.Companion.expression
@@ -54,7 +55,7 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
     public open val desiredCapacity: Int get() = 2
 
     /** Exposed publicly for the ALB to reach */
-    override val appExposedPublicly: Boolean get() = true
+    override val appBindsAllNetworkInterfaces: Boolean get() = true
 
     /**
      * Health-check path the ALB polls; must return 2xx/3xx when the app is alive. Defaults to the
@@ -120,6 +121,13 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
     public open val albAccessLogRetentionDays: Int get() = 90
 
     /**
+     * Whether to attach an AWS WAFv2 web ACL (AWS managed common + known-bad-inputs rule sets) to the ALB.
+     * Off by default — WAF adds hourly + per-request cost and can block legitimate traffic if rules are tuned
+     * too aggressively, so it's an opt-in.
+     */
+    public open val wafEnabled: Boolean get() = false
+
+    /**
      * Salt folded into the golden-AMI version. Bump this to force a re-bake even when the install
      * script itself has not changed — which is how you pick up OS security patches: a re-bake
      * starts from the latest Ubuntu base and re-runs `apt-get upgrade`. To rebuild on a schedule
@@ -127,6 +135,37 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
      * each apply produces a fresh, fully-patched AMI and a rolling instance refresh onto it.
      */
     public open val baseImageSalt: String get() = "1"
+
+    /**
+     * AWS-managed EC2 Image Builder components installed before the custom component. These replace
+     * hand-rolled install steps with AWS-maintained ones (e.g. the AWS CLI and the CloudWatch agent).
+     */
+    public open val imageManagedComponents: List<ImageComponent>
+        get() = listOf(ImageComponent("aws-cli-version-2-linux"), ImageComponent("amazon-cloudwatch-agent-linux"))
+
+    /**
+     * Components applied *after* everything is installed — typically OS hardening. Empty by default; enable
+     * STIG with the [stigBuildLinux] shortcut, e.g. `override val hardeningComponents = listOf(stigBuildLinux(StigLevel.Low))`.
+     */
+    public open val hardeningComponents: List<ImageComponent>
+        get() = emptyList()
+
+    /** Seconds apt waits for the dpkg lock (held briefly at boot by Ubuntu's apt-daily) before failing. */
+    public open val aptLockTimeoutSeconds: Int get() = 600
+
+    /** A full component ARN passes through unchanged; a short name expands to the latest AWS-managed version. */
+    private fun managedComponentArn(name: String): String =
+        if (name.startsWith("arn:")) name else "arn:aws:imagebuilder:$applicationRegion:aws:component/$name/x.x.x"
+
+    /** Render an [ImageComponent] as a recipe `component` block, including a `parameter` list when present. */
+    private fun ImageComponent.toRecipeComponent(): JsonElement = terraformJsonObject {
+        "component_arn" - managedComponentArn(arnOrName)
+        if (parameters.isNotEmpty()) {
+            "parameter" - parameters.entries.map<Map.Entry<String, String>, JsonElement> { (k, v) ->
+                terraformJsonObject { "name" - k; "value" - v }
+            }
+        }
+    }
 
     override fun validateConfiguration() {
         // The fleet relies on the shared cache to ensure scheduled tasks run once across all
@@ -148,7 +187,7 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
     }
 
     override fun emitDeploymentSpecific() {
-        (applicationVpc as? AwsVpc.TFManaged)?.also { emitVpc(it, enableIPv6) }
+        (applicationVpc as? VpcInfoTerraformManaged)?.also { emitVpc(it, enableIPv6) }
         emitSecurityGroups()
         emitImageBuilder()
         emitAlb()
@@ -246,7 +285,10 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
 
     /** Semver-ish version derived from the install script so the AMI re-bakes only on change. */
     private val imageVersion: String by lazy {
-        val patch = (imageInstallScript() + baseImageSalt).hashCode().absoluteValue % 100000
+        // Fold the component lists in too, so changing managed/hardening components re-bakes the AMI.
+        val saltInput = imageInstallScript() + baseImageSalt +
+            imageManagedComponents.joinToString(",") + hardeningComponents.joinToString(",")
+        val patch = saltInput.hashCode().absoluteValue % 100000
         "1.0.$patch"
     }
 
@@ -311,8 +353,12 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
                 "name" - "$projectPrefix-recipe"
                 "version" - imageVersion
                 "parent_image" - expression("data.aws_ami.ubuntu.id")
-                "component" {
-                    "component_arn" - expression("aws_imagebuilder_component.install.arn")
+                // Ordered: AWS-managed installs first, then our custom component, then hardening last so it
+                // locks down the fully-built image.
+                "component" - buildList<JsonElement> {
+                    imageManagedComponents.forEach { add(it.toRecipeComponent()) }
+                    add(terraformJsonObject { "component_arn" - expression("aws_imagebuilder_component.install.arn") })
+                    hardeningComponents.forEach { add(it.toRecipeComponent()) }
                 }
                 "block_device_mapping" {
                     "device_name" - "/dev/sda1"
@@ -371,16 +417,19 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
             appendLine("#!/bin/bash")
             appendLine("set -euo pipefail")
             appendLine("export DEBIAN_FRONTEND=noninteractive")
-            appendLine("apt-get update -y")
-            // Patch the base OS at bake time so a re-bake (bump baseImageSalt) ships a fully
-            // patched image rather than only whatever was in the parent AMI.
-            appendLine("apt-get upgrade -y")
-            appendLine("apt-get install -y openjdk-17-jre-headless openssl curl gnupg ca-certificates unzip")
+            // A freshly-booted Ubuntu holds the dpkg lock for the first few minutes (apt-daily/
+            // unattended-upgrades); wait for it instead of failing or appearing to hang. We intentionally
+            // do NOT run a blanket `apt-get upgrade` — the AWS-managed `update-linux` component (or a
+            // baseImageSalt bump onto the latest base AMI) is the controlled way to pick up patches.
+            val apt = "apt-get -o DPkg::Lock::Timeout=$aptLockTimeoutSeconds"
+            appendLine("$apt update -y")
+            appendLine("$apt install -y openjdk-17-jre-headless openssl curl gnupg ca-certificates unzip")
             if (additionalPackages.isNotEmpty()) {
-                appendLine("apt-get install -y ${additionalPackages.joinToString(" ") { it.shellEscape() }}")
+                appendLine("$apt install -y ${additionalPackages.joinToString(" ") { it.shellEscape() }}")
             }
-            cloudwatchAgent(applicationRegion)
-            awsCli()
+            // The AWS CLI and the CloudWatch agent binary are installed by AWS-managed components
+            // (see imageManagedComponents) that run before this one; we only write the agent config here.
+            cloudwatchAgentConfig()
             ssm()
             systemD()
             // The redeploy script reads the bucket + region from deploy.env written at boot, and
@@ -516,6 +565,45 @@ $indentedScript
                     }
                 }
             }
+            if (wafEnabled) emitWaf()
+        }
+    }
+
+    /** Regional WAFv2 web ACL with AWS-managed rule sets, associated with the ALB. */
+    private fun TerraformJsonObject.emitWaf() {
+        fun managedRule(ruleName: String, priority: Int): JsonElement = terraformJsonObject {
+            "name" - ruleName
+            "priority" - priority
+            "override_action" { "none" { } }
+            "statement" {
+                "managed_rule_group_statement" {
+                    "name" - ruleName
+                    "vendor_name" - "AWS"
+                }
+            }
+            "visibility_config" {
+                "cloudwatch_metrics_enabled" - true
+                "metric_name" - "$projectPrefix-$ruleName"
+                "sampled_requests_enabled" - true
+            }
+        }
+        "resource.aws_wafv2_web_acl.main" {
+            "name" - "$projectPrefix-waf"
+            "scope" - "REGIONAL"
+            "default_action" { "allow" { } }
+            "rule" - listOf<JsonElement>(
+                managedRule("AWSManagedRulesCommonRuleSet", 1),
+                managedRule("AWSManagedRulesKnownBadInputsRuleSet", 2),
+            )
+            "visibility_config" {
+                "cloudwatch_metrics_enabled" - true
+                "metric_name" - "$projectPrefix-waf"
+                "sampled_requests_enabled" - true
+            }
+        }
+        "resource.aws_wafv2_web_acl_association.main" {
+            "resource_arn" - expression("aws_lb.app.arn")
+            "web_acl_arn" - expression("aws_wafv2_web_acl.main.arn")
         }
     }
 
@@ -551,15 +639,16 @@ $indentedScript
                     }
                 }
             }
-            // Allow the regional ELB log-delivery service to write access logs.
-            "data.aws_elb_service_account.main" {}
+            // Allow the ELB log-delivery service to write access logs. Granting the service principal
+            // (rather than the deprecated per-region `aws_elb_service_account`) is AWS's current method and
+            // is the only one that works in regions launched after August 2022.
             "data.aws_iam_policy_document.alb_logs" {
                 "statement" {
                     "actions" - listOf("s3:PutObject")
                     "resources" - listOf($$"${aws_s3_bucket.alb_logs.arn}/$$projectPrefix/*")
                     "principals" {
-                        "type" - "AWS"
-                        "identifiers" - listOf(expression("aws_elb_service_account.main.arn"))
+                        "type" - "Service"
+                        "identifiers" - listOf("logdelivery.elasticloadbalancing.amazonaws.com")
                     }
                 }
             }
@@ -577,7 +666,7 @@ $indentedScript
         emit("asg") {
             "resource.aws_launch_template.app" {
                 "name_prefix" - "$projectPrefix-"
-                "image_id" - expression("aws_imagebuilder_image.this.output_resources[0].amis[0].image")
+                "image_id" - expression("tolist(aws_imagebuilder_image.this.output_resources[0].amis)[0].image")
                 "instance_type" - instanceType
                 "update_default_version" - true
                 "iam_instance_profile" {
@@ -599,6 +688,7 @@ $indentedScript
                         "volume_size" - volumeSizeGiB
                         "volume_type" - "gp3"
                         "encrypted" - true
+                        sharedKmsKeyArn?.let { "kms_key_id" - it }
                         "delete_on_termination" - true
                     }
                 }
@@ -639,7 +729,7 @@ $indentedScript
                         "min_healthy_percentage" - instanceRefreshMinHealthyPercent
                         "auto_rollback" - true
                     }
-                    "triggers" - listOf("launch_template")
+                    // Launch template changes implicitly trigger a refresh; no explicit trigger needed.
                 }
                 "tag" - listOf(
                     terraformJsonObject {
@@ -935,9 +1025,11 @@ log "Rolling redeploy complete."
             "resource.aws_cloudwatch_log_group.application" {
                 "name" - "/ec2/$projectPrefix/application"
                 "retention_in_days" - logRetentionDays
+                sharedKmsKeyArn?.let { "kms_key_id" - it }
             }
             "resource.aws_sns_topic.emergency" {
                 "name" - "${projectPrefix}_emergencies"
+                sharedKmsKeyArn?.let { "kms_master_key_id" - it }
             }
             "resource.aws_sns_topic_subscription.emergency_primary" {
                 "topic_arn" - expression("aws_sns_topic.emergency.arn")

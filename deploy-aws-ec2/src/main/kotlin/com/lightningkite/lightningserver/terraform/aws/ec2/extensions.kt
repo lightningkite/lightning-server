@@ -1,4 +1,4 @@
-package com.lightningkite.lightningserver.terraform.awsec2
+package com.lightningkite.lightningserver.terraform.aws.ec2
 
 import com.lightningkite.services.terraform.TerraformEmitter
 
@@ -8,3 +8,4 @@ import com.lightningkite.services.terraform.TerraformEmitter
  */
 public val TerraformEmitter.projectPrefixPath: String
     get() = projectPrefix.lowercase().replace("-", "/").replace("_", "")
+

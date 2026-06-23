@@ -17,7 +17,7 @@
     "resource": {
         "aws_sns_topic": {
             "emailInbound": {
-                "name": "LightningServerDemo-emailInbound-email-inbound"
+                "name": "LightningServerEC2SDemo-emailInbound-email-inbound"
             }
         },
         "null_resource": {
@@ -30,7 +30,7 @@
         },
         "aws_ses_receipt_rule_set": {
             "emailInbound": {
-                "rule_set_name": "LightningServerDemo-emailInbound-rules"
+                "rule_set_name": "LightningServerEC2SDemo-emailInbound-rules"
             }
         },
         "aws_ses_active_receipt_rule_set": {
@@ -49,12 +49,12 @@
                     "aws_ses_active_receipt_rule_set.emailInbound"
                 ],
                 "recipients": [
-                    "lightningserver.cs.lightningkite.com"
+                    "lightningserver2.cs.lightningkite.com"
                 ],
                 "scan_enabled": true,
-                "name": "LightningServerDemo-emailInbound-receive",
+                "name": "LightningServerEC2SDemo-emailInbound-receive",
                 "rule_set_name": "${aws_ses_receipt_rule_set.emailInbound.rule_set_name}",
-                "tls_policy": "Optional",
+                "tls_policy": "Require",
                 "enabled": true
             }
         },
@@ -64,7 +64,7 @@
                 "records": [
                     "10 inbound-smtp.us-west-2.amazonaws.com"
                 ],
-                "name": "lightningserver.cs.lightningkite.com",
+                "name": "lightningserver2.cs.lightningkite.com",
                 "type": "MX",
                 "ttl": "600"
             }

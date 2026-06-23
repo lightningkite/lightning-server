@@ -1,0 +1,133 @@
+{
+    "data": {
+        "aws_ami": {
+            "ubuntu": {
+                "filter": [
+                    {
+                        "values": [
+                            "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-arm64-server-*"
+                        ],
+                        "name": "name"
+                    },
+                    {
+                        "values": [
+                            "arm64"
+                        ],
+                        "name": "architecture"
+                    },
+                    {
+                        "values": [
+                            "hvm"
+                        ],
+                        "name": "virtualization-type"
+                    }
+                ],
+                "most_recent": true,
+                "owners": [
+                    "099720109477"
+                ]
+            }
+        }
+    },
+    "resource": {
+        "aws_iam_role_policy_attachment": {
+            "imagebuilder_core": {
+                "policy_arn": "arn:aws:iam::aws:policy/EC2InstanceProfileForImageBuilder",
+                "role": "${aws_iam_role.imagebuilder.name}"
+            },
+            "imagebuilder_ssm": {
+                "policy_arn": "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+                "role": "${aws_iam_role.imagebuilder.name}"
+            }
+        },
+        "aws_imagebuilder_image": {
+            "this": {
+                "image_tests_configuration": {
+                    "image_tests_enabled": false
+                },
+                "infrastructure_configuration_arn": "${aws_imagebuilder_infrastructure_configuration.this.arn}",
+                "image_recipe_arn": "${aws_imagebuilder_image_recipe.this.arn}",
+                "distribution_configuration_arn": "${aws_imagebuilder_distribution_configuration.this.arn}"
+            }
+        },
+        "aws_iam_role": {
+            "imagebuilder": {
+                "name": "LightningServerEC2SDemo-imagebuilder-role",
+                "assume_role_policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ec2.amazonaws.com\"}}]}"
+            }
+        },
+        "aws_imagebuilder_distribution_configuration": {
+            "this": {
+                "name": "LightningServerEC2SDemo-dist",
+                "distribution": {
+                    "ami_distribution_configuration": {
+                        "name": "LightningServerEC2SDemo-{{ imagebuilder:buildDate }}"
+                    },
+                    "region": "us-west-2"
+                }
+            }
+        },
+        "aws_iam_instance_profile": {
+            "imagebuilder": {
+                "role": "${aws_iam_role.imagebuilder.name}",
+                "name": "LightningServerEC2SDemo-imagebuilder-profile"
+            }
+        },
+        "aws_imagebuilder_component": {
+            "install": {
+                "data": "name: LightningServerEC2SDemo-install\ndescription: Install base tooling for Lightning Server Demo\nschemaVersion: 1.0\nphases:\n  - name: build\n    steps:\n      - name: Install\n        action: ExecuteBash\n        inputs:\n          commands:\n            - |\n              #!/bin/bash\n              set -euo pipefail\n              export DEBIAN_FRONTEND=noninteractive\n              apt-get -o DPkg::Lock::Timeout=600 update -y\n              apt-get -o DPkg::Lock::Timeout=600 install -y openjdk-17-jre-headless openssl curl gnupg ca-certificates unzip\n              \n              # === CloudWatch Agent Configuration ===\n              echo \"[INFO] Creating amazon-cloudwatch-agent.json for CloudWatch $(date)\"\n              cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json << EOF\n              {\n                \"logs\": {\n                  \"logs_collected\": {\n                    \"files\": {\n                      \"collect_list\": [\n                        {\n                          \"file_path\": \"/var/log/LightningServerEC2SDemo/ec2_init.log\",\n                          \"log_group_name\": \"/ec2/LightningServerEC2SDemo/application\",\n                          \"log_stream_name\": \"{instance_id}/ec2_init\"\n                        },\n                        {\n                          \"file_path\": \"/var/log/LightningServerEC2SDemo/server.log\",\n                          \"log_group_name\": \"/ec2/LightningServerEC2SDemo/application\",\n                          \"log_stream_name\": \"{instance_id}/server\"\n                        },\n                        {\n                          \"file_path\": \"/var/log/LightningServerEC2SDemo/redeploy.log\",\n                          \"log_group_name\": \"/ec2/LightningServerEC2SDemo/application\",\n                          \"log_stream_name\": \"{instance_id}/redeploy\"\n                        }\n                      ]\n                    }\n                  }\n                },\n                \"metrics\": {\n                  \"metrics_collected\": {\n                    \"mem\": {\n                      \"measurement\": [\"mem_used_percent\"]\n                    },\n                    \"disk\": {\n                      \"measurement\": [\"disk_used_percent\"],\n                      \"resources\": [\"/\"]\n                    }\n                  }\n                }\n              }\n              EOF\n              \n              systemctl enable amazon-cloudwatch-agent\n              systemctl restart amazon-cloudwatch-agent\n              \n              \n              # === SSM Agent ===\n              echo \"[INFO] Ensuring SSM agent is installed and running at $(date)\"\n              # Required so terraform can drive in-place jar/settings redeploys via\n              # `aws ssm send-command`. Ubuntu 24.04 ships amazon-ssm-agent as a snap; install if missing,\n              # then enable + start so newly-created instances register with SSM.\n              if ! snap list amazon-ssm-agent >/dev/null 2>&1; then\n                  snap install amazon-ssm-agent --classic\n                  systemctl enable snap.amazon-ssm-agent.amazon-ssm-agent.service\n                  systemctl start snap.amazon-ssm-agent.amazon-ssm-agent.service\n              fi\n              \n              \n              # === Systemd Service ===\n              echo \"[INFO] Creating Systemd unit for Lightning Server Demo\"\n              cat > /etc/systemd/system/LightningServerEC2SDemo.service << 'UNIT_EOF'\n              [Unit]\n              Description=Lightning Server Demo\n              After=network.target\n              Requires=network.target\n              \n              [Service]\n              Type=simple\n              User=ubuntu\n              WorkingDirectory=/opt/lightning-server\n              ExecStart=/opt/lightning-server/server/bin/server serve\n              \n              Restart=always\n              RestartSec=5\n              StandardOutput=append:/var/log/LightningServerEC2SDemo/server.log\n              StandardError=append:/var/log/LightningServerEC2SDemo/server.log\n              \n              Environment=JAVA_OPTS=-Xmx512m\n              \n              \n              [Install]\n              WantedBy=multi-user.target\n              UNIT_EOF\n              \n              # === Server log file ===\n              echo \"[INFO] Preparing server log directory\"\n              mkdir -p /var/log/LightningServerEC2SDemo\n              touch /var/log/LightningServerEC2SDemo/server.log\n              chown -R ubuntu:ubuntu /var/log/LightningServerEC2SDemo\n              \n              cat > /etc/logrotate.d/LightningServerEC2SDemo << 'LOGROTATE_EOF'\n              /var/log/LightningServerEC2SDemo/*.log {\n                  daily\n                  rotate 7\n                  compress\n                  delaycompress\n                  missingok\n                  notifempty\n                  copytruncate\n                  su ubuntu ubuntu\n              }\n              LOGROTATE_EOF\n              \n              \n              # === Lightning Server Redeploy Script ===\n              echo \"[INFO] Creating Lightning Server Redeploy Script\"\n              cat > /usr/local/bin/lightning-server-redeploy << 'REDEPLOY_EOF'\n              #!/bin/bash\n              set -euo pipefail\n              \n              log() { echo \"[lightning-server-redeploy] $*\"; }\n              err() { echo \"[lightning-server-redeploy] ERROR: $*\" >&2; }\n              \n              if [ -f /etc/lightning-server/deploy.env ]; then . /etc/lightning-server/deploy.env; fi\n              BUCKET=\"$DEPLOYMENT_BUCKET\"\n              REGION=\"$AWS_REGION_NAME\"\n              SSM_PARAM=\"/LightningServerEC2SDemo/settings-password\"\n              APP_DIR=\"/opt/lightning-server\"\n              LOG_FILE=\"/var/log/LightningServerEC2SDemo/redeploy.log\"\n              \n              mkdir -p \"$(dirname \"$LOG_FILE\")\"\n              touch \"$LOG_FILE\"\n              chown ubuntu:ubuntu \"$LOG_FILE\"\n              exec > >(tee -a \"$LOG_FILE\" | logger -t lightning-server-redeploy -s) 2>&1\n              \n              log \"Redeploy started at $(date)\"\n              mkdir -p \"$APP_DIR\"\n              \n              download_with_retry() {\n                  local src=\"$1\" dst=\"$2\" max=5 attempt=1\n                  while [ $attempt -le $max ]; do\n                      log \"Downloading $src (attempt $attempt/$max)\"\n                      if aws s3 cp \"$src\" \"$dst\" --region \"$REGION\" --no-progress; then return 0; fi\n                      sleep $((attempt * 5))\n                      attempt=$((attempt + 1))\n                  done\n                  err \"Failed to download $src after $max attempts\"\n                  return 1\n              }\n              \n              # Roll back to the previously-working server + settings, then restart. Used when the new\n              # version fails to become active so the instance self-heals instead of staying down.\n              rollback() {\n                  err \"Rolling back to previous version\"\n                  [ -d \"$APP_DIR/server-old\" ] && { rm -rf \"$APP_DIR/server\"; mv \"$APP_DIR/server-old\" \"$APP_DIR/server\"; }\n                  [ -f \"$APP_DIR/settings.json.old\" ] && mv -f \"$APP_DIR/settings.json.old\" \"$APP_DIR/settings.json\"\n                  chown -R ubuntu:ubuntu \"$APP_DIR\"\n                  systemctl restart LightningServerEC2SDemo || true\n              }\n              \n              download_with_retry \"s3://$BUCKET/server.zip\" \"$APP_DIR/server.zip\"\n              [ -d \"$APP_DIR/server-old\" ] && rm -rf \"$APP_DIR/server-old\"\n              [ -d \"$APP_DIR/server\" ] && mv \"$APP_DIR/server\" \"$APP_DIR/server-old\"\n              log \"Successful Download\"\n              log \"Unziping server.zip\"\n              unzip -q \"$APP_DIR/server.zip\" -d $APP_DIR\n              \n              download_with_retry \"s3://$BUCKET/settings.enc\" \"$APP_DIR/settings.enc\"\n              SETTINGS_PASS=$(aws ssm get-parameter --name \"$SSM_PARAM\" --with-decryption --query Parameter.Value --output text --region \"$REGION\")\n              if ! openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -md sha256 \\\n                  -in \"$APP_DIR/settings.enc\" -out \"$APP_DIR/settings.json.new\" -pass pass:\"$SETTINGS_PASS\"; then\n                  err \"Failed to decrypt settings\"\n                  exit 1\n              fi\n              log \"Successfully decrypted settings\"\n              [ -f \"$APP_DIR/settings.json.old\" ] && rm \"$APP_DIR/settings.json.old\"\n              [ -f \"$APP_DIR/settings.json\" ] && mv \"$APP_DIR/settings.json\" \"$APP_DIR/settings.json.old\"\n              mv \"$APP_DIR/settings.json.new\" \"$APP_DIR/settings.json\"\n              rm -f \"$APP_DIR/settings.enc\"\n              \n              chown -R ubuntu:ubuntu \"$APP_DIR\"\n              chmod 600 \"$APP_DIR/settings.json\"\n              \n              log \"Restarting Lightning Server Demo\"\n              systemctl restart LightningServerEC2SDemo\n              sleep 5\n              if ! systemctl is-active --quiet LightningServerEC2SDemo; then\n                  err \"Service failed to start\"\n                  tail -n 100 /var/log/LightningServerEC2SDemo/server.log >&2 || true\n                  rollback\n                  exit 1\n              fi\n              \n              log \"Waiting for liveness at http://localhost:8080/meta/online\"\n              healthy=0\n              for i in $(seq 1 20); do\n                  if curl -fsS -o /dev/null --max-time 5 \"http://localhost:8080/meta/online\"; then healthy=1; break; fi\n                  sleep 3\n              done\n              if [ \"$healthy\" -ne 1 ]; then\n                  err \"Liveness endpoint http://localhost:8080/meta/online never returned success\"\n                  tail -n 100 /var/log/LightningServerEC2SDemo/server.log >&2 || true\n                  rollback\n                  exit 1\n              fi\n              log \"Done\"\n              REDEPLOY_EOF\n              \n              chmod +x /usr/local/bin/lightning-server-redeploy\n              echo \"[INFO] Creating Lightning Server Redeploy Script - DONE\"\n              \n              systemctl enable LightningServerEC2SDemo || true\n              systemctl enable amazon-cloudwatch-agent || true",
+                "name": "LightningServerEC2SDemo-install",
+                "version": "1.0.45942",
+                "platform": "Linux"
+            }
+        },
+        "aws_imagebuilder_image_recipe": {
+            "this": {
+                "lifecycle": {
+                    "create_before_destroy": true
+                },
+                "component": [
+                    {
+                        "component_arn": "arn:aws:imagebuilder:us-west-2:aws:component/aws-cli-version-2-linux/x.x.x"
+                    },
+                    {
+                        "component_arn": "arn:aws:imagebuilder:us-west-2:aws:component/amazon-cloudwatch-agent-linux/x.x.x"
+                    },
+                    {
+                        "component_arn": "${aws_imagebuilder_component.install.arn}"
+                    }
+                ],
+                "block_device_mapping": {
+                    "device_name": "/dev/sda1",
+                    "ebs": {
+                        "volume_type": "gp3",
+                        "encrypted": true,
+                        "volume_size": 20,
+                        "delete_on_termination": true
+                    }
+                },
+                "name": "LightningServerEC2SDemo-recipe",
+                "parent_image": "${data.aws_ami.ubuntu.id}",
+                "version": "1.0.45942"
+            }
+        },
+        "aws_imagebuilder_infrastructure_configuration": {
+            "this": {
+                "instance_types": [
+                    "t4g.micro"
+                ],
+                "terminate_instance_on_failure": true,
+                "instance_profile_name": "${aws_iam_instance_profile.imagebuilder.name}",
+                "instance_metadata_options": {
+                    "http_tokens": "required",
+                    "http_put_response_hop_limit": 2
+                },
+                "name": "LightningServerEC2SDemo-infra",
+                "subnet_id": "${module.vpc.private_subnets[0]}",
+                "security_group_ids": [
+                    "${aws_security_group.instance.id}"
+                ]
+            }
+        }
+    }
+}
