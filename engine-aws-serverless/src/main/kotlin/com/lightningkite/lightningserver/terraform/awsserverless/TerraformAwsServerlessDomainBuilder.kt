@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.terraform.awsserverless
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.terraform.aws.VpcInfoTerraformManaged
+import com.lightningkite.lightningserver.terraform.awsserverless.TerraformAwsServerlessBuilder.VpcInfoTerraformManaged
 import com.lightningkite.services.terraform.*
 import com.lightningkite.services.terraform.TerraformJsonObject.Companion.expression
 

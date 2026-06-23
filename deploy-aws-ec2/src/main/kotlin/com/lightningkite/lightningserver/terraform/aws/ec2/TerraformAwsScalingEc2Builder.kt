@@ -1,7 +1,6 @@
 package com.lightningkite.lightningserver.terraform.aws.ec2
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.terraform.aws.VpcInfoTerraformManaged
 import com.lightningkite.services.Untested
 import com.lightningkite.services.terraform.*
 import com.lightningkite.services.terraform.TerraformJsonObject.Companion.expression
@@ -42,6 +41,22 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
 ) : TerraformAwsEc2BuilderBase<S>(builder) {
 
     abstract override val applicationVpc: AwsVpc.VpcInfo
+
+    public fun terraformManagedVPC(
+        ipPrefix: String,
+        availabilityZones: List<String>,
+        natGateway: AwsVpc.NatGateway,
+    ): AwsVpc.VpcInfo = VpcInfoTerraformManaged(
+        ipPrefix = ipPrefix,
+        availabilityZones = availabilityZones,
+        natGateway = natGateway,
+        id = expression("module.vpc.vpc_id"),
+        securityGroup = expression("aws_security_group.internal.id"),
+        privateSubnets = expression("module.vpc.private_subnets"),
+        publicSubnets = expression("module.vpc.public_subnets"),
+        applicationSubnet = expression("module.vpc.private_subnets[0]"),
+        natGatewayIps = expression("module.vpc.nat_public_ips"),
+    )
 
     // === Scaling configuration ===
 

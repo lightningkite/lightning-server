@@ -1,7 +1,6 @@
 package com.lightningkite.lightningserver.terraform.aws.ec2
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.terraform.aws.VpcInfoTerraformManaged
 import com.lightningkite.services.Untested
 import com.lightningkite.services.kfile.KFile
 import com.lightningkite.services.terraform.*
@@ -47,6 +46,22 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
 ) : TerraformAwsEc2BuilderBase<S>(builder) {
 
     abstract override val applicationVpc: AwsVpc.EC2Safe
+
+    public fun terraformManagedVPC(
+        ipPrefix: String,
+        availabilityZones: List<String>,
+        natGateway: AwsVpc.NatGateway,
+    ): AwsVpc.VpcInfo = VpcInfoTerraformManaged(
+        ipPrefix = ipPrefix,
+        availabilityZones = availabilityZones,
+        natGateway = natGateway,
+        id = TerraformJsonObject.expression("module.vpc.vpc_id"),
+        securityGroup = TerraformJsonObject.expression("aws_security_group.internal.id"),
+        privateSubnets = TerraformJsonObject.expression("module.vpc.private_subnets"),
+        publicSubnets = TerraformJsonObject.expression("module.vpc.public_subnets"),
+        applicationSubnet = TerraformJsonObject.expression("module.vpc.public_subnets[0]"),
+        natGatewayIps = TerraformJsonObject.expression("module.vpc.nat_public_ips"),
+    )
 
     // === SSH access (optional, for debugging) ===
 

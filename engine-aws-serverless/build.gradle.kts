@@ -10,7 +10,6 @@ plugins {
 
 dependencies {
     api(project(":core"))
-    api(project(":deploy-aws-ec2"))
     fun ModuleDependency.excludeNetty() {
         exclude("software.amazon.awssdk:netty-nio-client")
         exclude("software.amazon.awssdk:apache-client")

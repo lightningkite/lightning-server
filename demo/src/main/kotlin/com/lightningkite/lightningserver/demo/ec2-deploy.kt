@@ -7,7 +7,6 @@ import com.lightningkite.lightningserver.engine.ktor.ktorRunConfig
 import com.lightningkite.lightningserver.engine.local.engineCache
 import com.lightningkite.lightningserver.engine.local.enginePubSub
 import com.lightningkite.lightningserver.terraform.*
-import com.lightningkite.lightningserver.terraform.aws.VpcInfoTerraformManaged
 import com.lightningkite.lightningserver.terraform.aws.ec2.TerraformAwsScalingEc2Builder
 import com.lightningkite.lightningserver.terraform.awsserverless.*
 import com.lightningkite.services.LoggingSettings
@@ -53,7 +52,7 @@ object TestEc2Scaling : TerraformAwsScalingEc2Builder<Server>(Server) {
     override val domain: String = "lightningserver2.cs.lightningkite.com"
     override val emergencyContact: EmailAddress = "joseph@lightningkite.com".toEmailAddress()
 
-    override val applicationVpc: AwsVpc.VpcInfo = VpcInfoTerraformManaged(
+    override val applicationVpc: AwsVpc.VpcInfo = terraformManagedVPC(
         ipPrefix = "10.7",
         availabilityZones = listOf(
             "${region.id()}a",
