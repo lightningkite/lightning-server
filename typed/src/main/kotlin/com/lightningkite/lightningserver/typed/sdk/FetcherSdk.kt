@@ -133,6 +133,7 @@ public class FetcherSdk(
                         "com.lightningkite.lightningserver.typed.Fetcher",
                         "kotlinx.serialization.ContextualSerializer",
                         "kotlinx.serialization.builtins.*",
+                        "kotlinx.serialization.ExperimentalSerializationApi"
                     )
                     writeLive(processed)
                 }
