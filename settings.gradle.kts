@@ -51,3 +51,5 @@ include(":secret-source-aws")
 include(":load-test")
 
 include(":demo")
+
+include(":docs-guide")

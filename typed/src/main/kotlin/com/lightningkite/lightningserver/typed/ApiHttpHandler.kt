@@ -31,6 +31,8 @@ private val errorCaseLogger = KotlinLogging.logger("com.lightningkite.lightnings
  * @param USER The authenticated user type (or null for unauthenticated endpoints)
  * @param INPUT The request input type
  * @param OUTPUT The response output type
+ *
+ * @sample com.lightningkite.lightningserver.guide.samples.echoServerSample
  */
 public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> : HttpHandler<PATH>,
     SDK.Documentable {
