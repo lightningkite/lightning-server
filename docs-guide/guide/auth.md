@@ -165,7 +165,7 @@ declares the `database` setting — in this chapter that is
 ## Testing an Authenticated Endpoint
 
 `PrincipalType.testAuth(subject)` creates a synthetic `Authentication<SUBJECT>`
-for testing.  It must be called inside a `test {}` block because it needs a
+for testing.  It must be called inside a `testBlocking {}` block because it needs a
 `ServerRuntime` in context (to capture the current clock time as `issuedAt`).
 
 Pass the resulting auth token as the first argument to the typed `.test()` call.

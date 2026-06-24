@@ -90,7 +90,7 @@ Inside any callback that receives `WebSocketConnection` as context:
 
 ## Testing a WebSocket Endpoint
 
-`WebSocketHandler.test()` is available inside a `test {}` block.  It runs
+`WebSocketHandler.test()` is available inside a `testBlocking {}` block.  It runs
 `willConnect` and `didConnect` synchronously, returns a `TestWebSocket`, and
 gives you `send()` and `onMessageSent` to drive the conversation:
 

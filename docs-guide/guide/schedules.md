@@ -105,7 +105,7 @@ fires the task when its next-run time has passed.  You cannot unit-test the
 *timing*, but you can test the *work* the task does.
 
 `ScheduledTask.execute()` is the same method the engine calls when the timer
-fires.  Call it directly inside a `test {}` block to exercise the task body:
+fires.  Call it directly inside a `testBlocking {}` block to exercise the task body:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/SchedulesSamples.kt#schedule-test -->
 ```kotlin
