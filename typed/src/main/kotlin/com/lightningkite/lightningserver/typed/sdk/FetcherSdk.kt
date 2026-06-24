@@ -132,10 +132,8 @@ public class FetcherSdk(
                         "com.lightningkite.lightningserver.HttpMethod",
                         "com.lightningkite.lightningserver.typed.Fetcher",
                         "kotlinx.serialization.ContextualSerializer",
-                        "kotlinx.serialization.builtins.serializer",
-                        "kotlinx.serialization.builtins.MapSerializer",
-                        "kotlinx.serialization.builtins.ListSerializer",
-                        "kotlinx.serialization.builtins.nullable"
+                        "kotlinx.serialization.builtins.*",
+                        "kotlinx.serialization.ExperimentalSerializationApi"
                     )
                     writeLive(processed)
                 }
@@ -149,10 +147,8 @@ public class FetcherSdk(
                         "com.lightningkite.lightningserver.HttpMethod",
                         "com.lightningkite.lightningserver.typed.Fetcher",
                         "kotlinx.serialization.ContextualSerializer",
-                        "kotlinx.serialization.builtins.serializer",
-                        "kotlinx.serialization.builtins.MapSerializer",
-                        "kotlinx.serialization.builtins.ListSerializer",
-                        "kotlinx.serialization.builtins.nullable"
+                        "kotlinx.serialization.builtins.*",
+                        "kotlinx.serialization.ExperimentalSerializationApi"
                     )
                     writeInterface(processed)
                     writeLive(processed)
@@ -273,6 +269,7 @@ public class FetcherSdk(
                     }
 
                 if (depth == 0) {
+                    appendLine("@OptIn(ExperimentalSerializationApi::class)")
                     appendLine("class Live${info.interfaceName}(val fetcher: Fetcher) : ${extendsInterfaces.joinToString()} {")
 
                     appendIdtLine(

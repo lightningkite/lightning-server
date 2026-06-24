@@ -111,12 +111,42 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
      */
     public open val useCloudFrontForWebSocket: Boolean get() = false
 
-    override fun finalize() {
+
+    internal class VpcInfoTerraformManaged(
+        val ipPrefix: String,
+        val availabilityZones: List<String>,
+        val natGateway: AwsVpc.NatGateway,
+        override val id: String, //= TerraformJsonObject.expression("module.vpc.vpc_id"),
+        override val securityGroup: String, //= TerraformJsonObject.expression("aws_security_group.internal.id"),
+        override val privateSubnets: String, //= TerraformJsonObject.expression("module.vpc.private_subnets"),
+        override val publicSubnets: String, //= TerraformJsonObject.expression("module.vpc.public_subnets"),
+        override val applicationSubnet: String, //= TerraformJsonObject.expression("module.vpc.public_subnets[0]"),
+        override val natGatewayIps: String, //= TerraformJsonObject.expression("module.vpc.nat_public_ips"),
+        override val cidr: String = "$ipPrefix.0.0/16",
+    ) : AwsVpc.VpcInfo
+
+    public fun terraformManagedVPC(
+        ipPrefix: String,
+        availabilityZones: List<String>,
+        natGateway: AwsVpc.NatGateway,
+    ): AwsVpc.VpcInfo = VpcInfoTerraformManaged(
+        ipPrefix = ipPrefix,
+        availabilityZones = availabilityZones,
+        natGateway = natGateway,
+        id = TerraformJsonObject.expression("module.vpc.vpc_id"),
+        securityGroup = TerraformJsonObject.expression("aws_security_group.internal.id"),
+        privateSubnets = TerraformJsonObject.expression("module.vpc.private_subnets"),
+        publicSubnets = TerraformJsonObject.expression("module.vpc.public_subnets"),
+        applicationSubnet = TerraformJsonObject.expression("module.vpc.public_subnets[0]"),
+        natGatewayIps = TerraformJsonObject.expression("module.vpc.nat_public_ips"),
+    )
+
+    override fun prepareForWrite() {
 
         if (projectPrefix.any { !it.isLetterOrDigit() && !(it == '-' || it == '_') })
             throw IllegalArgumentException("The projectPrefix has illegal characters in it. It can only contain: Letters, Digits, '-', and '_'.")
 
-        super.finalize()
+        super.prepareForWrite()
         require(TerraformProviderImport.aws)
         require(
             TerraformProvider(
@@ -559,9 +589,10 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                     "apply_on" - "PublishedVersions"
                 }
 
-                if (emitter is TerraformEmitterAwsVpc) {
+                val vpcInfo = emitter.applicationVpc as? AwsVpc.VpcInfo
+                if (vpcInfo != null) {
                     "vpc_config" {
-                        "subnet_ids" - expression("module.vpc.private_subnets")
+                        "subnet_ids" - vpcInfo.privateSubnets
                         "security_group_ids" - listOf(
                             expression("aws_security_group.internal.id"),
                             expression("aws_security_group.access_outside.id")
@@ -648,7 +679,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
             }
             "resource.null_resource.settings_reread" {
                 "triggers" {
-                    "settingsRawHash" - expression("local_sensitive_file.settings_raw.content")
+                    "settingsRawHash" - expression("local_sensitive_file.settings_raw.content_sha256")
                 }
                 "depends_on" - listOf("null_resource.lambda_jar_source")
                 "provisioner.local-exec" {

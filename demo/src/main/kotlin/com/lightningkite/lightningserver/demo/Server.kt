@@ -29,6 +29,7 @@ import com.lightningkite.services.LoggingTelemetryBackend
 import com.lightningkite.services.cache.*
 import com.lightningkite.services.cache.dynamodb.*
 import com.lightningkite.services.cache.memcached.*
+import com.lightningkite.services.cache.redis.RedisCache
 import com.lightningkite.services.data.toPhoneNumber
 import com.lightningkite.services.database.*
 import com.lightningkite.services.database.jsonfile.JsonFileDatabase
@@ -44,6 +45,7 @@ import com.lightningkite.services.phonecall.PhoneCallService
 import com.lightningkite.services.phonecall.twilio.TwilioPhoneCallService
 import com.lightningkite.services.pubsub.PubSub
 import com.lightningkite.services.pubsub.aws.DynamoDbPubSub
+import com.lightningkite.services.pubsub.redis.RedisPubSub
 import com.lightningkite.services.sms.*
 import com.lightningkite.services.sms.twilio.TwilioSMS
 import com.lightningkite.services.sms.twilio.TwilioSmsInboundService
@@ -92,6 +94,7 @@ object Server : ServerBuilder() {
         TwilioSMS
         LoggingTelemetryBackend
         TwilioPhoneCallService
+        RedisCache
         JsonFileDatabase
         DynamoDbCache
         MongoDatabase
@@ -99,6 +102,7 @@ object Server : ServerBuilder() {
         S3PublicFileSystem
         OpenAIVoiceAgentService
         DynamoDbPubSub
+        RedisPubSub
     }
 
     val setupAdmins = path.path("setup-admins2") bind startupOnce(database) {

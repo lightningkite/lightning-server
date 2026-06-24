@@ -16,6 +16,7 @@ import com.lightningkite.services.email.javasmtp.awsSesSmtp
 import com.lightningkite.services.email.ses.awsSesInbound
 import com.lightningkite.services.files.s3.awsS3Bucket
 import com.lightningkite.services.pubsub.aws.dynamoDb
+import com.lightningkite.services.terraform.AwsVpc
 import com.lightningkite.services.terraform.byVariable
 import com.lightningkite.services.terraform.direct
 import io.github.oshai.kotlinlogging.Level
@@ -53,6 +54,8 @@ object LkEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
 
     override val secretsSource: SecretSource =
         AwsSecretSource(profile = "lk", idPrefix = "lightning-server-demo", region = Region.US_WEST_2)
+
+    override val applicationVpc: AwsVpc = AwsVpc.None
 
     override fun Server.settings() {
 //        require(TerraformProviderImport.mongodbAtlas)
@@ -110,6 +113,7 @@ object LkEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
         pubsub.dynamoDb()
         phoneCall.byVariable()
         voiceAgent.byVariable()
+        githubOauth.byVariable()
     }
 }
 

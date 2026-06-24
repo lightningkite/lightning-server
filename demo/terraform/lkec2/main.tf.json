@@ -1,0 +1,46 @@
+{
+    "provider": {
+        "aws": [
+            {
+                "region": "us-west-2"
+            }
+        ]
+    },
+    "terraform": {
+        "required_providers": {
+            "random": {
+                "source": "hashicorp/random",
+                "version": "~> 3.8.0"
+            },
+            "external": {
+                "source": "hashicorp/external",
+                "version": "~> 2.3.0"
+            },
+            "null": {
+                "source": "hashicorp/null",
+                "version": "~> 3.2.3"
+            },
+            "archive": {
+                "source": "hashicorp/archive",
+                "version": "~> 2.7.0"
+            },
+            "aws": {
+                "source": "hashicorp/aws",
+                "version": "~> 6.34.0"
+            },
+            "local": {
+                "source": "hashicorp/local",
+                "version": "~> 2.7.0"
+            }
+        },
+        "required_version": "~> 1.0",
+        "backend": {
+            "s3": {
+                "bucket": "lightningkite-terraform",
+                "encrypt": true,
+                "region": "us-west-2",
+                "key": "LightningServerEC2SDemo"
+            }
+        }
+    }
+}

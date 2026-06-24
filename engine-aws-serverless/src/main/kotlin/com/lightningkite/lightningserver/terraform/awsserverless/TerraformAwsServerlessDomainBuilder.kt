@@ -1,7 +1,9 @@
 package com.lightningkite.lightningserver.terraform.awsserverless
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.terraform.awsserverless.TerraformAwsServerlessBuilder.VpcInfoTerraformManaged
 import com.lightningkite.services.terraform.*
+import com.lightningkite.services.terraform.TerraformJsonObject.Companion.expression
 
 public abstract class TerraformAwsServerlessDomainBuilder<S : ServerBuilder>(
     builder: S,
@@ -12,40 +14,14 @@ public abstract class TerraformAwsServerlessDomainBuilder<S : ServerBuilder>(
     public abstract val domainZone: String
     public abstract override val domain: String
     override val domainZoneId: String by lazy { domainZoneId(domainZone) }
-}
 
-public abstract class TerraformAwsServerlessVpcBuilder<S : ServerBuilder>(
-    builder: S,
-) : TerraformAwsServerlessBuilder<S>(
-    builder = builder,
-), TerraformEmitterAwsVpc {
-    public open val ipPrefix: String get() = "10.0"
-    public open val availabilityZones: List<String>
-        get() = listOf(
-            "${region.id()}a",
-            "${region.id()}b",
-            "${region.id()}c"
-        )
-    override val applicationVpc: TerraformAwsVpcInfo by lazy { vpc(ipPrefix, availabilityZones) }
-}
 
-public abstract class TerraformAwsServerlessDomainVpcBuilder<S : ServerBuilder>(
-    builder: S,
-) : TerraformAwsServerlessBuilder<S>(
-    builder = builder,
-), TerraformEmitterAwsVpc, TerraformEmitterAwsDomain {
-    public abstract val domainZone: String
-    public abstract override val domain: String
-    override val domainZoneId: String by lazy { domainZoneId(domainZone) }
-
-    public open val ipPrefix: String get() = "10.0"
-    public open val availabilityZones: List<String>
-        get() = listOf(
-            "${region.id()}a",
-            "${region.id()}b",
-            "${region.id()}c"
-        )
-    override val applicationVpc: TerraformAwsVpcInfo by lazy { vpc(ipPrefix, availabilityZones) }
+    override fun prepareForWrite() {
+        (applicationVpc as? VpcInfoTerraformManaged)?.also {
+            emitVpc(it)
+        }
+        super.prepareForWrite()
+    }
 }
 
 
@@ -55,47 +31,45 @@ private fun TerraformEmitterAws.domainZoneId(domainZone: String): String {
             "name" - domainZone
         }
     }
-    return TerraformJsonObject.expression("data.aws_route53_zone.main.zone_id")
+    return expression("data.aws_route53_zone.main.zone_id")
 }
 
-
-private fun TerraformEmitterAws.vpc(
-    ipPrefix: String = "10.0",
-    availabilityZones: List<String> = listOf("${applicationRegion}a", "${applicationRegion}b", "${applicationRegion}c"),
-): TerraformAwsVpcInfo {
-    val cidr = "$ipPrefix.0.0/16"
+private fun TerraformEmitterAws.emitVpc(
+    info: VpcInfoTerraformManaged
+) {
     emit("cloud") {
         "module.vpc" {
             "source" - "terraform-aws-modules/vpc/aws"
             "version" - "6.6.0"
 
             "name" - projectPrefix
-            "cidr" - cidr
+            "cidr" - info.cidr
 
-            "azs" - availabilityZones
-            "private_subnets" - listOf("${ipPrefix}.1.0/24", "${ipPrefix}.2.0/24", "${ipPrefix}.3.0/24")
-            "public_subnets" - listOf("${ipPrefix}.101.0/24", "${ipPrefix}.102.0/24", "${ipPrefix}.103.0/24")
+            "azs" - info.availabilityZones
+            "private_subnets" - listOf("${info.ipPrefix}.1.0/24", "${info.ipPrefix}.2.0/24", "${info.ipPrefix}.3.0/24")
+            "public_subnets" - listOf("${info.ipPrefix}.101.0/24", "${info.ipPrefix}.102.0/24", "${info.ipPrefix}.103.0/24")
 
-            "enable_nat_gateway" - true
-            "single_nat_gateway" - true
+            "enable_nat_gateway" - (info.natGateway != AwsVpc.NatGateway.None)
+            "single_nat_gateway" - (info.natGateway == AwsVpc.NatGateway.Single)
+            "one_nat_gateway_per_az" - (info.natGateway == AwsVpc.NatGateway.PerAvailabilityZone)
             "enable_vpn_gateway" - false
             "enable_dns_hostnames" - true
             "enable_dns_support" - true
         }
         "resource.aws_vpc_endpoint.s3" {
             "vpc_id" - expression("module.vpc.vpc_id")
-            "service_name" - "com.amazonaws.${this@vpc.applicationRegion}.s3"
+            "service_name" - "com.amazonaws.${this@emitVpc.applicationRegion}.s3"
             "route_table_ids" - expression("module.vpc.public_route_table_ids")
         }
         "resource.aws_vpc_endpoint.execute_api" {
             "vpc_id" - expression("module.vpc.vpc_id")
-            "service_name" - "com.amazonaws.${this@vpc.applicationRegion}.execute-api"
+            "service_name" - "com.amazonaws.${this@emitVpc.applicationRegion}.execute-api"
             "security_group_ids" - listOf(expression("aws_security_group.execute_api.id"))
             "vpc_endpoint_type" - "Interface"
         }
         "resource.aws_vpc_endpoint.lambda_invoke" {
             "vpc_id" - expression("module.vpc.vpc_id")
-            "service_name" - "com.amazonaws.${this@vpc.applicationRegion}.lambda"
+            "service_name" - "com.amazonaws.${this@emitVpc.applicationRegion}.lambda"
             "security_group_ids" - listOf(expression("aws_security_group.lambda_invoke.id"))
             "vpc_endpoint_type" - "Interface"
         }
@@ -147,13 +121,4 @@ private fun TerraformEmitterAws.vpc(
             "cidr_ipv4" - expression("module.vpc.vpc_cidr_block")
         }
     }
-    return TerraformAwsVpcInfo(
-        id = "module.vpc.vpc_id",
-        securityGroup = "aws_security_group.internal.id",
-        privateSubnets = "module.vpc.private_subnets",
-        publicSubnets = "module.vpc.public_subnets",
-        applicationSubnets = "module.vpc.public_subnets",
-        natGatewayIps = "module.vpc.nat_public_ips",
-        cidr = cidr
-    )
 }
