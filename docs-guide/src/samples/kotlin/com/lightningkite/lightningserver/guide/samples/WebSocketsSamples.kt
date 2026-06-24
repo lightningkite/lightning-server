@@ -45,32 +45,30 @@ object EchoWsServer : ServerBuilder() {
 // endregion echo-ws-server
 
 // region echo-ws-test
-fun echoWsTest() = runBlocking {
-    EchoWsServer.test(settings = {}) {
-        // .test() on a WebSocketHandler returns a TestWebSocket.
-        // The connection is fully established (willConnect + didConnect already ran).
-        val received = mutableListOf<String>()
+fun echoWsTest() = EchoWsServer.testBlocking(settings = {}) {
+    // .test() on a WebSocketHandler returns a TestWebSocket.
+    // The connection is fully established (willConnect + didConnect already ran).
+    val received = mutableListOf<String>()
 
-        val ws = EchoWsServer.echo.test()
+    val ws = EchoWsServer.echo.test()
 
-        // Capture frames the server sends back via onMessageSent.
-        ws.onMessageSent = { frame -> received.add(frame.text) }
+    // Capture frames the server sends back via onMessageSent.
+    ws.onMessageSent = { frame -> received.add(frame.text) }
 
-        // The didConnect greeting arrives before test() returns, so it's already in
-        // the received list if the handler sent it synchronously. In this case the
-        // greeting was sent in didConnect which ran before test() returned.
-        // We reset and only check the echo:
-        received.clear()
+    // The didConnect greeting arrives before test() returns, so it's already in
+    // the received list if the handler sent it synchronously. In this case the
+    // greeting was sent in didConnect which ran before test() returned.
+    // We reset and only check the echo:
+    received.clear()
 
-        // Send a text frame to the server.
-        ws.send(WebSocketFrame("hello"))
+    // Send a text frame to the server.
+    ws.send(WebSocketFrame("hello"))
 
-        // The server's messageFromClient ran synchronously; received now holds the reply.
-        check(received.size == 1) { "Expected 1 reply, got ${received.size}" }
-        check(received[0] == "Echo: hello") { "Unexpected reply: ${received[0]}" }
+    // The server's messageFromClient ran synchronously; received now holds the reply.
+    check(received.size == 1) { "Expected 1 reply, got ${received.size}" }
+    check(received[0] == "Echo: hello") { "Unexpected reply: ${received[0]}" }
 
-        ws.close()
-    }
+    ws.close()
 }
 // endregion echo-ws-test
 
@@ -112,27 +110,25 @@ object BroadcastServer : ServerBuilder() {
 // endregion pubsub-ws-server
 
 // region pubsub-ws-test
-fun broadcastWsTest() = runBlocking {
-    BroadcastServer.test(settings = {}) {
-        val received = mutableListOf<String>()
+fun broadcastWsTest() = BroadcastServer.testBlocking(settings = {}) {
+    val received = mutableListOf<String>()
 
-        // Connect two clients.
-        val ws1 = BroadcastServer.listen.test()
-        val ws2 = BroadcastServer.listen.test()
-        ws1.onMessageSent = { received.add("ws1:${it.text}") }
-        ws2.onMessageSent = { received.add("ws2:${it.text}") }
+    // Connect two clients.
+    val ws1 = BroadcastServer.listen.test()
+    val ws2 = BroadcastServer.listen.test()
+    ws1.onMessageSent = { received.add("ws1:${it.text}") }
+    ws2.onMessageSent = { received.add("ws2:${it.text}") }
 
-        // Send via the HTTP endpoint. sendWebSocketSubscriptionMessage is dispatched
-        // synchronously in the test runtime, so both connections receive the frame
-        // before the next line executes.
-        BroadcastServer.announcementTopic.send("hello everyone")
+    // Send via the HTTP endpoint. sendWebSocketSubscriptionMessage is dispatched
+    // synchronously in the test runtime, so both connections receive the frame
+    // before the next line executes.
+    BroadcastServer.announcementTopic.send("hello everyone")
 
-        check(received.contains("ws1:hello everyone"))
-        check(received.contains("ws2:hello everyone"))
+    check(received.contains("ws1:hello everyone"))
+    check(received.contains("ws2:hello everyone"))
 
-        ws1.close()
-        ws2.close()
-    }
+    ws1.close()
+    ws2.close()
 }
 // endregion pubsub-ws-test
 

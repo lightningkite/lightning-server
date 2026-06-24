@@ -37,15 +37,13 @@ object NestedServer : ServerBuilder() {
 The endpoint is mounted at the full path `/api/v1/status`.  Test it exactly
 as you would a root endpoint — the path is resolved automatically.
 
-> To wrap these examples in a test class, annotate your test methods with `@Test` — see [Testing Your Server](testing.md) for the complete `@Test` + `runBlocking` pattern.
+> To wrap these examples in a test class, annotate your test methods with `@Test` — see [Testing Your Server](testing.md) for the complete `@Test` + `testBlocking` pattern.
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/RoutingSamples.kt#nested-paths-test -->
 ```kotlin
-fun nestedPathsTest() = runBlocking {
-    NestedServer.test(settings = {}) {
-        val response = NestedServer.status.test()
-        check(response.body?.text() == "OK")
-    }
+fun nestedPathsTest() = NestedServer.testBlocking(settings = {}) {
+    val response = NestedServer.status.test()
+    check(response.body?.text() == "OK")
 }
 ```
 
@@ -81,17 +79,15 @@ accepts the path argument as its first positional parameter:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/RoutingSamples.kt#http-methods-test -->
 ```kotlin
-fun httpMethodsTest() = runBlocking {
-    ItemServer.test(settings = {}) {
-        val replaced = ItemServer.replace.test("42")
-        check(replaced.body?.text() == "Replaced 42")
+fun httpMethodsTest() = ItemServer.testBlocking(settings = {}) {
+    val replaced = ItemServer.replace.test("42")
+    check(replaced.body?.text() == "Replaced 42")
 
-        val updated = ItemServer.update.test("42")
-        check(updated.body?.text() == "Updated 42")
+    val updated = ItemServer.update.test("42")
+    check(updated.body?.text() == "Updated 42")
 
-        val deleted = ItemServer.remove.test("42")
-        check(deleted.body?.text() == "Deleted 42")
-    }
+    val deleted = ItemServer.remove.test("42")
+    check(deleted.body?.text() == "Deleted 42")
 }
 ```
 
@@ -120,11 +116,9 @@ Pass both arguments to `.test()` in order:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/RoutingSamples.kt#multi-arg-test -->
 ```kotlin
-fun multiArgTest() = runBlocking {
-    PostServer.test(settings = {}) {
-        val response = PostServer.getPost.test("alice", 7)
-        check(response.body?.text() == "User alice, post 7")
-    }
+fun multiArgTest() = PostServer.testBlocking(settings = {}) {
+    val response = PostServer.getPost.test("alice", 7)
+    check(response.body?.text() == "User alice, post 7")
 }
 ```
 
@@ -160,11 +154,9 @@ prefix is applied automatically by the `BlogServer.test {}` runner:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/RoutingSamples.kt#sub-builder-test -->
 ```kotlin
-fun subBuilderTest() = runBlocking {
-    BlogServer.test(settings = {}) {
-        val response = CommentsApi.list.test()
-        check(response.body?.text() == "[]")
-    }
+fun subBuilderTest() = BlogServer.testBlocking(settings = {}) {
+    val response = CommentsApi.list.test()
+    check(response.body?.text() == "[]")
 }
 ```
 
@@ -191,13 +183,11 @@ Pass query parameters in tests via `QueryParameters.parse("key=value&...")`:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/RoutingSamples.kt#query-params-test -->
 ```kotlin
-fun queryParamsTest() = runBlocking {
-    SearchServer.test(settings = {}) {
-        val response = SearchServer.search.test(
-            queryParameters = QueryParameters.parse("q=lightning&limit=5")
-        )
-        check(response.body?.text() == "query=lightning limit=5")
-    }
+fun queryParamsTest() = SearchServer.testBlocking(settings = {}) {
+    val response = SearchServer.search.test(
+        queryParameters = QueryParameters.parse("q=lightning&limit=5")
+    )
+    check(response.body?.text() == "query=lightning limit=5")
 }
 ```
 

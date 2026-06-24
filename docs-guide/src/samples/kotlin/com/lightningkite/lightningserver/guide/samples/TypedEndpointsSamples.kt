@@ -52,28 +52,24 @@ object DivideServer : ServerBuilder() {
 // endregion divide-server
 
 // region divide-success-test
-fun divideSuccessTest() = runBlocking {
-    DivideServer.test(settings = {}) {
-        val result = DivideServer.divide.test(null, DivideRequest(10.0, 4.0))
-        check(result.result == 2.5)
-    }
+fun divideSuccessTest() = DivideServer.testBlocking(settings = {}) {
+    val result = DivideServer.divide.test(null, DivideRequest(10.0, 4.0))
+    check(result.result == 2.5)
 }
 // endregion divide-success-test
 
 // region divide-error-test
-fun divideErrorTest() = runBlocking {
-    DivideServer.test(settings = {}) {
-        // When an ApiHttpHandler implementation throws an HttpStatusException,
-        // the typed .test() extension propagates it directly as a Kotlin exception.
-        // Catch HttpStatusException and inspect .status.code and .detail to verify
-        // the right error fired.
-        try {
-            DivideServer.divide.test(null, DivideRequest(1.0, 0.0))
-            error("Expected an exception")
-        } catch (e: HttpStatusException) {
-            check(e.status.code == 400)
-            check(e.detail == "division-by-zero")
-        }
+fun divideErrorTest() = DivideServer.testBlocking(settings = {}) {
+    // When an ApiHttpHandler implementation throws an HttpStatusException,
+    // the typed .test() extension propagates it directly as a Kotlin exception.
+    // Catch HttpStatusException and inspect .status.code and .detail to verify
+    // the right error fired.
+    try {
+        DivideServer.divide.test(null, DivideRequest(1.0, 0.0))
+        error("Expected an exception")
+    } catch (e: HttpStatusException) {
+        check(e.status.code == 400)
+        check(e.detail == "division-by-zero")
     }
 }
 // endregion divide-error-test
@@ -105,15 +101,13 @@ object NoteServer : ServerBuilder() {
 // endregion success-code-server
 
 // region success-code-test
-fun successCodeTest() = runBlocking {
-    NoteServer.test(settings = {}) {
-        // ApiHttpHandler.test() returns the typed output directly.
-        // The HTTP status code is used by real clients; in unit tests confirm
-        // the response fields instead of the status.
-        val result = NoteServer.create.test(null, NoteRequest("hello"))
-        check(result.text == "hello")
-        check(result.id.isNotEmpty())
-    }
+fun successCodeTest() = NoteServer.testBlocking(settings = {}) {
+    // ApiHttpHandler.test() returns the typed output directly.
+    // The HTTP status code is used by real clients; in unit tests confirm
+    // the response fields instead of the status.
+    val result = NoteServer.create.test(null, NoteRequest("hello"))
+    check(result.text == "hello")
+    check(result.id.isNotEmpty())
 }
 // endregion success-code-test
 

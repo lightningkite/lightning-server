@@ -20,10 +20,8 @@ object OverviewServer : ServerBuilder() {
 // endregion overview-server
 
 // region overview-server-test
-fun overviewServerTest() = runBlocking {
-    OverviewServer.test(settings = {}) {
-        val response = OverviewServer.root.test()
-        check(response.body?.text() == "Hello, world!")
-    }
+fun overviewServerTest() = OverviewServer.testBlocking(settings = {}) {
+    val response = OverviewServer.root.test()
+    check(response.body?.text() == "Hello, world!")
 }
 // endregion overview-server-test

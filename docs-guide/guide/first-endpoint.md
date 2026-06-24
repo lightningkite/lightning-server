@@ -46,27 +46,25 @@ it.
 
 To exercise this endpoint call `SERVER.test {}`:
 
-> To wrap these examples in a test class, annotate your test methods with `@Test` — see [Testing Your Server](testing.md) for the complete `@Test` + `runBlocking` pattern.
+> To wrap these examples in a test class, annotate your test methods with `@Test` — see [Testing Your Server](testing.md) for the complete `@Test` + `testBlocking` pattern.
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/FirstEndpointSamples.kt#hello-server-test -->
 ```kotlin
-fun helloServerTest() = runBlocking {
-    HelloServer.test(settings = {}) {
-        val response = HelloServer.root.test()
-        check(response.body?.text() == "Hello, Lightning Server!")
-    }
+fun helloServerTest() = HelloServer.testBlocking(settings = {}) {
+    val response = HelloServer.root.test()
+    check(response.body?.text() == "Hello, Lightning Server!")
 }
 ```
 
-`test {}` spins up an ephemeral in-memory runtime, initialises all settings
-with their defaults, and then runs your block.  Inside the block every
+`testBlocking {}` spins up an ephemeral in-memory runtime, initialises all
+settings with their defaults, and then runs your block.  Inside the block every
 `HttpHandler` gains a `.test()` extension that fires a request and returns the
 response — no network, no server process.
 
-Note the `runBlocking {}` wrapper: the `test {}` action lambda is not a
-suspend function, but the `.test()` calls on handlers are suspend, so they
-must run inside a coroutine.  `runBlocking` provides that coroutine without
-changing how the code reads in a test method.
+`testBlocking {}` takes a **suspend** action, so the `.test()` calls on handlers
+(which are themselves suspend) work directly with no `runBlocking` wrapper.  It
+blocks the calling thread until the action completes, which is what an ordinary
+`@Test` method wants.  See [Testing Your Server](testing.md) for the full story.
 
 ## Path Parameters
 
@@ -89,11 +87,9 @@ Pass the path argument value to `.test()`:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/FirstEndpointSamples.kt#greet-server-test -->
 ```kotlin
-fun greetServerTest() = runBlocking {
-    GreetServer.test(settings = {}) {
-        val response = GreetServer.greet.test("World")
-        check(response.body?.text() == "Hello, World!")
-    }
+fun greetServerTest() = GreetServer.testBlocking(settings = {}) {
+    val response = GreetServer.greet.test("World")
+    check(response.body?.text() == "Hello, World!")
 }
 ```
 
@@ -150,14 +146,12 @@ returns the typed output — no JSON round-trip or `body.contains()` needed:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/FirstEndpointSamples.kt#echo-server-test -->
 ```kotlin
-fun echoServerTest() = runBlocking {
-    EchoServer.test(settings = {}) {
-        // ApiHttpHandler.test() accepts null auth for noAuth endpoints and
-        // returns the typed output directly — no JSON manipulation needed.
-        val result = EchoServer.echo.test(null, EchoRequest("ping"))
-        check(result.echo == "ping")
-        check(result.length == 4)
-    }
+fun echoServerTest() = EchoServer.testBlocking(settings = {}) {
+    // ApiHttpHandler.test() accepts null auth for noAuth endpoints and
+    // returns the typed output directly — no JSON manipulation needed.
+    val result = EchoServer.echo.test(null, EchoRequest("ping"))
+    check(result.echo == "ping")
+    check(result.length == 4)
 }
 ```
 

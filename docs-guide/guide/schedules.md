@@ -115,14 +115,12 @@ fires.  Call it directly inside a `test {}` block to exercise the task body:
 // ServerRuntime in context.
 //
 // This tests the work the schedule does, not the timing.
-fun scheduleTest() = runBlocking {
-    ScheduleServer.test(settings = {}) {
-        // Call execute() directly — same as what the engine does when the timer fires.
-        ScheduleServer.cleanup.execute()
+fun scheduleTest() = ScheduleServer.testBlocking(settings = {}) {
+    // Call execute() directly — same as what the engine does when the timer fires.
+    ScheduleServer.cleanup.execute()
 
-        val count = ScheduleServer.cache().get<Int>("cleanup:last-count")
-        assertEquals(42, count)
-    }
+    val count = ScheduleServer.cache().get<Int>("cleanup:last-count")
+    assertEquals(42, count)
 }
 ```
 

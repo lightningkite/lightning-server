@@ -72,35 +72,31 @@ object UserProfileServer : ServerBuilder() {
 // endregion auth-server
 
 // region auth-test
-fun authTest() = runBlocking {
-    UserProfileServer.test(settings = { database set Database.Settings("ram") }) {
-        // Seed a user directly into the database
-        val alice = UserProfileServer.database().table<UserProfile>()
-            .insertOne(UserProfile(name = "Alice", email = "alice@example.com"))!!
+fun authTest() = UserProfileServer.testBlocking(settings = { database set Database.Settings("ram") }) {
+    // Seed a user directly into the database
+    val alice = UserProfileServer.database().table<UserProfile>()
+        .insertOne(UserProfile(name = "Alice", email = "alice@example.com"))!!
 
-        // testAuth() creates an Authentication<UserProfile> for use in tests.
-        // It must be called inside a test {} block because it needs a ServerRuntime in context.
-        val aliceAuth = UserAuth.testAuth(alice)
+    // testAuth() creates an Authentication<UserProfile> for use in tests.
+    // It must be called inside a test {} block because it needs a ServerRuntime in context.
+    val aliceAuth = UserAuth.testAuth(alice)
 
-        // Pass the auth token as the first argument to the typed .test() call.
-        val profile = UserProfileServer.getProfile.test(aliceAuth, Unit)
-        check(profile.name == "Alice")
-        check(profile.email == "alice@example.com")
-        check(profile._id == alice._id)
-    }
+    // Pass the auth token as the first argument to the typed .test() call.
+    val profile = UserProfileServer.getProfile.test(aliceAuth, Unit)
+    check(profile.name == "Alice")
+    check(profile.email == "alice@example.com")
+    check(profile._id == alice._id)
 }
 // endregion auth-test
 
 // region auth-rejection-test
-fun authRejectionTest() = runBlocking {
-    UserProfileServer.test(settings = { database set Database.Settings("ram") }) {
-        // Drive the endpoint as an HttpHandler (not ApiHttpHandler.test()) so the full
-        // auth-checking pipeline runs. The framework serializes the rejection into an HTTP
-        // response; inspect .status.code on the returned HttpResponse.
-        // Note: the framework throws ForbiddenException (403) when no credentials are
-        // supplied, which is distinct from an invalid token (401).
-        val response = UserProfileServer.getProfile.test()
-        check(response.status.code == 403)
-    }
+fun authRejectionTest() = UserProfileServer.testBlocking(settings = { database set Database.Settings("ram") }) {
+    // Drive the endpoint as an HttpHandler (not ApiHttpHandler.test()) so the full
+    // auth-checking pipeline runs. The framework serializes the rejection into an HTTP
+    // response; inspect .status.code on the returned HttpResponse.
+    // Note: the framework throws ForbiddenException (403) when no credentials are
+    // supplied, which is distinct from an invalid token (401).
+    val response = UserProfileServer.getProfile.test()
+    check(response.status.code == 403)
 }
 // endregion auth-rejection-test

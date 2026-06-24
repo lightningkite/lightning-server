@@ -20,11 +20,9 @@ object NestedServer : ServerBuilder() {
 // endregion nested-paths
 
 // region nested-paths-test
-fun nestedPathsTest() = runBlocking {
-    NestedServer.test(settings = {}) {
-        val response = NestedServer.status.test()
-        check(response.body?.text() == "OK")
-    }
+fun nestedPathsTest() = NestedServer.testBlocking(settings = {}) {
+    val response = NestedServer.status.test()
+    check(response.body?.text() == "OK")
 }
 // endregion nested-paths-test
 
@@ -49,17 +47,15 @@ object ItemServer : ServerBuilder() {
 // endregion http-methods
 
 // region http-methods-test
-fun httpMethodsTest() = runBlocking {
-    ItemServer.test(settings = {}) {
-        val replaced = ItemServer.replace.test("42")
-        check(replaced.body?.text() == "Replaced 42")
+fun httpMethodsTest() = ItemServer.testBlocking(settings = {}) {
+    val replaced = ItemServer.replace.test("42")
+    check(replaced.body?.text() == "Replaced 42")
 
-        val updated = ItemServer.update.test("42")
-        check(updated.body?.text() == "Updated 42")
+    val updated = ItemServer.update.test("42")
+    check(updated.body?.text() == "Updated 42")
 
-        val deleted = ItemServer.remove.test("42")
-        check(deleted.body?.text() == "Deleted 42")
-    }
+    val deleted = ItemServer.remove.test("42")
+    check(deleted.body?.text() == "Deleted 42")
 }
 // endregion http-methods-test
 
@@ -79,11 +75,9 @@ object PostServer : ServerBuilder() {
 // endregion multi-arg-server
 
 // region multi-arg-test
-fun multiArgTest() = runBlocking {
-    PostServer.test(settings = {}) {
-        val response = PostServer.getPost.test("alice", 7)
-        check(response.body?.text() == "User alice, post 7")
-    }
+fun multiArgTest() = PostServer.testBlocking(settings = {}) {
+    val response = PostServer.getPost.test("alice", 7)
+    check(response.body?.text() == "User alice, post 7")
 }
 // endregion multi-arg-test
 
@@ -103,11 +97,9 @@ object BlogServer : ServerBuilder() {
 // endregion sub-builder
 
 // region sub-builder-test
-fun subBuilderTest() = runBlocking {
-    BlogServer.test(settings = {}) {
-        val response = CommentsApi.list.test()
-        check(response.body?.text() == "[]")
-    }
+fun subBuilderTest() = BlogServer.testBlocking(settings = {}) {
+    val response = CommentsApi.list.test()
+    check(response.body?.text() == "[]")
 }
 // endregion sub-builder-test
 
@@ -124,12 +116,10 @@ object SearchServer : ServerBuilder() {
 // endregion query-params
 
 // region query-params-test
-fun queryParamsTest() = runBlocking {
-    SearchServer.test(settings = {}) {
-        val response = SearchServer.search.test(
-            queryParameters = QueryParameters.parse("q=lightning&limit=5")
-        )
-        check(response.body?.text() == "query=lightning limit=5")
-    }
+fun queryParamsTest() = SearchServer.testBlocking(settings = {}) {
+    val response = SearchServer.search.test(
+        queryParameters = QueryParameters.parse("q=lightning&limit=5")
+    )
+    check(response.body?.text() == "query=lightning limit=5")
 }
 // endregion query-params-test

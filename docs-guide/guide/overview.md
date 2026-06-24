@@ -79,11 +79,9 @@ And its test:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/OverviewSamples.kt#overview-server-test -->
 ```kotlin
-fun overviewServerTest() = runBlocking {
-    OverviewServer.test(settings = {}) {
-        val response = OverviewServer.root.test()
-        check(response.body?.text() == "Hello, world!")
-    }
+fun overviewServerTest() = OverviewServer.testBlocking(settings = {}) {
+    val response = OverviewServer.root.test()
+    check(response.body?.text() == "Hello, world!")
 }
 ```
 

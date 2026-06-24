@@ -8,5 +8,5 @@ class TestingTest {
     @Test fun `noAuth typed endpoint returns output directly`() { noAuthTypedTest() }
     @Test fun `authenticated typed endpoint with testAuth`() { authTypedTest() }
     @Test fun `error path catches HttpStatusException with correct code and detail`() { errorPathTest() }
-    @Test fun `runBlocking explanation compiles and runs`() { runBlockingExplanation() }
+    @Test fun `testBlocking explanation compiles and runs`() { testBlockingExplanation() }
 }

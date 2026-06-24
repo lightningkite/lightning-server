@@ -55,35 +55,33 @@ object NoteDbServer : ServerBuilder() {
 // endregion note-server
 
 // region db-test
-fun databaseTest() = runBlocking {
-    NoteDbServer.test(settings = { database set Database.Settings("ram") }) {
-        // Insert two notes
-        val first = NoteDbServer.create.test(null, Note(title = "Shopping", body = "Eggs, milk"))
-        val second = NoteDbServer.create.test(null, Note(title = "Ideas", body = "Start a blog"))
+fun databaseTest() = NoteDbServer.testBlocking(settings = { database set Database.Settings("ram") }) {
+    // Insert two notes
+    val first = NoteDbServer.create.test(null, Note(title = "Shopping", body = "Eggs, milk"))
+    val second = NoteDbServer.create.test(null, Note(title = "Ideas", body = "Start a blog"))
 
-        // List returns both
-        val all = NoteDbServer.list.test(null, Unit)
-        check(all.size == 2)
+    // List returns both
+    val all = NoteDbServer.list.test(null, Unit)
+    check(all.size == 2)
 
-        // Direct table access for condition / modification / delete
-        val table = NoteDbServer.database().table<Note>()
+    // Direct table access for condition / modification / delete
+    val table = NoteDbServer.database().table<Note>()
 
-        // condition { } builds a type-safe query using generated path extensions
-        val found = table.find(condition { it.title eq "Shopping" }).toList()
-        check(found.size == 1)
-        check(found[0]._id == first!!._id)
+    // condition { } builds a type-safe query using generated path extensions
+    val found = table.find(condition { it.title eq "Shopping" }).toList()
+    check(found.size == 1)
+    check(found[0]._id == first!!._id)
 
-        // modification { } builds a type-safe update
-        table.updateOneIgnoringResult(
-            condition { it._id eq first._id },
-            modification { it.body assign "Eggs, milk, bread" }
-        )
-        val updated = table.get(first._id)!!
-        check(updated.body == "Eggs, milk, bread")
+    // modification { } builds a type-safe update
+    table.updateOneIgnoringResult(
+        condition { it._id eq first._id },
+        modification { it.body assign "Eggs, milk, bread" }
+    )
+    val updated = table.get(first._id)!!
+    check(updated.body == "Eggs, milk, bread")
 
-        // delete
-        table.deleteOneIgnoringOld(condition { it._id eq second!!._id })
-        check(table.count() == 1)
-    }
+    // delete
+    table.deleteOneIgnoringOld(condition { it._id eq second!!._id })
+    check(table.count() == 1)
 }
 // endregion db-test

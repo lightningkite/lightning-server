@@ -129,34 +129,31 @@ object TestingServer : ServerBuilder() {
 }
 ```
 
-## Why `runBlocking` Is Always Required
+## Use `testBlocking` to Run Suspend Tests
 
-`SERVER.test {}` is an `inline` function.  Its `action` lambda is **not**
-`suspend` — plain lambdas cannot suspend.  But because the lambda is inlined,
-`suspend` calls inside it are lifted into the surrounding coroutine scope.
-There is no surrounding scope unless you provide one, so every call to
-`SERVER.test {}` must be wrapped in `runBlocking {}`.
+`SERVER.testBlocking {}` is the recommended way to write a test.  Its `action`
+is a **suspend** lambda, so you call suspend APIs — `.test()`, database and
+cache operations — directly inside it with no `runBlocking` wrapper.  The name
+signals that it blocks the calling thread until the action finishes, which is
+exactly what an ordinary (non-suspend) `@Test` method needs.
 
-<!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-runblocking -->
+<!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-testblocking -->
 ```kotlin
-// The test {} action lambda is NOT suspend, even though all .test() calls inside it are.
-// This is because test {} is an inline function, and the action is a plain lambda — the
-// suspend calls work only because they are inlined into the surrounding runBlocking scope.
-// Every call to SERVER.test { } must therefore be wrapped in runBlocking { }.
-fun runBlockingExplanation() = runBlocking {
-    TestingServer.test(settings = { cache set Cache.Settings("ram") }) {
-        // suspend calls like .test() work here because this block is inlined into runBlocking
-        val response = TestingServer.hello.test()
-        check(response.status == HttpStatus.OK)
-    }
+// SERVER.testBlocking { } is the recommended entry point for tests. Its action is a
+// suspend lambda, so you call suspend APIs (.test(), database/cache operations) directly —
+// no runBlocking wrapper. The name signals that it blocks the calling thread until the
+// action finishes, which is exactly what an ordinary (non-suspend) @Test method needs.
+fun testBlockingExplanation() = TestingServer.testBlocking(settings = { cache set Cache.Settings("ram") }) {
+    // .test() is a suspend call and works here because the action lambda is suspend.
+    val response = TestingServer.hello.test()
+    check(response.status == HttpStatus.OK)
 }
 ```
 
-> **Note:** Making `action` a `suspend` lambda would remove this
-> boilerplate — every example and test would become cleaner.  A future PR
-> could make this change since `test {}` is `inline` and the Kotlin compiler
-> handles inline + suspend correctly.  For now, `runBlocking {}` is the
-> required wrapper.
+> **Lower-level alternative:** `SERVER.test {}` takes a non-suspend `action`,
+> so you must provide the coroutine scope yourself with
+> `SERVER.test { runBlocking { ... } }`.  Prefer `testBlocking` — it removes
+> that boilerplate.
 
 ## Testing a Plain `HttpHandler`
 
@@ -172,16 +169,14 @@ in by `import com.lightningkite.lightningserver.settings.set`).
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-plain-handler -->
 ```kotlin
-fun plainHandlerTest() = runBlocking {
-    // The settings lambda configures each ServerSetting before the runtime starts.
-    // "ram" is the built-in URL for the in-process cache — no external dependencies.
-    TestingServer.test(settings = { cache set Cache.Settings("ram") }) {
-        // HttpHandler.test() returns an HttpResponse.
-        // Inspect .status and .body?.text() to assert the outcome.
-        val response = TestingServer.hello.test()
-        check(response.status == HttpStatus.OK)
-        check(response.body?.text() == "Hello!")
-    }
+// The settings lambda configures each ServerSetting before the runtime starts.
+// "ram" is the built-in URL for the in-process cache — no external dependencies.
+fun plainHandlerTest() = TestingServer.testBlocking(settings = { cache set Cache.Settings("ram") }) {
+    // HttpHandler.test() returns an HttpResponse.
+    // Inspect .status and .body?.text() to assert the outcome.
+    val response = TestingServer.hello.test()
+    check(response.status == HttpStatus.OK)
+    check(response.body?.text() == "Hello!")
 }
 ```
 
@@ -195,15 +190,13 @@ The first argument is the authentication token.  For `noAuth` endpoints the
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-noauth-typed -->
 ```kotlin
-fun noAuthTypedTest() = runBlocking {
-    TestingServer.test(settings = { cache set Cache.Settings("ram") }) {
-        // ApiHttpHandler.test() takes (auth, input) and returns the typed OUTPUT directly —
-        // no HttpResponse to unwrap, no JSON to parse.
-        //
-        // For noAuth endpoints (USER = Nothing?), the auth argument must be null.
-        val result = TestingServer.greet.test(null, GreetRequest("Alice"))
-        check(result.greeting == "Hello, Alice!")
-    }
+fun noAuthTypedTest() = TestingServer.testBlocking(settings = { cache set Cache.Settings("ram") }) {
+    // ApiHttpHandler.test() takes (auth, input) and returns the typed OUTPUT directly —
+    // no HttpResponse to unwrap, no JSON to parse.
+    //
+    // For noAuth endpoints (USER = Nothing?), the auth argument must be null.
+    val result = TestingServer.greet.test(null, GreetRequest("Alice"))
+    check(result.greeting == "Hello, Alice!")
 }
 ```
 
@@ -218,21 +211,19 @@ testing.  It must be called **inside** a `test {}` block because it needs a
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-auth-typed -->
 ```kotlin
-fun authTypedTest() = runBlocking {
-    TestingServer.test(settings = { cache set Cache.Settings("ram") }) {
-        val alice = Member(name = "Alice")
-        Member.store[alice._id] = alice  // seed the in-memory store so fetch() finds her
+fun authTypedTest() = TestingServer.testBlocking(settings = { cache set Cache.Settings("ram") }) {
+    val alice = Member(name = "Alice")
+    Member.store[alice._id] = alice  // seed the in-memory store so fetch() finds her
 
-        // testAuth() creates a synthetic Authentication<Member> for the test.
-        // It must be called inside a test {} block because it needs a ServerRuntime in context.
-        val aliceAuth = Member.testAuth(alice)
+    // testAuth() creates a synthetic Authentication<Member> for the test.
+    // It must be called inside a test {} block because it needs a ServerRuntime in context.
+    val aliceAuth = Member.testAuth(alice)
 
-        // For authenticated endpoints (USER is non-nullable), pass a non-null Authentication.
-        val result = TestingServer.profile.test(aliceAuth, Unit)
-        check(result.name == "Alice")
+    // For authenticated endpoints (USER is non-nullable), pass a non-null Authentication.
+    val result = TestingServer.profile.test(aliceAuth, Unit)
+    check(result.name == "Alice")
 
-        Member.store.clear()  // clean up so tests don't bleed state
-    }
+    Member.store.clear()  // clean up so tests don't bleed state
 }
 ```
 
@@ -247,18 +238,16 @@ the right error fired:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-error-path -->
 ```kotlin
-fun errorPathTest() = runBlocking {
-    TestingServer.test(settings = { cache set Cache.Settings("ram") }) {
-        // ApiHttpHandler.test() propagates HttpStatusException directly as a Kotlin exception.
-        // It does NOT serialize to/from HTTP, so the exception is exactly what the handler threw.
-        // Catch HttpStatusException and inspect .status.code and .detail to verify the right error fired.
-        try {
-            TestingServer.greet.test(null, GreetRequest(""))
-            error("Expected BadRequestException to be thrown")
-        } catch (e: HttpStatusException) {
-            check(e.status.code == 400)
-            check(e.detail == "empty-name")
-        }
+fun errorPathTest() = TestingServer.testBlocking(settings = { cache set Cache.Settings("ram") }) {
+    // ApiHttpHandler.test() propagates HttpStatusException directly as a Kotlin exception.
+    // It does NOT serialize to/from HTTP, so the exception is exactly what the handler threw.
+    // Catch HttpStatusException and inspect .status.code and .detail to verify the right error fired.
+    try {
+        TestingServer.greet.test(null, GreetRequest(""))
+        error("Expected BadRequestException to be thrown")
+    } catch (e: HttpStatusException) {
+        check(e.status.code == 400)
+        check(e.detail == "empty-name")
     }
 }
 ```
@@ -281,27 +270,23 @@ together:
 <!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-full-example -->
 ```kotlin
 // A complete, copy-pasteable test class.
-// @Test marks each method for the test runner. runBlocking {} is required because
-// test {} is inline (not suspend), so the outer coroutine scope must be provided explicitly.
+// @Test marks each method for the test runner. testBlocking {} runs the suspend action
+// to completion on the calling thread, so each non-suspend @Test method stays simple.
 class GreetServerTest {
     @Test
-    fun `greet returns greeting for valid name`() = runBlocking {
-        TestingServer.test(settings = { cache set Cache.Settings("ram") }) {
-            val result = TestingServer.greet.test(null, GreetRequest("Alice"))
-            check(result.greeting == "Hello, Alice!")
-        }
+    fun `greet returns greeting for valid name`() = TestingServer.testBlocking(settings = { cache set Cache.Settings("ram") }) {
+        val result = TestingServer.greet.test(null, GreetRequest("Alice"))
+        check(result.greeting == "Hello, Alice!")
     }
 
     @Test
-    fun `greet rejects blank name`() = runBlocking {
-        TestingServer.test(settings = { cache set Cache.Settings("ram") }) {
-            try {
-                TestingServer.greet.test(null, GreetRequest(""))
-                error("Expected exception")
-            } catch (e: HttpStatusException) {
-                check(e.status.code == 400)
-                check(e.detail == "empty-name")
-            }
+    fun `greet rejects blank name`() = TestingServer.testBlocking(settings = { cache set Cache.Settings("ram") }) {
+        try {
+            TestingServer.greet.test(null, GreetRequest(""))
+            error("Expected exception")
+        } catch (e: HttpStatusException) {
+            check(e.status.code == 400)
+            check(e.detail == "empty-name")
         }
     }
 }
@@ -309,7 +294,7 @@ class GreetServerTest {
 
 Key points:
 - `@Test` is `kotlin.test.Test` — import `kotlin.test.Test`.
-- Each `@Test` method wraps its `SERVER.test {}` call in `runBlocking {}`.
+- Each `@Test` method uses `SERVER.testBlocking {}`, whose suspend action runs to completion on the calling thread.
 - Methods are inside a class (standard JUnit requirement).
 - The `settings` lambda resets state per test — each test gets a fresh `"ram"` cache.
 

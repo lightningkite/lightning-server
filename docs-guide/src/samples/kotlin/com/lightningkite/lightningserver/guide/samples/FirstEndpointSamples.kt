@@ -23,11 +23,9 @@ object HelloServer : ServerBuilder() {
 // endregion hello-server
 
 // region hello-server-test
-fun helloServerTest() = runBlocking {
-    HelloServer.test(settings = {}) {
-        val response = HelloServer.root.test()
-        check(response.body?.text() == "Hello, Lightning Server!")
-    }
+fun helloServerTest() = HelloServer.testBlocking(settings = {}) {
+    val response = HelloServer.root.test()
+    check(response.body?.text() == "Hello, Lightning Server!")
 }
 // endregion hello-server-test
 
@@ -43,11 +41,9 @@ object GreetServer : ServerBuilder() {
 // endregion greet-server
 
 // region greet-server-test
-fun greetServerTest() = runBlocking {
-    GreetServer.test(settings = {}) {
-        val response = GreetServer.greet.test("World")
-        check(response.body?.text() == "Hello, World!")
-    }
+fun greetServerTest() = GreetServer.testBlocking(settings = {}) {
+    val response = GreetServer.greet.test("World")
+    check(response.body?.text() == "Hello, World!")
 }
 // endregion greet-server-test
 
@@ -78,23 +74,19 @@ object EchoServer : ServerBuilder() {
 // endregion echo-server
 
 // region echo-server-test
-fun echoServerTest() = runBlocking {
-    EchoServer.test(settings = {}) {
-        // ApiHttpHandler.test() accepts null auth for noAuth endpoints and
-        // returns the typed output directly — no JSON manipulation needed.
-        val result = EchoServer.echo.test(null, EchoRequest("ping"))
-        check(result.echo == "ping")
-        check(result.length == 4)
-    }
+fun echoServerTest() = EchoServer.testBlocking(settings = {}) {
+    // ApiHttpHandler.test() accepts null auth for noAuth endpoints and
+    // returns the typed output directly — no JSON manipulation needed.
+    val result = EchoServer.echo.test(null, EchoRequest("ping"))
+    check(result.echo == "ping")
+    check(result.length == 4)
 }
 // endregion echo-server-test
 
 
 // Top-level function referenced by @sample in ApiHttpHandler KDoc.
-fun echoServerSample() = runBlocking {
-    EchoServer.test(settings = {}) {
-        val result = EchoServer.echo.test(null, EchoRequest("ping"))
-        check(result.echo == "ping")
-        check(result.length == 4)
-    }
+fun echoServerSample() = EchoServer.testBlocking(settings = {}) {
+    val result = EchoServer.echo.test(null, EchoRequest("ping"))
+    check(result.echo == "ping")
+    check(result.length == 4)
 }

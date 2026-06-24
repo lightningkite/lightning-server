@@ -60,19 +60,17 @@ object CounterServer : ServerBuilder() {
 // endregion counter-server
 
 // region counter-test
-fun counterTest() = runBlocking {
-    // Override the setting inside the settings lambda so the test uses
-    // a fresh in-memory cache. "ram" is a built-in URL that resolves to a
-    // ConcurrentHashMap-backed MapCache — no external service needed.
-    CounterServer.test(settings = { cache set Cache.Settings("ram") }) {
-        // Call increment twice; the counter should reach 2.
-        CounterServer.increment.test(null, CounterRequest("hits"))
-        val result = CounterServer.increment.test(null, CounterRequest("hits"))
-        check(result.value == 2L)
+// Override the setting inside the settings lambda so the test uses
+// a fresh in-memory cache. "ram" is a built-in URL that resolves to a
+// ConcurrentHashMap-backed MapCache — no external service needed.
+fun counterTest() = CounterServer.testBlocking(settings = { cache set Cache.Settings("ram") }) {
+    // Call increment twice; the counter should reach 2.
+    CounterServer.increment.test(null, CounterRequest("hits"))
+    val result = CounterServer.increment.test(null, CounterRequest("hits"))
+    check(result.value == 2L)
 
-        // A counter that was never incremented reads as 0.
-        val missing = CounterServer.read.test(null, CounterRequest("unset"))
-        check(missing.value == 0L)
-    }
+    // A counter that was never incremented reads as 0.
+    val missing = CounterServer.read.test(null, CounterRequest("unset"))
+    check(missing.value == 0L)
 }
 // endregion counter-test

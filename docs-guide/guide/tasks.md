@@ -86,16 +86,14 @@ means you can assert effects on the very next line:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/TasksSamples.kt#task-test -->
 ```kotlin
-fun taskTest() = runBlocking {
-    TaskServer.test(settings = {}) {
-        // Launch the task directly. In TestRunner, Task.invoke calls executeInline —
-        // the task body completes before launch() returns. The effect is immediately
-        // visible in the next line.
-        TaskServer.sendWelcomeEmail.launch(WelcomeEmailInput("alice@example.com", "Alice"))
+fun taskTest() = TaskServer.testBlocking(settings = {}) {
+    // Launch the task directly. In TestRunner, Task.invoke calls executeInline —
+    // the task body completes before launch() returns. The effect is immediately
+    // visible in the next line.
+    TaskServer.sendWelcomeEmail.launch(WelcomeEmailInput("alice@example.com", "Alice"))
 
-        val logged = TaskServer.cache().get<String>("last-welcome-email")
-        assertEquals("alice@example.com", logged)
-    }
+    val logged = TaskServer.cache().get<String>("last-welcome-email")
+    assertEquals("alice@example.com", logged)
 }
 ```
 

@@ -111,15 +111,13 @@ The typed `.test()` extension calls `handle()` directly and returns the typed
 output — no HTTP serialisation round-trip.  The first argument to
 `ApiHttpHandler.test()` is the auth token; pass `null` for `noAuth` endpoints.
 
-> To wrap these examples in a test class, annotate your test methods with `@Test` — see [Testing Your Server](testing.md) for the complete `@Test` + `runBlocking` pattern.
+> To wrap these examples in a test class, annotate your test methods with `@Test` — see [Testing Your Server](testing.md) for the complete `@Test` + `testBlocking` pattern.
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/TypedEndpointsSamples.kt#divide-success-test -->
 ```kotlin
-fun divideSuccessTest() = runBlocking {
-    DivideServer.test(settings = {}) {
-        val result = DivideServer.divide.test(null, DivideRequest(10.0, 4.0))
-        check(result.result == 2.5)
-    }
+fun divideSuccessTest() = DivideServer.testBlocking(settings = {}) {
+    val result = DivideServer.divide.test(null, DivideRequest(10.0, 4.0))
+    check(result.result == 2.5)
 }
 ```
 
@@ -132,19 +130,17 @@ inspect `e.status.code` and `e.detail` to verify the right error fired:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/TypedEndpointsSamples.kt#divide-error-test -->
 ```kotlin
-fun divideErrorTest() = runBlocking {
-    DivideServer.test(settings = {}) {
-        // When an ApiHttpHandler implementation throws an HttpStatusException,
-        // the typed .test() extension propagates it directly as a Kotlin exception.
-        // Catch HttpStatusException and inspect .status.code and .detail to verify
-        // the right error fired.
-        try {
-            DivideServer.divide.test(null, DivideRequest(1.0, 0.0))
-            error("Expected an exception")
-        } catch (e: HttpStatusException) {
-            check(e.status.code == 400)
-            check(e.detail == "division-by-zero")
-        }
+fun divideErrorTest() = DivideServer.testBlocking(settings = {}) {
+    // When an ApiHttpHandler implementation throws an HttpStatusException,
+    // the typed .test() extension propagates it directly as a Kotlin exception.
+    // Catch HttpStatusException and inspect .status.code and .detail to verify
+    // the right error fired.
+    try {
+        DivideServer.divide.test(null, DivideRequest(1.0, 0.0))
+        error("Expected an exception")
+    } catch (e: HttpStatusException) {
+        check(e.status.code == 400)
+        check(e.detail == "division-by-zero")
     }
 }
 ```
@@ -193,15 +189,13 @@ directly.  Test the typed fields instead:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/TypedEndpointsSamples.kt#success-code-test -->
 ```kotlin
-fun successCodeTest() = runBlocking {
-    NoteServer.test(settings = {}) {
-        // ApiHttpHandler.test() returns the typed output directly.
-        // The HTTP status code is used by real clients; in unit tests confirm
-        // the response fields instead of the status.
-        val result = NoteServer.create.test(null, NoteRequest("hello"))
-        check(result.text == "hello")
-        check(result.id.isNotEmpty())
-    }
+fun successCodeTest() = NoteServer.testBlocking(settings = {}) {
+    // ApiHttpHandler.test() returns the typed output directly.
+    // The HTTP status code is used by real clients; in unit tests confirm
+    // the response fields instead of the status.
+    val result = NoteServer.create.test(null, NoteRequest("hello"))
+    check(result.text == "hello")
+    check(result.id.isNotEmpty())
 }
 ```
 

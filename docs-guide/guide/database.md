@@ -125,40 +125,38 @@ the first argument to `ApiHttpHandler.test()` is the auth token; `null` is
 correct for `noAuth` endpoints.  The infix `set` extension comes from
 `com.lightningkite.lightningserver.settings` and is already in the imports list.
 
-> To wrap these examples in a test class, annotate your test methods with `@Test` — see [Testing Your Server](testing.md) for the complete `@Test` + `runBlocking` pattern.
+> To wrap these examples in a test class, annotate your test methods with `@Test` — see [Testing Your Server](testing.md) for the complete `@Test` + `testBlocking` pattern.
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/DatabaseSamples.kt#db-test -->
 ```kotlin
-fun databaseTest() = runBlocking {
-    NoteDbServer.test(settings = { database set Database.Settings("ram") }) {
-        // Insert two notes
-        val first = NoteDbServer.create.test(null, Note(title = "Shopping", body = "Eggs, milk"))
-        val second = NoteDbServer.create.test(null, Note(title = "Ideas", body = "Start a blog"))
+fun databaseTest() = NoteDbServer.testBlocking(settings = { database set Database.Settings("ram") }) {
+    // Insert two notes
+    val first = NoteDbServer.create.test(null, Note(title = "Shopping", body = "Eggs, milk"))
+    val second = NoteDbServer.create.test(null, Note(title = "Ideas", body = "Start a blog"))
 
-        // List returns both
-        val all = NoteDbServer.list.test(null, Unit)
-        check(all.size == 2)
+    // List returns both
+    val all = NoteDbServer.list.test(null, Unit)
+    check(all.size == 2)
 
-        // Direct table access for condition / modification / delete
-        val table = NoteDbServer.database().table<Note>()
+    // Direct table access for condition / modification / delete
+    val table = NoteDbServer.database().table<Note>()
 
-        // condition { } builds a type-safe query using generated path extensions
-        val found = table.find(condition { it.title eq "Shopping" }).toList()
-        check(found.size == 1)
-        check(found[0]._id == first!!._id)
+    // condition { } builds a type-safe query using generated path extensions
+    val found = table.find(condition { it.title eq "Shopping" }).toList()
+    check(found.size == 1)
+    check(found[0]._id == first!!._id)
 
-        // modification { } builds a type-safe update
-        table.updateOneIgnoringResult(
-            condition { it._id eq first._id },
-            modification { it.body assign "Eggs, milk, bread" }
-        )
-        val updated = table.get(first._id)!!
-        check(updated.body == "Eggs, milk, bread")
+    // modification { } builds a type-safe update
+    table.updateOneIgnoringResult(
+        condition { it._id eq first._id },
+        modification { it.body assign "Eggs, milk, bread" }
+    )
+    val updated = table.get(first._id)!!
+    check(updated.body == "Eggs, milk, bread")
 
-        // delete
-        table.deleteOneIgnoringOld(condition { it._id eq second!!._id })
-        check(table.count() == 1)
-    }
+    // delete
+    table.deleteOneIgnoringOld(condition { it._id eq second!!._id })
+    check(table.count() == 1)
 }
 ```
 
