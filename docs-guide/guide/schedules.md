@@ -139,8 +139,11 @@ prevents duplicate execution via a distributed cache lock:
 4. The lock is always released after the tick (even on cancellation), so a
    crashed instance does not block the next run.
 
-The lock TTL is hardcoded at 1 hour (in `LocalEngine`).  A task that runs
-longer than 1 hour will have its lock expire before it finishes, which can
-allow another instance to start a concurrent tick.  Design schedule bodies to
-complete well within their frequency interval, and design them to be
+The lock TTL defaults to 1 hour and is configurable via
+`EngineReliabilitySettings.scheduleLockTtl` (set it on your engine's run-config
+setting).  Because the lock is released as soon as the tick finishes (and on
+graceful shutdown), the TTL only acts as a backstop after a hard crash — but a
+task that runs longer than its lock TTL can have the lock expire before it
+finishes, allowing another instance to start a concurrent tick.  Design schedule
+bodies to complete well within their frequency interval, and design them to be
 **idempotent** — a duplicate or retried tick should be safe.
