@@ -6,12 +6,12 @@ import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.definition.telemetrySettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.terraform.aws.VpcInfoTerraformManaged
 import com.lightningkite.lightningserver.terraform.aws.ec2.TerraformAwsEc2BuilderBase
 import com.lightningkite.lightningserver.terraform.aws.ec2.StigLevel
 import com.lightningkite.lightningserver.terraform.aws.ec2.TerraformAwsScalingEc2Builder
 import com.lightningkite.lightningserver.terraform.aws.ec2.stigBuildLinux
 import com.lightningkite.lightningserver.terraform.aws.ec2.TerraformAwsSingleEc2Builder
+import com.lightningkite.lightningserver.terraform.aws.ec2.VpcInfoTerraformManaged
 import com.lightningkite.services.data.EmailAddress
 import com.lightningkite.services.terraform.AwsVpc
 import kotlinx.serialization.json.*
@@ -45,12 +45,6 @@ class Ec2BuilderGenerationTest {
         if (cacheUrl != null) fulfillSetting("cache", JsonPrimitive(cacheUrl))
     }
 
-    private val managedVpc = VpcInfoTerraformManaged(
-        ipPrefix = "10.0",
-        availabilityZones = listOf("us-west-2a", "us-west-2b"),
-        natGateway = AwsVpc.NatGateway.Single,
-    )
-
     inner class SingleDeployment : TerraformAwsSingleEc2Builder<TestServer>(TestServer) {
         override val storageBucket = "test-tf-state"
         override val region: Region = Region.US_WEST_2
@@ -78,7 +72,11 @@ class Ec2BuilderGenerationTest {
         override val emergencyContact = EmailAddress("ops@example.com")
         override val instanceType = "t4g.medium"
         override val instanceArchitecture = CPUArchitecture.Arm
-        override val applicationVpc = managedVpc
+        override val applicationVpc = terraformManagedVPC(
+            ipPrefix = "10.0",
+            availabilityZones = listOf("us-west-2a", "us-west-2b"),
+            natGateway = AwsVpc.NatGateway.Single,
+        )
         override val terraformRoot = File(tmpRoot, "scaling")
         override fun TestServer.settings() = fulfillGlobals(cacheUrl)
     }
@@ -93,7 +91,11 @@ class Ec2BuilderGenerationTest {
         override val emergencyContact = EmailAddress("ops@example.com")
         override val instanceType = "t4g.medium"
         override val instanceArchitecture = CPUArchitecture.Arm
-        override val applicationVpc = managedVpc
+        override val applicationVpc = terraformManagedVPC(
+            ipPrefix = "10.0",
+            availabilityZones = listOf("us-west-2a", "us-west-2b"),
+            natGateway = AwsVpc.NatGateway.Single,
+        )
         override val scalingRequestsPerTarget = 300
         override val maxInstanceLifetimeSeconds = 604800
         override val terraformRoot = File(tmpRoot, "online")
@@ -110,7 +112,11 @@ class Ec2BuilderGenerationTest {
         override val emergencyContact = EmailAddress("ops@example.com")
         override val instanceType = "t4g.medium"
         override val instanceArchitecture = CPUArchitecture.Arm
-        override val applicationVpc = managedVpc
+        override val applicationVpc = terraformManagedVPC(
+            ipPrefix = "10.0",
+            availabilityZones = listOf("us-west-2a", "us-west-2b"),
+            natGateway = AwsVpc.NatGateway.Single,
+        )
         override val customerManagedKey = true
         override val wafEnabled = true
         override val hardeningComponents = listOf(stigBuildLinux(StigLevel.Low))
