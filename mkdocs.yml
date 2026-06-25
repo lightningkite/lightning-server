@@ -58,10 +58,13 @@ nav:
   - Home: index.md
   - Guide:
     - Overview: overview.md
+    - Project Structure: project-structure.md
     - Your First Endpoint: first-endpoint.md
     - Running Your Server: running.md
     - Routing: routing.md
     - Typed Endpoints: typed-endpoints.md
+    - Model REST Endpoints: model-rest.md
+    - Bulk Endpoints: bulk-endpoints.md
     - Services & Settings: services.md
     - Database & Query DSL: database.md
     - Validation: validation.md

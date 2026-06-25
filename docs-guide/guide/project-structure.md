@@ -1,6 +1,3 @@
-> # ⚠️ UNREVIEWED FIRST DRAFT — DO NOT PUBLISH
-> Auto-generated first pass. Code samples are modeled on the current source but have **NOT** been compiled, drift-checked, or reviewed. This page is intentionally **not** in the site nav. Before publishing: port samples into the drift-checked `docs-guide/src/samples` module, run the fresh-eyes judge, and delete this banner.
-
 # Project Structure & Modules
 
 This chapter explains how Lightning Server itself is organized into modules and how
@@ -23,7 +20,7 @@ ServerDefinition  ←──── all endpoints, tasks, schedules,
         │               settings, and interceptors collected
         │  Engine(definition)
         ▼
-Engine  ←──────────── KtorEngine / NettyEngine / JdkServerEngine
+Engine  ←──────────── KtorEngine / NettyEngine / JdkEngine
         │              AwsAdapter / LocalEngine (tests)
         │  .settings.loadFromFile(...)
         │  .start(...)
@@ -47,42 +44,43 @@ environment.
 declaration to a concrete service instance (`Database`, `Cache`, `Files`, etc.).  On first
 run the engine writes a default `settings.json` if none exists.
 
-**`.start(...)`** begins serving requests (or, for `AwsAdapter`, generates Terraform).
+**`.start(...)`** begins serving requests.
 
 Because the definition and the engine are decoupled, the same `ServerBuilder` can be:
 
 - Started under `KtorEngine` with Netty for local development.
-- Deployed via `AwsAdapter` to AWS Lambda with zero code changes.
+- Deployed via `AwsAdapter` to AWS Lambda with zero code changes (Terraform is generated
+  separately via `TerraformAwsServerlessBuilder` in the same module).
 - Run inside a JUnit test using `LocalEngine` (no ports, no infrastructure) through the
-  `.test {}` / `.testBlocking {}` helpers.
+  `.test {}` / `.testBlocking {}` helpers in `core`.
 
 ---
 
 ## Framework module catalog
 
 Lightning Server's own Gradle project (`settings.gradle.kts`) contains the following
-modules.  This is what you add to your dependency block.
+modules.  These are what you reference in your dependency blocks.
 
 ### Core
 
 | Module | Type | What it provides |
 |---|---|---|
-| `core` | JVM | HTTP handling, serialization, settings, service abstractions (`Database`, `Cache`, `Files`, `Email`, `Sms`), `ServerBuilder`, `ServerDefinition`, interceptors, tasks, schedules |
-| `core-shared` | KMP | Base types shared with clients: `LSError`, `HttpMethod`, `MultiplexMessage`; the `PrincipalType` interface |
+| `core` | JVM | HTTP handling, serialization, settings, service abstractions (`Database`, `Cache`, `Files`, `Email`, `Sms`), `ServerBuilder`, `ServerDefinition`, interceptors, tasks, schedules, `TestRunner`, `test {}` / `testBlocking {}` helpers |
+| `core-shared` | KMP | Base types shared with clients: `LSError`, `HttpMethod` |
 
 ### Typed endpoints
 
 | Module | Type | What it provides |
 |---|---|---|
-| `typed` | JVM | `ApiHttpHandler`, OpenAPI/kschema generation, SDK generators, `MetaEndpoints`, `ModelRestEndpoints`, `FunnelEndpoints` |
-| `typed-shared` | KMP | `BulkRequest`, `BulkResponse`, model types shared with generated SDKs |
+| `typed` | JVM | `ApiHttpHandler`, `ApiWebsocketHandler`, OpenAPI/kschema generation, SDK generators, `MetaEndpoints`, `ModelRestEndpoints`, `FunnelEndpoints` |
+| `typed-shared` | KMP | `BulkRequest`, `BulkResponse`, client-side model rest endpoint interfaces shared with generated SDKs |
 
 ### Authentication
 
 | Module | Type | What it provides |
 |---|---|---|
-| `auth` | JVM | `AuthEndpoints`, `PrincipalType` resolution, session storage, bearer token issuance |
-| `auth-shared` | KMP | `AuthRequirement`, proof types, session token models |
+| `auth` | JVM | `PrincipalType`, `Authentication`, `AuthRequirement`, bearer-token resolution, `testAuth` helper |
+| `auth-shared` | KMP | `Scope` — the OAuth/permission scope type |
 
 ### Files & Media
 
@@ -97,8 +95,8 @@ modules.  This is what you add to your dependency block.
 
 | Module | Type | What it provides |
 |---|---|---|
-| `sessions` | JVM | Session management, proof accumulation, strength thresholds |
-| `sessions-shared` | KMP | Proof models, session token types |
+| `sessions` | JVM | `AuthEndpoints`, session management, proof accumulation, strength thresholds |
+| `sessions-shared` | KMP | Proof models, session token types, client-side auth endpoint interfaces |
 | `sessions-email` | JVM | Email magic-link / PIN proof endpoint |
 | `sessions-sms` | JVM | SMS PIN proof endpoint |
 | `sessions-oauth` | JVM | OAuth 2.0 proof endpoint (GitHub, Google, etc.) |
@@ -122,11 +120,11 @@ modules.  This is what you add to your dependency block.
 
 | Module | Target | Use case |
 |---|---|---|
-| `engine-local` | JVM (test scope) | `LocalEngine`, the `.test {}` / `.testBlocking {}` helpers, `MapCache` and other mock implementations |
+| `engine-local` | JVM (test scope) | `LocalEngine` — the in-process engine backing the test helpers in `core` |
 | `engine-ktor` | JVM | `KtorEngine` — Ktor + Netty/CIO; recommended for local development |
 | `engine-netty` | JVM | `NettyEngine` — Netty without Ktor |
 | `engine-jdk-server` | JVM | `JdkEngine` — pure JDK HTTP server, no extra runtime |
-| `engine-aws-serverless` | JVM | `AwsAdapter` — generates Terraform for API Gateway + Lambda |
+| `engine-aws-serverless` | JVM | `AwsAdapter` (Lambda request handler) + `TerraformAwsServerlessBuilder` (Terraform generation) |
 | `deploy-aws-ec2` | JVM | EC2-specific deployment helpers |
 
 ---
@@ -137,6 +135,8 @@ Most features have two Gradle modules: `X` (JVM server logic) and `X-shared`
 (Kotlin Multiplatform types).
 
 ```
+Illustrative — not a drift-checked sample.
+
 typed               typed-shared
   │   ←─ depends on ──   │
   │                       │
@@ -163,6 +163,8 @@ KMP `*-shared` module, and put your `ServerBuilder` and endpoint logic in a JVM 
 A typical Lightning Server application with a generated Kotlin SDK or KMP client looks like:
 
 ```
+Illustrative directory tree.
+
 my-app/
 ├── settings.gradle.kts          # includes :shared and :server
 ├── gradle/
@@ -171,16 +173,15 @@ my-app/
 ├── shared/                      # Kotlin Multiplatform module
 │   └── src/commonMain/kotlin/
 │       └── com/example/myapp/
-│           ├── models/
-│           │   ├── User.kt      # @Serializable data classes
-│           │   └── Post.kt
-│           └── auth/
-│               └── UserAuth.kt  # PrincipalType declaration
+│           └── models/
+│               ├── User.kt      # @Serializable data classes
+│               └── Post.kt
 │
 └── server/                      # JVM module
     └── src/main/kotlin/
         └── com/example/myapp/
             ├── Server.kt        # ServerBuilder object
+            ├── UserAuth.kt      # PrincipalType implementation
             ├── Main.kt          # main() + engine startup
             └── endpoints/
                 ├── PostEndpoints.kt
@@ -190,6 +191,7 @@ my-app/
 **`settings.gradle.kts`:**
 
 ```kotlin
+// Illustrative — not a drift-checked sample.
 rootProject.name = "my-app"
 include(":shared")
 include(":server")
@@ -198,6 +200,7 @@ include(":server")
 **`:shared/build.gradle.kts`:**
 
 ```kotlin
+// Illustrative — not a drift-checked sample.
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.kotlin.serialization)
@@ -211,8 +214,8 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation("com.lightningkite.lightningserver:core-shared:$lightningServerVersion")
-            implementation("com.lightningkite.lightningserver:auth-shared:$lightningServerVersion")
             implementation("com.lightningkite.lightningserver:typed-shared:$lightningServerVersion")
+            // sessions-shared if you need auth proof types on the client side
         }
     }
 }
@@ -221,6 +224,7 @@ kotlin {
 **`:server/build.gradle.kts`:**
 
 ```kotlin
+// Illustrative — not a drift-checked sample.
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
@@ -229,7 +233,8 @@ plugins {
 
 dependencies {
     implementation(project(":shared"))
-    ksp("com.lightningkite.lightningserver:processor:$lightningServerVersion")
+    // KSP processor is from service-abstractions, not lightning-server itself
+    ksp("com.lightningkite.services:database-processor:$serviceAbstractionsVersion")
     implementation("com.lightningkite.lightningserver:core:$lightningServerVersion")
     implementation("com.lightningkite.lightningserver:typed:$lightningServerVersion")
     implementation("com.lightningkite.lightningserver:auth:$lightningServerVersion")
@@ -245,54 +250,53 @@ dependencies {
 
 ---
 
-## Why the shared/server split matters for auth
+## The shared/server split for models and auth
 
-`PrincipalType<SUBJECT, ID>` is the bridge between your user model and the auth system.
-It lives in `core-shared` so that generated SDKs and KMP clients can reference it, but
-its implementation calls `database()` which requires a `ServerRuntime` context:
+Your **model classes** (`@Serializable data class User(...)`) live in `:shared` because:
+
+- The generated TypeScript or Kotlin SDK needs `User` with the exact same field structure.
+- The model itself has no server dependencies — it is a plain data class.
+
+Your **`PrincipalType` implementation** (e.g., `UserAuth`) lives in `:server`, not
+`:shared`, because `PrincipalType` is defined in the JVM-only `auth` module:
 
 ```kotlin
-// In :shared — no server deps, compiles for any KMP target
+// Illustrative.
+// UserAuth lives in :server because PrincipalType is a JVM-only type from :auth.
+// The model (User) can still live in :shared — UserAuth just references it.
 object UserAuth : PrincipalType<User, Uuid> {
     override val idSerializer     = Uuid.serializer()
     override val subjectSerializer = User.serializer()
-    override val name             = "User"
 
     context(server: ServerRuntime)
     override suspend fun fetch(id: Uuid): User =
-        Server.userInfo.table().get(id) ?: throw NotFoundException()
+        Server.users.table().get(id) ?: throw NotFoundException()
 }
 ```
 
-If `UserAuth` lived in `:server` it could not be imported by a KMP client that needs to
-know the principal type for SDK generation.  Keeping it in `:shared` lets both sides
-reference the same declaration.
-
-The same applies to your model classes: `@Serializable data class User(...)` must be in
-`:shared` so that the generated TypeScript or Kotlin SDK can import `User` with the
-identical field structure.
-
-> **Rule of thumb**: anything that the generated SDK or a KMP client imports must be in
-> `:shared`.  Everything that touches `ServerBuilder`, endpoints, engines, or services
-> belongs in `:server`.
+> **Rule of thumb**: anything the generated SDK or a KMP client needs to import
+> (model classes, shared types) must be in `:shared`.  Everything that touches
+> `ServerBuilder`, `PrincipalType`, endpoints, engines, or services belongs in `:server`.
 
 ---
 
 ## The `ksp` processor
 
-The `:processor` artifact is a KSP (Kotlin Symbol Processing) annotation processor that
-generates the `DataClassPaths` DSL used by `condition {}` and `modification {}`.
-It must be applied in any module where you annotate a class with `@GenerateDataClassPaths`:
+`@GenerateDataClassPaths` triggers a KSP (Kotlin Symbol Processing) annotation processor
+that generates the `DataClassPaths` DSL used by `condition {}` and `modification {}`.
+The processor artifact ships with the **Service Abstractions** library (not Lightning Server
+itself):
 
 ```kotlin
-// build.gradle.kts
+// Illustrative — not a drift-checked sample.
+// In any module where you annotate classes with @GenerateDataClassPaths:
 dependencies {
-    ksp("com.lightningkite.lightningserver:processor:$lightningServerVersion")
+    ksp("com.lightningkite.services:database-processor:$serviceAbstractionsVersion")
 }
 ```
 
-Apply it in `:shared` if your model classes live there (they usually do), and optionally
-in `:server` as well if you have server-only models.
+Apply it in `:shared` if your model classes live there (they usually do), and in `:server`
+if you have server-only models.
 
 ---
 
@@ -343,9 +347,9 @@ pull values from AWS Secrets Manager.
 ## What's Next
 
 - **Running Your Server** — the `KtorEngine`, `NettyEngine`, and `JdkEngine` startup
-  sequence and `settings.json` format.  See [Running Your Server](../guide/running.md).
-- **AWS Deployment** — `AwsAdapter` generates Terraform from your declared `setting(...)`
-  entries.  See [AWS Deployment](../guide/aws-deployment.md).
-- **Testing** — `LocalEngine` and the `.test {}` helpers let you exercise the full
-  `ServerDefinition` (interceptors, tasks, typed endpoints) in a JUnit test.
-  See [Testing Your Server](../guide/testing.md).
+  sequence and `settings.json` format.  See [Running Your Server](running.md).
+- **AWS Deployment** — `AwsAdapter` and `TerraformAwsServerlessBuilder` handle Lambda
+  deployment and Terraform generation.  See [AWS Deployment](aws-deployment.md).
+- **Testing** — `LocalEngine` and the `.test {}` helpers from `core` let you exercise the
+  full `ServerDefinition` (interceptors, tasks, typed endpoints) in a JUnit test.
+  See [Testing Your Server](testing.md).
