@@ -75,10 +75,10 @@ object UserProfileServer : ServerBuilder() {
 fun authTest() = UserProfileServer.testBlocking(settings = { database set Database.Settings("ram") }) {
     // Seed a user directly into the database
     val alice = UserProfileServer.database().table<UserProfile>()
-        .insertOne(UserProfile(name = "Alice", email = "alice@example.com"))!!
+        .insertOne(UserProfile(name = "Alice", email = "alice@example.com"))
 
     // testAuth() creates an Authentication<UserProfile> for use in tests.
-    // It must be called inside a test {} block because it needs a ServerRuntime in context.
+    // It must be called inside a testBlocking {} block because it needs a ServerRuntime in context.
     val aliceAuth = UserAuth.testAuth(alice)
 
     // Pass the auth token as the first argument to the typed .test() call.
