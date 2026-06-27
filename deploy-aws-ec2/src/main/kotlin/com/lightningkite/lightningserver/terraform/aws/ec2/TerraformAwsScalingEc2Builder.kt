@@ -194,9 +194,9 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
         if (url != null && (url.isEmpty() || url == "ram" || url.startsWith("ram://"))) {
             throw IllegalStateException(
                 "TerraformAwsScalingEc2Builder requires a distributed cache (e.g. redis://, " +
-                    "memcached://, dynamodb://) so scheduled tasks coordinate across the fleet, " +
-                    "but the configured cache is '$url'. A per-instance RAM cache would run every " +
-                    "scheduled task on every instance."
+                        "memcached://, dynamodb://) so scheduled tasks coordinate across the fleet, " +
+                        "but the configured cache is '$url'. A per-instance RAM cache would run every " +
+                        "scheduled task on every instance."
             )
         }
     }
@@ -302,7 +302,7 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
     private val imageVersion: String by lazy {
         // Fold the component lists in too, so changing managed/hardening components re-bakes the AMI.
         val saltInput = imageInstallScript() + baseImageSalt +
-            imageManagedComponents.joinToString(",") + hardeningComponents.joinToString(",")
+                imageManagedComponents.joinToString(",") + hardeningComponents.joinToString(",")
         val patch = saltInput.hashCode().absoluteValue % 100000
         "1.0.$patch"
     }
@@ -361,7 +361,7 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
                 "name" - "$projectPrefix-install"
                 "platform" - "Linux"
                 "version" - imageVersion
-                "data" - imageComponentYaml()
+                "data" - expression("local.image_data")
             }
 
             "resource.aws_imagebuilder_image_recipe.this" {
@@ -421,6 +421,15 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
                 "image_tests_configuration" {
                     "image_tests_enabled" - false
                 }
+            }
+
+            // Data script
+            "locals" {
+                emitExtra("image_data.yaml", imageComponentYaml())
+                val replacements = provisioningFragments
+                    .flatMap { it.second.entries.map { "${it.key} = ${it.value}" } }
+                    .joinToString(", ")
+                "image_data" - $$"""${templatefile("${path.module}/image_data.yaml", { $$replacements })}"""
             }
         }
     }
@@ -642,6 +651,7 @@ $indentedScript
             "resource.aws_s3_bucket_server_side_encryption_configuration.alb_logs" {
                 "bucket" - expression("aws_s3_bucket.alb_logs.id")
                 "rule" {
+                    "blocked_encryption_types" - listOf("SSE-C")
                     "apply_server_side_encryption_by_default" {
                         "sse_algorithm" - "AES256"
                     }

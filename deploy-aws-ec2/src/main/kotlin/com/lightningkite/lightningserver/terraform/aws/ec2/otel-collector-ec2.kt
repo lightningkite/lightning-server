@@ -203,7 +203,7 @@ WantedBy=multi-user.target
             this.appendLine(unit)
             this.appendLine("ALLOY_UNIT_EOF")
             this.appendLine("systemctl enable alloy")
-        }.trim()
+        }.trim() to emptyMap()
     }
     emitter.provisioningServices += "alloy"
 
@@ -308,7 +308,7 @@ private fun adotProvisioningFragment(
     region: String,
     namespace: String,
     enableMetrics: Boolean,
-): String {
+): Pair<String, Map<String, String>> {
     // Standard OTel Collector config: OTLP receiver on localhost -> batch -> AWS exporters. The
     // awsxray/awsemf exporters resolve credentials from the instance role.
     val config = buildString {
@@ -358,7 +358,7 @@ exporters:
         appendLine(config)
         appendLine("ADOT_CONFIG_EOF")
         appendLine("systemctl enable aws-otel-collector")
-    }.trim()
+    }.trim() to emptyMap()
 }
 
 /**

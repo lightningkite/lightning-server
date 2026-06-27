@@ -228,7 +228,12 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
             // User data script
             "locals" {
                 emitExtra("ec2_init.sh", generateEC2Init())
-                "ec2_init" - $$"""${templatefile("${path.module}/ec2_init.sh", { deployment_bucket = aws_s3_bucket.deployment.id })}"""
+                val replacements = listOf(
+                    "deployment_bucket = aws_s3_bucket.deployment.id",
+                    *provisioningFragments.flatMap { it.second.entries.map { "${it.key} = ${it.value}" } }.toTypedArray()
+                )
+                    .joinToString(", ")
+                "ec2_init" - $$"""${templatefile("${path.module}/ec2_init.sh", { $$replacements })}"""
             }
         }
     }
