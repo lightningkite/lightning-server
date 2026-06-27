@@ -168,9 +168,7 @@ public class TypescriptFetcherSdk(
             fun Appendable.appendModelImports() =
                 appendLine(
                     "import type { ${
-                        models.joinToString {
-                            it.tsType().substringBefore('<')
-                        }
+                        models.map { it.tsTopLevelTypeName() }.distinct().joinToString()
                     } } from './${fileStructure.modelsFilename}'"
                 )
 
@@ -216,13 +214,22 @@ public class TypescriptFetcherSdk(
                         ?: emptyMap()
 
                     fun String.replaceGenerics(): String =
-                        genericMap.entries.fold(this) { acc, (old, new) -> acc.replace(old, new) }
+                        genericMap.entries
+                            .sortedByDescending { it.key.length }
+                            .fold(this) { acc, (old, new) -> acc.replace(old, new) }
 
                     if (type.descriptor.isInline) {
                         val valueType =
                             type.serializableProperties?.firstOrNull()?.serializer?.tsType()?.replaceGenerics()
                         val name = type.tsType().replaceGenerics()
-                        appendLine("export type ${name} = Brand<${valueType}, '${name}'>")
+                        val namespaceParts = name.split('.', limit = 2)
+                        if (namespaceParts.size == 2) {
+                            appendLine("export namespace ${namespaceParts[0]} {")
+                            appendLine("\texport type ${namespaceParts[1]} = Brand<${valueType}, \"$name\">")
+                            appendLine('}')
+                        } else {
+                            appendLine("export type ${name} = Brand<${valueType}, \"$name\">")
+                        }
                     } else {
                         appendLine("export interface ${type.tsType().replaceGenerics()} {")
                         val properties = type
@@ -437,6 +444,11 @@ public class TypescriptFetcherSdk(
         }
 
 
+    context(runtime: ServerRuntime)
+    private fun KSerializer<*>.tsTopLevelTypeName(): String = tsType()
+        .substringBefore('<')
+        .substringBefore('.')
+
     @OptIn(ExperimentalSerializationApi::class)
     context(runtime: ServerRuntime)
     private fun KSerializer<*>.tsType(): String = nullElement()?.let { it.tsType() + " | null | undefined" } ?: when {
@@ -486,12 +498,11 @@ public class TypescriptFetcherSdk(
                         append("DeepPartial")
                     } else {
                         val name = descriptor.simpleSerialName
-                        if (name == "ID" || name == "Value") {
+                        if (descriptor.isInline && (name == "ID" || name == "Value")) {
                             val parts = descriptor.serialName.split('.')
                             if (parts.size >= 2) {
                                 val parentName = parts[parts.size - 2]
-                                // If the parent is the containing class, return "Account" + "ID" -> "AccountId"
-                                append("${parentName}${name}")
+                                append("${parentName}.${name}")
                             }
                         } else {
                             append(name)
