@@ -7,7 +7,8 @@ import com.lightningkite.lightningserver.engine.local.enginePubSub
 import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.websockets.*
-import com.lightningkite.services.otel.OpenTelemetrySettings
+import com.lightningkite.services.otel.OtelTelemetryBackend
+import com.lightningkite.services.telemetry.TelemetryBackend
 import io.ktor.client.plugins.websocket.*
 import io.ktor.server.testing.*
 import io.ktor.websocket.*
@@ -31,14 +32,19 @@ class WebSocketSpanTest {
     private val exporter = InMemorySpanExporter.create()
 
     private fun registerMemoryScheme() {
-        OpenTelemetrySettings.register("ws-memory-${System.identityHashCode(this)}") { _, _, _ ->
-            OpenTelemetrySdk.builder()
-                .setTracerProvider(
-                    SdkTracerProvider.builder()
-                        .addSpanProcessor(SimpleSpanProcessor.create(exporter))
-                        .build()
-                )
-                .build()
+        // Register an in-memory OTel backend under a custom scheme so this test can read the spans
+        // the engine produces. telemetrySettings now resolves a TelemetryBackend.Settings (not the
+        // deprecated OpenTelemetrySettings), so the scheme registers on TelemetryBackend.Settings.
+        TelemetryBackend.Settings.register("ws-memory-${System.identityHashCode(this)}") { _, _, _ ->
+            OtelTelemetryBackend(
+                OpenTelemetrySdk.builder()
+                    .setTracerProvider(
+                        SdkTracerProvider.builder()
+                            .addSpanProcessor(SimpleSpanProcessor.create(exporter))
+                            .build()
+                    )
+                    .build()
+            )
         }
     }
 
@@ -61,7 +67,7 @@ class WebSocketSpanTest {
             com.lightningkite.lightningserver.definition.generalSettings.useDefault()
             com.lightningkite.lightningserver.definition.secretBasis.useDefault()
             com.lightningkite.lightningserver.definition.loggingSettings.useDefault()
-            telemetrySettings.set(OpenTelemetrySettings(url = schemeName))
+            telemetrySettings.set(TelemetryBackend.Settings(url = schemeName))
             enginePubSub.useDefault()
             engineCache.useDefault()
             forceWebSocketPubSub set true  // hit the standard pub/sub branch where the *WithMetrics calls live

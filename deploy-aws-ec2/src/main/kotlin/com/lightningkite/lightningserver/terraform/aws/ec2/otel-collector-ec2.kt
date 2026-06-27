@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.terraform.aws.ec2
 
 import com.lightningkite.services.otel.OpenTelemetrySettings
+import com.lightningkite.services.telemetry.TelemetryBackend
 import com.lightningkite.services.terraform.AwsPolicyStatement
 import com.lightningkite.services.terraform.TerraformJsonObject.Companion.expression
 import com.lightningkite.services.terraform.TerraformNeed
@@ -58,7 +59,7 @@ private val SAFE_IDENTIFIER = Regex("^[A-Za-z0-9._-]+$")
  * @param alloyVersion The pinned Grafana Alloy release tag to install (see [DEFAULT_ALLOY_VERSION]).
  */
 context(emitter: TerraformAwsEc2BuilderBase<*>)
-public fun TerraformNeed<OpenTelemetrySettings?>.otelGrafanaCloud(
+public fun TerraformNeed<TelemetryBackend.Settings>.otelGrafanaCloud(
     grafanaCloudInstanceId: String,
     zone: String = "prod-us-east-0",
     serviceName: String? = null,
@@ -273,7 +274,7 @@ internal fun TerraformAwsEc2BuilderBase<*>.emitInstanceSecret(
  * @param adotVersion The pinned ADOT collector release to install (see [DEFAULT_ADOT_VERSION]).
  */
 context(emitter: TerraformAwsEc2BuilderBase<*>)
-public fun TerraformNeed<OpenTelemetrySettings?>.otelXRay(
+public fun TerraformNeed<TelemetryBackend.Settings>.otelXRay(
     serviceName: String? = null,
     samplingRatio: Double? = null,
     enableMetrics: Boolean = true,

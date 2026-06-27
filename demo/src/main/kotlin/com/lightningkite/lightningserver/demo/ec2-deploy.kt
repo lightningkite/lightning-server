@@ -24,6 +24,7 @@ import com.lightningkite.services.email.ses.awsSesInbound
 import com.lightningkite.services.files.s3.awsS3Bucket
 import com.lightningkite.services.pubsub.aws.dynamoDb
 import com.lightningkite.services.pubsub.redis.redis
+import com.lightningkite.services.telemetry.TelemetryBackend
 import com.lightningkite.services.terraform.AwsVpc
 import com.lightningkite.services.terraform.KmsKeySource
 import com.lightningkite.services.terraform.byVariable
