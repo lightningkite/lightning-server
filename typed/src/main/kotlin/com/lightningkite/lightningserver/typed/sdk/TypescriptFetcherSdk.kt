@@ -218,18 +218,26 @@ public class TypescriptFetcherSdk(
                     fun String.replaceGenerics(): String =
                         genericMap.entries.fold(this) { acc, (old, new) -> acc.replace(old, new) }
 
-                    appendLine("export interface ${type.tsType().replaceGenerics()} {")
+                    if (type.descriptor.isInline) {
+                        val valueType =
+                            type.serializableProperties?.firstOrNull()?.serializer?.tsType()?.replaceGenerics()
+                        val name = type.tsType().replaceGenerics()
+                        appendLine("export type ${name} = Brand<${valueType}, '${name}'>")
+                    } else {
+                        appendLine("export interface ${type.tsType().replaceGenerics()} {")
+                        val properties = type
+                            .serializableProperties?.map { it.serializer }
+                            ?: type.childSerializersOrNull()?.toList()
+                            ?: emptyList()
 
-                    val properties = type
-                        .serializableProperties?.map { it.serializer }
-                        ?: type.childSerializersOrNull()?.toList()
-                        ?: emptyList()
+                        for ((idx, prop) in properties.withIndex()) {
+                            appendLine("\t${type.descriptor.getElementName(idx)}: ${prop.tsType().replaceGenerics()}")
+                        }
 
-                    for ((idx, prop) in properties.withIndex()) {
-                        appendLine("\t${type.descriptor.getElementName(idx)}: ${prop.tsType().replaceGenerics()}")
+                        appendLine('}')
                     }
 
-                    appendLine('}')
+
                 }
 
                 SerialKind.ENUM -> {
@@ -477,7 +485,17 @@ public class TypescriptFetcherSdk(
                     if (descriptor.serialName == "com.lightningkite.serialization.Partial") {
                         append("DeepPartial")
                     } else {
-                        append(descriptor.simpleSerialName)
+                        val name = descriptor.simpleSerialName
+                        if (name == "ID" || name == "Value") {
+                            val parts = descriptor.serialName.split('.')
+                            if (parts.size >= 2) {
+                                val parentName = parts[parts.size - 2]
+                                // If the parent is the containing class, return "Account" + "ID" -> "AccountId"
+                                append("${parentName}${name}")
+                            }
+                        } else {
+                            append(name)
+                        }
                     }
                     typeParametersSerializersOrNull()
                         ?.takeUnless { it.isEmpty() }
@@ -517,7 +535,8 @@ public class TypescriptFetcherSdk(
         "DataClassPathPartial",
         "QueryPartial",
         "DeepPartial",
-        "Fetcher"
+        "Fetcher",
+        "Brand",
     )
 
     private val skipFromLsPackage = setOf("Partial") + fromLightningServerPackage
