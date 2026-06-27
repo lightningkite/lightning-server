@@ -214,7 +214,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                     "Name" - displayName
                 }
 
-                "depends_on" - listOf(
+                "depends_on" - (listOf(
                     "null_resource.upload_jar",
                     "null_resource.upload_settings",
                     "aws_ssm_parameter.settings_password",
@@ -222,7 +222,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                     "aws_iam_role_policy_attachment.ssm",
                     "aws_iam_role_policy_attachment.cloudwatch_agent",
                     "aws_s3_bucket_server_side_encryption_configuration.deployment",
-                )
+                ) + instanceSecretDependencies)
             }
 
             // User data script
@@ -554,6 +554,8 @@ apt install -y openjdk-17-jre-headless openssl curl gnupg ca-certificates unzip
 
             systemD()
 
+            runProvisioningFragments()
+
             // The single instance fills the bucket name via terraform templatefile() and the
             // region is a compile-time constant. The app listens on appPort behind Angie.
             instanceRedeployScript(
@@ -596,7 +598,16 @@ systemctl daemon-reload
 
 systemctl enable angie
 systemctl restart angie
+"""
+            )
 
+            // Start on-box agents (e.g. the OTel collector) now that the instance role is available;
+            // their cloud-init `enable` alone would not start them until the next boot.
+            startProvisioningServices()
+
+            // language="Shell Script"
+            appendLine(
+                $$"""
 # Verify CloudWatch agent started (non-fatal if it fails)
 if ! systemctl is-active --quiet amazon-cloudwatch-agent; then
     echo "[WARN] CloudWatch agent failed to start. Logs may not be collected."

@@ -447,6 +447,10 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
             cloudwatchAgentConfig()
             ssm()
             systemD()
+            // Bake on-box agents (e.g. the OTel collector) into the AMI. They install + `enable`
+            // here but do not start; the ASG starts them at boot, where the instance role can fetch
+            // any secrets they need from SSM.
+            runProvisioningFragments()
             // The redeploy script reads the bucket + region from deploy.env written at boot, and
             // validates the new build against the local liveness endpoint before declaring success.
             instanceRedeployScript(
@@ -758,11 +762,11 @@ $indentedScript
                         "propagate_at_launch" - true
                     },
                 )
-                "depends_on" - listOf(
+                "depends_on" - (listOf(
                     "null_resource.upload_jar",
                     "null_resource.upload_settings",
                     "aws_ssm_parameter.settings_password",
-                )
+                ) + instanceSecretDependencies)
             }
 
             // Target-tracking scaling on average CPU. Catches compute-bound saturation

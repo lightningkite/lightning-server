@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.engine.local.engineCache
 import com.lightningkite.lightningserver.engine.local.enginePubSub
 import com.lightningkite.lightningserver.terraform.*
 import com.lightningkite.lightningserver.terraform.aws.ec2.TerraformAwsScalingEc2Builder
+import com.lightningkite.lightningserver.terraform.aws.ec2.otelGrafanaCloud
 import com.lightningkite.lightningserver.terraform.awsserverless.*
 import com.lightningkite.services.LoggingSettings
 import com.lightningkite.services.cache.dynamodb.awsDynamoDb
@@ -97,7 +98,10 @@ object TestEc2Scaling : TerraformAwsScalingEc2Builder<Server>(Server) {
                 )
             )
         )
-        telemetrySettings.direct(null)
+        // Run an on-box Grafana Alloy collector and ship telemetry to Grafana Cloud. Replace the
+        // instance id with your Grafana Cloud OTLP username/stack id, and supply the
+        // `grafana_cloud_api_key` variable (write-scoped access-policy token) via editVars().
+        telemetrySettings.otelGrafanaCloud(grafanaCloudInstanceId = "000000")
         cors.direct(
             CorsSettings(
                 limitToDomains = listOf("*"),
