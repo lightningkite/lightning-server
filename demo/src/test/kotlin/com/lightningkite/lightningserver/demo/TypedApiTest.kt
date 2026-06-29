@@ -1,12 +1,122 @@
 package com.lightningkite.lightningserver.demo
 
+import com.lightningkite.lightningserver.auth.noAuth
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.demo.endpoints.*
+import com.lightningkite.lightningserver.http.post
+import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.settings.set
+import com.lightningkite.lightningserver.typed.ApiHttpHandler
+import com.lightningkite.lightningserver.typed.sdk.Archive
+import com.lightningkite.lightningserver.typed.sdk.TypescriptFetcherSdk
 import com.lightningkite.lightningserver.typed.test
+import com.lightningkite.services.data.ExperimentalLightningServer
+import com.lightningkite.services.database.Database
 import kotlinx.coroutines.runBlocking
+import kotlinx.io.Buffer
+import kotlinx.io.Sink
+import kotlinx.io.asSink
+import kotlinx.io.buffered
+import kotlinx.io.readString
+import kotlinx.serialization.Serializable
 import org.junit.Test
 import kotlin.test.*
+import kotlin.uuid.Uuid
 
 class TypedApiTest {
+
+
+    object TsQuickCheckServer : ServerBuilder() {
+        @JvmInline @Serializable value class IDThing(val uuid: Uuid)
+        val uuidTest = path.path("test").post bind ApiHttpHandler(
+            summary = "uuid raw test",
+            auth = noAuth,
+            implementation = { id: IDThing ->
+                id
+            }
+        )
+    }
+    @OptIn(ExperimentalLightningServer::class)
+    @Test
+    fun tsSdkQuickCheck() = runBlocking {
+        TsQuickCheckServer.test(settings = {}) {
+            TypescriptFetcherSdk(
+                fileStructure = TypescriptFetcherSdk.Structure.SingleFile("sdk.kt"),
+            ).write(object: Archive {
+                override fun sub(name: String): Archive {
+                    println("SUB $name")
+                    return this
+                }
+
+                override fun entry(name: String, write: (Sink) -> Unit) {
+                    println("--$name--")
+                    System.out.asSink().buffered().use {
+                        write(it)
+                    }
+                    println("----")
+                }
+
+                override fun close() {
+                    println("CLOSE")
+                }
+
+            })
+        }
+        Unit
+    }
+
+    object TsSealedServer : ServerBuilder() {
+        @Serializable
+        sealed interface Shape {
+            @Serializable data class Circle(val radius: Double) : Shape
+            @Serializable data class Rectangle(val width: Double, val height: Double) : Shape
+        }
+        val shapeTest = path.path("shape").post bind ApiHttpHandler(
+            summary = "sealed result test",
+            auth = noAuth,
+            implementation = { input: Shape -> input }
+        )
+    }
+
+    /**
+     * App `@Serializable sealed` types must emit as a flat-discriminator TS union plus an interface
+     * per subtype, matching the runtime wire format `{ "type": "<name>", ...subtype fields }`.
+     */
+    @OptIn(ExperimentalLightningServer::class)
+    @Test
+    fun tsSdkSealedTypes() = runBlocking {
+        val files = HashMap<String, String>()
+        TsSealedServer.test(settings = {}) {
+            TypescriptFetcherSdk(
+                fileStructure = TypescriptFetcherSdk.Structure.SingleFile("sdk.ts"),
+            ).write(object : Archive {
+                override fun sub(name: String): Archive = this
+                override fun entry(name: String, write: (Sink) -> Unit) {
+                    val buffer = Buffer()
+                    write(buffer)
+                    files[name] = buffer.readString()
+                }
+                override fun close() {}
+            })
+        }
+        val ts = files.values.joinToString("\n")
+        println(ts)
+
+        // The sealed union type itself.
+        assertTrue(ts.contains("export type ") && Regex("""export type \w*Shape =""").containsMatchIn(ts),
+            "sealed union type not emitted:\n$ts")
+        // Flat-discriminator union members referencing the per-subtype interfaces.
+        assertTrue(Regex("""\| \(\{ type: "[^"]*Circle" \} & \w*ShapeCircle\)""").containsMatchIn(ts),
+            "Circle union member not emitted in discriminator form:\n$ts")
+        assertTrue(Regex("""\| \(\{ type: "[^"]*Rectangle" \} & \w*ShapeRectangle\)""").containsMatchIn(ts),
+            "Rectangle union member not emitted in discriminator form:\n$ts")
+        // The subtype interfaces, with their fields.
+        assertTrue(Regex("""interface \w*ShapeCircle \{[^}]*radius: number""").containsMatchIn(ts),
+            "Circle subtype interface/fields not emitted:\n$ts")
+        assertTrue(Regex("""interface \w*ShapeRectangle \{[^}]*width: number""").containsMatchIn(ts),
+            "Rectangle subtype interface/fields not emitted:\n$ts")
+        Unit
+    }
 
     @Test
     fun testCalculatorAddition() = runBlocking {
