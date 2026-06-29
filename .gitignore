@@ -22,3 +22,5 @@ local.version.txt
 local.auto.tfvars
 .fork
 tmp
+site
+.claude/worktrees
