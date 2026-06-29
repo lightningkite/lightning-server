@@ -367,10 +367,7 @@ public class TypescriptFetcherSdk(
         }
 
         for (type in types) {
-            renderType(type)?.let { topLevelDeclarations += it.also {
-                println("1 ------- : ${it.first}")
-                println("2 ------- :: ${it.second}")
-            } }
+            renderType(type)?.let { topLevelDeclarations += it }
         }
 
         for ((name, declaration) in topLevelDeclarations) {

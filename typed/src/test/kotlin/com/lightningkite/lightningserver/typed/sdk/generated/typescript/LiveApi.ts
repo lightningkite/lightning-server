@@ -1,5 +1,5 @@
-import type { Query, MassModification, EntryChange, ListChange, Modification, Condition, GroupCountQuery, AggregateQuery, GroupAggregateQuery, Aggregate, SortPart, DataClassPath, DataClassPathPartial, QueryPartial, DeepPartial, Fetcher } from '@lightningkite/lightning-server-simplified'
-import type { CollectionUpdates, Mask, Mode, ModelPermissions, Pair, Part, TestInput, TestModel, UpdateRestrictions, Uuid } from './models.ts'
+import type { Query, MassModification, EntryChange, ListChange, Modification, Condition, GroupCountQuery, AggregateQuery, GroupAggregateQuery, Aggregate, SortPart, DataClassPath, DataClassPathPartial, QueryPartial, DeepPartial, Fetcher, Brand } from '@lightningkite/lightning-server-simplified'
+import type { CollectionUpdates, TestModel, Mask, UpdateRestrictions, ModelPermissions, Pair, TestInput, Uuid } from './models.ts'
 import type { Api } from './Api.ts'
 
 export class LiveApi implements Api {

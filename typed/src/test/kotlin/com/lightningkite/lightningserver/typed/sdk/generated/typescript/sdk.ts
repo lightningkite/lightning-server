@@ -1,4 +1,4 @@
-import type { Query, MassModification, EntryChange, ListChange, Modification, Condition, GroupCountQuery, AggregateQuery, GroupAggregateQuery, Aggregate, SortPart, DataClassPath, DataClassPathPartial, QueryPartial, DeepPartial, Fetcher } from '@lightningkite/lightning-server-simplified'
+import type { Query, MassModification, EntryChange, ListChange, Modification, Condition, GroupCountQuery, AggregateQuery, GroupAggregateQuery, Aggregate, SortPart, DataClassPath, DataClassPathPartial, QueryPartial, DeepPartial, Fetcher, Brand } from '@lightningkite/lightning-server-simplified'
 
 export interface CollectionUpdates<T, T1> {
 	updates: Array<T>
@@ -9,11 +9,6 @@ export interface CollectionUpdates<T, T1> {
 
 export interface Mask<T> {
 	pairs: Array<Pair<Condition<T>, Modification<T>>>
-}
-
-export enum Mode {
-	Blacklist = "Blacklist",
-	Whitelist = "Whitelist",
 }
 
 export interface ModelPermissions<T> {
@@ -31,25 +26,48 @@ export interface Pair<T, T1> {
 	second: T1
 }
 
-export interface Part<T> {
-	property: DataClassPathPartial<T>
-	requires: Condition<T>
-	limitedTo: Condition<T>
-}
-
 export interface TestInput {
 	id: number
 	name: string
 }
 
 export interface TestModel {
-	_id: Uuid
+	_id: TestModel.ID
 	name: string
+	statusInfo: TestModel.TestStatusInfo
+}
+
+export namespace TestModel {
+	export type ID = Brand<Uuid, "TestModel.ID">
+
+	export enum Status {
+		Active = "Active",
+		Inactive = "Inactive",
+		Pending = "Pending",
+	}
+
+	export interface TestStatusInfo {
+		status: TestModel.Status
+		updatedAt: number
+	}
 }
 
 export interface UpdateRestrictions<T> {
-	mode: Mode
-	fields: Array<Part<T>>
+	mode: UpdateRestrictions.Mode
+	fields: Array<UpdateRestrictions.Part<T>>
+}
+
+export namespace UpdateRestrictions {
+	export enum Mode {
+		Blacklist = "Blacklist",
+		Whitelist = "Whitelist",
+	}
+
+	export interface Part<T> {
+		property: DataClassPathPartial<T>
+		requires: Condition<T>
+		limitedTo: Condition<T>
+	}
 }
 
 export type Uuid = string  // kotlin.uuid.Uuid
@@ -243,7 +261,7 @@ export interface Api {
 		 * 
 		 * **Auth Requirements:** No Requirements
 		 * */
-		detail(id: Uuid): Promise<TestModel>
+		detail(id: TestModel.ID): Promise<TestModel>
 		/**
 		 * Upsert
 		 * 
@@ -251,7 +269,7 @@ export interface Api {
 		 * 
 		 * **Auth Requirements:** No Requirements
 		 * */
-		upsert(id: Uuid, input: TestModel): Promise<TestModel>
+		upsert(id: TestModel.ID, input: TestModel): Promise<TestModel>
 		/**
 		 * Replace
 		 * 
@@ -259,7 +277,7 @@ export interface Api {
 		 * 
 		 * **Auth Requirements:** No Requirements
 		 * */
-		replace(id: Uuid, input: TestModel): Promise<TestModel>
+		replace(id: TestModel.ID, input: TestModel): Promise<TestModel>
 		/**
 		 * Modify
 		 * 
@@ -267,7 +285,7 @@ export interface Api {
 		 * 
 		 * **Auth Requirements:** No Requirements
 		 * */
-		modify(id: Uuid, input: Modification<TestModel>): Promise<TestModel>
+		modify(id: TestModel.ID, input: Modification<TestModel>): Promise<TestModel>
 		/**
 		 * Delete
 		 * 
@@ -275,7 +293,7 @@ export interface Api {
 		 * 
 		 * **Auth Requirements:** No Requirements
 		 * */
-		delete(id: Uuid): Promise<void>
+		delete(id: TestModel.ID): Promise<void>
 		/**
 		 * Simplified Modify
 		 * 
@@ -283,7 +301,7 @@ export interface Api {
 		 * 
 		 * **Auth Requirements:** No Requirements
 		 * */
-		simplifiedModify(id: Uuid, input: Partial<TestModel>): Promise<TestModel>
+		simplifiedModify(id: TestModel.ID, input: Partial<TestModel>): Promise<TestModel>
 		/**
 		 * Modify with Diff
 		 * 
@@ -291,7 +309,7 @@ export interface Api {
 		 * 
 		 * **Auth Requirements:** No Requirements
 		 * */
-		modifyWithDiff(id: Uuid, input: Modification<TestModel>): Promise<EntryChange<TestModel>>
+		modifyWithDiff(id: TestModel.ID, input: Modification<TestModel>): Promise<EntryChange<TestModel>>
 
 		readonly default: {
 			/**
@@ -429,7 +447,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** Authenticated
 			 * */
-			detail(id: Uuid): Promise<TestModel>
+			detail(id: TestModel.ID): Promise<TestModel>
 			/**
 			 * Upsert
 			 * 
@@ -437,7 +455,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** Authenticated
 			 * */
-			upsert(id: Uuid, input: TestModel): Promise<TestModel>
+			upsert(id: TestModel.ID, input: TestModel): Promise<TestModel>
 			/**
 			 * Replace
 			 * 
@@ -445,7 +463,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** Authenticated
 			 * */
-			replace(id: Uuid, input: TestModel): Promise<TestModel>
+			replace(id: TestModel.ID, input: TestModel): Promise<TestModel>
 			/**
 			 * Modify
 			 * 
@@ -453,7 +471,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** Authenticated
 			 * */
-			modify(id: Uuid, input: Modification<TestModel>): Promise<TestModel>
+			modify(id: TestModel.ID, input: Modification<TestModel>): Promise<TestModel>
 			/**
 			 * Delete
 			 * 
@@ -461,7 +479,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** Authenticated
 			 * */
-			delete(id: Uuid): Promise<void>
+			delete(id: TestModel.ID): Promise<void>
 			/**
 			 * Simplified Modify
 			 * 
@@ -469,7 +487,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** Authenticated
 			 * */
-			simplifiedModify(id: Uuid, input: Partial<TestModel>): Promise<TestModel>
+			simplifiedModify(id: TestModel.ID, input: Partial<TestModel>): Promise<TestModel>
 			/**
 			 * Modify with Diff
 			 * 
@@ -477,7 +495,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** Authenticated
 			 * */
-			modifyWithDiff(id: Uuid, input: Modification<TestModel>): Promise<EntryChange<TestModel>>
+			modifyWithDiff(id: TestModel.ID, input: Modification<TestModel>): Promise<EntryChange<TestModel>>
 
 			readonly notInlined: {
 				/**
@@ -626,7 +644,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** Authenticated
 			 * */
-			detail(id: Uuid): Promise<TestModel>
+			detail(id: TestModel.ID): Promise<TestModel>
 			/**
 			 * Upsert
 			 * 
@@ -634,7 +652,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** Authenticated
 			 * */
-			upsert(id: Uuid, input: TestModel): Promise<TestModel>
+			upsert(id: TestModel.ID, input: TestModel): Promise<TestModel>
 			/**
 			 * Replace
 			 * 
@@ -642,7 +660,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** Authenticated
 			 * */
-			replace(id: Uuid, input: TestModel): Promise<TestModel>
+			replace(id: TestModel.ID, input: TestModel): Promise<TestModel>
 			/**
 			 * Modify
 			 * 
@@ -650,7 +668,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** Authenticated
 			 * */
-			modify(id: Uuid, input: Modification<TestModel>): Promise<TestModel>
+			modify(id: TestModel.ID, input: Modification<TestModel>): Promise<TestModel>
 			/**
 			 * Delete
 			 * 
@@ -658,7 +676,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** Authenticated
 			 * */
-			delete(id: Uuid): Promise<void>
+			delete(id: TestModel.ID): Promise<void>
 			/**
 			 * Simplified Modify
 			 * 
@@ -666,7 +684,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** Authenticated
 			 * */
-			simplifiedModify(id: Uuid, input: Partial<TestModel>): Promise<TestModel>
+			simplifiedModify(id: TestModel.ID, input: Partial<TestModel>): Promise<TestModel>
 			/**
 			 * Modify with Diff
 			 * 
@@ -674,7 +692,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** Authenticated
 			 * */
-			modifyWithDiff(id: Uuid, input: Modification<TestModel>): Promise<EntryChange<TestModel>>
+			modifyWithDiff(id: TestModel.ID, input: Modification<TestModel>): Promise<EntryChange<TestModel>>
 
 			readonly notInlined: {
 				/**
@@ -824,7 +842,7 @@ export interface Api {
 		 * 
 		 * **Auth Requirements:** Authenticated
 		 * */
-		detail(id: Uuid): Promise<TestModel>
+		detail(id: TestModel.ID): Promise<TestModel>
 		/**
 		 * Upsert
 		 * 
@@ -832,7 +850,7 @@ export interface Api {
 		 * 
 		 * **Auth Requirements:** Authenticated
 		 * */
-		upsert(id: Uuid, input: TestModel): Promise<TestModel>
+		upsert(id: TestModel.ID, input: TestModel): Promise<TestModel>
 		/**
 		 * Replace
 		 * 
@@ -840,7 +858,7 @@ export interface Api {
 		 * 
 		 * **Auth Requirements:** Authenticated
 		 * */
-		replace(id: Uuid, input: TestModel): Promise<TestModel>
+		replace(id: TestModel.ID, input: TestModel): Promise<TestModel>
 		/**
 		 * Modify
 		 * 
@@ -848,7 +866,7 @@ export interface Api {
 		 * 
 		 * **Auth Requirements:** Authenticated
 		 * */
-		modify(id: Uuid, input: Modification<TestModel>): Promise<TestModel>
+		modify(id: TestModel.ID, input: Modification<TestModel>): Promise<TestModel>
 		/**
 		 * Delete
 		 * 
@@ -856,7 +874,7 @@ export interface Api {
 		 * 
 		 * **Auth Requirements:** Authenticated
 		 * */
-		delete(id: Uuid): Promise<void>
+		delete(id: TestModel.ID): Promise<void>
 		/**
 		 * Simplified Modify
 		 * 
@@ -864,7 +882,7 @@ export interface Api {
 		 * 
 		 * **Auth Requirements:** Authenticated
 		 * */
-		simplifiedModify(id: Uuid, input: Partial<TestModel>): Promise<TestModel>
+		simplifiedModify(id: TestModel.ID, input: Partial<TestModel>): Promise<TestModel>
 		/**
 		 * Modify with Diff
 		 * 
@@ -872,7 +890,7 @@ export interface Api {
 		 * 
 		 * **Auth Requirements:** Authenticated
 		 * */
-		modifyWithDiff(id: Uuid, input: Modification<TestModel>): Promise<EntryChange<TestModel>>
+		modifyWithDiff(id: TestModel.ID, input: Modification<TestModel>): Promise<EntryChange<TestModel>>
 
 		readonly notInlined: {
 			/**
@@ -1031,7 +1049,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** No Requirements
 			 * */
-			detail(id: Uuid): Promise<TestModel>
+			detail(id: TestModel.ID): Promise<TestModel>
 			/**
 			 * Upsert
 			 * 
@@ -1039,7 +1057,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** No Requirements
 			 * */
-			upsert(id: Uuid, input: TestModel): Promise<TestModel>
+			upsert(id: TestModel.ID, input: TestModel): Promise<TestModel>
 			/**
 			 * Replace
 			 * 
@@ -1047,7 +1065,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** No Requirements
 			 * */
-			replace(id: Uuid, input: TestModel): Promise<TestModel>
+			replace(id: TestModel.ID, input: TestModel): Promise<TestModel>
 			/**
 			 * Modify
 			 * 
@@ -1055,7 +1073,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** No Requirements
 			 * */
-			modify(id: Uuid, input: Modification<TestModel>): Promise<TestModel>
+			modify(id: TestModel.ID, input: Modification<TestModel>): Promise<TestModel>
 			/**
 			 * Delete
 			 * 
@@ -1063,7 +1081,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** No Requirements
 			 * */
-			delete(id: Uuid): Promise<void>
+			delete(id: TestModel.ID): Promise<void>
 			/**
 			 * Simplified Modify
 			 * 
@@ -1071,7 +1089,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** No Requirements
 			 * */
-			simplifiedModify(id: Uuid, input: Partial<TestModel>): Promise<TestModel>
+			simplifiedModify(id: TestModel.ID, input: Partial<TestModel>): Promise<TestModel>
 			/**
 			 * Modify with Diff
 			 * 
@@ -1079,7 +1097,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** No Requirements
 			 * */
-			modifyWithDiff(id: Uuid, input: Modification<TestModel>): Promise<EntryChange<TestModel>>
+			modifyWithDiff(id: TestModel.ID, input: Modification<TestModel>): Promise<EntryChange<TestModel>>
 		}
 		readonly rest2: {
 			/**
@@ -1209,7 +1227,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** No Requirements
 			 * */
-			detail(id: Uuid): Promise<TestModel>
+			detail(id: TestModel.ID): Promise<TestModel>
 			/**
 			 * Upsert
 			 * 
@@ -1217,7 +1235,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** No Requirements
 			 * */
-			upsert(id: Uuid, input: TestModel): Promise<TestModel>
+			upsert(id: TestModel.ID, input: TestModel): Promise<TestModel>
 			/**
 			 * Replace
 			 * 
@@ -1225,7 +1243,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** No Requirements
 			 * */
-			replace(id: Uuid, input: TestModel): Promise<TestModel>
+			replace(id: TestModel.ID, input: TestModel): Promise<TestModel>
 			/**
 			 * Modify
 			 * 
@@ -1233,7 +1251,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** No Requirements
 			 * */
-			modify(id: Uuid, input: Modification<TestModel>): Promise<TestModel>
+			modify(id: TestModel.ID, input: Modification<TestModel>): Promise<TestModel>
 			/**
 			 * Delete
 			 * 
@@ -1241,7 +1259,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** No Requirements
 			 * */
-			delete(id: Uuid): Promise<void>
+			delete(id: TestModel.ID): Promise<void>
 			/**
 			 * Simplified Modify
 			 * 
@@ -1249,7 +1267,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** No Requirements
 			 * */
-			simplifiedModify(id: Uuid, input: Partial<TestModel>): Promise<TestModel>
+			simplifiedModify(id: TestModel.ID, input: Partial<TestModel>): Promise<TestModel>
 			/**
 			 * Modify with Diff
 			 * 
@@ -1257,7 +1275,7 @@ export interface Api {
 			 * 
 			 * **Auth Requirements:** No Requirements
 			 * */
-			modifyWithDiff(id: Uuid, input: Modification<TestModel>): Promise<EntryChange<TestModel>>
+			modifyWithDiff(id: TestModel.ID, input: Modification<TestModel>): Promise<EntryChange<TestModel>>
 		}
 	}
 }

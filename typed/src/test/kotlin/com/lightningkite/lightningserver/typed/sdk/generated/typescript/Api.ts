@@ -1,5 +1,5 @@
-import type { Query, MassModification, EntryChange, ListChange, Modification, Condition, GroupCountQuery, AggregateQuery, GroupAggregateQuery, Aggregate, SortPart, DataClassPath, DataClassPathPartial, QueryPartial, DeepPartial, Fetcher } from '@lightningkite/lightning-server-simplified'
-import type { CollectionUpdates, Mask, Mode, ModelPermissions, Pair, Part, TestInput, TestModel, UpdateRestrictions, Uuid } from './models.ts'
+import type { Query, MassModification, EntryChange, ListChange, Modification, Condition, GroupCountQuery, AggregateQuery, GroupAggregateQuery, Aggregate, SortPart, DataClassPath, DataClassPathPartial, QueryPartial, DeepPartial, Fetcher, Brand } from '@lightningkite/lightning-server-simplified'
+import type { CollectionUpdates, TestModel, Mask, UpdateRestrictions, ModelPermissions, Pair, TestInput, Uuid } from './models.ts'
 
 export interface Api {
 	index(): Promise<number>
@@ -28,13 +28,13 @@ export interface Api {
 		groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
 		bulkDelete(input: Condition<TestModel>): Promise<number>
 		aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
-		detail(id: Uuid): Promise<TestModel>
-		upsert(id: Uuid, input: TestModel): Promise<TestModel>
-		replace(id: Uuid, input: TestModel): Promise<TestModel>
-		modify(id: Uuid, input: Modification<TestModel>): Promise<TestModel>
-		delete(id: Uuid): Promise<void>
-		simplifiedModify(id: Uuid, input: Partial<TestModel>): Promise<TestModel>
-		modifyWithDiff(id: Uuid, input: Modification<TestModel>): Promise<EntryChange<TestModel>>
+		detail(id: TestModel.ID): Promise<TestModel>
+		upsert(id: TestModel.ID, input: TestModel): Promise<TestModel>
+		replace(id: TestModel.ID, input: TestModel): Promise<TestModel>
+		modify(id: TestModel.ID, input: Modification<TestModel>): Promise<TestModel>
+		delete(id: TestModel.ID): Promise<void>
+		simplifiedModify(id: TestModel.ID, input: Partial<TestModel>): Promise<TestModel>
+		modifyWithDiff(id: TestModel.ID, input: Modification<TestModel>): Promise<EntryChange<TestModel>>
 
 		readonly default: {
 			testSdkEndpoint(second: string, input: TestInput): Promise<string>
@@ -53,13 +53,13 @@ export interface Api {
 			groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
 			bulkDelete(input: Condition<TestModel>): Promise<number>
 			aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
-			detail(id: Uuid): Promise<TestModel>
-			upsert(id: Uuid, input: TestModel): Promise<TestModel>
-			replace(id: Uuid, input: TestModel): Promise<TestModel>
-			modify(id: Uuid, input: Modification<TestModel>): Promise<TestModel>
-			delete(id: Uuid): Promise<void>
-			simplifiedModify(id: Uuid, input: Partial<TestModel>): Promise<TestModel>
-			modifyWithDiff(id: Uuid, input: Modification<TestModel>): Promise<EntryChange<TestModel>>
+			detail(id: TestModel.ID): Promise<TestModel>
+			upsert(id: TestModel.ID, input: TestModel): Promise<TestModel>
+			replace(id: TestModel.ID, input: TestModel): Promise<TestModel>
+			modify(id: TestModel.ID, input: Modification<TestModel>): Promise<TestModel>
+			delete(id: TestModel.ID): Promise<void>
+			simplifiedModify(id: TestModel.ID, input: Partial<TestModel>): Promise<TestModel>
+			modifyWithDiff(id: TestModel.ID, input: Modification<TestModel>): Promise<EntryChange<TestModel>>
 
 			readonly notInlined: {
 				inlinedEndpoint(id: Uuid, category: Uuid): Promise<number>
@@ -82,13 +82,13 @@ export interface Api {
 			groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
 			bulkDelete(input: Condition<TestModel>): Promise<number>
 			aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
-			detail(id: Uuid): Promise<TestModel>
-			upsert(id: Uuid, input: TestModel): Promise<TestModel>
-			replace(id: Uuid, input: TestModel): Promise<TestModel>
-			modify(id: Uuid, input: Modification<TestModel>): Promise<TestModel>
-			delete(id: Uuid): Promise<void>
-			simplifiedModify(id: Uuid, input: Partial<TestModel>): Promise<TestModel>
-			modifyWithDiff(id: Uuid, input: Modification<TestModel>): Promise<EntryChange<TestModel>>
+			detail(id: TestModel.ID): Promise<TestModel>
+			upsert(id: TestModel.ID, input: TestModel): Promise<TestModel>
+			replace(id: TestModel.ID, input: TestModel): Promise<TestModel>
+			modify(id: TestModel.ID, input: Modification<TestModel>): Promise<TestModel>
+			delete(id: TestModel.ID): Promise<void>
+			simplifiedModify(id: TestModel.ID, input: Partial<TestModel>): Promise<TestModel>
+			modifyWithDiff(id: TestModel.ID, input: Modification<TestModel>): Promise<EntryChange<TestModel>>
 
 			readonly notInlined: {
 				inlinedEndpoint(id: Uuid, category: Uuid): Promise<number>
@@ -112,13 +112,13 @@ export interface Api {
 		groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
 		bulkDelete(input: Condition<TestModel>): Promise<number>
 		aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
-		detail(id: Uuid): Promise<TestModel>
-		upsert(id: Uuid, input: TestModel): Promise<TestModel>
-		replace(id: Uuid, input: TestModel): Promise<TestModel>
-		modify(id: Uuid, input: Modification<TestModel>): Promise<TestModel>
-		delete(id: Uuid): Promise<void>
-		simplifiedModify(id: Uuid, input: Partial<TestModel>): Promise<TestModel>
-		modifyWithDiff(id: Uuid, input: Modification<TestModel>): Promise<EntryChange<TestModel>>
+		detail(id: TestModel.ID): Promise<TestModel>
+		upsert(id: TestModel.ID, input: TestModel): Promise<TestModel>
+		replace(id: TestModel.ID, input: TestModel): Promise<TestModel>
+		modify(id: TestModel.ID, input: Modification<TestModel>): Promise<TestModel>
+		delete(id: TestModel.ID): Promise<void>
+		simplifiedModify(id: TestModel.ID, input: Partial<TestModel>): Promise<TestModel>
+		modifyWithDiff(id: TestModel.ID, input: Modification<TestModel>): Promise<EntryChange<TestModel>>
 
 		readonly notInlined: {
 			inlinedEndpoint(id: Uuid, category: Uuid): Promise<number>
@@ -144,13 +144,13 @@ export interface Api {
 			groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
 			bulkDelete(input: Condition<TestModel>): Promise<number>
 			aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
-			detail(id: Uuid): Promise<TestModel>
-			upsert(id: Uuid, input: TestModel): Promise<TestModel>
-			replace(id: Uuid, input: TestModel): Promise<TestModel>
-			modify(id: Uuid, input: Modification<TestModel>): Promise<TestModel>
-			delete(id: Uuid): Promise<void>
-			simplifiedModify(id: Uuid, input: Partial<TestModel>): Promise<TestModel>
-			modifyWithDiff(id: Uuid, input: Modification<TestModel>): Promise<EntryChange<TestModel>>
+			detail(id: TestModel.ID): Promise<TestModel>
+			upsert(id: TestModel.ID, input: TestModel): Promise<TestModel>
+			replace(id: TestModel.ID, input: TestModel): Promise<TestModel>
+			modify(id: TestModel.ID, input: Modification<TestModel>): Promise<TestModel>
+			delete(id: TestModel.ID): Promise<void>
+			simplifiedModify(id: TestModel.ID, input: Partial<TestModel>): Promise<TestModel>
+			modifyWithDiff(id: TestModel.ID, input: Modification<TestModel>): Promise<EntryChange<TestModel>>
 		}
 		readonly rest2: {
 			list(input: Query<TestModel>): Promise<Array<TestModel>>
@@ -168,13 +168,13 @@ export interface Api {
 			groupCount2(input: GroupCountQuery<TestModel>): Promise<Record<string, number>>
 			bulkDelete(input: Condition<TestModel>): Promise<number>
 			aggregate(input: AggregateQuery<TestModel>): Promise<number | null | undefined>
-			detail(id: Uuid): Promise<TestModel>
-			upsert(id: Uuid, input: TestModel): Promise<TestModel>
-			replace(id: Uuid, input: TestModel): Promise<TestModel>
-			modify(id: Uuid, input: Modification<TestModel>): Promise<TestModel>
-			delete(id: Uuid): Promise<void>
-			simplifiedModify(id: Uuid, input: Partial<TestModel>): Promise<TestModel>
-			modifyWithDiff(id: Uuid, input: Modification<TestModel>): Promise<EntryChange<TestModel>>
+			detail(id: TestModel.ID): Promise<TestModel>
+			upsert(id: TestModel.ID, input: TestModel): Promise<TestModel>
+			replace(id: TestModel.ID, input: TestModel): Promise<TestModel>
+			modify(id: TestModel.ID, input: Modification<TestModel>): Promise<TestModel>
+			delete(id: TestModel.ID): Promise<void>
+			simplifiedModify(id: TestModel.ID, input: Partial<TestModel>): Promise<TestModel>
+			modifyWithDiff(id: TestModel.ID, input: Modification<TestModel>): Promise<EntryChange<TestModel>>
 		}
 	}
 }
