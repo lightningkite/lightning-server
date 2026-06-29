@@ -4,6 +4,8 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.loggingSettings
 import com.lightningkite.lightningserver.definition.secretBasis
 import com.lightningkite.lightningserver.definition.telemetrySettings
+import com.lightningkite.lightningserver.engine.local.engineCache
+import com.lightningkite.lightningserver.engine.local.enginePubSub
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.terraform.aws.ec2.TerraformAwsEc2BuilderBase
@@ -12,7 +14,9 @@ import com.lightningkite.lightningserver.terraform.aws.ec2.TerraformAwsScalingEc
 import com.lightningkite.lightningserver.terraform.aws.ec2.stigBuildLinux
 import com.lightningkite.lightningserver.terraform.aws.ec2.TerraformAwsSingleEc2Builder
 import com.lightningkite.lightningserver.terraform.aws.ec2.VpcInfoTerraformManaged
+import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.data.EmailAddress
+import com.lightningkite.services.pubsub.PubSub
 import com.lightningkite.services.terraform.AwsVpc
 import kotlinx.serialization.json.*
 import software.amazon.awssdk.regions.Region
@@ -43,6 +47,8 @@ class Ec2BuilderGenerationTest {
         fulfillSetting(loggingSettings.name, Json.encodeToJsonElement(loggingSettings.serializer, loggingSettings.default))
         fulfillSetting(telemetrySettings.name, JsonNull)
         if (cacheUrl != null) fulfillSetting("cache", JsonPrimitive(cacheUrl))
+        fulfillSetting(engineCache.name, Json.encodeToJsonElement(Cache.Settings()))
+        fulfillSetting(enginePubSub.name, Json.encodeToJsonElement(PubSub.Settings()))
     }
 
     inner class SingleDeployment : TerraformAwsSingleEc2Builder<TestServer>(TestServer) {

@@ -11,6 +11,7 @@ plugins {
 
 dependencies {
     api(project(":core"))
+    api(project(":engine-local"))
     fun ModuleDependency.excludeNetty() {
         exclude("software.amazon.awssdk:netty-nio-client")
         exclude("software.amazon.awssdk:apache-client")

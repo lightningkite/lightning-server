@@ -28,3 +28,5 @@ site/
 # Python venv used for mkdocs builds
 tmp/mkdocs-venv/
 tmp
+site
+.claude/worktrees
