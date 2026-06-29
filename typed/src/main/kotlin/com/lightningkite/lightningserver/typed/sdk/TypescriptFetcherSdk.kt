@@ -202,15 +202,21 @@ public class TypescriptFetcherSdk(
     context(server: ServerRuntime)
     private fun Appendable.writeTypeDefinitions(types: List<KSerializer<*>> = server.models()) {
         val stringSerialNames = HashSet<String>()
+        // TypeScript merges declarations with the same exported name, so nested Kotlin types
+        // are emitted as namespace members next to their parent interface. We render first,
+        // collect members like TestModel.ID/Status, then flush each namespace immediately
+        // after the matching top-level declaration for readability and stable imports.
         val namespaces = linkedMapOf<String, MutableList<String>>()
+        val topLevelDeclarations = ArrayList<Pair<String, String>>()
 
-        fun Appendable.appendNamespaced(
+        fun String.topLevelDeclarationName(): String = substringBefore('<').substringBefore('.')
+
+        fun Appendable.appendNamespace(
             typeName: String,
             declaration: Appendable.(localName: String, depth: Int) -> Unit,
         ): Boolean {
             val namespace = typeName.substringBefore('.', missingDelimiterValue = "")
             if (namespace.isBlank()) {
-                declaration(typeName, 0)
                 return true
             } else {
                 namespaces.getOrPut(namespace) { ArrayList() } += buildString {
@@ -220,7 +226,18 @@ public class TypescriptFetcherSdk(
             }
         }
 
-        fun Appendable.writeType(type: KSerializer<*>): Boolean {
+        fun Appendable.appendNamespace(namespace: String) {
+            val declarations = namespaces.remove(namespace) ?: return
+            appendLine("export namespace $namespace {")
+            declarations.forEachIndexed { index, declaration ->
+                if (index > 0) appendLine()
+                append(declaration)
+            }
+            appendLine('}')
+            appendLine()
+        }
+
+        fun renderType(type: KSerializer<*>): Pair<String, String>? {
             when (type.descriptor.kind) {
                 StructureKind.CLASS -> {
                     val genericMap: Map<String, String> = type
@@ -240,8 +257,11 @@ public class TypescriptFetcherSdk(
                         val valueType =
                             type.serializableProperties?.firstOrNull()?.serializer?.tsType()?.replaceGenerics()
                         val name = type.tsType().replaceGenerics()
-                        return appendNamespaced(name) { localName, depth ->
+                        if (!StringBuilder().appendNamespace(name) { localName, depth ->
                             appendIdtLine(depth, "export type $localName = Brand<${valueType}, \"$name\">")
+                        }) return null
+                        return name.topLevelDeclarationName() to buildString {
+                            appendLine("export type $name = Brand<${valueType}, \"$name\">")
                         }
                     } else {
                         val properties = type
@@ -249,13 +269,22 @@ public class TypescriptFetcherSdk(
                             ?: type.childSerializersOrNull()?.toList()
                             ?: emptyList()
 
-                        return appendNamespaced(type.tsType().replaceGenerics()) { localName, depth ->
+                        val name = type.tsType().replaceGenerics()
+                        if (!StringBuilder().appendNamespace(name) { localName, depth ->
                             appendIdtLine(depth, "export interface $localName {")
                             for ((idx, prop) in properties.withIndex()) {
                                 appendIdtLine(depth + 1, "${type.descriptor.getElementName(idx)}: ${prop.tsType().replaceGenerics()}")
                             }
 
                             appendIdtLine(depth, "}")
+                        }) return null
+                        return name.topLevelDeclarationName() to buildString {
+                            appendLine("export interface $name {")
+                            for ((idx, prop) in properties.withIndex()) {
+                                appendIdtLine(1, "${type.descriptor.getElementName(idx)}: ${prop.tsType().replaceGenerics()}")
+                            }
+
+                            appendLine("}")
                         }
                     }
 
@@ -265,7 +294,7 @@ public class TypescriptFetcherSdk(
                 SerialKind.ENUM -> {
                     val typeName = type.tsType()
                     if (erasableTypes) {
-                        return appendNamespaced(typeName) { localName, depth ->
+                        if (!StringBuilder().appendNamespace(typeName) { localName, depth ->
                             appendIdt(depth)
                             append("export type $localName = ")
                             for (index in 0 until type.descriptor.elementsCount) {
@@ -273,9 +302,17 @@ public class TypescriptFetcherSdk(
                                 append(if (index == 0) "\"$name\"" else "| \"$name\"")
                             }
                             appendLine()
+                        }) return null
+                        return typeName.topLevelDeclarationName() to buildString {
+                            append("export type $typeName = ")
+                            for (index in 0 until type.descriptor.elementsCount) {
+                                val name = type.descriptor.getElementName(index)
+                                append(if (index == 0) "\"$name\"" else "| \"$name\"")
+                            }
+                            appendLine()
                         }
                     } else {
-                        return appendNamespaced(typeName) { localName, depth ->
+                        if (!StringBuilder().appendNamespace(typeName) { localName, depth ->
                             appendIdtLine(depth, "export enum $localName {")
                             for (index in 0 until type.descriptor.elementsCount) {
                                 appendIdt(depth + 1)
@@ -291,6 +328,23 @@ public class TypescriptFetcherSdk(
                             }
 
                             appendIdtLine(depth, "}")
+                        }) return null
+                        return typeName.topLevelDeclarationName() to buildString {
+                            appendLine("export enum $typeName {")
+                            for (index in 0 until type.descriptor.elementsCount) {
+                                appendIdt(1)
+                                val name = type.descriptor.getElementName(index)
+                                name.forEachIndexed { idx, it ->
+                                    if ((idx == 0 && it.isJavaIdentifierStart()) || (idx != 0 && it.isJavaIdentifierPart()))
+                                        append(it)
+                                    else
+                                        append('_')
+                                }
+                                append(" = \"$name\",")
+                                appendLine()
+                            }
+
+                            appendLine("}")
                         }
                     }
                 }
@@ -298,32 +352,34 @@ public class TypescriptFetcherSdk(
                 PrimitiveKind.STRING -> {
                     val name = type.descriptor.simpleSerialName
                     if (name != "String" && stringSerialNames.add(name)) {
-                        appendLine(
-                            "export type $name = string  // ${type.descriptor.serialName}"
+                        return name to buildString {
+                            appendLine(
+                                "export type $name = string  // ${type.descriptor.serialName}"
                                 .replace("/loose", "")
-                        )
-                        return true
+                            )
+                        }
                     }
-                    return false
+                    return null
                 }
 
-                else -> return false
+                else -> return null
             }
         }
 
         for (type in types) {
-            if (writeType(type)) appendLine()
+            renderType(type)?.let { topLevelDeclarations += it.also {
+                println("1 ------- : ${it.first}")
+                println("2 ------- :: ${it.second}")
+            } }
         }
 
-        for ((namespace, declarations) in namespaces) {
-            appendLine("export namespace $namespace {")
-            declarations.forEachIndexed { index, declaration ->
-                if (index > 0) appendLine()
-                append(declaration)
-            }
-            appendLine('}')
+        for ((name, declaration) in topLevelDeclarations) {
+            append(declaration)
             appendLine()
+            appendNamespace(name)
         }
+
+        namespaces.keys.toList().forEach { appendNamespace(it) }
     }
 
 
