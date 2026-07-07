@@ -61,6 +61,9 @@ import kotlin.uuid.Uuid
  * @property mode How the OAuth provider sends the authorization code (form_post or query)
  * @property settings Configuration for credentials serialization (standard or provider-specific)
  * @property scopeForProfile OAuth scopes required to retrieve user profile information
+ * @property supportsPkce Whether this provider accepts PKCE (RFC 7636) parameters on the authorization
+ *   and token requests. Defaults to `true`; all major providers support (and recommend) PKCE. Set to
+ *   `false` only for a non-compliant provider that rejects unknown `code_challenge`/`code_verifier` params.
  * @property getProfile Async function that retrieves user profile from the provider
  */
 public class OauthProviderInfo(
@@ -73,6 +76,7 @@ public class OauthProviderInfo(
     public val mode: OauthResponseMode = OauthResponseMode.form_post,
     public val settings: SettingInfo<*> = SettingInfo.standard,
     public val scopeForProfile: String,
+    public val supportsPkce: Boolean = true,
     public val getProfile: suspend context(ServerRuntime) (OauthResponse, OauthProviderCredentials?) -> ExternalProfile,
 ) {
     public data class SettingInfo<T : Any>(
@@ -96,6 +100,7 @@ public class OauthProviderInfo(
         accessType: OauthAccessType = OauthAccessType.online,
         prompt: OauthPromptType? = if (accessType == OauthAccessType.offline) OauthPromptType.consent else null,
         loginHint: String? = null,
+        codeChallenge: String? = null,
     ): String {
         val params = OauthCodeRequest(
             response_type = "code",
@@ -107,6 +112,8 @@ public class OauthProviderInfo(
             access_type = accessType,
             prompt = prompt,
             login_hint = loginHint,
+            code_challenge = codeChallenge,
+            code_challenge_method = codeChallenge?.let { "S256" },
         ).let { FormDataFormat(EmptySerializersModule()).encodeToString(OauthCodeRequest.serializer(), it) }
         return "$loginUrl?$params"
     }
@@ -116,6 +123,7 @@ public class OauthProviderInfo(
         credentials: Runtime<OauthProviderCredentials>,
         redirectUri: String,
         oauth: OauthCode,
+        codeVerifier: String? = null,
     ): OauthResponse {
         oauth.error?.let {
             throw BadRequestException("Got error code '${it}' from $niceName.")
@@ -130,6 +138,7 @@ public class OauthProviderInfo(
                             client_secret = credentials().secret,
                             redirect_uri = redirectUri,
                             grant_type = OauthGrantTypes.authorizationCode,
+                            code_verifier = codeVerifier,
                         )
                     )
                 )
