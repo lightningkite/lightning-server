@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.otel.applyToLogback
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.contracts.*
 
 /**
@@ -89,7 +90,18 @@ public class ServerSettings private constructor(
     private var usingDefaults: Boolean = false
 
     private val serializable: MapRegistry<ServerSetting<*, *>, Any?> = MapRegistry()
-    private val goal: MapRegistry<ServerSetting<*, *>, Any?> = MapRegistry()
+
+    // Transformed results, keyed by setting. Backed by a ConcurrentHashMap so a fully-resolved value can be
+    // read on the hot path without locking. ConcurrentHashMap forbids null values, so a null result is stored
+    // as [NULL_RESULT] and unwrapped on read.
+    private val goal = ConcurrentHashMap<ServerSetting<*, *>, Any>()
+
+    // A single lock guarding transformation in [get]. A single (reentrant) lock — rather than per-setting
+    // locks — is used deliberately: a setting's getter may resolve its dependencies by calling get() again on
+    // the same thread, which re-enters this lock harmlessly, whereas per-setting locks could produce a
+    // cross-thread lock-ordering deadlock between two mutually-dependent settings. Correctness (transform once)
+    // is preserved because the only concurrent writers to [goal] go through this lock.
+    private val resolveLock = Any()
 
     // Track settings currently being resolved to detect circular dependencies at runtime
     private val resolving: ThreadLocal<MutableSet<ServerSetting<*, *>>>? =
@@ -137,7 +149,7 @@ public class ServerSettings private constructor(
      */
     public infix fun <RESULT> ServerSetting<*, RESULT>.setStatic(value: RESULT) {
         if (ready) throw IllegalStateException("Settings are marked as ready.")
-        goal.register(this, value as Any?)
+        goal[this] = value ?: NULL_RESULT
     }
 
     /**
@@ -250,7 +262,16 @@ public class ServerSettings private constructor(
     public fun <SERIALIZABLE, RESULT> get(key: ServerSetting<SERIALIZABLE, RESULT>): RESULT {
         if (!ready) throw IllegalStateException("Settings not ready yet.")
 
-        return goal.getOrRegister(key) {
+        // Lock-free fast path: once resolved, the value is published in [goal] and read without locking.
+        goal[key]?.let { return it.unwrapResult() as RESULT }
+
+        // Slow path: resolve under [resolveLock] so each setting is transformed at most once, even when
+        // multiple threads request it for the first time concurrently. The per-thread [resolving] set (checked
+        // inside the lock) still detects circular dependencies.
+        val resolved: Any? = synchronized(resolveLock) {
+            // Re-check now that we hold the lock; another thread may have resolved it while we waited.
+            goal[key]?.let { return it.unwrapResult() as RESULT }
+
             // Check for circular dependency during resolution
             val currentlyResolving = resolving?.get()
             if (currentlyResolving != null && key in currentlyResolving) {
@@ -258,7 +279,7 @@ public class ServerSettings private constructor(
             }
 
             currentlyResolving?.add(key)
-            try {
+            val result = try {
                 overrides[key]?.let { defer ->
                     serializable[key]
                         ?.let { key.get(it as SERIALIZABLE) } // specified in settings file
@@ -282,8 +303,14 @@ public class ServerSettings private constructor(
             } finally {
                 currentlyResolving?.remove(key)
             }
-        } as RESULT
+            goal[key] = result ?: NULL_RESULT
+            result
+        }
+        return resolved as RESULT
     }
+
+    /** Unwraps the [NULL_RESULT] sentinel used to store null results in the null-hostile [goal] map. */
+    private fun Any.unwrapResult(): Any? = if (this === NULL_RESULT) null else this
 
     // For some dumb fucking reason kotlin made this internal, and it's what getOrElse should do in the first place!
     @OptIn(ExperimentalContracts::class)
@@ -328,7 +355,7 @@ public class ServerSettings private constructor(
         overrides: Map<ServerSetting<*, *>, Runtime<*>> = this.overrides,
     ) = ServerSettings(settings, overrides).also {
         it.serializable.include(this.serializable)
-        it.goal.include(this.goal)
+        it.goal.putAll(this.goal)
     }
 
     public operator fun plus(requirement: ServerSetting<*, *>): ServerSettings = copy(settings + requirement)
@@ -336,6 +363,11 @@ public class ServerSettings private constructor(
         copy(settings + requirements)
 
     public data class Override<S, R>(val override: ServerSetting<S, R>, val deferTo: Runtime<R>)
+
+    private companion object {
+        /** Sentinel stored in [goal] to represent a resolved-but-null result (ConcurrentHashMap forbids null values). */
+        private val NULL_RESULT = Any()
+    }
 }
 
 /*
@@ -347,9 +379,6 @@ public class ServerSettings private constructor(
  * 2. The missing settings check in `ready()` doesn't distinguish between truly required settings
  *    and optional settings with no default. The error message could be more helpful.
  *
- * 3. The `get()` function performs lazy transformation but the caching isn't thread-safe.
- *    If called concurrently during initial ready phase, could transform the same setting twice.
- *    (Though this is documented in ServerSetting.kt TODO, worth noting here too.)
  *
  * 4. `readyUsingDefaults()` bypasses all validation with a warning, but doesn't actually
  *    enforce that defaults exist for all settings. Could still throw during get().
