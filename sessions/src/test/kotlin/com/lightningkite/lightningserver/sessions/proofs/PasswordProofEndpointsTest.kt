@@ -433,4 +433,67 @@ class PasswordProofEndpointsTest {
             }
         }
     }
+
+    /**
+     * Security regression: the rate-limit key must be built from the NORMALIZED identifier, so that
+     * case/whitespace variants of one account share a single bucket. If the key were derived from the
+     * raw value, an attacker could dodge the limiter (and its exponential backoff) by varying case.
+     */
+    @Test
+    fun `rate limiter shares one bucket across case variants of the same identifier`() = runBlocking {
+        TestUser.users.clear()
+        val userId = Uuid.random()
+        val user = TestUser(userId, "test@example.com")
+        TestUser.users[userId] = user
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
+
+            init {
+                register(TestUser)
+            }
+
+            val passwordProof = path.path("auth").path("password") include PasswordProofEndpoints(
+                database = database,
+                cache = cache,
+                proofSigner = RuntimeDeferred.Cached { testBasis.signer("proof") },
+                proofExpiration = 1.hours
+            )
+        }.let { server ->
+            server.test({}) {
+                server.passwordProof.establish(TestUser, userId, EstablishPassword("correctPassword"))
+
+                // Five distinct case variants that all normalize to "test@example.com". The default limit
+                // is 5 attempts; five failing attempts across these variants must fill ONE shared bucket.
+                val emailVariants = listOf(
+                    "Test@example.com",
+                    "tEst@example.com",
+                    "teSt@example.com",
+                    "tesT@example.com",
+                    "TEST@example.com",
+                )
+                for (variant in emailVariants) {
+                    assertFailsWith<BadRequestException> {
+                        server.passwordProof.prove.test(
+                            null, IdentificationAndPassword("TestUser", "email", variant, "wrongPassword")
+                        )
+                    }
+                }
+
+                // A sixth attempt with yet another distinct variant must be blocked by the shared limiter.
+                // Under the old raw-value key this variant would be an untouched bucket and fail only with
+                // the ordinary "does not match" error.
+                val blocked = assertFailsWith<BadRequestException> {
+                    server.passwordProof.prove.test(
+                        null, IdentificationAndPassword("TestUser", "email", "TesT@example.com", "wrongPassword")
+                    )
+                }
+                assertTrue(
+                    blocked.message.contains("Too many attempts"),
+                    "Expected the shared rate limiter to block, but got: ${blocked.message}"
+                )
+            }
+        }
+    }
 }
