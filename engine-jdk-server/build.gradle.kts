@@ -17,6 +17,7 @@ dependencies {
     api(libs.kotlin.reflect)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
+    testImplementation(testFixtures(project(":engine-local")))
     testImplementation(libs.okhttp)
     testImplementation(libs.openTelemetry.sdk.testing)
 }
