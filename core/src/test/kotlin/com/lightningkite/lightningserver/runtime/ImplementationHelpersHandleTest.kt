@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.runtime
 
 import com.lightningkite.lightningserver.HttpMethod
+import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.loggingSettings
 import com.lightningkite.lightningserver.http.*
@@ -86,6 +87,11 @@ class ImplementationHelpersHandleTest {
         // Fast handler with the same short timeout to confirm normal completion is unaffected.
         val fast = path.path("fast").get bind HttpHandler<PathSpec0>(timeout = 100.milliseconds) {
             HttpResponse.plainText("quick")
+        }
+
+        // Always throws, to prove error responses still receive interceptor post-processing.
+        val boom = path.path("boom").get bind HttpHandler<PathSpec0> {
+            throw NotFoundException(detail = "boom", message = "Boom.")
         }
 
         init {
@@ -386,6 +392,34 @@ class ImplementationHelpersHandleTest {
                     )
                 )
                 assertEquals(HttpStatus.RequestTimeout, resp.status)
+            }
+        }
+    }
+
+    @Test
+    fun error_response_still_receives_cors_headers() {
+        // Regression: a handler that throws must still get CORS headers. The exception is now
+        // mapped to a response INSIDE the interceptor chain, so CORS post-processes it. Without
+        // this, the browser masks every 4xx/5xx as a CORS failure and the real error (here, a
+        // 404) is invisible to client JS.
+        TestServer.test(settings = {}) {
+            runBlocking {
+                val resp = serverRuntime.handle(
+                    HttpRequest<PathSpec>(
+                        path = RawHttpEndpoint(asString = "/boom", method = HttpMethod.GET),
+                        queryParameters = QueryParameters.EMPTY,
+                        headers = HttpHeaders { add(HttpHeader.Origin, "https://example.com") },
+                        domain = "example.com",
+                        protocol = "https",
+                        sourceIp = "local",
+                    )
+                )
+                assertEquals(HttpStatus.NotFound, resp.status)
+                assertEquals(
+                    "https://example.com",
+                    resp.headers[HttpHeader.AccessControlAllowOrigin]?.root,
+                    "error responses must carry the CORS allow-origin header",
+                )
             }
         }
     }

@@ -60,9 +60,28 @@ private val errorType = TelemetryKey.OfString("error.type")
  */
 public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpResponse = instrumentHttpRequest(request) {
     var errorType: String? = null
+
+    // Turns a thrown error into an HTTP response via the configured exception handler,
+    // recording the error type for instrumentation; falls back to a bare 500 if the handler
+    // itself throws. Applied INSIDE the interceptor chain (below) so error responses still
+    // pass back through the interceptors — most importantly CORS. Otherwise error responses
+    // ship without CORS headers and browsers misreport every 4xx/5xx as a CORS failure.
+    suspend fun handleError(e: Exception, label: String? = e::class.simpleName): HttpResponse {
+        errorType = label
+        return try {
+            instrument("exceptionHandler") { server.exceptionHandler.handle(request, e) }
+        } catch (_: Exception) {
+            errorType = "unhandled_exception"
+            HttpResponse(status = HttpStatus.InternalServerError)
+        }
+    }
+
     val response = try {
         server.compiledHttpInterceptors.intercept(request) { req ->
             this.logger.info { "${request.path} accessed by ${request.sourceIp}" }
+            // Map handler/route/compression exceptions to responses in-place so the surrounding
+            // interceptors (CORS, etc.) still post-process error responses.
+            try {
             val result = try {
                 // Route resolution must live inside this try so that a RouteNotFoundException (e.g. a HEAD
                 // request with no HEAD handler, or a missing trailing slash) is caught below and recovered
@@ -173,37 +192,30 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
                 } else result.headers,
                 body = TypedData(newData, result.body.mediaType)
             )
-        }
-    } catch (timeout: TimeoutCancellationException) {
-        // A handler exceeded its HttpHandler.timeout. Map to 408 through the normal exception handler so the
-        // error body is formatted consistently. (Other CancellationExceptions — e.g. client disconnect — are
-        // NOT caught here and fall through unchanged.)
-        errorType = "timeout"
-        this.logger.warn { "Request to ${request.path} exceeded its handler timeout." }
-        instrument("exceptionHandler") {
-            server.exceptionHandler.handle(
-                request,
-                HttpStatusException(
-                    status = HttpStatus.RequestTimeout,
-                    detail = "timeout",
-                    message = "The request handler exceeded its timeout.",
-                ),
-            )
+            } catch (timeout: TimeoutCancellationException) {
+                // A handler exceeded its HttpHandler.timeout. Map to 408 through the normal exception handler so
+                // the error body is formatted consistently. (Other CancellationExceptions — e.g. client
+                // disconnect — are handled by the generic catch below, matching prior behavior.)
+                this.logger.warn { "Request to ${request.path} exceeded its handler timeout." }
+                handleError(
+                    HttpStatusException(
+                        status = HttpStatus.RequestTimeout,
+                        detail = "timeout",
+                        message = "The request handler exceeded its timeout.",
+                    ),
+                    label = "timeout",
+                )
+            } catch (e: Exception) {
+                this.logger.error(e) { "Exception in HTTP" }
+                handleError(e)
+            }
         }
     } catch (e: Exception) {
-        errorType = e::class.simpleName
-        try {
-            this.logger.error(e) { "Exception in HTTP" }
-            instrument("exceptionHandler") {
-                server.exceptionHandler.handle(
-                    request,
-                    e
-                )
-            }
-        } catch (_: Exception) {
-            errorType = "unhandled_exception"
-            HttpResponse(status = HttpStatus.InternalServerError)
-        }
+        // Safety net for exceptions thrown by an interceptor itself (outside the handler), which
+        // never reach the in-chain handling above and so may lack interceptor-applied headers
+        // (e.g. CORS) — acceptable for this rare failure mode.
+        this.logger.error(e) { "Exception in HTTP interceptor chain" }
+        handleError(e)
     }
     HttpInstrumentationResult(response, response.status.code, errorType)
 }
