@@ -84,12 +84,23 @@ class HttpSpanTest {
             )
             assertEquals(200L, root.attributes.asMap().entries.first { it.key.key == "http.status_code" }.value)
 
+            // SecurityHeadersInterceptor is installed by default and is the outermost interceptor,
+            // so its span is the direct child of the route root.
+            val security = spans.singleOrNull { it.name == "lightningserver.SecurityHeaders" }
+                ?: fail("Expected a SecurityHeaders interceptor span. Got: ${spans.map { it.name }}")
+            assertEquals(
+                root.spanContext.spanId,
+                security.parentSpanContext.spanId,
+                "SecurityHeaders interceptor span should be a child of the route root span",
+            )
+
+            // The user-installed CORS interceptor nests inside the default SecurityHeaders span.
             val cors = spans.singleOrNull { it.name == "lightningserver.CORS" }
                 ?: fail("Expected a CORS interceptor span. Got: ${spans.map { it.name }}")
             assertEquals(
-                root.spanContext.spanId,
+                security.spanContext.spanId,
                 cors.parentSpanContext.spanId,
-                "CORS interceptor span should be a child of the route root span",
+                "CORS interceptor span should nest inside the default SecurityHeaders span",
             )
         }
     }
