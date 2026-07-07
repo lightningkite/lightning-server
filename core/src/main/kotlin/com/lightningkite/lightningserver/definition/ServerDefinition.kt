@@ -63,7 +63,15 @@ public data class ServerDefinition(
 
     public val endpoints: PathSpecMap<ServerPathEndpoints> get() = flattened.endpoints
     public val httpInterceptors: List<HttpInterceptor> get() = flattened.httpInterceptors
-    public val compiledHttpInterceptors: HttpInterceptor by lazy { httpInterceptors.compileAndInstrument() }
+
+    // SecurityHeadersInterceptor is prepended (outermost) so every server emits baseline security
+    // headers by default, and so it post-processes the final response after all user interceptors
+    // (e.g. CORS) and after error responses are mapped inside the chain. Prepending here — at the
+    // single top-level composition point — guarantees exactly one instance for the whole server,
+    // rather than one per flattened module.
+    public val compiledHttpInterceptors: HttpInterceptor by lazy {
+        (listOf(SecurityHeadersInterceptor()) + httpInterceptors).compileAndInstrument()
+    }
     public val websocketInterceptors: List<WebSocketHandlerInterceptor> get() = flattened.websocketInterceptors
     public val compiledWebsocketInterceptors: WebSocketHandlerInterceptor by lazy { websocketInterceptors.compileAndInstrument() }
     public val exceptionHandler: ExceptionHttpHandler get() = flattened.exceptionHandler
