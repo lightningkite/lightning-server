@@ -476,6 +476,83 @@ class ImplementationHelpersHandleTest {
     }
 
     @Test
+    fun https_response_has_security_headers() {
+        // SecurityHeadersInterceptor is installed by default for every server: an https response
+        // must carry nosniff and HSTS.
+        TestServer.test(settings = {}) {
+            runBlocking {
+                val resp = serverRuntime.handle(
+                    HttpRequest<PathSpec>(
+                        path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
+                        queryParameters = QueryParameters.EMPTY,
+                        headers = HttpHeaders.EMPTY,
+                        domain = "example.com",
+                        protocol = "https",
+                        sourceIp = "local",
+                    )
+                )
+                assertEquals("nosniff", resp.headers[HttpHeader.XContentTypeOptions]?.root)
+                assertEquals(
+                    "max-age=3600",
+                    resp.headers[HttpHeader.StrictTransportSecurity]?.root,
+                    "https responses must carry HSTS",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun http_response_has_nosniff_but_not_hsts() {
+        // HSTS must never be sent over plain http (per the HSTS spec), but nosniff still applies.
+        TestServer.test(settings = {}) {
+            runBlocking {
+                val resp = serverRuntime.handle(
+                    HttpRequest<PathSpec>(
+                        path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
+                        queryParameters = QueryParameters.EMPTY,
+                        headers = HttpHeaders.EMPTY,
+                        domain = "example.com",
+                        protocol = "http",
+                        sourceIp = "local",
+                    )
+                )
+                assertEquals("nosniff", resp.headers[HttpHeader.XContentTypeOptions]?.root)
+                assertNull(
+                    resp.headers[HttpHeader.StrictTransportSecurity],
+                    "plain http responses must NOT carry HSTS",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun error_response_has_security_headers() {
+        // Error responses are mapped inside the interceptor chain, so security headers apply to
+        // them too.
+        TestServer.test(settings = {}) {
+            runBlocking {
+                val resp = serverRuntime.handle(
+                    HttpRequest<PathSpec>(
+                        path = RawHttpEndpoint(asString = "/boom", method = HttpMethod.GET),
+                        queryParameters = QueryParameters.EMPTY,
+                        headers = HttpHeaders.EMPTY,
+                        domain = "example.com",
+                        protocol = "https",
+                        sourceIp = "local",
+                    )
+                )
+                assertEquals(HttpStatus.NotFound, resp.status)
+                assertEquals("nosniff", resp.headers[HttpHeader.XContentTypeOptions]?.root)
+                assertEquals(
+                    "max-age=3600",
+                    resp.headers[HttpHeader.StrictTransportSecurity]?.root,
+                    "error responses must carry security headers",
+                )
+            }
+        }
+    }
+
+    @Test
     fun fast_handler_completes_within_its_timeout() {
         TestServer.test(settings = {}) {
             runBlocking {
