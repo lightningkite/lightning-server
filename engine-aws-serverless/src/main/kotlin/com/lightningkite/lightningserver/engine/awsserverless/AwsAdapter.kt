@@ -14,6 +14,7 @@ import com.lightningkite.lightningserver.settings.*
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.Service
 import com.lightningkite.services.aws.AwsConnections
+import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.get
 import io.github.oshai.kotlinlogging.KLogger
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -41,14 +42,37 @@ import kotlin.time.Duration.Companion.milliseconds
 
 private val awsApiGatewayWsEndpointSetting = ServerSetting("awsApiGatewayWsEndpointSetting", "", String.serializer())
 
+/**
+ * Cache used by the AWS engine for distributed locking of scheduled-task execution
+ * (see [AwsAdapterSchedule]). EventBridge can deliver a scheduled trigger more than once and to
+ * overlapping Lambda invocations; the lock ensures only one invocation runs a given tick.
+ *
+ * For this to coordinate across concurrent Lambda instances (separate processes) it must point at a
+ * shared cache such as DynamoDB or Redis. The default "ram" cache only deduplicates within a single
+ * process, mirroring [com.lightningkite.lightningserver.engine.local.LocalEngine]'s engine cache.
+ *
+ * Optional so existing deployments whose settings.json predates this setting still start.
+ */
+public val awsEngineCache: ServerSetting<Cache.Settings, Cache> =
+    ServerSetting(
+        "engine-cache",
+        Cache.Settings(),
+        Cache.Settings.serializer(),
+        instructions = "Shared cache (e.g. DynamoDB) used to coordinate scheduled tasks across Lambda invocations.",
+        optional = true,
+    )
+
 public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(server), RequestStreamHandler, Resource {
 
     internal val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.engine.awsserverless")
     internal var preventLambdaTimeoutReuse: Boolean = false
 
-    override val settings: ServerSettings = super.settings + awsApiGatewayWsEndpointSetting
+    override val settings: ServerSettings = super.settings + awsApiGatewayWsEndpointSetting + awsEngineCache
 
     override val websocketHandlersRunOnSameMachine: Boolean get() = false
+
+    /** Cache used for scheduled-task distributed locking; see [awsEngineCache]. */
+    internal val cache: Cache by lazy { with(this) { awsEngineCache() } }
 
     init {
         logger.info { "Initializing AwsAdapter..." }
