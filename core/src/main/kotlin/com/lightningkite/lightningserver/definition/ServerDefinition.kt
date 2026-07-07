@@ -113,7 +113,12 @@ public data class ServerDefinition(
      * Flattening is **not** sealed or cached to prevent unnecessary intermediate allocations.
      * */
     private fun flatten(): Module {
-        if (modules.isEmpty()) return thisLayer
+        // Even a single-module server routes its serializers module getter through the naming guard so a
+        // throwing getter fails fast with a clear, module-identified error rather than an opaque lazy failure.
+        if (modules.isEmpty()) return thisLayer.copy(
+            internalSerializersModule = thisLayer.internalSerializersModule.namedSerializers("internal", "/"),
+            externalSerializersModule = thisLayer.externalSerializersModule.namedSerializers("external", "/"),
+        )
 
         val flattenedModules = modules.mapItems { it.flatten() }
         // Cache this to avoid repeated list creation in serializers module lambdas
@@ -144,8 +149,19 @@ public data class ServerDefinition(
 
         return Module(
             moduleId = Uuid.NIL,    // When flattening module identification loses meaning
-            internalSerializersModule = { flattenedModuleItems.fold(thisLayer.internalSerializersModule()) { acc, module -> acc + module.internalSerializersModule() } },
-            externalSerializersModule = { flattenedModuleItems.fold(thisLayer.externalSerializersModule()) { acc, module -> acc + module.externalSerializersModule() } },
+            // Each module's serializers module getter is routed through [namedSerializers] so that a getter
+            // which throws fails fast with the offending module's location named, rather than surfacing an
+            // opaque error the first time a request touches serialization.
+            internalSerializersModule = {
+                var acc = thisLayer.internalSerializersModule.namedSerializers("internal", "/")()
+                for ((modPath, module) in flattenedModules) acc += module.internalSerializersModule.namedSerializers("internal", "/$modPath")()
+                acc
+            },
+            externalSerializersModule = {
+                var acc = thisLayer.externalSerializersModule.namedSerializers("external", "/")()
+                for ((modPath, module) in flattenedModules) acc += module.externalSerializersModule.namedSerializers("external", "/$modPath")()
+                acc
+            },
             annotationValidators = { flattenedModuleItems.fold(thisLayer.annotationValidators()) { acc, module -> acc + module.annotationValidators() } },
             httpInterceptors = flattenList { it.httpInterceptors },
             websocketInterceptors = flattenList { it.websocketInterceptors },
@@ -215,6 +231,26 @@ public data class ServerDefinition(
         )
     }
 
+
+    /**
+     * Wraps a module's serializers module [Runtime] so that, when evaluated, any failure is rethrown with the
+     * module's [location] and [kind] ("internal"/"external") named — making the offending module immediately
+     * identifiable instead of surfacing an opaque error the first time a request touches serialization.
+     */
+    private fun Runtime<SerializersModule>.namedSerializers(kind: String, location: String): Runtime<SerializersModule> {
+        val wrapped = this
+        return Runtime {
+            try {
+                wrapped()
+            } catch (e: Exception) {
+                throw IllegalStateException(
+                    "Failed to build the $kind serializers module for the module at '$location'. " +
+                        "Check that module's serializer registration (internalSerialization/externalSerialization).",
+                    e,
+                )
+            }
+        }
+    }
 
     private val reverseLookupHttpHandler: Map<HttpHandler<*>, HttpEndpoint<*>> by lazy {
         endpoints.entries.flatMap { (path, group) ->
