@@ -67,7 +67,8 @@ public class OauthProofEndpoints(
     private val provider: OauthProviderInfo,
     override val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
     override val proofExpiration: Duration = 1.hours,
-    private val credentials: () -> OauthProviderCredentials,
+
+    private val credentials: context(ServerRuntime) () -> OauthProviderCredentials,
     private val continueUiAuthUrl: ()->String
 ) : ServerBuilder(), ExternalProofMethod {
 

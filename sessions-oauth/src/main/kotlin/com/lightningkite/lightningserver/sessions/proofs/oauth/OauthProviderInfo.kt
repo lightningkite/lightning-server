@@ -85,7 +85,7 @@ public class OauthProviderInfo(
 
     context(runtime: ServerRuntime)
     public fun loginUrl(
-        credentials: () -> OauthProviderCredentials,
+        credentials: context(ServerRuntime) () -> OauthProviderCredentials,
         callback: HttpHandler<*>,
         state: String = Uuid.random().toString(),
         scope: String = scopeForProfile,
@@ -108,7 +108,7 @@ public class OauthProviderInfo(
 
     context(runtime: ServerRuntime)
     public suspend fun accessToken(
-        credentials: () -> OauthProviderCredentials,
+        credentials: context(ServerRuntime) () -> OauthProviderCredentials,
         callback: PathSpec,
         oauth: OauthCode,
     ): OauthResponse {
@@ -136,7 +136,7 @@ public class OauthProviderInfo(
     }
 
     context(runtime: ServerRuntime)
-    public suspend fun accessToken(credentials: () -> OauthProviderCredentials, refreshToken: String): OauthResponse {
+    public suspend fun accessToken(credentials: context(ServerRuntime) () -> OauthProviderCredentials, refreshToken: String): OauthResponse {
         return client.post(tokenUrl) {
             setBody(
                 FormDataFormat(EmptySerializersModule()).encodeToString(

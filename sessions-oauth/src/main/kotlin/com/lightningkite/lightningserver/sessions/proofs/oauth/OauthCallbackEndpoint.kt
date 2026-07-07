@@ -13,7 +13,7 @@ public class OauthCallbackEndpoint<STATE>(
     path: PathSpec,
     public val stateSerializer: KSerializer<STATE>,
     public val oauthProviderInfo: OauthProviderInfo,
-    public val credentials: () -> OauthProviderCredentials,
+    public val credentials: context(ServerRuntime)() -> OauthProviderCredentials,
     public val defaultScope: String = oauthProviderInfo.scopeForProfile,
     public val defaultAccessType: OauthAccessType = OauthAccessType.online,
     public val onError: suspend context(ServerRuntime) (OauthCode) -> HttpResponse = {
@@ -69,7 +69,7 @@ public class OauthCallbackEndpoint<STATE>(
 context(builder: ServerBuilder)
 public inline fun <reified STATE> HttpEndpoint<PathSpec0>.oauthCallback(
     oauthProviderInfo: OauthProviderInfo,
-    noinline credentials: () -> OauthProviderCredentials,
+    noinline credentials: context(ServerRuntime) () -> OauthProviderCredentials,
     defaultScope: String = oauthProviderInfo.scopeForProfile,
     defaultAccessType: OauthAccessType = OauthAccessType.online,
     noinline onError: suspend context(ServerRuntime) (OauthCode) -> HttpResponse = {
