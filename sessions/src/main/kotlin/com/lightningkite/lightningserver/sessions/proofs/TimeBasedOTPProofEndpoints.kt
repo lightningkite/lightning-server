@@ -153,13 +153,17 @@ public class TimeBasedOTPProofEndpoints(
             implementation = { input: IdentificationAndPassword ->
                 val now = now()
                 val gracePeriod = now().minus(5.seconds)
+                val subject = input.type
+                val handler = serverRuntime.server.principalTypes[subject]
+                    ?: throw IllegalArgumentException("No subject $subject recognized")
+                // Normalize BEFORE building the rate-limit key: the key must be derived from the canonical
+                // identifier so that case/whitespace variants of the same account share one bucket. Keying on
+                // the raw value would let an attacker dodge the limiter (and its exponential backoff) simply
+                // by varying case or whitespace.
+                val normalizedValue = handler.normalizePropertyValue(input.property, input.value)
                 cache().constrainAttemptRate(
-                    cacheKey = "totp-count-${input.property}-${input.value}"
+                    cacheKey = "totp-count-${input.property}-${normalizedValue}"
                 ) {
-                    val subject = input.type
-                    val handler = serverRuntime.server.principalTypes[subject]
-                        ?: throw IllegalArgumentException("No subject $subject recognized")
-                    val normalizedValue = handler.normalizePropertyValue(input.property, input.value)
                     val subjectId = handler.fetchUserIdString(input.property, normalizedValue)
                         ?: throw BadRequestException("User ID and code do not match")
 
