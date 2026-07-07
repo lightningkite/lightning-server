@@ -253,6 +253,11 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
                         sessionId = null,
                         issuedAt = server.clock.now(),
                         expiration = auth.expiration,
+                        // NOTE: the masqueraded session inherits the ACTOR's scopes verbatim, not the
+                        // target's. This means a masquerade can carry more privilege than the target
+                        // normally holds. Whether that is desired (act with your own powers as the user)
+                        // or should be narrowed to a subset is an intentional, app-specific decision;
+                        // gate it in permitMasquerade if you need to restrict it.
                         scopes = auth.scopes,
                         fromMasquerade = auth,
                     )
@@ -263,8 +268,15 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
                         throw BadRequestException(message = "Invalid masquerade id", data = mask.rawId)
                     }
 
-                    if (handler.permitMasquerade(auth, mask)) return mask
-                    else throw ForbiddenException("You are not allowed to masquerade as $masquerade")
+                    if (handler.permitMasquerade(auth, mask)) {
+                        // Audit trail: masquerade is a privilege-sensitive action, so record who
+                        // assumed whom. Logged at info because it is an authorized, expected event.
+                        server.logger.info { "AUDIT masquerade granted: ${auth.principalName}/${auth.rawId} -> $masquerade" }
+                        return mask
+                    } else {
+                        server.logger.warn { "AUDIT masquerade denied: ${auth.principalName}/${auth.rawId} attempted -> $masquerade" }
+                        throw ForbiddenException("You are not allowed to masquerade as $masquerade")
+                    }
                 }
 
                 return auth
