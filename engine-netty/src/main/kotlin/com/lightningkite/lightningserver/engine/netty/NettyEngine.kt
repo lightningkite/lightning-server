@@ -690,9 +690,11 @@ public class NettyEngine(
             this.body?.mediaType?.let { mt ->
                 res.headers()[CONTENT_TYPE] = mt.toString()
             }
-            if (contentBuf !== Unpooled.EMPTY_BUFFER) {
-                res.headers()[CONTENT_LENGTH] = contentBuf.readableBytes().toString()
-            }
+            // Always advertise the body length, including 0 for bodyless responses (redirects, etc.).
+            // Without a Content-Length (or 0) a keep-alive HTTP/1.1 client cannot tell the response is
+            // complete and stalls until the idle timeout closes the connection — a cross-engine
+            // conformance defect caught by EngineHttpConformanceSuite.trailing_slash_redirects_307.
+            res.headers()[CONTENT_LENGTH] = contentBuf.readableBytes().toString()
 
             return res
         }
