@@ -111,6 +111,9 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
      */
     public open val useCloudFrontForWebSocket: Boolean get() = false
 
+    /** IP Stack Configuration. */
+    public open val enableIPv6: Boolean = true
+
 
     internal class VpcInfoTerraformManaged(
         val ipPrefix: String,
@@ -263,6 +266,8 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                         "certificate_arn" - expression("aws_acm_certificate.http.arn")
                         "endpoint_type" - "REGIONAL"
                         "security_policy" - "TLS_1_2"
+                        if (enableIPv6)
+                            "ip_address_type" - "dualstack"
                     }
                     "depends_on" - listOf("aws_acm_certificate_validation.http")
                 }
@@ -281,6 +286,17 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                         "zone_id" - expression("aws_apigatewayv2_domain_name.http.domain_name_configuration[0].hosted_zone_id")
                     }
                 }
+                if (enableIPv6)
+                    "resource.aws_route53_record.httpAccessIpv6" {
+                        "type" - "AAAA"
+                        "name" - expression("aws_apigatewayv2_domain_name.http.domain_name")
+                        "zone_id" - zone
+                        "alias" {
+                            "evaluate_target_health" - false
+                            "name" - expression("aws_apigatewayv2_domain_name.http.domain_name_configuration[0].target_domain_name")
+                            "zone_id" - expression("aws_apigatewayv2_domain_name.http.domain_name_configuration[0].hosted_zone_id")
+                        }
+                    }
             }
         }
         emit("ws") {
@@ -382,6 +398,8 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                             "certificate_arn" - expression("aws_acm_certificate.ws.arn")
                             "endpoint_type" - "REGIONAL"
                             "security_policy" - "TLS_1_2"
+                            if (enableIPv6)
+                                "ip_address_type" - "dualstack"
                         }
                         "depends_on" - listOf("aws_acm_certificate_validation.ws")
                     }
@@ -400,6 +418,17 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                             "zone_id" - expression("aws_apigatewayv2_domain_name.ws.domain_name_configuration[0].hosted_zone_id")
                         }
                     }
+                    if (enableIPv6)
+                        "resource.aws_route53_record.wsAccessIpv6" {
+                            "type" - "AAAA"
+                            "name" - expression("aws_apigatewayv2_domain_name.ws.domain_name")
+                            "zone_id" - zone
+                            "alias" {
+                                "evaluate_target_health" - false
+                                "name" - expression("aws_apigatewayv2_domain_name.ws.domain_name_configuration[0].target_domain_name")
+                                "zone_id" - expression("aws_apigatewayv2_domain_name.ws.domain_name_configuration[0].hosted_zone_id")
+                            }
+                        }
                 }
             }
         }
@@ -592,6 +621,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 val vpcInfo = emitter.applicationVpc as? AwsVpc.VpcInfo
                 if (vpcInfo != null) {
                     "vpc_config" {
+                        "ipv6_allowed_for_dual_stack" - enableIPv6
                         "subnet_ids" - vpcInfo.privateSubnets
                         "security_group_ids" - listOf(
                             expression("aws_security_group.internal.id"),
