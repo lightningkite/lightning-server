@@ -678,7 +678,8 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
             }
             "resource.null_resource.lambda_jar_source" {
                 "triggers" {
-                    "always" - expression("timestamp()")
+                    "buildHash" - expression($$"""sha256(join("", [for f in fileset("${path.module}/../../build/dist/lambda", "**") : filesha256("${path.module}/../../build/dist/lambda/${f}")]))""")
+                    "settingsHash" - expression("local_sensitive_file.settings_raw.content_sha256")
                 }
                 "provisioner.local-exec" - (listOf(
                     terraformJsonObject {
