@@ -18,7 +18,7 @@ public abstract class TerraformAwsServerlessDomainBuilder<S : ServerBuilder>(
 
     override fun prepareForWrite() {
         (applicationVpc as? VpcInfoTerraformManaged)?.also {
-            emitVpc(it)
+            emitVpc(it, enableIPv6)
         }
         super.prepareForWrite()
     }
@@ -35,7 +35,8 @@ private fun TerraformEmitterAws.domainZoneId(domainZone: String): String {
 }
 
 private fun TerraformEmitterAws.emitVpc(
-    info: VpcInfoTerraformManaged
+    info: VpcInfoTerraformManaged,
+    enableIPv6: Boolean,
 ) {
     emit("cloud") {
         "module.vpc" {
@@ -46,8 +47,20 @@ private fun TerraformEmitterAws.emitVpc(
             "cidr" - info.cidr
 
             "azs" - info.availabilityZones
-            "private_subnets" - listOf("${info.ipPrefix}.1.0/24", "${info.ipPrefix}.2.0/24", "${info.ipPrefix}.3.0/24")
-            "public_subnets" - listOf("${info.ipPrefix}.101.0/24", "${info.ipPrefix}.102.0/24", "${info.ipPrefix}.103.0/24")
+
+            // IPv4 Subnets
+            "private_subnets" - List(info.availabilityZones.size) { index -> "${info.ipPrefix}.${index + 1}.0/24" }
+            "public_subnets" - List(info.availabilityZones.size) { index -> "${info.ipPrefix}.${index + 100}.0/24" }
+
+            // IPv6 Support and Subnets
+            if (enableIPv6) {
+                "enable_ipv6" - true
+                "create_egress_only_igw" - true
+                "public_subnet_assign_ipv6_address_on_creation" - true
+                "public_subnet_ipv6_prefixes" - List(info.availabilityZones.size) { index -> index }
+                "private_subnet_assign_ipv6_address_on_creation" - true
+                "private_subnet_ipv6_prefixes" - List(info.availabilityZones.size) { index -> index + 3 }
+            }
 
             "enable_nat_gateway" - (info.natGateway != AwsVpc.NatGateway.None)
             "single_nat_gateway" - (info.natGateway == AwsVpc.NatGateway.Single)
@@ -60,6 +73,12 @@ private fun TerraformEmitterAws.emitVpc(
             "vpc_id" - expression("module.vpc.vpc_id")
             "service_name" - "com.amazonaws.${this@emitVpc.applicationRegion}.s3"
             "route_table_ids" - expression("module.vpc.public_route_table_ids")
+            if (enableIPv6) {
+                "ip_address_type" - "dualstack"
+                "dns_options" {
+                    "dns_record_ip_type" - "dualstack"
+                }
+            }
         }
         "resource.aws_vpc_endpoint.execute_api" {
             "vpc_id" - expression("module.vpc.vpc_id")
@@ -98,6 +117,12 @@ private fun TerraformEmitterAws.emitVpc(
             "ip_protocol" - "-1"
             "cidr_ipv4" - "0.0.0.0/0"
         }
+        if (enableIPv6)
+            "resource.aws_vpc_security_group_egress_rule.access_outside_ipv6" {
+                "security_group_id" - expression("aws_security_group.access_outside.id")
+                "ip_protocol" - "-1"
+                "cidr_ipv6" - "::/0"
+            }
         "resource.aws_security_group.execute_api" {
             "name" - "$projectPrefix-execute-api"
             "vpc_id" - expression("module.vpc.vpc_id")
