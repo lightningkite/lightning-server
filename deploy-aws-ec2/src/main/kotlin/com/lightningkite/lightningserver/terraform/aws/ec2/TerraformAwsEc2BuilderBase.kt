@@ -116,7 +116,7 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     public open val distributionZipPath: String? get() = null
 
     /** JVM arguments for the application. */
-    public open val jvmArgs: List<String> get() = listOf("-Xmx512m")
+    public open val jvmArgs: List<String> get() = emptyList()
 
     /** Command to start the server (passed to main class). */
     public open val serverCommand: String get() = "serve"
@@ -792,7 +792,7 @@ RestartSec=5
 StandardOutput=append:/var/log/$$projectPrefix/server.log
 StandardError=append:/var/log/$$projectPrefix/server.log
 
-$${if (jvmArgs.isNotEmpty()) "Environment=JAVA_OPTS=${jvmArgs.joinToString(" ")}" else ""}
+$${if (jvmArgs.isNotEmpty()) "Environment=\"JAVA_OPTS=${jvmArgs.joinToString(" ")}\"" else ""}
 $${systemdEnvironment.entries.joinToString("\n") { (key, value) -> "Environment=$key=${value.systemdEscape()}" }}
 
 [Install]
