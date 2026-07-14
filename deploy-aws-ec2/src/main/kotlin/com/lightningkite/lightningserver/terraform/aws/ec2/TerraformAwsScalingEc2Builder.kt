@@ -304,7 +304,7 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
         val saltInput = imageInstallScript() + baseImageSalt +
                 imageManagedComponents.joinToString(",") + hardeningComponents.joinToString(",")
         val patch = saltInput.hashCode().absoluteValue % 100000
-        "1.0.$patch"
+        "1.${expression("regex(\"[0-9]{8}\", data.aws_ami.ubuntu.name)")}.$patch"
     }
 
     private fun emitImageBuilder() {
