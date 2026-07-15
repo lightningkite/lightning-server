@@ -62,6 +62,7 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
         get() = displayName.lowercase().replace(" ", "-").filter { it.isLetterOrDigit() || it == '-' }
     public open val storageBucketPath: String get() = projectPrefix
     public open val storageEncryptionEnabled: Boolean get() = true
+    public open val useStorageLockFile: Boolean get() = false
 
     /**
      * When true, a dedicated customer-managed KMS key is created and used to encrypt the mutable-domain
@@ -342,6 +343,8 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
                     "key" - storageBucketPath
                     "region" - applicationRegion
                     "encrypt" - storageEncryptionEnabled
+                    if(useStorageLockFile)
+                        "use_lockfile" - true
                 }
             }
             if (terraformProviders.isNotEmpty()) {
