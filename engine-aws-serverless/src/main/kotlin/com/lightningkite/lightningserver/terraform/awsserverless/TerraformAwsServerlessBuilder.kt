@@ -704,7 +704,10 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                         )
                         "interpreter" - this@emit.expression("local.is_windows ? [\"PowerShell\", \"-Command\"] : []")
                     }, terraformJsonObject {
-                        "command" - $$"openssl enc -aes-256-cbc -md sha256 -in \"${local_sensitive_file.settings_raw.filename}\" -out \"${path.module}/build/lambda/settings.enc\" -pass pass:${random_password.settings.result}"
+                        "command" - $$"openssl enc -aes-256-cbc -md sha256 -in \"${local_sensitive_file.settings_raw.filename}\" -out \"${path.module}/build/lambda/settings.enc\" -pass env:SETTINGS_PASS"
+                        "environment" {
+                            "SETTINGS_PASS" - expression("random_password.settings.result")
+                        }
                         "interpreter" - this@emit.expression("local.is_windows ? [\"PowerShell\", \"-Command\"] : []")
                     }
                 ) + lambdaFiles.map { (filename, _) ->
@@ -721,7 +724,10 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 }
                 "depends_on" - listOf("null_resource.lambda_jar_source")
                 "provisioner.local-exec" {
-                    "command" - $$"openssl enc -d -aes-256-cbc -md sha256 -out \"${local_sensitive_file.settings_raw.filename}.decrypted.json\" -in \"${path.module}/build/lambda/settings.enc\" -pass pass:${random_password.settings.result}"
+                    "command" - $$"openssl enc -d -aes-256-cbc -md sha256 -out \"${local_sensitive_file.settings_raw.filename}.decrypted.json\" -in \"${path.module}/build/lambda/settings.enc\" -pass env:SETTINGS_PASS"
+                    "environment" {
+                        "SETTINGS_PASS" - expression("random_password.settings.result")
+                    }
                     "interpreter" - expression("local.is_windows ? [\"PowerShell\", \"-Command\"] : []")
                 }
             }
