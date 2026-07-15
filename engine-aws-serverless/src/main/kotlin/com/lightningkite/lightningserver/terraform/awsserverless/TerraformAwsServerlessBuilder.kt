@@ -28,6 +28,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
         get() = displayName.lowercase().replace(" ", "-").filter { it.isLetterOrDigit() || it == '-' }
     public open val storageBucketPath: String get() = projectPrefix
     public open val storageEncryptionEnabled: Boolean get() = true
+    public open val useStorageLockFile: Boolean get() = false
     override val terraformRoot: File get() = File("terraform/$projectPrefix")
     override val secretsSource: SecretSource by lazy {
         val fetcher = PasswordFetcher()
@@ -573,10 +574,11 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 "role" - expression("aws_iam_role.main_exec.name")
                 "policy_arn" - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
             }
-            "resource.aws_iam_role_policy_attachment.main_policy_vpc" {
-                "role" - expression("aws_iam_role.main_exec.name")
-                "policy_arn" - "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
-            }
+            if (emitter.applicationVpc is AwsVpc.VpcInfo)
+                "resource.aws_iam_role_policy_attachment.main_policy_vpc" {
+                    "role" - expression("aws_iam_role.main_exec.name")
+                    "policy_arn" - "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+                }
             "resource.aws_iam_role_policy_attachment.insights_policy" {
                 "role" - expression("aws_iam_role.main_exec.id")
                 "policy_arn" - "arn:aws:iam::aws:policy/CloudWatchLambdaInsightsExecutionRolePolicy"
@@ -634,6 +636,11 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                     "tracing_config" {
                         "mode" - mode.name
                     }
+                }
+
+                "logging_config" {
+                    "log_format" - "Text"
+                    "log_group" - expression("aws_cloudwatch_log_group.main.name")
                 }
 
                 "environment" {
@@ -779,6 +786,8 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                     "key" - storageBucketPath
                     "region" - applicationRegion
                     "encrypt" - storageEncryptionEnabled
+                    if(useStorageLockFile)
+                        "use_lockfile" - true
                 }
             }
             if (terraformProviders.isNotEmpty()) {
