@@ -62,6 +62,7 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
         get() = displayName.lowercase().replace(" ", "-").filter { it.isLetterOrDigit() || it == '-' }
     public open val storageBucketPath: String get() = projectPrefix
     public open val storageEncryptionEnabled: Boolean get() = true
+    public open val useStorageLockFile: Boolean get() = false
 
     /**
      * When true, a dedicated customer-managed KMS key is created and used to encrypt the mutable-domain
@@ -116,7 +117,7 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     public open val distributionZipPath: String? get() = null
 
     /** JVM arguments for the application. */
-    public open val jvmArgs: List<String> get() = listOf("-Xmx512m")
+    public open val jvmArgs: List<String> get() = emptyList()
 
     /** Command to start the server (passed to main class). */
     public open val serverCommand: String get() = "serve"
@@ -342,6 +343,8 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
                     "key" - storageBucketPath
                     "region" - applicationRegion
                     "encrypt" - storageEncryptionEnabled
+                    if(useStorageLockFile)
+                        "use_lockfile" - true
                 }
             }
             if (terraformProviders.isNotEmpty()) {
@@ -792,7 +795,7 @@ RestartSec=5
 StandardOutput=append:/var/log/$$projectPrefix/server.log
 StandardError=append:/var/log/$$projectPrefix/server.log
 
-$${if (jvmArgs.isNotEmpty()) "Environment=JAVA_OPTS=${jvmArgs.joinToString(" ")}" else ""}
+$${if (jvmArgs.isNotEmpty()) "Environment=\"JAVA_OPTS=${jvmArgs.joinToString(" ")}\"" else ""}
 $${systemdEnvironment.entries.joinToString("\n") { (key, value) -> "Environment=$key=${value.systemdEscape()}" }}
 
 [Install]

@@ -302,9 +302,11 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
     private val imageVersion: String by lazy {
         // Fold the component lists in too, so changing managed/hardening components re-bakes the AMI.
         val saltInput = imageInstallScript() + baseImageSalt +
-                imageManagedComponents.joinToString(",") + hardeningComponents.joinToString(",")
+                imageManagedComponents.joinToString() +
+                hardeningComponents.joinToString() +
+                jvmArgs.joinToString()
         val patch = saltInput.hashCode().absoluteValue % 100000
-        "1.0.$patch"
+        "1.${expression("regex(\"[0-9]{8}\", data.aws_ami.ubuntu.name)")}.$patch"
     }
 
     private fun emitImageBuilder() {
