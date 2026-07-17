@@ -11,6 +11,8 @@ import com.lightningkite.lightningserver.typed.sdk.functionCase
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.serializerOrContextual
 import kotlinx.serialization.KSerializer
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Internal data class implementation of [ApiHttpHandler].
@@ -29,6 +31,7 @@ private data class ApiHttpHandlerData<PATH : PathSpec, USER : HasId<*>?, INPUT, 
     override val successCode: HttpStatus = HttpStatus.OK,
     override val errorCases: List<LSError> = emptyList(),
     override val examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = emptyList(),
+    override val timeout: Duration,
     val implementation: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT,
 ) : ApiHttpHandler<PATH, USER, INPUT, OUTPUT> {
     context(server: ServerRuntime)
@@ -63,6 +66,7 @@ public fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> explicitApiHttpHan
     successCode: HttpStatus = HttpStatus.OK,
     errorCases: List<LSError> = emptyList(),
     examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = emptyList(),
+    timeout: Duration = 30.seconds,
     implementation: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT,
 ): ApiHttpHandler<PATH, USER, INPUT, OUTPUT> =
     ApiHttpHandlerData(
@@ -75,6 +79,7 @@ public fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> explicitApiHttpHan
         successCode,
         errorCases,
         examples,
+        timeout,
         implementation
     )
 
@@ -117,6 +122,7 @@ public inline fun <PATH : PathSpec, USER : HasId<*>?, reified INPUT, reified OUT
     successCode: HttpStatus = HttpStatus.OK,
     errorCases: List<LSError> = emptyList(),
     examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = emptyList(),
+    timeout: Duration = 30.seconds,
     noinline implementation: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT,
 ): ApiHttpHandler<PATH, USER, INPUT, OUTPUT> =
     explicitApiHttpHandler(
@@ -129,6 +135,7 @@ public inline fun <PATH : PathSpec, USER : HasId<*>?, reified INPUT, reified OUT
         successCode,
         errorCases,
         examples,
+        timeout,
         implementation
     )
 
