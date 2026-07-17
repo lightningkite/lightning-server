@@ -216,19 +216,21 @@ public class OauthProviderInfo(
                 val claimsJson = serverRuntime.externalSerialization.json.parseToJsonElement(
                     serverRuntime.externalSerialization.json.encodeToString(claims)
                 ).jsonObject
+
+                val sub = claimsJson.get("sub")?.jsonPrimitive?.content
+                    ?: throw BadRequestException("Subject id must be present")
+
                 val emailVerified = claimsJson.get("email_verified")?.jsonPrimitive?.content?.toBooleanStrictOrNull()
                     ?: claimsJson.get("email_verified")?.jsonPrimitive?.boolean
-                    ?: throw BadRequestException("Missing email_verified claim in Apple ID token")
+                    ?: false
 
-                if (!emailVerified) {
-                    throw BadRequestException("Apple has not verified the email address.")
-                }
+                // Email will be null on 2nd+ logins
+                val email = if (emailVerified) claimsJson.get("email")?.jsonPrimitive?.content else null
 
-                // Extract email from verified claims
-                val email = claimsJson.get("email")?.jsonPrimitive?.content
-                    ?: throw BadRequestException("No email found in verified Apple ID token")
-
-                ExternalProfile(email = email)
+                ExternalProfile(
+                    id = sub,
+                    email = email
+                )
             }
         ).also { all.add(it) }
 
@@ -276,6 +278,7 @@ public class OauthProviderInfo(
                     if (primary.verified) primary.email else null
                 }
                 ExternalProfile(
+                    id = user.id.toString(),
                     email = email,
                     username = user.login,
                     image = user.avatar_url,
