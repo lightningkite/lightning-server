@@ -3,10 +3,8 @@ package com.lightningkite.lightningserver.typed.singlesdk
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.typed.Fetcher
 import kotlinx.serialization.ContextualSerializer
-import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.builtins.MapSerializer
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.builtins.nullable
+import kotlinx.serialization.builtins.*
+import kotlinx.serialization.ExperimentalSerializationApi
 
 interface Api {
 	fun withHeaderCalculator(calculator: suspend () -> List<Pair<String, String>>): Api
@@ -170,6 +168,7 @@ interface Api {
 	val other: OtherEndpoints
 }
 
+@OptIn(ExperimentalSerializationApi::class)
 class LiveApi(val fetcher: Fetcher) : Api {
 	override fun withHeaderCalculator(calculator: suspend () -> List<Pair<String, String>>): LiveApi = 
 		LiveApi(fetcher.withHeaderCalculator(calculator))

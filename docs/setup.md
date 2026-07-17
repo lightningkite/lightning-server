@@ -134,29 +134,20 @@ Unit tests in Lightning Server use mock services to avoid external dependencies:
 
 ```kotlin
 // src/test/kotlin/ServerTest.kt
-import com.lightningkite.lightningserver.engine.local.LocalEngine
-import com.lightningkite.lightningserver.http.test
-import com.lightningkite.services.database.jsonfile.JsonFileDatabase
+import com.lightningkite.lightningserver.runtime.test.test
 import kotlinx.coroutines.runBlocking
-import org.junit.jupiter.api.BeforeAll
-import org.junit.jupiter.api.Test
+import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class ServerTest {
-    companion object {
-        @BeforeAll
-        @JvmStatic
-        fun setup() {
-            // Ensure service implementations are loaded
-            JsonFileDatabase
-        }
-    }
-
     @Test
-    fun testRoot(): Unit = runBlocking {
-        val engine = LocalEngine(Server.build())
-        val response = Server.root.test(engine)
-        assertEquals("Hello world!", response.body!!.text())
+    fun testRoot() {
+        Server.test(settings = {}) {
+            runBlocking {
+                val response = Server.root.test()
+                assertEquals("Hello world!", response.body!!.text())
+            }
+        }
     }
 }
 ```

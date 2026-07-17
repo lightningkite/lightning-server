@@ -1,0 +1,164 @@
+{
+    "data": {
+        "aws_iam_policy_document": {
+            "alb_logs": {
+                "statement": {
+                    "resources": [
+                        "${aws_s3_bucket.alb_logs.arn}/LightningServerEC2SDemo/*"
+                    ],
+                    "principals": {
+                        "identifiers": [
+                            "logdelivery.elasticloadbalancing.amazonaws.com"
+                        ],
+                        "type": "Service"
+                    },
+                    "actions": [
+                        "s3:PutObject"
+                    ]
+                }
+            }
+        }
+    },
+    "resource": {
+        "aws_lb": {
+            "app": {
+                "security_groups": [
+                    "${aws_security_group.alb.id}"
+                ],
+                "drop_invalid_header_fields": true,
+                "internal": false,
+                "depends_on": [
+                    "aws_s3_bucket_policy.alb_logs"
+                ],
+                "load_balancer_type": "application",
+                "name": "LightningServerEC2SDemo-alb",
+                "access_logs": {
+                    "bucket": "${aws_s3_bucket.alb_logs.id}",
+                    "prefix": "LightningServerEC2SDemo",
+                    "enabled": true
+                },
+                "ip_address_type": "dualstack",
+                "subnets": "${module.vpc.public_subnets}",
+                "idle_timeout": 4000
+            }
+        },
+        "aws_s3_bucket_public_access_block": {
+            "alb_logs": {
+                "bucket": "${aws_s3_bucket.alb_logs.id}",
+                "block_public_policy": true,
+                "block_public_acls": true,
+                "ignore_public_acls": true,
+                "restrict_public_buckets": true
+            }
+        },
+        "aws_s3_bucket_server_side_encryption_configuration": {
+            "alb_logs": {
+                "bucket": "${aws_s3_bucket.alb_logs.id}",
+                "rule": {
+                    "apply_server_side_encryption_by_default": {
+                        "sse_algorithm": "AES256"
+                    }
+                }
+            }
+        },
+        "aws_s3_bucket_lifecycle_configuration": {
+            "alb_logs": {
+                "bucket": "${aws_s3_bucket.alb_logs.id}",
+                "rule": {
+                    "filter": {},
+                    "expiration": {
+                        "days": 90
+                    },
+                    "id": "expire",
+                    "status": "Enabled"
+                }
+            }
+        },
+        "aws_lb_listener": {
+            "http": {
+                "protocol": "HTTP",
+                "port": 80,
+                "load_balancer_arn": "${aws_lb.app.arn}",
+                "default_action": {
+                    "redirect": {
+                        "protocol": "HTTPS",
+                        "status_code": "HTTP_301",
+                        "port": "443"
+                    },
+                    "type": "redirect"
+                }
+            },
+            "https": {
+                "protocol": "HTTPS",
+                "port": 443,
+                "certificate_arn": "${aws_acm_certificate_validation.this.certificate_arn}",
+                "load_balancer_arn": "${aws_lb.app.arn}",
+                "ssl_policy": "ELBSecurityPolicy-TLS13-1-2-2021-06",
+                "default_action": {
+                    "target_group_arn": "${aws_lb_target_group.app.arn}",
+                    "type": "forward"
+                }
+            }
+        },
+        "aws_route53_record": {
+            "cert_validation": {
+                "zone_id": "${data.aws_route53_zone.main.zone_id}",
+                "records": [
+                    "${each.value.record}"
+                ],
+                "name": "${each.value.name}",
+                "for_each": "${{\n    for dvo in aws_acm_certificate.this.domain_validation_options : dvo.domain_name => {\n      name   = dvo.resource_record_name\n      record = dvo.resource_record_value\n      type   = dvo.resource_record_type\n    }\n  }}",
+                "type": "${each.value.type}",
+                "ttl": 60,
+                "allow_overwrite": true
+            }
+        },
+        "aws_acm_certificate_validation": {
+            "this": {
+                "certificate_arn": "${aws_acm_certificate.this.arn}",
+                "validation_record_fqdns": "${[for record in aws_route53_record.cert_validation : record.fqdn]}"
+            }
+        },
+        "aws_lb_target_group": {
+            "app": {
+                "protocol": "HTTP",
+                "port": 8080,
+                "vpc_id": "${module.vpc.vpc_id}",
+                "name": "LightningServerEC2SDemo-tg",
+                "target_type": "instance",
+                "deregistration_delay": 30,
+                "health_check": {
+                    "path": "/meta/online",
+                    "healthy_threshold": 2,
+                    "protocol": "HTTP",
+                    "unhealthy_threshold": 3,
+                    "interval": 15,
+                    "matcher": "200-399",
+                    "enabled": true,
+                    "timeout": 5
+                }
+            }
+        },
+        "aws_s3_bucket": {
+            "alb_logs": {
+                "force_destroy": true,
+                "bucket_prefix": "lightningserverec2sdemo-alb-logs"
+            }
+        },
+        "aws_acm_certificate": {
+            "this": {
+                "lifecycle": {
+                    "create_before_destroy": true
+                },
+                "domain_name": "lightningserver2.cs.lightningkite.com",
+                "validation_method": "DNS"
+            }
+        },
+        "aws_s3_bucket_policy": {
+            "alb_logs": {
+                "bucket": "${aws_s3_bucket.alb_logs.id}",
+                "policy": "${data.aws_iam_policy_document.alb_logs.json}"
+            }
+        }
+    }
+}

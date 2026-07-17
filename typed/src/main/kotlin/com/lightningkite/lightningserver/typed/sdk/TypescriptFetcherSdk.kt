@@ -199,6 +199,7 @@ public class TypescriptFetcherSdk(
         appendLine("import type { ${fromLightningServerPackage.joinToString()} } from '@lightningkite/lightning-server-simplified'")
 
 
+    @OptIn(ExperimentalSerializationApi::class)
     context(server: ServerRuntime)
     private fun Appendable.writeTypeDefinitions(types: List<KSerializer<*>> = server.models()) {
         val stringSerialNames = HashSet<String>()
@@ -355,11 +356,42 @@ public class TypescriptFetcherSdk(
                         return name to buildString {
                             appendLine(
                                 "export type $name = string  // ${type.descriptor.serialName}"
-                                .replace("/loose", "")
                             )
                         }
                     }
                     return null
+                }
+
+                is PolymorphicKind -> {
+                    val options = type.sealedOptionsOrNull() ?: continue
+
+                    val genericMap: Map<String, String> = type
+                        .getGenerics()
+                        ?.withIndex()
+                        ?.associate { (index, value) ->
+                            value.tsType() to "T${if (index > 0) index else ""}"
+                        }
+                        ?: emptyMap()
+
+                    fun String.replaceGenerics(): String =
+                        genericMap.entries.fold(this) { acc, (old, new) -> acc.replace(old, new) }
+
+                    // A discriminated union of the subtypes. App `@Serializable sealed` types serialize
+                    // flat with a "type" discriminator ({ "type": "<name>", ...subtype fields }); framework
+                    // wrapper types serialize as { "<name>": <subtype> }. Each subtype is emitted as its own
+                    // interface, so the union just references those by name.
+                    val wrapper = type.isWrapperSealed()
+                    append("export type ${type.tsType().replaceGenerics()} =")
+                    if (options.isEmpty()) {
+                        appendLine(" never")
+                    } else {
+                        appendLine()
+                        for (option in options) {
+                            val sub = option.serializer.tsType().replaceGenerics()
+                            if (wrapper) appendIdtLine(1, "| { \"${option.name}\": $sub }")
+                            else appendIdtLine(1, "| ({ type: \"${option.name}\" } & $sub)")
+                        }
+                    }
                 }
 
                 else -> return null
@@ -519,15 +551,21 @@ public class TypescriptFetcherSdk(
     }
 
 
+    @OptIn(ExperimentalSerializationApi::class)
     private fun ServerRuntime.models() = usedTypes()
         .filter { it.descriptor.simpleSerialName !in skipFromLsPackage }
         .sortedBy { it.descriptor.simpleSerialName }
         .distinctBy { it.tsType().substringBefore("<") } // Distinct by generics
         .filter {
-            when (it.descriptor.kind) {
+            if(it.descriptor.isInline) true
+            else when (it.descriptor.kind) {
                 SerialKind.ENUM -> true
-                StructureKind.CLASS if (it !is MySealedClassSerializer) -> true
+                // Inline value classes serialize as their underlying primitive (see tsType), so they get no
+                // standalone type definition and must not be emitted/imported as model types.
+                StructureKind.CLASS if (it !is MySealedClassSerializer && !it.descriptor.isInline) -> true
                 PrimitiveKind.STRING if (it.descriptor.simpleSerialName != "String") -> true
+                // Sealed/polymorphic types are emitted as TS discriminated unions (see writeTypeDefinitions).
+                is PolymorphicKind -> true
 
                 else -> false
             }
@@ -599,7 +637,10 @@ public class TypescriptFetcherSdk(
     }
 
     private val SerialDescriptor.simpleSerialName: String
-        get() = serialName.substringBefore('<').substringBefore('/').substringAfterLast('.').removeSuffix("?")
+        get() {
+            val fqn = serialName.substringBefore('<').substringBefore('/').removeSuffix("?")
+            return fqn.split('.').filter { it.first().isUpperCase() }.joinToString("")
+        }
 
     private val SerialDescriptor.nestedTsTypeName: String?
         get() {

@@ -104,6 +104,7 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
 
     /** Map of context names to Terraform JSON objects. Each will become a separate .tf.json file. */
     protected val files: MutableMap<String, TerraformJsonObject> = mutableMapOf()
+    protected val extraFiles: MutableMap<String, String> = mutableMapOf()
 
     /**
      * Emit Terraform configuration into a specific context (file).
@@ -120,12 +121,26 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
     }
 
     /**
+     * Emit Terraform configuration into a specific context (file).
+     * If context is null, configuration goes into "unclassified.tf.json".
+     *
+     * @param context Optional name for the terraform file (without .tf.json extension)
+     * @param action Builder lambda to construct Terraform JSON objects
+     */
+    public fun emitExtra(
+        context: String,
+        content: String,
+    ) {
+        extraFiles.getOrPut(context) { content }
+    }
+
+    /**
      * Finalizes the Terraform configuration by ensuring all required settings have been fulfilled.
      * Called automatically by [write] before generating files.
      *
      * @throws IllegalStateException if any required settings are missing
      */
-    protected open fun finalize() {
+    protected open fun prepareForWrite() {
         builder.settings()
         val built = builder.build()
         ServerSettings(built)   // run checks for conflicts & circular references
@@ -135,25 +150,28 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
         if (missing.isNotEmpty()) throw IllegalStateException("Missing settings for deployment ${projectPrefix}: $missing")
     }
 
-    private var finalized = false
+    private var preparedForWrite = false
 
     /**
      * Generates and writes Terraform JSON files to [terraformRoot].
-     * Automatically calls [finalize] on first invocation to validate configuration.
+     * Automatically calls [prepareForWrite] on first invocation to validate configuration.
      *
      * **Important**: This will delete any existing .tf.json files in the terraformRoot directory
      * before writing new ones, ensuring a clean slate for each generation.
      */
     public fun write() {
-        if (!finalized) {
-            finalize()
-            finalized = true
+        if (!preparedForWrite) {
+            prepareForWrite()
+            preparedForWrite = true
         }
         terraformRoot.mkdirs()
         val prettyJson = Json { prettyPrint = true }
         terraformRoot.listFiles()?.filter { it.name.endsWith(".tf.json") }?.forEach { it.delete() }
         for ((name, content) in files.entries) {
             terraformRoot.resolve("$name.tf.json").writeText(prettyJson.encodeToString(content.toJsonObject()))
+        }
+        for((name, content) in extraFiles){
+            terraformRoot.resolve(name).writeText(content)
         }
     }
 

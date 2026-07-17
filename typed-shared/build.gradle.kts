@@ -48,6 +48,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 api(libs.kotlinx.datetime)
+                api(libs.kotlinx.serialization.json)
                 api(libs.services.database.shared)
                 api(project(":core-shared"))
                 api(project(":auth-shared"))

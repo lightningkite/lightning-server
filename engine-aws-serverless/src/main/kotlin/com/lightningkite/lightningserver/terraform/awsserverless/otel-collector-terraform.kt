@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.terraform.awsserverless
 
+import com.lightningkite.services.telemetry.TelemetryBackend
 import com.lightningkite.services.otel.OpenTelemetrySettings
 import com.lightningkite.services.terraform.TerraformNeed
 import kotlinx.serialization.KSerializer
@@ -81,7 +82,7 @@ public enum class OtlpProtocol(
  *                              be written to a file and OPENTELEMETRY_COLLECTOR_CONFIG_FILE will point to it.
  */
 context(emitter: TerraformAwsServerlessBuilder<*>)
-public fun TerraformNeed<OpenTelemetrySettings?>.otelCollector(
+public fun TerraformNeed<TelemetryBackend.Settings>.otelCollector(
     collectorLayerVersion: String = "0-117-0",
     layerVersion: Int = 1,
     otlpEndpoint: String? = null,
@@ -187,7 +188,7 @@ public fun TerraformNeed<OpenTelemetrySettings?>.otelCollector(
  * @param samplingRatio Client-side sampling ratio (Honeycomb also supports server-side via Refinery).
  */
 context(emitter: TerraformAwsServerlessBuilder<*>)
-public fun TerraformNeed<OpenTelemetrySettings?>.otelHoneycomb(
+public fun TerraformNeed<TelemetryBackend.Settings>.otelHoneycomb(
     collectorLayerVersion: String = "0-117-0",
     layerVersion: Int = 1,
     dataset: String? = null,
@@ -233,7 +234,7 @@ public fun TerraformNeed<OpenTelemetrySettings?>.otelHoneycomb(
  * @param samplingRatio Client-side sampling ratio.
  */
 context(emitter: TerraformAwsServerlessBuilder<*>)
-public fun TerraformNeed<OpenTelemetrySettings?>.otelGrafanaCloud(
+public fun TerraformNeed<TelemetryBackend.Settings>.otelGrafanaCloud(
     collectorLayerVersion: String = "0-117-0",
     layerVersion: Int = 1,
     instanceId: String,
@@ -278,7 +279,7 @@ public fun TerraformNeed<OpenTelemetrySettings?>.otelGrafanaCloud(
  * @param samplingRatio Client-side sampling ratio (0.0 to 1.0).
  */
 context(emitter: TerraformAwsServerlessBuilder<*>)
-public fun TerraformNeed<OpenTelemetrySettings?>.otelXRay(
+public fun TerraformNeed<TelemetryBackend.Settings>.otelXRay(
     collectorLayerVersion: String = "0-117-0",
     layerVersion: Int = 1,
     samplingRatio: Double? = null,

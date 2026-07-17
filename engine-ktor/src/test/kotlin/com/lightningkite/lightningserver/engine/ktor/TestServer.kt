@@ -47,6 +47,41 @@ object TestServerBuilder : ServerBuilder() {
         )
     }
 
+    // GET /sink — exercises the Data.Sink response branch in KtorEngine
+    val sink = path.path("sink").get bind HttpHandler<PathSpec0> {
+        HttpResponse(
+            body = TypedData.sink(MediaType.Text.Plain) { out ->
+                out.writeString("sink-content")
+            },
+            status = HttpStatus.OK,
+        )
+    }
+
+    // GET /bigsink — large payload to verify buffered sink is fully flushed
+    val bigSink = path.path("bigsink").get bind HttpHandler<PathSpec0> {
+        val content = "x".repeat(100_000)
+        HttpResponse(
+            body = TypedData.sink(MediaType.Text.Plain) { out ->
+                out.writeString(content)
+            },
+            status = HttpStatus.OK,
+        )
+    }
+
+    // GET /chunkedsink — multiple writes to verify all chunks land in order
+    val chunkedSink = path.path("chunkedsink").get bind HttpHandler<PathSpec0> {
+        HttpResponse(
+            body = TypedData.sink(MediaType.Application.OctetStream) { out ->
+                out.writeString("alpha")
+                out.writeString("|")
+                out.writeString("beta")
+                out.writeString("|")
+                out.writeString("gamma")
+            },
+            status = HttpStatus.OK,
+        )
+    }
+
     // GET /empty triggers 204 branch with preset CT + CL headers
     val empty = path.path("empty").get bind HttpHandler<PathSpec0> {
         HttpResponse(

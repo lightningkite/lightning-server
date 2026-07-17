@@ -101,6 +101,8 @@ There are many conditions and modifications available.
 To write a condition or modification, use the `condition { it }` and `modification { it }` DSL:
 
 ```kotlin
+import kotlin.time.Duration.Companion.days
+
 // Conditions
 condition { it.title eq "Test" }
 condition { it.author eq "joe@example.com" }

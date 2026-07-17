@@ -27,6 +27,24 @@ import kotlin.time.Instant
  *  @throws [BadRequestException] if attempt is denied.
  */
 
+/**
+ * Atomically claims [cacheKey] for single use, returning `true` only for the very first caller.
+ *
+ * Backed by [setIfNotExists], which is atomic on every backend (Redis `SET NX`, DynamoDB conditional
+ * put, synchronized [com.lightningkite.services.cache.MapCache]). Concurrent callers therefore race
+ * safely: exactly one receives `true`. This is the building block for making one-time secrets
+ * (signed proofs, TOTP codes, WebAuthN challenges) single-use within their validity window — a plain
+ * `get`-then-`set` would have a time-of-check/time-of-use race that lets two concurrent replays both
+ * succeed.
+ *
+ * @param cacheKey Identifies the thing being consumed (must be derived from the secret, not the user).
+ * @param ttl How long the claim is remembered; set to at least the remaining validity of the secret.
+ * @return `true` if this caller claimed it (proceed), `false` if it was already consumed (reject).
+ */
+context(server: ServerRuntime)
+public suspend fun Cache.claimOnce(cacheKey: String, ttl: Duration): Boolean =
+    setIfNotExists(cacheKey, now(), ttl)
+
 context(server: ServerRuntime)
 public suspend inline fun <R> Cache.constrainAttemptRate(
     cacheKey: String,

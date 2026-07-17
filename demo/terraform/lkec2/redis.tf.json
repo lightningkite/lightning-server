@@ -1,0 +1,24 @@
+{
+    "resource": {
+        "aws_elasticache_subnet_group": {
+            "redis": {
+                "name": "LightningServerEC2SDemo-redis",
+                "subnet_ids": "${module.vpc.private_subnets}"
+            }
+        },
+        "aws_elasticache_cluster": {
+            "redis": {
+                "cluster_id": "lightningserverec2sdemo-redis",
+                "node_type": "cache.t4g.micro",
+                "engine": "redis",
+                "port": 6379,
+                "parameter_group_name": "default.redis7",
+                "subnet_group_name": "${aws_elasticache_subnet_group.redis.name}",
+                "security_group_ids": [
+                    "${aws_security_group.internal.id}"
+                ],
+                "num_cache_nodes": 1
+            }
+        }
+    }
+}

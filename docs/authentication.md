@@ -351,22 +351,29 @@ val access = AuthAccess(auth)
 
 ### Testing Endpoints Directly
 
-For testing typed endpoints with authentication:
+For testing typed endpoints with authentication, use `testAuth` inside a `Server.test { }` block.
+`testAuth` is a `context(server: ServerRuntime)` extension on `PrincipalType`, so it is only
+callable where a `ServerRuntime` is in context (i.e., inside `test { }`).
 
 ```kotlin
 @Test
-fun testEndpoint() = runBlocking {
-    with(TestHelper.testRunner) {
-        val user = User(email = "test@example.com", hashedPassword = "...")
-        Server.userInfo.table().insertOne(user)
+fun testEndpoint() {
+    Server.test(settings = {}) {
+        runBlocking {
+            val user = User(email = "test@example.com", hashedPassword = "...")
+            Server.userInfo.table().insertOne(user)
 
-        // Test with authentication header
-        val response = Server.protectedEndpoint.test(
-            headers = mapOf("Authorization" to "Bearer ${createTestToken(user)}")
-        )
-        assertEquals(HttpStatus.OK, response.status)
+            // Build a test Authentication without going through the real auth flow
+            val auth = Server.userPrincipal.testAuth(user)
+
+            val result = Server.protectedEndpoint.test(auth = auth, input = Unit)
+            assertEquals(expectedValue, result)
+        }
     }
 }
 ```
+
+`AuthAccess` is a typealias for `Access<*, *, SUBJECT>` — you rarely need to construct it directly;
+the `test(auth = ..., input = ...)` overloads on `ApiHttpHandler` accept `Authentication<USER>` directly.
 
 NEXT: [Typed Endpoints](typed-endpoints.md)

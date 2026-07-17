@@ -193,37 +193,25 @@ The transformation happens once during the ready phase and is cached for subsequ
 
 ## Settings in Tests
 
-Back in [setup](setup.md), you may remember the `TestSettings` object. We centrally define one set of settings for unit
-tests. If you wish to override the default value of a setting for your unit test, make the following modification:
-
-```kotlin
-// ServerTest.kt
-object TestSettings {
-    init {
-        //...
-        
-        // Set up our settings for the test environment
-        Settings.populateDefaults(mapOf(Server.settingName.name to "Unit Test"))
-        // .......................^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^...
-
-        //...
-    }
-}
-```
-
-To demonstrate that it worked, we can add a test:
+To override a setting's value in a unit test, pass a `settings` lambda to the `test { }` block. The
+`settings` lambda runs in a `ServerSettings` context, so you can call `.set()` on any setting:
 
 ```kotlin
 class ServerTest {
-    //...
     @Test
-    fun testSetting(): Unit = runBlocking {
-        val response = Server.seeSampleSetting.test()
-        assertEquals("Unit Test", response.body!!.text())
+    fun testSetting() {
+        Server.test(
+            settings = {
+                Server.settingName.set("Unit Test")
+            }
+        ) {
+            runBlocking {
+                val response = Server.seeSampleSetting.test()
+                assertEquals("Unit Test", response.body!!.text())
+            }
+        }
     }
 }
 ```
-
-Give the test a run and you'll see it passes!
 
 NEXT: [Endpoints](endpoints.md)

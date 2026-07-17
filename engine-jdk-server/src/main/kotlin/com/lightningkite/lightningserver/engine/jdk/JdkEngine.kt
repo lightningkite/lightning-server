@@ -1,9 +1,13 @@
 package com.lightningkite.lightningserver.engine.jdk
 
 import com.lightningkite.lightningserver.HttpMethod
+import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
+import com.lightningkite.lightningserver.engine.local.BodyTooLargeException
+import com.lightningkite.lightningserver.engine.local.EngineReliabilitySettings
 import com.lightningkite.lightningserver.engine.local.LocalEngine
+import com.lightningkite.lightningserver.engine.local.copyLimited
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
@@ -17,6 +21,9 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.io.*
 import kotlinx.serialization.Serializable
 import java.net.InetSocketAddress
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 import kotlin.time.Clock
 
 /**
@@ -25,12 +32,15 @@ import kotlin.time.Clock
  * @property host The host address to bind to (defaults to "0.0.0.0" for all interfaces)
  * @property port The port number to listen on (defaults to 8080)
  * @property realIpHeader Optional header name to extract the real client IP from (useful behind proxies)
+ * @property reliability Shared engine reliability settings (request timeout, max body size, graceful
+ *   shutdown drain, worker-thread pool size). See [EngineReliabilitySettings].
  */
 @Serializable
 public data class JdkRuntimeSettings(
     val host: String = "0.0.0.0",
     val port: Int = 8080,
     val realIpHeader: String? = null,
+    val reliability: EngineReliabilitySettings = EngineReliabilitySettings(),
 )
 
 /**
@@ -66,14 +76,35 @@ public class JdkEngine(
     override val settings: ServerSettings = super.settings + jdkRunConfig
 
     /**
+     * The bounded thread pool that runs request handlers, or null before [start] is called.
+     * Retained so it can be shut down during graceful shutdown.
+     */
+    @Volatile
+    private var executor: ThreadPoolExecutor? = null
+
+    /**
+     * The running HTTP server, or null before [start] is called. Retained so graceful shutdown
+     * can stop it.
+     */
+    @Volatile
+    private var httpServer: HttpServer? = null
+
+    /**
      * Starts the JDK HTTP server.
      *
      * This method:
      * 1. Ensures settings are ready and validated
      * 2. Runs any startup tasks defined in the server
      * 3. Starts the schedule coordinator
-     * 4. Creates and starts the HTTP server
-     * 5. Blocks indefinitely (server runs until process termination)
+     * 4. Creates and starts the HTTP server on a bounded thread pool
+     * 5. Registers a SIGTERM/SIGINT shutdown hook for graceful drain
+     * 6. Blocks indefinitely (server runs until process termination)
+     *
+     * **Threading model:** the JDK `HttpServer` is given a bounded [ThreadPoolExecutor] with
+     * `reliability.workerThreads ?: availableProcessors() * 2` threads, a bounded backlog queue,
+     * and a `CallerRunsPolicy` rejection handler. Each request is still handled synchronously via
+     * `runBlocking` on a pool thread (thread-per-request), so handler concurrency is capped by the
+     * pool size rather than serialized on the single default executor.
      *
      * Note: This method blocks the calling thread.
      */
@@ -81,26 +112,36 @@ public class JdkEngine(
         // Prepare configuration and lifecycle
         this.settings.ready()
         runBlocking { runStartupTasks() }
-        startSchedules()
 
         val cfg = jdkRunConfig()
-        val httpServer = HttpServer.create(InetSocketAddress(cfg.host, cfg.port), 0)
+        val reliability = cfg.reliability
+        startSchedules(reliability.scheduleLockTtl)
+        val maxBody = reliability.maxBodySize.bytes
+        val server = HttpServer.create(InetSocketAddress(cfg.host, cfg.port), 0)
+        this.httpServer = server
 
-        httpServer.createContext("/") { exchange ->
+        server.createContext("/") { exchange ->
             try {
-                val request = exchange.requestToLightningServer(cfg.realIpHeader, this@JdkEngine)
+                val declaredLength = exchange.requestHeaders.getFirst("Content-Length")?.toLongOrNull()
+                if (declaredLength != null && declaredLength > maxBody) {
+                    exchange.respondPlain(HttpStatus.PayloadTooLarge.code, "Payload Too Large")
+                    return@createContext
+                }
+                val request = exchange.requestToLightningServer(cfg.realIpHeader, this@JdkEngine, maxBody)
+                // Request timeout is enforced centrally in ServerRuntime.handle (per-handler HttpHandler.timeout).
                 val result: HttpResponse = runBlocking { this@JdkEngine.handle(request) }
                 exchange.write(result)
+            } catch (e: BodyTooLargeException) {
+                // 2.5: streamed body exceeded the cap mid-read.
+                try {
+                    exchange.respondPlain(HttpStatus.PayloadTooLarge.code, "Payload Too Large")
+                } catch (_: Throwable) {
+                }
             } catch (e: Throwable) {
                 // Ensure we always send some response to avoid client hang
                 try {
                     if (exchange.responseBody != null) {
-                        val msg = "Internal Server Error"
-                        exchange.responseHeaders.add("Content-Type", "text/plain; charset=utf-8")
-                        exchange.sendResponseHeaders(500, msg.toByteArray().size.toLong())
-                        exchange.responseBody.use { out ->
-                            out.write(msg.toByteArray())
-                        }
+                        exchange.respondPlain(500, "Internal Server Error")
                     }
                 } catch (_: Throwable) {
                 }
@@ -112,14 +153,45 @@ public class JdkEngine(
             }
         }
 
-        httpServer.executor = null // default executor
-        httpServer.start()
+        val threads = (reliability.workerThreads ?: (java.lang.Runtime.getRuntime().availableProcessors() * 2)).coerceAtLeast(1)
+        val pool = ThreadPoolExecutor(
+            threads,
+            threads,
+            60L,
+            TimeUnit.SECONDS,
+            ArrayBlockingQueue(threads * 8),
+            ThreadPoolExecutor.CallerRunsPolicy(),
+        )
+        this.executor = pool
+        server.executor = pool
+        server.start()
+        registerShutdownHook { shutdown() }
         logger.info { "JdkEngine started on http://${cfg.host}:${cfg.port}" }
     }
 
-    private companion object {
-        const val DEFAULT_BUFFER = 32 * 1024
+    /**
+     * Gracefully shuts the engine down: cancels schedules, stops accepting new connections and
+     * waits up to [EngineReliabilitySettings.shutdownDrainTimeout] for in-flight requests to finish,
+     * disconnects all services, then shuts down the request thread pool. Idempotent.
+     */
+    public fun shutdown() {
+        val server = httpServer ?: return // never started; nothing to drain
+        val drain = jdkRunConfig().reliability.shutdownDrainTimeout
+        gracefulShutdown(drain) { timeout ->
+            // HttpServer.stop blocks up to `delay` seconds for exchanges to complete, then forces close.
+            server.stop(timeout.inWholeSeconds.coerceAtLeast(0).toInt())
+            executor?.shutdown()
+        }
     }
+}
+
+
+/** Sends a plain-text response with the given status code and message. */
+private fun HttpExchange.respondPlain(status: Int, message: String) {
+    val bytes = message.toByteArray()
+    responseHeaders.add("Content-Type", "text/plain; charset=utf-8")
+    sendResponseHeaders(status, bytes.size.toLong())
+    responseBody.use { it.write(bytes) }
 }
 
 /**
@@ -161,16 +233,12 @@ private fun HttpExchange.write(response: HttpResponse) {
         is Data.Sink -> {
             // Unknown length; use chunked
             sendResponseHeaders(status, b.size ?: 0)
-            this.responseBody.use { os ->
-                b.emit(os.asSink().buffered())
-            }
+            this.responseBody.asSink().buffered().use { sink -> b.emit(sink) }
         }
 
         is Data.Source -> {
             sendResponseHeaders(status, b.size ?: 0)
-            this.responseBody.use { os ->
-                b.source.transferTo(os.asSink().buffered())
-            }
+            this.responseBody.asSink().buffered().use { sink -> b.source.transferTo(sink) }
         }
     }
 }
@@ -182,7 +250,11 @@ private fun HttpExchange.write(response: HttpResponse) {
  * @param engine The JdkEngine instance (used for logging)
  * @return The converted HttpRequest
  */
-private fun HttpExchange.requestToLightningServer(realIpHeader: String?, engine: JdkEngine): HttpRequest<PathSpec> {
+private fun HttpExchange.requestToLightningServer(
+    realIpHeader: String?,
+    engine: JdkEngine,
+    maxBody: Long,
+): HttpRequest<PathSpec> {
     val method = this.requestMethod
     val uri = this.requestURI
     val queryParams = QueryParameters.parse(uri.rawQuery ?: "")
@@ -203,7 +275,7 @@ private fun HttpExchange.requestToLightningServer(realIpHeader: String?, engine:
             contentTypeHeader ?: headers.contentType ?: MediaType.Application.OctetStream,
             contentLength
         ) { out ->
-            out.transferFrom(src.asSource())
+            copyLimited(src, maxBody) { b, off, len -> out.write(b, off, len) }
         }
     } else null
 

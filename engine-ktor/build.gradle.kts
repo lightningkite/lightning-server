@@ -31,6 +31,7 @@ dependencies {
     testImplementation(libs.ktor.test.host)
     testImplementation(libs.ktor.client.cio.jvm)
     testImplementation(libs.ktor.client.websockets.jvm)
+    testImplementation(libs.openTelemetry.sdk.testing)
 }
 
 

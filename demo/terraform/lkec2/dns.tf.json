@@ -1,0 +1,33 @@
+{
+    "data": {
+        "aws_route53_zone": {
+            "main": {
+                "name": "cs.lightningkite.com"
+            }
+        }
+    },
+    "resource": {
+        "aws_route53_record": {
+            "alias_a": {
+                "zone_id": "${data.aws_route53_zone.main.zone_id}",
+                "name": "lightningserver2.cs.lightningkite.com",
+                "alias": {
+                    "zone_id": "${aws_lb.app.zone_id}",
+                    "evaluate_target_health": true,
+                    "name": "${aws_lb.app.dns_name}"
+                },
+                "type": "A"
+            },
+            "alias_aaaa": {
+                "zone_id": "${data.aws_route53_zone.main.zone_id}",
+                "name": "lightningserver2.cs.lightningkite.com",
+                "alias": {
+                    "zone_id": "${aws_lb.app.zone_id}",
+                    "evaluate_target_health": true,
+                    "name": "${aws_lb.app.dns_name}"
+                },
+                "type": "AAAA"
+            }
+        }
+    }
+}

@@ -187,7 +187,7 @@ public infix fun PathSpec.commonPrefix(other: PathSpec): PathSpec {
 
 
 public object DummyPathSpecSerializer : KSerializer<PathSpec> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("PathSpec", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.lightningserver.pathing.PathSpec", PrimitiveKind.STRING)
     override fun deserialize(decoder: Decoder): PathSpec =
         PathSpec0(decoder.decodeString().split('/').map { PathSpec.Segment.Constant(it) }, PathSpec.Afterwards.None)
 

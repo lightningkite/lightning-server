@@ -397,14 +397,14 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
      */
     @Serializable
     @GenerateDataClassPaths
-    public data class RunInstant(val instant: kotlin.time.Instant) : HasId<String> {
+    public data class RunInstant(
+        override val _id: String = ID,
+        val instant: kotlin.time.Instant,
+    ) : HasId<String> {
         public companion object {
             /** The singleton ID for this record */
             public const val ID: String = "SINGLETON"
         }
-
-        @Transient
-        override val _id: String = ID
     }
 
     private val lastRunInfo = database.explicitModelInfo(
@@ -470,7 +470,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
                 .table()
                 .run {
                     findOne(Condition.Always)
-                        ?: insertOne(RunInstant(Instant.DISTANT_PAST))
+                        ?: insertOne(RunInstant(instant = Instant.DISTANT_PAST))
                         ?: throw IllegalStateException("Could not insert RunInstant while refreshing notifications")
                 }
                 .instant

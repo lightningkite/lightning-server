@@ -22,7 +22,8 @@ public sealed class Schedule {
      * Schedule.Frequency(gap = 5.minutes)  // Run every 5 minutes
      * ```
      *
-     * @property gap The duration between executions
+     * @property gap The duration between executions. Must be at least one minute; sub-minute
+     * frequencies are not supported because scheduling is driven by a once-per-minute engine tick.
      */
     public data class Frequency(val gap: Duration) : Schedule() {
         init {

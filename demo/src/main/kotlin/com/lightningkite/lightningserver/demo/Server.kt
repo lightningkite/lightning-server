@@ -13,17 +13,23 @@ import com.lightningkite.lightningserver.demo.endpoints.*
 import com.lightningkite.lightningserver.files.Files
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.pathing.fullUrl
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.serialization.StandardWithExternalModule
+import com.lightningkite.lightningserver.serialization.queryParameters
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.sessions.*
 import com.lightningkite.lightningserver.sessions.proofs.*
+import com.lightningkite.lightningserver.sessions.proofs.oauth.OauthProviderCredentials
+import com.lightningkite.lightningserver.sessions.proofs.oauth.OauthProviderInfo
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.typed.sdk.module
 import com.lightningkite.lightningserver.websockets.*
+import com.lightningkite.services.LoggingTelemetryBackend
 import com.lightningkite.services.cache.*
 import com.lightningkite.services.cache.dynamodb.*
 import com.lightningkite.services.cache.memcached.*
+import com.lightningkite.services.cache.redis.RedisCache
 import com.lightningkite.services.data.toPhoneNumber
 import com.lightningkite.services.database.*
 import com.lightningkite.services.database.jsonfile.JsonFileDatabase
@@ -39,12 +45,15 @@ import com.lightningkite.services.phonecall.PhoneCallService
 import com.lightningkite.services.phonecall.twilio.TwilioPhoneCallService
 import com.lightningkite.services.pubsub.PubSub
 import com.lightningkite.services.pubsub.aws.DynamoDbPubSub
+import com.lightningkite.services.pubsub.redis.RedisPubSub
 import com.lightningkite.services.sms.*
 import com.lightningkite.services.sms.twilio.TwilioSMS
 import com.lightningkite.services.sms.twilio.TwilioSmsInboundService
 import com.lightningkite.services.voiceagent.VoiceAgentService
 import com.lightningkite.services.voiceagent.openai.OpenAIVoiceAgentService
 import io.ktor.client.request.*
+import io.ktor.http.decodeURLQueryComponent
+import io.ktor.http.encodeURLQueryComponent
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.html.*
@@ -73,6 +82,7 @@ object Server : ServerBuilder() {
     val pubsub = setting("pubSub", PubSub.Settings())
     val phoneCall = setting("phoneCall", PhoneCallService.Settings())
     val newSecret = setting("someSecret", "???", instructions = "This can be whatever you dream, you madman.")
+    val githubOauth = setting("githubOauth", OauthProviderCredentials("", ""))
 
     val corsInterceptor = install(CorsInterceptor(cors))
 
@@ -82,7 +92,9 @@ object Server : ServerBuilder() {
         SesEmailInboundService
         TwilioSmsInboundService
         TwilioSMS
+        LoggingTelemetryBackend
         TwilioPhoneCallService
+        RedisCache
         JsonFileDatabase
         DynamoDbCache
         MongoDatabase
@@ -90,6 +102,7 @@ object Server : ServerBuilder() {
         S3PublicFileSystem
         OpenAIVoiceAgentService
         DynamoDbPubSub
+        RedisPubSub
     }
 
     val setupAdmins = path.path("setup-admins2") bind startupOnce(database) {
@@ -234,9 +247,19 @@ object Server : ServerBuilder() {
     val proofOtp = path.path("proof").path("otp") module TimeBasedOTPProofEndpoints(database, cache)
     val proofPassword = path.path("proof").path("password") module PasswordProofEndpoints(database, cache)
     val proofDevices = path.path("proof").path("devices") module KnownDeviceProofEndpoints(database, cache)
+    val proofOauth = path.path("proof").path("github") module OauthProofEndpoints(
+        provider = OauthProviderInfo.github,
+        credentials = githubOauth,
+        continueUiAuthUrl = { autosignIn.location.path.resolved().fullUrl() + "?proof=" + serverRuntime.externalSerialization.json.encodeToString(Proof.serializer(), it).encodeURLQueryComponent() + "&backend=" + generalSettings().publicUrl.encodeURLQueryComponent() }
+    )
+    val autosignIn = path.path("auth").path("autosignin").get bind HttpHandler {
+        val proof = it.queryParameters["proof"]!!.decodeURLQueryComponent().let { serverRuntime.externalSerialization.json.decodeFromString(Proof.serializer(), it) }
+        HttpResponse.plainText("OK")
+    }
     val subjects = path.path("auth") module object : AuthEndpoints<User, Uuid>(
         principal = UserAuth,
         database = database,
+        cache = cache,
     ) {
         context(server: ServerRuntime)
         override suspend fun requiredProofStrengthFor(subject: User): Int = 5

@@ -91,7 +91,7 @@ public class MediaTypeDecoderRegistry(
  */
 context(serverRuntime: ServerRuntime)
 public val MediaType.encoder: MediaTypeEncoder?
-    get() = serverRuntime.server.mediaTypeEncoders[this]?.firstOrNull { it.accepts(this.parameters) }
+    get() = serverRuntime.server.mediaTypeEncoders[withoutParameters]?.firstOrNull { it.accepts(this.parameters) }
 
 /**
  * Finds an encoder for any media type in this list.
@@ -103,7 +103,7 @@ public val MediaType.encoder: MediaTypeEncoder?
 context(serverRuntime: ServerRuntime)
 public val List<MediaType>.encoder: Pair<MediaType, MediaTypeEncoder>?
     get() = firstNotNullOfOrNull { type ->
-        serverRuntime.server.mediaTypeEncoders[type]
+        serverRuntime.server.mediaTypeEncoders[type.withoutParameters]
             ?.firstOrNull { it.accepts(type.parameters) }
             ?.let { type to it }
     }
@@ -131,7 +131,7 @@ public val defaultEncoder: Pair<MediaType, MediaTypeEncoder>
  */
 context(serverRuntime: ServerRuntime)
 public val MediaType.decoder: MediaTypeDecoder?
-    get() = serverRuntime.server.mediaTypeDecoders[this]?.firstOrNull { it.accepts(this.parameters) }
+    get() = serverRuntime.server.mediaTypeDecoders[withoutParameters]?.firstOrNull { it.accepts(this.parameters) }
 
 /**
  * Parses this TypedData into a Kotlin object using the appropriate decoder.

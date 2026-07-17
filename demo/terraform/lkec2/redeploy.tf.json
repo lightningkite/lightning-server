@@ -1,0 +1,24 @@
+{
+    "resource": {
+        "null_resource": {
+            "redeploy_app": {
+                "provisioner": {
+                    "local-exec": {
+                        "command": "bash ${path.module}/redeploy-fleet.sh ${aws_autoscaling_group.app.name} us-west-2 ${aws_lb_target_group.app.arn}"
+                    }
+                },
+                "depends_on": [
+                    "null_resource.upload_jar",
+                    "null_resource.upload_settings",
+                    "aws_autoscaling_group.app",
+                    "aws_lb_target_group.app",
+                    "aws_ssm_parameter.settings_password"
+                ],
+                "triggers": {
+                    "settings_hash": "${local_sensitive_file.settings_raw.content_sha256}",
+                    "jar_hash": "${data.external.jar_hash.result.hash}"
+                }
+            }
+        }
+    }
+}

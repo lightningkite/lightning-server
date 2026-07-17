@@ -1,16 +1,24 @@
 package com.lightningkite.lightningserver.engine.ktor
 
 import com.lightningkite.lightningserver.HttpStatusException
+import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
+import com.lightningkite.lightningserver.engine.local.BodyTooLargeException
+import com.lightningkite.lightningserver.engine.local.EngineReliabilitySettings
 import com.lightningkite.lightningserver.engine.local.LocalEngine
+import com.lightningkite.lightningserver.engine.local.WsOversizePolicy
 import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawWebsocketPath
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.didConnectWithMetrics
+import com.lightningkite.lightningserver.runtime.disconnectWithMetrics
 import com.lightningkite.lightningserver.runtime.handle
+import com.lightningkite.lightningserver.runtime.messageFromClientWithMetrics
+import com.lightningkite.lightningserver.runtime.willConnectWithMetrics
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.Data
@@ -25,9 +33,11 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.util.*
+import io.ktor.utils.io.asSink
 import io.ktor.websocket.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.io.buffered
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlin.time.Clock
@@ -39,12 +49,17 @@ import kotlin.time.Clock
  * @property port The port number to listen on (defaults to 8080)
  * @property realIpHeader Optional header name to extract the real client IP from (useful behind proxies).
  *                        Common values: "X-Forwarded-For", "X-Real-IP"
+ * @property reliability Shared engine reliability settings (request timeout, max body size, graceful
+ *   shutdown drain, WebSocket backpressure). See [EngineReliabilitySettings]. Note that
+ *   [EngineReliabilitySettings.idleTimeout] and [EngineReliabilitySettings.workerThreads] are
+ *   Netty/JDK-specific and ignored by the Ktor engine.
  */
 @Serializable
 public data class KtorRuntimeSettings(
     val host: String = "0.0.0.0",
     val port: Int = 8080,
     val realIpHeader: String? = null,
+    val reliability: EngineReliabilitySettings = EngineReliabilitySettings(),
 )
 
 /**
@@ -99,11 +114,26 @@ public class KtorEngine(
 
         val runConfig = ktorRunConfig()
 
+        val reliability = runConfig.reliability
+        val maxBody = reliability.maxBodySize.bytes
+
         routing {
             route("{...}") {
                 handle {
-                    val request = call.adapt()
-                    val result: HttpResponse = this@KtorEngine.handle(request)
+                    // 2.5: reject oversized bodies by declared Content-Length before reading the body.
+                    val declaredLength = call.request.contentLength()
+                    if (declaredLength != null && declaredLength > maxBody) {
+                        call.respondText("Payload Too Large", status = HttpStatusCode.PayloadTooLarge)
+                        return@handle
+                    }
+                    val request = call.adapt(maxBody)
+                    // Request timeout is enforced centrally in ServerRuntime.handle (per-handler HttpHandler.timeout).
+                    val result: HttpResponse = try {
+                        this@KtorEngine.handle(request)
+                    } catch (_: BodyTooLargeException) {
+                        // 2.5: streamed body exceeded the cap mid-read.
+                        HttpResponse.plainText("Payload Too Large", HttpStatus.PayloadTooLarge)
+                    }
 
                     for (header in result.headers.normalizedEntries) {
                         for (value in header.value) {
@@ -131,7 +161,9 @@ public class KtorEngine(
                         when (body) {
                             is Data.Bytes -> call.respondBytes(body.data, type, code)
                             is Data.Text -> call.respondText(body.data, type, code)
-                            is Data.Sink -> body.source().use { call.respondSource(it, type, code, body.size) }
+                            is Data.Sink -> call.respondBytesWriter(contentType = type, status = code) {
+                                this.asSink().buffered().use { body.emit(it) }
+                            }
                             is Data.Source -> body.source.use { call.respondSource(it, type, code, body.size) }
                         }
                 }
@@ -183,18 +215,29 @@ public class KtorEngine(
                     @Suppress("UNCHECKED_CAST")
                     val directHandler = socketHandler as DirectExecutableWebSocketHandler<PathSpec>
 
-                    // Create channel for incoming frames
-                    val incomingChannel = Channel<WebSocketFrame>(Channel.UNLIMITED)
+                    // 2.10: bounded inbound channel with backpressure instead of Channel.UNLIMITED.
+                    val incomingChannel = newWebSocketInboundChannel<WebSocketFrame>(reliability)
 
                     // Launch coroutine to pipe Ktor frames to our channel
                     launch {
                         try {
                             for (frame in incoming) {
-                                when (frame) {
-                                    is Frame.Binary -> incomingChannel.send(WebSocketFrame(frame.data))
-                                    is Frame.Text -> incomingChannel.send(WebSocketFrame(frame.readText()))
-                                    else -> { /* ignore ping/pong/close */
+                                val lkFrame = when (frame) {
+                                    is Frame.Binary -> WebSocketFrame(frame.data)
+                                    is Frame.Text -> WebSocketFrame(frame.readText())
+                                    else -> continue // ignore ping/pong/close
+                                }
+                                if (reliability.webSocketOversizePolicy == WsOversizePolicy.CLOSE) {
+                                    // Non-suspending offer: if the bounded buffer is full, the peer is
+                                    // outrunning the handler -> close with 1009 (message too big).
+                                    val result = incomingChannel.trySend(lkFrame)
+                                    if (result.isFailure && !result.isClosed) {
+                                        close(CloseReason(1009.toShort(), "WebSocket inbound buffer overflow"))
+                                        break
                                     }
+                                } else {
+                                    // DROP_OLDEST / SUSPEND are handled by the channel's BufferOverflow policy.
+                                    incomingChannel.send(lkFrame)
                                 }
                             }
                         } finally {
@@ -222,7 +265,7 @@ public class KtorEngine(
                     @Suppress("UNCHECKED_CAST")
                     socketHandler as WebSocketHandler<PathSpec, Any?>
 
-                    val startingState = socketHandler.willConnect(request)
+                    val startingState = socketHandler.willConnectWithMetrics(match.pathSpec, this@KtorEngine, request)
                     var closingMid: WebSocketConnection<PathSpec, Any?>? = null
                     try {
 
@@ -249,7 +292,7 @@ public class KtorEngine(
                         }
                         closingMid = mid
 
-                        context(mid) { socketHandler.didConnect() }
+                        socketHandler.didConnectWithMetrics(match.pathSpec, mid)
 
                         for (incoming in this.incoming) {
                             val m = when (incoming) {
@@ -259,20 +302,20 @@ public class KtorEngine(
                                 is Frame.Ping -> continue
                                 is Frame.Pong -> continue
                             }
-                            context(mid) { socketHandler.messageFromClient(m) }
+                            socketHandler.messageFromClientWithMetrics(match.pathSpec, mid, m)
                         }
 
                         closingMid.let { mid ->
-                            context(mid) { socketHandler.disconnect(WebSocketClose.NORMAL) }
+                            socketHandler.disconnectWithMetrics(match.pathSpec, mid, WebSocketClose.NORMAL)
                         }
                     } catch (e: Throwable) {
                         closingMid?.let { mid ->
-                            with(mid) {
-                                socketHandler.disconnect(
-                                    ((e as? HttpStatusException)?.status
-                                        ?: HttpStatus.InternalServerError).bestWebsocketCloseCode
-                                )
-                            }
+                            socketHandler.disconnectWithMetrics(
+                                match.pathSpec,
+                                mid,
+                                ((e as? HttpStatusException)?.status
+                                    ?: HttpStatus.InternalServerError).bestWebsocketCloseCode
+                            )
                         }
                     }
                 }
@@ -301,14 +344,24 @@ public class KtorEngine(
     public fun <TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.Configuration> start(factory: ApplicationEngineFactory<TEngine, TConfiguration>) {
         this.settings.ready()
         runBlocking { runStartupTasks() }
-        startSchedules()
-        embeddedServer(
+        val reliability = ktorRunConfig().reliability
+        startSchedules(reliability.scheduleLockTtl)
+        val drainMillis = reliability.shutdownDrainTimeout.inWholeMilliseconds
+        val server = embeddedServer(
             factory = factory,
             port = ktorRunConfig().port,
             host = ktorRunConfig().host,
             module = { adapt() },
             watchPaths = listOf()
-        ).start(wait = true)
+        )
+        // 2.4: graceful shutdown on SIGTERM/SIGINT — stop accepting + drain in-flight, then
+        // disconnect services. We block below to preserve the wait=true contract of the old call.
+        registerShutdownHook {
+            gracefulShutdown(reliability.shutdownDrainTimeout) {
+                server.stop(gracePeriodMillis = drainMillis, timeoutMillis = drainMillis)
+            }
+        }
+        server.start(wait = true)
     }
 
 }

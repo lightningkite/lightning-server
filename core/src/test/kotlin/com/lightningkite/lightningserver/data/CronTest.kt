@@ -265,4 +265,63 @@ class CronTest {
         assertEquals(LocalDateTime(2024, 1, 22, 9, 0), next)
     }
 
+    // ========== W17: advanced day-of-month / day-of-week modifiers ==========
+
+    @Test
+    fun testLastDayOfMonth() {
+        val pattern = CronPattern(
+            minutes = listOf(0), hours = listOf(9),
+            days = CronDays.DaysOfMonth(setOf(CronDayOfMonth.Last)),
+            months = Month.entries,
+        )
+        // January has 31 days
+        assertEquals(LocalDateTime(2024, 1, 31, 9, 0), LocalDateTime(2024, 1, 10, 10, 0) + pattern)
+        // February 2024 is a leap year -> 29 days
+        assertEquals(LocalDateTime(2024, 2, 29, 9, 0), LocalDateTime(2024, 2, 10, 10, 0) + pattern)
+    }
+
+    @Test
+    fun testNearestWeekday() {
+        fun pattern(day: Int) = CronPattern(
+            minutes = listOf(0), hours = listOf(9),
+            days = CronDays.DaysOfMonth(setOf(CronDayOfMonth.NearestWeekday(day))),
+            months = Month.entries,
+        )
+        // Jan 13 2024 is a Saturday -> nearest weekday is Friday the 12th
+        assertEquals(LocalDateTime(2024, 1, 12, 9, 0), LocalDateTime(2024, 1, 1, 0, 0) + pattern(13))
+        // Jan 14 2024 is a Sunday -> nearest weekday is Monday the 15th
+        assertEquals(LocalDateTime(2024, 1, 15, 9, 0), LocalDateTime(2024, 1, 1, 0, 0) + pattern(14))
+        // Jun 1 2024 is a Saturday, and there's no preceding weekday in June -> Monday the 3rd
+        assertEquals(LocalDateTime(2024, 6, 3, 9, 0), LocalDateTime(2024, 6, 1, 0, 0) + pattern(1))
+    }
+
+    @Test
+    fun testLastWeekdayOfMonth() {
+        val pattern = CronPattern(
+            minutes = listOf(0), hours = listOf(9),
+            days = CronDays.DaysOfWeek(setOf(CronDayOfWeek(DayOfWeek.FRIDAY, last = true))),
+            months = Month.entries,
+        )
+        // Fridays in Jan 2024: 5, 12, 19, 26 -> last is the 26th
+        assertEquals(LocalDateTime(2024, 1, 26, 9, 0), LocalDateTime(2024, 1, 1, 0, 0) + pattern)
+    }
+
+    @Test
+    fun testNthWeekdayOfMonth() {
+        val pattern = CronPattern(
+            minutes = listOf(0), hours = listOf(9),
+            days = CronDays.DaysOfWeek(setOf(CronDayOfWeek(DayOfWeek.MONDAY, recurrence = 2))),
+            months = Month.entries,
+        )
+        // Mondays in Jan 2024: 1, 8, 15, 22, 29 -> the 2nd is the 8th
+        assertEquals(LocalDateTime(2024, 1, 8, 9, 0), LocalDateTime(2024, 1, 1, 0, 0) + pattern)
+    }
+
+    @Test
+    fun testDayOfMonthValidation() {
+        assertFailsWith<IllegalArgumentException> { CronDayOfMonth.Day(0) }
+        assertFailsWith<IllegalArgumentException> { CronDayOfMonth.Day(32) }
+        assertFailsWith<IllegalArgumentException> { CronDayOfWeek(DayOfWeek.MONDAY, last = true, recurrence = 1) }
+    }
+
 }

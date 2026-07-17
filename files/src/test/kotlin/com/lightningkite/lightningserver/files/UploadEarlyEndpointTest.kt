@@ -54,7 +54,7 @@ class UploadEarlyEndpointTest {
         val json = Json {
             serializersModule = serializersModuleOf(ServerFile::class, object : KSerializer<ServerFile> {
                 override val descriptor: SerialDescriptor =
-                    PrimitiveSerialDescriptor("ServerFile", PrimitiveKind.STRING)
+                    PrimitiveSerialDescriptor("com.lightningkite.services.files.ServerFile/EarlyUpload", PrimitiveKind.STRING)
 
                 override fun serialize(
                     encoder: Encoder,

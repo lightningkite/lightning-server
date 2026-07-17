@@ -7,6 +7,7 @@ import com.lightningkite.services.kfile.workingDirectory
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class SettingsLoaderFileTest {
 
@@ -49,6 +50,31 @@ class SettingsLoaderFileTest {
             .forEach { println("${it.key.name}: ${it.value}") }
     }
 
+    @Serializable
+    data class HashHolder(val color: String, val url: String, val plain: String)
+
+    /**
+     * Regression test: a '#' inside a property value (hex color, URL fragment) must be preserved.
+     * The parser previously treated '#' as a comment marker anywhere on the line, silently
+     * truncating such values.
+     */
+    @Test
+    fun testPropertiesValueContainingHashIsPreserved() {
+        val format = settingsFormat("properties", EmptySerializersModule())
+        val parsed = format.decodeFromString(
+            HashHolder.serializer(),
+            """
+            # this whole line is a comment and must be ignored
+            color=#FF0000
+            url=https://example.com/page#section
+            plain=value
+            """.trimIndent()
+        )
+        assertEquals("#FF0000", parsed.color)
+        assertEquals("https://example.com/page#section", parsed.url)
+        assertEquals("value", parsed.plain)
+    }
+
     @Test
     fun testJsonComplete() {
         testRoot.deleteRecursively()
@@ -89,8 +115,8 @@ class SettingsLoaderFileTest {
                 .allSerializable()
                 .forEach { println("${it.key.name}: ${it.value}") }
         } catch (e: IncompleteSettingsException) {
-            println("---SUGGESTED---\n${e.suggestedFile.readString()}\n")
-            e.suggestedFile.copyTo(file, overwrite = true)
+            println("---SUGGESTED---\n${e.suggestedFile?.readString()}\n")
+            e.suggestedFile?.copyTo(file, overwrite = true)
         }
         ServerSettings(allSettings)
             .apply { loadFromFile(file, EmptySerializersModule()) }
@@ -111,8 +137,8 @@ class SettingsLoaderFileTest {
                 .allSerializable()
                 .forEach { println("${it.key.name}: ${it.value}") }
         } catch (e: IncompleteSettingsException) {
-            println("---SUGGESTED---\n${e.suggestedFile.readString()}\n")
-            e.suggestedFile.copyTo(file, overwrite = true)
+            println("---SUGGESTED---\n${e.suggestedFile?.readString()}\n")
+            e.suggestedFile?.copyTo(file, overwrite = true)
         }
         ServerSettings(allSettings)
             .apply { loadFromFile(file, EmptySerializersModule()) }

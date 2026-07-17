@@ -152,7 +152,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             implementation = { value: T ->
                 try {
                     info.table(this)
-                        .insertOne(value)
+                        .insert(listOf(value)).firstOrNull()
                         ?: throw ForbiddenException("Value was not posted as requested.")
                 } catch (e: UniqueViolationException) {
                     throw BadRequestException(

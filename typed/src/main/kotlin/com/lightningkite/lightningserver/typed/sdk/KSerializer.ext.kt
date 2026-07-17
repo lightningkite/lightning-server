@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.typed.sdk
 
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.services.data.serialNameFQN
 import com.lightningkite.services.database.*
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.*
@@ -12,7 +13,7 @@ public fun KSerializer<*>.kotlinTypeString(): String {
         StructureKind.MAP -> "Map<String, ${this.mapValueElement()!!.kotlinTypeString()}>"
 
         StructureKind.LIST -> "List<${this.listElement()!!.kotlinTypeString()}>"
-        SerialKind.CONTEXTUAL -> descriptor.capturedKClass?.qualifiedName ?: descriptor.serialName.substringBefore('/')
+        SerialKind.CONTEXTUAL -> descriptor.capturedKClass?.qualifiedName ?: descriptor.serialNameFQN()
         else -> {
             descriptor.serialName.substringBefore('/').substringBefore('<') +
                     (typeParametersSerializersOrNull()
@@ -39,17 +40,39 @@ public fun KSerializer<*>.kotlinSerializer(): String {
             this.typeParametersSerializersOrNull()?.joinToString(", ") { it.kotlinSerializer() } ?: ""
         }))"
 
-        else -> {
-            descriptor.serialName
+        else ->
+            if (descriptor.serialName == "kotlin.Nothing") "kotlinx.serialization.builtins.NothingSerializer()"
+            else descriptor.serialName
                 .substringBefore('/')
                 .substringBefore('<')
                 .plus(".serializer")
                 .plus(typeParametersSerializersOrNull()?.joinToString(", ", "(", ")") { it.kotlinSerializer() } ?: "()")
-        }
     }
 }
 
 public fun KSerializer<*>.isUnit(): Boolean = descriptor.serialName == "kotlin.Unit"
+
+/** One subtype of a sealed type: its on-the-wire discriminator [name] and its [serializer]. */
+public class SealedOptionInfo(public val name: String, public val serializer: KSerializer<*>)
+
+/**
+ * The subtypes of a sealed/polymorphic serializer, or null if this isn't one.
+ *
+ * Covers the two polymorphic serializers Lightning Server actually emits: framework
+ * [MySealedClassSerializerInterface] types (wrapper wire format `{ "<name>": value }`)
+ * and app `@Serializable sealed` types, which the registry virtualizes to
+ * [VirtualSealed] (flat discriminator wire format `{ "type": "<name>", ...fields }`).
+ */
+@OptIn(ExperimentalSerializationApi::class)
+public fun KSerializer<*>.sealedOptionsOrNull(): List<SealedOptionInfo>? = when {
+    this is MySealedClassSerializerInterface<*> -> options.map { SealedOptionInfo(it.baseName, it.serializer) }
+    this is VirtualSealed.Concrete -> serializableOptions.map { SealedOptionInfo(it.name, it.serializer) }
+    descriptor.kind == PolymorphicKind.SEALED -> serializableOptions?.map { SealedOptionInfo(it.name, it.serializer) }
+    else -> null
+}
+
+/** True for [MySealedClassSerializerInterface] types, which use the `{ "<name>": value }` wrapper format. */
+public fun KSerializer<*>.isWrapperSealed(): Boolean = this is MySealedClassSerializerInterface<*>
 
 
 @OptIn(InternalSerializationApi::class)
@@ -75,6 +98,8 @@ public fun KSerializer<*>.subAndChildSerializers(): Array<KSerializer<*>> = null
     ?: (this as? PartialSerializer<*>)?.source?.let { arrayOf(it) }
     ?: (this as? SortPartSerializer<*>)?.inner?.let { arrayOf(it) }
     ?: (this as? DataClassPathSerializer<*>)?.inner?.let { arrayOf(it) }
+    // Recurse into sealed subtypes so their serializers (and the types they reference) are collected.
+    ?: sealedOptionsOrNull()?.map { it.serializer }?.toTypedArray()
     ?: arrayOf()
 
 @OptIn(ExperimentalSerializationApi::class)

@@ -3,8 +3,7 @@ package com.lightningkite.lightningserver.runtime
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.ServerSettings
-import com.lightningkite.lightningserver.telemetry.HttpMetrics
-import com.lightningkite.services.OpenTelemetry
+import com.lightningkite.services.telemetry.TelemetryBackend
 import com.lightningkite.services.SharedResources
 import kotlinx.coroutines.*
 
@@ -15,7 +14,7 @@ import kotlinx.coroutines.*
  * - Settings initialization and management (including automatic addition of system settings)
  * - Serialization setup for both internal and external use
  * - Shared resources management
- * - OpenTelemetry integration
+ * - Metrics backend integration
  * - Startup task execution with dependency resolution
  *
  * Subclasses should implement:
@@ -67,26 +66,13 @@ public abstract class ServerRuntimeBase(override val server: ServerDefinition) :
     override val projectName: String by lazy { generalSettings().projectName }
 
     /**
-     * OpenTelemetry instance for distributed tracing and metrics.
+     * Metrics backend for distributed tracing and RED metrics.
      *
-     * Lazily initialized from telemetry settings.
+     * Lazily initialized from telemetry settings. Defaults to [TelemetryBackend.Noop] when
+     * telemetry is not configured so all metrics calls are zero-overhead no-ops.
      */
-    override val openTelemetry: OpenTelemetry? by lazy {
+    override val telemetryBackend: TelemetryBackend by lazy {
         telemetrySettings()
-    }
-
-    /**
-     * HTTP metrics for OpenTelemetry.
-     *
-     * Lazily initialized when first accessed. Returns null if telemetry is not configured.
-     * Provides metrics for:
-     * - Request duration (histogram)
-     * - Request count (counter)
-     * - Response status category (counter)
-     * - Server errors (counter)
-     */
-    public val httpMetrics: HttpMetrics? by lazy {
-        openTelemetry?.let { HttpMetrics(it.getMeter("com.lightningkite.lightningserver.http")) }
     }
 
     /**

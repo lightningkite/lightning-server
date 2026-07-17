@@ -1,0 +1,12 @@
+{
+    "output": {
+        "alb_dns_name": {
+            "description": "Public DNS name of the load balancer",
+            "value": "${aws_lb.app.dns_name}"
+        },
+        "application_url": {
+            "description": "Application URL",
+            "value": "https://lightningserver2.cs.lightningkite.com"
+        }
+    }
+}

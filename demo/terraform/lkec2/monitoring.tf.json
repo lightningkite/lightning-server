@@ -1,0 +1,92 @@
+{
+    "resource": {
+        "aws_autoscaling_notification": {
+            "scaling": {
+                "topic_arn": "${aws_sns_topic.emergency.arn}",
+                "group_names": [
+                    "${aws_autoscaling_group.app.name}"
+                ],
+                "notifications": [
+                    "autoscaling:EC2_INSTANCE_LAUNCH",
+                    "autoscaling:EC2_INSTANCE_TERMINATE",
+                    "autoscaling:EC2_INSTANCE_LAUNCH_ERROR",
+                    "autoscaling:EC2_INSTANCE_TERMINATE_ERROR"
+                ]
+            }
+        },
+        "aws_sns_topic": {
+            "emergency": {
+                "name": "LightningServerEC2SDemo_emergencies"
+            }
+        },
+        "aws_cloudwatch_metric_alarm": {
+            "unhealthy_hosts": {
+                "alarm_name": "LightningServerEC2SDemo-unhealthy-hosts",
+                "statistic": "Maximum",
+                "period": 60,
+                "metric_name": "UnHealthyHostCount",
+                "evaluation_periods": 3,
+                "alarm_description": "One or more targets are failing ALB health checks",
+                "treat_missing_data": "notBreaching",
+                "namespace": "AWS/ApplicationELB",
+                "comparison_operator": "GreaterThanThreshold",
+                "alarm_actions": [
+                    "${aws_sns_topic.emergency.arn}"
+                ],
+                "threshold": 0,
+                "dimensions": {
+                    "TargetGroup": "${aws_lb_target_group.app.arn_suffix}",
+                    "LoadBalancer": "${aws_lb.app.arn_suffix}"
+                }
+            },
+            "target_5xx": {
+                "alarm_name": "LightningServerEC2SDemo-target-5xx",
+                "statistic": "Sum",
+                "period": 300,
+                "metric_name": "HTTPCode_Target_5XX_Count",
+                "evaluation_periods": 3,
+                "alarm_description": "Elevated 5xx responses from application targets",
+                "treat_missing_data": "notBreaching",
+                "namespace": "AWS/ApplicationELB",
+                "comparison_operator": "GreaterThanThreshold",
+                "alarm_actions": [
+                    "${aws_sns_topic.emergency.arn}"
+                ],
+                "threshold": 25,
+                "dimensions": {
+                    "LoadBalancer": "${aws_lb.app.arn_suffix}"
+                }
+            },
+            "high_cpu": {
+                "alarm_name": "LightningServerEC2SDemo-high-cpu",
+                "statistic": "Average",
+                "period": 300,
+                "metric_name": "CPUUtilization",
+                "evaluation_periods": 3,
+                "alarm_description": "Sustained high CPU across the Auto Scaling Group",
+                "namespace": "AWS/EC2",
+                "comparison_operator": "GreaterThanThreshold",
+                "alarm_actions": [
+                    "${aws_sns_topic.emergency.arn}"
+                ],
+                "threshold": 90,
+                "dimensions": {
+                    "AutoScalingGroupName": "${aws_autoscaling_group.app.name}"
+                }
+            }
+        },
+        "aws_cloudwatch_log_group": {
+            "application": {
+                "retention_in_days": 30,
+                "name": "/ec2/LightningServerEC2SDemo/application"
+            }
+        },
+        "aws_sns_topic_subscription": {
+            "emergency_primary": {
+                "protocol": "email",
+                "endpoint": "joseph@lightningkite.com",
+                "topic_arn": "${aws_sns_topic.emergency.arn}"
+            }
+        }
+    }
+}
