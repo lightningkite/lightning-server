@@ -210,20 +210,21 @@ public class TypescriptFetcherSdk(
         val namespaces = linkedMapOf<String, MutableList<String>>()
         val topLevelDeclarations = ArrayList<Pair<String, String>>()
 
-        fun String.topLevelDeclarationName(): String = substringBefore('<').substringBefore('.')
+        fun Appendable.appendDecl(
+            name: String,
+            emit: Appendable.(String, Int) -> Unit,
+        ): Pair<String, String>? {
+            val namespace = name.substringBefore('.', "")
 
-        fun Appendable.appendNamespace(
-            typeName: String,
-            declaration: Appendable.(localName: String, depth: Int) -> Unit,
-        ): Boolean {
-            val namespace = typeName.substringBefore('.', missingDelimiterValue = "")
-            if (namespace.isBlank()) {
-                return true
-            } else {
+            if (namespace.isNotEmpty()) {
                 namespaces.getOrPut(namespace) { ArrayList() } += buildString {
-                    declaration(typeName.substringAfter('.'), 1)
+                    emit(name.substringAfter('.'), 1)
                 }
-                return false
+                return null
+            }
+//            Top Level Declaration Name
+            return name.substringBefore('<').substringBefore('.') to buildString {
+                emit(name, 0)
             }
         }
 
@@ -238,164 +239,132 @@ public class TypescriptFetcherSdk(
             appendLine()
         }
 
-        fun renderType(type: KSerializer<*>): Pair<String, String>? {
-            when (type.descriptor.kind) {
-                StructureKind.CLASS -> {
-                    val genericMap: Map<String, String> = type
-                        .getGenerics()
-                        ?.withIndex()
-                        ?.associate { (index, value) ->
-                            value.tsType() to "T${if (index > 0) index else ""}"
-                        }
-                        ?: emptyMap()
-
-                    fun String.replaceGenerics(): String =
-                        genericMap.entries
-                            .sortedByDescending { it.key.length }
-                            .fold(this) { acc, (old, new) -> acc.replace(old, new) }
-
-                    if (type.descriptor.isInline) {
-                        val valueType =
-                            type.serializableProperties?.firstOrNull()?.serializer?.tsType()?.replaceGenerics()
-                        val name = type.tsType().replaceGenerics()
-                        if (!StringBuilder().appendNamespace(name) { localName, depth ->
-                            appendIdtLine(depth, "export type $localName = Brand<${valueType}, \"$name\">")
-                        }) return null
-                        return name.topLevelDeclarationName() to buildString {
-                            appendLine("export type $name = Brand<${valueType}, \"$name\">")
-                        }
-                    } else {
-                        val properties = type
-                            .serializableProperties?.map { it.serializer }
-                            ?: type.childSerializersOrNull()?.toList()
-                            ?: emptyList()
-
-                        val name = type.tsType().replaceGenerics()
-                        if (!StringBuilder().appendNamespace(name) { localName, depth ->
-                            appendIdtLine(depth, "export interface $localName {")
-                            for ((idx, prop) in properties.withIndex()) {
-                                appendIdtLine(depth + 1, "${type.descriptor.getElementName(idx)}: ${prop.tsType().replaceGenerics()}")
-                            }
-
-                            appendIdtLine(depth, "}")
-                        }) return null
-                        return name.topLevelDeclarationName() to buildString {
-                            appendLine("export interface $name {")
-                            for ((idx, prop) in properties.withIndex()) {
-                                appendIdtLine(1, "${type.descriptor.getElementName(idx)}: ${prop.tsType().replaceGenerics()}")
-                            }
-
-                            appendLine("}")
-                        }
+        fun renderType(type: KSerializer<*>): Pair<String, String>? = when (type.descriptor.kind) {
+            StructureKind.CLASS -> {
+                val genericMap: Map<String, String> = type
+                    .getGenerics()
+                    ?.withIndex()
+                    ?.associate { (index, value) ->
+                        value.tsType() to "T${if (index > 0) index else ""}"
                     }
+                    ?: emptyMap()
 
+                fun String.replaceGenerics(): String =
+                    genericMap.entries
+                        .sortedByDescending { it.key.length }
+                        .fold(this) { acc, (old, new) -> acc.replace(old, new) }
 
-                }
+                if (type.descriptor.isInline) {
+                    val valueType =
+                        type.serializableProperties?.firstOrNull()?.serializer?.tsType()?.replaceGenerics()
+                    val name = type.tsType().replaceGenerics()
+                    appendDecl(name, { localName, depth ->
+                        appendIdtLine(depth, "export type $localName = Brand<${valueType}, \"$name\">")
+                    })
+                } else {
+                    val properties = type
+                        .serializableProperties?.map { it.serializer }
+                        ?: type.childSerializersOrNull()?.toList()
+                        ?: emptyList()
 
-                SerialKind.ENUM -> {
-                    val typeName = type.tsType()
-                    if (erasableTypes) {
-                        if (!StringBuilder().appendNamespace(typeName) { localName, depth ->
-                            appendIdt(depth)
-                            append("export type $localName = ")
-                            for (index in 0 until type.descriptor.elementsCount) {
-                                val name = type.descriptor.getElementName(index)
-                                append(if (index == 0) "\"$name\"" else "| \"$name\"")
-                            }
-                            appendLine()
-                        }) return null
-                        return typeName.topLevelDeclarationName() to buildString {
-                            append("export type $typeName = ")
-                            for (index in 0 until type.descriptor.elementsCount) {
-                                val name = type.descriptor.getElementName(index)
-                                append(if (index == 0) "\"$name\"" else "| \"$name\"")
-                            }
-                            appendLine()
-                        }
-                    } else {
-                        if (!StringBuilder().appendNamespace(typeName) { localName, depth ->
-                            appendIdtLine(depth, "export enum $localName {")
-                            for (index in 0 until type.descriptor.elementsCount) {
-                                appendIdt(depth + 1)
-                                val name = type.descriptor.getElementName(index)
-                                name.forEachIndexed { idx, it ->
-                                    if ((idx == 0 && it.isJavaIdentifierStart()) || (idx != 0 && it.isJavaIdentifierPart()))
-                                        append(it)
-                                    else
-                                        append('_')
-                                }
-                                append(" = \"$name\",")
-                                appendLine()
-                            }
+                    val name = type.tsType().replaceGenerics()
 
-                            appendIdtLine(depth, "}")
-                        }) return null
-                        return typeName.topLevelDeclarationName() to buildString {
-                            appendLine("export enum $typeName {")
-                            for (index in 0 until type.descriptor.elementsCount) {
-                                appendIdt(1)
-                                val name = type.descriptor.getElementName(index)
-                                name.forEachIndexed { idx, it ->
-                                    if ((idx == 0 && it.isJavaIdentifierStart()) || (idx != 0 && it.isJavaIdentifierPart()))
-                                        append(it)
-                                    else
-                                        append('_')
-                                }
-                                append(" = \"$name\",")
-                                appendLine()
-                            }
-
-                            appendLine("}")
-                        }
-                    }
-                }
-
-                PrimitiveKind.STRING -> {
-                    val name = type.descriptor.simpleSerialName
-                    if (name != "String" && stringSerialNames.add(name)) {
-                        return name to buildString {
-                            appendLine(
-                                "export type $name = string  // ${type.descriptor.serialName}"
+                    appendDecl(name, { localName, depth ->
+                        appendIdtLine(depth, "export interface $localName {")
+                        for ((idx, prop) in properties.withIndex()) {
+                            appendIdtLine(
+                                depth + 1,
+                                "${type.descriptor.getElementName(idx)}: ${prop.tsType().replaceGenerics()}"
                             )
                         }
-                    }
-                    return null
+
+                        appendIdtLine(depth, "}")
+                    })
                 }
+            }
 
-                is PolymorphicKind -> {
-                    val options = type.sealedOptionsOrNull() ?: continue
-
-                    val genericMap: Map<String, String> = type
-                        .getGenerics()
-                        ?.withIndex()
-                        ?.associate { (index, value) ->
-                            value.tsType() to "T${if (index > 0) index else ""}"
+            SerialKind.ENUM -> {
+                val typeName = type.tsType()
+                if (erasableTypes) {
+                    appendDecl(typeName, { localName, depth ->
+                        appendIdt(depth)
+                        append("export type $localName = ")
+                        for (index in 0 until type.descriptor.elementsCount) {
+                            val name = type.descriptor.getElementName(index)
+                            append(if (index == 0) "\"$name\"" else "| \"$name\"")
                         }
-                        ?: emptyMap()
+                        appendLine()
+                    })
+                } else {
+                    val typeName = type.tsType();
+                    appendDecl(typeName, { localName, depth ->
+                        appendIdtLine(depth, "export enum $localName {")
+                        for (index in 0 until type.descriptor.elementsCount) {
+                            appendIdt(depth + 1)
+                            val name = type.descriptor.getElementName(index)
+                            name.forEachIndexed { idx, it ->
+                                if ((idx == 0 && it.isJavaIdentifierStart()) || (idx != 0 && it.isJavaIdentifierPart()))
+                                    append(it)
+                                else
+                                    append('_')
+                            }
+                            append(" = \"$name\",")
+                            appendLine()
+                        }
 
-                    fun String.replaceGenerics(): String =
-                        genericMap.entries.fold(this) { acc, (old, new) -> acc.replace(old, new) }
+                        appendIdtLine(depth, "}")
+                    })
+                }
+            }
 
-                    // A discriminated union of the subtypes. App `@Serializable sealed` types serialize
-                    // flat with a "type" discriminator ({ "type": "<name>", ...subtype fields }); framework
-                    // wrapper types serialize as { "<name>": <subtype> }. Each subtype is emitted as its own
-                    // interface, so the union just references those by name.
+            PrimitiveKind.STRING -> {
+                val name = type.descriptor.simpleSerialName
+                if (name != "String" && stringSerialNames.add(name)) {
+                    name to buildString {
+                        appendLine(
+                            "export type $name = string  // ${type.descriptor.serialName}"
+                        )
+                    }
+                } else  null
+            }
+
+            is PolymorphicKind -> {
+                val options = type.sealedOptionsOrNull() ?: return null
+                val genericMap: Map<String, String> = type
+                    .getGenerics()
+                    ?.withIndex()
+                    ?.associate { (index, value) ->
+                        value.tsType() to "T${if (index > 0) index else ""}"
+                    }
+                    ?: emptyMap()
+
+                fun String.replaceGenerics(): String =
+                    genericMap.entries.fold(this) { acc, (old, new) -> acc.replace(old, new) }
+
+                // A discriminated union of the subtypes. App `@Serializable sealed` types serialize
+                // flat with a "type" discriminator ({ "type": "<name>", ...subtype fields }); framework
+                // wrapper types serialize as { "<name>": <subtype> }. Each subtype is emitted as its own
+                // interface, so the union just references those by name.
+
+                val typeName = type.tsType().replaceGenerics()
+                appendDecl(typeName, { localName, depth ->
                     val wrapper = type.isWrapperSealed()
-                    append("export type ${type.tsType().replaceGenerics()} =")
+                    appendIdt(depth)
+                    append("export type ${localName} =")
                     if (options.isEmpty()) {
                         appendLine(" never")
                     } else {
                         appendLine()
                         for (option in options) {
                             val sub = option.serializer.tsType().replaceGenerics()
-                            if (wrapper) appendIdtLine(1, "| { \"${option.name}\": $sub }")
-                            else appendIdtLine(1, "| ({ type: \"${option.name}\" } & $sub)")
+                            if (wrapper) appendIdtLine(depth + 1, "| { \"${option.name}\": $sub }")
+                            else appendIdtLine(depth + 1, "| ({ type: \"${option.name}\" } & $sub)")
                         }
                     }
-                }
-
-                else -> return null
+                })
             }
+
+            else -> null
         }
 
         for (type in types) {
@@ -557,16 +526,12 @@ public class TypescriptFetcherSdk(
         .sortedBy { it.descriptor.simpleSerialName }
         .distinctBy { it.tsType().substringBefore("<") } // Distinct by generics
         .filter {
-            if(it.descriptor.isInline) true
-            else when (it.descriptor.kind) {
+            when (it.descriptor.kind) {
                 SerialKind.ENUM -> true
-                // Inline value classes serialize as their underlying primitive (see tsType), so they get no
-                // standalone type definition and must not be emitted/imported as model types.
-                StructureKind.CLASS if (it !is MySealedClassSerializer && !it.descriptor.isInline) -> true
+                StructureKind.CLASS if (it !is MySealedClassSerializer) -> true
                 PrimitiveKind.STRING if (it.descriptor.simpleSerialName != "String") -> true
                 // Sealed/polymorphic types are emitted as TS discriminated unions (see writeTypeDefinitions).
                 is PolymorphicKind -> true
-
                 else -> false
             }
         }
@@ -637,10 +602,7 @@ public class TypescriptFetcherSdk(
     }
 
     private val SerialDescriptor.simpleSerialName: String
-        get() {
-            val fqn = serialName.substringBefore('<').substringBefore('/').removeSuffix("?")
-            return fqn.split('.').filter { it.first().isUpperCase() }.joinToString("")
-        }
+        get() = serialName.substringBefore('<').substringBefore('/').substringAfterLast('.').removeSuffix("?")
 
     private val SerialDescriptor.nestedTsTypeName: String?
         get() {
