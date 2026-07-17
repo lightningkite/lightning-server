@@ -3,9 +3,11 @@ package com.lightningkite.lightningserver.sessions
 import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.data.Request
+import com.lightningkite.lightningserver.data.get
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
+import com.lightningkite.lightningserver.definition.requestLogDescribers
 import com.lightningkite.lightningserver.encryption.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
@@ -105,6 +107,10 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     init {
         authReaders.register(this)
+        // Names the request's resolved principal — including masquerade, via Authentication.toString — in
+        // core's access log, without core depending on the auth module. Registered per session manager;
+        // duplicate describers are harmless since the first non-null result wins and auth is cached per request.
+        requestLogDescribers.register { request -> request[Authentication.CacheKey]?.toString() }
     }
 
     /**

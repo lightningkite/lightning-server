@@ -13,6 +13,7 @@ import com.lightningkite.services.telemetry.TelemetryTrace
 import com.lightningkite.services.data.Data
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.telemetry.telemetryTrace
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 import kotlinx.io.*
@@ -61,11 +62,6 @@ private val errorType = TelemetryKey.OfString("error.type")
 public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpResponse = instrumentHttpRequest(request) {
     var errorType: String? = null
 
-    // Turns a thrown error into an HTTP response via the configured exception handler,
-    // recording the error type for instrumentation; falls back to a bare 500 if the handler
-    // itself throws. Applied INSIDE the interceptor chain (below) so error responses still
-    // pass back through the interceptors — most importantly CORS. Otherwise error responses
-    // ship without CORS headers and browsers misreport every 4xx/5xx as a CORS failure.
     suspend fun handleError(e: Exception, label: String? = e::class.simpleName): HttpResponse {
         errorType = label
         return try {
@@ -78,128 +74,141 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
 
     val response = try {
         server.compiledHttpInterceptors.intercept(request) { req ->
-            this.logger.info { "${request.path} accessed by ${request.sourceIp}" }
+            if (this.logger.isInfoEnabled()) {
+                val accessedBy = this.server.requestLogDescribers.firstNotNullOfOrNull {
+                    try {
+                        it(request)
+                    } catch (e: CancellationException) {
+                        throw e // never swallow cancellation — it would break structured concurrency
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
+                this.logger.info { "${request.path} accessed by ${accessedBy ?: "anonymous"} (${request.sourceIp})" }
+            }
             // Map handler/route/compression exceptions to responses in-place so the surrounding
             // interceptors (CORS, etc.) still post-process error responses.
             try {
-            val result = try {
-                // Route resolution must live inside this try so that a RouteNotFoundException (e.g. a HEAD
-                // request with no HEAD handler, or a missing trailing slash) is caught below and recovered
-                // via the HEAD->GET fallback / slash-redirect logic rather than escaping as a bare 404.
-                @Suppress("UNCHECKED_CAST")
-                val handler = req.path.match.value as HttpHandler<PathSpec>
-                instrument("handler") {
-                    // Per-handler request timeout (HttpHandler.timeout, default 30s), enforced at this single
-                    // choke point shared by every engine instead of being duplicated (and high-risk) in each
-                    // engine adapter. Cooperative cancellation: only interrupts at suspension points.
-                    withTimeout(handler.timeout) {
-                        handler.handle(req as HttpRequest<PathSpec>)
+                val result = try {
+                    // Route resolution must live inside this try so that a RouteNotFoundException (e.g. a HEAD
+                    // request with no HEAD handler, or a missing trailing slash) is caught below and recovered
+                    // via the HEAD->GET fallback / slash-redirect logic rather than escaping as a bare 404.
+                    @Suppress("UNCHECKED_CAST")
+                    val handler = req.path.match.value as HttpHandler<PathSpec>
+                    instrument("handler") {
+                        // Per-handler request timeout (HttpHandler.timeout, default 30s), enforced at this single
+                        // choke point shared by every engine instead of being duplicated (and high-risk) in each
+                        // engine adapter. Cooperative cancellation: only interrupts at suspension points.
+                        withTimeout(handler.timeout) {
+                            handler.handle(req as HttpRequest<PathSpec>)
+                        }
+                    }
+                } catch (notFound: RouteNotFoundException) {
+                    when (req.path.method) {
+                        HttpMethod.HEAD -> {
+                            // OK, we'll do a get and remove the body.
+                            val getRequest = req.copyWithNewPathType(path = req.path.copy(method = HttpMethod.GET))
+
+                            @Suppress("UNCHECKED_CAST")
+                            val headHandler = getRequest.path.match.value as HttpHandler<PathSpec>
+                            val getResult = instrument("handler") {
+                                withTimeout(headHandler.timeout) { headHandler.handle(getRequest) }
+                            }
+                            getResult.copy(
+                                body = null,
+                                status = if (getResult.status.success) HttpStatus.NoContent else getResult.status,
+                            )
+                        }
+
+                        else -> {
+                            this.logger.debug {
+                                "Not found: ${req.path.pathSegments.segments.map { "'$it'" }}, looking for slashes"
+                            }
+                            if (request.path.pathSegments.isNotEmpty()) {
+                                // Let's see if they just got their ending slash wrong.
+                                val altSlashEndpoint = req.path.copy(pathSegments = req.path.pathSegments.segments.let {
+                                    if (it.lastOrNull() == "") it.dropLast(1) else it + ""
+                                }.let(::PathSegments))
+                                try {
+                                    altSlashEndpoint.match
+                                    HttpResponse.pathMoved(to = "/" + altSlashEndpoint.pathSegments.toString())
+                                } catch (_: RouteNotFoundException) {
+                                    throw notFound
+                                }
+                            } else throw notFound
+                        }
                     }
                 }
-            } catch (notFound: RouteNotFoundException) {
-                when (req.path.method) {
-                    HttpMethod.HEAD -> {
-                        // OK, we'll do a get and remove the body.
-                        val getRequest = req.copyWithNewPathType(path = req.path.copy(method = HttpMethod.GET))
+                if (result.body == null || request.headers[HttpHeader.AcceptEncoding] == null) return@intercept result
 
-                        @Suppress("UNCHECKED_CAST")
-                        val headHandler = getRequest.path.match.value as HttpHandler<PathSpec>
-                        val getResult = instrument("handler") {
-                            withTimeout(headHandler.timeout) { headHandler.handle(getRequest) }
-                        }
-                        getResult.copy(
-                            body = null,
-                            status = if (getResult.status.success) HttpStatus.NoContent else getResult.status,
-                        )
+                val acceptedEncodings = request.headers.getMany(HttpHeader.AcceptEncoding)
+                if (acceptedEncodings.isEmpty()) return@intercept result
+
+                val accepts = acceptedEncodings
+                    .map { it.root.lowercase().substringBefore(';').trim() }
+
+                // Accept-Encoding negotiation (gzip only for now)
+                if (!accepts.contains("gzip")) return@intercept result
+
+                // Content-Type denylist (skip already-compressed types)
+                if (result.body.mediaType.type in setOf("image", "audio", "video") ||
+                    (result.body.mediaType.type == "application" &&
+                            result.body.mediaType.subtype in
+                            setOf("zip", "gzip", "x-gzip", "x-7z-compressed", "x-bzip2", "x-tar", "pdf")
+                            ) ||
+                    (result.body.mediaType.type == "font" && result.body.mediaType.subtype in setOf("woff", "woff2"))
+                ) return@intercept result
+
+                // Lower compress limit. Either not worth the effort, or likely will inflate a little.
+                if (result.body.data.size?.let { it < 256 } == true) return@intercept result
+
+                val (newData, compressed) = when (val data = result.body.data) {
+                    is Data.Sink -> {
+                        Data.Sink { outSink ->
+                            GZIPOutputStream(outSink.asOutputStream()).asSink().buffered().use { gzOut ->
+                                data.write(gzOut)
+                            }
+                        } to true
+                    }
+
+                    is Data.Source -> {
+                        Data.Sink { outSink ->
+                            GZIPOutputStream(outSink.asOutputStream()).asSink().buffered().use { gzOut ->
+                                data.write(gzOut)
+                            }
+                        } to true
                     }
 
                     else -> {
-                        this.logger.debug {
-                            "Not found: ${req.path.pathSegments.segments.map { "'$it'" }}, looking for slashes"
-                        }
-                        if (request.path.pathSegments.isNotEmpty()) {
-                            // Let's see if they just got their ending slash wrong.
-                            val altSlashEndpoint = req.path.copy(pathSegments = req.path.pathSegments.segments.let {
-                                if (it.lastOrNull() == "") it.dropLast(1) else it + ""
-                            }.let(::PathSegments))
-                            try {
-                                altSlashEndpoint.match
-                                HttpResponse.pathMoved(to = "/" + altSlashEndpoint.pathSegments.toString())
-                            } catch (_: RouteNotFoundException) {
-                                throw notFound
-                            }
-                        } else throw notFound
+                        // 1024 Grey area. It likely will compress fine, but if not send the original
+                        val s = data.size
+                        if (s?.let { it <= 1024 } == true) {
+                            val og = data.bytes()
+                            val gz = og.gzip()
+                            if (gz.size < s)
+                                Data.Bytes(gz) to true
+                            else
+                                Data.Bytes(og) to false
+                        } else
+                            Data.Bytes(data.bytes().gzip()) to true
                     }
                 }
-            }
-            if (result.body == null || request.headers[HttpHeader.AcceptEncoding] == null) return@intercept result
-
-            val acceptedEncodings = request.headers.getMany(HttpHeader.AcceptEncoding)
-            if (acceptedEncodings.isEmpty()) return@intercept result
-
-            val accepts = acceptedEncodings
-                .map { it.root.lowercase().substringBefore(';').trim() }
-
-            // Accept-Encoding negotiation (gzip only for now)
-            if (!accepts.contains("gzip")) return@intercept result
-
-            // Content-Type denylist (skip already-compressed types)
-            if (result.body.mediaType.type in setOf("image", "audio", "video") ||
-                (result.body.mediaType.type == "application" &&
-                        result.body.mediaType.subtype in
-                        setOf("zip", "gzip", "x-gzip", "x-7z-compressed", "x-bzip2", "x-tar", "pdf")
-                        ) ||
-                (result.body.mediaType.type == "font" && result.body.mediaType.subtype in setOf("woff", "woff2"))
-            ) return@intercept result
-
-            // Lower compress limit. Either not worth the effort, or likely will inflate a little.
-            if (result.body.data.size?.let { it < 256 } == true) return@intercept result
-
-            val (newData, compressed) = when (val data = result.body.data) {
-                is Data.Sink -> {
-                    Data.Sink { outSink ->
-                        GZIPOutputStream(outSink.asOutputStream()).asSink().buffered().use { gzOut ->
-                            data.write(gzOut)
-                        }
-                    } to true
-                }
-
-                is Data.Source -> {
-                    Data.Sink { outSink ->
-                        GZIPOutputStream(outSink.asOutputStream()).asSink().buffered().use { gzOut ->
-                            data.write(gzOut)
-                        }
-                    } to true
-                }
-
-                else -> {
-                    // 1024 Grey area. It likely will compress fine, but if not send the original
-                    val s = data.size
-                    if (s?.let { it <= 1024 } == true) {
-                        val og = data.bytes()
-                        val gz = og.gzip()
-                        if (gz.size < s)
-                            Data.Bytes(gz) to true
-                        else
-                            Data.Bytes(og) to false
-                    } else
-                        Data.Bytes(data.bytes().gzip()) to true
-                }
-            }
-            result.copy(
-                headers = if (compressed) result.headers.copy {
-                    add(HttpHeader.ContentEncoding, "gzip")
-                } else result.headers,
-                body = TypedData(newData, result.body.mediaType)
-            )
+                result.copy(
+                    headers = if (compressed) result.headers.copy {
+                        add(HttpHeader.ContentEncoding, "gzip")
+                    } else result.headers,
+                    body = TypedData(newData, result.body.mediaType)
+                )
             } catch (timeout: TimeoutCancellationException) {
-                // A handler exceeded its HttpHandler.timeout. Map to 408 through the normal exception handler so
-                // the error body is formatted consistently. (Other CancellationExceptions — e.g. client
-                // disconnect — are handled by the generic catch below, matching prior behavior.)
+                // A handler exceeded its HttpHandler.timeout. This is a server-side condition (the server
+                // couldn't finish in time), so it maps to 503 Service Unavailable — NOT 408, which per
+                // RFC 7231 means the client was too slow sending its request. Routed through the normal
+                // exception handler so the error body is formatted consistently. (Other
+                // CancellationExceptions — e.g. client disconnect — are handled by the generic catch below.)
                 this.logger.warn { "Request to ${request.path} exceeded its handler timeout." }
                 handleError(
                     HttpStatusException(
-                        status = HttpStatus.RequestTimeout,
+                        status = HttpStatus.ServiceUnavailable,
                         detail = "timeout",
                         message = "The request handler exceeded its timeout.",
                     ),
@@ -282,14 +291,18 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
         instrument("messageFromClient", TelemetryAttributes {
             put(wsRoute, location.toString())
             put(TelemetryKeys.Net.peerIp, request.sourceIp)
-            put(wsFrameType, when (frame) {
-                is WebSocketFrame.Text -> "text"
-                is WebSocketFrame.Binary -> "binary"
-            })
-            put(wsFrameSize, when (frame) {
-                is WebSocketFrame.Text -> frame.content.length.toLong()
-                is WebSocketFrame.Binary -> frame.content.size.toLong()
-            })
+            put(
+                wsFrameType, when (frame) {
+                    is WebSocketFrame.Text -> "text"
+                    is WebSocketFrame.Binary -> "binary"
+                }
+            )
+            put(
+                wsFrameSize, when (frame) {
+                    is WebSocketFrame.Text -> frame.content.length.toLong()
+                    is WebSocketFrame.Binary -> frame.content.size.toLong()
+                }
+            )
         }) {
             messageFromClient(frame)
         }

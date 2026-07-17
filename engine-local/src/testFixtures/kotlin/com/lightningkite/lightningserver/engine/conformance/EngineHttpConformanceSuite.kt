@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpStatus
+import com.lightningkite.lightningserver.http.SecurityHeadersInterceptor
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
@@ -244,16 +245,17 @@ public abstract class EngineHttpConformanceSuite {
     }
 
     @Test
-    public fun handler_timeout_returns_408() {
+    public fun handler_timeout_returns_503() {
         startEngine(freePort(), maxBodySize).use { running ->
             val resp = client().send(
                 request(running.port, "/slow").GET().build(),
                 BodyHandlers.ofString(),
             )
             assertEquals(
-                HttpStatus.RequestTimeout.code,
+                HttpStatus.ServiceUnavailable.code,
                 resp.statusCode(),
-                "A handler that exceeds its timeout should yield 408 (enforced centrally in ServerRuntime.handle)",
+                "A handler that exceeds its timeout is a server-side condition, so it should yield 503 " +
+                    "(enforced centrally in ServerRuntime.handle) — not 408, which means a slow client.",
             )
         }
     }
@@ -293,8 +295,11 @@ public abstract class EngineHttpConformanceSuite {
         )
 
         init {
-            // Needed so the central 408/error bodies can be serialized by the default exception handler.
+            // Needed so the central timeout/error bodies can be serialized by the default exception handler.
             registerBasicMediaTypeCoders()
+            // Installed first (outermost) so security headers apply to every response — including CORS-processed
+            // and error responses — which the nosniff_* tests verify end-to-end through each engine.
+            install(SecurityHeadersInterceptor())
             install(CorsInterceptor(cors))
         }
 

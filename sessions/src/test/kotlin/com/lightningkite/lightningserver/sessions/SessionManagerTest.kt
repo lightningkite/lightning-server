@@ -2,10 +2,15 @@
 package com.lightningkite.lightningserver.sessions
 
 import com.lightningkite.lightningserver.ForbiddenException
+import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.definition.requestLogDescribers
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.typed.test
@@ -92,6 +97,46 @@ class SessionManagerTest {
                 assertNotNull(refreshToken.string)
                 assertEquals("SessionTestUser", refreshToken.type)
                 assertEquals(session._id, refreshToken._id)
+            }
+        }
+    }
+
+    @Test
+    fun `session manager registers an access-log describer that names the principal`() = runBlocking {
+        // Restores v4 behavior: core's access log records who made each request. core can't depend on the
+        // auth module, so SessionManager registers a RequestLogDescriber that resolves the request's
+        // Authentication (whose toString also renders masquerade, covered by AuthenticationExtTest).
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(database = database)
+        }.let { server ->
+            server.test({}) {
+                val (_, refreshToken) = server.sessions.newSession(userId)
+                val accessToken = server.sessions.tokenSimple.test(null, refreshToken.string)
+
+                val request = HttpRequest<PathSpec>(
+                    path = RawHttpEndpoint(asString = "/auth", method = HttpMethod.GET),
+                    queryParameters = QueryParameters.EMPTY,
+                    headers = HttpHeaders { add(HttpHeader.Authorization, "Bearer $accessToken") },
+                    domain = "example.com",
+                    protocol = "https",
+                    sourceIp = "local",
+                )
+
+                val describers = serverRuntime.server.requestLogDescribers
+                assertTrue(describers.isNotEmpty(), "SessionManager should register an access-log describer")
+
+                val described = describers.firstNotNullOfOrNull { it(request) }
+                assertNotNull(described, "the describer should resolve the authenticated principal")
+                assertTrue(
+                    described.contains("SessionTestUser") && described.contains(userId.toString()),
+                    "the access-log description should name the principal type and id; was: $described",
+                )
             }
         }
     }

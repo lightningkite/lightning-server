@@ -63,15 +63,7 @@ public data class ServerDefinition(
 
     public val endpoints: PathSpecMap<ServerPathEndpoints> get() = flattened.endpoints
     public val httpInterceptors: List<HttpInterceptor> get() = flattened.httpInterceptors
-
-    // SecurityHeadersInterceptor is prepended (outermost) so every server emits baseline security
-    // headers by default, and so it post-processes the final response after all user interceptors
-    // (e.g. CORS) and after error responses are mapped inside the chain. Prepending here — at the
-    // single top-level composition point — guarantees exactly one instance for the whole server,
-    // rather than one per flattened module.
-    public val compiledHttpInterceptors: HttpInterceptor by lazy {
-        (listOf(SecurityHeadersInterceptor()) + httpInterceptors).compileAndInstrument()
-    }
+    public val compiledHttpInterceptors: HttpInterceptor by lazy { httpInterceptors.compileAndInstrument() }
     public val websocketInterceptors: List<WebSocketHandlerInterceptor> get() = flattened.websocketInterceptors
     public val compiledWebsocketInterceptors: WebSocketHandlerInterceptor by lazy { websocketInterceptors.compileAndInstrument() }
     public val exceptionHandler: ExceptionHttpHandler get() = flattened.exceptionHandler
@@ -121,12 +113,7 @@ public data class ServerDefinition(
      * Flattening is **not** sealed or cached to prevent unnecessary intermediate allocations.
      * */
     private fun flatten(): Module {
-        // Even a single-module server routes its serializers module getter through the naming guard so a
-        // throwing getter fails fast with a clear, module-identified error rather than an opaque lazy failure.
-        if (modules.isEmpty()) return thisLayer.copy(
-            internalSerializersModule = thisLayer.internalSerializersModule.namedSerializers("internal", "/"),
-            externalSerializersModule = thisLayer.externalSerializersModule.namedSerializers("external", "/"),
-        )
+        if (modules.isEmpty()) return thisLayer
 
         val flattenedModules = modules.mapItems { it.flatten() }
         // Cache this to avoid repeated list creation in serializers module lambdas
@@ -157,19 +144,8 @@ public data class ServerDefinition(
 
         return Module(
             moduleId = Uuid.NIL,    // When flattening module identification loses meaning
-            // Each module's serializers module getter is routed through [namedSerializers] so that a getter
-            // which throws fails fast with the offending module's location named, rather than surfacing an
-            // opaque error the first time a request touches serialization.
-            internalSerializersModule = {
-                var acc = thisLayer.internalSerializersModule.namedSerializers("internal", "/")()
-                for ((modPath, module) in flattenedModules) acc += module.internalSerializersModule.namedSerializers("internal", "/$modPath")()
-                acc
-            },
-            externalSerializersModule = {
-                var acc = thisLayer.externalSerializersModule.namedSerializers("external", "/")()
-                for ((modPath, module) in flattenedModules) acc += module.externalSerializersModule.namedSerializers("external", "/$modPath")()
-                acc
-            },
+            internalSerializersModule = { flattenedModuleItems.fold(thisLayer.internalSerializersModule()) { acc, module -> acc + module.internalSerializersModule() } },
+            externalSerializersModule = { flattenedModuleItems.fold(thisLayer.externalSerializersModule()) { acc, module -> acc + module.externalSerializersModule() } },
             annotationValidators = { flattenedModuleItems.fold(thisLayer.annotationValidators()) { acc, module -> acc + module.annotationValidators() } },
             httpInterceptors = flattenList { it.httpInterceptors },
             websocketInterceptors = flattenList { it.websocketInterceptors },
@@ -239,26 +215,6 @@ public data class ServerDefinition(
         )
     }
 
-
-    /**
-     * Wraps a module's serializers module [Runtime] so that, when evaluated, any failure is rethrown with the
-     * module's [location] and [kind] ("internal"/"external") named — making the offending module immediately
-     * identifiable instead of surfacing an opaque error the first time a request touches serialization.
-     */
-    private fun Runtime<SerializersModule>.namedSerializers(kind: String, location: String): Runtime<SerializersModule> {
-        val wrapped = this
-        return Runtime {
-            try {
-                wrapped()
-            } catch (e: Exception) {
-                throw IllegalStateException(
-                    "Failed to build the $kind serializers module for the module at '$location'. " +
-                        "Check that module's serializer registration (internalSerialization/externalSerialization).",
-                    e,
-                )
-            }
-        }
-    }
 
     private val reverseLookupHttpHandler: Map<HttpHandler<*>, HttpEndpoint<*>> by lazy {
         endpoints.entries.flatMap { (path, group) ->
