@@ -66,7 +66,7 @@ public data class OauthProviderCredentialsApple(
         val unsignedToken = "$header.$payload"
 
         // 1. Ensure valid PEM formatting for the Apple .p8 key
-        val formattedPem = if (keyString.contains("BEGIN")) keyString else """
+        val formattedPem = if (keyString.contains("-----BEGIN")) keyString else """
         -----BEGIN PRIVATE KEY-----
         $keyString
         -----END PRIVATE KEY-----
