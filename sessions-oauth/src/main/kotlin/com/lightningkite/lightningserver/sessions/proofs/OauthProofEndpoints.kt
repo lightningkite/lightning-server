@@ -64,6 +64,11 @@ public class OauthProofEndpoints(
     override val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
     override val proofExpiration: Duration = 1.hours,
     private val credentials: Runtime<OauthProviderCredentials>,
+    private val makeProof: suspend context(ServerRuntime, ProofMethod) (ExternalProfile, RuntimeDeferred<Signer>) -> Proof =
+        { profile, proofSigner ->
+            val email = profile.email ?: throw BadRequestException("No email was found for this profile.")
+            proofSigner.await().makeProof(property = "email", value = email)
+        },
     private val continueUiAuthUrl: context(ServerRuntime) (Proof) -> String,
 ) : ServerBuilder(), ExternalProofMethod {
 
@@ -90,15 +95,7 @@ public class OauthProofEndpoints(
         credentials = credentials,
     ) { response: OauthResponse, _: Uuid ->
         val profile = provider.getProfile(response, credentials())
-        val email = profile.email ?: throw BadRequestException("No email was found for this profile.")
-        HttpResponse.redirectToGet(
-            continueUiAuthUrl(
-                proofSigner.await().makeProof(
-                    property = "email",
-                    value = email,
-                )
-            )
-        )
+        HttpResponse.redirectToGet(continueUiAuthUrl(makeProof(profile, proofSigner)))
     }
 
     public val openEndpoint: HttpHandler<*> = path.path("open").get bind HttpHandler {
