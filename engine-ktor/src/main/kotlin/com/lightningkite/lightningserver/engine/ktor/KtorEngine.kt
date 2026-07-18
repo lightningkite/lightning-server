@@ -108,40 +108,51 @@ public class KtorEngine(
         routing {
             route("{...}") {
                 handle {
-                    val request = call.adapt()
-                    val result: HttpResponse = this@KtorEngine.handle(request)
+                    // Run the entire request lifecycle on Dispatchers.IO rather than undispatched on the
+                    // Netty event-loop thread. The Data contract is *blocking* (Data.Sink.emit / Data.Source
+                    // reads), so consuming the request body or producing a streamed response goes through
+                    // Ktor's blocking bridges (receiveStream()/toInputStream, asSink()), which park the
+                    // current thread in runBlocking until the socket supplies/drains bytes. The event loop
+                    // is the very thread that moves those bytes, so blocking on it deadlocks the server
+                    // (observed in production as a total freeze with all call event-loop threads parked).
+                    // On an IO thread, those blocking waits are harmless: the event loop stays free to
+                    // pump the socket, and bodies stream without being buffered fully into memory.
+                    withContext(Dispatchers.IO) {
+                        val request = call.adapt()
+                        val result: HttpResponse = this@KtorEngine.handle(request)
 
-                    for (header in result.headers.normalizedEntries) {
-                        for (value in header.value) {
-                            call.response.header(header.key, value.toHttpString())
-                        }
-                    }
-                    val code = HttpStatusCode.fromValue(result.status.code)
-                    val type = result.body?.mediaType?.toString()?.let { ContentType.parse(it) }
-
-                    val body = result.body?.data
-                    if (body == null) {
-                        val contentType = call.response.headers[HttpHeaders.ContentType]
-                        val contentLength = call.response.headers[HttpHeaders.ContentLength]
-                        if (contentType != null && contentLength != null) {
-                            call.response.call.respondOutputStream(
-                                ContentType.parse(contentType),
-                                HttpStatusCode.NoContent,
-                                contentLength.toLong()
-                            ) { close() }
-                        } else
-                            call.respondText("", type, code) { }
-                    } else if (disableResponseStreaming(request))
-                        call.respondBytes(body.bytes(), type, code)
-                    else
-                        when (body) {
-                            is Data.Bytes -> call.respondBytes(body.data, type, code)
-                            is Data.Text -> call.respondText(body.data, type, code)
-                            is Data.Sink -> call.respondBytesWriter(contentType = type, status = code) {
-                                this.asSink().buffered().use { body.emit(it) }
+                        for (header in result.headers.normalizedEntries) {
+                            for (value in header.value) {
+                                call.response.header(header.key, value.toHttpString())
                             }
-                            is Data.Source -> body.source.use { call.respondSource(it, type, code, body.size) }
                         }
+                        val code = HttpStatusCode.fromValue(result.status.code)
+                        val type = result.body?.mediaType?.toString()?.let { ContentType.parse(it) }
+
+                        val body = result.body?.data
+                        if (body == null) {
+                            val contentType = call.response.headers[HttpHeaders.ContentType]
+                            val contentLength = call.response.headers[HttpHeaders.ContentLength]
+                            if (contentType != null && contentLength != null) {
+                                call.response.call.respondOutputStream(
+                                    ContentType.parse(contentType),
+                                    HttpStatusCode.NoContent,
+                                    contentLength.toLong()
+                                ) { close() }
+                            } else
+                                call.respondText("", type, code) { }
+                        } else if (disableResponseStreaming(request))
+                            call.respondBytes(body.bytes(), type, code)
+                        else
+                            when (body) {
+                                is Data.Bytes -> call.respondBytes(body.data, type, code)
+                                is Data.Text -> call.respondText(body.data, type, code)
+                                is Data.Sink -> call.respondBytesWriter(contentType = type, status = code) {
+                                    this.asSink().buffered().use { body.emit(it) }
+                                }
+                                is Data.Source -> body.source.use { call.respondSource(it, type, code, body.size) }
+                            }
+                    }
                 }
             }
             webSocket("{...}") {
