@@ -138,7 +138,15 @@ public class KtorEngine(
                             is Data.Bytes -> call.respondBytes(body.data, type, code)
                             is Data.Text -> call.respondText(body.data, type, code)
                             is Data.Sink -> call.respondBytesWriter(contentType = type, status = code) {
-                                this.asSink().buffered().use { body.emit(it) }
+                                // body.emit writes through a *blocking* Sink (asSink bridges the write
+                                // channel via runBlocking). Run it off the Netty event loop so the loop
+                                // stays free to flush bytes to the socket; otherwise a backpressured/full
+                                // write buffer parks the loop and deadlocks it — the response-side mirror
+                                // of the request-body read.
+                                val channel = this
+                                withContext(Dispatchers.IO) {
+                                    channel.asSink().buffered().use { body.emit(it) }
+                                }
                             }
                             is Data.Source -> body.source.use { call.respondSource(it, type, code, body.size) }
                         }

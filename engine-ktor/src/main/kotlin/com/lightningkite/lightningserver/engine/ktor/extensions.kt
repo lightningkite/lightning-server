@@ -14,7 +14,7 @@ import io.ktor.server.application.*
 import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.util.*
-import kotlinx.io.asSource
+import io.ktor.utils.io.readRemaining
 
 /**
  * Converts a Ktor ContentType to a Lightning Server MediaType.
@@ -47,11 +47,14 @@ internal suspend fun ApplicationCall.adapt(): HttpRequest<PathSpec> {
         } ?: request.origin.remoteAddress,
         body = run {
             // TODO: Add MultiPart support
-            val stream = receiveStream()
-
-            TypedData.sink(request.contentType().adapt(), request.contentLength() ?: -1) {
-                it.transferFrom(stream.asSource())
-            }
+            // Read the whole request body up front via the suspending channel API. Data's Sink/Source are
+            // *blocking* contracts, so consuming the body later (during parsing) would go through Ktor's
+            // blocking receiveStream()/toInputStream, which does runBlocking on the current thread. Since
+            // request handling runs undispatched on the Netty event-loop thread — the very thread that feeds
+            // this channel from the socket — that parks the loop and deadlocks the server whenever the body
+            // isn't already fully buffered. readRemaining() suspends instead of blocking, so the loop stays free.
+            val source = receiveChannel().readRemaining()
+            TypedData.source(source, request.contentType().adapt(), request.contentLength())
         },
     )
 }
