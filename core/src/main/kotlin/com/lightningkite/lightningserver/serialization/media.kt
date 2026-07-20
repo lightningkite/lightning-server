@@ -3,8 +3,11 @@ package com.lightningkite.lightningserver.serialization
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.services.data.Data
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
 
@@ -138,6 +141,13 @@ public val MediaType.decoder: MediaTypeDecoder?
  *
  * Automatically selects the decoder based on the data's media type.
  *
+ * When the underlying data can perform blocking IO ([Data.Source]/[Data.Sink], as used for socket-backed request
+ * bodies), decoding runs on [Dispatchers.IO]. Consuming such data on an engine's event-loop thread can deadlock: the
+ * read blocks the very thread that feeds the body channel, so it can never receive the rest of the body. Dispatching
+ * to IO decouples the blocking read from the event loop. In-memory data ([Data.Bytes]/[Data.Text]) is decoded inline
+ * to avoid a needless thread hop. Note the IO path holds a worker for the duration of a slow read; the long-term fix
+ * is non-blocking IO on the underlying `Data` type.
+ *
  * @param serializer The deserialization strategy
  * @return The parsed object
  * @throws BadRequestException if no decoder is found or parsing fails
@@ -146,8 +156,14 @@ context(serverRuntime: ServerRuntime)
 public suspend fun <T> TypedData.parse(serializer: DeserializationStrategy<T>): T {
     val format = mediaType.decoder
         ?: throw BadRequestException("No media type decoder found supporting $mediaType")
+    // Data.Source/Data.Sink may block a thread while reading (e.g. a live request body); keep that off the event loop.
+    val mayBlock = when (data) {
+        is Data.Bytes, is Data.Text -> false
+        is Data.Source, is Data.Sink -> true
+    }
     return try {
-        format(this, serializer)
+        if (mayBlock) withContext(Dispatchers.IO) { format(this@parse, serializer) }
+        else format(this@parse, serializer)
     } catch (e: SerializationException) {
         throw BadRequestException(e.message ?: "Unknown formatting error", cause = e.cause)
     }
