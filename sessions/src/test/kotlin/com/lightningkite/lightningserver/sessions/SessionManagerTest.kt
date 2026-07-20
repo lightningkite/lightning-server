@@ -6,12 +6,18 @@ import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.definition.requestLogDescribers
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.handle
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.runtime.test.test
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
+import org.slf4j.LoggerFactory
 import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.database.Database
@@ -102,10 +108,10 @@ class SessionManagerTest {
     }
 
     @Test
-    fun `session manager registers an access-log describer that names the principal`() = runBlocking {
-        // Restores v4 behavior: core's access log records who made each request. core can't depend on the
-        // auth module, so SessionManager registers a RequestLogDescriber that resolves the request's
-        // Authentication (whose toString also renders masquerade, covered by AuthenticationExtTest).
+    fun `access-log interceptor names the authenticated principal`() = runBlocking {
+        // v4-style access log via an opt-in interceptor: it resolves the request's Authentication (whose
+        // toString also renders masquerade, covered by AuthenticationExtTest) and logs it. We capture the
+        // emitted line to prove the principal, not just the IP, is recorded.
         SessionTestUser.users.clear()
         val userId = Uuid.random()
         SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
@@ -113,29 +119,43 @@ class SessionManagerTest {
         object : ServerBuilder() {
             val database = setting("database", Database.Settings("ram"))
 
+            init { install(AccessLogInterceptor()) }
+
             val sessions = path.path("auth") include TestSessionManager(database = database)
+            val ping = path.path("ping").get bind HttpHandler<PathSpec0> { HttpResponse.plainText("pong") }
         }.let { server ->
             server.test({}) {
                 val (_, refreshToken) = server.sessions.newSession(userId)
                 val accessToken = server.sessions.tokenSimple.test(null, refreshToken.string)
 
-                val request = HttpRequest<PathSpec>(
-                    path = RawHttpEndpoint(asString = "/auth", method = HttpMethod.GET),
-                    queryParameters = QueryParameters.EMPTY,
-                    headers = HttpHeaders { add(HttpHeader.Authorization, "Bearer $accessToken") },
-                    domain = "example.com",
-                    protocol = "https",
-                    sourceIp = "local",
-                )
+                // Attach the log capture after settings are applied, so the framework's logback setup can't
+                // wipe it. Scoped to this logger and detached in finally.
+                val logbackLogger = LoggerFactory.getLogger("com.lightningkite.lightningserver") as Logger
+                val appender = ListAppender<ILoggingEvent>().apply { start() }
+                logbackLogger.level = Level.INFO
+                logbackLogger.addAppender(appender)
+                try {
+                    runBlocking {
+                        serverRuntime.handle(
+                            HttpRequest<PathSpec>(
+                                path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
+                                queryParameters = QueryParameters.EMPTY,
+                                headers = HttpHeaders { add(HttpHeader.Authorization, "Bearer $accessToken") },
+                                domain = "example.com",
+                                protocol = "https",
+                                sourceIp = "local",
+                            )
+                        )
+                    }
+                } finally {
+                    logbackLogger.detachAppender(appender)
+                }
 
-                val describers = serverRuntime.server.requestLogDescribers
-                assertTrue(describers.isNotEmpty(), "SessionManager should register an access-log describer")
-
-                val described = describers.firstNotNullOfOrNull { it(request) }
-                assertNotNull(described, "the describer should resolve the authenticated principal")
+                val accessLine = appender.list.map { it.formattedMessage }.singleOrNull { it.contains("accessed by") }
+                    ?: fail("Expected an access-log line; got: ${appender.list.map { it.formattedMessage }}")
                 assertTrue(
-                    described.contains("SessionTestUser") && described.contains(userId.toString()),
-                    "the access-log description should name the principal type and id; was: $described",
+                    accessLine.contains("SessionTestUser") && accessLine.contains(userId.toString()),
+                    "access log should name the authenticated principal; was: $accessLine",
                 )
             }
         }

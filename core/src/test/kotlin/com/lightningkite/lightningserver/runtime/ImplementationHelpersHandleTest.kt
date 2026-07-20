@@ -4,7 +4,6 @@ import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.loggingSettings
-import com.lightningkite.lightningserver.definition.requestLogDescribers
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.plainText
@@ -500,43 +499,6 @@ class ImplementationHelpersHandleTest {
                     "max-age=31536000",
                     resp.headers[HttpHeader.StrictTransportSecurity]?.root,
                     "error responses must carry security headers",
-                )
-            }
-        }
-    }
-
-    @Test
-    fun access_log_consults_request_describers_when_info_enabled() {
-        // handle() names who made each request by consulting the registered RequestLogDescribers (this is how
-        // the auth layer injects the principal into the access log without core depending on it).
-        val consulted = mutableListOf<String>()
-        object : ServerBuilder() {
-            init {
-                requestLogDescribers.register { req -> "described".also { consulted.add(it) } }
-            }
-
-            val ping = path.path("ping").get bind HttpHandler<PathSpec0> { HttpResponse.plainText("pong") }
-        }.let { server ->
-            server.test(settings = {
-                loggingSettings.set(
-                    LoggingSettings(LoggingSettings.ContextSettings(filePattern = null, toConsole = true, level = Level.INFO))
-                )
-            }) {
-                runBlocking {
-                    serverRuntime.handle(
-                        HttpRequest<PathSpec>(
-                            path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
-                            queryParameters = QueryParameters.EMPTY,
-                            headers = HttpHeaders.EMPTY,
-                            domain = "example.com",
-                            protocol = "https",
-                            sourceIp = "local",
-                        )
-                    )
-                }
-                assertTrue(
-                    consulted.isNotEmpty(),
-                    "handle() should consult registered describers to name the principal in the access log",
                 )
             }
         }

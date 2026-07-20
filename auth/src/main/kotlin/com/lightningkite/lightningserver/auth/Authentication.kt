@@ -319,9 +319,6 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
      * object Server : ServerBuilder() {
      *     init {
      *         authReaders.register(BearerTokenReader)
-     *         // Optional: name the principal in the access log. SessionManager registers this for you,
-     *         // so it is only needed when wiring readers by hand as shown here.
-     *         requestLogDescribers.register { request -> request[Authentication.CacheKey]?.toString() }
      *     }
      * }
      * ```

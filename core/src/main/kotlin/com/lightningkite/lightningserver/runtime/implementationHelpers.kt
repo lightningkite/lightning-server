@@ -13,7 +13,6 @@ import com.lightningkite.services.telemetry.TelemetryTrace
 import com.lightningkite.services.data.Data
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.telemetry.telemetryTrace
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 import kotlinx.io.*
@@ -74,18 +73,8 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
 
     val response = try {
         server.compiledHttpInterceptors.intercept(request) { req ->
-            if (this.logger.isInfoEnabled()) {
-                val accessedBy = this.server.requestLogDescribers.firstNotNullOfOrNull {
-                    try {
-                        it(request)
-                    } catch (e: CancellationException) {
-                        throw e // never swallow cancellation — it would break structured concurrency
-                    } catch (_: Exception) {
-                        null
-                    }
-                }
-                this.logger.info { "${request.path} accessed by ${accessedBy ?: "anonymous"} (${request.sourceIp})" }
-            }
+            // Access logging (with the resolved principal) is provided by the opt-in AccessLogInterceptor in
+            // the auth module, not hardcoded here — so it can name the principal without core depending on auth.
             // Map handler/route/compression exceptions to responses in-place so the surrounding
             // interceptors (CORS, etc.) still post-process error responses.
             try {
