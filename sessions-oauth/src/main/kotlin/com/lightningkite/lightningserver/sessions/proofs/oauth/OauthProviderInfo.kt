@@ -188,6 +188,7 @@ public class OauthProviderInfo(
                     }
                 }.internalBody<GoogleResponse2>()
                 ExternalProfile(
+                    id = response2.id,
                     email = if (response2.verified_email) response2.email else null,
                     image = response2.picture?.takeUnless { it.isEmpty() },
                     name = response2.name?.takeUnless { it.isEmpty() },
@@ -246,6 +247,7 @@ public class OauthProviderInfo(
                     }
                 }.body()
                 ExternalProfile(
+                    id = response2.sub,
                     email = response2.email,
                     image = response2.picture,
                 )
@@ -297,6 +299,7 @@ private suspend inline fun <reified T> io.ktor.client.statement.HttpResponse.int
 
 @Serializable
 private data class GoogleResponse2(
+    val id: String? = null,
     val verified_email: Boolean,
     val email: String,
     val picture: String? = null,
@@ -305,6 +308,7 @@ private data class GoogleResponse2(
 
 @Serializable
 private data class MicrosoftAccountInfo(
+    val sub: String? = null,
     val email: String? = null,
     val picture: String? = null,
 )
