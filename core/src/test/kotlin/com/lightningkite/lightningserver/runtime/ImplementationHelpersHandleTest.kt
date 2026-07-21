@@ -72,6 +72,17 @@ class ImplementationHelpersHandleTest {
             )
         }
 
+        // Streaming large response backed by a blocking Data.Source at /bigsource
+        val bigSource = path.path("bigsource").get bind HttpHandler<PathSpec0> {
+            val content = "s".repeat(100_000)
+            HttpResponse(
+                body = TypedData.source(
+                    source = kotlinx.io.Buffer().also { it.writeString(content) },
+                    mediaType = MediaType.Text.Plain,
+                ),
+            )
+        }
+
         // Large plain text at /big for Range tests
         val bigGet = path.path("big").get bind HttpHandler<PathSpec0> {
             HttpResponse.plainText("z".repeat(10_000))
@@ -645,6 +656,31 @@ class ImplementationHelpersHandleTest {
                 val decompressed =
                     GZIPInputStream(ByteArrayInputStream(compressed)).readBytes().toString(Charsets.UTF_8)
                 assertEquals("x".repeat(100_000), decompressed)
+            }
+        }
+    }
+
+    @Test
+    fun gzip_applied_on_stream_source() {
+        // The blocking Data.Source path must stream-compress (no full-body buffering) and still produce valid gzip.
+        TestServer.test(settings = {}) {
+            runBlocking {
+                val resp = serverRuntime.handle(
+                    HttpRequest(
+                        path = RawHttpEndpoint(asString = "/bigsource", method = HttpMethod.GET),
+                        queryParameters = QueryParameters.EMPTY,
+                        headers = HttpHeaders { add(HttpHeader.AcceptEncoding, "gzip") },
+                        domain = "example.com",
+                        protocol = "https",
+                        sourceIp = "local",
+                    )
+                )
+                assertEquals(HttpStatus.OK, resp.status)
+                assertEquals("gzip", resp.headers[HttpHeader.ContentEncoding]?.root)
+                val compressed = resp.body?.data?.bytes() ?: error("Expected body bytes")
+                val decompressed =
+                    GZIPInputStream(ByteArrayInputStream(compressed)).readBytes().toString(Charsets.UTF_8)
+                assertEquals("s".repeat(100_000), decompressed)
             }
         }
     }

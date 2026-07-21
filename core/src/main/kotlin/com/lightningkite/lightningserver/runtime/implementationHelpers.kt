@@ -151,21 +151,26 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
                 // Lower compress limit. Either not worth the effort, or likely will inflate a little.
                 if (result.body.data.size?.let { it < 256 } == true) return@intercept result
 
+                // Stream-compress a body straight into the response through GZIP, with no full-body buffering. Runs
+                // inside Data.Sink.emit, which engines invoke on a blocking-capable dispatcher, so the blocking GZIP
+                // writes never touch an event loop.
+                fun gzipStream(writePlain: (kotlinx.io.Sink) -> Unit): Data.Sink = Data.Sink { outSink ->
+                    GZIPOutputStream(outSink.asOutputStream()).asSink().buffered().use { gz -> writePlain(gz) }
+                }
                 val (newData, compressed) = when (val data = result.body.data) {
-                    is Data.Sink -> {
-                        Data.Sink { outSink ->
-                            GZIPOutputStream(outSink.asOutputStream()).asSink().buffered().use { gzOut ->
-                                data.write(gzOut)
-                            }
-                        } to true
-                    }
+                    // Push producer / blocking source: drive the plaintext straight into GZIP with no buffering, so a
+                    // large streamed response (e.g. an octet-stream/CSV/JSON download) is never materialized in heap.
+                    is Data.Sink -> gzipStream { data.emit(it) } to true
+                    is Data.Source -> gzipStream { sink -> data.source.use { sink.transferFrom(it) } } to true
 
-                    is Data.Source -> {
-                        Data.Sink { outSink ->
-                            GZIPOutputStream(outSink.asOutputStream()).asSink().buffered().use { gzOut ->
-                                data.write(gzOut)
-                            }
-                        } to true
+                    // Cooperative source: there is no non-suspend way to feed it into a blocking GZIPOutputStream
+                    // without a runBlocking bridge into the response channel (deadlock-adjacent). Compress only when the
+                    // size is known and bounded (4 MiB); otherwise pass the body through uncompressed rather than risk
+                    // materializing an unbounded stream in the heap.
+                    is Data.Suspending, is Data.SuspendingProducer -> {
+                        val s = data.size
+                        if (s != null && s <= 4L * 1024 * 1024) Data.Bytes(data.bytes().gzip()) to true
+                        else return@intercept result
                     }
 
                     else -> {

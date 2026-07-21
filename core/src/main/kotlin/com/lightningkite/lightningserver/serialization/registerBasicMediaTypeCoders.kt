@@ -9,6 +9,8 @@ import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.services.data.*
 import com.lightningkite.services.serializers.KotlinBytesFormat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.io.decodeFromSource
@@ -33,6 +35,7 @@ public open class BinaryFormatMediaTypeCoder(
 ) : MediaTypeCoder {
 
     private var _formatCached: BinaryFormat? = null
+
     private context(runtime: ServerRuntime)
     val formatCached: BinaryFormat
         get() {
@@ -84,6 +87,7 @@ public open class StringFormatMediaTypeCoder(
 ) : MediaTypeCoder {
 
     private var _formatCached: StringFormat? = null
+
     private context(runtime: ServerRuntime)
     val formatCached: StringFormat
         get() {
@@ -139,6 +143,7 @@ public class JsonMediaTypeCoder(
     override val priority: Float get() = 1f
 
     private var _formatCached: Json? = null
+
     private context(runtime: ServerRuntime)
     val formatCached: Json
         get() {
@@ -156,7 +161,11 @@ public class JsonMediaTypeCoder(
     override context(runtime: ServerRuntime)
     suspend fun <T> invoke(content: TypedData, serializer: DeserializationStrategy<T>): T {
         return when (val body = content.data) {
-            is Data.Source -> body.source.use { formatCached.decodeFromSource(serializer, it) }
+            is Data.Source -> withContext(Dispatchers.IO) {
+                body.source.use {
+                    formatCached.decodeFromSource(serializer, it)
+                }
+            }
             else -> super.invoke(content, serializer)
         }
     }
@@ -169,9 +178,8 @@ public class JsonMediaTypeCoder(
     suspend fun <T> invoke(mediaType: MediaType, serializer: SerializationStrategy<T>, value: T): TypedData {
         return TypedData.sink(
             mediaType,
-            emit = {
-                it.use { formatCached.encodeToSink(serializer, value, it) }
-            }
+            // Do NOT close `sink` — it is caller-owned (see Data.write's contract); the consumer manages its lifecycle.
+            emit = { sink -> formatCached.encodeToSink(serializer, value, sink) }
         )
     }
 }

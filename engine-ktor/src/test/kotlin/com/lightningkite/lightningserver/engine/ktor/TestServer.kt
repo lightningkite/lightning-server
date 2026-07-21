@@ -7,6 +7,8 @@ import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
+import com.lightningkite.services.data.asSuspendingSource
+import com.lightningkite.services.data.writeAll
 import kotlinx.io.*
 import kotlinx.serialization.Serializable
 import java.io.ByteArrayInputStream
@@ -77,6 +79,30 @@ object TestServerBuilder : ServerBuilder() {
                 out.writeString("beta")
                 out.writeString("|")
                 out.writeString("gamma")
+            },
+            status = HttpStatus.OK,
+        )
+    }
+
+    // GET /suspendingsource — exercises the cooperative Data.Suspending response branch in KtorEngine
+    val suspendingSource = path.path("suspendingsource").get bind HttpHandler<PathSpec0> {
+        val content = "suspending-content"
+        HttpResponse(
+            body = TypedData.suspending(
+                source = Buffer().also { it.writeString(content) }.asSuspendingSource(),
+                mediaType = MediaType.Text.Plain,
+                size = content.length.toLong(),
+            ),
+            status = HttpStatus.OK,
+        )
+    }
+
+    // GET /suspendingproducer — large cooperative producer body; verifies full delivery + backpressure via SuspendingSink
+    val suspendingProducer = path.path("suspendingproducer").get bind HttpHandler<PathSpec0> {
+        val content = "y".repeat(100_000)
+        HttpResponse(
+            body = TypedData.suspendingProducer(MediaType.Text.Plain) { sink ->
+                sink.writeAll(Buffer().also { it.writeString(content) })
             },
             status = HttpStatus.OK,
         )

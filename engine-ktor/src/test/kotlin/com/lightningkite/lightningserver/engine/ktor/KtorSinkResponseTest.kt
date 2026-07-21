@@ -82,6 +82,39 @@ class KtorSinkResponseTest {
     }
 
     @Test
+    fun blocking_source_response_streams_full_content() = runTest {
+        // Data.Source response branch: streamed off the event loop (withContext(IO) + asSink bridge), not on it.
+        withEngine {
+            val response = client.get("/source")
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals("streamed-content", response.bodyAsText())
+        }
+    }
+
+    @Test
+    fun suspending_source_response_streams_full_content() = runTest {
+        // Cooperative Data.Suspending response branch: streamed via KtorChannelSuspendingSink (fully non-blocking).
+        withEngine {
+            val response = client.get("/suspendingsource")
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals("suspending-content", response.bodyAsText())
+        }
+    }
+
+    @Test
+    fun large_suspending_producer_is_fully_delivered() = runTest {
+        // 100k cooperative producer body: any dropped tail or backpressure-handling bug in the SuspendingSink
+        // adapter would show up as a short read.
+        withEngine {
+            val response = client.get("/suspendingproducer")
+            assertEquals(HttpStatusCode.OK, response.status)
+            val text = response.bodyAsText()
+            assertEquals(100_000, text.length)
+            assertEquals("y".repeat(100_000), text)
+        }
+    }
+
+    @Test
     fun sink_response_uses_chunked_transfer_encoding() = runTest {
         // Data.Sink has no known size, so Ktor should fall back to chunked transfer.
         // (Content-Length must NOT be set; respondBytesWriter is a streaming response.)
