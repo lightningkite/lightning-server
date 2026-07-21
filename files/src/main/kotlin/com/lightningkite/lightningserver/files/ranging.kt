@@ -4,8 +4,48 @@ import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.services.data.*
+import kotlinx.io.Buffer
 import kotlinx.io.Sink
 import kotlinx.io.writeString
+
+/** Sentinel for [RangeSlicingSink.forward] meaning "forward everything after the skip, to end of stream". */
+private const val RANGE_UNTIL_END: Long = -1L
+
+/**
+ * A [SuspendingSink] that slices a passing byte stream: it discards the first [skip] bytes, forwards the next
+ * [forward] bytes to [downstream] (or all remaining bytes if [forward] is [RANGE_UNTIL_END]), and discards anything
+ * past that. Lets a range be served straight from a streaming body without buffering the whole thing in memory.
+ *
+ * Does not close [downstream] — the enclosing producer owns its lifecycle.
+ */
+private class RangeSlicingSink(
+    private val downstream: SuspendingSink,
+    skip: Long,
+    private val forward: Long,
+) : SuspendingSink {
+    private var toSkip = skip
+    private var forwarded = 0L
+
+    override val state: StreamState get() = downstream.state
+
+    override suspend fun write(from: Buffer, count: Long) {
+        var remaining = count
+        if (toSkip > 0L) {
+            val dropped = minOf(toSkip, remaining)
+            from.skip(dropped); toSkip -= dropped; remaining -= dropped
+        }
+        if (remaining <= 0L) return
+        val allowed = if (forward == RANGE_UNTIL_END) remaining else minOf(remaining, forward - forwarded)
+        if (allowed > 0L) {
+            downstream.write(from, allowed); forwarded += allowed; remaining -= allowed
+        }
+        if (remaining > 0L) from.skip(remaining) // past the window — discard, but still consume `count` from `from`
+    }
+
+    override suspend fun flush(): Unit = downstream.flush()
+    override suspend fun close() {} // downstream is caller-owned
+    override fun close(cause: Throwable) {}
+}
 
 /**
  * Represents a single range value requested by a `Range` header.
@@ -27,7 +67,9 @@ public sealed interface HttpRange {
      * A range of the form `<range-start>-<range-end>`. Range starts at [rangeStart] and ends at [rangeEnd], end inclusive.
      * */
     public data class Bounded(val rangeStart: Long, val rangeEnd: Long) : HttpRange {
-        val size: Long get() = rangeEnd - rangeStart
+        // RFC 9110: both ends are inclusive, so `bytes=0-0` is one byte and `bytes=100-109` is ten. This is the byte
+        // count the body must carry to match the `Content-Range: bytes start-end/total` header the endpoint sends.
+        val size: Long get() = rangeEnd - rangeStart + 1
 
         override fun rangeStart(resourceSize: Long): Long = rangeStart
         override fun rangeEnd(resourceSize: Long): Long = rangeEnd
@@ -124,29 +166,38 @@ public fun ByteArray.sliceArray(range: HttpRange): ByteArray = sliceArray(
     range.rangeStart(size.toLong()).toInt()..range.rangeEnd(size.toLong()).toInt()
 )
 
-public fun TypedData.getRange(range: HttpRange, dataSize: Long): TypedData =
+public suspend fun TypedData.getRange(range: HttpRange, dataSize: Long): TypedData =
     TypedData(
         mediaType = mediaType,
         data = when (data) {
             is Data.Bytes, is Data.Text -> Data.Bytes(data.bytes().sliceArray(range))
-            is Data.Sink, is Data.Source -> Data.Sink { sink ->
-                data.source().use { source ->
-                    source.skip(range.rangeStart(dataSize))
-                    when (range) {
-                        is HttpRange.Bounded -> sink.write(source, range.size)
-                        is HttpRange.Last, is HttpRange.UntilEnd -> source.transferTo(sink)
-                    }
+            is Data.Sink, is Data.Source, is Data.Suspending, is Data.SuspendingProducer -> {
+                // Stream the requested window through instead of buffering the whole body into the heap: pipe the
+                // source into a slicing sink that drops everything before the range and forwards only the window.
+                // (This still *reads* through the whole upstream — post-hoc slicing can't seek — but heap stays flat,
+                // which is what matters for large media served from a streaming source.)
+                val bytesToForward: Long = when (range) {
+                    is HttpRange.Bounded -> range.size
+                    is HttpRange.Last, is HttpRange.UntilEnd -> RANGE_UNTIL_END
+                }
+                val start = range.rangeStart(dataSize)
+                Data.SuspendingProducer(size = bytesToForward.takeIf { it != RANGE_UNTIL_END }) { out ->
+                    data.writeTo(RangeSlicingSink(out, skip = start, forward = bytesToForward))
                 }
             }
         }
     )
 
-public fun TypedData.getRanges(
+public suspend fun TypedData.getRanges(
     ranges: List<HttpRange>,
     dataSize: Long,
     rangeBoundary: String = "CONTENT_BOUNDARY",
-): TypedData =
-    TypedData(
+): TypedData {
+    // Multi-range (multipart/byteranges) responses buffer the whole body once: the boundary framing interleaves
+    // headers between arbitrary, possibly-overlapping windows, so a single streaming pass isn't enough. Multi-range
+    // requests are rare; single-range seeking (the large-media case) streams via getRange without buffering.
+    val raw = data.bytes()
+    return TypedData(
         mediaType = MediaType.MultiPart.ByteRanges.copy(parameters = mapOf("boundary" to rangeBoundary)),
         data = Data.Sink { sink ->
             fun Sink.writeRangeHeaders(range: HttpRange) {
@@ -157,7 +208,7 @@ public fun TypedData.getRanges(
 
             if (data is Data.Bytes || data is Data.Text || ranges.mergeOverlaps(dataSize).size != ranges.size) {
                 // read all bytes if available or ranges overlap
-                val bytes = data.bytes()
+                val bytes = raw
 
                 for (range in ranges) {
                     sink.writeRangeHeaders(range)
@@ -166,7 +217,7 @@ public fun TypedData.getRanges(
                     sink.writeString(LINE_FEED)
                 }
                 sink.writeString(rangeBoundary)
-            } else data.source().use { source ->  // use source if possible
+            } else kotlinx.io.Buffer().apply { write(raw) }.let { source ->  // use source if possible
                 var pos = 0L
                 for (range in ranges) {
                     sink.writeRangeHeaders(range)
@@ -190,5 +241,6 @@ public fun TypedData.getRanges(
             }
         }
     )
+}
 
 private const val LINE_FEED = "\r\n"
