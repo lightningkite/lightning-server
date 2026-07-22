@@ -280,7 +280,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                         "name" - wsDomain
                         "type" - "AAAA"
                         "ttl" - 300
-                        "records" - listOf(expression("aws_instance.ubuntu.ipv6_addresses"))
+                        "records" - listOf(expression("aws_instance.ubuntu.ipv6_addresses[0]"))
                     }
             }
         }
@@ -590,6 +590,10 @@ REGION="$$applicationRegion"""",
             // language="Shell Script"
             appendLine(
                 $$"""
+
+echo "[INFO] Reloading systemd configuration..."
+systemctl daemon-reload
+
 systemctl enable $$projectPrefix
 
 # First-time deploy uses the same script that subsequent SSM-driven redeploys
@@ -599,8 +603,6 @@ echo "[INFO] Running first-time application deploy..."
 
 # === Start Services ===
 echo "[INFO] Starting services..."
-systemctl daemon-reload
-
 systemctl enable angie
 systemctl restart angie
 """
