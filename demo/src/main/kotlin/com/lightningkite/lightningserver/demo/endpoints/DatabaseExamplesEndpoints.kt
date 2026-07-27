@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.demo.models.status
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.arg1
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
+import com.lightningkite.lightningserver.typed.registerTable
 import com.lightningkite.lightningserver.typed.route
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
@@ -57,13 +58,8 @@ class DatabaseExamplesEndpoints(
 
     // Table definitions identify each table; prepare them once per deploy (before serving) so the
     // collection/indexes exist, then access them at runtime with database().table(def).
-    private val postTable = DatabaseTableDefinition<BlogPost>()
-    private val commentTable = DatabaseTableDefinition<Comment>()
-
-    val prepareTables = path.path("prepare") bind PreDeployTask {
-        database().prepare(postTable)
-        database().prepare(commentTable)
-    }
+    private val postTable = database.registerTable<BlogPost>("BlogPost")
+    private val commentTable = database.registerTable<Comment>("Comment")
 
     /**
      * POST /blog/posts
@@ -96,7 +92,7 @@ class DatabaseExamplesEndpoints(
                 status = PostStatus.DRAFT
             )
 
-            database().table(postTable).insertOne(post)
+            postTable().insertOne(post)
         }
     )
 
@@ -114,7 +110,7 @@ class DatabaseExamplesEndpoints(
         implementation = { _: Unit ->
             // Note: Query parameters would need to be passed differently in ApiHttpHandler
             // For this example, we'll return all published posts
-            val posts = database().table(postTable)
+            val posts = postTable()
 
             // Simple condition for published posts
             val condition: Condition<BlogPost> = condition { it.status eq PostStatus.PUBLISHED }
@@ -152,7 +148,7 @@ class DatabaseExamplesEndpoints(
         successCode = HttpStatus.OK,
         implementation = { _: Unit ->
             val id = route.arg1
-            val posts = database().table(postTable)
+            val posts = postTable()
 
             val post = posts.get(id) ?: throw NotFoundException("Blog post not found")
 
@@ -182,7 +178,7 @@ class DatabaseExamplesEndpoints(
         successCode = HttpStatus.OK,
         implementation = { input: UpdatePostRequest ->
             val id = route.arg1
-            val posts = database().table(postTable)
+            val posts = postTable()
 
             // Check if post exists
             posts.get(id) ?: throw NotFoundException("Blog post not found")
@@ -231,8 +227,8 @@ class DatabaseExamplesEndpoints(
             successCode = HttpStatus.NoContent,
             implementation = { _: Unit ->
                 val id = route.arg1
-                val posts = database().table(postTable)
-                val comments = database().table(commentTable)
+                val posts = postTable()
+                val comments = commentTable()
 
                 // Check if post exists
                 posts.get(id) ?: throw NotFoundException("Blog post not found")
@@ -262,7 +258,7 @@ class DatabaseExamplesEndpoints(
         successCode = HttpStatus.Created,
         implementation = { input: CreateCommentRequest ->
             val postId = route.arg1
-            val posts = database().table(postTable)
+            val posts = postTable()
 
             // Verify post exists
             posts.get(postId) ?: throw NotFoundException("Blog post not found")
@@ -278,7 +274,7 @@ class DatabaseExamplesEndpoints(
                 parentCommentId = input.parentCommentId
             )
 
-            database().table(commentTable).insertOne(comment)
+            commentTable().insertOne(comment)
         }
     )
 
@@ -296,7 +292,7 @@ class DatabaseExamplesEndpoints(
         implementation = { _: Unit ->
             val postId = route.arg1
 
-            database().table(commentTable)
+            commentTable()
                 .find(
                     condition = condition {
                         (it.postId eq postId) and (it.isApproved eq true)
@@ -319,7 +315,7 @@ class DatabaseExamplesEndpoints(
         auth = noAuth,
         successCode = HttpStatus.OK,
         implementation = { input: SearchPostsRequest ->
-            val posts = database().table(postTable)
+            val posts = postTable()
 
             // Start with published posts only
             var condition: Condition<BlogPost> = condition { it.status eq PostStatus.PUBLISHED }

@@ -162,12 +162,12 @@ Both patterns add a WebSocket endpoint that provides:
 **Manual Database Operations (use only when needed)**
 
 Use low-level database operations for custom business logic beyond simple CRUD. Define a
-`DatabaseTableDefinition` once per model and share it (prepare it once per deploy in a `PreDeployTask`
-with `database().prepare(postTable)`):
+each table once in your `ServerBuilder` with `registerTable` — one call defines it, registers it, and
+creates its once-per-deploy prepare task. Invoke the result inside a handler to get the `Table`:
 
 ```kotlin
-val postTable = DatabaseTableDefinition<Post>()   // define once, share across your app
-val posts = database().table(postTable)
+val postTable = database.registerTable<Post>("Post")   // in your ServerBuilder: define + register + prepare
+val posts = postTable()                                // inside a handler: the live Table<Post>
 
 // Insert
 posts.insertOne(Post(title = "Hello", content = "World"))
@@ -328,14 +328,14 @@ val sendEmail = path.path("send-email").post bind HttpHandler { request ->
     HttpResponse.plainText("Email queued")
 }
 
-val oldDataTable = DatabaseTableDefinition<OldData>()   // define once, share across your app
+val oldDataTable = database.registerTable<OldData>("OldData")   // define + register + prepare, once
 
 // Scheduled task
 val cleanup = path.path("scheduled-cleanup") bind ScheduledTask(
     frequency = 1.hours
 ) {
     println("Running cleanup...")
-    database().table(oldDataTable).deleteMany(condition {
+    oldDataTable().deleteMany(condition {
         it.createdAt lt Clock.System.now() - 30.days
     })
 }
@@ -356,13 +356,12 @@ val value = cache().get<String>("key")
 cache().remove("key")
 
 // Cache-aside pattern
-val dataTable = DatabaseTableDefinition<Data>()   // define once, share across your app
-
+// dataTable is registered in your ServerBuilder: val dataTable = database.registerTable<Data>("Data")
 suspend fun getExpensiveData(id: String): Data {
     val cached = cache().get<Data>("data:$id")
     if (cached != null) return cached
 
-    val fresh = database().table(dataTable).get(id)
+    val fresh = dataTable().get(id)
     cache().set("data:$id", fresh, expire = 10.minutes)
     return fresh
 }
