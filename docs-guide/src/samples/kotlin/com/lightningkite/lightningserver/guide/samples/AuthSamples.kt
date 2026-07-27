@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.guide.samples
 // region auth-imports
 import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.definition.PreDeployTask
 import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.runtime.*
@@ -37,7 +38,7 @@ object UserAuth : PrincipalType<UserProfile, Uuid> {
 
     context(server: ServerRuntime)
     override suspend fun fetch(id: Uuid): UserProfile =
-        UserProfileServer.database().table<UserProfile>().get(id)
+        UserProfileServer.database().table(UserProfileServer.userProfiles).get(id)
             ?: throw NotFoundException("User not found")
 }
 // endregion user-auth
@@ -45,6 +46,10 @@ object UserAuth : PrincipalType<UserProfile, Uuid> {
 // region auth-server
 object UserProfileServer : ServerBuilder() {
     val database = setting("database", Database.Settings())
+
+    // Prepare the table once per deploy (before serving); access it with database().table(userProfiles).
+    val userProfiles = DatabaseTableDefinition<UserProfile>()
+    val prepareUserProfiles = path.path("prepare") bind PreDeployTask { database().prepare(userProfiles) }
 
     init {
         // register() makes this principal type discoverable when deserializing tokens.
@@ -74,7 +79,7 @@ object UserProfileServer : ServerBuilder() {
 // region auth-test
 fun authTest() = UserProfileServer.testBlocking(settings = { database set Database.Settings("ram") }) {
     // Seed a user directly into the database
-    val alice = UserProfileServer.database().table<UserProfile>()
+    val alice = UserProfileServer.database().table(UserProfileServer.userProfiles)
         .insertOne(UserProfile(name = "Alice", email = "alice@example.com"))
 
     // testAuth() creates an Authentication<UserProfile> for use in tests.

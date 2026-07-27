@@ -347,6 +347,15 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
      * deploy pipeline can abort the cutover. Services are disconnected afterwards so the process can
      * exit cleanly.
      */
+    /**
+     * Runs all pre-deploy tasks and returns, leaving services connected. Intended to be called just
+     * before [start] in a combined "prepare then serve" dev command, so a single local process
+     * reconciles the database and then serves. Settings must already be ready.
+     */
+    public fun runPreDeployTasksBlocking() {
+        runBlocking { runPreDeployTasks() }
+    }
+
     public fun runPreDeploy() {
         settings.ready()
         try {

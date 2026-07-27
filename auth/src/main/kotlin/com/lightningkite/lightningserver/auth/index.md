@@ -117,10 +117,11 @@ data class User(
     companion object : PrincipalType<User, Uuid> {
         override val idSerializer = Uuid.serializer()
         override val subjectSerializer = serializer()
+        val table = DatabaseTableDefinition<User>()   // define once, reuse everywhere
 
         context(server: ServerRuntime)
         override suspend fun fetch(id: Uuid): User {
-            return database().table<User>().get(id)
+            return database().table(table).get(id)
                 ?: throw NotFoundException("User not found")
         }
 

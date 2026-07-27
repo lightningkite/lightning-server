@@ -24,6 +24,7 @@ All examples in this chapter use the following imports:
 ```kotlin
 import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.definition.PreDeployTask
 import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.runtime.*
@@ -89,7 +90,7 @@ object UserAuth : PrincipalType<UserProfile, Uuid> {
 
     context(server: ServerRuntime)
     override suspend fun fetch(id: Uuid): UserProfile =
-        UserProfileServer.database().table<UserProfile>().get(id)
+        UserProfileServer.database().table(UserProfileServer.userProfiles).get(id)
             ?: throw NotFoundException("User not found")
 }
 ```
@@ -119,6 +120,10 @@ declare that the endpoint requires a `UserProfile` token.  Compare this to
 ```kotlin
 object UserProfileServer : ServerBuilder() {
     val database = setting("database", Database.Settings())
+
+    // Prepare the table once per deploy (before serving); access it with database().table(userProfiles).
+    val userProfiles = DatabaseTableDefinition<UserProfile>()
+    val prepareUserProfiles = path.path("prepare") bind PreDeployTask { database().prepare(userProfiles) }
 
     init {
         // register() makes this principal type discoverable when deserializing tokens.
@@ -176,7 +181,7 @@ Pass the resulting auth token as the first argument to the typed `.test()` call.
 ```kotlin
 fun authTest() = UserProfileServer.testBlocking(settings = { database set Database.Settings("ram") }) {
     // Seed a user directly into the database
-    val alice = UserProfileServer.database().table<UserProfile>()
+    val alice = UserProfileServer.database().table(UserProfileServer.userProfiles)
         .insertOne(UserProfile(name = "Alice", email = "alice@example.com"))
 
     // testAuth() creates an Authentication<UserProfile> for use in tests.
@@ -243,7 +248,7 @@ val isAdmin: AuthCacheKey<UserProfile, Boolean> = authCacheKey(
 ) { auth ->
     // `auth` is the Authentication<UserProfile> the value is derived from.
     // Run any suspension here — database queries, etc.
-    UserProfileServer.database().table<UserProfile>()
+    UserProfileServer.database().table(UserProfileServer.userProfiles)
         .count(condition { it._id eq auth.id } and condition { it.role eq "admin" }) > 0
 }
 ```

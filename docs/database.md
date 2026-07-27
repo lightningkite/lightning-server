@@ -46,11 +46,20 @@ data class Post(
 
 ## Accessing the database
 
-You can now access a table of these objects like this:
+A table is identified by a `DatabaseTableDefinition`. **Create one per model and share it across your
+application** — it is the key backends use to locate the table, so you should not construct a new one at
+each call site:
+
+```kotlin
+val postTable = DatabaseTableDefinition<Post>()
+```
+
+Prepare it once per deploy (before serving) so the collection/indexes exist — typically as a
+[pre-deploy task](tasks.md); `database().prepare(postTable)`. Then access it inside a handler:
 
 ```kotlin
 val db = database()
-val posts = db.table<Post>()
+val posts = db.table(postTable)
 
 // Insert a new post
 posts.insertOne(Post(
@@ -150,7 +159,7 @@ Signals occur when a change is made to the database.
 You can wrap a collection with actions that will occur on those changes:
 
 ```kotlin
-val collection = database().table<Post>()
+val collection = database().table(postTable)
     .interceptCreate { value ->
         println("About to insert: $value")
         value.copy(title = value.title + " (New)")

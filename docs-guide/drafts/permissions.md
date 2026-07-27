@@ -80,7 +80,7 @@ object UserAuth : PrincipalType<User, Uuid> {
 
     context(server: ServerRuntime)
     override suspend fun fetch(id: Uuid): User =
-        PostServer.database().table<User>().get(id) ?: throw NotFoundException()
+        PostServer.database().table(userTable).get(id) ?: throw NotFoundException()
 }
 ```
 
@@ -406,7 +406,7 @@ val publishedFeed = path.path("feed").get bind ApiHttpHandler(
 )
 ```
 
-Do not call `database().table<Post>()` directly in secured endpoints — that
+Do not call `database().table(postTable)` directly in secured endpoints — that
 bypasses all permission enforcement.
 
 ## Blog post example (from demo)

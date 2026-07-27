@@ -128,7 +128,7 @@ object Server : ServerBuilder() {
     )
 
     val passwordProof = PasswordProofEndpoints(
-        table = database.table<PasswordSecret>(),
+        table = database.table(passwordSecretTable),
         getSubjectId = { it.email },
         hash = { it.secureHash() }
     )

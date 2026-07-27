@@ -236,10 +236,13 @@ data class Post(
 ) : HasId<Uuid>
 ```
 
-Database operations use a DSL for type-safe queries:
+Database operations use a DSL for type-safe queries. Define a `DatabaseTableDefinition` once per model
+and share it (prepare it once per deploy with `database().prepare(postTable)`, typically in a
+`PreDeployTask`):
 
 ```kotlin
-val posts = database().table<Post>()
+val postTable = DatabaseTableDefinition<Post>()   // define once, share across your app
+val posts = database().table(postTable)
 
 // Insert
 posts.insertOne(Post(title = "Test", author = "user@example.com", body = "Content"))

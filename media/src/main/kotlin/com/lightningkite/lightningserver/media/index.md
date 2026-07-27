@@ -43,9 +43,10 @@ that meet or exceed requirements.
 context(runtime: ServerRuntime)
 object Server : ServerBuilder() {
     val database = setting("database", Database.Settings())
+    val postTable = DatabaseTableDefinition<Post>()   // define once, share across your app
 
     val posts = database
-        .table<Post>()
+        .table(postTable)
         .interceptImagesForProcessing(
             MediaPreviewOptions(sizeInPixels = 200),
             MediaPreviewOptions(sizeInPixels = 800),

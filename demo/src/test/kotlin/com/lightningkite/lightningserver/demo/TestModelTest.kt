@@ -9,6 +9,9 @@ import org.junit.Test
 import kotlin.test.*
 
 class TestModelTest {
+    private val testModelTable = DatabaseTableDefinition<TestModel>()
+    private val userTable = DatabaseTableDefinition<User>()
+
 
     @Test
     fun testModelCreation() = runBlocking {
@@ -44,7 +47,7 @@ class TestModelTest {
     fun testDatabaseInsertAndRead() = runBlocking {
         TestHelper.testServer {
             val db = Server.database()
-            val collection = db.table<TestModel>()
+            val collection = db.table(testModelTable)
 
             val testItem = TestModel(
                 name = "Database Test",
@@ -67,7 +70,7 @@ class TestModelTest {
     fun testDatabaseQuery() = runBlocking {
         TestHelper.testServer {
             val db = Server.database()
-            val collection = db.table<TestModel>()
+            val collection = db.table(testModelTable)
 
             // Insert test data
             val item1 = TestModel(name = "Item 1", number = 1, status = Status.DRAFT)
@@ -88,7 +91,7 @@ class TestModelTest {
     fun testDatabaseUpdate() = runBlocking {
         TestHelper.testServer {
             val db = Server.database()
-            val collection = db.table<TestModel>()
+            val collection = db.table(testModelTable)
 
             val testItem = TestModel(name = "Original Name", number = 50)
             collection.insertOne(testItem)
@@ -109,7 +112,7 @@ class TestModelTest {
     fun testDatabaseDelete() = runBlocking {
         TestHelper.testServer {
             val db = Server.database()
-            val collection = db.table<TestModel>()
+            val collection = db.table(testModelTable)
 
             val testItem = TestModel(name = "To Delete", number = 999)
             collection.insertOne(testItem)
@@ -142,7 +145,7 @@ class TestModelTest {
     fun testUserDatabaseOperations() = runBlocking {
         TestHelper.testServer {
             val db = Server.database()
-            val users = db.table<User>()
+            val users = db.table(userTable)
 
             val newUser = User(
                 email = "newuser@example.com",
