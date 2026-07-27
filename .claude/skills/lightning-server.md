@@ -161,10 +161,13 @@ Both patterns add a WebSocket endpoint that provides:
 
 **Manual Database Operations (use only when needed)**
 
-Use low-level database operations for custom business logic beyond simple CRUD:
+Use low-level database operations for custom business logic beyond simple CRUD. Define a
+`DatabaseTableDefinition` once per model and share it (prepare it once per deploy in a `PreDeployTask`
+with `database().prepare(postTable)`):
 
 ```kotlin
-val posts = database().table<Post>()
+val postTable = DatabaseTableDefinition<Post>()   // define once, share across your app
+val posts = database().table(postTable)
 
 // Insert
 posts.insertOne(Post(title = "Hello", content = "World"))
@@ -325,12 +328,14 @@ val sendEmail = path.path("send-email").post bind HttpHandler { request ->
     HttpResponse.plainText("Email queued")
 }
 
+val oldDataTable = DatabaseTableDefinition<OldData>()   // define once, share across your app
+
 // Scheduled task
 val cleanup = path.path("scheduled-cleanup") bind ScheduledTask(
     frequency = 1.hours
 ) {
     println("Running cleanup...")
-    database().table<OldData>().deleteMany(condition {
+    database().table(oldDataTable).deleteMany(condition {
         it.createdAt lt Clock.System.now() - 30.days
     })
 }
@@ -351,11 +356,13 @@ val value = cache().get<String>("key")
 cache().remove("key")
 
 // Cache-aside pattern
+val dataTable = DatabaseTableDefinition<Data>()   // define once, share across your app
+
 suspend fun getExpensiveData(id: String): Data {
     val cached = cache().get<Data>("data:$id")
     if (cached != null) return cached
 
-    val fresh = database().table<Data>().get(id)
+    val fresh = database().table(dataTable).get(id)
     cache().set("data:$id", fresh, expire = 10.minutes)
     return fresh
 }

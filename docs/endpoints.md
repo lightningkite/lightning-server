@@ -195,7 +195,7 @@ val listUsers = path.path("users").get bind HttpHandler { request ->
     val page = request.queryParameters["page"]?.toIntOrNull() ?: 1
     val limit = request.queryParameters["limit"]?.toIntOrNull() ?: 20
 
-    val users = database().table<User>()
+    val users = database().table(userTable)
         .find(condition { /* ... */ }, skip = (page - 1) * limit, limit = limit)
         .toList()
 
@@ -625,7 +625,7 @@ Support ETags for caching:
 
 ```kotlin
 val getResource = path.path("resource").arg<String>("id").get bind HttpHandler { request ->
-    val resource = database().table<Resource>().get(request.path.arg1)
+    val resource = database().table(resourceTable).get(request.path.arg1)
     val etag = resource.hash()
 
     val clientETag = request.headers[HttpHeader.IfNoneMatch]?.root
@@ -729,7 +729,7 @@ Store endpoint references for easy testing:
 
 ```kotlin
 val getUser = path.path("users").arg<String>("id").get bind HttpHandler { request ->
-    val user = database().table<User>().get(request.path.arg1)
+    val user = database().table(userTable).get(request.path.arg1)
     HttpResponse.json(user)
 }
 

@@ -96,7 +96,7 @@ object Server : ServerBuilder() {
     val database = setting("database", Database.Settings())
 
     val posts = database
-        .table<Post>()
+        .table(postTable)
         .interceptImagesForProcessing(
             MediaPreviewOptions(sizeInPixels = 200),
             MediaPreviewOptions(sizeInPixels = 800),
@@ -181,7 +181,7 @@ object Server : ServerBuilder() {
 
     // Use interceptor for immediate availability
     val products = database
-        .table<Product>()
+        .table(productTable)
         .interceptImagesForProcessing(
             MediaPreviewOptions(sizeInPixels = 100),   // Thumbnail
             MediaPreviewOptions(sizeInPixels = 400),   // Medium
@@ -248,7 +248,7 @@ The processing functions only process image files - other file types are returne
 ```kotlin
 // This is safe even if some uploads are PDFs or other non-image files
 val documents = database
-    .table<Document>()
+    .table(documentTable)
     .interceptImagesForProcessing(
         MediaPreviewOptions(sizeInPixels = 200),
         makePath = { it.path { it.attachment } }

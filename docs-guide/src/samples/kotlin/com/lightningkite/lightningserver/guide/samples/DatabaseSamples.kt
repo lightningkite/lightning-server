@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.guide.samples
 // region db-imports
 import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.definition.PreDeployTask
 import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.runtime.test.*
@@ -30,6 +31,11 @@ data class Note(
 object NoteDbServer : ServerBuilder() {
     val database = setting("database", Database.Settings())
 
+    // A table definition names the table and its type. Prepare it once per deploy (before serving),
+    // then access it at runtime with database().table(notes).
+    val notes = DatabaseTableDefinition<Note>()
+    val prepareNotes = path.path("prepare") bind PreDeployTask { database().prepare(notes) }
+
     // GET /notes — list all notes
     val list = path.path("notes").get bind ApiHttpHandler(
         summary = "List all notes",
@@ -37,7 +43,7 @@ object NoteDbServer : ServerBuilder() {
         successCode = HttpStatus.OK,
         errorCases = emptyList(),
         implementation = { _: Unit ->
-            database().table<Note>().find(Condition.Always).toList()
+            database().table(notes).find(Condition.Always).toList()
         }
     )
 
@@ -48,7 +54,7 @@ object NoteDbServer : ServerBuilder() {
         successCode = HttpStatus.Created,
         errorCases = emptyList(),
         implementation = { input: Note ->
-            database().table<Note>().insertOne(input)
+            database().table(notes).insertOne(input)
         }
     )
 }
@@ -65,7 +71,7 @@ fun databaseTest() = NoteDbServer.testBlocking(settings = { database set Databas
     check(all.size == 2)
 
     // Direct table access for condition / modification / delete
-    val table = NoteDbServer.database().table<Note>()
+    val table = NoteDbServer.database().table(NoteDbServer.notes)
 
     // condition { } builds a type-safe query using generated path extensions
     val found = table.find(condition { it.title eq "Shopping" }).toList()

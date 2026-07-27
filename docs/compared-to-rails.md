@@ -152,7 +152,7 @@ end
 **Lightning Server:**
 
 ```kotlin
-val posts = database().table<Post>()
+val posts = database().table(postTable)
     .interceptCreate { value ->
         // Modify before insertion (like before_create)
         value.copy(slug = value.title.slugify())

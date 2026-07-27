@@ -129,7 +129,7 @@ object Server : ServerBuilder() {
     val database = setting("database", Database.Settings())
 
     val products = database()
-        .table<Product>()
+        .table(productTable)
         .interceptImagesForProcessingNotNull(
             MediaPreviewOptions(sizeInPixels = 200),   // thumbnail
             MediaPreviewOptions(sizeInPixels = 1200),  // full-size web

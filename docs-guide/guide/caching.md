@@ -84,7 +84,7 @@ suspend fun getUser(id: Uuid): User {
     if (cached != null) return cached
 
     // 2. Miss — load from the source of truth
-    val user = database().table<User>().get(id)
+    val user = database().table(userTable).get(id)
         ?: throw NotFoundException("user $id not found")
 
     // 3. Populate cache for future reads
@@ -98,7 +98,7 @@ On writes, invalidate or update the cached entry so stale data is not served:
 ```kotlin
 // Illustrative — not a drift-checked sample.
 suspend fun updateUser(id: Uuid, modification: Modification<User>): User {
-    val updated = database().table<User>().updateOneById(id, modification)
+    val updated = database().table(userTable).updateOneById(id, modification)
         ?: throw NotFoundException("user $id not found")
 
     // Invalidate — next read will reload from the database.

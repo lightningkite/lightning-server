@@ -1,8 +1,8 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.definition.PreDeployTask
 import com.lightningkite.lightningserver.definition.Runtime
-import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.*
@@ -13,6 +13,9 @@ public interface ModelInfo<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     public val idSerializer: KSerializer<ID>
 
     public val auth: AuthRequirement<SUBJECT>
+
+    public val tableDefinition: DatabaseTableDefinition<T>
+    public val preDeployTask: PreDeployTask
 
     public object Scopes {
         public val create: Subscope = Subscope("create")
@@ -60,9 +63,12 @@ public inline fun <reified USER : HasId<*>?, reified T : HasId<ID>, reified ID :
 
     override val auth: AuthRequirement<USER> = subscope?.let { auth.subscope(it) } ?: auth
 
-    val tableDefinition = DatabaseTableDefinition(serializer, tableName)
-    val startupTask = with(builder) {
-        path.path(tableName) bind StartupTask {
+    override val tableDefinition: DatabaseTableDefinition<T> = DatabaseTableDefinition(serializer, tableName)
+    // Table/index reconciliation runs as a pre-deploy task: once per deploy, before the new version
+    // serves, rather than on every instance's boot (keeps it off the cold-start path). It is
+    // convergent (reconciles the DB to the current model), so running it every deploy is correct.
+    override val preDeployTask: PreDeployTask = with(builder) {
+        path.path(tableName) bind PreDeployTask {
             this@modelInfo().prepare(tableDefinition)
         }
     }
@@ -114,8 +120,18 @@ public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> Runtime<Databa
 
     override val auth: AuthRequirement<USER> = subscope?.let { auth.subscope(it) } ?: auth
 
+    override val tableDefinition: DatabaseTableDefinition<T> = DatabaseTableDefinition(serializer, tableName)
+    // Table/index reconciliation runs as a pre-deploy task: once per deploy, before the new version
+    // serves, rather than on every instance's boot (keeps it off the cold-start path). It is
+    // convergent (reconciles the DB to the current model), so running it every deploy is correct.
+    override val preDeployTask: PreDeployTask = with(builder) {
+        path.path(tableName) bind PreDeployTask {
+            this@explicitModelInfo().prepare(tableDefinition)
+        }
+    }
+
     context(server: ServerRuntime)
-    override fun baseTable(): Table<T> = this@explicitModelInfo().table(serializer, tableName)
+    override fun baseTable(): Table<T> = this@explicitModelInfo().table(tableDefinition)
 
     override val tableName: String
         get() = tableName

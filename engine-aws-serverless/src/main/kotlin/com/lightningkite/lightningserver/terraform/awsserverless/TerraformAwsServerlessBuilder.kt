@@ -654,11 +654,34 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
 
                 "depends_on" - listOf("aws_s3_object.app_storage")
             }
+            // Pre-deploy gate: invoke the freshly-published function version with a {"predeploy":true}
+            // event and only proceed to the alias cutover if it reports "predeploy-ok". The payload is
+            // supplied via a file to avoid cross-platform shell quoting. Triggered on every code change.
+            // Note: with snapStart the new version is isolated so this truly gates cutover; without
+            // snapStart the alias tracks $LATEST, which is live as soon as the function updates.
+            "resource.local_file.predeploy_payload" {
+                "content" - "{\"predeploy\":true}"
+                "filename" - $$"${path.module}/build/predeploy-payload.json"
+            }
+            "resource.null_resource.predeploy" {
+                "triggers" {
+                    "code" - expression("aws_lambda_function.main.source_code_hash")
+                }
+                "depends_on" - listOf("aws_lambda_function.main", "local_file.predeploy_payload")
+                "provisioner.local-exec" {
+                    "command" - expression(
+                        $$"""local.is_windows ? "aws lambda invoke --function-name ${aws_lambda_function.main.function_name} --qualifier ${aws_lambda_function.main.version} --payload file://${path.module}/build/predeploy-payload.json --region $${emitter.applicationRegion} ${path.module}/build/predeploy-out.json | Out-Null; if(-not(Select-String -Path ${path.module}/build/predeploy-out.json -Pattern predeploy-ok -Quiet)){exit 1}" : "aws lambda invoke --function-name ${aws_lambda_function.main.function_name} --qualifier ${aws_lambda_function.main.version} --payload file://${path.module}/build/predeploy-payload.json --region $${emitter.applicationRegion} ${path.module}/build/predeploy-out.json > /dev/null && grep -q predeploy-ok ${path.module}/build/predeploy-out.json""" + "\""
+                    )
+                    "interpreter" - expression("local.is_windows ? [\"PowerShell\", \"-Command\"] : []")
+                }
+            }
             "resource.aws_lambda_alias.main" {
                 "name" - "prod"
                 "description" - "The current production version of the lambda."
                 "function_name" - expression("aws_lambda_function.main.arn")
                 "function_version" - (if (snapStart) expression("aws_lambda_function.main.version") else "\$LATEST")
+                // Cut over to the new version only after pre-deploy tasks succeed.
+                "depends_on" - listOf("null_resource.predeploy")
             }
             "resource.aws_cloudwatch_log_group.main" {
                 "name" - "${emitter.projectPrefix}-main-log"

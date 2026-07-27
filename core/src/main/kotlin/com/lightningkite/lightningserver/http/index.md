@@ -45,9 +45,12 @@ includes types for requests, responses, headers, status codes, URL parsing, and 
 ### Basic Request Handler
 
 ```kotlin
+// Define the table once and share it; it is the key backends use to locate the table.
+val userTable = DatabaseTableDefinition<User>()
+
 val endpoint = path.path("users").arg<String>("id").get bind HttpHandler { request ->
     val userId = request.path.arg1
-    val user = database().table<User>().get(userId)
+    val user = database().table(userTable).get(userId)
     HttpResponse.json(user)
 }
 ```

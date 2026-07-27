@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.typed
 
+import com.lightningkite.lightningserver.definition.PreDeployTask
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.runtime.*
@@ -20,6 +21,8 @@ public data class ActionHasOccurred(
     val errorMessage: String? = null,
 ) : HasId<String>
 
+private val actionHasOccurredTable = DatabaseTableDefinition<ActionHasOccurred>()
+
 context(runtime: ServerRuntime)
 public suspend fun doOnce(
     key: String,
@@ -27,7 +30,7 @@ public suspend fun doOnce(
     timeout: Duration = 60.seconds,
     action: suspend context(ServerRuntime) () -> Unit,
 ) {
-    val table = database().table<ActionHasOccurred>()
+    val table = database().prepare(actionHasOccurredTable)
 
     val existing = table.get(key)
     if (existing == null) {
@@ -79,7 +82,39 @@ public fun startupOnce(
             val oldKey = location.segments.lastOrNull()?.toString() ?: ""
             val newKey = location.toString()
 
-            val table = database().table<ActionHasOccurred>()
+            val table = database().prepare(actionHasOccurredTable)
+
+            if (table.get(newKey) == null) table.get(oldKey)?.let { old ->
+                table.insertOne(
+                    old.copy(_id = newKey)
+                )
+            }
+        }
+
+        doOnce(
+            key = location.toString(),
+            database = database,
+            timeout = timeout,
+            action = action
+        )
+    }
+
+/**
+ * Creates a [StartupTask] that calls [doOnce] with its bound path as its key.
+ * */
+public fun predeployOnce(
+    database: Runtime<Database>,
+    migrateKey: Boolean = false,
+    dependencies: () -> List<PreDeployTask> = { emptyList() },
+    timeout: Duration = 60.seconds,
+    action: suspend context(ServerRuntime) () -> Unit,
+): PreDeployTask =
+    PreDeployTask(dependencies, timeout) {
+        if (migrateKey) {
+            val oldKey = location.segments.lastOrNull()?.toString() ?: ""
+            val newKey = location.toString()
+
+            val table = database().prepare(actionHasOccurredTable)
 
             if (table.get(newKey) == null) table.get(oldKey)?.let { old ->
                 table.insertOne(

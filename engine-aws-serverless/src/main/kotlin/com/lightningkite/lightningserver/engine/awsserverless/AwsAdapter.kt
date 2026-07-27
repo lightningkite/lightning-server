@@ -244,6 +244,16 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
                             schedules.handleSchedule(parsed)
                         }
 
+                        asJson.containsKey("predeploy") -> {
+                            try {
+                                runPreDeployTasks()
+                                APIGatewayV2HTTPResponse(statusCode = 200, body = "predeploy-ok")
+                            } catch (e: Exception) {
+                                logger.error(e) { "Pre-deploy tasks failed" }
+                                APIGatewayV2HTTPResponse(statusCode = 500, body = "predeploy-failed: ${e.message}")
+                            }
+                        }
+
                         asJson.containsKey("topic") -> {
                             val parsed: AwsAdapterWs.WebSocketPublish =
                                 internalSerialization.json.decodeFromJsonElement(asJson)

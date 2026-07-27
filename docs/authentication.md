@@ -41,15 +41,15 @@ object Server : ServerBuilder() {
 
         context(server: ServerRuntime)
         override suspend fun fetch(id: Uuid): User =
-            database().table<User>().get(id) ?: throw NotFoundException()
+            database().table(userTable).get(id) ?: throw NotFoundException()
 
         context(server: ServerRuntime)
         override suspend fun fetchByProperty(property: String, value: String): User? {
             return when (property) {
                 "email" -> {
-                    val existing = database().table<User>()
+                    val existing = database().table(userTable)
                         .findOne(condition { it.email eq value })
-                    existing ?: database().table<User>()
+                    existing ?: database().table(userTable)
                         .insertOne(User(email = value))
                 }
                 else -> super.fetchByProperty(property, value)
@@ -104,15 +104,15 @@ object UserAuth : PrincipalType<User, Uuid> {
 
     context(server: ServerRuntime)
     override suspend fun fetch(id: Uuid): User =
-        database().table<User>().get(id) ?: throw NotFoundException()
+        database().table(userTable).get(id) ?: throw NotFoundException()
 
     context(server: ServerRuntime)
     override suspend fun fetchByProperty(property: String, value: String): User? {
         return when (property) {
             "email" -> {
                 // Find or create user by email
-                database().table<User>().findOne(condition { it.email eq value })
-                    ?: database().table<User>().insertOne(User(email = value))
+                database().table(userTable).findOne(condition { it.email eq value })
+                    ?: database().table(userTable).insertOne(User(email = value))
             }
             else -> super.fetchByProperty(property, value)
         }

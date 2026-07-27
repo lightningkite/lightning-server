@@ -122,6 +122,14 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     /** Command to start the server (passed to main class). */
     public open val serverCommand: String get() = "serve"
 
+    /**
+     * Command that runs pre-deploy tasks and exits (passed to the app launcher). Run once per
+     * deploy, before the new version is cut over, while the current version keeps serving; a
+     * non-zero exit aborts the deploy. The application must expose this command (see the framework's
+     * `runPreDeploy`). Defaults to `"predeploy"`.
+     */
+    public open val preDeployCommand: String get() = "predeploy"
+
     /** Whether this is a debug deployment. */
     public abstract val debug: Boolean
 
@@ -943,6 +951,66 @@ REDEPLOY_EOF
 
 chmod +x /usr/local/bin/lightning-server-redeploy
 echo "[INFO] Creating Lightning Server Redeploy Script - DONE"
+
+# === Lightning Server Pre-Deploy Script ===
+# Runs pre-deploy tasks with the NEW build in a scratch dir, without touching the live server, so
+# the current version keeps serving while migrations run. Invoked once per deploy (before the
+# redeploy/cutover) - by the single-instance redeploy on the one box, and by the scaling fleet
+# script on one instance. A non-zero exit aborts the deploy.
+echo "[INFO] Creating Lightning Server Pre-Deploy Script"
+cat > /usr/local/bin/lightning-server-predeploy << 'PREDEPLOY_EOF'
+#!/bin/bash
+set -euo pipefail
+
+log() { echo "[lightning-server-predeploy] $*"; }
+err() { echo "[lightning-server-predeploy] ERROR: $*" >&2; }
+
+$$bucketRegionResolution
+SSM_PARAM="/$$projectPrefix/settings-password"
+SCRATCH="/opt/lightning-server/predeploy"
+LOG_FILE="/var/log/$$projectPrefix/predeploy.log"
+
+mkdir -p "$(dirname "$LOG_FILE")"
+touch "$LOG_FILE"
+chown ubuntu:ubuntu "$LOG_FILE"
+exec > >(tee -a "$LOG_FILE" | logger -t lightning-server-predeploy -s) 2>&1
+
+log "Pre-deploy started at $(date)"
+
+# Fetch the NEW build + settings into a scratch dir; the live server is never touched.
+rm -rf "$SCRATCH"
+mkdir -p "$SCRATCH"
+aws s3 cp "s3://$BUCKET/server.zip" "$SCRATCH/server.zip" --region "$REGION" --no-progress
+unzip -q "$SCRATCH/server.zip" -d "$SCRATCH"
+aws s3 cp "s3://$BUCKET/settings.enc" "$SCRATCH/settings.enc" --region "$REGION" --no-progress
+SETTINGS_PASS=$(aws ssm get-parameter --name "$SSM_PARAM" --with-decryption --query Parameter.Value --output text --region "$REGION")
+if ! openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -md sha256 \
+    -in "$SCRATCH/settings.enc" -out "$SCRATCH/settings.json" -pass pass:"$SETTINGS_PASS"; then
+    err "Failed to decrypt settings"
+    rm -rf "$SCRATCH"
+    exit 1
+fi
+rm -f "$SCRATCH/settings.enc"
+chown -R ubuntu:ubuntu "$SCRATCH"
+chmod 600 "$SCRATCH/settings.json"
+
+# Cap heap so this runs alongside the live server without risking OOM. Heavy migrations may need more.
+log "Running pre-deploy tasks with the new version"
+cd "$SCRATCH"
+if sudo -u ubuntu env "JAVA_OPTS=-Xmx512m" ./server/bin/server $$preDeployCommand; then
+    cd /
+    rm -rf "$SCRATCH"
+    log "Pre-deploy complete"
+else
+    cd /
+    rm -rf "$SCRATCH"
+    err "Pre-deploy tasks failed"
+    exit 1
+fi
+PREDEPLOY_EOF
+
+chmod +x /usr/local/bin/lightning-server-predeploy
+echo "[INFO] Creating Lightning Server Pre-Deploy Script - DONE"
 """
         )
     }
@@ -971,6 +1039,11 @@ echo "[INFO] Creating Lightning Server Redeploy Script - DONE"
         // Validate server command
         require(serverCommand.none { it in dangerousChars }) {
             "Invalid server command '$serverCommand': contains potentially dangerous characters"
+        }
+
+        // Validate pre-deploy command
+        require(preDeployCommand.none { it in dangerousChars }) {
+            "Invalid pre-deploy command '$preDeployCommand': contains potentially dangerous characters"
         }
 
         // Validate instance file names (must be absolute, no traversal)
