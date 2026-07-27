@@ -87,6 +87,20 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
     }
 
     /**
+     * Runs all registered startup tasks in dependency order (test support).
+     *
+     * Exposes the protected [runStartupTasks] so tests can exercise startup behavior.
+     */
+    public suspend fun executeStartupTasks(): Unit = runStartupTasks()
+
+    /**
+     * Runs all registered pre-deploy tasks in dependency order (test support).
+     *
+     * Exposes the protected [runPreDeployTasks] so tests can exercise pre-deploy behavior.
+     */
+    public suspend fun executePreDeployTasks(): Unit = runPreDeployTasks()
+
+    /**
      * Test wrapper for WebSocket connections.
      *
      * Provides methods to simulate client behavior and inspect server state during testing.
