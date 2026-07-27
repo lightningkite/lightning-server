@@ -14,8 +14,7 @@ public interface ModelInfo<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<I
 
     public val auth: AuthRequirement<SUBJECT>
 
-    public val tableDefinition: DatabaseTableDefinition<T>
-    public val preDeployTask: PreDeployTask
+    public val registration: DatabaseTableRegistration<T>
 
     public object Scopes {
         public val create: Subscope = Subscope("create")
@@ -63,18 +62,12 @@ public inline fun <reified USER : HasId<*>?, reified T : HasId<ID>, reified ID :
 
     override val auth: AuthRequirement<USER> = subscope?.let { auth.subscope(it) } ?: auth
 
-    override val tableDefinition: DatabaseTableDefinition<T> = DatabaseTableDefinition(serializer, tableName)
-    // Table/index reconciliation runs as a pre-deploy task: once per deploy, before the new version
-    // serves, rather than on every instance's boot (keeps it off the cold-start path). It is
-    // convergent (reconciles the DB to the current model), so running it every deploy is correct.
-    override val preDeployTask: PreDeployTask = with(builder) {
-        path.path(tableName) bind PreDeployTask {
-            this@modelInfo().prepare(tableDefinition)
-        }
-    }
+    // registerTable defines the table, registers it, and creates its (once-per-deploy) prepare task.
+    override val registration: DatabaseTableRegistration<T> =
+        with(builder) { this@modelInfo.registerTable(tableName, serializer) }
 
     context(server: ServerRuntime)
-    override fun baseTable(): Table<T> = this@modelInfo().table(tableDefinition)
+    override fun baseTable(): Table<T> = registration()
 
     override val tableName: String get() = tableName
 
@@ -120,18 +113,12 @@ public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> Runtime<Databa
 
     override val auth: AuthRequirement<USER> = subscope?.let { auth.subscope(it) } ?: auth
 
-    override val tableDefinition: DatabaseTableDefinition<T> = DatabaseTableDefinition(serializer, tableName)
-    // Table/index reconciliation runs as a pre-deploy task: once per deploy, before the new version
-    // serves, rather than on every instance's boot (keeps it off the cold-start path). It is
-    // convergent (reconciles the DB to the current model), so running it every deploy is correct.
-    override val preDeployTask: PreDeployTask = with(builder) {
-        path.path(tableName) bind PreDeployTask {
-            this@explicitModelInfo().prepare(tableDefinition)
-        }
-    }
+    // registerTable defines the table, registers it, and creates its (once-per-deploy) prepare task.
+    override val registration: DatabaseTableRegistration<T> =
+        with(builder) { this@explicitModelInfo.registerTable(tableName, serializer) }
 
     context(server: ServerRuntime)
-    override fun baseTable(): Table<T> = this@explicitModelInfo().table(tableDefinition)
+    override fun baseTable(): Table<T> = registration()
 
     override val tableName: String
         get() = tableName

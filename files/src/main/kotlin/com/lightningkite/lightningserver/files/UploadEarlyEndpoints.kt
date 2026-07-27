@@ -11,6 +11,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
+import com.lightningkite.lightningserver.typed.registerTable
 import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.services.database.*
 import com.lightningkite.services.files.*
@@ -46,12 +47,8 @@ public class UploadEarlyEndpoint(
         sdkSettings.clientInterface = ClientUploadEarlyEndpoints::class.info()
     }
 
-    private val uploadForNextRequestTable = DatabaseTableDefinition<UploadForNextRequest>()
-
-    /** Prepares the backing table (collection/indexes) once per deploy, before serving. */
-    public val prepareTable: PreDeployTask = path.path("prepare") bind PreDeployTask {
-        database().prepare(uploadForNextRequestTable)
-    }
+    // Defines the table, registers it, and creates its once-per-deploy prepare task.
+    private val uploadForNextRequestTable = database.registerTable<UploadForNextRequest>("UploadForNextRequest")
 
     /**
      * Contextual serializer used for ServerFile values that integrates with the configured PublicFileSystem
@@ -66,7 +63,7 @@ public class UploadEarlyEndpoint(
             fileSystems = listOf(files()),
             onUse = { fileObject ->
                 runBlocking {
-                    database().table(uploadForNextRequestTable)
+                    uploadForNextRequestTable()
                         .deleteManyIgnoringOld(condition { it.file eq ServerFile(fileObject.url) })
                 }
             },
@@ -102,7 +99,7 @@ public class UploadEarlyEndpoint(
                         expires = now().plus(expiration),
                         file = ServerFile(newFile.url)
                     )
-                    database().table(uploadForNextRequestTable).insertOne(newItem)
+                    uploadForNextRequestTable().insertOne(newItem)
                     UploadInformation(
                         uploadUrl = newFile.uploadUrl(expiration),
                         futureCallToken = serializer().certifyAlreadyScannedForUse(key, expiration)
@@ -113,7 +110,7 @@ public class UploadEarlyEndpoint(
                         expires = now().plus(expiration),
                         file = ServerFile(newFile.url)
                     )
-                    database().table(uploadForNextRequestTable).insertOne(newItem)
+                    uploadForNextRequestTable().insertOne(newItem)
                     UploadInformation(
                         uploadUrl = newFile.uploadUrl(expiration),
                         futureCallToken = serializer().certifyForUse(key, expiration)
@@ -143,7 +140,7 @@ public class UploadEarlyEndpoint(
                     expires = now().plus(expiration),
                     file = ServerFile(safe.url)
                 )
-                database().table(uploadForNextRequestTable).insertOne(newItem)
+                uploadForNextRequestTable().insertOne(newItem)
 
                 url
             }
@@ -153,7 +150,7 @@ public class UploadEarlyEndpoint(
      * Daily cleanup of expired uploads. Removes database entries and attempts to delete the associated file.
      */
     public val cleanupSchedule: ScheduledTask = path.path("cleanupUploads") bind ScheduledTask(frequency = 1.days) {
-        database().table(uploadForNextRequestTable).deleteMany(condition { it.expires lt now() }).forEach {
+        uploadForNextRequestTable().deleteMany(condition { it.expires lt now() }).forEach {
             try {
                 files().parseInternalUrl(it.file.location)!!.delete()
             } catch (e: Exception) {
