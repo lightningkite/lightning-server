@@ -511,6 +511,40 @@ class AuthRequirementTest {
         assertEquals(AuthRequirement.IsSuperUser, scoped.wraps)
     }
 
+    @Test
+    fun `AuthSetting requiredScopes falls back to default when unconfigured`() = runBlocking {
+        // IsAdmin itself is left unconfigured; only its default (IsSuperUser) is set.
+        // requiredScopes() used to ignore `default` and report an empty set here, which
+        // fed incorrect (understated) scopes into generated docs/SDKs.
+        val customRequirement = TestUser.require(scope = RequiredScope("root-scope"))
+
+        object : ServerBuilder() {
+            init {
+                register(TestUser)
+                AuthRequirement.isSuperUser = customRequirement
+            }
+        }.test({}) {
+            val scopes = AuthRequirement.IsAdmin.requiredScopes()
+            assertTrue(scopes.contains(RequiredScope("root-scope")))
+        }
+    }
+
+    @Test
+    fun `AuthSetting Scoped requiredScopes falls back to default when unconfigured`() = runBlocking {
+        val customRequirement = TestUser.require(scope = RequiredScope("root-scope"))
+
+        object : ServerBuilder() {
+            init {
+                register(TestUser)
+                AuthRequirement.isSuperUser = customRequirement
+            }
+        }.test({}) {
+            val scoped = AuthRequirement.IsAdmin.subscope(listOf(Subscope("nested")))
+            val scopes = scoped.requiredScopes()
+            assertTrue(scopes.isNotEmpty())
+        }
+    }
+
     // ========== naturalLanguage Tests ==========
 
     @Test
