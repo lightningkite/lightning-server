@@ -95,4 +95,4 @@ public suspend fun <SUBJECT : HasId<*>?> Request<*>.tryAuth(auth: AuthRequiremen
     auth.check(this[Authentication.CacheKey])
 
 context(server: ServerRuntime, access: Access<*, *, *>)
-public suspend operator fun AuthRequirement.AuthSetting.invoke(): Boolean = accepts(access.authOrNull)
+public suspend operator fun AuthRequirement.AuthSetting<*>.invoke(): Boolean = accepts(access.authOrNull)
