@@ -1,4 +1,4 @@
-import type { Query, MassModification, EntryChange, ListChange, Modification, Condition, GroupCountQuery, AggregateQuery, GroupAggregateQuery, Aggregate, SortPart, DataClassPath, DataClassPathPartial, QueryPartial, DeepPartial, Fetcher } from '@lightningkite/lightning-server-simplified'
+import type { Query, MassModification, EntryChange, ListChange, Modification, Condition, GroupCountQuery, AggregateQuery, GroupAggregateQuery, Aggregate, SortPart, DataClassPath, DataClassPathPartial, QueryPartial, DeepPartial, Fetcher, Brand } from '@lightningkite/lightning-server-simplified'
 
 export interface CollectionUpdates<T, T1> {
 	updates: Array<T>
@@ -32,24 +32,42 @@ export interface TestInput {
 }
 
 export interface TestModel {
-	_id: Uuid
+	_id: TestModel.ID
 	name: string
+	statusInfo: TestModel.TestStatusInfo
+}
+
+export namespace TestModel {
+	export type ID = Brand<Uuid, "TestModel.ID">
+
+	export enum Status {
+		Active = "Active",
+		Inactive = "Inactive",
+		Pending = "Pending",
+	}
+
+	export interface TestStatusInfo {
+		status: TestModel.Status
+		updatedAt: number
+	}
 }
 
 export interface UpdateRestrictions<T> {
-	mode: UpdateRestrictionsMode
-	fields: Array<UpdateRestrictionsPart<T>>
+	mode: UpdateRestrictions.Mode
+	fields: Array<UpdateRestrictions.Part<T>>
 }
 
-export enum UpdateRestrictionsMode {
-	Blacklist = "Blacklist",
-	Whitelist = "Whitelist",
-}
+export namespace UpdateRestrictions {
+	export enum Mode {
+		Blacklist = "Blacklist",
+		Whitelist = "Whitelist",
+	}
 
-export interface UpdateRestrictionsPart<T> {
-	property: DataClassPathPartial<T>
-	requires: Condition<T>
-	limitedTo: Condition<T>
+	export interface Part<T> {
+		property: DataClassPathPartial<T>
+		requires: Condition<T>
+		limitedTo: Condition<T>
+	}
 }
 
 export type Uuid = string  // kotlin.uuid.Uuid
