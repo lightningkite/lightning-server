@@ -241,15 +241,48 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
             for (reader in server.server.authReaders.sortedByDescending { it.priority }) {
                 val auth = reader.read(input) ?: continue
 
-                input.headers[HttpHeader.XMasquerade]?.root?.let { masquerade ->
-                    val principal = masquerade.substringBefore('/')
+                input.headers[HttpHeader.XMasquerade]?.let { header ->
+                    val masquerade = header.root
 
-                    val handler = server.server.principalTypes[principal] as? PrincipalType<HasId<*>, *>
-                        ?: throw BadRequestException("Principal type $principal is unrecognized for masquerade")
+                    val validEncodings = mapOf(
+                        "str-array" to server.externalSerialization.stringArrayFormat,
+                        "json" to server.externalSerialization.json
+                    )
 
-                    val mask = Authentication<HasId<*>>(
-                        principal,
-                        rawId = masquerade.substringAfter('/'),
+                    if (!masquerade.contains('/')) throw BadRequestException(
+                        """Invalid masquerade value. Expected to be in the form: <principal-name>/<subject-id> (; encoding=[${
+                            validEncodings.keys.withIndex().joinToString("|") { (idx, enc) -> 
+                                if (idx == 0) "${enc}(default)"
+                                else enc
+                            }
+                        }])"""
+                    )
+
+                    val principalName = masquerade.substringBefore('/')
+                    val principal = server.server.principalTypes[principalName] as? PrincipalType<HasId<*>, *>
+                        ?: throw BadRequestException("Principal type $principalName is unrecognized for masquerade")
+
+                    val encoding = header.parameters["encoding"]
+                        ?.let {
+                            validEncodings[it] ?: throw BadRequestException("Invalid encoding type. Supported types are ${validEncodings.keys}")
+                        }
+                        ?: validEncodings.values.first()
+
+                    val idString = masquerade.substringAfter('/')
+                    val id = try {
+                        encoding.decodeFromString(principal.idSerializer, idString)
+                    } catch (e: SerializationException) {
+                        throw BadRequestException(
+                            message = "Invalid masquerade id: ${e.message}",
+                            data = idString,
+                            cause = e
+                        )
+                    }
+
+                    val mask = Authentication(
+                        principalType = principal,
+                        id = id,
+                        rawId = idString,
                         sessionId = null,
                         issuedAt = server.clock.now(),
                         expiration = auth.expiration,
@@ -260,15 +293,10 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
                         // gate it in permitMasquerade if you need to restrict it.
                         scopes = auth.scopes,
                         fromMasquerade = auth,
+                        cache = auth.cache,
                     )
 
-                    try {
-                        mask.untypedId
-                    } catch (_: SerializationException) {
-                        throw BadRequestException(message = "Invalid masquerade id", data = mask.rawId)
-                    }
-
-                    if (handler.permitMasquerade(auth, mask)) {
+                    if (principal.permitMasquerade(auth, mask)) {
                         // Audit trail: masquerade is a privilege-sensitive action, so record who
                         // assumed whom. Logged at info because it is an authorized, expected event.
                         server.logger.info { "AUDIT masquerade granted: ${auth.principalName}/${auth.rawId} -> $masquerade" }
