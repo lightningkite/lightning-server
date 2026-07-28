@@ -152,7 +152,7 @@ end
 **Lightning Server:**
 
 ```kotlin
-val posts = database().table(postTable)
+val posts = postTable()
     .interceptCreate { value ->
         // Modify before insertion (like before_create)
         value.copy(slug = value.title.slugify())
@@ -204,6 +204,7 @@ object Server : ServerBuilder() {
     val posts = path.path("posts") include object : ServerBuilder() {
         val info = database.modelInfo(
             auth = UserAuth.require(),
+            tableName = "Post",
             permissions = { /* permission rules */ }
         )
         val rest = path.path("rest") module ModelRestEndpoints(info)

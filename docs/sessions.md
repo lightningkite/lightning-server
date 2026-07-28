@@ -127,11 +127,9 @@ object Server : ServerBuilder() {
         }
     )
 
-    val passwordProof = PasswordProofEndpoints(
-        table = database.table(passwordSecretTable),
-        getSubjectId = { it.email },
-        hash = { it.secureHash() }
-    )
+    // PasswordProofEndpoints registers its own "PasswordSecret" table and hashes
+    // passwords on write; you only hand it the database and cache.
+    val passwordProof = PasswordProofEndpoints(database, cache)
 
     // Include in your server
     init {

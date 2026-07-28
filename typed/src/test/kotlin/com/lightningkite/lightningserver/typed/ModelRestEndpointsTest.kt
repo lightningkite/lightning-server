@@ -23,6 +23,7 @@ class ModelRestEndpointsTest {
     object CrudTestServer : ServerBuilder() {
         val database = setting("database", Database.Settings())
         val info = database.modelInfo<HasId<*>?, CrudItem, Uuid>(
+            tableName = "CrudItem",
             auth = noAuth,
             permissions = { ModelPermissions.allowAll() }
         )

@@ -179,7 +179,7 @@ Post.objects.filter(author='user@example.com').delete()
 **Lightning Server:**
 
 ```kotlin
-val posts = database().table(postTable)
+val posts = postTable()
 
 // Get all posts by an author
 posts.find(condition { it.author eq "user@example.com" }).toList()
@@ -245,7 +245,7 @@ def post_deleted(sender, instance, **kwargs):
 ### Lightning Server Lifecycle Hooks
 
 ```kotlin
-val collection = database().table(postTable)
+val collection = postTable()
     .interceptCreate { value ->
         // Modify value before creation
         println("About to insert: ${value.title}")
@@ -302,19 +302,19 @@ url = reverse('post-detail', args=[123])  # '/posts/123/'
 object Server : ServerBuilder() {
     // Endpoints are stored as constants
     val postList = path.path("posts").get bind HttpHandler {
-        HttpResponse.json(database().table(postTable).find(condition { it.always }).toList())
+        HttpResponse.json(postTable().find(condition { it.always }).toList())
     }
 
     val postDetail = path.path("posts").arg<Int>("pk").get bind HttpHandler { request ->
         val pk = request.path.arg1
-        val post = database().table(postTable).get(pk) ?: throw NotFoundException()
+        val post = postTable().get(pk) ?: throw NotFoundException()
         HttpResponse.json(post)
     }
 
     val userPosts = path.path("users").arg<String>("userId").path("posts").get bind HttpHandler { request ->
         val userId = request.path.arg1
         HttpResponse.json(
-            database().table(postTable).find(condition { it.author eq userId }).toList()
+            postTable().find(condition { it.author eq userId }).toList()
         )
     }
 }
@@ -356,12 +356,12 @@ class PostListView(View):
 ```kotlin
 object PostEndpoints : ServerBuilder() {
     val list = path.get bind HttpHandler {
-        HttpResponse.json(database().table(postTable).find(condition { it.always }).toList())
+        HttpResponse.json(postTable().find(condition { it.always }).toList())
     }
 
     val create = path.post bind HttpHandler { request ->
         val data = request.body?.parse<Post>() ?: throw BadRequestException("Missing body")
-        val created = database().table(postTable).insertOne(data)
+        val created = postTable().insertOne(data)
         HttpResponse(
             body = TypedData.json(mapOf("id" to created._id)),
             status = HttpStatus.Created
@@ -415,6 +415,7 @@ object PostApi : ServerBuilder() {
     // Define model info with permissions
     val postInfo = database.modelInfo<User?, Post, Uuid>(
         auth = authOptions<User>(),
+        tableName = "Post",
         permissions = {
             val user = authOrNull?.fetch()
             ModelPermissions(
@@ -467,7 +468,7 @@ val createPost = path.path("posts").post bind ApiHttpHandler<_, User?, CreatePos
             author = user.email,
             body = input.body
         )
-        database().table(postTable).insertOne(post)
+        postTable().insertOne(post)
         post
     }
 )
@@ -562,7 +563,7 @@ object Server : ServerBuilder() {
 
         context(server: ServerRuntime)
         override suspend fun fetch(id: Uuid): User =
-            database().table(userTable).get(id) ?: throw NotFoundException()
+            userTable().get(id) ?: throw NotFoundException()
     }
 
     // Protected endpoint

@@ -81,6 +81,7 @@ object PostRestServer : ServerBuilder() {
     //   ID = Uuid, the primary-key type
     val postInfo = database.modelInfo<HasId<*>?, Post, Uuid>(
         auth = noAuth,
+        tableName = "Post",
         permissions = { ModelPermissions.allowAll() }
     )
 
@@ -260,6 +261,7 @@ object AuthPostServer : ServerBuilder() {
 
     val postInfo = database.modelInfo<UserProfile, Post, Uuid>(
         auth = UserAuth.require(),
+        tableName = "Post",
         permissions = {
             val user = auth.fetch()
             ModelPermissions(
@@ -287,6 +289,7 @@ Allow unauthenticated callers for reads while requiring a session for writes:
 // Illustrative — not drift-checked.
 val postInfo = database.modelInfo<UserProfile, Post, Uuid>(
     auth = UserAuth.require() or AuthRequirement.None,
+    tableName = "Post",
     permissions = {
         val user = authOrNull?.fetch()
         ModelPermissions(
@@ -312,6 +315,7 @@ client:
 // Illustrative — not drift-checked.
 val postInfo = database.modelInfo<UserProfile, Post, Uuid>(
     auth = UserAuth.require() or AuthRequirement.None,
+    tableName = "Post",
     permissions = {
         val user = authOrNull?.fetch()
         val self: Condition<Post> = condition { it.author eq (user?.email ?: "") }

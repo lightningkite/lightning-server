@@ -38,6 +38,7 @@ object BlogServer : ServerBuilder() {
 
     val blogInfo = database.modelInfo(
         auth = UserAuth.require(),
+        tableName = "BlogPost",
         permissions = {
             if (auth.fetch().isSuperUser)
                 ModelPermissions.allowAll<BlogPost>()
@@ -223,6 +224,7 @@ socket.incoming.collect { updates: CollectionUpdates<BlogPost, Uuid> ->
 object BlogEndpoints : ServerBuilder() {
     val info = Server.database.modelInfo(
         auth = Server.UserAuth.require(),
+        tableName = "BlogPost",
         permissions = {
             if (auth.fetch().isSuperUser)
                 ModelPermissions.allowAll<BlogPost>()

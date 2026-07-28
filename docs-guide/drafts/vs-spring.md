@@ -86,7 +86,7 @@ object UserEndpoints : ServerBuilder() {
         errorCases = listOf(LSError(http = 404, detail = "not-found", message = "User not found")),
         implementation = { _: Unit ->
             val id = path.arg1
-            database().table(userTable).get(Uuid.parse(id))
+            userTable().get(Uuid.parse(id))
                 ?: throw NotFoundException(detail = "not-found", message = "User not found")
         }
     )
@@ -96,7 +96,7 @@ object UserEndpoints : ServerBuilder() {
         auth        = noAuth,
         successCode = HttpStatus.Created,
         implementation = { request: CreateUserRequest ->
-            database().table(userTable).insertOne(request.toUser())
+            userTable().insertOne(request.toUser())
         }
     )
 }
@@ -129,7 +129,7 @@ data class User(
 ) : HasId<Uuid>
 
 // No repository interface — use the table directly:
-val users = database().table(userTable)
+val users = userTable()
 
 users.find(condition { it.email.contains("@example.com") }).toList()
 users.findOne(condition { (it.email eq email) and (it.active eq true) })
@@ -239,7 +239,7 @@ val getUser = path.path("users").arg<String>("id").get bind ApiHttpHandler(
         val id = path.arg1
         val key = "user:$id"
         cache().get<User>(key) ?: run {
-            val user = database().table(userTable).get(Uuid.parse(id)) ?: throw NotFoundException()
+            val user = userTable().get(Uuid.parse(id)) ?: throw NotFoundException()
             cache().set(key, user, ttl = 5.minutes)
             user
         }
@@ -298,7 +298,7 @@ public CompletableFuture<Void> sendWelcomeEmail(String userId) { ... }
 object Server : ServerBuilder() {
 
     val sendWelcomeEmail = task("send-welcome-email") { userId: Uuid ->
-        val user = database().table(userTable).get(userId) ?: return@task
+        val user = userTable().get(userId) ?: return@task
         email().send(welcomeEmail(user))
     }
 
@@ -306,7 +306,7 @@ object Server : ServerBuilder() {
         summary = "Register",
         auth    = noAuth,
         implementation = { req: RegistrationRequest ->
-            val user = database().table(userTable).insertOne(req.toUser())
+            val user = userTable().insertOne(req.toUser())
             sendWelcomeEmail.launch(user._id)   // fire and forget
             user
         }
@@ -345,7 +345,7 @@ class UserEndpointsTest {
     @Test
     fun testGetUser() = Server.testBlocking(settings = { database.set("ram") }) {
         val user = User(_id = Uuid.random(), email = "test@example.com")
-        database().table(userTable).insertOne(user)
+        userTable().insertOne(user)
 
         val result = Server.getUser.test(null, Unit)  // typed output, no HTTP round-trip
         check(result.email == "test@example.com")

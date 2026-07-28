@@ -37,6 +37,7 @@ class UploadEarlySdkTests {
 
     private object Module : ServerBuilder() {
         val info = Server.database.modelInfo(
+            tableName = "Model",
             auth = noAuth,
             permissions = { ModelPermissions.allowAll<Model>() }
         )

@@ -25,6 +25,7 @@ public class FunnelEndpoints(
 ) : ServerBuilder() {
 
     public val summaryInfo: ModelInfo<HasId<*>, FunnelSummary, Uuid> = database.modelInfo(
+        tableName = "FunnelSummary",
         auth = read,
         permissions = { ModelPermissions.allowAll() }
     )
@@ -33,6 +34,7 @@ public class FunnelEndpoints(
         path.path("summary").path("rest") module ModelRestEndpoints(summaryInfo).withSdkInfo(valueName = "summaries")
 
     public val info: ModelInfo<HasId<*>, FunnelInstance, Uuid> = database.modelInfo(
+        tableName = "FunnelInstance",
         auth = read,
         permissions = { ModelPermissions.allowAll() }
     )

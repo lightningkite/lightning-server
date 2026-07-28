@@ -295,7 +295,7 @@ object UserAuth : PrincipalType<User, Uuid> {
     context(server: ServerRuntime)
     override suspend fun fetchByProperty(property: String, value: String): User? {
         return when (property) {
-            "email" -> Server.database().table(userTable)
+            "email" -> Server.userTable()
                 .findOne(condition { it.email eq value })
             else -> super.fetchByProperty(property, value)
         }
@@ -311,8 +311,8 @@ If no user with that email exists, `fetchByProperty` returns `null`, and the ses
 context(server: ServerRuntime)
 override suspend fun fetchByProperty(property: String, value: String): User? {
     return when (property) {
-        "email" -> Server.database().table(userTable).findOne(condition { it.email eq value })
-            ?: Server.database().table(userTable).insertOne(User(email = value))
+        "email" -> Server.userTable().findOne(condition { it.email eq value })
+            ?: Server.userTable().insertOne(User(email = value))
         else -> super.fetchByProperty(property, value)
     }
 }

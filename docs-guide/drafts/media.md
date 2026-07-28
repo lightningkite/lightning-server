@@ -123,23 +123,35 @@ There are two strategies.  Choose based on whether previews must be ready
 and every modification that touches the image field triggers processing *before*
 the operation completes.  The API response is held until previews are written.
 
+The wrapping belongs in `modelInfo`'s `signals` hook — that hook runs with a
+`ServerRuntime` in context, which is what materialises the `Table<Product>`:
+
 ```kotlin
-context(runtime: ServerRuntime)
 object Server : ServerBuilder() {
     val database = setting("database", Database.Settings())
 
-    val products = database()
-        .table(productTable)
-        .interceptImagesForProcessingNotNull(
-            MediaPreviewOptions(sizeInPixels = 200),   // thumbnail
-            MediaPreviewOptions(sizeInPixels = 1200),  // full-size web
-            makePath = { it.path { it.photo } }
-        )
+    val productInfo = database.modelInfo<HasId<*>?, Product, Uuid>(
+        auth = noAuth,
+        tableName = "Product",
+        signals = { table ->
+            table.interceptImagesForProcessingNotNull(
+                MediaPreviewOptions(sizeInPixels = 200),   // thumbnail
+                MediaPreviewOptions(sizeInPixels = 1200),  // full-size web
+                makePath = { it.photo },
+            )
+        },
+        permissions = { ModelPermissions.allowAll() },
+    )
+
+    val products = path.path("products") include ModelRestEndpoints(productInfo)
 }
 ```
 
 Use `interceptImagesForProcessing` (with the trailing-`NotNull` dropped) when
-the field is nullable (`ServerFileWithMetadata?`).
+the field is nullable (`ServerFileWithMetadata?`).  The `NotNull` variant exists
+because `makePath` must produce a `DataClassPath<T, ServerFileWithMetadata?>` and
+`DataClassPath` is invariant in its value type — a path to a non-nullable field
+does not fit without it.
 
 **When to use this strategy:**
 - Previews must exist the moment the record is readable by clients.
@@ -151,24 +163,28 @@ the field is nullable (`ServerFileWithMetadata?`).
 model and schedules processing work outside the request lifecycle.
 
 ```kotlin
-context(runtime: ServerRuntime)
 object Server : ServerBuilder() {
     val database = setting("database", Database.Settings())
 
     // The task must be bound to a path or it will never execute.
     val processProductImages =
-        path.path("tasks").path("process-product-images").task bind
+        path.path("tasks").path("process-product-images") bind
             processImagesInBackground(
                 info = productInfo,                             // ModelInfo<USER, Product, Uuid>
                 MediaPreviewOptions(sizeInPixels = 200),
                 MediaPreviewOptions(sizeInPixels = 1200),
                 timeout = 5.minutes,
-                makePath = { it.path { it.photo } }
+                makePath = { it.photo },
             )
 }
 ```
 
-> **Important:** If you skip the `path.task bind` binding, the task object is
+There is no `NotNull` variant of `processImagesInBackground`, so this strategy
+requires the image field to be declared nullable (`ServerFileWithMetadata?`).
+With `Product.photo` non-nullable as declared above, either relax the field to
+nullable or use Strategy 1.
+
+> **Important:** If you skip the `bind` binding, the task object is
 > never registered and the framework logs a warning:
 > `"processImagesInBackground is unregistered and cannot be executed."`
 
