@@ -89,9 +89,27 @@ private val testEndpoint = explicitApiHttpHandler<PathSpec1<String>, HasId<*>?, 
 
 @Serializable
 data class TestModel(
-    override val _id: Uuid = Uuid.random(),
+    override val _id: ID = ID(),
     val name: String,
-) : HasId<Uuid>
+    val statusInfo: TestStatusInfo = TestStatusInfo(),
+) : HasId<TestModel.ID> {
+    @JvmInline
+    @Serializable
+    value class ID(override val raw: Uuid = Uuid.random()) : TypedId<Uuid, ID> {
+        override fun toString(): String = raw.toString()
+    }
+
+    enum class Status {
+        Active,
+        Inactive,
+        Pending,
+    }
+    @Serializable
+    data class TestStatusInfo(
+        val status: Status = Status.Active,
+        val updatedAt: Int = 0,
+    )
+}
 
 object Module : ServerBuilder() {
     val info = Server.database.modelInfo(

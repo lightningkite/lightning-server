@@ -168,9 +168,7 @@ public class TypescriptFetcherSdk(
             fun Appendable.appendModelImports() =
                 appendLine(
                     "import type { ${
-                        models.joinToString {
-                            it.tsType().substringBefore('<')
-                        }
+                        models.map { it.tsTopLevelTypeName() }.distinct().joinToString()
                     } } from './${fileStructure.modelsFilename}'"
                 )
 
@@ -200,61 +198,109 @@ public class TypescriptFetcherSdk(
     private fun Appendable.appendLsImports() =
         appendLine("import type { ${fromLightningServerPackage.joinToString()} } from '@lightningkite/lightning-server-simplified'")
 
+
     @OptIn(ExperimentalSerializationApi::class)
     context(server: ServerRuntime)
     private fun Appendable.writeTypeDefinitions(types: List<KSerializer<*>> = server.models()) {
         val stringSerialNames = HashSet<String>()
+        // TypeScript merges declarations with the same exported name, so nested Kotlin types
+        // are emitted as namespace members next to their parent interface. We render first,
+        // collect members like TestModel.ID/Status, then flush each namespace immediately
+        // after the matching top-level declaration for readability and stable imports.
+        val namespaces = linkedMapOf<String, MutableList<String>>()
+        val topLevelDeclarations = ArrayList<Pair<String, String>>()
 
-        for (type in types) {
-            if(type.descriptor.isInline) {
-                val name = type.descriptor.simpleSerialName
-                if (stringSerialNames.add(name)) {
-                    if(name == "ServerFile") appendLine(
-                        "export type ServerFile = string"
-                    )
-                    else appendLine(
-                        "export type $name = ${type.innerElement().decontextualize().tsType()}  // ${type.descriptor.serialName}"
-                    )
+        fun Appendable.appendDecl(
+            name: String,
+            emit: Appendable.(String, Int) -> Unit,
+        ): Pair<String, String>? {
+            val namespace = name.substringBefore('.', "")
+
+            if (namespace.isNotEmpty()) {
+                namespaces.getOrPut(namespace) { ArrayList() } += buildString {
+                    emit(name.substringAfter('.'), 1)
                 }
-            } else when (type.descriptor.kind) {
-                StructureKind.CLASS -> {
-                    val genericMap: Map<String, String> = type
-                        .getGenerics()
-                        ?.withIndex()
-                        ?.associate { (index, value) ->
-                            value.tsType() to "T${if (index > 0) index else ""}"
-                        }
-                        ?: emptyMap()
+                return null
+            }
+//            Top Level Declaration Name
+            return name.substringBefore('<').substringBefore('.') to buildString {
+                emit(name, 0)
+            }
+        }
 
-                    fun String.replaceGenerics(): String =
-                        genericMap.entries.fold(this) { acc, (old, new) -> acc.replace(old, new) }
+        fun Appendable.appendNamespace(namespace: String) {
+            val declarations = namespaces.remove(namespace) ?: return
+            appendLine("export namespace $namespace {")
+            declarations.forEachIndexed { index, declaration ->
+                if (index > 0) appendLine()
+                append(declaration)
+            }
+            appendLine('}')
+            appendLine()
+        }
 
-                    appendLine("export interface ${type.tsType().replaceGenerics()} {")
+        fun renderType(type: KSerializer<*>): Pair<String, String>? = when (type.descriptor.kind) {
+            StructureKind.CLASS -> {
+                val genericMap: Map<String, String> = type
+                    .getGenerics()
+                    ?.withIndex()
+                    ?.associate { (index, value) ->
+                        value.tsType() to "T${if (index > 0) index else ""}"
+                    }
+                    ?: emptyMap()
 
+                fun String.replaceGenerics(): String =
+                    genericMap.entries
+                        .sortedByDescending { it.key.length }
+                        .fold(this) { acc, (old, new) -> acc.replace(old, new) }
+
+                if (type.descriptor.isInline) {
+                    val valueType =
+                        type.serializableProperties?.firstOrNull()?.serializer?.tsType()?.replaceGenerics()
+                    val name = type.tsType().replaceGenerics()
+                    appendDecl(name, { localName, depth ->
+                        appendIdtLine(depth, "export type $localName = Brand<${valueType}, \"$name\">")
+                    })
+                } else {
                     val properties = type
                         .serializableProperties?.map { it.serializer }
                         ?: type.childSerializersOrNull()?.toList()
                         ?: emptyList()
 
-                    for ((idx, prop) in properties.withIndex()) {
-                        appendLine("\t${type.descriptor.getElementName(idx)}: ${prop.tsType().replaceGenerics()}")
-                    }
+                    val name = type.tsType().replaceGenerics()
 
-                    appendLine('}')
+                    appendDecl(name, { localName, depth ->
+                        appendIdtLine(depth, "export interface $localName {")
+                        for ((idx, prop) in properties.withIndex()) {
+                            appendIdtLine(
+                                depth + 1,
+                                "${type.descriptor.getElementName(idx)}: ${prop.tsType().replaceGenerics()}"
+                            )
+                        }
+
+                        appendIdtLine(depth, "}")
+                    })
                 }
+            }
 
-                SerialKind.ENUM -> {
-                    if (erasableTypes) {
-                        append("export type ${type.tsType()} = ")
+            SerialKind.ENUM -> {
+                val typeName = type.tsType()
+                if (erasableTypes) {
+                    appendDecl(typeName, { localName, depth ->
+                        appendIdt(depth)
+                        append("export type $localName = ")
                         for (index in 0 until type.descriptor.elementsCount) {
                             val name = type.descriptor.getElementName(index)
                             append(if (index == 0) "\"$name\"" else "| \"$name\"")
                         }
                         appendLine()
-                    } else {
-                        appendLine("export enum ${type.tsType()} {")
+                    })
+                } else {
+                    val typeName = type.tsType();
+                    appendDecl(typeName, { localName, depth ->
+                        appendIdtLine(depth, "export enum $localName {")
                         for (index in 0 until type.descriptor.elementsCount) {
-                            append('\t')
+                            appendIdt(depth + 1)
                             val name = type.descriptor.getElementName(index)
                             name.forEachIndexed { idx, it ->
                                 if ((idx == 0 && it.isJavaIdentifierStart()) || (idx != 0 && it.isJavaIdentifierPart()))
@@ -266,56 +312,74 @@ public class TypescriptFetcherSdk(
                             appendLine()
                         }
 
-                        appendLine('}')
-                    }
+                        appendIdtLine(depth, "}")
+                    })
                 }
+            }
 
-                PrimitiveKind.STRING -> {
-                    val name = type.descriptor.simpleSerialName
-                    if (name != "String" && stringSerialNames.add(name)) {
+            PrimitiveKind.STRING -> {
+                val name = type.descriptor.simpleSerialName
+                if (name != "String" && stringSerialNames.add(name)) {
+                    name to buildString {
                         appendLine(
                             "export type $name = string  // ${type.descriptor.serialName}"
                         )
                     }
-                }
+                } else  null
+            }
 
-                is PolymorphicKind -> {
-                    val options = type.sealedOptionsOrNull() ?: continue
+            is PolymorphicKind -> {
+                val options = type.sealedOptionsOrNull() ?: return null
+                val genericMap: Map<String, String> = type
+                    .getGenerics()
+                    ?.withIndex()
+                    ?.associate { (index, value) ->
+                        value.tsType() to "T${if (index > 0) index else ""}"
+                    }
+                    ?: emptyMap()
 
-                    val genericMap: Map<String, String> = type
-                        .getGenerics()
-                        ?.withIndex()
-                        ?.associate { (index, value) ->
-                            value.tsType() to "T${if (index > 0) index else ""}"
-                        }
-                        ?: emptyMap()
+                fun String.replaceGenerics(): String =
+                    genericMap.entries.fold(this) { acc, (old, new) -> acc.replace(old, new) }
 
-                    fun String.replaceGenerics(): String =
-                        genericMap.entries.fold(this) { acc, (old, new) -> acc.replace(old, new) }
+                // A discriminated union of the subtypes. App `@Serializable sealed` types serialize
+                // flat with a "type" discriminator ({ "type": "<name>", ...subtype fields }); framework
+                // wrapper types serialize as { "<name>": <subtype> }. Each subtype is emitted as its own
+                // interface, so the union just references those by name.
 
-                    // A discriminated union of the subtypes. App `@Serializable sealed` types serialize
-                    // flat with a "type" discriminator ({ "type": "<name>", ...subtype fields }); framework
-                    // wrapper types serialize as { "<name>": <subtype> }. Each subtype is emitted as its own
-                    // interface, so the union just references those by name.
+                val typeName = type.tsType().replaceGenerics()
+                appendDecl(typeName, { localName, depth ->
                     val wrapper = type.isWrapperSealed()
-                    append("export type ${type.tsType().replaceGenerics()} =")
+                    appendIdt(depth)
+                    append("export type ${localName} =")
                     if (options.isEmpty()) {
                         appendLine(" never")
                     } else {
                         appendLine()
                         for (option in options) {
                             val sub = option.serializer.tsType().replaceGenerics()
-                            if (wrapper) appendIdtLine(1, "| { \"${option.name}\": $sub }")
-                            else appendIdtLine(1, "| ({ type: \"${option.name}\" } & $sub)")
+                            if (wrapper) appendIdtLine(depth + 1, "| { \"${option.name}\": $sub }")
+                            else appendIdtLine(depth + 1, "| ({ type: \"${option.name}\" } & $sub)")
                         }
                     }
-                }
-
-                else -> continue
+                })
             }
-            appendLine()
+
+            else -> null
         }
+
+        for (type in types) {
+            renderType(type)?.let { topLevelDeclarations += it }
+        }
+
+        for ((name, declaration) in topLevelDeclarations) {
+            append(declaration)
+            appendLine()
+            appendNamespace(name)
+        }
+
+        namespaces.keys.toList().forEach { appendNamespace(it) }
     }
+
 
     /**
      * Generates the TypeScript interface definition for the API.
@@ -462,20 +526,21 @@ public class TypescriptFetcherSdk(
         .sortedBy { it.descriptor.simpleSerialName }
         .distinctBy { it.tsType().substringBefore("<") } // Distinct by generics
         .filter {
-            if(it.descriptor.isInline) true
-            else when (it.descriptor.kind) {
+            when (it.descriptor.kind) {
                 SerialKind.ENUM -> true
-                // Inline value classes serialize as their underlying primitive (see tsType), so they get no
-                // standalone type definition and must not be emitted/imported as model types.
-                StructureKind.CLASS if (it !is MySealedClassSerializer && !it.descriptor.isInline) -> true
+                StructureKind.CLASS if (it !is MySealedClassSerializer) -> true
                 PrimitiveKind.STRING if (it.descriptor.simpleSerialName != "String") -> true
                 // Sealed/polymorphic types are emitted as TS discriminated unions (see writeTypeDefinitions).
                 is PolymorphicKind -> true
-
                 else -> false
             }
         }
 
+
+    context(runtime: ServerRuntime)
+    private fun KSerializer<*>.tsTopLevelTypeName(): String = tsType()
+        .substringBefore('<')
+        .substringBefore('.')
 
     @OptIn(ExperimentalSerializationApi::class)
     context(runtime: ServerRuntime)
@@ -525,7 +590,8 @@ public class TypescriptFetcherSdk(
                     if (descriptor.serialName == "com.lightningkite.serialization.Partial") {
                         append("DeepPartial")
                     } else {
-                        append(descriptor.simpleSerialName)
+                        val name = descriptor.simpleSerialName
+                        append(descriptor.nestedTsTypeName ?: name)
                     }
                     typeParametersSerializersOrNull()
                         ?.takeUnless { it.isEmpty() }
@@ -536,9 +602,16 @@ public class TypescriptFetcherSdk(
     }
 
     private val SerialDescriptor.simpleSerialName: String
+        get() = serialName.substringBefore('<').substringBefore('/').substringAfterLast('.').removeSuffix("?")
+
+    private val SerialDescriptor.nestedTsTypeName: String?
         get() {
-            val fqn = serialName.substringBefore('<').substringBefore('/').removeSuffix("?")
-            return fqn.split('.').filter { it.first().isUpperCase() }.joinToString("")
+            val parts = serialName.substringBefore('<').substringBefore('/').split('.')
+            if (parts.size < 2) return null
+            val name = simpleSerialName
+            val parentName = parts[parts.size - 2]
+            if (parentName.firstOrNull()?.isUpperCase() != true) return null
+            return "$parentName.$name"
         }
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -568,7 +641,8 @@ public class TypescriptFetcherSdk(
         "DataClassPathPartial",
         "QueryPartial",
         "DeepPartial",
-        "Fetcher"
+        "Fetcher",
+        "Brand",
     )
 
     private val skipFromLsPackage = setOf("Partial") + fromLightningServerPackage
