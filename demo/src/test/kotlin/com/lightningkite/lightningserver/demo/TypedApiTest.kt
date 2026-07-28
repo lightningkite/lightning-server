@@ -81,6 +81,8 @@ class TypedApiTest {
     /**
      * App `@Serializable sealed` types must emit as a flat-discriminator TS union plus an interface
      * per subtype, matching the runtime wire format `{ "type": "<name>", ...subtype fields }`.
+     * Subtypes nested under the sealed interface (e.g. `Shape.Circle`) are emitted as members of a
+     * TS `namespace` matching their parent name, rather than a flattened/concatenated name.
      */
     @OptIn(ExperimentalLightningServer::class)
     @Test
@@ -105,15 +107,18 @@ class TypedApiTest {
         // The sealed union type itself.
         assertTrue(ts.contains("export type ") && Regex("""export type \w*Shape =""").containsMatchIn(ts),
             "sealed union type not emitted:\n$ts")
+        // The subtypes are namespaced under their parent (Shape) rather than flattened/concatenated.
+        assertTrue(Regex("""export namespace Shape \{""").containsMatchIn(ts),
+            "Shape namespace not emitted:\n$ts")
         // Flat-discriminator union members referencing the per-subtype interfaces.
-        assertTrue(Regex("""\| \(\{ type: "[^"]*Circle" \} & \w*ShapeCircle\)""").containsMatchIn(ts),
+        assertTrue(Regex("""\| \(\{ type: "[^"]*Circle" \} & [\w.]*Circle\)""").containsMatchIn(ts),
             "Circle union member not emitted in discriminator form:\n$ts")
-        assertTrue(Regex("""\| \(\{ type: "[^"]*Rectangle" \} & \w*ShapeRectangle\)""").containsMatchIn(ts),
+        assertTrue(Regex("""\| \(\{ type: "[^"]*Rectangle" \} & [\w.]*Rectangle\)""").containsMatchIn(ts),
             "Rectangle union member not emitted in discriminator form:\n$ts")
         // The subtype interfaces, with their fields.
-        assertTrue(Regex("""interface \w*ShapeCircle \{[^}]*radius: number""").containsMatchIn(ts),
+        assertTrue(Regex("""interface Circle \{[^}]*radius: number""").containsMatchIn(ts),
             "Circle subtype interface/fields not emitted:\n$ts")
-        assertTrue(Regex("""interface \w*ShapeRectangle \{[^}]*width: number""").containsMatchIn(ts),
+        assertTrue(Regex("""interface Rectangle \{[^}]*width: number""").containsMatchIn(ts),
             "Rectangle subtype interface/fields not emitted:\n$ts")
         Unit
     }
