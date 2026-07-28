@@ -68,6 +68,7 @@ public class BackupCodeEndpoints(
     public val modelInfo: ModelInfo<HasId<*>?, BackupCodeSecret, Uuid> =
         database.modelInfo(
             auth = noAuth,
+            tableName = "BackupCodeSecret",
             permissions = { ModelPermissions<BackupCodeSecret>(all = Condition.Never) }
         )
 

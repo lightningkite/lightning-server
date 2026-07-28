@@ -115,7 +115,7 @@ that touches services must therefore carry `context(runtime: ServerRuntime)`:
 ```kotlin
 // A helper that uses the database now declares the runtime context.
 context(runtime: ServerRuntime)
-suspend fun countUsers(): Int = database().table(userTable).count()
+suspend fun countUsers(): Int = userTable().count()
 ```
 
 This is the most pervasive source of migration compile errors: functions called from handlers, hooks, or signals

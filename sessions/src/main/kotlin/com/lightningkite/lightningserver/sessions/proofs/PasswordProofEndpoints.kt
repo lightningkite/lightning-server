@@ -55,6 +55,7 @@ public class PasswordProofEndpoints(
 
     public val modelInfo: ModelInfo<HasId<*>, PasswordSecret, Uuid> =
         database.modelInfo(
+            tableName = "PasswordSecret",
             auth = proofMethodAuth or AuthRequirement.IsAdmin,
             signals = { col ->
                 col.interceptCreate {

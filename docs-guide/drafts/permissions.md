@@ -80,7 +80,7 @@ object UserAuth : PrincipalType<User, Uuid> {
 
     context(server: ServerRuntime)
     override suspend fun fetch(id: Uuid): User =
-        PostServer.database().table(userTable).get(id) ?: throw NotFoundException()
+        PostServer.userTable().get(id) ?: throw NotFoundException()
 }
 ```
 
@@ -136,6 +136,7 @@ the full user object — it is cached on the token for the lifetime of the reque
 ```kotlin
 val postInfo = database.modelInfo(
     auth = UserAuth.require() or AuthRequirement.None,
+    tableName = "Post",
     permissions = {
         val user: User? = authOrNull?.fetch()
         val isAdmin: Boolean = user?.isSuperUser == true
@@ -309,8 +310,12 @@ all three layers per caller:
 object PostServer : ServerBuilder() {
     val database = setting("database", Database.Settings())
 
+    // Raw table access for UserAuth.fetch; ModelRestEndpoints uses postInfo below.
+    val userTable = database.registerTable<User>("User")
+
     val postInfo = database.modelInfo(
         auth = UserAuth.require() or AuthRequirement.None,
+        tableName = "Post",
         permissions = {
             // authOrNull is Authentication<User>? — null for unauthenticated callers
             val user: User? = authOrNull?.fetch()
@@ -406,7 +411,7 @@ val publishedFeed = path.path("feed").get bind ApiHttpHandler(
 )
 ```
 
-Do not call `database().table(postTable)` directly in secured endpoints — that
+Do not call `postTable()` directly in secured endpoints — that
 bypasses all permission enforcement.
 
 ## Blog post example (from demo)
@@ -418,6 +423,7 @@ real-world example:
 object BlogEndpoints : ServerBuilder() {
     val info = Server.database.modelInfo(
         auth = Server.UserAuth.require(),
+        tableName = "BlogPost",
         permissions = {
             if (auth.fetch().isSuperUser)
                 ModelPermissions.allowAll<BlogPost>()

@@ -67,7 +67,7 @@ and a direction:
 
 ```kotlin
 // Illustrative.
-val posts = database().table(postTable)
+val posts = postTable()
 
 // Ten most-recently updated posts.
 val recent = posts.find(
@@ -120,7 +120,7 @@ Count the number of matching documents:
 
 ```kotlin
 // Illustrative.
-val table = database().table(postTable)
+val table = postTable()
 
 // Total number of posts.
 val total: Int = table.count()
@@ -269,7 +269,7 @@ list of stored documents.  The `insertMany` convenience extension wraps it:
 
 ```kotlin
 // Illustrative.
-val table = database().table(postTable)
+val table = postTable()
 
 val newPosts = listOf(
     Post(title = "First",  author = "alice@example.com", body = "..."),
@@ -374,7 +374,7 @@ your table reference, usually inside a lazy property or a helper:
 ```kotlin
 // Illustrative — setting this up in a helper property.
 fun notesTableWithHooks(): Table<Note> =
-    database().table(noteTable)
+    noteTable()
         .postCreate { note ->
             // Runs after every successful insert or upsert-that-inserted.
             println("Note created: ${note._id}")
@@ -421,7 +421,7 @@ another system — a PubSub channel, a websocket topic, or an audit log:
 
 ```kotlin
 // Illustrative.
-val table = database().table(postTable)
+val table = postTable()
     .withChangeListener { changes ->
         for (change in changes.changes) {
             // Forward to a PubSub channel so other instances know.

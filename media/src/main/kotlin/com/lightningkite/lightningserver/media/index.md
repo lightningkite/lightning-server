@@ -40,18 +40,25 @@ that meet or exceed requirements.
 ## Usage Example
 
 ```kotlin
-context(runtime: ServerRuntime)
 object Server : ServerBuilder() {
     val database = setting("database", Database.Settings())
-    val postTable = DatabaseTableDefinition<Post>()   // define once, share across your app
 
-    val posts = database
-        .table(postTable)
-        .interceptImagesForProcessing(
-            MediaPreviewOptions(sizeInPixels = 200),
-            MediaPreviewOptions(sizeInPixels = 800),
-            makePath = { it.path { it.image } }
-        )
+    // The interceptor needs a live Table, which only exists inside a ServerRuntime;
+    // modelInfo's `signals` hook is where that wrapping belongs.
+    val postInfo = database.modelInfo<HasId<*>?, Post, Uuid>(
+        auth = noAuth,
+        tableName = "Post",
+        signals = { table ->
+            table.interceptImagesForProcessing(
+                MediaPreviewOptions(sizeInPixels = 200),
+                MediaPreviewOptions(sizeInPixels = 800),
+                makePath = { it.image },
+            )
+        },
+        permissions = { ModelPermissions.allowAll() },
+    )
+
+    val posts = path.path("posts") include ModelRestEndpoints(postInfo)
 }
 ```
 

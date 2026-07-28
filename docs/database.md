@@ -93,6 +93,7 @@ For more advanced use cases with permissions and authentication, use `ModelInfo`
 ```kotlin
 val postInfo = database.modelInfo(
     auth = UserAuth.require(),
+    tableName = "Post",
     permissions = {
         val user = auth.fetch()
         ModelPermissions(

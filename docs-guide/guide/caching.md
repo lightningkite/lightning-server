@@ -75,6 +75,8 @@ from the source of truth and populate the cache.
 ```kotlin
 // Illustrative — not a drift-checked sample.
 // Requires ServerRuntime in context; in production, annotate with context(server: ServerRuntime).
+// `users` is the registration declared on the ServerBuilder:
+//     val users = database.registerTable<User>("User")
 
 suspend fun getUser(id: Uuid): User {
     val key = "user:$id"
@@ -84,7 +86,7 @@ suspend fun getUser(id: Uuid): User {
     if (cached != null) return cached
 
     // 2. Miss — load from the source of truth
-    val user = database().table(userTable).get(id)
+    val user = users().get(id)
         ?: throw NotFoundException("user $id not found")
 
     // 3. Populate cache for future reads
@@ -98,7 +100,7 @@ On writes, invalidate or update the cached entry so stale data is not served:
 ```kotlin
 // Illustrative — not a drift-checked sample.
 suspend fun updateUser(id: Uuid, modification: Modification<User>): User {
-    val updated = database().table(userTable).updateOneById(id, modification)
+    val updated = users().updateOneById(id, modification)
         ?: throw NotFoundException("user $id not found")
 
     // Invalidate — next read will reload from the database.

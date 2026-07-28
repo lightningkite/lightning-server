@@ -385,6 +385,7 @@ daily digest, weekly, etc.) via a REST API that is auto-generated at `/subscript
 val subs = FrequencyCustomizableSubscriptions<User, Uuid>(
     info         = Server.database.modelInfo<User, NotificationSendMethods<Uuid>, UserEventType<Uuid>>(
         auth        = Server.auth,
+        tableName   = "NotificationSendMethods",
         permissions = { ModelPermissions(read = condition { it.user eq auth.id }) }
     ),
     defaultEmail = Frequency.batch(60),   // hourly by default
@@ -448,6 +449,7 @@ formatting:
 object MyDispatcher : NotificationBulkDispatcher<User, Uuid, String>(
     info              = Server.database.modelInfo<HasId<*>, Notification<Uuid, String>, Uuid>(
         auth        = Server.auth,
+        tableName   = "Notification",
         permissions = { ModelPermissions(read = condition { it.user eq auth.id }) }
     ),
     cache             = Server.cache,

@@ -104,7 +104,7 @@ directly on the `FieldCollection` (table reference):
 
 ```kotlin
 // Illustrative
-val posts = database().table(postTable)
+val posts = postTable()
     .interceptCreate { value -> value.copy(slug = slugify(value.title)) }
     .postCreate  { value -> notifySubscribers(value) }
     .postChange  { value -> invalidateCache(value._id) }
@@ -126,7 +126,7 @@ object UserAuth : PrincipalType<User, Uuid> {
 
     context(server: ServerRuntime)
     override suspend fun fetch(id: Uuid): User =
-        database().table(userTable).get(id) ?: throw NotFoundException()
+        userTable().get(id) ?: throw NotFoundException()
 }
 
 // Require auth on an endpoint
