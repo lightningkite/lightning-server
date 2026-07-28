@@ -47,8 +47,7 @@ public interface ModelInfo<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<I
 context(builder: ServerBuilder)
 public inline fun <reified USER : HasId<*>?, reified T : HasId<ID>, reified ID : Comparable<ID>> Runtime<Database>.modelInfo(
     auth: AuthRequirement<USER>,
-    tableName: String = serializerOrContextual<T>().descriptor.serialName.substringBefore('/').substringBefore('<')
-        .substringAfterLast('.'),
+    tableName: String,
     subscope: Subscope? = Subscope(tableName.lowercase()),
     crossinline signals: context(ServerRuntime) (Table<T>) -> Table<T> = { it },
     crossinline log: context(ServerRuntime) AuthAccess<USER>?.(Table<T>) -> Table<T> = { it },
@@ -99,7 +98,7 @@ public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> Runtime<Databa
     auth: AuthRequirement<USER>,
     serializer: KSerializer<T>,
     idSerializer: KSerializer<ID>,
-    tableName: String = serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.'),
+    tableName: String,
     subscope: Subscope? = Subscope(tableName.lowercase()),
     signals: context(ServerRuntime) (Table<T>) -> Table<T> = { it },
     log: context(ServerRuntime) AuthAccess<USER>?.(Table<T>) -> Table<T> = { it },
