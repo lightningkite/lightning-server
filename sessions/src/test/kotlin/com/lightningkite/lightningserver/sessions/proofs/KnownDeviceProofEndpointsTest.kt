@@ -220,6 +220,37 @@ class KnownDeviceProofEndpointsTest {
     }
 
     @Test
+    fun `prove rejects malformed device id with bad request`() = runBlocking {
+        TestUser.users.clear()
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
+
+            init {
+                register(TestUser)
+            }
+
+            val knownDevice = path.path("auth").path("known-device") include KnownDeviceProofEndpoints(
+                database = database,
+                cache = cache,
+                proofSigner = RuntimeDeferred.Cached { testBasis.signer("proof") },
+                proofExpiration = 1.hours
+            )
+        }.let { server ->
+            server.test({}) {
+                // The id segment isn't a valid Uuid; this used to throw an unhandled
+                // IllegalArgumentException (surfaced as a 500) instead of a 400.
+                val malformedSecret = "not-a-uuid/${Uuid.random()}"
+
+                assertFailsWith<BadRequestException>("Malformed device id should be rejected") {
+                    server.knownDevice.prove.test(null, malformedSecret)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `options returns correct configuration`() = runBlocking {
         TestUser.users.clear()
 
