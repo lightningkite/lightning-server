@@ -13,6 +13,7 @@ object BlogEndpoints : ServerBuilder() {
     // The correct way of doing it
     val info = Server.database.modelInfo(
         auth = Server.UserAuth.require(),
+        tableName = "BlogPost",
         permissions = {
             if (auth.fetch().isSuperUser)
                 ModelPermissions.allowAll<BlogPost>()

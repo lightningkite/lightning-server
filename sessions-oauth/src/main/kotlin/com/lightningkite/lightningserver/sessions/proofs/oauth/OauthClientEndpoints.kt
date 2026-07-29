@@ -21,6 +21,7 @@ public class OauthClientEndpoints(
 
     public val modelInfo: ModelInfo<HasId<*>?, OauthClient, String> = database.modelInfo(
         auth = maintainPermissions or noAuth,
+        tableName = "OauthClient",
         permissions = {
             val isRoot = maintainPermissions.accepts(authOrNull)
             ModelPermissions(

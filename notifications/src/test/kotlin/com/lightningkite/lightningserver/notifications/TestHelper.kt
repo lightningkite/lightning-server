@@ -56,6 +56,7 @@ context(builder: ServerBuilder)
 inline fun <reified T : HasId<ID>, reified ID : Comparable<ID>> Runtime<Database>.testModelInfo(): ModelInfo<TestUser, T, ID> =
     modelInfo(
         TestUser.require(),
+        tableName = T::class.simpleName!!,
         permissions = { ModelPermissions.allowAll() }
     )
 

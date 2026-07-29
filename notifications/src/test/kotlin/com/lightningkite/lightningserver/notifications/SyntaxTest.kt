@@ -41,6 +41,7 @@ class SyntaxTest {
 
         val userInfo = database.modelInfo(
             User.require(),
+            tableName = "User",
             permissions = { ModelPermissions.allowAll<User>() },
         )
 
@@ -62,6 +63,7 @@ class SyntaxTest {
             inline fun <reified T : HasId<ID>, reified ID : Comparable<ID>> Runtime<Database>.testModelInfo() =
                 modelInfo(
                     User.require(),
+                    tableName = T::class.simpleName!!,
                     permissions = { ModelPermissions.allowAll<T>() }
                 )
         }
@@ -132,6 +134,7 @@ class SyntaxTest {
     private object ModelEndpoints : ServerBuilder() {
         val info: ModelInfo<User, Model, Uuid> = Server.database.modelInfo(
             auth = User.require(),
+            tableName = "Model",
             permissions = { ModelPermissions.allowAll() },
             signals = { table ->
                 table
