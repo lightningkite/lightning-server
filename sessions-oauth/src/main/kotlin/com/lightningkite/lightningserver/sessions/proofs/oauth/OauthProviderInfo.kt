@@ -128,7 +128,7 @@ public class OauthProviderInfo(
         oauth.error?.let {
             throw BadRequestException("Got error code '${it}' from $niceName.")
         } ?: oauth.code?.let { code ->
-            return client.post(tokenUrl) {
+            val httpResponse = client.post(tokenUrl) {
                 setBody(
                     FormDataFormat(EmptySerializersModule()).encodeToString(
                         OauthTokenRequest.serializer(),
@@ -144,7 +144,22 @@ public class OauthProviderInfo(
                 )
                 contentType(ContentType.Application.FormUrlEncoded)
                 accept(ContentType.Application.Json)
-            }.internalBody<OauthResponse>()
+            }
+            // Providers report token-exchange failures (expired/invalid code, PKCE mismatch, etc.)
+            // as a non-2xx status with an RFC 6749 §5.2 error body, e.g. {"error":"invalid_grant"}.
+            // That body doesn't satisfy OauthResponse's required fields, so decoding it directly would
+            // surface a raw MissingFieldException instead of a clean, expected BadRequestException.
+            // Check the status first and surface only the standardized `error` code - the provider's
+            // free-text `error_description` (or any other response content) is not relayed, since it's
+            // not meant for the end user and could contain provider-internal detail.
+            val bodyText = httpResponse.bodyAsText()
+            if (!httpResponse.status.isSuccess()) {
+                val errorCode = runCatching {
+                    runtime.externalSerialization.json.parseToJsonElement(bodyText).jsonObject["error"]?.jsonPrimitive?.content
+                }.getOrNull()
+                throw BadRequestException("Token exchange with $niceName failed" + (errorCode?.let { " ($it)" } ?: "."))
+            }
+            return runtime.externalSerialization.json.decodeFromString(OauthResponse.serializer(), bodyText)
         }
         throw BadRequestException("Code is empty")
     }
