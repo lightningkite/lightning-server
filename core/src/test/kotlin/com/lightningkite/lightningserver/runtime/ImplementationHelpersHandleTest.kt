@@ -36,6 +36,9 @@ class ImplementationHelpersHandleTest {
         )
 
         init {
+            // Installed outermost so security headers apply to every response, including CORS-processed and
+            // error responses (exercised by the security-header tests below).
+            install(com.lightningkite.lightningserver.http.SecurityHeadersInterceptor())
             install(com.lightningkite.lightningserver.cors.CorsInterceptor(setting("cors", cors)))
         }
 
@@ -477,8 +480,8 @@ class ImplementationHelpersHandleTest {
 
     @Test
     fun https_response_has_security_headers() {
-        // SecurityHeadersInterceptor is installed by default for every server: an https response
-        // must carry nosniff and HSTS.
+        // TestServer explicitly installs SecurityHeadersInterceptor: an https response must carry
+        // nosniff and HSTS.
         TestServer.test(settings = {}) {
             runBlocking {
                 val resp = serverRuntime.handle(
@@ -493,7 +496,7 @@ class ImplementationHelpersHandleTest {
                 )
                 assertEquals("nosniff", resp.headers[HttpHeader.XContentTypeOptions]?.root)
                 assertEquals(
-                    "max-age=3600",
+                    "max-age=31536000",
                     resp.headers[HttpHeader.StrictTransportSecurity]?.root,
                     "https responses must carry HSTS",
                 )
@@ -544,7 +547,7 @@ class ImplementationHelpersHandleTest {
                 assertEquals(HttpStatus.NotFound, resp.status)
                 assertEquals("nosniff", resp.headers[HttpHeader.XContentTypeOptions]?.root)
                 assertEquals(
-                    "max-age=3600",
+                    "max-age=31536000",
                     resp.headers[HttpHeader.StrictTransportSecurity]?.root,
                     "error responses must carry security headers",
                 )
