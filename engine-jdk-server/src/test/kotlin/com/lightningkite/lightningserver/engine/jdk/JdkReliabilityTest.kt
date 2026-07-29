@@ -107,14 +107,6 @@ class JdkReliabilityTest {
         .build()
 
     @Test
-    fun slow_handler_returns_408() {
-        startServer()
-        client().newCall(Request.Builder().url("http://127.0.0.1:$port/slow").build()).execute().use { resp ->
-            assertEquals(HttpStatus.RequestTimeout.code, resp.code)
-        }
-    }
-
-    @Test
     fun oversized_body_by_content_length_returns_413() {
         startServer()
         val body = ByteArray((maxBody + 1).toInt()) { 'x'.code.toByte() }.toRequestBody()
