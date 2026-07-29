@@ -165,11 +165,15 @@ public class PasswordProofEndpoints(
             successCode = HttpStatus.OK,
             implementation = { input: IdentificationAndPassword ->
                 val now = now()
-                cache().constrainAttemptRate("password-${input.property}-${input.value}") {
-                    val subject = input.type
-                    val handler = serverRuntime.server.principalTypes.values.find { it.name == subject }
-                        ?: throw IllegalArgumentException("No subject $subject recognized")
-                    val normalizedValue = handler.normalizePropertyValue(input.property, input.value)
+                val subject = input.type
+                val handler = serverRuntime.server.principalTypes.values.find { it.name == subject }
+                    ?: throw IllegalArgumentException("No subject $subject recognized")
+                // Normalize BEFORE building the rate-limit key: the key must be derived from the canonical
+                // identifier so that case/whitespace variants (e.g. "Bob@x.com" vs "bob@x.com ") of the same
+                // account share one bucket. Keying on the raw value would let an attacker dodge the limiter
+                // (and its exponential backoff) simply by varying case or whitespace.
+                val normalizedValue = handler.normalizePropertyValue(input.property, input.value)
+                cache().constrainAttemptRate("password-${input.property}-${normalizedValue}") {
                     val subjectId = handler.fetchUserIdString(input.property, normalizedValue)
                         ?: throw BadRequestException("User ID and code do not match")
 
