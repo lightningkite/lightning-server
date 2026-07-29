@@ -67,24 +67,30 @@ public suspend inline fun <R> Cache.constrainAttemptRate(
     val startKey = "$cacheKey-start-time"
     val levelKey = "$cacheKey-level"
 
-    val ct = (this.get<Int>(cacheKey) ?: 0)
-    val start = this.setIfNotExists<Instant>(startKey, now(), expires)
+    // The block window must never be shorter than the attempt window, or a blocked attacker could
+    // simply wait out the block and immediately get a fresh batch of attempts. This is the block
+    // duration for a first-time offender (strike level 0); repeat offenses multiply it below.
+    val baseBlockDuration = blocked.coerceAtLeast(expires)
 
-    if (start && ct != 0 && ct <= count) {
+    val attemptsSoFar = (this.get<Int>(cacheKey) ?: 0)
+    val windowStarted = this.setIfNotExists<Instant>(startKey, now(), expires)
+
+    if (windowStarted && attemptsSoFar != 0 && attemptsSoFar <= count) {
         this.remove(cacheKey)
     }
 
-    if (ct >= count) {
-        val baseBlock = blocked.coerceAtLeast(expires)
-        // Cap the exponent so the multiplication can never overflow to Duration.INFINITE; the result
-        // is capped at maxBlocked long before level 20 anyway.
-        val level = (this.get<Int>(levelKey) ?: 0)
-        val block = (baseBlock * 2.0.pow(level.coerceAtMost(20))).coerceAtMost(maxBlocked.coerceAtLeast(baseBlock))
+    if (attemptsSoFar >= count) {
+        // Each repeat violation doubles the block: strike level 0 -> baseBlockDuration, level 1 -> x2,
+        // level 2 -> x4, and so on, capped at maxBlockDuration.
+        val strikeLevel = (this.get<Int>(levelKey) ?: 0).coerceAtMost(20) // avoid overflow to Duration.INFINITE
+        val maxBlockDuration = maxBlocked.coerceAtLeast(baseBlockDuration)
+        val blockDuration = (baseBlockDuration * 2.0.pow(strikeLevel)).coerceAtMost(maxBlockDuration)
+
         // Remember the escalated strike level well beyond this block window so a returning attacker is
         // still treated as a repeat offender (defeats slow "popcorn" brute forcing).
         this.add(levelKey, 1, maxBlocked * 4)
-        this.add(cacheKey, 1, block)
-        throw BadRequestException("Too many attempts; please wait ${block.inWholeMinutes} minutes.")
+        this.add(cacheKey, 1, blockDuration)
+        throw BadRequestException("Too many attempts; please wait ${blockDuration.inWholeMinutes} minutes.")
     }
 
     return try {
@@ -93,7 +99,7 @@ public suspend inline fun <R> Cache.constrainAttemptRate(
         remove(levelKey)
         result
     } catch (e: Throwable) {
-        this.add(cacheKey, 1, blocked.coerceAtLeast(expires))
+        this.add(cacheKey, 1, baseBlockDuration)
         throw e
     }
 }
