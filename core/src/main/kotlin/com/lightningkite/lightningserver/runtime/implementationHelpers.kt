@@ -211,9 +211,12 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
             }
         }
     } catch (e: Exception) {
-        // Safety net for exceptions thrown by an interceptor itself (outside the handler), which
-        // never reach the in-chain handling above and so may lack interceptor-applied headers
-        // (e.g. CORS) — acceptable for this rare failure mode.
+        // Last-resort safety net. Exceptions thrown by an interceptor itself are now recovered
+        // inside HttpInterceptor.interceptInstrumented, at the point each interceptor is invoked,
+        // so outer interceptors (e.g. CORS) still get to post-process the resulting response. This
+        // catch only fires when there are no interceptors installed (compiledHttpInterceptors is
+        // HttpInterceptor.NoOp, which bypasses interceptInstrumented) or some other exception
+        // escapes the chain machinery itself — headers from would-be interceptors are absent here.
         this.logger.error(e) { "Exception in HTTP interceptor chain" }
         handleError(e)
     }
