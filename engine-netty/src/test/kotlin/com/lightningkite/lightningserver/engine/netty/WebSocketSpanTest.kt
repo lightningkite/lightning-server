@@ -72,6 +72,7 @@ class WebSocketSpanTest {
             telemetrySettings.set(OpenTelemetrySettings(url = schemeName))
             enginePubSub.useDefault()
             engineCache.useDefault()
+            com.lightningkite.lightningserver.websockets.websocketSettings.useDefault()
             forceWebSocketPubSub set true  // Use the pub/sub branch where *WithMetrics fires
             nettyRunConfig set NettyRuntimeSettings(host = "127.0.0.1", port = port)
         }

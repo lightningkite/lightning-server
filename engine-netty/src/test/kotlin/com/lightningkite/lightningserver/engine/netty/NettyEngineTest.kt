@@ -45,6 +45,7 @@ class NettyEngineTest {
             com.lightningkite.lightningserver.definition.loggingSettings.useDefault()
             com.lightningkite.lightningserver.engine.local.enginePubSub.useDefault()
             com.lightningkite.lightningserver.engine.local.engineCache.useDefault()
+            com.lightningkite.lightningserver.websockets.websocketSettings.useDefault()
             nettyRunConfig set NettyRuntimeSettings(host = "127.0.0.1", port = port)
         }
         engine.start()

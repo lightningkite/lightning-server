@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
+import com.lightningkite.lightningserver.websockets.websocketSettings
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
 import com.lightningkite.services.cache.*
 import com.lightningkite.services.pubsub.PubSub
@@ -49,6 +50,7 @@ public val forceWebSocketPubSub: ServerSetting.Direct<Boolean> = ServerSetting(
     kotlinx.serialization.serializer(),
     optional = true
 )
+
 
 /**
  * Base class for local server engines that run within a single JVM process.
@@ -93,6 +95,7 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
         enginePubSub,
         engineCache,
         forceWebSocketPubSub,
+        websocketSettings,
     )
 
     /**

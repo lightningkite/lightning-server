@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.runtime.send
 import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
 import com.lightningkite.lightningserver.websockets.*
+import com.lightningkite.lightningserver.serialization.approximateJsonSize
 import com.lightningkite.services.database.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -26,6 +27,11 @@ public data class ModelRestUpdatesWebsocketData<T : HasId<ID>, ID : Comparable<I
     @Suppress("UNCHECKED_CAST")
     internal fun <USER : HasId<*>?> auth() = user as Authentication<USER & Any>?
 }
+
+/**
+ * Payload size past which a client is told to resynchronise over HTTP instead of being sent the change.
+ */
+private const val OVERLOAD_THRESHOLD_BYTES: Int = 24000
 
 public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     public val info: ModelInfo<USER, T, ID>,
@@ -99,29 +105,31 @@ public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
                 hashTopic -> topic.value
                 else -> return
             } as CollectionChanges<T>
-            val toSend = message.changes.map { entry ->
-                ListChange(
-                    old = entry.old?.takeIf { connection.currentState.condition(it) }
-                        ?.let { connection.currentState.mask(it) },
-                    new = entry.new?.takeIf { connection.currentState.condition(it) }
-                        ?.let { connection.currentState.mask(it) },
-                )
-            }.filter { it.old != null || it.new != null }
-            if (toSend.isEmpty()) return
-            val updates = CollectionUpdates(
-                updates = toSend.mapNotNull { it.new }.toSet(),
-                remove = toSend.mapNotNull { it.old.takeIf { _ -> it.new == null }?._id }.toSet()
+            val unmasked = message.changes.mapNotNull { entry ->
+                val old = entry.old?.takeIf { connection.currentState.condition(it) }
+                val new = entry.new?.takeIf { connection.currentState.condition(it) }
+                if(old != null || new != null) ListChange(old = old, new = new)
+                else null
+            }
+            if (unmasked.isEmpty()) return
+            val unmaskedUpdates = CollectionUpdates(
+                updates = unmasked.mapNotNull { it.new }.toSet(),
+                remove = unmasked.mapNotNull { it.old.takeIf { _ -> it.new == null }?._id }.toSet()
             )
-            val size = connection.externalSerialization.json.encodeToString(
-                CollectionUpdates.serializer(
-                    info.serializer,
-                    info.idSerializer
-                ), updates
-            ).length
-            if (size >= 24000) {
+            // Measured on the unmasked payload: masking only ever removes content, so this errs toward
+            // declaring an overload, which costs the client an HTTP refetch rather than a huge frame.
+            val approxSize = connection.externalSerialization.approximateJsonSize(
+                CollectionUpdates.serializer(info.serializer, info.idSerializer),
+                unmaskedUpdates,
+                limit = OVERLOAD_THRESHOLD_BYTES,
+            )
+            if (approxSize >= OVERLOAD_THRESHOLD_BYTES) {
                 connection.send(CollectionUpdates(overload = true))
             } else {
-                connection.send(updates)
+                val safeUpdates = unmaskedUpdates.copy(
+                    updates = unmaskedUpdates.updates.mapTo(HashSet()) { connection.currentState.mask(it) },
+                )
+                connection.send(safeUpdates)
             }
         }
 
@@ -147,7 +155,7 @@ public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
                         it.old?.let { key.get(it).hashCode() },
                         it.new?.let { key.get(it).hashCode() },
                     )
-                }
+                }.distinct()
                 for (hash in hashes) {
                     hashTopic.send(hash, CollectionChanges(changes.changes.mapNotNull {
                         val old = it.old?.takeIf { key.get(it).hashCode() == hash }
