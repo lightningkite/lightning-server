@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.engine.local.LocalEngine
 import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
+import com.lightningkite.lightningserver.engine.local.LocalWebSocketConnection
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
@@ -40,7 +41,11 @@ import kotlinx.coroutines.channels.SendChannel
 import kotlinx.serialization.KSerializer
 import java.net.InetSocketAddress
 import java.net.URI
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import com.lightningkite.lightningserver.http.HttpHeaders as LsHttpHeaders
 import com.lightningkite.lightningserver.websockets.WebSocketFrame as LkWebSocketFrame
 import io.netty.handler.codec.http.HttpHeaders as NettyHttpHeaders
@@ -414,7 +419,15 @@ public class NettyEngine(
             val socketHandler = this@NettyEngine.server.compiledWebsocketInterceptors.intercept(match.value)
 
             val host = req.headers()[HOST] ?: "localhost"
-            val wsFactory = WebSocketServerHandshakerFactory("ws://$host${URI(req.uri()).path}", null, true)
+            // Netty's own default payload limit is 64 KiB; honour the configured one so both engines
+            // bound this peer-driven allocation the same way.
+            val wsFactory = WebSocketServerHandshakerFactory(
+                "ws://$host${URI(req.uri()).path}",
+                null,
+                true,
+                websocketSettings().maxFrameSize?.bytes?.coerceAtMost(Int.MAX_VALUE.toLong())?.toInt()
+                    ?: Int.MAX_VALUE,
+            )
             val handshaker = wsFactory.newHandshaker(req)
             if (handshaker == null) {
                 WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(ctx.channel())
@@ -658,45 +671,6 @@ public class NettyEngine(
 
     }
 
-    private abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
-        startingState: STORAGE,
-        override val request: WebSocketConnectRequest<PATH>,
-        val handler: WebSocketHandler<PATH, STORAGE>,
-        val scope: CoroutineScope,
-        server: ServerRuntime,
-        val pubSub: (request: WebSocketSubscriptionRequest<*, Any?>) -> com.lightningkite.services.pubsub.PubSubChannel<Any?>,
-    ) : WebSocketConnection<PATH, STORAGE>, ServerRuntime by server {
-        override var currentState: STORAGE = startingState
-        override suspend fun repullState(): STORAGE = currentState
-        override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE) {
-            currentState = modification(currentState)
-        }
-
-        override suspend fun updateStateImmediately(modification: (STORAGE) -> STORAGE): STORAGE {
-            currentState = modification(currentState)
-            return currentState
-        }
-
-        val subscriptions = HashMap<WebSocketTopic<*, *>, Job>()
-
-        override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-            @Suppress("UNCHECKED_CAST")
-            topic as WebSocketSubscriptionRequest<*, Any?>
-            subscriptions[topic.topic]?.cancel()
-            subscriptions[topic.topic] = scope.launch {
-                pubSub(topic).collect { value ->
-                    handler.messageFromSubscription(
-                        WebSocketSubscriptionMessage(topic.topic, topic.pathInContext.rawPathArguments, value),
-                    )
-                }
-                yield()
-            }
-        }
-
-        override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-            subscriptions[topic.topic]?.cancel()
-        }
-    }
 
     @JvmInline
     private value class TypeRetriever(val retriever: (KSerializer<*>) -> Any?) {

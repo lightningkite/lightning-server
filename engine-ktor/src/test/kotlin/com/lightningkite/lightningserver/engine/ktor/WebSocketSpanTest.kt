@@ -64,6 +64,7 @@ class WebSocketSpanTest {
             telemetrySettings.set(OpenTelemetrySettings(url = schemeName))
             enginePubSub.useDefault()
             engineCache.useDefault()
+            com.lightningkite.lightningserver.websockets.websocketSettings.useDefault()
             forceWebSocketPubSub set true  // hit the standard pub/sub branch where the *WithMetrics calls live
             ktorRunConfig set KtorRuntimeSettings(host = "127.0.0.1", port = 0)
         }
