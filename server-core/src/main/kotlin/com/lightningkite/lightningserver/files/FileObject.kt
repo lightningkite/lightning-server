@@ -36,7 +36,7 @@ interface FileObject {
     fun checkSignature(queryParams: String): Boolean {
         return runBlocking {
             val response = client.get("$url?$queryParams") {
-                header("Range", "0-0")
+                header("Range", "bytes=0-0")
             }
             response.status.isSuccess()
         }
