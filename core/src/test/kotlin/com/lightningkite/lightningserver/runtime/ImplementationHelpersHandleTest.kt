@@ -1,6 +1,8 @@
 package com.lightningkite.lightningserver.runtime
 
 import com.lightningkite.lightningserver.HttpMethod
+import com.lightningkite.lightningserver.HttpStatusException
+import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.loggingSettings
 import com.lightningkite.lightningserver.http.*
@@ -86,6 +88,11 @@ class ImplementationHelpersHandleTest {
         // Fast handler with the same short timeout to confirm normal completion is unaffected.
         val fast = path.path("fast").get bind HttpHandler<PathSpec0>(timeout = 100.milliseconds) {
             HttpResponse.plainText("quick")
+        }
+
+        // Always throws, to prove error responses still receive interceptor post-processing.
+        val boom = path.path("boom").get bind HttpHandler<PathSpec0> {
+            throw NotFoundException(detail = "boom", message = "Boom.")
         }
 
         init {
@@ -386,6 +393,84 @@ class ImplementationHelpersHandleTest {
                     )
                 )
                 assertEquals(HttpStatus.RequestTimeout, resp.status)
+            }
+        }
+    }
+
+    @Test
+    fun error_response_still_receives_cors_headers() {
+        // Regression: a handler that throws must still get CORS headers. The exception is now
+        // mapped to a response INSIDE the interceptor chain, so CORS post-processes it. Without
+        // this, the browser masks every 4xx/5xx as a CORS failure and the real error (here, a
+        // 404) is invisible to client JS.
+        TestServer.test(settings = {}) {
+            runBlocking {
+                val resp = serverRuntime.handle(
+                    HttpRequest<PathSpec>(
+                        path = RawHttpEndpoint(asString = "/boom", method = HttpMethod.GET),
+                        queryParameters = QueryParameters.EMPTY,
+                        headers = HttpHeaders { add(HttpHeader.Origin, "https://example.com") },
+                        domain = "example.com",
+                        protocol = "https",
+                        sourceIp = "local",
+                    )
+                )
+                assertEquals(HttpStatus.NotFound, resp.status)
+                assertEquals(
+                    "https://example.com",
+                    resp.headers[HttpHeader.AccessControlAllowOrigin]?.root,
+                    "error responses must carry the CORS allow-origin header",
+                )
+            }
+        }
+    }
+
+    // A minimal server whose second (innermost) interceptor always throws before calling its
+    // continuation - simulating a rate limiter or auth interceptor rejecting a request. CORS is
+    // installed first (outermost) so this proves outer interceptors still post-process a response
+    // that resulted from an *interceptor's own* thrown exception, not just a handler's.
+    object InterceptorFailureTestServer : ServerBuilder() {
+        val cors = com.lightningkite.lightningserver.cors.CorsSettings(
+            limitToDomains = listOf("example.com"),
+            limitToMethods = listOf("*"),
+        )
+
+        init {
+            install(com.lightningkite.lightningserver.cors.CorsInterceptor(setting("cors", cors)))
+            install(HttpInterceptor { _, _ ->
+                throw HttpStatusException(
+                    status = HttpStatus.TooManyRequests,
+                    detail = "boom-interceptor",
+                    message = "Simulated interceptor failure.",
+                )
+            })
+            registerBasicMediaTypeCoders()
+        }
+    }
+
+    @Test
+    fun error_thrown_by_interceptor_itself_still_receives_outer_post_processing() {
+        // Regression: an interceptor that throws directly (not the handler) must still be
+        // recovered close enough to the throw site that interceptors wrapping it - here, CORS -
+        // see a normal response back from their continuation and still post-process it.
+        InterceptorFailureTestServer.test(settings = {}) {
+            runBlocking {
+                val resp = serverRuntime.handle(
+                    HttpRequest<PathSpec>(
+                        path = RawHttpEndpoint(asString = "/anything", method = HttpMethod.GET),
+                        queryParameters = QueryParameters.EMPTY,
+                        headers = HttpHeaders { add(HttpHeader.Origin, "https://example.com") },
+                        domain = "example.com",
+                        protocol = "https",
+                        sourceIp = "local",
+                    )
+                )
+                assertEquals(HttpStatus.TooManyRequests, resp.status)
+                assertEquals(
+                    "https://example.com",
+                    resp.headers[HttpHeader.AccessControlAllowOrigin]?.root,
+                    "CORS (an outer interceptor) must still post-process a response produced by an inner interceptor's own thrown exception",
+                )
             }
         }
     }

@@ -1,7 +1,9 @@
 package com.lightningkite.lightningserver.http
 
+import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.instrument
+import kotlinx.coroutines.CancellationException
 
 /**
  * Interface for intercepting and modifying HTTP requests and responses.
@@ -72,9 +74,25 @@ public fun interface HttpInterceptor {
 }
 
 /**
- * Wraps the intercept call with instrumentation for performance monitoring.
+ * Wraps the intercept call with instrumentation for performance monitoring, and recovers from
+ * exceptions thrown by this interceptor (or anything nested inside it) by converting them to a
+ * response via the configured exception handler.
  *
  * This is used internally to track the time spent in each interceptor.
+ *
+ * ## Why recover here
+ * Every interceptor in the chain is composed via nested calls to this function (see
+ * [compileAndInstrument]), so recovering at this single point means an exception thrown by *any*
+ * interceptor - not just the terminal handler - is turned into a response before it unwinds past
+ * the interceptors that wrap it. Those outer interceptors then see a normal return value from
+ * their own continuation call and still get to post-process it (e.g. CORS still adds
+ * `Access-Control-Allow-Origin` to a response produced by a rate limiter's own thrown exception).
+ * Without this, only exceptions from the innermost handler were guaranteed interceptor
+ * post-processing; an interceptor throwing directly (as [com.lightningkite.lightningserver.cors.CorsInterceptor]
+ * and rate limiters do) would still skip every interceptor wrapping it.
+ *
+ * [CancellationException] is rethrown unchanged - it signals coroutine cancellation (e.g. a client
+ * disconnect), not a request-level failure, and must not be swallowed into a fabricated response.
  *
  * @param request The HTTP request to intercept
  * @param action The continuation function
@@ -85,8 +103,19 @@ public suspend inline fun HttpInterceptor.interceptInstrumented(
     request: HttpRequest<*>,
     noinline action: suspend ServerRuntime.(HttpRequest<*>) -> HttpResponse,
 ): HttpResponse {
-    return instrument(name) {
-        intercept(request, action)
+    return try {
+        instrument(name) {
+            intercept(request, action)
+        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        try {
+            @Suppress("UNCHECKED_CAST")
+            server.server.exceptionHandler.handle(request as HttpRequest<PathSpec>, e)
+        } catch (_: Exception) {
+            HttpResponse(status = HttpStatus.InternalServerError)
+        }
     }
 }
 
