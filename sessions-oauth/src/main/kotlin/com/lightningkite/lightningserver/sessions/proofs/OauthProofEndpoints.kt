@@ -91,7 +91,6 @@ public class OauthProofEndpoints(
     )
 
     public val callback: OauthCallbackEndpoint<Uuid> = path.path("callback") include OauthCallbackEndpoint(
-        path = path,
         stateSerializer = serializerOrContextual<Uuid>(),
         oauthProviderInfo = provider,
         credentials = credentials,

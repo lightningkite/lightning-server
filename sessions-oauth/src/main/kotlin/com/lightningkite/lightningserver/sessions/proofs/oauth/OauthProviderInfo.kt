@@ -185,12 +185,6 @@ public class OauthProviderInfo(
 
 
     public companion object {
-        /**
-         * Registry of all available OAuth providers.
-         * Built-in providers are automatically added to this list.
-         */
-        public val all: ArrayList<OauthProviderInfo> = ArrayList<OauthProviderInfo>()
-
         public val google: OauthProviderInfo = OauthProviderInfo(
             niceName = "Google",
             loginUrl = "https://accounts.google.com/o/oauth2/v2/auth",
@@ -208,7 +202,7 @@ public class OauthProviderInfo(
                     name = response2.name?.takeUnless { it.isEmpty() },
                 )
             }
-        ).also { all.add(it) }
+        )
 
         public val apple: OauthProviderInfo = OauthProviderInfo(
             niceName = "Apple",
@@ -245,7 +239,7 @@ public class OauthProviderInfo(
 
                 ExternalProfile(email = email)
             }
-        ).also { all.add(it) }
+        )
 
         public val microsoft: OauthProviderInfo = OauthProviderInfo(
             niceName = "Microsoft",
@@ -263,7 +257,7 @@ public class OauthProviderInfo(
                     image = response2.picture,
                 )
             }
-        ).also { all.add(it) }
+        )
 
         public val github: OauthProviderInfo = OauthProviderInfo(
             niceName = "GitHub",
@@ -297,7 +291,7 @@ public class OauthProviderInfo(
                     name = user.name
                 )
             }
-        ).also { all.add(it) }
+        )
     }
 }
 

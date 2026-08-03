@@ -21,7 +21,6 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 public class OauthCallbackEndpoint<STATE>(
-    path: PathSpec0,
     public val stateSerializer: KSerializer<STATE>,
     public val oauthProviderInfo: OauthProviderInfo,
     public val credentials: Runtime<OauthProviderCredentials>,
@@ -47,7 +46,7 @@ public class OauthCallbackEndpoint<STATE>(
      * do not trust its fields for anything security-sensitive. The default simply throws.
      */
     public val onError: suspend context(ServerRuntime) (OauthCode) -> HttpResponse = {
-        throw Exception("Got Oauth error from ${oauthProviderInfo.niceName}: ${it}")
+        throw Exception("Got Oauth error from ${oauthProviderInfo.niceName}: $it")
     },
     public val onAccess: suspend context(ServerRuntime) (OauthResponse, STATE) -> HttpResponse,
 ) : ServerBuilder() {
@@ -124,7 +123,11 @@ public class OauthCallbackEndpoint<STATE>(
     public val callback: HttpHandler<PathSpec0> = when (oauthProviderInfo.mode) {
         OauthResponseMode.form_post -> {
             path.post bind HttpHandler { request ->
-                handle(request.body!!.parse(OauthCode.serializer()))
+                handle(
+                    request.body
+                        ?.parse(OauthCode.serializer())
+                        ?: throw BadRequestException()
+                )
             }
         }
 
