@@ -116,9 +116,8 @@ public class OauthProofEndpoints(
         HttpResponse.redirectToGet(callback.loginUrl(Uuid.random()))
     }
 
-    context(_: ServerRuntime)
-    public val loginApi: ApiHttpHandler<*, *, Unit, String>
-        get() = path.path("login").get bind ApiHttpHandler(
+    public val loginApi: ApiHttpHandler<*, *, Unit, String> =
+        path.path("login").get bind ApiHttpHandler(
             auth = noAuth,
             summary = "Log In via ${provider.niceName}",
             description = "Returns a URL which, when opened in a browser, will allow you to log into the system with ${provider.niceName}.",
