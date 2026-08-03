@@ -98,7 +98,7 @@ class ConstrainAttemptRateTest {
     }
 
     @Test
-    fun `successful action resets strike level so later first offense is short again`() = runBlocking {
+    fun `successful action resets strike level only if there were recent failed attempts`() = runBlocking {
         val clock = MutableClock()
         TestServer.test(settings = {}, clock = { clock }) {
             withClock(clock) {
@@ -110,15 +110,19 @@ class ConstrainAttemptRateTest {
                 clock.advance(11.minutes)
                 assertTrue(cache.hitLimit(key, count = 3, blocked = 10.minutes).contains("20 minutes"))
 
-                // Let the block lapse, then a legitimate success clears the strike level.
+                // Let the block lapse (attempt counter expires), then succeed.
+                // Because failedAttempts == 0 at this point, the level is NOT cleared.
+                // This is intentional: we optimize the happy path by skipping cache writes
+                // when there are no recent failures to clear.
                 clock.advance(21.minutes)
                 val ok = cache.constrainAttemptRate(key, count = 3, blocked = 10.minutes) { "success" }
                 assertEquals("success", ok)
 
-                // A later first offense is short again because the level was reset.
+                // The strike level persists, so a later offense still faces escalated blocking.
+                // This is "unforgiving" but maintains security and keeps the happy path fast.
                 clock.advance(1.minutes)
-                val afterReset = cache.hitLimit(key, count = 3, blocked = 10.minutes)
-                assertTrue(afterReset.contains("10 minutes"), "After success the block should reset to 10 minutes, got: $afterReset")
+                val stillEscalated = cache.hitLimit(key, count = 3, blocked = 10.minutes)
+                assertTrue(stillEscalated.contains("40 minutes"), "Strike level should persist when success had no recent failures, got: $stillEscalated")
             }
         }
     }

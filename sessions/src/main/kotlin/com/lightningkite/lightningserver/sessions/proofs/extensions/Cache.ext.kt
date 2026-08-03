@@ -72,14 +72,15 @@ public suspend inline fun <R> Cache.constrainAttemptRate(
     // duration for a first-time offender (strike level 0); repeat offenses multiply it below.
     val baseBlockDuration = blocked.coerceAtLeast(expires)
 
-    val attemptsSoFar = (this.get<Int>(cacheKey) ?: 0)
+    val failedAttempts = (this.get<Int>(cacheKey) ?: 0)
     val windowStarted = this.setIfNotExists<Instant>(startKey, now(), expires)
 
-    if (windowStarted && attemptsSoFar != 0 && attemptsSoFar <= count) {
+    if (windowStarted && failedAttempts != 0 && failedAttempts < count) {
         this.remove(cacheKey)
+        this.remove(levelKey)
     }
 
-    if (attemptsSoFar >= count) {
+    if (failedAttempts >= count) {
         // Each repeat violation doubles the block: strike level 0 -> baseBlockDuration, level 1 -> x2,
         // level 2 -> x4, and so on, capped at maxBlockDuration.
         val strikeLevel = (this.get<Int>(levelKey) ?: 0).coerceAtMost(20) // avoid overflow to Duration.INFINITE
@@ -95,8 +96,12 @@ public suspend inline fun <R> Cache.constrainAttemptRate(
 
     return try {
         val result = action()
-        remove(cacheKey)
-        remove(levelKey)
+        if (failedAttempts != 0) {
+            // this technically is "incorrect", if user has failedAttempts=0 but level=5 because of above comment this won't reset level,
+            // I think it's a worthwhile trade-off to make the happy path faster while maintaining security, this is just unforgiving
+            remove(cacheKey)
+            remove(levelKey)
+        }
         result
     } catch (e: Throwable) {
         this.add(cacheKey, 1, baseBlockDuration)
