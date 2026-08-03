@@ -28,6 +28,19 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
     public val detailPath: PathSpec1<ID> = path.arg(Segment.Wildcard("id", info.idSerializer))
     private val bulkPath = path.path("bulk")
 
+    // Errors actually thrown by the implementations below; declared so docs/SDKs advertise them and the
+    // W6 "undeclared error" advisory stays quiet.
+    private val notFoundError = LSError(
+        http = HttpStatus.NotFound.code,
+        detail = "",
+        message = "There was no known object by that ID.",
+    )
+    private val uniqueViolationError = LSError(
+        http = HttpStatus.BadRequest.code,
+        detail = "unique",
+        message = "A unique constraint was violated.",
+    )
+
     public val permissions: ApiHttpHandler<PathSpec0, USER, Unit, ModelPermissions<T>> =
         path.path("_permissions_").get bind explicitApiHttpHandler(
             summary = "Permissions",
@@ -101,14 +114,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = Unit.serializer(),
             outputType = info.serializer,
             auth = info.auth.subscope(ModelInfo.Scopes.read),
-            errorCases = listOf(
-                LSError(
-                    http = HttpStatus.NotFound.code,
-                    detail = "",
-                    message = "There was no known object by that ID.",
-                    data = ""
-                )
-            ),
+            errorCases = listOf(notFoundError),
             examples = emptyList(),
             implementation = { _: Unit ->
                 info.table(this).get(route.arg1) ?: throw NotFoundException()
@@ -123,7 +129,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = ListSerializer(info.serializer),
             outputType = ListSerializer(info.serializer),
             auth = info.auth.subscope(ModelInfo.Scopes.create),
-            errorCases = emptyList(),
+            errorCases = listOf(uniqueViolationError),
             examples = emptyList(),
             implementation = { values: List<T> ->
                 try {
@@ -147,7 +153,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = info.serializer,
             outputType = info.serializer,
             auth = info.auth.subscope(ModelInfo.Scopes.create),
-            errorCases = emptyList(),
+            errorCases = listOf(uniqueViolationError),
             examples = emptyList(),
             implementation = { value: T ->
                 try {
@@ -171,7 +177,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = info.serializer,
             outputType = info.serializer,
             auth = info.auth.subscope(listOf(ModelInfo.Scopes.create, ModelInfo.Scopes.update)),
-            errorCases = emptyList(),
+            errorCases = listOf(notFoundError, uniqueViolationError),
             examples = emptyList(),
             implementation = { value: T ->
                 try {
@@ -197,7 +203,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = ListSerializer(info.serializer),
             outputType = ListSerializer(info.serializer),
             auth = info.auth.subscope(ModelInfo.Scopes.update),
-            errorCases = emptyList(),
+            errorCases = listOf(uniqueViolationError),
             examples = emptyList(),
             implementation = { values: List<T> ->
                 try {
@@ -221,7 +227,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = info.serializer,
             outputType = info.serializer,
             auth = info.auth.subscope(ModelInfo.Scopes.update),
-            errorCases = emptyList(),
+            errorCases = listOf(notFoundError, uniqueViolationError),
             examples = emptyList(),
             implementation = { value: T ->
                 try {
@@ -247,7 +253,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = MassModification.serializer(info.serializer),
             outputType = Int.serializer(),
             auth = info.auth.subscope(ModelInfo.Scopes.update),
-            errorCases = emptyList(),
+            errorCases = listOf(uniqueViolationError),
             examples = emptyList(),
             implementation = { input: MassModification<T> ->
                 try {
@@ -271,14 +277,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = Modification.serializer(info.serializer),
             outputType = EntryChange.serializer(info.serializer),
             auth = info.auth.subscope(ModelInfo.Scopes.update),
-            errorCases = listOf(
-                LSError(
-                    http = HttpStatus.NotFound.code,
-                    detail = "",
-                    message = "There was no known object by that ID.",
-                    data = ""
-                )
-            ),
+            errorCases = listOf(notFoundError, uniqueViolationError),
             examples = emptyList(),
             implementation = { input: Modification<T> ->
                 try {
@@ -303,14 +302,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = Modification.serializer(info.serializer),
             outputType = info.serializer,
             auth = info.auth.subscope(ModelInfo.Scopes.update),
-            errorCases = listOf(
-                LSError(
-                    http = HttpStatus.NotFound.code,
-                    detail = "",
-                    message = "There was no known object by that ID.",
-                    data = ""
-                )
-            ),
+            errorCases = listOf(notFoundError, uniqueViolationError),
             examples = emptyList(),
             implementation = { input: Modification<T> ->
                 try {
@@ -336,14 +328,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = PartialSerializer(info.serializer),
             outputType = info.serializer,
             auth = info.auth.subscope(ModelInfo.Scopes.update),
-            errorCases = listOf(
-                LSError(
-                    http = HttpStatus.NotFound.code,
-                    detail = "",
-                    message = "There was no known object by that ID.",
-                    data = ""
-                )
-            ),
+            errorCases = listOf(notFoundError, uniqueViolationError),
             examples = emptyList(),
             implementation = { input: Partial<T> ->
                 try {
@@ -384,14 +369,7 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             inputType = Unit.serializer(),
             outputType = Unit.serializer(),
             auth = info.auth.subscope(ModelInfo.Scopes.delete),
-            errorCases = listOf(
-                LSError(
-                    http = HttpStatus.NotFound.code,
-                    detail = "",
-                    message = "There was no known object by that ID.",
-                    data = ""
-                )
-            ),
+            errorCases = listOf(notFoundError),
             examples = emptyList(),
             implementation = { _: Unit ->
                 if (!info.table(this).deleteOneById(route.arg1)) {
