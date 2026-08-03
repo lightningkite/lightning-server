@@ -161,10 +161,13 @@ public class KtorEngine(
                         when (body) {
                             is Data.Bytes -> call.respondBytes(body.data, type, code)
                             is Data.Text -> call.respondText(body.data, type, code)
-                            is Data.Sink -> call.respondBytesWriter(contentType = type, status = code) {
-                                this.asSink().buffered().use { body.emit(it) }
-                            }
                             is Data.Source -> body.source.use { call.respondSource(it, type, code, body.size) }
+                            // Sink, Suspending and SuspendingProducer are all lazy streams of unknown length;
+                            // Data.write drives each into the response channel (blocking variants self-offload
+                            // to the IO dispatcher).
+                            else -> call.respondBytesWriter(contentType = type, status = code) {
+                                this.asSink().buffered().use { body.write(it) }
+                            }
                         }
                 }
             }

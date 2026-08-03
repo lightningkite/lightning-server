@@ -137,10 +137,12 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
             if (result.body.data.size?.let { it < 256 } == true) return@intercept result
 
             val (newData, compressed) = when (val data = result.body.data) {
+                // Data.Sink's producer is blocking and is offloaded to the IO dispatcher when consumed, so these
+                // branches gzip with the blocking APIs rather than the suspending ones.
                 is Data.Sink -> {
                     Data.Sink { outSink ->
                         GZIPOutputStream(outSink.asOutputStream()).asSink().buffered().use { gzOut ->
-                            data.write(gzOut)
+                            data.emit(gzOut)
                         }
                     } to true
                 }
@@ -148,7 +150,7 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
                 is Data.Source -> {
                     Data.Sink { outSink ->
                         GZIPOutputStream(outSink.asOutputStream()).asSink().buffered().use { gzOut ->
-                            data.write(gzOut)
+                            data.source.use { it.transferTo(gzOut) }
                         }
                     } to true
                 }

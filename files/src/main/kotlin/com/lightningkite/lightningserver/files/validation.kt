@@ -12,7 +12,7 @@ private val fileValidators = Runtime {
             val head = file.fileObject.head()
             when {
                 head == null -> "File does not exist"
-                head.size > maxSize -> "File is too big; max size is $maxSize bytes but file is ${head.size} bytes"
+                head.size.bytes > maxSize -> "File is too big; max size is $maxSize bytes but file is ${head.size.bytes} bytes"
                 types.isNotEmpty() && types.none { MediaType(it).accepts(head.type) } -> "File type ${head.type} does not match any of $types"
                 else -> null
             }

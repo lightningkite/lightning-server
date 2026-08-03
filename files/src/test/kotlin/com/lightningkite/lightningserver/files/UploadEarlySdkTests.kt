@@ -10,7 +10,7 @@ import com.lightningkite.lightningserver.typed.sdk.SDK.writeUsingDefaultSettings
 import com.lightningkite.lightningserver.typed.sdk.module
 import com.lightningkite.services.kfile.KFile
 import com.lightningkite.services.database.*
-import com.lightningkite.services.files.PublicFileSystem
+import com.lightningkite.services.files.ExternalFileSystem
 import kotlinx.serialization.Serializable
 import org.junit.Test
 import kotlin.uuid.Uuid
@@ -18,7 +18,7 @@ import kotlin.uuid.Uuid
 class UploadEarlySdkTests {
     private object Server : ServerBuilder() {
         val database = setting("database", Database.Settings())
-        val files = setting("files", PublicFileSystem.Settings())
+        val files = setting("files", ExternalFileSystem.Settings())
 
         val uploadEarly = path.path("upload") module UploadEarlyEndpoint(
             files = files,

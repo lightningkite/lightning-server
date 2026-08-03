@@ -124,49 +124,65 @@ public fun ByteArray.sliceArray(range: HttpRange): ByteArray = sliceArray(
     range.rangeStart(size.toLong()).toInt()..range.rangeEnd(size.toLong()).toInt()
 )
 
-public fun TypedData.getRange(range: HttpRange, dataSize: Long): TypedData =
+/**
+ * Narrows this data down to a single requested [range].
+ *
+ * Streaming data is read through its source, which is acquired here rather than inside the produced
+ * [Data.Sink] because that producer is blocking - the bytes themselves are still only pulled when the
+ * response is written.
+ */
+public suspend fun TypedData.getRange(range: HttpRange, dataSize: Long): TypedData =
     TypedData(
         mediaType = mediaType,
         data = when (data) {
             is Data.Bytes, is Data.Text -> Data.Bytes(data.bytes().sliceArray(range))
-            is Data.Sink, is Data.Source -> Data.Sink { sink ->
-                data.source().use { source ->
-                    source.skip(range.rangeStart(dataSize))
-                    when (range) {
-                        is HttpRange.Bounded -> sink.write(source, range.size)
-                        is HttpRange.Last, is HttpRange.UntilEnd -> source.transferTo(sink)
+            else -> data.source().let { opened ->
+                Data.Sink { sink ->
+                    opened.use { source ->
+                        source.skip(range.rangeStart(dataSize))
+                        when (range) {
+                            is HttpRange.Bounded -> sink.write(source, range.size)
+                            is HttpRange.Last, is HttpRange.UntilEnd -> source.transferTo(sink)
+                        }
                     }
                 }
             }
         }
     )
 
-public fun TypedData.getRanges(
+/**
+ * Packs the requested [ranges] into a `multipart/byteranges` body.
+ *
+ * As in [getRange], the bytes or the source are acquired here because the produced [Data.Sink]'s
+ * producer is blocking.
+ */
+public suspend fun TypedData.getRanges(
     ranges: List<HttpRange>,
     dataSize: Long,
     rangeBoundary: String = "CONTENT_BOUNDARY",
-): TypedData =
-    TypedData(
-        mediaType = MediaType.MultiPart.ByteRanges.copy(parameters = mapOf("boundary" to rangeBoundary)),
-        data = Data.Sink { sink ->
-            fun Sink.writeRangeHeaders(range: HttpRange) {
-                writeString(rangeBoundary + LINE_FEED)
-                writeString("${HttpHeader.ContentType}: $mediaType" + LINE_FEED)
-                writeString("${HttpHeader.ContentRange}: bytes ${range.rangeStart(dataSize)}-${range.rangeEnd(dataSize)}/$dataSize" + LINE_FEED)
+): TypedData {
+    fun Sink.writeRangeHeaders(range: HttpRange) {
+        writeString(rangeBoundary + LINE_FEED)
+        writeString("${HttpHeader.ContentType}: $mediaType" + LINE_FEED)
+        writeString("${HttpHeader.ContentRange}: bytes ${range.rangeStart(dataSize)}-${range.rangeEnd(dataSize)}/$dataSize" + LINE_FEED)
+    }
+
+    val ranged = if (data is Data.Bytes || data is Data.Text || ranges.mergeOverlaps(dataSize).size != ranges.size) {
+        // read all bytes if available or ranges overlap
+        val bytes = data.bytes()
+        Data.Sink { sink ->
+            for (range in ranges) {
+                sink.writeRangeHeaders(range)
+                sink.writeString(LINE_FEED)
+                sink.write(bytes.sliceArray(range))
+                sink.writeString(LINE_FEED)
             }
-
-            if (data is Data.Bytes || data is Data.Text || ranges.mergeOverlaps(dataSize).size != ranges.size) {
-                // read all bytes if available or ranges overlap
-                val bytes = data.bytes()
-
-                for (range in ranges) {
-                    sink.writeRangeHeaders(range)
-                    sink.writeString(LINE_FEED)
-                    sink.write(bytes.sliceArray(range))
-                    sink.writeString(LINE_FEED)
-                }
-                sink.writeString(rangeBoundary)
-            } else data.source().use { source ->  // use source if possible
+            sink.writeString(rangeBoundary)
+        }
+    } else {
+        val opened = data.source()  // use source if possible
+        Data.Sink { sink ->
+            opened.use { source ->
                 var pos = 0L
                 for (range in ranges) {
                     sink.writeRangeHeaders(range)
@@ -189,6 +205,12 @@ public fun TypedData.getRanges(
                 sink.writeString(rangeBoundary)
             }
         }
+    }
+
+    return TypedData(
+        mediaType = MediaType.MultiPart.ByteRanges.copy(parameters = mapOf("boundary" to rangeBoundary)),
+        data = ranged
     )
+}
 
 private const val LINE_FEED = "\r\n"
