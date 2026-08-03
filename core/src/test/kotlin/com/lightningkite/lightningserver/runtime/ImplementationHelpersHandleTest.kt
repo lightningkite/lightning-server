@@ -36,6 +36,9 @@ class ImplementationHelpersHandleTest {
         )
 
         init {
+            // Installed outermost so security headers apply to every response, including CORS-processed and
+            // error responses (exercised by the security-header tests below).
+            install(com.lightningkite.lightningserver.http.SecurityHeadersInterceptor())
             install(com.lightningkite.lightningserver.cors.CorsInterceptor(setting("cors", cors)))
         }
 
@@ -470,6 +473,83 @@ class ImplementationHelpersHandleTest {
                     "https://example.com",
                     resp.headers[HttpHeader.AccessControlAllowOrigin]?.root,
                     "CORS (an outer interceptor) must still post-process a response produced by an inner interceptor's own thrown exception",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun https_response_has_security_headers() {
+        // TestServer explicitly installs SecurityHeadersInterceptor: an https response must carry
+        // nosniff and HSTS.
+        TestServer.test(settings = {}) {
+            runBlocking {
+                val resp = serverRuntime.handle(
+                    HttpRequest<PathSpec>(
+                        path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
+                        queryParameters = QueryParameters.EMPTY,
+                        headers = HttpHeaders.EMPTY,
+                        domain = "example.com",
+                        protocol = "https",
+                        sourceIp = "local",
+                    )
+                )
+                assertEquals("nosniff", resp.headers[HttpHeader.XContentTypeOptions]?.root)
+                assertEquals(
+                    "max-age=31536000",
+                    resp.headers[HttpHeader.StrictTransportSecurity]?.root,
+                    "https responses must carry HSTS",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun http_response_has_nosniff_but_not_hsts() {
+        // HSTS must never be sent over plain http (per the HSTS spec), but nosniff still applies.
+        TestServer.test(settings = {}) {
+            runBlocking {
+                val resp = serverRuntime.handle(
+                    HttpRequest<PathSpec>(
+                        path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
+                        queryParameters = QueryParameters.EMPTY,
+                        headers = HttpHeaders.EMPTY,
+                        domain = "example.com",
+                        protocol = "http",
+                        sourceIp = "local",
+                    )
+                )
+                assertEquals("nosniff", resp.headers[HttpHeader.XContentTypeOptions]?.root)
+                assertNull(
+                    resp.headers[HttpHeader.StrictTransportSecurity],
+                    "plain http responses must NOT carry HSTS",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun error_response_has_security_headers() {
+        // Error responses are mapped inside the interceptor chain, so security headers apply to
+        // them too.
+        TestServer.test(settings = {}) {
+            runBlocking {
+                val resp = serverRuntime.handle(
+                    HttpRequest<PathSpec>(
+                        path = RawHttpEndpoint(asString = "/boom", method = HttpMethod.GET),
+                        queryParameters = QueryParameters.EMPTY,
+                        headers = HttpHeaders.EMPTY,
+                        domain = "example.com",
+                        protocol = "https",
+                        sourceIp = "local",
+                    )
+                )
+                assertEquals(HttpStatus.NotFound, resp.status)
+                assertEquals("nosniff", resp.headers[HttpHeader.XContentTypeOptions]?.root)
+                assertEquals(
+                    "max-age=31536000",
+                    resp.headers[HttpHeader.StrictTransportSecurity]?.root,
+                    "error responses must carry security headers",
                 )
             }
         }
