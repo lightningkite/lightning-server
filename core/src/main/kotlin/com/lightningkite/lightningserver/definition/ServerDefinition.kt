@@ -163,7 +163,7 @@ public data class ServerDefinition(
                         get(path)
                             ?.let { previous ->
                                 val intersection = endpoints.http.keys.intersect(previous.http.keys)
-                                if (intersection.isNotEmpty()) throw DuplicateRegistrationError(
+                                if (intersection.isNotEmpty()) throw DuplicateRegistrationException(
                                     "Endpoints ${
                                         intersection.map {
                                             HttpEndpoint(
@@ -173,7 +173,7 @@ public data class ServerDefinition(
                                         }
                                     } already have registered handlers", previous.http, endpoints.http
                                 )
-                                if (previous.websocket != null && endpoints.websocket != null) throw DuplicateRegistrationError(
+                                if (previous.websocket != null && endpoints.websocket != null) throw DuplicateRegistrationException(
                                     "Path $path already has a registered websocket",
                                     previous.websocket,
                                     endpoints.websocket

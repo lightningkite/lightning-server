@@ -2,7 +2,7 @@ package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.definition.*
-import com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationError
+import com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationException
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.HasId
@@ -222,7 +222,7 @@ private object PrincipalTypeRegistry : MapRegistryExtension<String, PrincipalTyp
 public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> ServerBuilder.register(type: PrincipalType<SUBJECT, ID>) {
     val registry = extensions[PrincipalTypeRegistry]
     registry[type.name]?.let {
-        if (it.subjectSerializer != type.subjectSerializer) throw DuplicateRegistrationError(
+        if (it.subjectSerializer != type.subjectSerializer) throw DuplicateRegistrationException(
             "Encountered two PrincipalTypes with the same name: ${type.name}",
             it,
             type

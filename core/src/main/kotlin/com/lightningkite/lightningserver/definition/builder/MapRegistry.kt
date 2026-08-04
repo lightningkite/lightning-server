@@ -7,7 +7,7 @@ import com.lightningkite.services.data.toSealedMap
  *
  * Unlike a standard [MutableMap], once an item is registered at a location, that location
  * becomes immutable - attempts to register a different value at the same location will throw
- * [DuplicateRegistrationError]. This prevents accidental overwriting of endpoints, tasks, and
+ * [DuplicateRegistrationException]. This prevents accidental overwriting of endpoints, tasks, and
  * other resources during server construction.
  *
  * This is used internally by [ServerBuilder] to register endpoints, tasks, schedules, and other
@@ -22,7 +22,7 @@ public interface MapRegistry<L, V> : Map<L, V> {
      *
      * @param location The location/key where the value should be registered
      * @param value The value to register
-     * @throws DuplicateRegistrationError if the location already has a registered value
+     * @throws DuplicateRegistrationException if the location already has a registered value
      */
     public fun register(location: L, value: V)
 }
@@ -36,14 +36,13 @@ public interface MapRegistry<L, V> : Map<L, V> {
  * @property initial The value that was originally registered at the location
  * @property overwrite The value that was attempted to be registered (and rejected)
  */
-public class DuplicateRegistrationError(message: String, public val initial: Any?, public val overwrite: Any?) :
-    Error(message)
+public class DuplicateRegistrationException(message: String, public val initial: Any?, public val overwrite: Any?) : Exception(message)
 
 /**
  * Registers all entries from a map into this registry.
  *
  * @param map The map whose entries should be registered
- * @throws DuplicateRegistrationError if any key already exists in the registry
+ * @throws DuplicateRegistrationException if any key already exists in the registry
  */
 public fun <L, V> MapRegistry<L, V>.include(map: Map<L, V>) {
     for ((k, v) in map) register(k, v)
@@ -72,7 +71,7 @@ private class BasicMapRegistry<L, V>(
 ) : MapRegistry<L, V>, Map<L, V> by registry {
     override fun register(location: L, value: V) {
         if (registry.containsKey(location)) registry.getValue(location).let {
-            throw DuplicateRegistrationError("Key $location already has a registered value: $it", it, value)
+            throw DuplicateRegistrationException("Key $location already has a registered value: $it", it, value)
         }
         registry[location] = value
     }
