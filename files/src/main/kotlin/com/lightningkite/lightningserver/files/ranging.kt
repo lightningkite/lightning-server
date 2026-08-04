@@ -8,45 +8,6 @@ import kotlinx.io.Buffer
 import kotlinx.io.Sink
 import kotlinx.io.writeString
 
-/** Sentinel for [RangeSlicingSink.forward] meaning "forward everything after the skip, to end of stream". */
-private const val RANGE_UNTIL_END: Long = -1L
-
-/**
- * A [SuspendingSink] that slices a passing byte stream: it discards the first [skip] bytes, forwards the next
- * [forward] bytes to [downstream] (or all remaining bytes if [forward] is [RANGE_UNTIL_END]), and discards anything
- * past that. Lets a range be served straight from a streaming body without buffering the whole thing in memory.
- *
- * Does not close [downstream] — the enclosing producer owns its lifecycle.
- */
-private class RangeSlicingSink(
-    private val downstream: SuspendingSink,
-    skip: Long,
-    private val forward: Long,
-) : SuspendingSink {
-    private var toSkip = skip
-    private var forwarded = 0L
-
-    override val state: StreamState get() = downstream.state
-
-    override suspend fun write(from: Buffer, count: Long) {
-        var remaining = count
-        if (toSkip > 0L) {
-            val dropped = minOf(toSkip, remaining)
-            from.skip(dropped); toSkip -= dropped; remaining -= dropped
-        }
-        if (remaining <= 0L) return
-        val allowed = if (forward == RANGE_UNTIL_END) remaining else minOf(remaining, forward - forwarded)
-        if (allowed > 0L) {
-            downstream.write(from, allowed); forwarded += allowed; remaining -= allowed
-        }
-        if (remaining > 0L) from.skip(remaining) // past the window — discard, but still consume `count` from `from`
-    }
-
-    override suspend fun flush(): Unit = downstream.flush()
-    override suspend fun close() {} // downstream is caller-owned
-    override fun close(cause: Throwable) {}
-}
-
 /**
  * Represents a single range value requested by a `Range` header.
  *
@@ -149,7 +110,7 @@ public fun List<HttpRange>.mergeOverlaps(resourceSize: Long): List<HttpRange> = 
                 // Merge: keep earlier start, take later end
                 current = HttpRange.Bounded(
                     current.rangeStart(resourceSize),
-                    current.rangeEnd(resourceSize)
+                    next.rangeEnd(resourceSize)
                 )
             } else {
                 // No overlap, save current and move to next
@@ -242,5 +203,45 @@ public suspend fun TypedData.getRanges(
         }
     )
 }
+
+
+/**
+ * A [SuspendingSink] that slices a passing byte stream: it discards the first [skip] bytes, forwards the next
+ * [forward] bytes to [downstream] (or all remaining bytes if [forward] is [RANGE_UNTIL_END]), and discards anything
+ * past that. Lets a range be served straight from a streaming body without buffering the whole thing in memory.
+ *
+ * Does not close [downstream] — the enclosing producer owns its lifecycle.
+ */
+private class RangeSlicingSink(
+    private val downstream: SuspendingSink,
+    skip: Long,
+    private val forward: Long,
+) : SuspendingSink {
+    private var toSkip = skip
+    private var forwarded = 0L
+
+    override val state: StreamState get() = downstream.state
+
+    override suspend fun write(from: Buffer, count: Long) {
+        var remaining = count
+        if (toSkip > 0L) {
+            val dropped = minOf(toSkip, remaining)
+            from.skip(dropped); toSkip -= dropped; remaining -= dropped
+        }
+        if (remaining <= 0L) return
+        val allowed = if (forward == RANGE_UNTIL_END) remaining else minOf(remaining, forward - forwarded)
+        if (allowed > 0L) {
+            downstream.write(from, allowed); forwarded += allowed; remaining -= allowed
+        }
+        if (remaining > 0L) from.skip(remaining) // past the window — discard, but still consume `count` from `from`
+    }
+
+    override suspend fun flush(): Unit = downstream.flush()
+    override suspend fun close() {} // downstream is caller-owned
+    override fun close(cause: Throwable) {}
+}
+
+/** Sentinel for [RangeSlicingSink.forward] meaning "forward everything after the skip, to end of stream". */
+private const val RANGE_UNTIL_END: Long = -1L
 
 private const val LINE_FEED = "\r\n"
