@@ -3,9 +3,11 @@ package com.lightningkite.lightningserver.typed
 import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.services.data.toSealedMap
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.DatabaseTableDefinition
 import com.lightningkite.services.database.Table
+import com.lightningkite.services.database.typeParametersSerializersOrNull
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
 
@@ -27,24 +29,89 @@ public data class DatabaseTableRegistration<T : Any>(
     override fun invoke(): Table<T> = database().table(tableDefinition)
 }
 
-private fun DatabaseTableRegistration<*>.typeName(): String = tableDefinition.serializer.descriptor.serialName
+public class DatabaseTableRegistry private constructor(
+    private val registry: HashMap<String, DatabaseTableRegistration<*>>
+): Map<String, DatabaseTableRegistration<*>> by registry {
+    public constructor() : this(HashMap())
+    public constructor(start: DatabaseTableRegistry) : this(HashMap(start.registry))
 
-private object KnownTablesExtensionKey : MapRegistryExtension<String, DatabaseTableRegistration<*>> {
-    // The same table is legitimately registered from more than one place (a model served by several
-    // endpoint groups, or a module mounted at two paths). Merge those idempotently by name (keep the
-    // first) instead of failing; only reject a name reused for a genuinely different table (type).
-    override fun MapRegistry<String, DatabaseTableRegistration<*>>.include(other: Map<String, DatabaseTableRegistration<*>>) {
-        for ((name, reg) in other) {
-            val existing = this[name]
-            if (existing == null) register(name, reg)
-            else require(existing.typeName() == reg.typeName()) {
-                "Table \"$name\" is registered for two different types (${existing.typeName()} vs ${reg.typeName()})."
+    private fun KSerializer<*>.deepEquals(other: KSerializer<*>): Boolean {
+        if (this.descriptor != other.descriptor) return false
+
+        val myTypes = this.typeParametersSerializersOrNull()
+        val otherTypes = other.typeParametersSerializersOrNull()
+
+        if (myTypes == null && otherTypes == null) return true
+        if (myTypes?.size != otherTypes?.size) return false
+
+        return myTypes.orEmpty().zip(otherTypes.orEmpty()).all { (a, b) -> a.deepEquals(b) }
+    }
+
+    private fun KSerializer<*>.typeName(): String {
+        val types = typeParametersSerializersOrNull()
+
+        return if (types.isNullOrEmpty()) descriptor.serialName
+        else descriptor.serialName + types.joinToString(prefix = "<", postfix = ">") { it.typeName() }
+    }
+
+    private fun <T : Any> checkRegistered(definition: DatabaseTableDefinition<T>): DatabaseTableRegistration<T>? {
+        val existing = registry[definition.name] ?: return null
+
+        if (!existing.tableDefinition.serializer.deepEquals(definition.serializer)) throw DuplicateRegistrationError(
+            "Table \"${definition.name}\" is already registered for a different type (${existing.tableDefinition.serializer.typeName()} vs ${definition.serializer.typeName()}).",
+            initial = existing.tableDefinition,
+            overwrite = definition
+        )
+
+        @Suppress("UNCHECKED_CAST")
+        return existing as DatabaseTableRegistration<T>
+    }
+
+    private fun <T : Any> register(registration: DatabaseTableRegistration<T>) {
+        checkRegistered(registration.tableDefinition)
+        registry[registration.tableDefinition.name] = registration
+    }
+
+
+    /**
+     * Defines a table, registers it on the [builder] (see [ServerDefinition.allRegisteredTables]), and
+     * creates its once-per-deploy prepare task. Returns a [DatabaseTableRegistration], which is a runtime
+     * accessor for the table — invoke it inside a handler to use it.
+     *
+     * Idempotent by [definition]: registering the same table again (e.g. a model served by multiple endpoint
+     * groups) returns the existing registration rather than creating a duplicate prepare task. Reusing a
+     * name for a genuinely *different* table (a different type) throws a [DuplicateRegistrationError]. Table names are unique per server.
+     */
+    context(builder: ServerBuilder)
+    public fun <T : Any> register(database: Runtime<Database>, definition: DatabaseTableDefinition<T>): DatabaseTableRegistration<T> {
+        checkRegistered(definition)?.let { return it }
+        val task = with(builder) {
+            path.path("prepare-${definition.name}") bind PreDeployTask {
+                database().prepare(definition)
             }
         }
+        val reg = DatabaseTableRegistration(database, definition, task)
+        registry[definition.name] = reg
+        return reg
+    }
+
+
+    public companion object ExtensionKey : MutableExtensions.WritableKey<DatabaseTableRegistry, Map<String, DatabaseTableRegistration<*>>> {
+        override fun default(): DatabaseTableRegistry = DatabaseTableRegistry()
+
+        override fun DatabaseTableRegistry.include(other: Map<String, DatabaseTableRegistration<*>>) {
+            other.values.forEach {
+                register(it)
+            }
+        }
+
+        override fun seal(data: Map<String, DatabaseTableRegistration<*>>): Map<String, DatabaseTableRegistration<*>> =
+            data.toSealedMap()
     }
 }
 
-private val ServerBuilder.allRegisteredTables: MapRegistry<String, DatabaseTableRegistration<*>> by KnownTablesExtensionKey
+@PublishedApi
+internal val ServerBuilder.tableRegistry: DatabaseTableRegistry by DatabaseTableRegistry
 
 /**
  * Every table registered on this server via [registerTable], keyed by table name.
@@ -52,46 +119,18 @@ private val ServerBuilder.allRegisteredTables: MapRegistry<String, DatabaseTable
  * Populated at definition-build time. Enables server-wide functionality that needs to enumerate
  * tables (e.g. preparing or introspecting all of them) without hard-coding the list.
  */
-public val ServerDefinition.allRegisteredTables: Map<String, DatabaseTableRegistration<*>> by KnownTablesExtensionKey
+public val ServerDefinition.allRegisteredTables: Map<String, DatabaseTableRegistration<*>> by DatabaseTableRegistry
+
 
 @Deprecated("It is strongly recommended you define the table name explicitly.")
 context(builder: ServerBuilder)
 public inline fun <reified T : Any> Runtime<Database>.registerTable(): DatabaseTableRegistration<T> =
-    registerTable(T::class.simpleName!!, serializer<T>())
+    builder.tableRegistry.register(this, DatabaseTableDefinition())
 
 context(builder: ServerBuilder)
 public inline fun <reified T : Any> Runtime<Database>.registerTable(name: String): DatabaseTableRegistration<T> =
-    registerTable(name, serializer<T>())
+    builder.tableRegistry.register(this, DatabaseTableDefinition(name))
 
-/**
- * Defines a table, registers it on the [builder] (see [ServerDefinition.allRegisteredTables]), and
- * creates its once-per-deploy prepare task. Returns a [DatabaseTableRegistration], which is a runtime
- * accessor for the table — invoke it inside a handler to use it.
- *
- * Idempotent by [name]: registering the same table again (e.g. a model served by multiple endpoint
- * groups) returns the existing registration rather than creating a duplicate prepare task. Reusing a
- * name for a genuinely *different* table (a different type) throws. Table names are unique per server.
- */
 context(builder: ServerBuilder)
-public fun <T : Any> Runtime<Database>.registerTable(
-    name: String,
-    serializer: KSerializer<T>,
-): DatabaseTableRegistration<T> {
-    builder.allRegisteredTables[name]?.let { existing ->
-        require(existing.typeName() == serializer.descriptor.serialName) {
-            "Table \"$name\" is already registered for a different type (${existing.typeName()} vs ${serializer.descriptor.serialName})."
-        }
-        @Suppress("UNCHECKED_CAST")
-        return existing as DatabaseTableRegistration<T>
-    }
-    val def = DatabaseTableDefinition(serializer, name)
-    val task = with(builder) {
-        path.path("prepare-$name") bind PreDeployTask {
-            this@registerTable().prepare(def)
-            Unit
-        }
-    }
-    val reg = DatabaseTableRegistration(this@registerTable, def, task)
-    builder.allRegisteredTables.register(name, reg)
-    return reg
-}
+public fun <T : Any> Runtime<Database>.registerTable(name: String, serializer: KSerializer<T>): DatabaseTableRegistration<T> =
+    builder.tableRegistry.register(this, DatabaseTableDefinition(serializer, name))

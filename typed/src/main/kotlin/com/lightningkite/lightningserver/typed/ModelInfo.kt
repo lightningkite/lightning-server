@@ -62,8 +62,7 @@ public inline fun <reified USER : HasId<*>?, reified T : HasId<ID>, reified ID :
     override val auth: AuthRequirement<USER> = subscope?.let { auth.subscope(it) } ?: auth
 
     // registerTable defines the table, registers it, and creates its (once-per-deploy) prepare task.
-    override val registration: DatabaseTableRegistration<T> =
-        with(builder) { this@modelInfo.registerTable(tableName, serializer) }
+    override val registration: DatabaseTableRegistration<T> = this@modelInfo.registerTable(tableName, serializer)
 
     context(server: ServerRuntime)
     override fun baseTable(): Table<T> = registration()
