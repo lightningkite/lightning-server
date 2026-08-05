@@ -34,7 +34,7 @@ import kotlin.uuid.Uuid
  * - The futureCallToken is time-limited by [expiration]. Ensure your client uses it promptly.
  */
 public class UploadEarlyEndpoint(
-    public val files: Runtime<PublicFileSystem>,
+    public val files: Runtime<ExternalFileSystem>,
     public val database: Runtime<Database>,
     public val fileScanner: Runtime<List<FileScanner>>,
     public val jailFilePath: String = "upload-jail",
@@ -47,7 +47,7 @@ public class UploadEarlyEndpoint(
     }
 
     /**
-     * Contextual serializer used for ServerFile values that integrates with the configured PublicFileSystem
+     * Contextual serializer used for ServerFile values that integrates with the configured ExternalFileSystem
      * and scanners to produce signed URLs, enforce jail/ready flows, and clean up single-use records.
      */
     public val serializer: Runtime<ExternalServerFileSerializer> = Runtime.Cached {
@@ -148,7 +148,7 @@ public class UploadEarlyEndpoint(
     public val cleanupSchedule: ScheduledTask = path.path("cleanupUploads") bind ScheduledTask(frequency = 1.days) {
         database().table<UploadForNextRequest>().deleteMany(condition { it.expires lt now() }).forEach {
             try {
-                ExternalFile.Parser(listOf(files())).parse(it.file.location).delete()
+                it.file.externalFile.delete()
             } catch (e: Exception) {
                 e.printStackTrace()
             }

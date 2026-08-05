@@ -79,6 +79,8 @@ public data class OauthTokenRequest(
     val client_secret: String,
     val redirect_uri: String? = null,
     val grant_type: String = "authorization_code",
+    /** PKCE (RFC 7636) code verifier proving this client started the flow. Omitted when PKCE is disabled. */
+    val code_verifier: String? = null,
 )
 
 @Serializable
@@ -101,6 +103,10 @@ public data class OauthCodeRequest(
     val prompt: OauthPromptType? = null,
     val login_hint: String? = null,
     val sessionExpiration: Instant? = null,
+    /** PKCE (RFC 7636) code challenge = BASE64URL-NOPAD(SHA256(code_verifier)). Omitted when PKCE is disabled. */
+    val code_challenge: String? = null,
+    /** PKCE transformation method; always "S256" when [code_challenge] is present. */
+    val code_challenge_method: String? = null,
 )
 
 @Serializable

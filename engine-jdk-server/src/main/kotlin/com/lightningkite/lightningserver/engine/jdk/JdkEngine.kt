@@ -226,21 +226,11 @@ private suspend fun HttpExchange.write(response: HttpResponse) {
             }
         }
 
-        is Data.Bytes, is Data.Text -> {
-            val bytes = b.bytes()
-            sendResponseHeaders(status, bytes.size.toLong())
-            this.responseBody.use { os -> os.write(bytes) }
-        }
-
-        is Data.Sink -> {
-            // Unknown length; use chunked
+        // A known size is sent as the exact content length; 0 tells the JDK server to use chunked encoding.
+        // Data.write streams every variant (blocking ones self-offload to the IO dispatcher).
+        else -> {
             sendResponseHeaders(status, b.size ?: 0)
-            this.responseBody.asSink().buffered().use { sink -> b.emit(sink) }
-        }
-
-        is Data.Source -> {
-            sendResponseHeaders(status, b.size ?: 0)
-            this.responseBody.asSink().buffered().use { sink -> b.source.transferTo(sink) }
+            this.responseBody.asSink().buffered().use { sink -> b.write(sink) }
         }
 
         is Data.Suspending, is Data.SuspendingProducer -> {

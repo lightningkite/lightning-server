@@ -11,11 +11,6 @@ export interface Mask<T> {
 	pairs: Array<Pair<Condition<T>, Modification<T>>>
 }
 
-export enum Mode {
-	Blacklist = "Blacklist",
-	Whitelist = "Whitelist",
-}
-
 export interface ModelPermissions<T> {
 	create: Condition<T>
 	read: Condition<T>
@@ -31,12 +26,6 @@ export interface Pair<T, T1> {
 	second: T1
 }
 
-export interface Part<T> {
-	property: DataClassPathPartial<T>
-	requires: Condition<T>
-	limitedTo: Condition<T>
-}
-
 export interface TestInput {
 	id: number
 	name: string
@@ -48,8 +37,19 @@ export interface TestModel {
 }
 
 export interface UpdateRestrictions<T> {
-	mode: Mode
-	fields: Array<Part<T>>
+	mode: UpdateRestrictionsMode
+	fields: Array<UpdateRestrictionsPart<T>>
+}
+
+export enum UpdateRestrictionsMode {
+	Blacklist = "Blacklist",
+	Whitelist = "Whitelist",
+}
+
+export interface UpdateRestrictionsPart<T> {
+	property: DataClassPathPartial<T>
+	requires: Condition<T>
+	limitedTo: Condition<T>
 }
 
 export type Uuid = string  // kotlin.uuid.Uuid

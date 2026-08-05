@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.typed.jsonschema
 
 import com.lightningkite.lightningserver.HttpMethod
+import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.plus
@@ -218,9 +219,31 @@ private fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PA
                 )
             )
 
-        mapOf(successCode.code.toString() to response)
+        // Declared error cases become documented responses keyed by status code. Cases sharing a status
+        // code are grouped into one response with a combined description and the LSError schema/example.
+        val errorResponses = errorCases
+            .groupBy { it.http }
+            .mapKeys { it.key.toString() }
+            .mapValues { (_, cases) ->
+                OpenApiResponse(
+                    description = cases.joinToString("\n") { case ->
+                        val prefix = if (case.detail.isNotBlank()) "[${case.detail}] " else ""
+                        prefix + case.message.ifBlank { "Error" }
+                    },
+                    content = mapOf(
+                        MediaType.Application.Json.toString() to OpenApiMediaType(
+                            schema = builder[LSError.serializer()],
+                            example = runtime.externalSerialization.json.encodeToJsonElement(
+                                LSError.serializer(),
+                                cases.first()
+                            )
+                        )
+                    )
+                )
+            }
+
+        mapOf(successCode.code.toString() to response) + errorResponses
     }
-    // TODO: Error codes
 )
 
 context(runtime: ServerRuntime)

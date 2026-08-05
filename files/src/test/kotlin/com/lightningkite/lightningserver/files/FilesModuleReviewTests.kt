@@ -9,8 +9,8 @@ import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.files.ExternalFileSystem
-import com.lightningkite.services.files.serverFile
 import com.lightningkite.services.files.ServerFile
+import com.lightningkite.services.files.serverFile
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals

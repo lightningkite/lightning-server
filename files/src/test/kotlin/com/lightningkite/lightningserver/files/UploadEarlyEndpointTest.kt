@@ -84,7 +84,7 @@ class UploadEarlyEndpointTest {
             println((files() as KotlinxIoExternalFileSystem).serveUrl)
             val file = files().root.then("test.txt")
             file.put(TypedData.text("Hello world!", MediaType.Text.Plain))
-            println(file)
+            println(file.signedUrl)
             val serialized = contextOf<ServerRuntime>().externalSerialization.stringArrayFormat.encodeToString(
                 uploadEarly.serializer(),
                 file.serverFile
