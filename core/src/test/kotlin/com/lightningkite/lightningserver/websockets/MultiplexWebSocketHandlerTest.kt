@@ -8,6 +8,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.builtins.serializer
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class MultiplexWebSocketHandlerTest {
 
@@ -30,6 +31,19 @@ class MultiplexWebSocketHandlerTest {
             topicHandlers = {},
             messageFromClient = { frame ->
                 if (frame is WebSocketFrame.Text) send(WebSocketFrame("other:" + frame.text))
+                else send(frame)
+            },
+            disconnect = {}
+        )
+        val toggle = path.path("toggle") bind WebSocketHandler(
+            storageSerializer = Unit.serializer(),
+            willConnect = { Unit },
+            didConnect = { subscribe(broadcast) },
+            topicHandlers = {
+                broadcast bind { send(WebSocketFrame(it.value)) }
+            },
+            messageFromClient = { frame ->
+                if (frame is WebSocketFrame.Text && frame.text == "off") unsubscribe(broadcast)
                 else send(frame)
             },
             disconnect = {}
@@ -89,6 +103,42 @@ class MultiplexWebSocketHandlerTest {
             val endAck = json.decodeFromString(MultiplexMessage.serializer(), (last as WebSocketFrame.Text).text)
             assertEquals("a", endAck.channel)
             assertEquals(true, endAck.end)
+
+            mux.close()
+        }
+    }
+
+    /**
+     * Regression test: unsubscribe used to *add* the topic to the channel's set instead of removing it,
+     * so a channel could never stop receiving a topic once subscribed, and the underlying subscription
+     * was never released. A connection that had ever subscribed broadly kept that firehose for its
+     * whole session.
+     */
+    @Test
+    fun unsubscribe_actually_stops_delivery() = runBlocking {
+        TestServer.test(settings = {}) {
+            val mux = TestServer.multiplex.test()
+            val json = mux.server.externalSerialization.json
+            var last: WebSocketFrame? = null
+            mux.onMessageSent = { last = it }
+
+            suspend fun send(message: MultiplexMessage) =
+                mux.send(WebSocketFrame.Text(json.encodeToString(MultiplexMessage.serializer(), message)))
+
+            send(MultiplexMessage(channel = "t", path = "/toggle", start = true))
+
+            // While subscribed, a broadcast reaches the channel.
+            TestServer.broadcast.send("first")
+            val received = json.decodeFromString(MultiplexMessage.serializer(), (last as WebSocketFrame.Text).text)
+            assertEquals("t", received.channel)
+            assertEquals("first", received.data)
+
+            // Ask the handler to unsubscribe, then broadcast again.
+            send(MultiplexMessage(channel = "t", data = "off"))
+            last = null
+            TestServer.broadcast.send("second")
+
+            assertNull(last, "Channel kept receiving the topic after unsubscribing")
 
             mux.close()
         }

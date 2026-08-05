@@ -81,6 +81,7 @@ class HttpSpanTest {
             telemetrySettings.set(TelemetryBackend.Settings(url = schemeName))
             enginePubSub.useDefault()
             engineCache.useDefault()
+            com.lightningkite.lightningserver.websockets.websocketSettings.useDefault()
             forceWebSocketPubSub.useDefault()
             jdkRunConfig set JdkRuntimeSettings(host = "127.0.0.1", port = port)
         }
