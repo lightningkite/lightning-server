@@ -57,6 +57,7 @@ public class KnownDeviceProofEndpoints(
 
     public val modelInfo: ModelInfo<HasId<*>, KnownDeviceSecret, Uuid> = database.modelInfo(
         auth = proofMethodAuth or AuthRequirement.IsAdmin,
+        tableName = "KnownDeviceSecret",
         signals = {
             it.interceptCreate {
                 it.copy(hash = it.hash.fastHash(), expiresAt = now() + expires())

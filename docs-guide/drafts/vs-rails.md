@@ -99,7 +99,7 @@ object PostApi : ServerBuilder() {
     val database = setting("database", Database.Settings())
 
     val posts = path.path("posts") include ModelRestEndpoints(
-        database.modelInfo(auth = UserAuth.require(), permissions = { /* ... */ })
+        database.modelInfo(auth = UserAuth.require(), tableName = "Post", permissions = { /* ... */ })
     )
 }
 ```
@@ -123,7 +123,7 @@ end
 
 ```kotlin
 // Lightning Server — illustrative
-val posts = database().table<Post>()
+val posts = postTable()
     .interceptCreate { value -> value.copy(slug = slugify(value.title)) }
     .postCreate  { value -> sendNotification(value) }
     .postChange  { value -> invalidateCache(value._id) }
@@ -151,7 +151,7 @@ Lightning Server `Task`:
 ```kotlin
 // Illustrative
 val sendWelcomeEmail = path.path("tasks").path("welcome-email") bind Task { input: WelcomeEmailInput ->
-    val user = database().table<User>().get(input.userId) ?: return@Task
+    val user = userTable().get(input.userId) ?: return@Task
     email().send(Email(subject = "Welcome!", to = listOf(input.address), html = "<h1>Hi ${user.name}!</h1>"))
 }
 
@@ -209,7 +209,7 @@ object UserAuth : PrincipalType<User, Uuid> {
 
     context(server: ServerRuntime)
     override suspend fun fetch(id: Uuid): User =
-        database().table<User>().get(id) ?: throw NotFoundException()
+        userTable().get(id) ?: throw NotFoundException()
 }
 
 // Requiring auth on an endpoint
@@ -247,7 +247,7 @@ RAM-backed server in-process with no ports or external infrastructure:
 // Illustrative — core pattern from guide/testing.md
 @Test
 fun testGetProfile() = UserProfileServer.testBlocking(settings = { database set Database.Settings("ram") }) {
-    val alice = UserProfileServer.database().table<User>()
+    val alice = UserProfileServer.userTable()
         .insertOne(User(name = "Alice", email = "alice@example.com"))
     val auth = UserAuth.testAuth(alice)
     val result = UserProfileServer.getProfile.test(auth, Unit)

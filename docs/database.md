@@ -46,11 +46,22 @@ data class Post(
 
 ## Accessing the database
 
-You can now access a table of these objects like this:
+Register each table once in your `ServerBuilder` with `registerTable`. A single call defines the table,
+registers it (so it can be enumerated later), and creates the once-per-deploy [pre-deploy task](tasks.md)
+that prepares its collection/indexes — you don't wire any of that up yourself. **Create one per model and
+share it** — don't call `registerTable` again for the same table:
 
 ```kotlin
-val db = database()
-val posts = db.table<Post>()
+object Server : ServerBuilder() {
+    val database = setting("database", Database.Settings())
+    val postTable = database.registerTable<Post>("Post")   // define + register + prepare, once
+}
+```
+
+The value it returns is a runtime accessor — **invoke it inside a handler** to get the live `Table<Post>`:
+
+```kotlin
+val posts = postTable()
 
 // Insert a new post
 posts.insertOne(Post(
@@ -82,6 +93,7 @@ For more advanced use cases with permissions and authentication, use `ModelInfo`
 ```kotlin
 val postInfo = database.modelInfo(
     auth = UserAuth.require(),
+    tableName = "Post",
     permissions = {
         val user = auth.fetch()
         ModelPermissions(
@@ -150,7 +162,7 @@ Signals occur when a change is made to the database.
 You can wrap a collection with actions that will occur on those changes:
 
 ```kotlin
-val collection = database().table<Post>()
+val collection = postTable()
     .interceptCreate { value ->
         println("About to insert: $value")
         value.copy(title = value.title + " (New)")

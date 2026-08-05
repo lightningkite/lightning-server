@@ -79,6 +79,10 @@ database suitable for tests and local development:
 object NoteDbServer : ServerBuilder() {
     val database = setting("database", Database.Settings())
 
+    // registerTable defines the table, registers it, and creates its once-per-deploy prepare task.
+    // Access it at runtime by invoking it: notes().
+    val notes = database.registerTable<Note>("Note")
+
     // GET /notes — list all notes
     val list = path.path("notes").get bind ApiHttpHandler(
         summary = "List all notes",
@@ -86,7 +90,7 @@ object NoteDbServer : ServerBuilder() {
         successCode = HttpStatus.OK,
         errorCases = emptyList(),
         implementation = { _: Unit ->
-            database().table<Note>().find(Condition.Always).toList()
+            notes().find(Condition.Always).toList()
         }
     )
 
@@ -97,7 +101,7 @@ object NoteDbServer : ServerBuilder() {
         successCode = HttpStatus.Created,
         errorCases = emptyList(),
         implementation = { input: Note ->
-            database().table<Note>().insertOne(input)
+            notes().insertOne(input)
         }
     )
 }
@@ -105,9 +109,10 @@ object NoteDbServer : ServerBuilder() {
 
 Key points:
 
-- **`database().table<Note>()`** — `database()` resolves the live service from
-  the current `ServerRuntime` (only callable inside a handler).  `.table<Note>()`
-  returns a `Table<Note>` keyed on the serializer, so one table per model type.
+- **`notes()`** — `notes` is the registration returned by `registerTable`; invoking it inside a
+  handler resolves the live `Table<Note>` from the current `ServerRuntime`. `registerTable` also
+  created the once-per-deploy task that prepares the table's collection/indexes, so you don't wire
+  that up yourself.
 - **`Condition.Always`** — matches every document.  Use `condition { }` to
   narrow the query (shown in the test below).
 - **`find()` returns a `Flow<Note>`** — call `.toList()` to collect all results
@@ -139,7 +144,7 @@ fun databaseTest() = NoteDbServer.testBlocking(settings = { database set Databas
     check(all.size == 2)
 
     // Direct table access for condition / modification / delete
-    val table = NoteDbServer.database().table<Note>()
+    val table = NoteDbServer.notes()
 
     // condition { } builds a type-safe query using generated path extensions
     val found = table.find(condition { it.title eq "Shopping" }).toList()

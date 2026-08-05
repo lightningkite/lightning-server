@@ -590,4 +590,73 @@ class BackupCodeEndpointsTest {
             }
         }
     }
+
+    /**
+     * Security regression: the rate-limit key must be built from the NORMALIZED identifier, so that
+     * case/whitespace variants of one account share a single bucket. If the key were derived from the
+     * raw value, an attacker could dodge the limiter (and its exponential backoff) by varying case.
+     */
+    @Test
+    fun `rate limiter shares one bucket across case variants of the same identifier`() = runBlocking {
+        TestUser.users.clear()
+        val userId = Uuid.random()
+        val user = TestUser(userId, "test@example.com")
+        TestUser.users[userId] = user
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
+
+            init {
+                register(TestUser)
+            }
+
+            val backupCodes = path.path("auth").path("backup") include BackupCodeEndpoints(
+                database = database,
+                cache = cache,
+                proofSigner = RuntimeDeferred.Cached { testBasis.signer("proof") },
+                proofExpiration = 1.hours
+            )
+        }.let { server ->
+            server.test({}) {
+                server.backupCodes.modelInfo.table().insert(
+                    listOf(
+                        BackupCodeSecret(
+                            code = "validcode",
+                            subjectId = TestUser.idString(userId),
+                            subjectType = TestUser.name
+                        )
+                    )
+                )
+
+                // Five distinct case variants that all normalize to "test@example.com". The default limit
+                // is 5 attempts; five failing attempts across these variants must fill ONE shared bucket.
+                val emailVariants = listOf(
+                    "Test@example.com",
+                    "tEst@example.com",
+                    "teSt@example.com",
+                    "tesT@example.com",
+                    "TEST@example.com",
+                )
+                for (variant in emailVariants) {
+                    assertFailsWith<BadRequestException> {
+                        server.backupCodes.prove.test(
+                            null, IdentificationAndPassword("TestUser", "email", variant, "wrongcode")
+                        )
+                    }
+                }
+
+                // A sixth attempt with yet another distinct variant must be blocked by the shared limiter.
+                val blocked = assertFailsWith<BadRequestException> {
+                    server.backupCodes.prove.test(
+                        null, IdentificationAndPassword("TestUser", "email", "TesT@example.com", "wrongcode")
+                    )
+                }
+                assertTrue(
+                    blocked.message.contains("Too many attempts"),
+                    "Expected the shared rate limiter to block, but got: ${blocked.message}"
+                )
+            }
+        }
+    }
 }
