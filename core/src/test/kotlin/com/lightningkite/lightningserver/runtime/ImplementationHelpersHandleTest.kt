@@ -380,9 +380,10 @@ class ImplementationHelpersHandleTest {
     }
 
     @Test
-    fun handler_exceeding_its_timeout_returns_408() {
+    fun handler_exceeding_its_timeout_returns_503() {
         // The timeout now lives in core: ServerRuntime.handle enforces HttpHandler.timeout and maps an
-        // exceeded handler to 408, regardless of which engine runs it.
+        // exceeded handler to 503 (a server-side condition — not 408, which means a slow client),
+        // regardless of which engine runs it.
         TestServer.test(settings = {}) {
             runBlocking {
                 val resp = serverRuntime.handle(
@@ -395,7 +396,7 @@ class ImplementationHelpersHandleTest {
                         sourceIp = "local",
                     )
                 )
-                assertEquals(HttpStatus.RequestTimeout, resp.status)
+                assertEquals(HttpStatus.ServiceUnavailable, resp.status)
             }
         }
     }
@@ -480,8 +481,7 @@ class ImplementationHelpersHandleTest {
 
     @Test
     fun https_response_has_security_headers() {
-        // TestServer explicitly installs SecurityHeadersInterceptor: an https response must carry
-        // nosniff and HSTS.
+        // This test server installs SecurityHeadersInterceptor: an https response must carry nosniff and HSTS.
         TestServer.test(settings = {}) {
             runBlocking {
                 val resp = serverRuntime.handle(

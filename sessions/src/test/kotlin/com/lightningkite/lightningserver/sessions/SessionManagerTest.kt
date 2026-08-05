@@ -2,11 +2,22 @@
 package com.lightningkite.lightningserver.sessions
 
 import com.lightningkite.lightningserver.ForbiddenException
+import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.handle
+import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.runtime.test.test
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
+import org.slf4j.LoggerFactory
 import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.database.Database
@@ -92,6 +103,60 @@ class SessionManagerTest {
                 assertNotNull(refreshToken.string)
                 assertEquals("SessionTestUser", refreshToken.type)
                 assertEquals(session._id, refreshToken._id)
+            }
+        }
+    }
+
+    @Test
+    fun `access-log interceptor names the authenticated principal`() = runBlocking {
+        // v4-style access log via an opt-in interceptor: it resolves the request's Authentication (whose
+        // toString also renders masquerade, covered by AuthenticationExtTest) and logs it. We capture the
+        // emitted line to prove the principal, not just the IP, is recorded.
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+
+            init { install(AccessLogInterceptor()) }
+
+            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val ping = path.path("ping").get bind HttpHandler<PathSpec0> { HttpResponse.plainText("pong") }
+        }.let { server ->
+            server.test({}) {
+                val (_, refreshToken) = server.sessions.newSession(userId)
+                val accessToken = server.sessions.tokenSimple.test(null, refreshToken.string)
+
+                // Attach the log capture after settings are applied, so the framework's logback setup can't
+                // wipe it. Scoped to this logger and detached in finally.
+                val logbackLogger = LoggerFactory.getLogger("com.lightningkite.lightningserver") as Logger
+                val appender = ListAppender<ILoggingEvent>().apply { start() }
+                logbackLogger.level = Level.INFO
+                logbackLogger.addAppender(appender)
+                try {
+                    runBlocking {
+                        serverRuntime.handle(
+                            HttpRequest<PathSpec>(
+                                path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
+                                queryParameters = QueryParameters.EMPTY,
+                                headers = HttpHeaders { add(HttpHeader.Authorization, "Bearer $accessToken") },
+                                domain = "example.com",
+                                protocol = "https",
+                                sourceIp = "local",
+                            )
+                        )
+                    }
+                } finally {
+                    logbackLogger.detachAppender(appender)
+                }
+
+                val accessLine = appender.list.map { it.formattedMessage }.singleOrNull { it.contains("accessed by") }
+                    ?: fail("Expected an access-log line; got: ${appender.list.map { it.formattedMessage }}")
+                assertTrue(
+                    accessLine.contains("SessionTestUser") && accessLine.contains(userId.toString()),
+                    "access log should name the authenticated principal; was: $accessLine",
+                )
             }
         }
     }
