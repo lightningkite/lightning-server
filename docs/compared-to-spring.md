@@ -28,7 +28,7 @@ Kotlin's type system and explicit code. This means fewer surprises at runtime, b
 | `@RestController`          | `ServerBuilder` object            | Define endpoints explicitly        |
 | `@Autowired`               | Direct object reference           | No DI container needed             |
 | `@ConfigurationProperties` | `setting()`                       | Type-safe, auto-generated defaults |
-| `@Repository`              | `database().table<T>()`           | Type-safe query DSL                |
+| `@Repository`              | `registerTable()`                 | Type-safe query DSL                |
 | `@Scheduled`               | `schedule()`                      | Cron, frequency, or daily time     |
 | `@Async`                   | `task()`                          | Fire-and-forget async tasks        |
 | Spring Security            | `PrincipalType` + `AuthEndpoints` | JWT-based, multiple proof methods  |
@@ -109,7 +109,7 @@ object UserEndpoints : ServerBuilder() {
         errorCases = listOf(LSError(http = 404, detail = "not-found", message = "User not found")),
         implementation = { _: Unit ->
             val id = path.arg1
-            database().table<User>().get(Uuid.parse(id))
+            userTable().get(Uuid.parse(id))
                 ?: throw NotFoundException("User not found")
         }
     )
@@ -119,7 +119,7 @@ object UserEndpoints : ServerBuilder() {
         authOptions = noAuth,
         successCode = HttpStatus.Created,
         implementation = { request: CreateUserRequest ->
-            database().table<User>().insertOne(request.toUser())
+            userTable().insertOne(request.toUser())
         }
     )
 }
@@ -161,7 +161,7 @@ data class User(
 ) : HasId<Uuid>
 
 // Usage - no interface to define!
-val users = database().table<User>()
+val users = userTable()
 
 // Find by email containing
 users.find(condition { it.email.contains("@example.com") }).toList()
@@ -284,7 +284,7 @@ object UserAuth : PrincipalType<User, Uuid> {
 
     context(server: ServerRuntime)
     override suspend fun fetch(id: Uuid): User =
-        database().table<User>().get(id) ?: throw NotFoundException()
+        userTable().get(id) ?: throw NotFoundException()
 }
 
 object Server : ServerBuilder() {
@@ -410,7 +410,7 @@ object Server : ServerBuilder() {
 
             // Explicit caching - no magic
             cache().get<User>(cacheKey) ?: run {
-                val user = database().table<User>().get(Uuid.parse(id))
+                val user = userTable().get(Uuid.parse(id))
                     ?: throw NotFoundException()
                 cache().set(cacheKey, user, ttl = 5.minutes)
                 user
@@ -505,7 +505,7 @@ object Server : ServerBuilder() {
         summary = "Create order",
         authOptions = authOptions<User>(),
         implementation = { order: CreateOrderRequest ->
-            val saved = database().table<Order>().insertOne(order.toOrder())
+            val saved = orderTable().insertOne(order.toOrder())
 
             // Fire and forget
             sendNotification(NotificationRequest(order.userId, "Order created!"))
@@ -632,7 +632,7 @@ class UserEndpointsTest {
     fun testGetUser() = runBlocking {
         with(testRunner) {
             // Insert test data
-            Server.database().table<User>().insertOne(
+            Server.userTable().insertOne(
                 User(_id = Uuid.parse("..."), email = "test@example.com")
             )
 

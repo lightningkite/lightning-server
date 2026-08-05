@@ -89,7 +89,20 @@ public class ServerSettings private constructor(
     private var usingDefaults: Boolean = false
 
     private val serializable: MapRegistry<ServerSetting<*, *>, Any?> = MapRegistry()
-    private val goal: MapRegistry<ServerSetting<*, *>, Any?> = MapRegistry()
+
+    // Transformed results, published as an immutable snapshot. Reads are lock-free: once a setting is resolved,
+    // its value is visible here for good (the @Volatile guarantees other threads see the new snapshot). Writes
+    // replace the whole map under [resolveLock] (copy-on-write) — cheap because each setting is resolved at most
+    // once, and in production every setting is pre-resolved single-threaded during ready(). An immutable Map
+    // (not a ConcurrentHashMap) is used so a null result is stored naturally, with no sentinel.
+    @Volatile
+    private var goal: Map<ServerSetting<*, *>, Any?> = emptyMap()
+
+    // Guards resolution so each setting is transformed exactly once, even if several threads first request it
+    // at once. A single reentrant lock — not per-setting — is deliberate: a setting's getter may resolve its
+    // dependencies by calling get() again on the same thread, which re-enters this lock harmlessly, whereas
+    // per-setting locks could deadlock between two mutually-dependent settings.
+    private val resolveLock = Any()
 
     // Track settings currently being resolved to detect circular dependencies at runtime
     private val resolving: ThreadLocal<MutableSet<ServerSetting<*, *>>>? =
@@ -137,7 +150,8 @@ public class ServerSettings private constructor(
      */
     public infix fun <RESULT> ServerSetting<*, RESULT>.setStatic(value: RESULT) {
         if (ready) throw IllegalStateException("Settings are marked as ready.")
-        goal.register(this, value as Any?)
+        // Pre-ready configuration is single-threaded, so a plain copy-on-write assignment is enough.
+        goal = goal + (this to value)
     }
 
     /**
@@ -250,7 +264,16 @@ public class ServerSettings private constructor(
     public fun <SERIALIZABLE, RESULT> get(key: ServerSetting<SERIALIZABLE, RESULT>): RESULT {
         if (!ready) throw IllegalStateException("Settings not ready yet.")
 
-        return goal.getOrRegister(key) {
+        // Lock-free fast path: once a setting is resolved its value lives in [goal] forever, read without locking.
+        // containsKey (not a null check) because a resolved value may legitimately be null.
+        goal.let { if (it.containsKey(key)) return it[key] as RESULT }
+
+        // Slow path: resolve under [resolveLock] so each setting is transformed at most once, even when several
+        // threads first request it concurrently. The per-thread [resolving] set still detects circular deps.
+        synchronized(resolveLock) {
+            // Re-check now that we hold the lock; another thread may have resolved it while we waited.
+            goal.let { if (it.containsKey(key)) return it[key] as RESULT }
+
             // Check for circular dependency during resolution
             val currentlyResolving = resolving?.get()
             if (currentlyResolving != null && key in currentlyResolving) {
@@ -258,7 +281,7 @@ public class ServerSettings private constructor(
             }
 
             currentlyResolving?.add(key)
-            try {
+            val result = try {
                 overrides[key]?.let { defer ->
                     serializable[key]
                         ?.let { key.get(it as SERIALIZABLE) } // specified in settings file
@@ -282,7 +305,11 @@ public class ServerSettings private constructor(
             } finally {
                 currentlyResolving?.remove(key)
             }
-        } as RESULT
+            // Publish by re-reading [goal] (never a snapshot captured before resolution): the getter above may
+            // have recursively resolved dependencies and published them, and those additions must be preserved.
+            goal = goal + (key to result)
+            return result as RESULT
+        }
     }
 
     // For some dumb fucking reason kotlin made this internal, and it's what getOrElse should do in the first place!
@@ -328,7 +355,8 @@ public class ServerSettings private constructor(
         overrides: Map<ServerSetting<*, *>, Runtime<*>> = this.overrides,
     ) = ServerSettings(settings, overrides).also {
         it.serializable.include(this.serializable)
-        it.goal.include(this.goal)
+        // Safe to share the reference: [goal] is immutable, and copy-on-write writes replace it rather than mutate.
+        it.goal = this.goal
     }
 
     public operator fun plus(requirement: ServerSetting<*, *>): ServerSettings = copy(settings + requirement)
@@ -347,9 +375,6 @@ public class ServerSettings private constructor(
  * 2. The missing settings check in `ready()` doesn't distinguish between truly required settings
  *    and optional settings with no default. The error message could be more helpful.
  *
- * 3. The `get()` function performs lazy transformation but the caching isn't thread-safe.
- *    If called concurrently during initial ready phase, could transform the same setting twice.
- *    (Though this is documented in ServerSetting.kt TODO, worth noting here too.)
  *
  * 4. `readyUsingDefaults()` bypasses all validation with a warning, but doesn't actually
  *    enforce that defaults exist for all settings. Could still throw during get().

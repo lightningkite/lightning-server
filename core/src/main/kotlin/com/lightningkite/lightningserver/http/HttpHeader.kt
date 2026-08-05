@@ -128,6 +128,9 @@ public object HttpHeader {
     public const val AccessControlExposeHeaders: String = "Access-Control-Expose-Headers"
     public const val AccessControlMaxAge: String = "Access-Control-Max-Age"
 
+    // Security headers
+    public const val XContentTypeOptions: String = "X-Content-Type-Options"
+
     // Unofficial de-facto headers
     public const val XHttpMethodOverride: String = "X-Http-Method-Override"
     public const val XForwardedHost: String = "X-Forwarded-Host"

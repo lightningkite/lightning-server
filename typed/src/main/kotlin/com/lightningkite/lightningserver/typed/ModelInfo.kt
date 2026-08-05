@@ -1,7 +1,9 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.definition.PreDeployTask
 import com.lightningkite.lightningserver.definition.Runtime
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.*
 import kotlinx.serialization.KSerializer
@@ -11,6 +13,8 @@ public interface ModelInfo<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     public val idSerializer: KSerializer<ID>
 
     public val auth: AuthRequirement<SUBJECT>
+
+    public val registration: DatabaseTableRegistration<T>
 
     public object Scopes {
         public val create: Subscope = Subscope("create")
@@ -40,10 +44,10 @@ public interface ModelInfo<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     public fun exampleItem(): T? = null
 }
 
+context(builder: ServerBuilder)
 public inline fun <reified USER : HasId<*>?, reified T : HasId<ID>, reified ID : Comparable<ID>> Runtime<Database>.modelInfo(
     auth: AuthRequirement<USER>,
-    tableName: String = serializerOrContextual<T>().descriptor.serialName.substringBefore('/').substringBefore('<')
-        .substringAfterLast('.'),
+    tableName: String,
     subscope: Subscope? = Subscope(tableName.lowercase()),
     crossinline signals: context(ServerRuntime) (Table<T>) -> Table<T> = { it },
     crossinline log: context(ServerRuntime) AuthAccess<USER>?.(Table<T>) -> Table<T> = { it },
@@ -57,8 +61,11 @@ public inline fun <reified USER : HasId<*>?, reified T : HasId<ID>, reified ID :
 
     override val auth: AuthRequirement<USER> = subscope?.let { auth.subscope(it) } ?: auth
 
+    // registerTable defines the table, registers it, and creates its (once-per-deploy) prepare task.
+    override val registration: DatabaseTableRegistration<T> = this@modelInfo.registerTable(tableName, serializer)
+
     context(server: ServerRuntime)
-    override fun baseTable(): Table<T> = this@modelInfo().table(serializer, tableName)
+    override fun baseTable(): Table<T> = registration()
 
     override val tableName: String get() = tableName
 
@@ -85,11 +92,12 @@ public inline fun <reified USER : HasId<*>?, reified T : HasId<ID>, reified ID :
 }
 
 
+context(builder: ServerBuilder)
 public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> Runtime<Database>.explicitModelInfo(
     auth: AuthRequirement<USER>,
     serializer: KSerializer<T>,
     idSerializer: KSerializer<ID>,
-    tableName: String = serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.'),
+    tableName: String,
     subscope: Subscope? = Subscope(tableName.lowercase()),
     signals: context(ServerRuntime) (Table<T>) -> Table<T> = { it },
     log: context(ServerRuntime) AuthAccess<USER>?.(Table<T>) -> Table<T> = { it },
@@ -103,8 +111,12 @@ public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> Runtime<Databa
 
     override val auth: AuthRequirement<USER> = subscope?.let { auth.subscope(it) } ?: auth
 
+    // registerTable defines the table, registers it, and creates its (once-per-deploy) prepare task.
+    override val registration: DatabaseTableRegistration<T> =
+        with(builder) { this@explicitModelInfo.registerTable(tableName, serializer) }
+
     context(server: ServerRuntime)
-    override fun baseTable(): Table<T> = this@explicitModelInfo().table(serializer, tableName)
+    override fun baseTable(): Table<T> = registration()
 
     override val tableName: String
         get() = tableName

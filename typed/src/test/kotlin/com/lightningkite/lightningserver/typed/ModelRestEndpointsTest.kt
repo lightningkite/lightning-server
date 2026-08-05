@@ -23,6 +23,7 @@ class ModelRestEndpointsTest {
     object CrudTestServer : ServerBuilder() {
         val database = setting("database", Database.Settings())
         val info = database.modelInfo<HasId<*>?, CrudItem, Uuid>(
+            tableName = "CrudItem",
             auth = noAuth,
             permissions = { ModelPermissions.allowAll() }
         )
@@ -549,6 +550,37 @@ class ModelRestEndpointsTest {
 
             val count = CrudTestServer.rest.count.test(null, Condition.Never)
             assertEquals(0, count)
+        }
+    }
+
+    // The endpoints below catch UniqueViolationException and rethrow BadRequestException(detail="unique"),
+    // or throw NotFoundException; declaring those cases keeps the W6 "undeclared error" advisory quiet and
+    // documents the errors. See ModelRestEndpoints implementations.
+    private fun declaresUnique(handler: ApiHttpHandler<*, *, *, *>) =
+        handler.errorCases.any { it.http == 400 && it.detail == "unique" }
+
+    private fun declaresNotFound(handler: ApiHttpHandler<*, *, *, *>) =
+        handler.errorCases.any { it.http == 404 }
+
+    @Test
+    fun endpoints_declare_the_errors_they_throw() {
+        val rest = CrudTestServer.rest
+
+        // Every endpoint that catches UniqueViolationException declares the 400 "unique" case.
+        listOf(rest.insert, rest.insertBulk, rest.upsert, rest.bulkReplace, rest.replace,
+            rest.bulkModify, rest.modifyWithDiff, rest.modify, rest.modifySimple).forEach {
+            assertTrue(declaresUnique(it), "expected 400:unique in errorCases")
+        }
+
+        // Every endpoint that can throw NotFoundException declares the 404 case.
+        listOf(rest.detail, rest.upsert, rest.replace, rest.modifyWithDiff, rest.modify,
+            rest.modifySimple, rest.deleteItem).forEach {
+            assertTrue(declaresNotFound(it), "expected 404 in errorCases")
+        }
+
+        // Read-only endpoints that never throw keep an empty error list.
+        listOf(rest.list, rest.query, rest.count, rest.permissions).forEach {
+            assertTrue(it.errorCases.isEmpty(), "read-only endpoint should declare no errors")
         }
     }
 

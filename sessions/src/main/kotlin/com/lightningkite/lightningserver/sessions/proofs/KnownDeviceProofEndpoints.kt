@@ -57,6 +57,7 @@ public class KnownDeviceProofEndpoints(
 
     public val modelInfo: ModelInfo<HasId<*>, KnownDeviceSecret, Uuid> = database.modelInfo(
         auth = proofMethodAuth or AuthRequirement.IsAdmin,
+        tableName = "KnownDeviceSecret",
         signals = {
             it.interceptCreate {
                 it.copy(hash = it.hash.fastHash(), expiresAt = now() + expires())
@@ -164,7 +165,16 @@ public class KnownDeviceProofEndpoints(
             successCode = HttpStatus.OK,
             implementation = { input: String ->
                 val now = now()
-                val id = input.substringBefore('/').let { Uuid.parse(it) }
+                val id = input.substringBefore('/').let {
+                    try { Uuid.parse(it) }
+                    catch (e: IllegalArgumentException) {
+                        throw BadRequestException(
+                            message = "Invalid known device identifier. ${e.message}",
+                            data = it,
+                            cause = e
+                        )
+                    }
+                }
                 val secret = input.substringAfter('/')
                 cache().constrainAttemptRate(
                     cacheKey = "known-devices-count-${id}"

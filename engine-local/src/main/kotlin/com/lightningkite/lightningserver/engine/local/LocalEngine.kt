@@ -338,6 +338,44 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
     }
 
     /**
+     * Runs all pre-deploy tasks exactly once and returns, without ever binding a port or starting
+     * schedules. Intended as the body of a `predeploy` command invoked once per deploy, before the
+     * new version is cut over.
+     *
+     * Settings must already be loaded (e.g. via [com.lightningkite.lightningserver.settings.loadFromFile]).
+     * If any pre-deploy task fails the exception propagates, so the caller can exit non-zero and the
+     * deploy pipeline can abort the cutover. Services are disconnected afterwards so the process can
+     * exit cleanly.
+     */
+    /**
+     * Runs all pre-deploy tasks and returns, leaving services connected. Intended to be called just
+     * before [start] in a combined "prepare then serve" dev command, so a single local process
+     * reconciles the database and then serves. Settings must already be ready.
+     */
+    public fun runPreDeployTasksBlocking() {
+        runBlocking { runPreDeployTasks() }
+    }
+
+    public fun runPreDeploy() {
+        settings.ready()
+        try {
+            runBlocking { runPreDeployTasks() }
+        } finally {
+            runBlocking {
+                settings.allGoals().values.forEach { goal ->
+                    (goal as? Service)?.let {
+                        try {
+                            it.disconnect()
+                        } catch (e: Throwable) {
+                            logger.warn(e) { "Error disconnecting service ${it.name} after pre-deploy." }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * Registers a JVM shutdown hook (fired on SIGTERM/SIGINT) that runs [action] exactly once.
      * Use this to wire [gracefulShutdown] into the process lifecycle so rolling deploys drain
      * in-flight requests instead of dropping them.

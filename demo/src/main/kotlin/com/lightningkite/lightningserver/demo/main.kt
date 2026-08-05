@@ -54,6 +54,32 @@ private fun serveNetty() {
     }
 }
 
+private fun predeploy() {
+    val built = Server.build()
+    KtorEngine(built).apply {
+        settings.loadFromFile(KFile("settings.json"), internalSerializersModule)
+        runPreDeploy()
+    }
+    println("Pre-deploy complete")
+}
+
+/**
+ * Local development convenience: run pre-deploy tasks (DB reconciliation, etc.) and then serve, in a
+ * single process. In production these are separate: the pipeline runs `predeploy` before cutover,
+ * and instances run `serve`.
+ */
+private fun dev() {
+    val before = TimeSource.Monotonic.markNow()
+    val built = Server.build()
+    println("Server built in ${before.elapsedNow()}")
+    KtorEngine(built).apply {
+        settings.loadFromFile(KFile("settings.json"), internalSerializersModule)
+        settings.ready()
+        runPreDeployTasksBlocking()
+        start(Netty)
+    }
+}
+
 fun sdk() {
     println("Writing SDK")
     FetcherSdk("com.lightningkite.lightningserver.demo").writeUsingDefaultSettings(
@@ -106,7 +132,7 @@ fun settingsSchema(output: File = File("settings.schema.json")) {
 fun main(vararg args: String) {
     cli(
         arguments = args,
-        available = listOf(::serve, ::serveJdk, ::serveNetty, ::sdk, ::apiBaselineWrite, ::apiCheck, ::settingsSchema),
+        available = listOf(::serve, ::serveJdk, ::serveNetty, ::predeploy, ::dev, ::sdk, ::apiBaselineWrite, ::apiCheck, ::settingsSchema),
     )
 }
 

@@ -35,6 +35,8 @@ class HttpSpanTest {
         val cors = CorsSettings(limitToDomains = listOf("example.com"))
 
         init {
+            // Installed outermost (before CORS) so its span is the direct child of the route root.
+            install(SecurityHeadersInterceptor())
             install(CorsInterceptor(setting("cors", cors)))
         }
 
@@ -84,12 +86,23 @@ class HttpSpanTest {
             )
             assertEquals(200L, root.attributes.asMap().entries.first { it.key.key == "http.status_code" }.value)
 
+            // This test server installs SecurityHeadersInterceptor outermost, so its span is the direct
+            // child of the route root.
+            val security = spans.singleOrNull { it.name == "lightningserver.SecurityHeaders" }
+                ?: fail("Expected a SecurityHeaders interceptor span. Got: ${spans.map { it.name }}")
+            assertEquals(
+                root.spanContext.spanId,
+                security.parentSpanContext.spanId,
+                "SecurityHeaders interceptor span should be a child of the route root span",
+            )
+
+            // The CORS interceptor, installed after it, nests inside the SecurityHeaders span.
             val cors = spans.singleOrNull { it.name == "lightningserver.CORS" }
                 ?: fail("Expected a CORS interceptor span. Got: ${spans.map { it.name }}")
             assertEquals(
-                root.spanContext.spanId,
+                security.spanContext.spanId,
                 cors.parentSpanContext.spanId,
-                "CORS interceptor span should be a child of the route root span",
+                "CORS interceptor span should nest inside the SecurityHeaders span",
             )
         }
     }

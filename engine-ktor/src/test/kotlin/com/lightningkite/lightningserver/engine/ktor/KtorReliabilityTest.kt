@@ -98,11 +98,14 @@ class KtorReliabilityTest {
     private fun httpClient(): HttpClient = HttpClient(ClientCIO)
 
     @Test
-    fun slow_handler_returns_408() = runBlocking {
+    fun slow_handler_returns_503() = runBlocking {
+        // A handler that exceeds its own timeout is a server-side failure to respond in time, which per RFC 7231 is
+        // 503 Service Unavailable — NOT 408 (that means the *client* was too slow sending its request). The interceptor
+        // maps the handler-timeout TimeoutCancellationException accordingly; KtorHttpConformanceTest pins the same.
         startServer()
         httpClient().use { client ->
             val resp = client.get("http://127.0.0.1:$port/slow")
-            assertEquals(HttpStatusCode.RequestTimeout.value, resp.status.value)
+            assertEquals(HttpStatusCode.ServiceUnavailable.value, resp.status.value)
         }
     }
 

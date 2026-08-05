@@ -44,7 +44,17 @@ public interface Extensions {
 public class MutableExtensions() : Extensions {
     public constructor(start: Extensions) : this() {
         for ((key, value) in start.entries) {
-            map[key] = value
+            if (key is WritableKey<*, *>) {
+                // Rehydrate the mutable WRITE form: [start] may be sealed (e.g. a ListRegistry stored
+                // as a SealableList), and a mutable copy must be writable so later include()/merge works.
+                @Suppress("UNCHECKED_CAST")
+                key as WritableKey<Any, Any>
+                val fresh = key.default()
+                key.run { fresh.include(value) }
+                map[key] = fresh
+            } else {
+                map[key] = value
+            }
         }
     }
 

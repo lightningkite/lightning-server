@@ -84,6 +84,11 @@ object Server : ServerBuilder() {
     val newSecret = setting("someSecret", "???", instructions = "This can be whatever you dream, you madman.")
     val githubOauth = setting("githubOauth", OauthProviderCredentials("", ""))
 
+    // Baseline security headers (X-Content-Type-Options, and HSTS over https). Installed first so it runs
+    // outermost and applies to every response, including CORS-processed and error responses.
+    val securityHeaders = install(SecurityHeadersInterceptor())
+    // v4-style access log: one line per request naming the resolved principal (or "anonymous") and IP.
+    val accessLog = install(AccessLogInterceptor())
     val corsInterceptor = install(CorsInterceptor(cors))
 
     init {
@@ -105,14 +110,19 @@ object Server : ServerBuilder() {
         RedisPubSub
     }
 
-    val setupAdmins = path.path("setup-admins2") bind startupOnce(database) {
-        userInfo.table().insertOne(
-            User(
-                email = "joseph@lightningkite.com",
-                isSuperUser = true,
-                phone = "+18013693729".toPhoneNumber()
+    // Seed an admin user. This runs as a pre-deploy task (once per deploy, before the new version
+    // serves), and `doOnce` guards the actual insert so the seed happens only once ever, not on
+    // every deploy - the sanctioned pattern for "run exactly once" pre-deploy work.
+    val setupAdmins = path.path("setup-admins2") bind PreDeployTask {
+        doOnce("setup-admins2", database) {
+            userInfo.table().insertOne(
+                User(
+                    email = "joseph@lightningkite.com",
+                    isSuperUser = true,
+                    phone = "+18013693729".toPhoneNumber()
+                )
             )
-        )
+        }
     }
 
     object UserAuth : PrincipalType<User, Uuid> {
@@ -137,6 +147,7 @@ object Server : ServerBuilder() {
 
     val userInfo: ModelInfo<User?, User, Uuid> = database.modelInfo(
         auth = UserAuth.require() or AuthRequirement.None,
+        tableName = "User",
         permissions = {
             val user = authOrNull?.fetch()
             val everyone: Condition<User> = Condition.Always

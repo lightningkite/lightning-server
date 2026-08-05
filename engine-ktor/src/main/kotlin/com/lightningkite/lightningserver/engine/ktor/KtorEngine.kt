@@ -162,9 +162,23 @@ public class KtorEngine(
                             is Data.Bytes -> call.respondBytes(body.data, type, code)
                             is Data.Text -> call.respondText(body.data, type, code)
                             is Data.Sink -> call.respondBytesWriter(contentType = type, status = code) {
-                                this.asSink().buffered().use { body.emit(it) }
+                                // emit is a blocking producer — run it on the IO pool (via Ktor's blocking asSink
+                                // bridge) so it streams to the channel without ever stalling the event-loop thread.
+                                val channel = this
+                                withContext(Dispatchers.IO) { channel.asSink().buffered().use { body.emit(it) } }
                             }
-                            is Data.Source -> body.source.use { call.respondSource(it, type, code, body.size) }
+                            is Data.Source -> call.respondBytesWriter(contentType = type, status = code) {
+                                // Blocking streaming source: copy it to the channel on the IO pool (no full buffering).
+                                val channel = this
+                                withContext(Dispatchers.IO) {
+                                    channel.asSink().buffered().use { sink -> body.source.use { sink.transferFrom(it) } }
+                                }
+                            }
+                            is Data.Suspending, is Data.SuspendingProducer -> call.respondBytesWriter(contentType = type, status = code) {
+                                // Fully cooperative: stream the body into the ByteWriteChannel via a SuspendingSink so
+                                // response writes suspend for backpressure instead of blocking the event loop.
+                                body.writeTo(KtorChannelSuspendingSink(this))
+                            }
                         }
                 }
             }

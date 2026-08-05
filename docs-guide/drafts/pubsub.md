@@ -94,7 +94,7 @@ function; it returns once the message has been handed to the backend:
 // Illustrative — inside an HTTP handler.
 val announce = path.path("posts").path("publish").post bind HttpHandler { request ->
     val post = /* ... parse body ... */
-    database().table<Post>().insertOne(post)
+    postTable().insertOne(post)
 
     // Notify all subscribers that a new post is available.
     pubsub().get<PostEvent>("post-events").emit(PostEvent(postId = post._id, action = "created"))
@@ -181,7 +181,7 @@ the table interceptors from [Advanced Database](advanced-database.md) with a
 ```kotlin
 // Illustrative.
 // 1. After each insert, publish the new post to all subscribers.
-val postsTable = database().table<Post>()
+val postsTable = postTable()
     .postCreate { post ->
         pubsub().get<Post>("new-posts").emit(post)
     }

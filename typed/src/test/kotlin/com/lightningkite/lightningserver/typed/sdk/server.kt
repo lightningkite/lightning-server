@@ -96,6 +96,7 @@ data class TestModel(
 object Module : ServerBuilder() {
     val info = Server.database.modelInfo(
         auth = noAuth,
+        tableName = "TestModel",
         permissions = { ModelPermissions.allowAll<TestModel>() }
     )
 
@@ -119,6 +120,7 @@ object SecondModule : ServerBuilder() {
 
     val info = Server.database.modelInfo(
         auth = anyAuth,
+        tableName = "TestModel",
         permissions = { ModelPermissions.allowAll<TestModel>() }
     )
 
@@ -132,6 +134,7 @@ object SecondModule : ServerBuilder() {
 object ThirdModule : ServerBuilder() {
     val info = Server.database.modelInfo(
         auth = noAuth,
+        tableName = "TestModel",
         permissions = { ModelPermissions.allowAll<TestModel>() }
     )
 

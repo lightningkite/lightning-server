@@ -37,7 +37,7 @@ object UserAuth : PrincipalType<UserProfile, Uuid> {
 
     context(server: ServerRuntime)
     override suspend fun fetch(id: Uuid): UserProfile =
-        UserProfileServer.database().table<UserProfile>().get(id)
+        UserProfileServer.userProfiles().get(id)
             ?: throw NotFoundException("User not found")
 }
 // endregion user-auth
@@ -45,6 +45,10 @@ object UserAuth : PrincipalType<UserProfile, Uuid> {
 // region auth-server
 object UserProfileServer : ServerBuilder() {
     val database = setting("database", Database.Settings())
+
+    // registerTable defines the table, registers it, and creates its once-per-deploy prepare task.
+    // Access it at runtime by invoking it: userProfiles().
+    val userProfiles = database.registerTable<UserProfile>("UserProfile")
 
     init {
         // register() makes this principal type discoverable when deserializing tokens.
@@ -74,7 +78,7 @@ object UserProfileServer : ServerBuilder() {
 // region auth-test
 fun authTest() = UserProfileServer.testBlocking(settings = { database set Database.Settings("ram") }) {
     // Seed a user directly into the database
-    val alice = UserProfileServer.database().table<UserProfile>()
+    val alice = UserProfileServer.userProfiles()
         .insertOne(UserProfile(name = "Alice", email = "alice@example.com"))
 
     // testAuth() creates an Authentication<UserProfile> for use in tests.

@@ -952,6 +952,34 @@ run_redeploy() {
     return 1
 }
 
+# Run pre-deploy tasks on one instance via SSM (in a scratch dir; the live server is untouched).
+# Returns non-zero on any failure so the rollout can abort before touching the fleet.
+run_predeploy() {
+    local id="$1"
+    local cmd_id
+    cmd_id=$(aws ssm send-command \
+        --instance-ids "$id" \
+        --document-name "AWS-RunShellScript" \
+        --comment "terraform pre-deploy" \
+        --parameters 'commands=/usr/local/bin/lightning-server-predeploy,executionTimeout=600' \
+        --region "$REGION" --query 'Command.CommandId' --output text)
+    for i in $(seq 1 180); do
+        status=$(aws ssm get-command-invocation --command-id "$cmd_id" --instance-id "$id" \
+            --region "$REGION" --query 'Status' --output text 2>/dev/null || echo "Pending")
+        case "$status" in
+            Success) return 0 ;;
+            Cancelled|Failed|TimedOut)
+                err "pre-deploy on $id finished with status: $status"
+                aws ssm get-command-invocation --command-id "$cmd_id" --instance-id "$id" \
+                    --region "$REGION" --query 'StandardErrorContent' --output text >&2 || true
+                return 1 ;;
+            *) sleep 5 ;;
+        esac
+    done
+    err "pre-deploy on $id did not finish within polling window"
+    return 1
+}
+
 # Drain -> redeploy -> validate healthy, for one instance. Returns non-zero on any failure.
 process_instance() {
     local id="$1"
@@ -988,6 +1016,17 @@ IDS=$(instance_ids)
 if [ -z "$IDS" ]; then
     log "No in-service instances found; nothing to redeploy."
     exit 0
+fi
+
+# Run pre-deploy tasks once, on one instance, before rolling the fleet. The whole fleet keeps
+# serving the previous version while these run; a failure aborts the rollout (the EXIT trap resumes
+# ASG processes and re-registers every instance, so the fleet is left untouched and serving).
+FIRST_ID="${IDS%%[[:space:]]*}"
+log "Running pre-deploy tasks on $FIRST_ID before rolling the fleet"
+wait_ssm_online "$FIRST_ID" || exit 1
+if ! run_predeploy "$FIRST_ID"; then
+    err "Pre-deploy tasks failed; aborting rollout."
+    exit 1
 fi
 
 # Process in batches of $BATCH, in parallel within a batch; fail the whole run if any member fails.

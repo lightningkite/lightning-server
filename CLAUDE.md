@@ -236,10 +236,16 @@ data class Post(
 ) : HasId<Uuid>
 ```
 
-Database operations use a DSL for type-safe queries:
+Database operations use a DSL for type-safe queries. Register each table once in your `ServerBuilder`
+with `registerTable` — one call defines it, registers it, and creates its once-per-deploy prepare task.
+The returned value is a runtime accessor; invoke it inside a handler to get the `Table`:
 
 ```kotlin
-val posts = database().table<Post>()
+// in your ServerBuilder:
+val postTable = database.registerTable<Post>("Post")   // define + register + prepare, once
+
+// inside a handler:
+val posts = postTable()
 
 // Insert
 posts.insertOne(Post(title = "Test", author = "user@example.com", body = "Content"))
