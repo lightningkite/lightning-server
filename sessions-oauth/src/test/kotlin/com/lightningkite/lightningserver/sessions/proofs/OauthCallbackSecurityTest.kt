@@ -38,7 +38,6 @@ class OauthCallbackSecurityTest {
             getProfile = { _, _ -> ExternalProfile(email = "user@example.com") },
         )
         val callback: OauthCallbackEndpoint<Uuid> = path.path("cb") include OauthCallbackEndpoint(
-            path = path,
             stateSerializer = serializerOrContextual<Uuid>(),
             oauthProviderInfo = provider,
             credentials = Runtime.Constant(OauthProviderCredentials("client-id", "client-secret")),
