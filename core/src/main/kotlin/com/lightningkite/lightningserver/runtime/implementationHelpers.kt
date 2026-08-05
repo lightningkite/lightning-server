@@ -333,6 +333,21 @@ public suspend fun StartupTask.executeWithMetrics(location: PathSpec0) {
 }
 
 /**
+ * Executes a pre-deploy task with telemetry metrics.
+ *
+ * @param location The path specification for this pre-deploy task
+ */
+context(serverRuntime: ServerRuntime)
+public suspend fun PreDeployTask.executeWithMetrics(location: PathSpec0) {
+    return instrument("predeploy", TelemetryAttributes {
+        put(taskType, "PREDEPLOY")
+        put(taskRoute, location.toString())
+    }) {
+        execute()
+    }
+}
+
+/**
  * Instruments a suspend block with the metrics backend, creating a named child span.
  *
  * All [attributes] are attached to the span at start. If telemetry is not configured the

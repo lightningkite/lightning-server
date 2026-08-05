@@ -54,6 +54,15 @@ private fun serveNetty() {
     }
 }
 
+private fun predeploy() {
+    val built = Server.build()
+    KtorEngine(built).apply {
+        settings.loadFromFile(KFile("settings.json"), internalSerializersModule)
+        runPreDeploy()
+    }
+    println("Pre-deploy complete")
+}
+
 fun sdk() {
     println("Writing SDK")
     FetcherSdk("com.lightningkite.lightningserver.demo").writeUsingDefaultSettings(
@@ -106,7 +115,7 @@ fun settingsSchema(output: File = File("settings.schema.json")) {
 fun main(vararg args: String) {
     cli(
         arguments = args,
-        available = listOf(::serve, ::serveJdk, ::serveNetty, ::sdk, ::apiBaselineWrite, ::apiCheck, ::settingsSchema),
+        available = listOf(::serve, ::serveJdk, ::serveNetty, ::predeploy, ::sdk, ::apiBaselineWrite, ::apiCheck, ::settingsSchema),
     )
 }
 

@@ -158,7 +158,7 @@ class ServerSettingsTest {
             TestServer.requiredSetting set "first"
 
             // Cannot set the same setting twice
-            assertFailsWith<com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationError> {
+            assertFailsWith<com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationException> {
                 TestServer.requiredSetting set "second"
             }
         }
