@@ -2,7 +2,7 @@
 package com.lightningkite.lightningserver.definition
 
 import com.lightningkite.lightningserver.HttpMethod
-import com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationError
+import com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationException
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
@@ -182,7 +182,7 @@ class ServerDefinitionTest {
 
     @Test
     fun `duplicate endpoint registration in same module throws`() {
-        assertFailsWith<DuplicateRegistrationError> {
+        assertFailsWith<DuplicateRegistrationException> {
             object : ServerBuilder() {
                 val first = path.path("test").get bind HttpHandler<PathSpec0> {
                     HttpResponse(status = HttpStatus.OK)
@@ -210,7 +210,7 @@ class ServerDefinitionTest {
             }
         }
 
-        assertFailsWith<DuplicateRegistrationError> {
+        assertFailsWith<DuplicateRegistrationException> {
             val server = object : ServerBuilder() {
                 val a = path include moduleA
                 val b = path include moduleB
