@@ -8,7 +8,8 @@ import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCod
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.services.database.Database
-import com.lightningkite.services.files.PublicFileSystem
+import com.lightningkite.services.files.ExternalFileSystem
+import com.lightningkite.services.files.serverFile
 import com.lightningkite.services.files.ServerFile
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -18,7 +19,7 @@ import kotlin.uuid.Uuid
 class FilesModuleReviewTests {
 
     private object Server : ServerBuilder() {
-        val files = setting("files", PublicFileSystem.Settings())
+        val files = setting("files", ExternalFileSystem.Settings())
         val database = setting("database", Database.Settings())
         val served = path.path("files") include FileSystemEndpoints(files)
         val uploadEarly = path.path("upload") include UploadEarlyEndpoint(
@@ -42,7 +43,7 @@ class FilesModuleReviewTests {
     fun nameWithoutExtension_basic(): Unit = runBlocking {
         Server.test(
             settings = {
-                files set PublicFileSystem.Settings("file://build/testfiles/${Uuid.random()}?serveUrl=http://localhost/files")
+                files set ExternalFileSystem.Settings("file://build/testfiles/${Uuid.random()}?serveUrl=http://localhost/files")
                 database set Database.Settings()
             }
         ) {
@@ -57,14 +58,14 @@ class FilesModuleReviewTests {
     fun serverFile_to_fileObject_roundTrip(): Unit = runBlocking {
         Server.test(
             settings = {
-                files set PublicFileSystem.Settings("file://build/testfiles/${Uuid.random()}?serveUrl=http://localhost/files")
+                files set ExternalFileSystem.Settings("file://build/testfiles/${Uuid.random()}?serveUrl=http://localhost/files")
                 database set Database.Settings()
             }
         ) {
             val fo = files().root.then("roundtrip.txt")
-            val sf = ServerFile(fo.url)
-            val back = sf.fileObject
-            assertEquals(fo.url, back.url)
+            val sf = fo.serverFile
+            val back = sf.externalFile
+            assertEquals(fo, back)
         }
     }
 }

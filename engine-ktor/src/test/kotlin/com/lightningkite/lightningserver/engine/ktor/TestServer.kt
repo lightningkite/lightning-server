@@ -8,7 +8,6 @@ import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.data.asSuspendingSource
-import com.lightningkite.services.data.writeAll
 import kotlinx.io.*
 import kotlinx.serialization.Serializable
 import java.io.ByteArrayInputStream
@@ -102,7 +101,7 @@ object TestServerBuilder : ServerBuilder() {
         val content = "y".repeat(100_000)
         HttpResponse(
             body = TypedData.suspendingProducer(MediaType.Text.Plain) { sink ->
-                sink.writeAll(Buffer().also { it.writeString(content) })
+                sink.write(Buffer().also { it.writeString(content) })
             },
             status = HttpStatus.OK,
         )

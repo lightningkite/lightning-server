@@ -12,7 +12,8 @@ import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.Database
-import com.lightningkite.services.files.PublicFileSystem
+import com.lightningkite.services.files.ExternalFileSystem
+import com.lightningkite.services.files.serverFile
 import com.lightningkite.services.files.ServerFile
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -22,7 +23,7 @@ import kotlin.uuid.Uuid
 class FileSystemEndpointsTest {
 
     object Server : ServerBuilder() {
-        val files = setting("files", PublicFileSystem.Settings())
+        val files = setting("files", ExternalFileSystem.Settings())
         val database = setting("database", Database.Settings())
         val served = path.path("files") include FileSystemEndpoints(files)
         val uploadEarly = path.path("upload") include UploadEarlyEndpoint(
@@ -47,17 +48,17 @@ class FileSystemEndpointsTest {
     fun testFetch(): Unit = runBlocking {
         Server.test(
             settings = {
-                files set PublicFileSystem.Settings("file://build/testfiles/${Uuid.random()}?serveUrl=http://localhost/files")
+                files set ExternalFileSystem.Settings("file://build/testfiles/${Uuid.random()}?serveUrl=http://localhost/files")
                 database set Database.Settings()
             }
         ) {
             val file = files().root.then("test.txt")
             file.put(TypedData.text("Hello world!", MediaType.Text.Plain))
-            println(file.url)
+            println(file)
             println(file.signedUrl)
             val serialized = serverRuntime.externalSerialization.stringArrayFormat.encodeToString(
                 uploadEarly.serializer(),
-                ServerFile(file.url)
+                file.serverFile
             )
             println("Serialized: $serialized")
             files().parseExternalUrl(serialized)!!
@@ -116,7 +117,7 @@ class FileSystemEndpointsTest {
     fun rangeRequests(): Unit = runBlocking {
         Server.test(
             settings = {
-                files set PublicFileSystem.Settings("file://build/testfiles/${Uuid.random()}?serveUrl=http://localhost/files")
+                files set ExternalFileSystem.Settings("file://build/testfiles/${Uuid.random()}?serveUrl=http://localhost/files")
                 database set Database.Settings()
             }
         ) {
@@ -127,7 +128,7 @@ class FileSystemEndpointsTest {
 
             val serialized = serverRuntime.externalSerialization.stringArrayFormat.encodeToString(
                 uploadEarly.serializer(),
-                ServerFile(file.url)
+                file.serverFile
             )
 
             files().parseExternalUrl(serialized)!!

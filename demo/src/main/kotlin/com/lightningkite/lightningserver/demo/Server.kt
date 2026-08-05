@@ -75,7 +75,7 @@ object Server : ServerBuilder() {
     val emailInbound = setting("emailInbound", EmailInboundService.Settings())
     val sms = setting("sms", SMS.Settings())
     val smsInbound = setting("smsInbound", SmsInboundService.Settings())
-    val files = setting("files", PublicFileSystem.Settings())
+    val files = setting("files", ExternalFileSystem.Settings())
     val cache = setting("cache", Cache.Settings())
     val cors = setting("cors", CorsSettings())
     val voiceAgent = setting("voiceAgent", VoiceAgentService.Settings())
@@ -104,7 +104,7 @@ object Server : ServerBuilder() {
         DynamoDbCache
         MongoDatabase
         MemcachedCache
-        S3PublicFileSystem
+        S3ExternalFileSystem
         OpenAIVoiceAgentService
         DynamoDbPubSub
         RedisPubSub

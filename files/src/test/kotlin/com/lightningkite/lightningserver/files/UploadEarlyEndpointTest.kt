@@ -28,7 +28,7 @@ import kotlin.uuid.Uuid
 class UploadEarlyEndpointTest {
 
     object Server : ServerBuilder() {
-        val files = setting("files", PublicFileSystem.Settings())
+        val files = setting("files", ExternalFileSystem.Settings())
         val database = setting("database", Database.Settings())
         val served = path.path("files") include FileSystemEndpoints(files)
         val uploadEarly = path.path("upload") include UploadEarlyEndpoint(
@@ -77,14 +77,14 @@ class UploadEarlyEndpointTest {
     fun testServed(): Unit = runBlocking {
         Server.test(
             settings = {
-                files set PublicFileSystem.Settings("file://build/testfiles/${Uuid.random()}?serveUrl=http://localhost:8080/files")
+                files set ExternalFileSystem.Settings("file://build/testfiles/${Uuid.random()}?serveUrl=http://localhost:8080/files")
                 database set Database.Settings()
             }
         ) {
-            println((files() as KotlinxIoPublicFileSystem).serveUrl)
+            println((files() as KotlinxIoExternalFileSystem).serveUrl)
             val file = files().root.then("test.txt")
             file.put(TypedData.text("Hello world!", MediaType.Text.Plain))
-            println(file.url)
+            println(file)
             val serialized = contextOf<ServerRuntime>().externalSerialization.stringArrayFormat.encodeToString(
                 uploadEarly.serializer(),
                 file.serverFile
@@ -112,7 +112,7 @@ class UploadEarlyEndpointTest {
     fun test(): Unit = runBlocking {
         Server.test(
             settings = {
-                files set PublicFileSystem.Settings("file://build/testfiles/${Uuid.random()}?serveUrl=http://localhost:8080/files")
+                files set ExternalFileSystem.Settings("file://build/testfiles/${Uuid.random()}?serveUrl=http://localhost:8080/files")
                 database set Database.Settings()
             }
         ) {

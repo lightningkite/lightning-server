@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.engine.ktor
 
-import com.lightningkite.services.data.StreamState
+import com.lightningkite.services.data.AbstractSuspendingSink
 import com.lightningkite.services.data.SuspendingSink
 import io.ktor.utils.io.ByteWriteChannel
 import io.ktor.utils.io.writeBuffer
@@ -14,30 +14,32 @@ import kotlinx.io.Buffer
  * `kotlinx.io.Sink` would.
  *
  * Lifecycle: this does **not** close the underlying channel — `respondBytesWriter` owns and closes it when its block
- * returns. [close] only flushes; [close] with a cause cancels the channel so the client sees a truncated response.
+ * returns. A clean close only flushes; cancelling cancels the channel, which is what makes the client see a truncated
+ * response rather than a complete one over a half-written body.
  */
-internal class KtorChannelSuspendingSink(private val channel: ByteWriteChannel) : SuspendingSink {
-    override var state: StreamState = StreamState.Open
-        private set
+internal class KtorChannelSuspendingSink(private val channel: ByteWriteChannel) : AbstractSuspendingSink() {
 
-    override suspend fun write(from: Buffer, count: Long) {
-        // writeBuffer consumes `count` bytes from `from` and suspends for backpressure (never blocks the thread).
-        channel.writeBuffer(from, count)
+    override suspend fun write(from: Buffer) {
+        checkWritable()
+        // writeBuffer consumes the bytes from `from` and suspends for backpressure (never blocks the thread).
+        channel.writeBuffer(from, from.size)
     }
 
     override suspend fun flush() {
+        checkWritable()
         channel.flush()
     }
 
-    override suspend fun close() {
-        if (state != StreamState.Open) return
+    override suspend fun finish() {
         channel.flush()
-        state = StreamState.Complete
     }
 
-    override fun close(cause: Throwable) {
-        if (state != StreamState.Open) return
-        channel.cancel(cause)
-        state = StreamState.ClosedAbnormally(cause)
+    /**
+     * A null cause can only come from a clean [close], and the channel's owner completes the response for us — so
+     * there is nothing to do. Any other cause means the body is short, and cancelling is the only way to stop the
+     * engine from framing a truncated response as a complete one.
+     */
+    override fun release(cause: Throwable?) {
+        cause?.let { channel.cancel(it) }
     }
 }

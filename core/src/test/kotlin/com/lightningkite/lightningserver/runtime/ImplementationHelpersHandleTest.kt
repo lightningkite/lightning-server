@@ -39,6 +39,8 @@ class ImplementationHelpersHandleTest {
             // Installed outermost so security headers apply to every response, including CORS-processed and
             // error responses (exercised by the security-header tests below).
             install(com.lightningkite.lightningserver.http.SecurityHeadersInterceptor())
+            // Outside CORS so it also compresses responses the CORS layer produces (exercised by the gzip tests below).
+            install(com.lightningkite.lightningserver.compression.GzipInterceptor())
             install(com.lightningkite.lightningserver.cors.CorsInterceptor(setting("cors", cors)))
         }
 

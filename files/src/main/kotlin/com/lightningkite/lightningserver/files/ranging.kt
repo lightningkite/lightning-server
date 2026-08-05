@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.services.data.*
 import kotlinx.io.Buffer
 import kotlinx.io.Sink
+import kotlinx.io.readByteArray
 import kotlinx.io.writeString
 
 /** Sentinel for [RangeSlicingSink.forward] meaning "forward everything after the skip, to end of stream". */
@@ -22,29 +23,36 @@ private class RangeSlicingSink(
     private val downstream: SuspendingSink,
     skip: Long,
     private val forward: Long,
-) : SuspendingSink {
+) : AbstractSuspendingSink() {
     private var toSkip = skip
     private var forwarded = 0L
 
-    override val state: StreamState get() = downstream.state
+    /** Reused staging for the in-window slice of a write; splitting a buffer is segment relinking, not a copy. */
+    private val window = Buffer()
 
-    override suspend fun write(from: Buffer, count: Long) {
-        var remaining = count
+    override suspend fun write(from: Buffer) {
+        checkWritable()
         if (toSkip > 0L) {
-            val dropped = minOf(toSkip, remaining)
-            from.skip(dropped); toSkip -= dropped; remaining -= dropped
+            val dropped = minOf(toSkip, from.size)
+            from.skip(dropped)
+            toSkip -= dropped
         }
-        if (remaining <= 0L) return
-        val allowed = if (forward == RANGE_UNTIL_END) remaining else minOf(remaining, forward - forwarded)
+        val allowed = if (forward == RANGE_UNTIL_END) from.size else minOf(from.size, forward - forwarded)
         if (allowed > 0L) {
-            downstream.write(from, allowed); forwarded += allowed; remaining -= allowed
+            window.write(from, allowed)
+            forwarded += allowed
+            downstream.write(window)
         }
-        if (remaining > 0L) from.skip(remaining) // past the window — discard, but still consume `count` from `from`
+        from.clear() // past the window — discard the remainder
     }
 
-    override suspend fun flush(): Unit = downstream.flush()
-    override suspend fun close() {} // downstream is caller-owned
-    override fun close(cause: Throwable) {}
+    override suspend fun flush() {
+        checkWritable()
+        downstream.flush()
+    }
+
+    /** Downstream is caller-owned: slicing the stream must not end it. */
+    override fun release(cause: Throwable?) {}
 }
 
 /**
@@ -188,36 +196,41 @@ public suspend fun TypedData.getRange(range: HttpRange, dataSize: Long): TypedDa
         }
     )
 
+/**
+ * Packs the requested [ranges] into a `multipart/byteranges` body.
+ *
+ * As in [getRange], the bytes or the source are acquired here because the produced [Data.Sink]'s
+ * producer is blocking.
+ */
 public suspend fun TypedData.getRanges(
     ranges: List<HttpRange>,
     dataSize: Long,
     rangeBoundary: String = "CONTENT_BOUNDARY",
 ): TypedData {
-    // Multi-range (multipart/byteranges) responses buffer the whole body once: the boundary framing interleaves
-    // headers between arbitrary, possibly-overlapping windows, so a single streaming pass isn't enough. Multi-range
-    // requests are rare; single-range seeking (the large-media case) streams via getRange without buffering.
-    val raw = data.bytes()
-    return TypedData(
-        mediaType = MediaType.MultiPart.ByteRanges.copy(parameters = mapOf("boundary" to rangeBoundary)),
-        data = Data.Sink { sink ->
-            fun Sink.writeRangeHeaders(range: HttpRange) {
-                writeString(rangeBoundary + LINE_FEED)
-                writeString("${HttpHeader.ContentType}: $mediaType" + LINE_FEED)
-                writeString("${HttpHeader.ContentRange}: bytes ${range.rangeStart(dataSize)}-${range.rangeEnd(dataSize)}/$dataSize" + LINE_FEED)
-            }
+    fun Sink.writeRangeHeaders(range: HttpRange) {
+        writeString(rangeBoundary + LINE_FEED)
+        writeString("${HttpHeader.ContentType}: $mediaType" + LINE_FEED)
+        writeString("${HttpHeader.ContentRange}: bytes ${range.rangeStart(dataSize)}-${range.rangeEnd(dataSize)}/$dataSize" + LINE_FEED)
+    }
 
-            if (data is Data.Bytes || data is Data.Text || ranges.mergeOverlaps(dataSize).size != ranges.size) {
-                // read all bytes if available or ranges overlap
-                val bytes = raw
-
-                for (range in ranges) {
-                    sink.writeRangeHeaders(range)
-                    sink.writeString(LINE_FEED)
-                    sink.write(bytes.sliceArray(range))
-                    sink.writeString(LINE_FEED)
-                }
-                sink.writeString(rangeBoundary)
-            } else kotlinx.io.Buffer().apply { write(raw) }.let { source ->  // use source if possible
+    val ranged = if (data is Data.Bytes || data is Data.Text || ranges.mergeOverlaps(dataSize).size != ranges.size) {
+        // read all bytes if available or ranges overlap
+        val bytes = data.bytes()
+        // It's cheaper to build the buffer immediately so that we can discard the old data as fast as possible.
+        val buffer = Buffer()
+        for (range in ranges) {
+            buffer.writeRangeHeaders(range)
+            buffer.writeString(LINE_FEED)
+            buffer.write(bytes.sliceArray(range))
+            buffer.writeString(LINE_FEED)
+        }
+        buffer.writeString(rangeBoundary)
+        Data.Bytes(buffer.readByteArray())
+    } else {
+        // TODO: I'm sure if I were smarter I could do something better here for suspension, but I have no idea what that is.
+        val opened = data.source()  // use source if possible
+        Data.Sink { sink ->
+            opened.use { source ->
                 var pos = 0L
                 for (range in ranges) {
                     sink.writeRangeHeaders(range)
@@ -240,6 +253,11 @@ public suspend fun TypedData.getRanges(
                 sink.writeString(rangeBoundary)
             }
         }
+    }
+
+    return TypedData(
+        mediaType = MediaType.MultiPart.ByteRanges.copy(parameters = mapOf("boundary" to rangeBoundary)),
+        data = ranged
     )
 }
 

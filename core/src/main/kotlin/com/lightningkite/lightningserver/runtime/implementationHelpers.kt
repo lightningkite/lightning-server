@@ -36,8 +36,7 @@ private val errorType = TelemetryKey.OfString("error.type")
  * 1. Routes the request to the appropriate handler
  * 2. Handles special HTTP methods (HEAD, OPTIONS) automatically
  * 3. Provides trailing slash redirect logic when routes differ only by trailing slash
- * 4. Applies GZIP compression when appropriate
- * 5. Handles exceptions and logs errors
+ * 4. Handles exceptions and logs errors
  *
  * ## Automatic HEAD support
  * If no HEAD handler is registered, automatically transforms a GET request and strips the body.
@@ -46,17 +45,11 @@ private val errorType = TelemetryKey.OfString("error.type")
  * If a route is not found, checks if an alternate version with/without trailing slash exists
  * and returns a redirect if found.
  *
- * ## GZIP compression
- * Automatically compresses responses when:
- * - Client sends Accept-Encoding: gzip header
- * - Response body is at least 256 bytes
- * - Content type is not already compressed (images, videos, fonts, archives, etc.)
- *
- * For payloads 256-1024 bytes, only compresses if compression reduces size.
- * For larger payloads, always compresses.
+ * Response compression is not part of routing; install
+ * [com.lightningkite.lightningserver.compression.GzipInterceptor] if you want it.
  *
  * @param request The HTTP request to handle
- * @return The HTTP response, potentially compressed
+ * @return The HTTP response
  */
 public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpResponse = instrumentHttpRequest(request) {
     var errorType: String? = null
@@ -128,71 +121,7 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
                         }
                     }
                 }
-                if (result.body == null || request.headers[HttpHeader.AcceptEncoding] == null) return@intercept result
-
-                val acceptedEncodings = request.headers.getMany(HttpHeader.AcceptEncoding)
-                if (acceptedEncodings.isEmpty()) return@intercept result
-
-                val accepts = acceptedEncodings
-                    .map { it.root.lowercase().substringBefore(';').trim() }
-
-                // Accept-Encoding negotiation (gzip only for now)
-                if (!accepts.contains("gzip")) return@intercept result
-
-                // Content-Type denylist (skip already-compressed types)
-                if (result.body.mediaType.type in setOf("image", "audio", "video") ||
-                    (result.body.mediaType.type == "application" &&
-                            result.body.mediaType.subtype in
-                            setOf("zip", "gzip", "x-gzip", "x-7z-compressed", "x-bzip2", "x-tar", "pdf")
-                            ) ||
-                    (result.body.mediaType.type == "font" && result.body.mediaType.subtype in setOf("woff", "woff2"))
-                ) return@intercept result
-
-                // Lower compress limit. Either not worth the effort, or likely will inflate a little.
-                if (result.body.data.size?.let { it < 256 } == true) return@intercept result
-
-                // Stream-compress a body straight into the response through GZIP, with no full-body buffering. Runs
-                // inside Data.Sink.emit, which engines invoke on a blocking-capable dispatcher, so the blocking GZIP
-                // writes never touch an event loop.
-                fun gzipStream(writePlain: (kotlinx.io.Sink) -> Unit): Data.Sink = Data.Sink { outSink ->
-                    GZIPOutputStream(outSink.asOutputStream()).asSink().buffered().use { gz -> writePlain(gz) }
-                }
-                val (newData, compressed) = when (val data = result.body.data) {
-                    // Push producer / blocking source: drive the plaintext straight into GZIP with no buffering, so a
-                    // large streamed response (e.g. an octet-stream/CSV/JSON download) is never materialized in heap.
-                    is Data.Sink -> gzipStream { data.emit(it) } to true
-                    is Data.Source -> gzipStream { sink -> data.source.use { sink.transferFrom(it) } } to true
-
-                    // Cooperative source: there is no non-suspend way to feed it into a blocking GZIPOutputStream
-                    // without a runBlocking bridge into the response channel (deadlock-adjacent). Compress only when the
-                    // size is known and bounded (4 MiB); otherwise pass the body through uncompressed rather than risk
-                    // materializing an unbounded stream in the heap.
-                    is Data.Suspending, is Data.SuspendingProducer -> {
-                        val s = data.size
-                        if (s != null && s <= 4L * 1024 * 1024) Data.Bytes(data.bytes().gzip()) to true
-                        else return@intercept result
-                    }
-
-                    else -> {
-                        // 1024 Grey area. It likely will compress fine, but if not send the original
-                        val s = data.size
-                        if (s?.let { it <= 1024 } == true) {
-                            val og = data.bytes()
-                            val gz = og.gzip()
-                            if (gz.size < s)
-                                Data.Bytes(gz) to true
-                            else
-                                Data.Bytes(og) to false
-                        } else
-                            Data.Bytes(data.bytes().gzip()) to true
-                    }
-                }
-                result.copy(
-                    headers = if (compressed) result.headers.copy {
-                        add(HttpHeader.ContentEncoding, "gzip")
-                    } else result.headers,
-                    body = TypedData(newData, result.body.mediaType)
-                )
+                result
             } catch (timeout: TimeoutCancellationException) {
                 // A handler exceeded its HttpHandler.timeout. This is a server-side condition (the server
                 // couldn't finish in time), so it maps to 503 Service Unavailable — NOT 408, which per

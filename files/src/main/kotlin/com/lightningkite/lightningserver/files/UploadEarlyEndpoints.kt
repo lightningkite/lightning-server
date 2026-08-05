@@ -60,7 +60,7 @@ public class UploadEarlyEndpoint(
             onUse = { fileObject ->
                 runBlocking {
                     database().table<UploadForNextRequest>()
-                        .deleteManyIgnoringOld(condition { it.file eq ServerFile(fileObject.url) })
+                        .deleteManyIgnoringOld(condition { it.file eq fileObject.serverFile })
                 }
             },
             key = secretBasis().HMAC_Blocking("upload-files")
@@ -93,7 +93,7 @@ public class UploadEarlyEndpoint(
                     val newFile = serializer().ready.then(key)
                     val newItem = UploadForNextRequest(
                         expires = now().plus(expiration),
-                        file = ServerFile(newFile.url)
+                        file = newFile.serverFile
                     )
                     database().table<UploadForNextRequest>().insertOne(newItem)
                     UploadInformation(
@@ -104,7 +104,7 @@ public class UploadEarlyEndpoint(
                     val newFile = serializer().jail.then(key)
                     val newItem = UploadForNextRequest(
                         expires = now().plus(expiration),
-                        file = ServerFile(newFile.url)
+                        file = newFile.serverFile
                     )
                     database().table<UploadForNextRequest>().insertOne(newItem)
                     UploadInformation(
@@ -134,7 +134,7 @@ public class UploadEarlyEndpoint(
                 val safe = serializer().ready.then(filePath)
                 val newItem = UploadForNextRequest(
                     expires = now().plus(expiration),
-                    file = ServerFile(safe.url)
+                    file = safe.serverFile
                 )
                 database().table<UploadForNextRequest>().insertOne(newItem)
 
@@ -148,7 +148,7 @@ public class UploadEarlyEndpoint(
     public val cleanupSchedule: ScheduledTask = path.path("cleanupUploads") bind ScheduledTask(frequency = 1.days) {
         database().table<UploadForNextRequest>().deleteMany(condition { it.expires lt now() }).forEach {
             try {
-                files().parseInternalUrl(it.file.location)!!.delete()
+                ExternalFile.Parser(listOf(files())).parse(it.file.location).delete()
             } catch (e: Exception) {
                 e.printStackTrace()
             }

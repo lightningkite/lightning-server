@@ -12,22 +12,22 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.files.*
 
 /**
- * HTTP endpoints for serving and uploading files backed by a PublicFileSystem.
+ * HTTP endpoints for serving and uploading files backed by an ExternalFileSystem.
  *
  * Endpoints:
  * - HEAD any: Returns metadata (Content-Type, Content-Length) for a file without a body.
  * - GET any: Streams the file bytes. Range requests are not yet supported.
- * - PUT any: Uploads/overwrites a file, only supported when the runtime file system is KotlinxIoPublicFileSystem.
+ * - PUT any: Uploads/overwrites a file, only supported when the runtime file system is KotlinxIoExternalFileSystem.
  */
 public class FileSystemEndpoints(
-    public val files: Runtime<PublicFileSystem>,
+    public val files: Runtime<ExternalFileSystem>,
     public val malformedRanges: HttpRange.MalformedBehavior = HttpRange.MalformedBehavior.IgnoreRangeRequest,
 ) : ServerBuilder() {
     /**
-     * The root file/directory of the configured PublicFileSystem for the current runtime.
+     * The root file/directory of the configured ExternalFileSystem for the current runtime.
      */
     context(runtime: ServerRuntime)
-    public val rootFile: FileObject get() = files().root
+    public val rootFile: ExternalFile get() = files().root
 
     /**
      * Builds the internal path+query portion used to address files relative to the file system's root.
@@ -41,6 +41,22 @@ public class FileSystemEndpoints(
     }
 
     /**
+     * Rebuilds the external URL the client was given, so the file system can validate its signature.
+     *
+     * These endpoints exist to *be* the serving layer for a local file system, so the URL is
+     * `serveUrl + <request path> + <query>`. A backend that serves its own bytes (S3) hands clients URLs
+     * that never reach this server, so there is nothing here to reconstruct — hence the cast rather than
+     * an interface call. [ExternalFileSystem] deliberately exposes no "base URL": signed-URL layout is
+     * the implementation's business, and the previous `rootUrls[0]` guessed at it.
+     */
+    context(runtime: ServerRuntime)
+    private fun Request<*>.externalUrl(): String {
+        val serveUrl = (files() as? KotlinxIoExternalFileSystem)?.serveUrl
+            ?: throw BadRequestException("This file system serves its own URLs; these endpoints only front a local one.")
+        return serveUrl.removeSuffix("/") + "/" + filePath()
+    }
+
+    /**
      * HEAD handler. Returns metadata headers for a file without a body.
      */
     public val fetchHead: HttpHandler<PathSpec0> = path.any.head bind HttpHandler {
@@ -49,7 +65,7 @@ public class FileSystemEndpoints(
         // If you ever see a NPE, logic itself has broken and the universe will cease to exist shortly.
         // ... or your file system implementation is broken and doesn't recognize its own root URL.
         val head = try {
-            files().parseExternalUrl(files().rootUrls[0] + filePath)!!.head()
+            files().parseExternalUrl(it.externalUrl())!!.head()
         } catch (_: Exception) {
             throw BadRequestException("Invalid file URL")
         } ?: throw NotFoundException("No file $filePath found")
@@ -59,7 +75,7 @@ public class FileSystemEndpoints(
             status = HttpStatus.NoContent,
             headers = HttpHeaders(
                 HttpHeader.ContentType to head.type.toString(),
-                HttpHeader.ContentLength to head.size.toString(),
+                HttpHeader.ContentLength to head.size.bytes.toString(),
                 HttpHeader.AcceptRanges to "bytes"
             )
         )
@@ -71,7 +87,7 @@ public class FileSystemEndpoints(
     public val fetch: HttpHandler<PathSpec0> = path.any.get bind HttpHandler { request ->
         val filePath = request.filePath()
         val file = try {
-            files().parseExternalUrl(files().rootUrls[0] + filePath)!!
+            files().parseExternalUrl(request.externalUrl())!!
         } catch (_: Exception) {
             throw BadRequestException("Invalid file URL")
         }
@@ -86,7 +102,7 @@ public class FileSystemEndpoints(
             // RFC 9110 14.2: A server that supports range requests MAY ignore or reject a Range header field that contains [...] a ranges-specifier with more than two overlapping ranges,
             // or a set of many small ranges that are not listed in ascending order, since these are indications of either a broken client or a deliberate denial-of-service attack
 
-            val size = head().size
+            val size = head().size.bytes
             val sorted = ranges.sortedBy { it.rangeStart(size) }
 
             if (ranges.size > 10 && sorted != ranges) when (malformedRanges) {
@@ -116,7 +132,7 @@ public class FileSystemEndpoints(
 
             1 -> {
                 val range = ranges.first()
-                val size = head().size
+                val size = head().size.bytes
 
                 HttpResponse(
                     status = HttpStatus.PartialContent,
@@ -128,30 +144,25 @@ public class FileSystemEndpoints(
                 )
             }
 
-            else -> {
-                HttpResponse(
-                    status = HttpStatus.PartialContent,
-                    headers = HttpHeaders(
-                        HttpHeader.AcceptRanges to "bytes",
-                    ),
-                    body = content.getRanges(ranges, head().size)
-                )
+            else -> when(malformedRanges) {
+                HttpRange.MalformedBehavior.IgnoreRangeRequest -> HttpResponse(content)
+                HttpRange.MalformedBehavior.BadRequest -> throw BadRequestException("Multiple ranges not accepted.")
             }
         }
     }
 
     /**
-     * PUT handler. Accepts an upload to a signed upload URL understood by KotlinxIoPublicFileSystem.
+     * PUT handler. Accepts an upload to a signed upload URL understood by KotlinxIoExternalFileSystem.
      *
-     * Only KotlinxIoPublicFileSystem supports server-generated upload URLs; other implementations will
+     * Only KotlinxIoExternalFileSystem supports server-generated upload URLs; other implementations will
      * reject uploads here.
      */
     public val upload: HttpHandler<PathSpec0> = path.any.put bind HttpHandler {
-        val kotlinx = files() as? KotlinxIoPublicFileSystem
+        val kotlinx = files() as? KotlinxIoExternalFileSystem
             ?: throw BadRequestException("You can't upload files to this reflection of the real file system.")
 
         try {
-            kotlinx.parseUploadUrl(files().rootUrls[0] + it.filePath())!!.put(it.body!!)
+            kotlinx.parseUploadUrl(it.externalUrl())!!.put(it.body!!)
         } catch (e: Exception) {
             throw BadRequestException("Invalid file Upload URL")
         }

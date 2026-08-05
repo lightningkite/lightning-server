@@ -22,6 +22,7 @@ import com.lightningkite.lightningserver.runtime.willConnectWithMetrics
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.Data
+import com.lightningkite.services.data.use
 import com.lightningkite.services.pubsub.PubSubChannel
 import io.ktor.http.*
 import io.ktor.http.HttpHeaders
@@ -177,7 +178,9 @@ public class KtorEngine(
                             is Data.Suspending, is Data.SuspendingProducer -> call.respondBytesWriter(contentType = type, status = code) {
                                 // Fully cooperative: stream the body into the ByteWriteChannel via a SuspendingSink so
                                 // response writes suspend for backpressure instead of blocking the event loop.
-                                body.writeTo(KtorChannelSuspendingSink(this))
+                                // use() is what turns a mid-body failure into a cancelled channel — without it the
+                                // engine would frame a half-written body as a complete response.
+                                KtorChannelSuspendingSink(this).use { body.writeTo(it) }
                             }
                         }
                 }
