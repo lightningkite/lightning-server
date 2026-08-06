@@ -155,7 +155,8 @@ public class JdkEngine(
             }
         }
 
-        val threads = (reliability.workerThreads ?: (java.lang.Runtime.getRuntime().availableProcessors() * 2)).coerceAtLeast(1)
+        val threads =
+            (reliability.workerThreads ?: (java.lang.Runtime.getRuntime().availableProcessors() * 2)).coerceAtLeast(1)
         val pool = ThreadPoolExecutor(
             threads,
             threads,
@@ -244,6 +245,8 @@ private suspend fun HttpExchange.write(response: HttpResponse) {
         }
 
         is Data.SuspendingSource, is Data.SuspendingSink -> {
+            // A known size is sent as the exact content length; 0 tells the JDK server to use chunked encoding.
+            // Data.write streams every variant (blocking ones self-offload to the IO dispatcher).
             sendResponseHeaders(status, b.size ?: 0)
             this.responseBody.asSink().buffered().use { sink -> b.write(sink) }
         }

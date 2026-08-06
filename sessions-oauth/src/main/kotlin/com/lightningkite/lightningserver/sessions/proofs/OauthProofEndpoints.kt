@@ -18,6 +18,7 @@ import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.sdk.SdkModule
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
 import com.lightningkite.lightningserver.typed.sdk.sdkSettings
+import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.database.HasId
 import io.ktor.http.*
 import kotlin.time.Duration
@@ -51,8 +52,13 @@ import kotlin.uuid.Uuid
  * )
  * ```
  *
+ * **Security:** The flow is protected against CSRF via a single-use `state` nonce and against
+ * authorization-code interception via PKCE (RFC 7636). Both are held in [cache] for the duration of
+ * the redirect round-trip and validated/consumed on the callback.
+ *
  * @param proofSigner The signer used to create cryptographic proofs (defaults to derived from secretBasis)
  * @param provider The OAuth provider configuration (Google, Apple, Microsoft, GitHub, or custom)
+ * @param cache Cache holding the transient CSRF `state` and PKCE verifier between redirect and callback
  * @param credentials Function that returns the OAuth client credentials (ID and secret)
  * @param continueUiAuthUrl Function that returns the UI URL to redirect to after successful authentication
  *
@@ -61,6 +67,7 @@ import kotlin.uuid.Uuid
  */
 public class OauthProofEndpoints(
     private val provider: OauthProviderInfo,
+    private val cache: Runtime<Cache>,
     override val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
     override val proofExpiration: Duration = 1.hours,
     private val credentials: Runtime<OauthProviderCredentials>,
@@ -84,13 +91,17 @@ public class OauthProofEndpoints(
     )
 
     public val callback: OauthCallbackEndpoint<Uuid> = path.path("callback") include OauthCallbackEndpoint(
-        path = path,
         stateSerializer = serializerOrContextual<Uuid>(),
         oauthProviderInfo = provider,
         credentials = credentials,
+        cache = cache,
     ) { response: OauthResponse, _: Uuid ->
         val profile = provider.getProfile(response, credentials())
         val email = profile.email ?: throw BadRequestException("No email was found for this profile.")
+        // Open-redirect note: the final destination is produced entirely by the app-supplied
+        // `continueUiAuthUrl` from a server-generated, signed Proof. No user- or attacker-controllable
+        // value (query param or `state`) feeds into it, so the redirect target is app-controlled and
+        // does not require redirect-URI whitelisting here.
         HttpResponse.redirectToGet(
             continueUiAuthUrl(
                 proofSigner.await().makeProof(
@@ -105,9 +116,8 @@ public class OauthProofEndpoints(
         HttpResponse.redirectToGet(callback.loginUrl(Uuid.random()))
     }
 
-    context(_: ServerRuntime)
-    public val loginApi: ApiHttpHandler<*, *, Unit, String>
-        get() = path.path("login").get bind ApiHttpHandler(
+    public val loginApi: ApiHttpHandler<*, *, Unit, String> =
+        path.path("login").get bind ApiHttpHandler(
             auth = noAuth,
             summary = "Log In via ${provider.niceName}",
             description = "Returns a URL which, when opened in a browser, will allow you to log into the system with ${provider.niceName}.",
@@ -161,7 +171,4 @@ public class OauthProofEndpoints(
  *
  * 5. Consider adding telemetry/metrics for OAuth login attempts, successes, and failures
  *    to help diagnose provider-specific issues.
- *
- * 6. The UUID state parameter in callback is generated but not validated. Consider using the
- *    state parameter for CSRF protection by storing and validating it.
  */
