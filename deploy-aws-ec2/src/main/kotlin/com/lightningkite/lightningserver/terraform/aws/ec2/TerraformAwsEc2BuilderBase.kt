@@ -167,15 +167,15 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     /** Additional systemd environment variables. */
     public open val systemdEnvironment: Map<String, String> = emptyMap()
 
-    public enum class FileType(public val basePath: String) {
-        Config("/etc/lightning-server/"),
-        Script("/usr/local/bin"),
+    public enum class FileType {
+        Config,
+        Script,
     }
 
     /**
      * Additional files to place on EC2 instances. Key = File Name to FileType, Value = raw string content.
      * File Type will determine where the file gets placed. If the type is Config, it will be placed
-     * in /etc/lightning-server/. If it is type Script it will be placed in /usr/local/bin. The file name
+     * in /etc/$projectPrefix/. If it is type Script it will be placed in /usr/local/bin. The file name
      * must be unique. If that file already exists it will not overwrite it.
      * */
     public val instanceFilesRaw: MutableMap<Pair<String, FileType>, String> = mutableMapOf()
@@ -183,7 +183,7 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     /**
      * Additional files to place on EC2 instances. Key = File Name to FileType, Value = KFile on your local system.
      * File Type will determine where the file gets placed. If the type is Config, it will be placed
-     * in /etc/lightning-server/. If it is type Script it will be placed in /usr/local/bin. The file name
+     * in /etc/$projectPrefix/. If it is type Script it will be placed in /usr/local/bin. The file name
      * must be unique. If that file already exists it will not overwrite it.
      * */
     public val instanceFiles: MutableMap<Pair<String, FileType>, KFile> = mutableMapOf()
@@ -634,9 +634,11 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     }
 
     protected fun StringBuilder.instanceFiles() {
+        val configPath = "/etc/$projectPrefix"
+        val scriptPath = "/usr/local/bin"
         appendLine("# === Copying in additional files ===")
         appendLine("""echo "[INFO] Copying in additional files at $(date)"""")
-        appendLine("""mkdir -p ${FileType.Config.basePath}""")
+        appendLine("""mkdir -p $configPath""")
 
         fun writeOutput(path: String, type: FileType, base64Content: String) {
             appendLine(
@@ -651,12 +653,14 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
 
         // Instance files - using base64 encoding to prevent heredoc injection
         for ((key, content) in instanceFilesRaw) {
+            val basePath = if(key.second == FileType.Config) configPath else scriptPath
             val base64Content = Base64.getEncoder().encodeToString(content.toByteArray())
-            writeOutput("${key.second.basePath}/${key.first}", key.second, base64Content)
+            writeOutput("$basePath/${key.first}", key.second, base64Content)
         }
         for ((key, file) in instanceFiles) {
+            val basePath = if(key.second == FileType.Config) configPath else scriptPath
             val base64Content = Base64.getEncoder().encodeToString(file.readByteArray())
-            writeOutput("${key.second.basePath}/${key.first}", key.second, base64Content)
+            writeOutput("$basePath/${key.first}", key.second, base64Content)
         }
     }
 
@@ -787,8 +791,8 @@ Requires=network.target
 [Service]
 Type=simple
 User=ubuntu
-WorkingDirectory=/opt/lightning-server
-ExecStart=/opt/lightning-server/server/bin/server $$serverCommand
+WorkingDirectory=/opt/$$projectPrefix
+ExecStart=/opt/$$projectPrefix/server/bin/server $$serverCommand
 
 Restart=always
 RestartSec=5
@@ -867,12 +871,12 @@ cat > /usr/local/bin/lightning-server-redeploy << 'REDEPLOY_EOF'
 #!/bin/bash
 set -euo pipefail
 
-log() { echo "[lightning-server-redeploy] $*"; }
-err() { echo "[lightning-server-redeploy] ERROR: $*" >&2; }
+log() { echo "[lightning-server-redeploy] $(date '+%Y-%m-%d %H:%M:%S') $*"; }
+err() { echo "[lightning-server-redeploy] $(date '+%Y-%m-%d %H:%M:%S') ERROR: $*" >&2; }
 
 $$bucketRegionResolution
 SSM_PARAM="/$$projectPrefix/settings-password"
-APP_DIR="/opt/lightning-server"
+APP_DIR="/opt/$$projectPrefix"
 LOG_FILE="/var/log/$$projectPrefix/redeploy.log"
 
 mkdir -p "$(dirname "$LOG_FILE")"
