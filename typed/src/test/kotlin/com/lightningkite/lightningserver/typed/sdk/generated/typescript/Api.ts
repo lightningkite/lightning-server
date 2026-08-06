@@ -1,5 +1,5 @@
 import type { Query, MassModification, EntryChange, ListChange, Modification, Condition, GroupCountQuery, AggregateQuery, GroupAggregateQuery, Aggregate, SortPart, DataClassPath, DataClassPathPartial, QueryPartial, DeepPartial, Fetcher } from '@lightningkite/lightning-server-simplified'
-import type { CollectionUpdates, Mask, ModelPermissions, Pair, TestInput, TestModel, UpdateRestrictions, Uuid } from './models.ts'
+import type { CollectionUpdates, Mask, ModelPermissions, Pair, TestInput, TestModel, UpdateRestrictions, UpdateRestrictionsMode, UpdateRestrictionsPart, Uuid } from './models.ts'
 
 export interface Api {
 	index(): Promise<number>

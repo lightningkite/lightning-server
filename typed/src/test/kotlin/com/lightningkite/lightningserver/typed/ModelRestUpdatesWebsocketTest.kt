@@ -119,6 +119,7 @@ class ModelRestUpdatesWebsocketTest {
     object KeyedServer : ServerBuilder() {
         val database = setting("database", Database.Settings())
         val info = database.modelInfo<HasId<*>?, Sample, String>(
+            tableName = "Sample",
             auth = noAuth,
             permissions = { ModelPermissions.allowAll() }
         )

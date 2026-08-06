@@ -10,6 +10,7 @@ import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryKey
 import com.lightningkite.services.telemetry.TelemetryKeys
 import com.lightningkite.services.telemetry.TelemetryTrace
+import com.lightningkite.services.telemetry.emptyTelemetryAttributes
 import com.lightningkite.services.data.Data
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.telemetry.telemetryTrace

@@ -21,6 +21,7 @@ import com.lightningkite.services.data.SuspendingSink
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.data.asSuspendingSource
 import com.lightningkite.services.data.readRemaining
+import com.lightningkite.services.data.use
 import kotlinx.coroutines.runBlocking
 import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
@@ -134,7 +135,7 @@ class GzipInterceptorTest {
         }
 
         val out = BufferSuspendingSink()
-        producer.gzip().writeTo(out)
+        out.gzip().use { producer.writeTo(it) }
         val compressed = out.buffer.readByteArray()
 
         assertContentEquals(original, compressed.ungzip())
@@ -152,7 +153,7 @@ class GzipInterceptorTest {
         }
 
         val out = BufferSuspendingSink()
-        producer.gzip().writeTo(out)
+        out.gzip().use { producer.writeTo(it) }
 
         assertContentEquals(original, out.buffer.readByteArray().ungzip())
     }
@@ -160,7 +161,7 @@ class GzipInterceptorTest {
     @Test
     fun `producer gzip round-trips an empty stream`() = runBlocking {
         val out = BufferSuspendingSink()
-        Data.SuspendingSink { }.gzip().writeTo(out)
+        out.gzip().use { Data.SuspendingSink { }.writeTo(it) }
 
         assertContentEquals(ByteArray(0), out.buffer.readByteArray().ungzip())
     }
@@ -174,7 +175,7 @@ class GzipInterceptorTest {
         }
 
         val out = RecordingSink()
-        producer.gzip().writeTo(out)
+        out.gzip().use { producer.writeTo(it) }
 
         assertEquals(cause, out.cancelCause, "the abandon must be forwarded to the consumer's sink")
         assertTrue(out.closedCleanly.not(), "an abandoned stream must never be reported as complete")

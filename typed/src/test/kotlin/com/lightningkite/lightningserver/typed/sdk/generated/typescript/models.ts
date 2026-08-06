@@ -16,7 +16,7 @@ export interface ModelPermissions<T> {
 	read: Condition<T>
 	readMask: Mask<T>
 	update: Condition<T>
-	updateRestrictions: UpdateRestrictions
+	updateRestrictions: UpdateRestrictions<T>
 	delete: Condition<T>
 	maxQueryTimeMs: number
 }
@@ -36,7 +36,20 @@ export interface TestModel {
 	name: string
 }
 
-export interface UpdateRestrictions {
+export interface UpdateRestrictions<T> {
+	mode: UpdateRestrictionsMode
+	fields: Array<UpdateRestrictionsPart<T>>
+}
+
+export enum UpdateRestrictionsMode {
+	Blacklist = "Blacklist",
+	Whitelist = "Whitelist",
+}
+
+export interface UpdateRestrictionsPart<T> {
+	property: DataClassPathPartial<T>
+	requires: Condition<T>
+	limitedTo: Condition<T>
 }
 
 export type Uuid = string  // kotlin.uuid.Uuid

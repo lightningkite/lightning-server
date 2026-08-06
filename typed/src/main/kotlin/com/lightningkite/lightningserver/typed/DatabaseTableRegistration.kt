@@ -57,7 +57,7 @@ public class DatabaseTableRegistry private constructor(
     private fun <T : Any> checkRegistered(definition: DatabaseTableDefinition<T>): DatabaseTableRegistration<T>? {
         val existing = registry[definition.name] ?: return null
 
-        if (!existing.tableDefinition.serializer.deepEquals(definition.serializer)) throw DuplicateRegistrationError(
+        if (!existing.tableDefinition.serializer.deepEquals(definition.serializer)) throw DuplicateRegistrationException(
             "Table \"${definition.name}\" is already registered for a different type (${existing.tableDefinition.serializer.typeName()} vs ${definition.serializer.typeName()}).",
             initial = existing.tableDefinition,
             overwrite = definition
@@ -80,7 +80,7 @@ public class DatabaseTableRegistry private constructor(
      *
      * Idempotent by [definition]: registering the same table again (e.g. a model served by multiple endpoint
      * groups) returns the existing registration rather than creating a duplicate prepare task. Reusing a
-     * name for a genuinely *different* table (a different type) throws a [DuplicateRegistrationError]. Table names are unique per server.
+     * name for a genuinely *different* table (a different type) throws a [DuplicateRegistrationException]. Table names are unique per server.
      */
     context(builder: ServerBuilder)
     public fun <T : Any> register(database: Runtime<Database>, definition: DatabaseTableDefinition<T>): DatabaseTableRegistration<T> {

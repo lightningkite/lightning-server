@@ -28,6 +28,7 @@ class JdkHttpConformanceTest : EngineHttpConformanceSuite() {
             enginePubSub.useDefault()
             engineCache.useDefault()
             forceWebSocketPubSub.useDefault()
+            com.lightningkite.lightningserver.websockets.websocketSettings.useDefault()
             applyConformanceAppDefaults()
             jdkRunConfig set JdkRuntimeSettings(
                 host = "127.0.0.1",

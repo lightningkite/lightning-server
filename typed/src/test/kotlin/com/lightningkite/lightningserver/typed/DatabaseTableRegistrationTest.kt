@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.typed
 
+import com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationException
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.services.database.*
 import kotlinx.serialization.Serializable
@@ -31,7 +32,7 @@ class DatabaseTableRegistrationTest {
 
     @Test
     fun `registerTable rejects a name reused for a different type`() {
-        assertFailsWith<IllegalArgumentException> {
+        assertFailsWith<DuplicateRegistrationException> {
             object : ServerBuilder() {
                 val database = setting("database", Database.Settings())
                 val a = database.registerTable<RegNote>("Shared")
