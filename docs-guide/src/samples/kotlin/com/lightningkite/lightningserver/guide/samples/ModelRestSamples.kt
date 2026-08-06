@@ -34,6 +34,7 @@ object PostRestServer : ServerBuilder() {
     //   ID = Uuid, the primary-key type
     val postInfo = database.modelInfo<HasId<*>?, Post, Uuid>(
         auth = noAuth,
+        tableName = "Post",
         permissions = { ModelPermissions.allowAll() }
     )
 

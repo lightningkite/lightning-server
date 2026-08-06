@@ -67,9 +67,10 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
             val asString = topic.path()
             val newstate = wrapped.updateStateImmediately { data ->
                 data.copy(map = data.map + (channel to data.map.getValue(channel).let {
-                    it.copy(topics = it.topics + asString)
+                    it.copy(topics = it.topics - asString)
                 }))
             }
+            // Only detach the underlying subscription once no channel on this socket still wants it.
             if (asString !in newstate) wrapped.unsubscribe(topic)
         }
 

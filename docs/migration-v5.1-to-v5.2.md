@@ -4,13 +4,14 @@ Last updated July 2026 (`5.2.0`)
 
 Lightning Server 5.2 is a hardening and polish release on top of 5.1 — most of the diff is documentation,
 tests, and internal robustness work, so there is no large-scale reorganization like the
-[v4 → v5](migration-v4-to-v5.md) move. The changes below are the complete set: one dependency bump, two
-source edits, and one settings-file edit — all small and mechanical.
+[v4 → v5](migration-v4-to-v5.md) move. Sections 0–4 below are small, mechanical edits (one dependency bump,
+two source edits, one settings-file edit). Section 5 is the one **runtime-behavior** change — pre-deploy
+tasks — and whether it needs action depends on how you deploy.
 
 !!! tip
-    These four items were exactly what it took to move a real, mid-sized application (auth, sessions, files,
-    AWS serverless deployment, a KiteUI web client) from 5.1 to 5.2 — nothing else was required, and the app
-    ran and served its client unchanged afterward.
+    The first four items were exactly what it took to move a real, mid-sized application (auth, sessions,
+    files, AWS serverless deployment, a KiteUI web client) from 5.1 to 5.2 with no behavior change. Section 5
+    is separate: it only requires action if you run `serve` without a pre-deploy step (see that section).
 
 ## 0. Bump the service-abstractions version
 
@@ -123,6 +124,105 @@ object LkEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
 ```
 
 This is compile-time only and unrelated to local runs, but every AWS deployment object in your project needs it.
+
+## 5. Pre-deploy tasks: `serve` no longer prepares your database
+
+This is the one **runtime-behavior** change to be aware of, and it matters most if you deploy with your
+own pipeline rather than the Lightning Server AWS builders.
+
+### What changed
+
+Lightning Server gained a new concept, **`PreDeployTask`**, that sits alongside `StartupTask`:
+
+- A **`StartupTask`** runs in *every server instance* as it boots, on the request-serving path.
+- A **`PreDeployTask`** runs *once per deploy*, in a dedicated `predeploy` invocation, **before the new
+  version starts serving** and concurrently with the still-live previous version. If it fails, the deploy
+  is aborted and the old version keeps serving.
+
+Database table/index reconciliation — the work `ModelInfo` used to register as a `StartupTask` (its
+`prepare` step) — is now a **`PreDeployTask`**. This moves migration work off every cold start and
+scale-out (a real latency win, especially on Lambda) and guarantees it completes before new code serves.
+
+!!! warning "The breaking part"
+    Because table preparation moved out of startup, **`bin/server serve` no longer prepares your
+    database.** Anywhere you previously relied on a plain `serve` to create tables/indexes — local
+    development against a real database, or a custom single-process production deploy — must now run the
+    pre-deploy step. (Unit tests are unaffected: the test harness runs neither startup nor pre-deploy
+    tasks automatically.)
+
+### What you need to do
+
+**1. Expose a `predeploy` command** in your application's CLI, mirroring your existing `serve` command.
+Each engine (Ktor/Netty/JDK) exposes `runPreDeploy()`, which loads settings, runs all pre-deploy tasks
+fail-fast, disconnects services, and returns (non-zero exit on failure):
+
+```kotlin
+private fun predeploy() {
+    val built = Server.build()
+    KtorEngine(built).apply {
+        settings.loadFromFile(KFile("settings.json"), internalSerializersModule)
+        runPreDeploy()   // runs all PreDeployTasks once, then returns
+    }
+}
+
+fun main(vararg args: String) {
+    cli(arguments = args, available = listOf(::serve, ::predeploy, /* ... */))
+}
+```
+
+**2. For local development**, add a convenience `dev` command that does prepare-then-serve in one process
+(so a single command still "just works"):
+
+```kotlin
+private fun dev() {
+    val built = Server.build()
+    KtorEngine(built).apply {
+        settings.loadFromFile(KFile("settings.json"), internalSerializersModule)
+        settings.ready()
+        runPreDeployTasksBlocking()   // prepare, leaving services connected
+        start(Netty)                  // then serve
+    }
+}
+```
+
+**3. In production, run `predeploy` before cutover.** If you deploy with the Lightning Server AWS
+builders, **this is already wired for you** — the EC2 (single and scaling) and serverless deployments now
+run the pre-deploy step before switching traffic to the new version, and abort the deploy if it fails. If
+you roll your own pipeline, invoke `bin/server predeploy` and gate the cutover on its success.
+
+### Migrating your own `StartupTask`s
+
+Audit each `StartupTask` you defined and decide where it belongs:
+
+- **Move to `PreDeployTask`** — anything that mutates shared state the new code depends on: schema/index
+  creation, data backfills, one-time setup, and prep that must be done before new code serves.
+- **Keep as `StartupTask`** — genuinely per-instance work: in-memory cache warming, establishing
+  instance-local state, cheap config validation.
+
+`PreDeployTask` uses lazily-supplied dependencies (so you can reference tasks declared later or in other
+modules without initialization-order surprises), and **every pre-deploy task runs on every deploy** — the
+framework tracks no history, so make them idempotent/convergent. For genuinely "run exactly once ever"
+work, guard it with a database marker (`doOnce`) *inside* a `PreDeployTask`; because pre-deploy runs once
+per deploy off the serving path, that check is cheap and uncontended:
+
+```kotlin
+// Before (5.1): a one-time seed as a per-instance startup task
+val setupAdmins = path.path("setup-admins") bind startupOnce(database) {
+    userInfo.table().insertOne(User(email = "admin@example.com", isSuperUser = true))
+}
+
+// After (5.2): a pre-deploy task; doOnce keeps it once-ever
+val setupAdmins = path.path("setup-admins") bind PreDeployTask {
+    doOnce("setup-admins", database) {
+        userInfo.table().insertOne(User(email = "admin@example.com", isSuperUser = true))
+    }
+}
+```
+
+!!! note "Startup tasks now fail fast"
+    A related fix: a failing `StartupTask` now aborts startup. Previously an exception from a startup task
+    with no dependents was silently swallowed and the server started anyway. If any of your startup tasks
+    threw and you relied on that being ignored, make the error handling explicit.
 
 ## Not source-breaking, but worth knowing
 

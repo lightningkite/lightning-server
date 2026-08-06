@@ -36,6 +36,7 @@ object Server : ServerBuilder() {
     val posts = path.path("posts") include object : ServerBuilder() {
         val info = database.modelInfo(
             auth = UserAuth.require(),
+            tableName = "Post",
             permissions = {
                 val user = auth.fetch()
                 ModelPermissions(
@@ -62,6 +63,7 @@ object Server : ServerBuilder() {
 ```kotlin
 val postInfo = database.modelInfo(
     auth = UserAuth.require(),  // Require authenticated user
+    tableName = "Post",
     permissions = {
         // Context: `auth` is the authenticated user
         val user = auth.fetch()
@@ -96,6 +98,7 @@ You can also hide or mask certain fields based on conditions:
 ```kotlin
 val postInfo = database.modelInfo(
     auth = UserAuth.require() or AuthRequirement.None,
+    tableName = "Post",
     permissions = {
         val user = authOrNull?.fetch()
         ModelPermissions(
@@ -168,6 +171,7 @@ A common pattern is to allow anyone to read but require authentication to write:
 ```kotlin
 val postInfo = database.modelInfo(
     auth = UserAuth.require() or AuthRequirement.None,
+    tableName = "Post",
     permissions = {
         val user = authOrNull?.fetch()
         val isAuthenticated = user != null

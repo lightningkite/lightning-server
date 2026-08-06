@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
+import com.lightningkite.lightningserver.websockets.websocketSettings
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
 import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryKey
@@ -58,6 +59,7 @@ public val forceWebSocketPubSub: ServerSetting.Direct<Boolean> = ServerSetting(
     optional = true
 )
 
+
 /**
  * Base class for local server engines that run within a single JVM process.
  *
@@ -101,6 +103,7 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
         enginePubSub,
         engineCache,
         forceWebSocketPubSub,
+        websocketSettings,
     )
 
     /**
@@ -347,6 +350,15 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
      * deploy pipeline can abort the cutover. Services are disconnected afterwards so the process can
      * exit cleanly.
      */
+    /**
+     * Runs all pre-deploy tasks and returns, leaving services connected. Intended to be called just
+     * before [start] in a combined "prepare then serve" dev command, so a single local process
+     * reconciles the database and then serves. Settings must already be ready.
+     */
+    public fun runPreDeployTasksBlocking() {
+        runBlocking { runPreDeployTasks() }
+    }
+
     public fun runPreDeploy() {
         settings.ready()
         try {

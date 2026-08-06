@@ -68,6 +68,7 @@ public class WebAuthNProofEndpoints(
         }
 
     public val modelInfo: ModelInfo<HasId<*>, WebAuthNCredential, String> = database.modelInfo(
+        tableName = "WebAuthNCredential",
         auth = proofMethodAuth or AuthRequirement.IsAdmin,
         permissions = {
             val admin = condition<WebAuthNCredential>(AuthRequirement.IsAdmin.accepts(authOrNull))

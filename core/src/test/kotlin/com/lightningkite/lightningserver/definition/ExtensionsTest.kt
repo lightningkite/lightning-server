@@ -38,6 +38,24 @@ class ExtensionsTest {
         assertEquals(listOf("item"), ext[TestWritableKey])
     }
 
+    @Test
+    fun `writable key survives seal then copy then include`() {
+        // Regression: a sealed WritableKey value (e.g. a ListRegistry stored as a SealableList) must
+        // rehydrate to its mutable WRITE form when copied into a new MutableExtensions, so a later
+        // include() can still merge it. This is the seal -> flatten -> merge cycle that ServerDefinition
+        // performs across modules; previously it threw ClassCastException.
+        val original = MutableExtensions()
+        original[TestWritableKey].add("a")
+
+        val copy = original.sealed().toMutableExtensions()
+
+        val other = MutableExtensions()
+        other[TestWritableKey].add("b")
+        copy.include(other)
+
+        assertEquals(listOf("a", "b"), copy[TestWritableKey])
+    }
+
     class TestExtendable : Extendable {
         override val extensions = MutableExtensions()
     }

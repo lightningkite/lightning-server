@@ -64,6 +64,7 @@ public class TimeBasedOTPProofEndpoints(
         }
 
     public val modelInfo: ModelInfo<HasId<*>, TotpSecret, Uuid> = database.modelInfo(
+        tableName = "TotpSecret",
         auth = proofMethodAuth or AuthRequirement.IsAdmin,
         permissions = {
             val admin = condition<TotpSecret>(AuthRequirement.IsAdmin.accepts(authOrNull))

@@ -259,9 +259,11 @@ For asynchronous checks (for example, checking a database for uniqueness):
 
 ```kotlin
 // Illustrative.
+// `users` is the registration declared on the ServerBuilder:
+//     val users = database.registerTable<User>("User")
 AnnotationValidators {
     validateSuspending<MustBeUnique, String> { value ->
-        if (database().table<User>().count(condition { it.email eq value }) > 0)
+        if (users().count(condition { it.email eq value }) > 0)
             "Email is already registered"
         else null
     }

@@ -164,6 +164,7 @@ object MyApi : ServerBuilder() {
 
     val postsInfo = database.modelInfo<User?, Post, Uuid>(
         auth = authOptions<User>(),
+        tableName = "Post",
         permissions = {
             // TODO: WARNING!  This exposes all create, edit, delete, and read capabilities!
             // We probably want something more restrictive, even for a demonstration.

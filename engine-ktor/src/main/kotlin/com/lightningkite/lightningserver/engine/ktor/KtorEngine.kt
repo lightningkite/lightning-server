@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.engine.local.EngineReliabilitySettings
 import com.lightningkite.lightningserver.engine.local.LocalEngine
 import com.lightningkite.lightningserver.engine.local.WsOversizePolicy
 import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
+import com.lightningkite.lightningserver.engine.local.LocalWebSocketConnection
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
@@ -41,7 +42,11 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.io.buffered
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 /**
  * Configuration settings for the Ktor HTTP server engine.
@@ -111,7 +116,17 @@ public class KtorEngine(
      * Sets up routing for both HTTP and WebSocket connections.
      */
     internal fun Application.adapt() {
-        install(WebSockets)
+        val wsSettings = websocketSettings()
+        install(WebSockets) {
+            // Ktor disables server-side pings by default, and its pong timeout has no effect without
+            // them. That leaves no way to notice a peer that has stopped reading: the ping send itself
+            // blocks on the backed-up outgoing channel and the timeout closes the connection, so
+            // enabling this is what evicts a stalled consumer instead of holding its buffers forever.
+            pingPeriodMillis = wsSettings.ping?.inWholeMilliseconds ?: PINGER_DISABLED
+            timeoutMillis = wsSettings.pongTimeout.inWholeMilliseconds
+            // Ktor's default is Long.MAX_VALUE, i.e. a peer may ask the server to allocate without limit.
+            wsSettings.maxFrameSize?.let { maxFrameSize = it.bytes }
+        }
 
         val runConfig = ktorRunConfig()
 
@@ -383,49 +398,6 @@ public class KtorEngine(
 
 }
 
-/**
- * Implementation of WebSocketConnection for local (in-process) WebSocket handling.
- * Manages subscriptions via PubSub channels and state synchronization.
- */
-private abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
-    startingState: STORAGE,
-    override val request: WebSocketConnectRequest<PATH>,
-    val handler: WebSocketHandler<PATH, STORAGE>,
-    val scope: CoroutineScope,
-    server: ServerRuntime,
-    val pubSub: (request: WebSocketSubscriptionRequest<*, Any?>) -> PubSubChannel<Any?>,
-) : WebSocketConnection<PATH, STORAGE>, ServerRuntime by server {
-    override var currentState: STORAGE = startingState
-    override suspend fun repullState(): STORAGE = currentState
-    override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE) {
-        currentState = modification(currentState)
-    }
-
-    override suspend fun updateStateImmediately(modification: (STORAGE) -> STORAGE): STORAGE {
-        currentState = modification(currentState)
-        return currentState
-    }
-
-    val subscriptions = HashMap<WebSocketTopic<*, *>, Job>()
-
-    override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-        @Suppress("UNCHECKED_CAST")
-        topic as WebSocketSubscriptionRequest<*, Any?>
-        subscriptions[topic.topic]?.cancel()
-        subscriptions[topic.topic] = scope.launch {
-            pubSub(topic).collect { value ->
-                handler.messageFromSubscription(
-                    WebSocketSubscriptionMessage(topic.topic, topic.pathInContext.rawPathArguments, value),
-                )
-            }
-            yield()
-        }
-    }
-
-    override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-        subscriptions[topic.topic]?.cancel()
-    }
-}
 
 /**
  * Helper class for type-safe retrieval of values with serializers.

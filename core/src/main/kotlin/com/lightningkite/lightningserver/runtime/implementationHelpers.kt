@@ -361,7 +361,7 @@ public suspend fun PreDeployTask.executeWithMetrics(location: PathSpec0) {
 context(runtime: ServerRuntime)
 public suspend fun <T> instrument(
     name: String,
-    attributes: TelemetryAttributes = TelemetryAttributes.empty,
+    attributes: TelemetryAttributes = emptyTelemetryAttributes(),
     action: suspend () -> T,
 ): T = runtime.telemetryTrace(name, attributes) { action() }
 

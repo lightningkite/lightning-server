@@ -805,6 +805,50 @@ for i in $(seq 1 180); do
     fi
 done
 
+# Run pre-deploy tasks first (new build in a scratch dir; the running server is untouched). If they
+# fail, abort without redeploying so the current version keeps serving.
+log "Sending SSM command to run /usr/local/bin/lightning-server-predeploy..."
+PRE_CMD_ID=$(aws ssm send-command \
+    --instance-ids "$INSTANCE_ID" \
+    --document-name "AWS-RunShellScript" \
+    --comment "terraform pre-deploy" \
+    --parameters 'commands=/usr/local/bin/lightning-server-predeploy,executionTimeout=600' \
+    --region "$REGION" \
+    --query 'Command.CommandId' \
+    --output text)
+log "Pre-deploy command ID: $PRE_CMD_ID — polling for completion..."
+for i in $(seq 1 180); do
+    status=$(aws ssm get-command-invocation \
+        --command-id "$PRE_CMD_ID" \
+        --instance-id "$INSTANCE_ID" \
+        --region "$REGION" \
+        --query 'Status' \
+        --output text 2>/dev/null || echo "Pending")
+    case "$status" in
+        Success)
+            log "Pre-deploy succeeded"
+            break
+            ;;
+        Cancelled|Failed|TimedOut)
+            err "Pre-deploy finished with status: $status — aborting without redeploy"
+            aws ssm get-command-invocation \
+                --command-id "$PRE_CMD_ID" \
+                --instance-id "$INSTANCE_ID" \
+                --region "$REGION" \
+                --query 'StandardErrorContent' \
+                --output text >&2 || true
+            exit 1
+            ;;
+        *)
+            sleep 5
+            ;;
+    esac
+    if [ "$i" = "180" ]; then
+        err "Pre-deploy did not finish within polling window"
+        exit 1
+    fi
+done
+
 log "Sending SSM command to run /usr/local/bin/lightning-server-redeploy..."
 CMD_ID=$(aws ssm send-command \
     --instance-ids "$INSTANCE_ID" \

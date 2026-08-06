@@ -408,6 +408,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
     }
 
     private val lastRunInfo = database.explicitModelInfo(
+        tableName = "RunInstant",
         auth = noAuth,
         serializer = RunInstant.serializer(),
         idSerializer = String.serializer(),

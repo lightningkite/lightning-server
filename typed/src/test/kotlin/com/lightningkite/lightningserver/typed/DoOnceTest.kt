@@ -18,6 +18,8 @@ import kotlin.time.Duration.Companion.seconds
  * - Timeout-based lock acquisition
  */
 class DoOnceTest {
+    private val actionTable = DatabaseTableDefinition<ActionHasOccurred>()
+
 
     object TestServer : ServerBuilder() {
         val database = setting("database", Database.Settings())
@@ -115,7 +117,7 @@ class DoOnceTest {
                 // Empty action
             }
 
-            val table = database().table<ActionHasOccurred>()
+            val table = database().table(actionTable)
             val record = table.get("record-test")
 
             assertNotNull(record, "Record should be created in database")
@@ -134,7 +136,7 @@ class DoOnceTest {
                 // Successful action
             }
 
-            val table = database().table<ActionHasOccurred>()
+            val table = database().table(actionTable)
             val record = table.get("completion-test")
 
             assertNotNull(record?.completed, "completed should be set on success")
@@ -158,7 +160,7 @@ class DoOnceTest {
                 // Expected
             }
 
-            val table = database().table<ActionHasOccurred>()
+            val table = database().table(actionTable)
             val record = table.get("error-test")
 
             assertNotNull(record, "Record should exist after error")
@@ -231,7 +233,7 @@ class DoOnceTest {
                 // Action completes
             }
 
-            val table = database().table<ActionHasOccurred>()
+            val table = database().table(actionTable)
             val record = table.get("default-timeout-test")
             assertNotNull(record?.completed)
         }
@@ -248,7 +250,7 @@ class DoOnceTest {
                 // Action completes
             }
 
-            val table = database().table<ActionHasOccurred>()
+            val table = database().table(actionTable)
             val record = table.get("custom-timeout-test")
             assertNotNull(record?.completed)
         }
