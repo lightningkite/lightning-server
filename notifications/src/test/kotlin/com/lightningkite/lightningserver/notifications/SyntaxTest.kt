@@ -39,6 +39,11 @@ class SyntaxTest {
         val sms = setting("sms", SMS.Settings())
         val email = setting("email", EmailService.Settings())
 
+        val userInfo = database.modelInfo(
+            User.require(),
+            permissions = { ModelPermissions.allowAll<User>() },
+        )
+
         val notifications = path.path("notifications") module Notifications
 
         val modelEndpoints = path.path("model") module ModelEndpoints
@@ -53,8 +58,7 @@ class SyntaxTest {
             context(server: ServerRuntime)
             override suspend fun fetch(id: Uuid): User = User(id)
 
-            val info = Server.database.modelInfo(User.require(), permissions = { ModelPermissions.allowAll<User>() })
-
+            context(builder: ServerBuilder)
             inline fun <reified T : HasId<ID>, reified ID : Comparable<ID>> Runtime<Database>.testModelInfo() =
                 modelInfo(
                     User.require(),
@@ -68,7 +72,7 @@ class SyntaxTest {
             info = Server.database.testModelInfo(),
             cache = Server.cache,
             database = Server.database,
-            users = User.info,
+            users = Server.userInfo,
             sms = Server.sms,
             email = Server.email,
             contentSerializer = String.serializer(),
@@ -109,7 +113,7 @@ class SyntaxTest {
         }
 
         val handler = path include NotificationEndpoints(
-            User.info,
+            Server.userInfo,
             Dispatcher,
             FrequencyCustomizableSubscriptions(
                 info = Server.database.testModelInfo()
@@ -182,11 +186,11 @@ class SyntaxTest {
             testEmail!!
 
             runBlocking {
-                User.info.table().insertOne(User(Uuid.random()))
+                Server.userInfo.table().insertOne(User(Uuid.random()))
 
                 // Count all users - the subscriber notifies ALL users in the shared in-memory DB,
                 // which may include users from other tests sharing this Server singleton.
-                val userCount = User.info.table().count(Condition.Always)
+                val userCount = Server.userInfo.table().count(Condition.Always)
                 val smsCountBefore = testSms.messageHistory.size
                 val emailCountBefore = testEmail.sentEmails.size
 
@@ -214,9 +218,9 @@ class SyntaxTest {
             testEmail!!
 
             runBlocking {
-                User.info.table().insertOne(User(Uuid.random()))
+                Server.userInfo.table().insertOne(User(Uuid.random()))
 
-                val userCount = User.info.table().count(Condition.Always)
+                val userCount = Server.userInfo.table().count(Condition.Always)
                 val smsCountBefore = testSms.messageHistory.size
                 val emailCountBefore = testEmail.sentEmails.size
 

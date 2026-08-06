@@ -23,7 +23,7 @@ class MapRegistryTest {
         val registry = MapRegistry<String, Int>()
         registry.register("a", 1)
 
-        val error = assertFailsWith<DuplicateRegistrationError> {
+        val error = assertFailsWith<DuplicateRegistrationException> {
             registry.register("a", 2)
         }
 
@@ -48,7 +48,7 @@ class MapRegistryTest {
         val registry = MapRegistry<String, Int>()
         registry.register("a", 1)
 
-        assertFailsWith<DuplicateRegistrationError> {
+        assertFailsWith<DuplicateRegistrationException> {
             registry.include(mapOf("a" to 2, "b" to 3))
         }
     }

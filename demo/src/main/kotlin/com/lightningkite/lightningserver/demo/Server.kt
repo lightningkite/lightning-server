@@ -75,7 +75,7 @@ object Server : ServerBuilder() {
     val emailInbound = setting("emailInbound", EmailInboundService.Settings())
     val sms = setting("sms", SMS.Settings())
     val smsInbound = setting("smsInbound", SmsInboundService.Settings())
-    val files = setting("files", PublicFileSystem.Settings())
+    val files = setting("files", ExternalFileSystem.Settings())
     val cache = setting("cache", Cache.Settings())
     val cors = setting("cors", CorsSettings())
     val voiceAgent = setting("voiceAgent", VoiceAgentService.Settings())
@@ -104,7 +104,7 @@ object Server : ServerBuilder() {
         DynamoDbCache
         MongoDatabase
         MemcachedCache
-        S3PublicFileSystem
+        S3ExternalFileSystem
         OpenAIVoiceAgentService
         DynamoDbPubSub
         RedisPubSub
@@ -254,10 +254,12 @@ object Server : ServerBuilder() {
     val proofDevices = path.path("proof").path("devices") module KnownDeviceProofEndpoints(database, cache)
     val proofOauth = path.path("proof").path("github") module OauthProofEndpoints(
         provider = OauthProviderInfo.github,
+        cache = cache,
         credentials = githubOauth,
         continueUiAuthUrl = { autosignIn.location.path.resolved().fullUrl() + "?proof=" + serverRuntime.externalSerialization.json.encodeToString(Proof.serializer(), it).encodeURLQueryComponent() + "&backend=" + generalSettings().publicUrl.encodeURLQueryComponent() }
     )
     val autosignIn = path.path("auth").path("autosignin").get bind HttpHandler {
+        telemetrySettings
         val proof = it.queryParameters["proof"]!!.decodeURLQueryComponent().let { serverRuntime.externalSerialization.json.decodeFromString(Proof.serializer(), it) }
         HttpResponse.plainText("OK")
     }

@@ -129,8 +129,10 @@ public class JdkEngine(
                 }
                 val request = exchange.requestToLightningServer(cfg.realIpHeader, this@JdkEngine, maxBody)
                 // Request timeout is enforced centrally in ServerRuntime.handle (per-handler HttpHandler.timeout).
-                val result: HttpResponse = runBlocking { this@JdkEngine.handle(request) }
-                exchange.write(result)
+                runBlocking {
+                    val result: HttpResponse = this@JdkEngine.handle(request)
+                    exchange.write(result)
+                }
             } catch (e: BodyTooLargeException) {
                 // 2.5: streamed body exceeded the cap mid-read.
                 try {
@@ -153,7 +155,8 @@ public class JdkEngine(
             }
         }
 
-        val threads = (reliability.workerThreads ?: (java.lang.Runtime.getRuntime().availableProcessors() * 2)).coerceAtLeast(1)
+        val threads =
+            (reliability.workerThreads ?: (java.lang.Runtime.getRuntime().availableProcessors() * 2)).coerceAtLeast(1)
         val pool = ThreadPoolExecutor(
             threads,
             threads,
@@ -198,7 +201,7 @@ private fun HttpExchange.respondPlain(status: Int, message: String) {
  * Writes a Lightning Server HttpResponse to a JDK HttpExchange.
  * Handles all response types including empty bodies, bytes, text, sinks, and sources.
  */
-private fun HttpExchange.write(response: HttpResponse) {
+private suspend fun HttpExchange.write(response: HttpResponse) {
     // Copy headers from response
     for ((key, values) in response.headers.normalizedEntries) {
         for (value in values) {
@@ -239,6 +242,13 @@ private fun HttpExchange.write(response: HttpResponse) {
         is Data.Source -> {
             sendResponseHeaders(status, b.size ?: 0)
             this.responseBody.asSink().buffered().use { sink -> b.source.transferTo(sink) }
+        }
+
+        is Data.SuspendingSource, is Data.SuspendingSink -> {
+            // A known size is sent as the exact content length; 0 tells the JDK server to use chunked encoding.
+            // Data.write streams every variant (blocking ones self-offload to the IO dispatcher).
+            sendResponseHeaders(status, b.size ?: 0)
+            this.responseBody.asSink().buffered().use { sink -> b.write(sink) }
         }
     }
 }

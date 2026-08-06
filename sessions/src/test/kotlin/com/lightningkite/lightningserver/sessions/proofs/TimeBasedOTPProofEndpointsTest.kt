@@ -526,4 +526,81 @@ class TimeBasedOTPProofEndpointsTest {
             }
         }
     }
+
+    /**
+     * Security regression: the rate-limit key must be built from the NORMALIZED identifier, so that
+     * case/whitespace variants of one account share a single bucket. If the key were derived from the
+     * raw value, an attacker could dodge the limiter (and its exponential backoff) by varying case.
+     */
+    @Test
+    fun `rate limiter shares one bucket across case variants of the same identifier`() = runBlocking {
+        TestUser.users.clear()
+        val userId = Uuid.random()
+        val user = TestUser(userId, "test@example.com")
+        TestUser.users[userId] = user
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
+
+            init {
+                register(TestUser)
+            }
+
+            val totpEndpoints = path.path("auth").path("totp") include TimeBasedOTPProofEndpoints(
+                database = database,
+                cache = cache,
+                proofSigner = RuntimeDeferred.Cached { testBasis.signer("proof") },
+                proofExpiration = 1.hours,
+                config = testConfig
+            )
+        }.let { server ->
+            server.test({}) {
+                server.totpEndpoints.modelInfo.table().insert(
+                    listOf(
+                        TotpSecret(
+                            subjectId = TestUser.idString(userId),
+                            subjectType = TestUser.name,
+                            secretBase32 = testSecretBase32,
+                            label = "test",
+                            issuer = "TestApp",
+                            period = 30.seconds,
+                            digits = 6,
+                            algorithm = TotpHashAlgorithm.SHA1,
+                            establishedAt = Clock.System.now(),
+                            lastUsedAt = Clock.System.now()
+                        )
+                    )
+                )
+
+                // Five distinct case variants that all normalize to "test@example.com". The default limit
+                // is 5 attempts; five failing attempts across these variants must fill ONE shared bucket.
+                val emailVariants = listOf(
+                    "Test@example.com",
+                    "tEst@example.com",
+                    "teSt@example.com",
+                    "tesT@example.com",
+                    "TEST@example.com",
+                )
+                for (variant in emailVariants) {
+                    assertFailsWith<BadRequestException> {
+                        server.totpEndpoints.prove.test(
+                            null, IdentificationAndPassword("TestUser", "email", variant, "000000")
+                        )
+                    }
+                }
+
+                // A sixth attempt with yet another distinct variant must be blocked by the shared limiter.
+                val blocked = assertFailsWith<BadRequestException> {
+                    server.totpEndpoints.prove.test(
+                        null, IdentificationAndPassword("TestUser", "email", "TesT@example.com", "000000")
+                    )
+                }
+                assertTrue(
+                    blocked.message.contains("Too many attempts"),
+                    "Expected the shared rate limiter to block, but got: ${blocked.message}"
+                )
+            }
+        }
+    }
 }

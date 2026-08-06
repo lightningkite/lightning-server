@@ -10,7 +10,7 @@ import com.lightningkite.lightningserver.pathing.arg1
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.route
 import com.lightningkite.services.database.Database
-import com.lightningkite.services.files.PublicFileSystem
+import com.lightningkite.services.files.ExternalFileSystem
 import com.lightningkite.services.files.ServerFile
 import kotlinx.serialization.Serializable
 
@@ -25,7 +25,7 @@ import kotlinx.serialization.Serializable
  * - Integration with different storage backends (S3, local, etc.)
  */
 class FileExamplesEndpoints(
-    private val files: Runtime<PublicFileSystem>,
+    private val files: Runtime<ExternalFileSystem>,
     private val database: Runtime<Database>,
 ) : ServerBuilder() {
 

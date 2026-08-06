@@ -675,7 +675,7 @@ public class NettyEngine(
             )
         }
 
-        private fun HttpResponse.toNettyResponse(version: HttpVersion): FullHttpResponse {
+        private suspend fun HttpResponse.toNettyResponse(version: HttpVersion): FullHttpResponse {
             val contentBuf = this.body?.data?.bytes()
                 ?.let { Unpooled.wrappedBuffer(it) }
                 ?: Unpooled.EMPTY_BUFFER

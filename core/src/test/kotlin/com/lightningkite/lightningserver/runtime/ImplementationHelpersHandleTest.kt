@@ -39,6 +39,8 @@ class ImplementationHelpersHandleTest {
             // Installed outermost so security headers apply to every response, including CORS-processed and
             // error responses (exercised by the security-header tests below).
             install(com.lightningkite.lightningserver.http.SecurityHeadersInterceptor())
+            // Outside CORS so it also compresses responses the CORS layer produces (exercised by the gzip tests below).
+            install(com.lightningkite.lightningserver.compression.GzipInterceptor())
             install(com.lightningkite.lightningserver.cors.CorsInterceptor(setting("cors", cors)))
         }
 
@@ -69,6 +71,17 @@ class ImplementationHelpersHandleTest {
                 body = TypedData.sink(mediaType = MediaType.Text.Plain) { sink ->
                     sink.writeString(content)
                 }
+            )
+        }
+
+        // Streaming large response backed by a blocking Data.Source at /bigsource
+        val bigSource = path.path("bigsource").get bind HttpHandler<PathSpec0> {
+            val content = "s".repeat(100_000)
+            HttpResponse(
+                body = TypedData.source(
+                    source = kotlinx.io.Buffer().also { it.writeString(content) },
+                    mediaType = MediaType.Text.Plain,
+                ),
             )
         }
 
@@ -645,6 +658,31 @@ class ImplementationHelpersHandleTest {
                 val decompressed =
                     GZIPInputStream(ByteArrayInputStream(compressed)).readBytes().toString(Charsets.UTF_8)
                 assertEquals("x".repeat(100_000), decompressed)
+            }
+        }
+    }
+
+    @Test
+    fun gzip_applied_on_stream_source() {
+        // The blocking Data.Source path must stream-compress (no full-body buffering) and still produce valid gzip.
+        TestServer.test(settings = {}) {
+            runBlocking {
+                val resp = serverRuntime.handle(
+                    HttpRequest(
+                        path = RawHttpEndpoint(asString = "/bigsource", method = HttpMethod.GET),
+                        queryParameters = QueryParameters.EMPTY,
+                        headers = HttpHeaders { add(HttpHeader.AcceptEncoding, "gzip") },
+                        domain = "example.com",
+                        protocol = "https",
+                        sourceIp = "local",
+                    )
+                )
+                assertEquals(HttpStatus.OK, resp.status)
+                assertEquals("gzip", resp.headers[HttpHeader.ContentEncoding]?.root)
+                val compressed = resp.body?.data?.bytes() ?: error("Expected body bytes")
+                val decompressed =
+                    GZIPInputStream(ByteArrayInputStream(compressed)).readBytes().toString(Charsets.UTF_8)
+                assertEquals("s".repeat(100_000), decompressed)
             }
         }
     }

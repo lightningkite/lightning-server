@@ -36,8 +36,7 @@ private val errorType = TelemetryKey.OfString("error.type")
  * 1. Routes the request to the appropriate handler
  * 2. Handles special HTTP methods (HEAD, OPTIONS) automatically
  * 3. Provides trailing slash redirect logic when routes differ only by trailing slash
- * 4. Applies GZIP compression when appropriate
- * 5. Handles exceptions and logs errors
+ * 4. Handles exceptions and logs errors
  *
  * ## Automatic HEAD support
  * If no HEAD handler is registered, automatically transforms a GET request and strips the body.
@@ -46,17 +45,11 @@ private val errorType = TelemetryKey.OfString("error.type")
  * If a route is not found, checks if an alternate version with/without trailing slash exists
  * and returns a redirect if found.
  *
- * ## GZIP compression
- * Automatically compresses responses when:
- * - Client sends Accept-Encoding: gzip header
- * - Response body is at least 256 bytes
- * - Content type is not already compressed (images, videos, fonts, archives, etc.)
- *
- * For payloads 256-1024 bytes, only compresses if compression reduces size.
- * For larger payloads, always compresses.
+ * Response compression is not part of routing; install
+ * [com.lightningkite.lightningserver.compression.GzipInterceptor] if you want it.
  *
  * @param request The HTTP request to handle
- * @return The HTTP response, potentially compressed
+ * @return The HTTP response
  */
 public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpResponse = instrumentHttpRequest(request) {
     var errorType: String? = null
@@ -128,66 +121,7 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
                         }
                     }
                 }
-                if (result.body == null || request.headers[HttpHeader.AcceptEncoding] == null) return@intercept result
-
-                val acceptedEncodings = request.headers.getMany(HttpHeader.AcceptEncoding)
-                if (acceptedEncodings.isEmpty()) return@intercept result
-
-                val accepts = acceptedEncodings
-                    .map { it.root.lowercase().substringBefore(';').trim() }
-
-                // Accept-Encoding negotiation (gzip only for now)
-                if (!accepts.contains("gzip")) return@intercept result
-
-                // Content-Type denylist (skip already-compressed types)
-                if (result.body.mediaType.type in setOf("image", "audio", "video") ||
-                    (result.body.mediaType.type == "application" &&
-                            result.body.mediaType.subtype in
-                            setOf("zip", "gzip", "x-gzip", "x-7z-compressed", "x-bzip2", "x-tar", "pdf")
-                            ) ||
-                    (result.body.mediaType.type == "font" && result.body.mediaType.subtype in setOf("woff", "woff2"))
-                ) return@intercept result
-
-                // Lower compress limit. Either not worth the effort, or likely will inflate a little.
-                if (result.body.data.size?.let { it < 256 } == true) return@intercept result
-
-                val (newData, compressed) = when (val data = result.body.data) {
-                    is Data.Sink -> {
-                        Data.Sink { outSink ->
-                            GZIPOutputStream(outSink.asOutputStream()).asSink().buffered().use { gzOut ->
-                                data.write(gzOut)
-                            }
-                        } to true
-                    }
-
-                    is Data.Source -> {
-                        Data.Sink { outSink ->
-                            GZIPOutputStream(outSink.asOutputStream()).asSink().buffered().use { gzOut ->
-                                data.write(gzOut)
-                            }
-                        } to true
-                    }
-
-                    else -> {
-                        // 1024 Grey area. It likely will compress fine, but if not send the original
-                        val s = data.size
-                        if (s?.let { it <= 1024 } == true) {
-                            val og = data.bytes()
-                            val gz = og.gzip()
-                            if (gz.size < s)
-                                Data.Bytes(gz) to true
-                            else
-                                Data.Bytes(og) to false
-                        } else
-                            Data.Bytes(data.bytes().gzip()) to true
-                    }
-                }
-                result.copy(
-                    headers = if (compressed) result.headers.copy {
-                        add(HttpHeader.ContentEncoding, "gzip")
-                    } else result.headers,
-                    body = TypedData(newData, result.body.mediaType)
-                )
+                result
             } catch (timeout: TimeoutCancellationException) {
                 // A handler exceeded its HttpHandler.timeout. This is a server-side condition (the server
                 // couldn't finish in time), so it maps to 503 Service Unavailable — NOT 408, which per
@@ -392,6 +326,21 @@ context(serverRuntime: ServerRuntime)
 public suspend fun StartupTask.executeWithMetrics(location: PathSpec0) {
     return instrument("startup", TelemetryAttributes {
         put(taskType, "STARTUP")
+        put(taskRoute, location.toString())
+    }) {
+        execute()
+    }
+}
+
+/**
+ * Executes a pre-deploy task with telemetry metrics.
+ *
+ * @param location The path specification for this pre-deploy task
+ */
+context(serverRuntime: ServerRuntime)
+public suspend fun PreDeployTask.executeWithMetrics(location: PathSpec0) {
+    return instrument("predeploy", TelemetryAttributes {
+        put(taskType, "PREDEPLOY")
         put(taskRoute, location.toString())
     }) {
         execute()
