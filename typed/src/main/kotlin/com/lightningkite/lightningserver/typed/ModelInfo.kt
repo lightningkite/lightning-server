@@ -2,6 +2,8 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.Runtime
+import com.lightningkite.lightningserver.definition.StartupTask
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.*
 import kotlinx.serialization.KSerializer
@@ -40,6 +42,7 @@ public interface ModelInfo<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     public fun exampleItem(): T? = null
 }
 
+context(builder: ServerBuilder)
 public inline fun <reified USER : HasId<*>?, reified T : HasId<ID>, reified ID : Comparable<ID>> Runtime<Database>.modelInfo(
     auth: AuthRequirement<USER>,
     tableName: String = serializerOrContextual<T>().descriptor.serialName.substringBefore('/').substringBefore('<')
@@ -57,8 +60,15 @@ public inline fun <reified USER : HasId<*>?, reified T : HasId<ID>, reified ID :
 
     override val auth: AuthRequirement<USER> = subscope?.let { auth.subscope(it) } ?: auth
 
+    val tableDefinition = DatabaseTableDefinition(serializer, tableName)
+    val startupTask = with(builder) {
+        path.path(tableName) bind StartupTask {
+            this@modelInfo().prepare(tableDefinition)
+        }
+    }
+
     context(server: ServerRuntime)
-    override fun baseTable(): Table<T> = this@modelInfo().table(serializer, tableName)
+    override fun baseTable(): Table<T> = this@modelInfo().table(tableDefinition)
 
     override val tableName: String get() = tableName
 
@@ -85,6 +95,7 @@ public inline fun <reified USER : HasId<*>?, reified T : HasId<ID>, reified ID :
 }
 
 
+context(builder: ServerBuilder)
 public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> Runtime<Database>.explicitModelInfo(
     auth: AuthRequirement<USER>,
     serializer: KSerializer<T>,

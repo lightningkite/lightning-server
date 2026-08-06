@@ -264,7 +264,10 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
                     }
 
                     if (handler.permitMasquerade(auth, mask)) return mask
-                    else throw ForbiddenException("You are not allowed to masquerade as $masquerade")
+                    else {
+                        server.logger.warn { "$auth denied masquerade as $masquerade" }
+                        throw ForbiddenException("You are not allowed to masquerade as $masquerade")
+                    }
                 }
 
                 return auth

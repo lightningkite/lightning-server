@@ -64,7 +64,7 @@ class FilesModuleReviewTests {
         ) {
             val fo = files().root.then("roundtrip.txt")
             val sf = fo.serverFile
-            val back = sf.fileObject
+            val back = sf.externalFile
             assertEquals(fo, back)
         }
     }

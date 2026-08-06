@@ -1,7 +1,9 @@
 # Expectations for Engines
 
-- X-Content-Type-Options: nosniff
-- (if public URL has https) Strict-Transport-Security: max-age=3600
+- Security headers — provided by the opt-in `SecurityHeadersInterceptor` (install it in your `ServerBuilder`),
+  not emitted automatically by engines:
+    - X-Content-Type-Options: nosniff
+    - (if the request arrived over https) Strict-Transport-Security: max-age=31536000 (one year, configurable)
 - HEAD - if undefined, perform get and ignore body
 - Range - respected, ideally abuses extra options to do proper file partial fetch
 - OPTIONS

@@ -3,8 +3,8 @@ package com.lightningkite.lightningserver.files
 import com.lightningkite.services.data.Data
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
-import kotlinx.coroutines.runBlocking
 import kotlinx.io.Buffer
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
@@ -72,11 +72,18 @@ class TypedDataGetRangeTest {
 
     @Test
     fun bounded_on_source_slices_inclusive(): Unit = runBlocking {
+        // Both ends inclusive (RFC 9110): bytes=10-19 is 10 bytes, and must match the Bytes path exactly.
         val out = typedSource().getRange(HttpRange.Bounded(10, 19), size).data.bytes()
-        // Bounded.size == rangeEnd - rangeStart, so 19-10 = 9 bytes emitted.
-        // This matches the current contract of getRange for streaming data.
-        assertEquals(9, out.size)
-        assertEquals(payload.sliceArray(10..18).toList(), out.toList())
+        assertEquals(10, out.size)
+        assertEquals(payload.sliceArray(10..19).toList(), out.toList())
+    }
+
+    @Test
+    fun single_byte_bounded_on_source_is_not_empty(): Unit = runBlocking {
+        // A `bytes=42-42` probe (common from video players) must return exactly that one byte, not an empty body.
+        val out = typedSource().getRange(HttpRange.Bounded(42, 42), size).data.bytes()
+        assertEquals(1, out.size)
+        assertEquals(payload[42], out[0])
     }
 
     @Test
@@ -92,9 +99,13 @@ class TypedDataGetRangeTest {
     }
 
     @Test
-    fun source_range_produces_sink_data(): Unit = runBlocking {
+    fun source_range_stays_streaming(): Unit = runBlocking {
+        // A range over a streaming source must stay streaming (not be materialized to Bytes) so large media served
+        // from a Source is sliced without buffering the whole payload in the heap.
         val ranged = typedSource().getRange(HttpRange.Bounded(0, 1), size)
-        assert(ranged.data is Data.Sink) { "Expected ranged source to become Data.Sink, got ${ranged.data::class}" }
+        assert(ranged.data is Data.SuspendingSink) {
+            "Expected ranged source to stream via Data.SuspendingSink, got ${ranged.data::class}"
+        }
     }
 
     // -------- Sink --------
@@ -102,8 +113,8 @@ class TypedDataGetRangeTest {
     @Test
     fun bounded_on_sink_slices_inclusive(): Unit = runBlocking {
         val out = typedSink().getRange(HttpRange.Bounded(100, 109), size).data.bytes()
-        assertEquals(9, out.size)
-        assertEquals(payload.sliceArray(100..108).toList(), out.toList())
+        assertEquals(10, out.size)
+        assertEquals(payload.sliceArray(100..109).toList(), out.toList())
     }
 
     @Test
@@ -119,9 +130,11 @@ class TypedDataGetRangeTest {
     }
 
     @Test
-    fun sink_range_produces_sink_data(): Unit = runBlocking {
+    fun sink_range_stays_streaming(): Unit = runBlocking {
         val ranged = typedSink().getRange(HttpRange.UntilEnd(0), size)
-        assert(ranged.data is Data.Sink) { "Expected ranged sink to remain Data.Sink, got ${ranged.data::class}" }
+        assert(ranged.data is Data.SuspendingSink) {
+            "Expected ranged sink to stream via Data.SuspendingSink, got ${ranged.data::class}"
+        }
     }
 
     // -------- Edge cases --------

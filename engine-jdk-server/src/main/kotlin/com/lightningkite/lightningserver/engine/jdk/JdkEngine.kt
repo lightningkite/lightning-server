@@ -155,7 +155,8 @@ public class JdkEngine(
             }
         }
 
-        val threads = (reliability.workerThreads ?: (java.lang.Runtime.getRuntime().availableProcessors() * 2)).coerceAtLeast(1)
+        val threads =
+            (reliability.workerThreads ?: (java.lang.Runtime.getRuntime().availableProcessors() * 2)).coerceAtLeast(1)
         val pool = ThreadPoolExecutor(
             threads,
             threads,
@@ -226,9 +227,26 @@ private suspend fun HttpExchange.write(response: HttpResponse) {
             }
         }
 
-        // A known size is sent as the exact content length; 0 tells the JDK server to use chunked encoding.
-        // Data.write streams every variant (blocking ones self-offload to the IO dispatcher).
-        else -> {
+        is Data.Bytes, is Data.Text -> {
+            val bytes = b.bytes()
+            sendResponseHeaders(status, bytes.size.toLong())
+            this.responseBody.use { os -> os.write(bytes) }
+        }
+
+        is Data.Sink -> {
+            // Unknown length; use chunked
+            sendResponseHeaders(status, b.size ?: 0)
+            this.responseBody.asSink().buffered().use { sink -> b.emit(sink) }
+        }
+
+        is Data.Source -> {
+            sendResponseHeaders(status, b.size ?: 0)
+            this.responseBody.asSink().buffered().use { sink -> b.source.transferTo(sink) }
+        }
+
+        is Data.SuspendingSource, is Data.SuspendingSink -> {
+            // A known size is sent as the exact content length; 0 tells the JDK server to use chunked encoding.
+            // Data.write streams every variant (blocking ones self-offload to the IO dispatcher).
             sendResponseHeaders(status, b.size ?: 0)
             this.responseBody.asSink().buffered().use { sink -> b.write(sink) }
         }

@@ -13,8 +13,8 @@ import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.files.ExternalFileSystem
-import com.lightningkite.services.files.ServerFile
 import com.lightningkite.services.files.serverFile
+import com.lightningkite.services.files.ServerFile
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -54,7 +54,7 @@ class FileSystemEndpointsTest {
         ) {
             val file = files().root.then("test.txt")
             file.put(TypedData.text("Hello world!", MediaType.Text.Plain))
-            println(file.signedUrl)
+            println(file)
             println(file.signedUrl)
             val serialized = serverRuntime.externalSerialization.stringArrayFormat.encodeToString(
                 uploadEarly.serializer(),

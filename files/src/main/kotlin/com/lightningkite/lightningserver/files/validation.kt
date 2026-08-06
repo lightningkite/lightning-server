@@ -9,7 +9,7 @@ import com.lightningkite.services.files.ServerFile
 private val fileValidators = Runtime {
     AnnotationValidators {
         validateSuspending<MimeType, ServerFile> { file ->
-            val head = file.fileObject.head()
+            val head = file.externalFile.head()
             when {
                 head == null -> "File does not exist"
                 head.size.bytes > maxSize -> "File is too big; max size is $maxSize bytes but file is ${head.size.bytes} bytes"

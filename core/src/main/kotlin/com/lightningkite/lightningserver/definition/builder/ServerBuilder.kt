@@ -93,6 +93,7 @@ public abstract class ServerBuilder : Extendable {
 
     private var exceptionHandler: ExceptionHttpHandler = DefaultExceptionHttpHandler
 
+    private val preDeployTasks: MapRegistry<PathSpec0, PreDeployTask> = MapRegistry()
     private val startupTasks: MapRegistry<PathSpec0, StartupTask> = MapRegistry()
     private val schedules: MapRegistry<PathSpec0, ScheduledTask> = MapRegistry()
     private val tasks: MapRegistry<PathSpec0, Task<*>> = MapRegistry()
@@ -137,6 +138,11 @@ public abstract class ServerBuilder : Extendable {
     public infix fun PathSpec0.bind(startupTask: StartupTask): StartupTask {
         startupTasks.register(this, startupTask)
         return startupTask
+    }
+
+    public infix fun PathSpec0.bind(preDeployTask: PreDeployTask): PreDeployTask {
+        preDeployTasks.register(this, preDeployTask)
+        return preDeployTask
     }
 
     public infix fun PathSpec0.bind(schedule: ScheduledTask): ScheduledTask {
@@ -321,6 +327,7 @@ public abstract class ServerBuilder : Extendable {
             extensions = extensions.sealed(),
             exceptionHandler = exceptionHandler,
             startupTasks = startupTasks.toSealedMap(),
+            preDeployTasks = preDeployTasks.toSealedMap(),
             mediaTypeDecoders = mediaTypeDecoders.toSealedMap(),
             mediaTypeEncoders = mediaTypeEncoders.toSealedMap(),
             settingOverrides = settingOverrides.toSealedMap()

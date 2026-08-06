@@ -148,7 +148,7 @@ public class UploadEarlyEndpoint(
     public val cleanupSchedule: ScheduledTask = path.path("cleanupUploads") bind ScheduledTask(frequency = 1.days) {
         database().table<UploadForNextRequest>().deleteMany(condition { it.expires lt now() }).forEach {
             try {
-                it.file.fileObject.delete()
+                it.file.externalFile.delete()
             } catch (e: Exception) {
                 e.printStackTrace()
             }

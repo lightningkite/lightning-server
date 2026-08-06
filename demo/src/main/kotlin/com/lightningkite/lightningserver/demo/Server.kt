@@ -84,6 +84,11 @@ object Server : ServerBuilder() {
     val newSecret = setting("someSecret", "???", instructions = "This can be whatever you dream, you madman.")
     val githubOauth = setting("githubOauth", OauthProviderCredentials("", ""))
 
+    // Baseline security headers (X-Content-Type-Options, and HSTS over https). Installed first so it runs
+    // outermost and applies to every response, including CORS-processed and error responses.
+    val securityHeaders = install(SecurityHeadersInterceptor())
+    // v4-style access log: one line per request naming the resolved principal (or "anonymous") and IP.
+    val accessLog = install(AccessLogInterceptor())
     val corsInterceptor = install(CorsInterceptor(cors))
 
     init {

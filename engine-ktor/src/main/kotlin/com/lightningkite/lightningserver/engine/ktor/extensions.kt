@@ -3,8 +3,6 @@ package com.lightningkite.lightningserver.engine.ktor
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
-import com.lightningkite.lightningserver.engine.local.BodyTooLargeException
-import com.lightningkite.lightningserver.engine.local.copyLimited
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
@@ -49,11 +47,16 @@ internal suspend fun ApplicationCall.adapt(maxBody: Long): HttpRequest<PathSpec>
         } ?: request.origin.remoteAddress,
         body = run {
             // TODO: Add MultiPart support
-            val stream = receiveStream()
-
-            TypedData.sink(request.contentType().adapt(), request.contentLength() ?: -1) {
-                copyLimited(stream, maxBody) { b, off, len -> it.write(b, off, len) }
-            }
+            // Cooperative, non-blocking body read: back the body with Ktor's suspending ByteReadChannel so consuming
+            // it yields the event loop instead of blocking it (the original receiveStream()+runBlocking path could
+            // deadlock the event loop on slow/segmented bodies). maxBody is enforced during the suspending read.
+            val declaredLength = request.contentLength()
+            TypedData.suspending(
+                // declaredLength lets the source reject a body that ends before its declared Content-Length (A1).
+                source = KtorChannelSuspendingSource(receiveChannel(), maxBody, declaredLength),
+                mediaType = request.contentType().adapt(),
+                size = declaredLength,
+            )
         },
     )
 }

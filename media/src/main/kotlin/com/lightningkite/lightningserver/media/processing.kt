@@ -2,7 +2,7 @@ package com.lightningkite.lightningserver.media
 
 import com.lightningkite.lightningserver.data.toKFile
 import com.lightningkite.lightningserver.definition.Task
-import com.lightningkite.lightningserver.files.fileObject
+import com.lightningkite.lightningserver.files.externalFile
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.typed.ModelInfo
 import com.lightningkite.services.data.TypedData
@@ -45,7 +45,7 @@ public suspend fun ServerFileWithMetadata.process(options: Collection<MediaPrevi
         if (previews.isNotEmpty()) return@withContext this@process
 
         val originalFile = original
-        val originalFileObject = originalFile.fileObject
+        val originalFileObject = originalFile.externalFile
 
         var out = this@process
 

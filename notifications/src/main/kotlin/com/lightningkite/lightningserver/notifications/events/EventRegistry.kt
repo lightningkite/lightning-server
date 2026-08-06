@@ -11,7 +11,7 @@ public class EventRegistry private constructor(
 
     public fun register(definition: EventDefinition<*, *>) {
         registry[definition.name]?.let { registered ->
-            if (registered != definition) throw DuplicateRegistrationError(
+            if (registered != definition) throw DuplicateRegistrationException(
                 "EventType name ${registered.name} is not unique. EventTypes require unique names.",
                 registered,
                 definition
