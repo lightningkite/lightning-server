@@ -9,52 +9,6 @@ import kotlinx.io.Sink
 import kotlinx.io.readByteArray
 import kotlinx.io.writeString
 
-/** Sentinel for [RangeSlicingSink.forward] meaning "forward everything after the skip, to end of stream". */
-private const val RANGE_UNTIL_END: Long = -1L
-
-/**
- * A [SuspendingSink] that slices a passing byte stream: it discards the first [skip] bytes, forwards the next
- * [forward] bytes to [downstream] (or all remaining bytes if [forward] is [RANGE_UNTIL_END]), and discards anything
- * past that. Lets a range be served straight from a streaming body without buffering the whole thing in memory.
- *
- * Does not close [downstream] — the enclosing producer owns its lifecycle.
- */
-private class RangeSlicingSink(
-    private val downstream: SuspendingSink,
-    skip: Long,
-    private val forward: Long,
-) : AbstractSuspendingSink() {
-    private var toSkip = skip
-    private var forwarded = 0L
-
-    /** Reused staging for the in-window slice of a write; splitting a buffer is segment relinking, not a copy. */
-    private val window = Buffer()
-
-    override suspend fun write(from: Buffer) {
-        checkWritable()
-        if (toSkip > 0L) {
-            val dropped = minOf(toSkip, from.size)
-            from.skip(dropped)
-            toSkip -= dropped
-        }
-        val allowed = if (forward == RANGE_UNTIL_END) from.size else minOf(from.size, forward - forwarded)
-        if (allowed > 0L) {
-            window.write(from, allowed)
-            forwarded += allowed
-            downstream.write(window)
-        }
-        from.clear() // past the window — discard the remainder
-    }
-
-    override suspend fun flush() {
-        checkWritable()
-        downstream.flush()
-    }
-
-    /** Downstream is caller-owned: slicing the stream must not end it. */
-    override fun release(cause: Throwable?) {}
-}
-
 /**
  * Represents a single range value requested by a `Range` header.
  *
@@ -179,7 +133,7 @@ public suspend fun TypedData.getRange(range: HttpRange, dataSize: Long): TypedDa
         mediaType = mediaType,
         data = when (data) {
             is Data.Bytes, is Data.Text -> Data.Bytes(data.bytes().sliceArray(range))
-            is Data.Sink, is Data.Source, is Data.Suspending, is Data.SuspendingProducer -> {
+            is Data.Sink, is Data.Source, is Data.SuspendingSource, is Data.SuspendingSink -> {
                 // Stream the requested window through instead of buffering the whole body into the heap: pipe the
                 // source into a slicing sink that drops everything before the range and forwards only the window.
                 // (This still *reads* through the whole upstream — post-hoc slicing can't seek — but heap stays flat,
@@ -189,7 +143,7 @@ public suspend fun TypedData.getRange(range: HttpRange, dataSize: Long): TypedDa
                     is HttpRange.Last, is HttpRange.UntilEnd -> RANGE_UNTIL_END
                 }
                 val start = range.rangeStart(dataSize)
-                Data.SuspendingProducer(size = bytesToForward.takeIf { it != RANGE_UNTIL_END }) { out ->
+                Data.SuspendingSink(size = bytesToForward.takeIf { it != RANGE_UNTIL_END }) { out ->
                     data.writeTo(RangeSlicingSink(out, skip = start, forward = bytesToForward))
                 }
             }
@@ -228,6 +182,7 @@ public suspend fun TypedData.getRanges(
         Data.Bytes(buffer.readByteArray())
     } else {
         // TODO: I'm sure if I were smarter I could do something better here for suspension, but I have no idea what that is.
+        //      I'll do it, but right now it's not very important. This will work for now.
         val opened = data.source()  // use source if possible
         Data.Sink { sink ->
             opened.use { source ->
@@ -261,4 +216,51 @@ public suspend fun TypedData.getRanges(
     )
 }
 
+
 private const val LINE_FEED = "\r\n"
+
+/** Sentinel for [RangeSlicingSink.forward] meaning "forward everything after the skip, to end of stream". */
+private const val RANGE_UNTIL_END: Long = -1L
+
+/**
+ * A [SuspendingSink] that slices a passing byte stream: it discards the first [skip] bytes, forwards the next
+ * [forward] bytes to [downstream] (or all remaining bytes if [forward] is [RANGE_UNTIL_END]), and discards anything
+ * past that. Lets a range be served straight from a streaming body without buffering the whole thing in memory.
+ *
+ * Does not close [downstream] — the enclosing producer owns its lifecycle.
+ */
+private class RangeSlicingSink(
+    private val downstream: SuspendingSink,
+    skip: Long,
+    private val forward: Long,
+) : AbstractSuspendingSink() {
+    private var toSkip = skip
+    private var forwarded = 0L
+
+    /** Reused staging for the in-window slice of a write; splitting a buffer is segment relinking, not a copy. */
+    private val window = Buffer()
+
+    override suspend fun write(from: Buffer) {
+        checkWritable()
+        if (toSkip > 0L) {
+            val dropped = minOf(toSkip, from.size)
+            from.skip(dropped)
+            toSkip -= dropped
+        }
+        val allowed = if (forward == RANGE_UNTIL_END) from.size else minOf(from.size, forward - forwarded)
+        if (allowed > 0L) {
+            window.write(from, allowed)
+            forwarded += allowed
+            downstream.write(window)
+        }
+        from.clear() // past the window — discard the remainder
+    }
+
+    override suspend fun flush() {
+        checkWritable()
+        downstream.flush()
+    }
+
+    /** Downstream is caller-owned: slicing the stream must not end it. */
+    override fun release(cause: Throwable?) {}
+}

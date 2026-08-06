@@ -175,7 +175,7 @@ public class KtorEngine(
                                     channel.asSink().buffered().use { sink -> body.source.use { sink.transferFrom(it) } }
                                 }
                             }
-                            is Data.Suspending, is Data.SuspendingProducer -> call.respondBytesWriter(contentType = type, status = code) {
+                            is Data.SuspendingSource, is Data.SuspendingSink -> call.respondBytesWriter(contentType = type, status = code) {
                                 // Fully cooperative: stream the body into the ByteWriteChannel via a SuspendingSink so
                                 // response writes suspend for backpressure instead of blocking the event loop.
                                 // use() is what turns a mid-body failure into a cancelled channel — without it the

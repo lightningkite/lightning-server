@@ -83,7 +83,7 @@ object TestServerBuilder : ServerBuilder() {
         )
     }
 
-    // GET /suspendingsource — exercises the cooperative Data.Suspending response branch in KtorEngine
+    // GET /suspendingsource — exercises the cooperative Data.SuspendingSource response branch in KtorEngine
     val suspendingSource = path.path("suspendingsource").get bind HttpHandler<PathSpec0> {
         val content = "suspending-content"
         HttpResponse(

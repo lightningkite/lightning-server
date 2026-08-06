@@ -129,7 +129,7 @@ class GzipInterceptorTest {
     @Test
     fun `producer gzip round-trips a multi-block stream`() = runBlocking {
         val original = payload.toByteArray()
-        val producer = Data.SuspendingProducer { sink ->
+        val producer = Data.SuspendingSink { sink ->
             chunksOf(payload, 700).forEach { sink.write(Buffer().also { b -> b.write(it) }) }
         }
 
@@ -144,7 +144,7 @@ class GzipInterceptorTest {
     @Test
     fun `producer gzip honors explicit flushes without breaking the stream`() = runBlocking {
         val original = payload.toByteArray()
-        val producer = Data.SuspendingProducer { sink ->
+        val producer = Data.SuspendingSink { sink ->
             chunksOf(payload, 700).forEach {
                 sink.write(Buffer().also { b -> b.write(it) })
                 sink.flush()
@@ -160,7 +160,7 @@ class GzipInterceptorTest {
     @Test
     fun `producer gzip round-trips an empty stream`() = runBlocking {
         val out = BufferSuspendingSink()
-        Data.SuspendingProducer { }.gzip().writeTo(out)
+        Data.SuspendingSink { }.gzip().writeTo(out)
 
         assertContentEquals(ByteArray(0), out.buffer.readByteArray().ungzip())
     }
@@ -168,7 +168,7 @@ class GzipInterceptorTest {
     @Test
     fun `producer gzip reports a failing producer downstream without appending a trailer`() = runBlocking {
         val cause = IllegalStateException("producer blew up")
-        val producer = Data.SuspendingProducer { sink ->
+        val producer = Data.SuspendingSink { sink ->
             sink.write(Buffer().also { it.write(payload.toByteArray()) })
             sink.cancel(cause)
         }
@@ -221,7 +221,7 @@ class GzipInterceptorTest {
             val endpoint = path.path("stream").get bind HttpHandler {
                 HttpResponse(
                     body = TypedData(
-                        Data.Suspending(Buffer().also { it.write(payload.toByteArray()) }.asSuspendingSource()),
+                        Data.SuspendingSource(Buffer().also { it.write(payload.toByteArray()) }.asSuspendingSource()),
                         MediaType.Text.Plain
                     ),
                     headers = HttpHeaders { add(HttpHeader.ContentLength, payload.length.toString()) }
@@ -250,7 +250,7 @@ class GzipInterceptorTest {
             val endpoint = path.path("produce").get bind HttpHandler {
                 HttpResponse(
                     body = TypedData(
-                        Data.SuspendingProducer { sink ->
+                        Data.SuspendingSink { sink ->
                             payload.toByteArray().toList().chunked(700).forEach {
                                 sink.write(Buffer().also { b -> b.write(it.toByteArray()) })
                             }

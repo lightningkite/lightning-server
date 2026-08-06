@@ -243,7 +243,7 @@ private suspend fun HttpExchange.write(response: HttpResponse) {
             this.responseBody.asSink().buffered().use { sink -> b.source.transferTo(sink) }
         }
 
-        is Data.Suspending, is Data.SuspendingProducer -> {
+        is Data.SuspendingSource, is Data.SuspendingSink -> {
             sendResponseHeaders(status, b.size ?: 0)
             this.responseBody.asSink().buffered().use { sink -> b.write(sink) }
         }

@@ -16,7 +16,7 @@ import com.lightningkite.services.files.*
  *
  * Endpoints:
  * - HEAD any: Returns metadata (Content-Type, Content-Length) for a file without a body.
- * - GET any: Streams the file bytes. Range requests are not yet supported.
+ * - GET any: Streams the file bytes.
  * - PUT any: Uploads/overwrites a file, only supported when the runtime file system is KotlinxIoExternalFileSystem.
  */
 public class FileSystemEndpoints(

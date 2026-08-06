@@ -9,10 +9,13 @@ import com.lightningkite.lightningserver.runtime.gzip
 import com.lightningkite.services.data.AbstractSuspendingSink
 import com.lightningkite.services.data.AbstractSuspendingSource
 import com.lightningkite.services.data.Data
+import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.SuspendingSink
 import com.lightningkite.services.data.SuspendingSource
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.data.use
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.io.Buffer
 import kotlinx.io.asOutputStream
 import kotlinx.io.asSink
@@ -50,9 +53,7 @@ public class GzipInterceptor: HttpInterceptor {
         // Content-Type denylist (skip already-compressed types)
         if (body.mediaType.type in setOf("image", "audio", "video") ||
             (body.mediaType.type == "application" &&
-                    body.mediaType.subtype in
-                    setOf("zip", "gzip", "x-gzip", "x-7z-compressed", "x-bzip2", "x-tar", "pdf")
-                    ) ||
+                    body.mediaType.subtype in setOf("zip", "gzip", "x-gzip", "x-7z-compressed", "x-bzip2", "x-tar", "pdf")) ||
             (body.mediaType.type == "font" && body.mediaType.subtype in setOf("woff", "woff2"))
         ) return result
 
@@ -71,13 +72,13 @@ public class GzipInterceptor: HttpInterceptor {
         val (newData, compressed) = when (val data = body.data) {
             // Push producer / blocking source: drive the plaintext straight into GZIP with no buffering, so a
             // large streamed response (e.g. an octet-stream/CSV/JSON download) is never materialized in heap.
-            is Data.Sink -> gzipStream { data.emit(it) } to true
+            is Data.Sink -> gzipStream(data.emit) to true
             is Data.Source -> gzipStream { sink -> data.source.use { sink.transferFrom(it) } } to true
 
             // Cooperative streams compress incrementally too. Deflating writes into an in-memory buffer and never
             // blocks, so there is nothing to offload and no reason to materialize the body first.
-            is Data.Suspending -> Data.Suspending(data.source.gzip()) to true
-            is Data.SuspendingProducer -> data.gzip() to true
+            is Data.SuspendingSource -> Data.SuspendingSource(data.source.gzip()) to true
+            is Data.SuspendingSink -> Data.SuspendingSink { it.gzip().use(data.emit) } to true
 
             else -> {
                 // 1024 Grey area. It likely will compress fine, but if not send the original
@@ -122,7 +123,7 @@ internal fun SuspendingSource.gzip(): SuspendingSource {
     val gzip = GZIPOutputStream(BufferOutputStream(compressed))
     var finished = false
     return object : AbstractSuspendingSource() {
-        override suspend fun fill(into: Buffer): Long {
+        override suspend fun fill(into: Buffer): Long = withContext(Dispatchers.IO) {
             // Pull plaintext until deflate spills something, or the upstream ends and the trailer has been written.
             while (compressed.exhausted() && !finished) {
                 if (upstream.read(staging) < 0L) {
@@ -136,7 +137,7 @@ internal fun SuspendingSource.gzip(): SuspendingSource {
                     gzip.flush()
                 }
             }
-            return if (compressed.exhausted()) -1L else compressed.transferTo(into)
+            if (compressed.exhausted()) -1L else compressed.transferTo(into)
         }
 
         override fun release(cause: Throwable?) {
@@ -147,46 +148,48 @@ internal fun SuspendingSource.gzip(): SuspendingSource {
 }
 
 /**
- * Wraps this producer so the bytes it emits are GZIP-compressed on the way to the consumer's sink.
+ * Wraps this sink so plaintext written to the returned sink is GZIP-compressed before reaching this sink.
  *
- * The plaintext is never materialized; each write is deflated and forwarded. Explicit [SuspendingSink.flush] calls
- * become sync-flush points, so trickling streams stay responsive while bulk streams keep a full compression ratio.
+ * Each write is deflated and forwarded incrementally. Explicit [SuspendingSink.flush] calls become sync-flush points,
+ * so trickling streams stay responsive while bulk streams keep a full compression ratio. Blocking deflate operations
+ * are dispatched to [Dispatchers.IO] so the caller's coroutine context is never blocked.
  */
-internal fun Data.SuspendingProducer.gzip(): Data.SuspendingProducer {
-    val emitPlain = this.emit
-    return Data.SuspendingProducer(null) { out ->
-        val compressed = Buffer()
-        val chunk = ByteArray(COPY_CHUNK)
-        val gzip = GZIPOutputStream(BufferOutputStream(compressed))
-        // This wrapper is ours, not the caller's, so its lifecycle can carry the gzip trailer: use() finishes it on
-        // success and cancels it on failure. `out`, by contrast, belongs to whoever consumes the producer — we only
-        // ever cancel it, to tell them the compressed stream is short.
-        object : AbstractSuspendingSink() {
-            override suspend fun write(from: Buffer) {
-                checkWritable()
+internal fun SuspendingSink.gzip(): SuspendingSink {
+    val out = this
+    val compressed = Buffer()
+    val chunk = ByteArray(COPY_CHUNK)
+    val gzip = GZIPOutputStream(BufferOutputStream(compressed))
+    return object : AbstractSuspendingSink() {
+        override suspend fun write(from: Buffer) {
+            checkWritable()
+            withContext(Dispatchers.IO) {
                 gzip.writeFrom(from, from.size, chunk)
-                // Forward only what deflate has already spilled on its own; forcing a flush here would wreck the
-                // ratio for producers that write in small pieces.
-                out.write(compressed)
             }
+            // Forward only what deflate has already spilled on its own; forcing a flush here would wreck the
+            // ratio for producers that write in small pieces.
+            out.write(compressed)
+        }
 
-            override suspend fun flush() {
-                checkWritable()
+        override suspend fun flush() {
+            checkWritable()
+            withContext(Dispatchers.IO) {
                 gzip.flush()
-                out.write(compressed)
-                out.flush()
             }
+            out.write(compressed)
+            out.flush()
+        }
 
-            override suspend fun finish() {
+        override suspend fun finish() {
+            withContext(Dispatchers.IO) {
                 gzip.finish() // final deflate block plus the CRC32/ISIZE trailer
-                out.write(compressed)
             }
+            out.write(compressed)
+        }
 
-            override fun release(cause: Throwable?) {
-                gzip.close() // releases the Deflater's native buffer; any trailer it writes here is discarded
-                cause?.let { out.cancel(it) }
-            }
-        }.use { emitPlain(it) }
+        override fun release(cause: Throwable?) {
+            gzip.close() // releases the Deflater's native buffer; any trailer it writes here is discarded
+            cause?.let { out.cancel(it) }
+        }
     }
 }
 

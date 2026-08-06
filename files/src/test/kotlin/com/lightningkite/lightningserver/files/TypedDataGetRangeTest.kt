@@ -103,8 +103,8 @@ class TypedDataGetRangeTest {
         // A range over a streaming source must stay streaming (not be materialized to Bytes) so large media served
         // from a Source is sliced without buffering the whole payload in the heap.
         val ranged = typedSource().getRange(HttpRange.Bounded(0, 1), size)
-        assert(ranged.data is Data.SuspendingProducer) {
-            "Expected ranged source to stream via Data.SuspendingProducer, got ${ranged.data::class}"
+        assert(ranged.data is Data.SuspendingSink) {
+            "Expected ranged source to stream via Data.SuspendingSink, got ${ranged.data::class}"
         }
     }
 
@@ -132,8 +132,8 @@ class TypedDataGetRangeTest {
     @Test
     fun sink_range_stays_streaming(): Unit = runBlocking {
         val ranged = typedSink().getRange(HttpRange.UntilEnd(0), size)
-        assert(ranged.data is Data.SuspendingProducer) {
-            "Expected ranged sink to stream via Data.SuspendingProducer, got ${ranged.data::class}"
+        assert(ranged.data is Data.SuspendingSink) {
+            "Expected ranged sink to stream via Data.SuspendingSink, got ${ranged.data::class}"
         }
     }
 

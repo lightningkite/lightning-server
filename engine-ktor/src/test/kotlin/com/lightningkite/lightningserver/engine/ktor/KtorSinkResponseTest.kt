@@ -93,7 +93,7 @@ class KtorSinkResponseTest {
 
     @Test
     fun suspending_source_response_streams_full_content() = runTest {
-        // Cooperative Data.Suspending response branch: streamed via KtorChannelSuspendingSink (fully non-blocking).
+        // Cooperative Data.SuspendingSource response branch: streamed via KtorChannelSuspendingSink (fully non-blocking).
         withEngine {
             val response = client.get("/suspendingsource")
             assertEquals(HttpStatusCode.OK, response.status)
