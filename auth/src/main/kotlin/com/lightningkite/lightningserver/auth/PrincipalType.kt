@@ -204,15 +204,8 @@ public interface PrincipalType<SUBJECT : HasId<ID>, ID : Comparable<ID>> {
  *    )
  *    ```
  *
- * 2. The subjectCacheKey has hard-coded expiration (5 minutes) and localOnly (true).
- *    Consider making these configurable per principal type for different use cases.
- *
  * 3. The hasProperty and getProperty methods use reflection-like behavior through serialization.
  *    For performance-critical paths, consider adding a compile-time code generation approach.
- *
- * 4. The permitMasquerade logic defaults to false (secure by default - good!), but users might
- *    not realize they need to override it. Consider adding a logging statement when masquerade
- *    is attempted but not permitted.
  *
  * 5. The precache list could benefit from a way to conditionally include keys based on scopes or
  *    other authentication properties to avoid loading unnecessary data.
