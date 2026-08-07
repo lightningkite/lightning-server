@@ -7,11 +7,13 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.services.cache.Cache
+import com.lightningkite.services.email.Email
+import com.lightningkite.services.email.EmailAddressWithName
+import com.lightningkite.services.email.EmailService
 import kotlinx.coroutines.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import kotlin.random.Random
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.Uuid
 
@@ -19,8 +21,7 @@ import kotlin.uuid.Uuid
  * TaskExamplesEndpoints - Demonstrates background task and scheduled job patterns.
  *
  * These examples showcase:
- * - Background task execution
- * - Task queuing and async processing
+ * - Background task execution, actually queued via [Task.launch] rather than run inline
  * - Scheduled/periodic jobs
  * - Long-running operations
  * - Task status tracking
@@ -28,28 +29,28 @@ import kotlin.uuid.Uuid
  */
 class TaskExamplesEndpoints(
     private val cache: Runtime<Cache>,
+    private val email: Runtime<EmailService>,
 ) : ServerBuilder() {
 
     /**
      * Background task for sending emails.
-     * Demonstrates: Task definition with typed input
+     * Demonstrates: Task definition with typed input, wired to the real EmailService.
      */
     val sendEmailTask = path.path("tasks").path("send-email") bind Task { input: SendEmailTaskInput ->
         val taskId = Uuid.random()
-        println("[$taskId] Starting email send task for ${input.to}")
-
-        // Store task status in cache
         cache().set("task:$taskId:status", "processing", String.serializer(), 1.minutes)
 
         try {
-            // Simulate email sending
-            delay(2000)
-
-            println("[$taskId] Email sent successfully to ${input.to}")
+            email().send(
+                Email(
+                    subject = input.subject,
+                    to = listOf(EmailAddressWithName(input.to)),
+                    plainText = input.body,
+                )
+            )
             cache().set("task:$taskId:status", "completed", String.serializer(), 1.minutes)
             cache().set("task:$taskId:result", "Email sent successfully", String.serializer(), 1.minutes)
         } catch (e: Exception) {
-            println("[$taskId] Email send failed: ${e.message}")
             cache().set("task:$taskId:status", "failed", String.serializer(), 1.minutes)
             cache().set("task:$taskId:error", e.message ?: "Unknown error", String.serializer(), 1.minutes)
         }
@@ -61,23 +62,17 @@ class TaskExamplesEndpoints(
      */
     val processDataTask = path.path("tasks").path("process-data") bind Task { input: ProcessDataTaskInput ->
         val taskId = Uuid.random()
-        println("[$taskId] Starting data processing task for ${input.items.size} items")
 
         var processed = 0
-        input.items.forEach { item ->
+        input.items.forEach { _ ->
             delay(100) // Simulate processing
             processed++
 
             // Update progress in cache
             val progress = (processed.toDouble() / input.items.size * 100).toInt()
             cache().set("task:$taskId:progress", progress, Int.serializer(), 5.minutes)
-
-            if (processed % 10 == 0) {
-                println("[$taskId] Progress: $progress%")
-            }
         }
 
-        println("[$taskId] Data processing completed: $processed items")
         cache().set("task:$taskId:status", "completed", String.serializer(), 5.minutes)
         cache().set("task:$taskId:result", "Processed $processed items", String.serializer(), 5.minutes)
     }
@@ -86,7 +81,10 @@ class TaskExamplesEndpoints(
      * POST /tasks/enqueue-email
      *
      * Enqueue an email sending task.
-     * Demonstrates: Triggering background tasks from HTTP endpoints
+     * Demonstrates: Triggering background tasks from HTTP endpoints via [Task.launch], which
+     * queues the task on engines that support queuing rather than running it inline in the
+     * request (that's what [Task.executeInline] is for - direct synchronous invocation, not the
+     * "background task" story this endpoint is meant to show).
      */
     val enqueueEmailTask = path.path("tasks").path("enqueue-email").post bind ApiHttpHandler(
         summary = "Enqueue an email sending task",
@@ -94,8 +92,7 @@ class TaskExamplesEndpoints(
         auth = noAuth,
         successCode = HttpStatus.Accepted,
         implementation = { input: SendEmailTaskInput ->
-            // Invoke the task asynchronously
-            sendEmailTask.executeInline(input)
+            sendEmailTask.launch(input)
 
             TaskEnqueuedResponse(
                 message = "Email task enqueued successfully",
@@ -116,7 +113,7 @@ class TaskExamplesEndpoints(
         auth = noAuth,
         successCode = HttpStatus.Accepted,
         implementation = { input: ProcessDataTaskInput ->
-            processDataTask.executeInline(input)
+            processDataTask.launch(input)
 
             TaskEnqueuedResponse(
                 message = "Data processing task enqueued successfully",
@@ -131,15 +128,10 @@ class TaskExamplesEndpoints(
      * Demonstrates: Periodic background jobs
      */
     val cleanupScheduledTask = path.path("tasks").path("scheduled-cleanup") bind ScheduledTask(frequency = 5.minutes) {
-        println("Running scheduled cleanup task...")
-
-        // Simulate cleanup work
         delay(1000)
 
         val cleaned = Random.nextInt(1, 100)
-        println("Cleanup completed: removed $cleaned old entries")
 
-        // Update metrics in cache
         cache().set("cleanup:last-run", System.currentTimeMillis(), Long.serializer(), 1.minutes)
         cache().set("cleanup:last-count", cleaned, Int.serializer(), 1.minutes)
     }
@@ -157,9 +149,6 @@ class TaskExamplesEndpoints(
 
     val healthCheckScheduledTask =
         path.path("tasks").path("scheduled-health-check") bind ScheduledTask(frequency = 1.minutes) {
-            println("Running health check...")
-
-            // Simulate health check
             delay(500)
 
             val status = HealthStatus(
@@ -169,26 +158,28 @@ class TaskExamplesEndpoints(
             )
 
             cache().set("health:status", status, HealthStatus.serializer(), 2.minutes)
-            println("Health check completed: ${status.status}")
         }
+
+    /**
+     * Background task used by [triggerBackgroundTask] below to demonstrate launching a task
+     * with no other input than a generated id.
+     */
+    val demoBackgroundTask = path.path("tasks").path("demo-background") bind Task { taskNumber: Int ->
+        delay(300)
+        cache().set("task:$taskNumber:result", "Completed", String.serializer(), 1.minutes)
+    }
 
     /**
      * GET /tasks/demo/trigger-background
      *
-     * Demonstrates triggering a simple background task.
+     * Demonstrates triggering a background task the same way [enqueueEmailTask] does - via
+     * [Task.launch] - rather than `GlobalScope.launch`, which detaches the coroutine from the
+     * server's lifecycle (no structured cancellation, no queuing on engines that support it, and
+     * a leaked coroutine if the endpoint is hit repeatedly).
      */
-    @OptIn(DelicateCoroutinesApi::class)
     val triggerBackgroundTask = path.path("tasks").path("demo").path("trigger-background").get bind HttpHandler {
-        // Create and invoke a simple background task
         val taskNumber = Random.nextInt(1, 1000)
-
-        // Simulate background work
-        GlobalScope.launch {
-            delay(3000.milliseconds)
-            println("Background task $taskNumber completed!")
-            cache().set("task:$taskNumber:result", "Completed", String.serializer(), 1.minutes)
-        }
-
+        demoBackgroundTask.launch(taskNumber)
         HttpResponse.plainText("Background task #$taskNumber started!")
     }
 

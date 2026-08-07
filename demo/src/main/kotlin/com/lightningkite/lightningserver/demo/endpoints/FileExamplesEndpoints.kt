@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.demo.endpoints
 
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.LSError
+import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -9,68 +10,60 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.arg1
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.route
-import com.lightningkite.services.database.Database
+import com.lightningkite.services.data.MediaType
+import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.files.ExternalFileSystem
-import com.lightningkite.services.files.ServerFile
 import kotlinx.serialization.Serializable
+import kotlin.io.encoding.Base64
 
 /**
- * FileExamplesEndpoints - Demonstrates file handling operations.
+ * FileExamplesEndpoints - Demonstrates file storage operations directly against
+ * [ExternalFileSystem]: writing bytes, reading them back, generating signed URLs, and deleting.
  *
- * These examples showcase:
- * - File uploads (early and late binding)
- * - File downloads
- * - Signed URLs for temporary access
- * - File metadata and storage
- * - Integration with different storage backends (S3, local, etc.)
+ * This is the low-level counterpart to [Server.uploadEarly] (`UploadEarlyEndpoint`), which
+ * demonstrates the early-binding client-upload flow instead. Every operation here touches real
+ * storage - nothing is fabricated - so [getFileInfo], [getSignedUrl], and [deleteFile] genuinely
+ * 404 when the file doesn't exist, rather than always succeeding on a made-up path.
  */
 class FileExamplesEndpoints(
     private val files: Runtime<ExternalFileSystem>,
-    private val database: Runtime<Database>,
 ) : ServerBuilder() {
 
     /**
      * POST /files/upload
-     * 
-     * Upload a file and store it in the file system.
-     * Demonstrates: File upload, ServerFile handling, file metadata
+     *
+     * Writes [UploadFileRequest.content] as a real text file at uploads/{fileName} and returns
+     * a genuine signed URL for it.
      */
     val uploadFile = path.path("files").path("upload").post bind ApiHttpHandler(
         summary = "Upload a file",
-        description = "Uploads a file to the server and returns file information including a signed URL",
+        description = "Writes the given text content to storage and returns a signed URL for it",
         auth = noAuth,
         errorCases = listOf(
-            LSError(http = 400, detail = "no-file", message = "No file provided in request")
+            LSError(http = 400, detail = "no-file", message = "File name is required")
         ),
         successCode = HttpStatus.Created,
         implementation = { input: UploadFileRequest ->
-            // In a real implementation, you would extract the file from the request body
-            // For this example, we'll simulate file upload
             if (input.fileName.isBlank()) {
                 throw BadRequestException("File name is required")
             }
 
-            // Create a ServerFile reference
-            // In practice, this would be created from the actual uploaded file
-            val serverFile = ServerFile(
-                location = "uploads/${input.fileName}"
-            )
+            val file = files().root.then("uploads", input.fileName)
+            val data = TypedData.text(input.content, MediaType.Text.Plain)
+            file.put(data)
 
-            val fileSystem = files.await()
             UploadFileResponse(
-                file = serverFile,
-                signedUrl = fileSystem.root.then(serverFile.location).signedUrl,
+                signedUrl = file.signedUrl,
                 fileName = input.fileName,
-                fileSize = input.fileSize
+                fileSize = input.content.encodeToByteArray().size.toLong(),
             )
         }
     )
 
     /**
      * GET /files/{path}/info
-     * 
-     * Get information about a file.
-     * Demonstrates: File metadata retrieval
+     *
+     * Reads real metadata (media type, size, last modified) for a stored file via `head()`.
      */
     val getFileInfo = path.path("files").arg<String>("path").path("info").get bind ApiHttpHandler(
         summary = "Get file information",
@@ -82,22 +75,22 @@ class FileExamplesEndpoints(
         successCode = HttpStatus.OK,
         implementation = { _: Unit ->
             val filePath = route.arg1
-            val fileSystem = files.await()
-            val fileRef = fileSystem.root.then(filePath)
+            val file = files().root.then("uploads", filePath)
+            val info = file.head() ?: throw NotFoundException("File not found")
 
             FileInfoResponse(
                 path = filePath,
-                signedUrl = fileRef.signedUrl,
-                expiresIn = "24 hours"
+                mediaType = info.type.toString(),
+                sizeBytes = info.size.bytes,
+                signedUrl = file.signedUrl,
             )
         }
     )
 
     /**
      * GET /files/{path}/signed-url
-     * 
-     * Generate a signed URL for temporary file access.
-     * Demonstrates: Signed URL generation with expiration
+     *
+     * Generates a signed URL for temporary access, after confirming the file actually exists.
      */
     val getSignedUrl = path.path("files").arg<String>("path").path("signed-url").get bind ApiHttpHandler(
         summary = "Generate a signed URL for file access",
@@ -109,22 +102,20 @@ class FileExamplesEndpoints(
         successCode = HttpStatus.OK,
         implementation = { _: Unit ->
             val filePath = route.arg1
-            val fileSystem = files.await()
-            val fileRef = fileSystem.root.then(filePath)
+            val file = files().root.then("uploads", filePath)
+            if (file.head() == null) throw NotFoundException("File not found")
 
             SignedUrlResponse(
-                url = fileRef.signedUrl,
-                expiresIn = "24 hours",
-                path = filePath
+                url = file.signedUrl,
+                path = filePath,
             )
         }
     )
 
     /**
      * DELETE /files/{path}
-     * 
-     * Delete a file from storage.
-     * Demonstrates: File deletion
+     *
+     * Deletes a file from storage, after confirming it exists.
      */
     val deleteFile = path.path("files").arg<String>("path").delete bind ApiHttpHandler<_, Nothing?, Unit, Unit>(
         summary = "Delete a file",
@@ -136,23 +127,21 @@ class FileExamplesEndpoints(
         successCode = HttpStatus.NoContent,
         implementation = { _: Unit ->
             val filePath = route.arg1
-            val fileSystem = files.await()
-            val fileRef = fileSystem.root.then(filePath)
-
-            // Delete the file
-            fileRef.delete()
+            val file = files().root.then("uploads", filePath)
+            if (file.head() == null) throw NotFoundException("File not found")
+            file.delete()
         }
     )
 
     /**
      * POST /files/upload-image
-     * 
-     * Upload an image with validation.
-     * Demonstrates: File type validation, image-specific handling
+     *
+     * Uploads a base64-encoded image with type/size validation, storing real bytes at
+     * images/{fileName}.
      */
     val uploadImage = path.path("files").path("upload-image").post bind ApiHttpHandler(
         summary = "Upload an image file",
-        description = "Uploads an image file with validation for image types (JPEG, PNG, GIF, WebP)",
+        description = "Uploads a base64-encoded image with validation for image types (JPEG, PNG, GIF, WebP)",
         auth = noAuth,
         errorCases = listOf(
             LSError(http = 400, detail = "invalid-type", message = "File must be an image (JPEG, PNG, GIF, or WebP)"),
@@ -160,31 +149,24 @@ class FileExamplesEndpoints(
         ),
         successCode = HttpStatus.Created,
         implementation = { input: UploadImageRequest ->
-            // Validate file type
             val allowedTypes = listOf("image/jpeg", "image/png", "image/gif", "image/webp")
             if (input.mimeType !in allowedTypes) {
-                throw BadRequestException(
-                    "File must be an image (JPEG, PNG, GIF, or WebP)"
-                )
+                throw BadRequestException("File must be an image (JPEG, PNG, GIF, or WebP)")
             }
 
-            // Validate file size (10MB limit)
-            val maxSize = 10 * 1024 * 1024L
-            if (input.fileSize > maxSize) {
-                throw BadRequestException(
-                    "Image file size exceeds maximum allowed size"
-                )
+            val bytes = Base64.decode(input.contentBase64)
+
+            val maxSize = 10 * 1024 * 1024
+            if (bytes.size > maxSize) {
+                throw BadRequestException("Image file size exceeds maximum allowed size")
             }
 
-            val serverFile = ServerFile(
-                location = "images/${input.fileName}"
-            )
+            val file = files().root.then("images", input.fileName)
+            file.put(TypedData.bytes(bytes, MediaType(input.mimeType)))
 
-            val fileSystem = files.await()
             UploadImageResponse(
-                file = serverFile,
-                signedUrl = fileSystem.root.then(serverFile.location).signedUrl,
-                thumbnailUrl = fileSystem.root.then("thumbnails/${input.fileName}").signedUrl
+                signedUrl = file.signedUrl,
+                fileSize = bytes.size.toLong(),
             )
         }
     )
@@ -195,12 +177,11 @@ class FileExamplesEndpoints(
 @Serializable
 data class UploadFileRequest(
     val fileName: String,
-    val fileSize: Long = 0,
+    val content: String,
 )
 
 @Serializable
 data class UploadFileResponse(
-    val file: ServerFile,
     val signedUrl: String,
     val fileName: String,
     val fileSize: Long,
@@ -209,27 +190,26 @@ data class UploadFileResponse(
 @Serializable
 data class FileInfoResponse(
     val path: String,
+    val mediaType: String,
+    val sizeBytes: Long,
     val signedUrl: String,
-    val expiresIn: String,
 )
 
 @Serializable
 data class SignedUrlResponse(
     val url: String,
-    val expiresIn: String,
     val path: String,
 )
 
 @Serializable
 data class UploadImageRequest(
     val fileName: String,
-    val fileSize: Long,
+    val contentBase64: String,
     val mimeType: String,
 )
 
 @Serializable
 data class UploadImageResponse(
-    val file: ServerFile,
     val signedUrl: String,
-    val thumbnailUrl: String,
+    val fileSize: Long,
 )

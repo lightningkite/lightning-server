@@ -41,6 +41,7 @@ import com.lightningkite.services.email.ses.SesEmailInboundService
 import com.lightningkite.services.files.*
 import com.lightningkite.services.files.s3.*
 import com.lightningkite.services.http.*
+import com.lightningkite.services.notifications.NotificationService
 import com.lightningkite.services.phonecall.PhoneCallService
 import com.lightningkite.services.phonecall.twilio.TwilioPhoneCallService
 import com.lightningkite.services.pubsub.PubSub
@@ -79,6 +80,7 @@ object Server : ServerBuilder() {
     val cache = setting("cache", Cache.Settings())
     val cors = setting("cors", CorsSettings())
     val voiceAgent = setting("voiceAgent", VoiceAgentService.Settings())
+    val notifications = setting("notifications", NotificationService.Settings("test"))
     val pubsub = setting("pubSub", PubSub.Settings())
     val phoneCall = setting("phoneCall", PhoneCallService.Settings())
     val newSecret = setting("someSecret", "???", instructions = "This can be whatever you dream, you madman.")
@@ -167,9 +169,14 @@ object Server : ServerBuilder() {
         }
     )
 
-    val user = path.path("user") include object : ServerBuilder() {
-        val rest = path.path("rest") module ModelRestEndpoints(this@Server.userInfo)
+    // A named object rather than an anonymous `object : ServerBuilder() { ... }` - Kotlin widens a
+    // public property's type to its nearest supertype when the initializer is an anonymous object,
+    // so `user.rest` would be invisible from other files (e.g. tests) with the anonymous form.
+    object UserEndpoints : ServerBuilder() {
+        val rest = path.path("rest") module ModelRestEndpoints(Server.userInfo)
     }
+
+    val user = path.path("user") include UserEndpoints
     val uploadEarly = path.path("upload") module UploadEarlyEndpoint(files, database, Runtime.Constant(listOf()))
 
     /**
@@ -187,8 +194,12 @@ object Server : ServerBuilder() {
 
     /**
      * File Examples - File upload, download, and signed URLs.
+     *
+     * Mounted at root (not path.path("files")) because the endpoints below already declare
+     * their own "files" prefix - same convention as [basic] and [websocketExamples]. Mounting
+     * at "files" too would double it into /files/files/upload.
      */
-    val fileExamples = path.path("files") module FileExamplesEndpoints(files, database)
+    val fileExamples = path module FileExamplesEndpoints(files)
 
     /**
      * WebSocket Examples - Real-time communication patterns.
@@ -196,19 +207,34 @@ object Server : ServerBuilder() {
     val websocketExamples = path include WebSocketExamplesEndpoints
 
     /**
-     * Cache Examples - Caching patterns and operations.
+     * Cache Examples - Caching patterns and operations. Mounted at root; see [fileExamples].
      */
-    val cacheExamples = path.path("cache") module CacheExamplesEndpoints(cache)
+    val cacheExamples = path module CacheExamplesEndpoints(cache)
 
     /**
-     * Task Examples - Background tasks and scheduled jobs.
+     * Task Examples - Background tasks and scheduled jobs. Mounted at root; see [fileExamples].
      */
-    val taskExamples = path.path("tasks") module TaskExamplesEndpoints(cache)
+    val taskExamples = path module TaskExamplesEndpoints(cache, email)
 
     /**
      * JSON-RPC Examples - RPC-style API endpoints using JSON-RPC 2.0 protocol.
      */
     val jsonRpcExamples = path include JsonRpcExamplesEndpoints
+
+    /**
+     * Auth Examples - Reading the logged-in user inside a handler: required auth, optional
+     * auth, and a role check. Field-level masking via ModelPermissions.readMask is already
+     * demonstrated by [userInfo] / GET /user/rest/{id}.
+     */
+    val authExamples = path include AuthExamplesEndpoints
+
+    /**
+     * Service Examples - Drives the outbound services declared as settings but not otherwise
+     * exercised by any endpoint: email, SMS, phone calls, push notifications, and a plain
+     * settings-with-instructions value. Auth-gated since these cost real money against real
+     * implementations.
+     */
+    val serviceExamples = path include ServiceExamplesEndpoints
 
     val multiplex = path.path("multiplex") bind MultiplexWebSocketHandler()
 
@@ -264,10 +290,19 @@ object Server : ServerBuilder() {
         credentials = githubOauth,
         continueUiAuthUrl = { autosignIn.location.path.resolved().fullUrl() + "?proof=" + serverRuntime.externalSerialization.json.encodeToString(Proof.serializer(), it).encodeURLQueryComponent() + "&backend=" + generalSettings().publicUrl.encodeURLQueryComponent() }
     )
+    /**
+     * Continuation target for [proofOauth]: the OAuth provider redirects the browser here with a
+     * signed proof of the user's identity attached. Completes the login with that single proof and
+     * reports the outcome, rather than just parsing the proof and discarding it.
+     */
     val autosignIn = path.path("auth").path("autosignin").get bind HttpHandler {
-        telemetrySettings
-        val proof = it.queryParameters["proof"]!!.decodeURLQueryComponent().let { serverRuntime.externalSerialization.json.decodeFromString(Proof.serializer(), it) }
-        HttpResponse.plainText("OK")
+        val proof = it.queryParameters["proof"]!!.decodeURLQueryComponent()
+            .let { serverRuntime.externalSerialization.json.decodeFromString(Proof.serializer(), it) }
+        val result = subjects.login(it, listOf(proof))
+        HttpResponse.plainText(
+            result.refreshToken?.let { token -> "Logged in. Refresh token: $token" }
+                ?: "Proof accepted, but more authentication is needed (strength required: ${result.strengthRequired})."
+        )
     }
     val subjects = path.path("auth") module object : AuthEndpoints<User, Uuid>(
         principal = UserAuth,

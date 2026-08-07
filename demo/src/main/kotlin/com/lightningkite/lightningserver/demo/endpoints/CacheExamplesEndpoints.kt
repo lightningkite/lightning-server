@@ -145,7 +145,7 @@ class CacheExamplesEndpoints(
 
     /**
      * POST /cache/increment/{key}
-     * 
+     *
      * Demonstrates atomic increment operation.
      * Useful for counters, rate limiting, etc.
      */
@@ -157,16 +157,13 @@ class CacheExamplesEndpoints(
         implementation = { input: IncrementRequest ->
             val key = route.arg1
 
-            // Get current value or start at 0
-            val current = cache().get(key, Int.serializer()) ?: 0
-            val newValue = current + input.incrementBy
-
-            // Set new value with expiration
-            cache().set(key, newValue, Int.serializer(), input.expireSeconds?.seconds)
+            // Cache.add() is atomic (read-then-write is not: two concurrent requests would lose
+            // an increment). It returns the value *after* incrementing.
+            val newValue = cache().add(key, input.incrementBy, input.expireSeconds?.seconds)
 
             IncrementResponse(
                 key = key,
-                previousValue = current,
+                previousValue = newValue - input.incrementBy,
                 newValue = newValue,
                 incrementedBy = input.incrementBy
             )
@@ -203,32 +200,11 @@ class CacheExamplesEndpoints(
         }
     )
 
-    /**
-     * POST /cache/clear-pattern
-     * 
-     * Clear all cache entries matching a pattern.
-     * Demonstrates: Pattern-based cache invalidation
-     */
-    val clearPattern = path.path("cache").path("clear-pattern").post bind ApiHttpHandler(
-        summary = "Clear cache entries by pattern",
-        description = "Removes all cached values whose keys start with the specified prefix",
-        auth = noAuth,
-        successCode = HttpStatus.OK,
-        implementation = { input: ClearPatternRequest ->
-            // Note: This is a simplified example
-            // In production, you'd need backend-specific pattern matching
-            var cleared = 0
-
-            // For demonstration, we'll show the concept
-            // Actual implementation depends on cache backend capabilities
-
-            ClearPatternResponse(
-                pattern = input.prefix,
-                entriesCleared = cleared,
-                message = "Pattern-based clearing would happen here (backend-specific)"
-            )
-        }
-    )
+    // No pattern-based clear endpoint: the Cache interface has no `keys(pattern)` or
+    // `removePattern()` operation (see the TODO in Cache.kt), so there is no real, backend-agnostic
+    // way to implement one. A version of this endpoint that just returned entriesCleared = 0 without
+    // clearing anything used to live here; shipping an endpoint that lies about what it did is worse
+    // than not having it.
 }
 
 // Request/Response models
@@ -293,16 +269,4 @@ data class BatchSetRequest(
 data class BatchSetResponse(
     val success: Boolean,
     val entriesSet: Int,
-)
-
-@Serializable
-data class ClearPatternRequest(
-    val prefix: String,
-)
-
-@Serializable
-data class ClearPatternResponse(
-    val pattern: String,
-    val entriesCleared: Int,
-    val message: String,
 )

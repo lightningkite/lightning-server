@@ -1,7 +1,5 @@
 package com.lightningkite.lightningserver.demo
 
-import com.lightningkite.lightningserver.runtime.test.test
-import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
@@ -15,7 +13,7 @@ class TestModelTest {
 
     @Test
     fun testModelCreation() = runBlocking {
-        Server.test(settings = { database set Database.Settings("ram") }) {
+        TestHelper.testServer {
             val model = TestModel(
                 name = "Test Item",
                 number = 42,

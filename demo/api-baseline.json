@@ -87,6 +87,53 @@
                 "defaultCode": "Uuid.random()"
             }
         },
+        "com.lightningkite.lightningserver.demo.endpoints.AuthExamplesEndpoints.WhoAmIResponse": {
+            "serialName": "com.lightningkite.lightningserver.demo.endpoints.AuthExamplesEndpoints.WhoAmIResponse",
+            "annotations": [],
+            "fields": [
+                {
+                    "index": 0,
+                    "name": "id",
+                    "type": {
+                        "serialName": "kotlin.uuid.Uuid",
+                        "arguments": [],
+                        "isNullable": false
+                    },
+                    "optional": false,
+                    "annotations": [],
+                    "defaultJson": null,
+                    "defaultCode": null
+                },
+                {
+                    "index": 1,
+                    "name": "email",
+                    "type": {
+                        "serialName": "kotlin.String",
+                        "arguments": [],
+                        "isNullable": false
+                    },
+                    "optional": false,
+                    "annotations": [],
+                    "defaultJson": null,
+                    "defaultCode": null
+                },
+                {
+                    "index": 2,
+                    "name": "isSuperUser",
+                    "type": {
+                        "serialName": "kotlin.Boolean",
+                        "arguments": [],
+                        "isNullable": false
+                    },
+                    "optional": false,
+                    "annotations": [],
+                    "defaultJson": null,
+                    "defaultCode": null
+                }
+            ],
+            "parameters": [],
+            "idField": null
+        },
         "com.lightningkite.lightningserver.demo.endpoints.BatchSetRequest": {
             "serialName": "com.lightningkite.lightningserver.demo.endpoints.BatchSetRequest",
             "annotations": [],
@@ -276,74 +323,6 @@
             "parameters": [],
             "idField": null
         },
-        "com.lightningkite.lightningserver.demo.endpoints.ClearPatternRequest": {
-            "serialName": "com.lightningkite.lightningserver.demo.endpoints.ClearPatternRequest",
-            "annotations": [],
-            "fields": [
-                {
-                    "index": 0,
-                    "name": "prefix",
-                    "type": {
-                        "serialName": "kotlin.String",
-                        "arguments": [],
-                        "isNullable": false
-                    },
-                    "optional": false,
-                    "annotations": [],
-                    "defaultJson": null,
-                    "defaultCode": null
-                }
-            ],
-            "parameters": [],
-            "idField": null
-        },
-        "com.lightningkite.lightningserver.demo.endpoints.ClearPatternResponse": {
-            "serialName": "com.lightningkite.lightningserver.demo.endpoints.ClearPatternResponse",
-            "annotations": [],
-            "fields": [
-                {
-                    "index": 0,
-                    "name": "pattern",
-                    "type": {
-                        "serialName": "kotlin.String",
-                        "arguments": [],
-                        "isNullable": false
-                    },
-                    "optional": false,
-                    "annotations": [],
-                    "defaultJson": null,
-                    "defaultCode": null
-                },
-                {
-                    "index": 1,
-                    "name": "entriesCleared",
-                    "type": {
-                        "serialName": "kotlin.Int",
-                        "arguments": [],
-                        "isNullable": false
-                    },
-                    "optional": false,
-                    "annotations": [],
-                    "defaultJson": null,
-                    "defaultCode": null
-                },
-                {
-                    "index": 2,
-                    "name": "message",
-                    "type": {
-                        "serialName": "kotlin.String",
-                        "arguments": [],
-                        "isNullable": false
-                    },
-                    "optional": false,
-                    "annotations": [],
-                    "defaultJson": null,
-                    "defaultCode": null
-                }
-            ],
-            "parameters": [],
-            "idField": null
-        },
         "com.lightningkite.lightningserver.demo.endpoints.EmailValidationRequest": {
             "serialName": "com.lightningkite.lightningserver.demo.endpoints.EmailValidationRequest",
             "annotations": [],
@@ -491,7 +470,7 @@
                 },
                 {
                     "index": 1,
-                    "name": "signedUrl",
+                    "name": "mediaType",
                     "type": {
                         "serialName": "kotlin.String",
                         "arguments": [],
@@ -504,7 +483,20 @@
                 },
                 {
                     "index": 2,
-                    "name": "expiresIn",
+                    "name": "sizeBytes",
+                    "type": {
+                        "serialName": "kotlin.Long",
+                        "arguments": [],
+                        "isNullable": false
+                    },
+                    "optional": false,
+                    "annotations": [],
+                    "defaultJson": null,
+                    "defaultCode": null
+                },
+                {
+                    "index": 3,
+                    "name": "signedUrl",
                     "type": {
                         "serialName": "kotlin.String",
                         "arguments": [],
@@ -1152,19 +1144,6 @@
                 },
                 {
                     "index": 1,
-                    "name": "expiresIn",
-                    "type": {
-                        "serialName": "kotlin.String",
-                        "arguments": [],
-                        "isNullable": false
-                    },
-                    "optional": false,
-                    "annotations": [],
-                    "defaultJson": null,
-                    "defaultCode": null
-                },
-                {
-                    "index": 2,
                     "name": "path",
                     "type": {
                         "serialName": "kotlin.String",
@@ -1301,15 +1280,15 @@
                 },
                 {
                     "index": 1,
-                    "name": "fileSize",
+                    "name": "content",
                     "type": {
-                        "serialName": "kotlin.Long",
+                        "serialName": "kotlin.String",
                         "arguments": [],
                         "isNullable": false
                     },
                     "optional": false,
                     "annotations": [],
-                    "defaultJson": "0",
+                    "defaultJson": null,
                     "defaultCode": null
                 }
             ],
@@ -1322,19 +1301,6 @@
             "fields": [
                 {
                     "index": 0,
-                    "name": "file",
-                    "type": {
-                        "serialName": "com.lightningkite.services.files.ServerFile/DeferToContextualServerFileSerializer",
-                        "arguments": [],
-                        "isNullable": false
-                    },
-                    "optional": false,
-                    "annotations": [],
-                    "defaultJson": null,
-                    "defaultCode": null
-                },
-                {
-                    "index": 1,
                     "name": "signedUrl",
                     "type": {
                         "serialName": "kotlin.String",
@@ -1347,7 +1313,7 @@
                     "defaultCode": null
                 },
                 {
-                    "index": 2,
+                    "index": 1,
                     "name": "fileName",
                     "type": {
                         "serialName": "kotlin.String",
@@ -1360,7 +1326,7 @@
                     "defaultCode": null
                 },
                 {
-                    "index": 3,
+                    "index": 2,
                     "name": "fileSize",
                     "type": {
                         "serialName": "kotlin.Long",
@@ -1395,9 +1361,9 @@
                 },
                 {
                     "index": 1,
-                    "name": "fileSize",
+                    "name": "contentBase64",
                     "type": {
-                        "serialName": "kotlin.Long",
+                        "serialName": "kotlin.String",
                         "arguments": [],
                         "isNullable": false
                     },
@@ -1429,19 +1395,6 @@
             "fields": [
                 {
                     "index": 0,
-                    "name": "file",
-                    "type": {
-                        "serialName": "com.lightningkite.services.files.ServerFile/DeferToContextualServerFileSerializer",
-                        "arguments": [],
-                        "isNullable": false
-                    },
-                    "optional": false,
-                    "annotations": [],
-                    "defaultJson": null,
-                    "defaultCode": null
-                },
-                {
-                    "index": 1,
                     "name": "signedUrl",
                     "type": {
                         "serialName": "kotlin.String",
@@ -1454,10 +1407,10 @@
                     "defaultCode": null
                 },
                 {
-                    "index": 2,
-                    "name": "thumbnailUrl",
+                    "index": 1,
+                    "name": "fileSize",
                     "type": {
-                        "serialName": "kotlin.String",
+                        "serialName": "kotlin.Long",
                         "arguments": [],
                         "isNullable": false
                     },
@@ -1658,7 +1611,7 @@
                     "index": 5,
                     "name": "coverImage",
                     "type": {
-                        "serialName": "com.lightningkite.services.files.ServerFile/DeferToContextualServerFileSerializer",
+                        "serialName": "com.lightningkite.services.files.ServerFile",
                         "arguments": [],
                         "isNullable": true
                     },
@@ -2037,14 +1990,6 @@
                 {
                     "fqn": "com.lightningkite.services.data.IndexSet",
                     "values": {
-                        "unique": {
-                            "type": "com.lightningkite.services.database.SerializableAnnotationValue.StringValue",
-                            "value": "NotUnique"
-                        },
-                        "name": {
-                            "type": "com.lightningkite.services.database.SerializableAnnotationValue.StringValue",
-                            "value": ""
-                        },
                         "fields": {
                             "type": "com.lightningkite.services.database.SerializableAnnotationValue.ArrayValue",
                             "value": [
@@ -2065,6 +2010,14 @@
                                     "value": "disabledAt"
                                 }
                             ]
+                        },
+                        "unique": {
+                            "type": "com.lightningkite.services.database.SerializableAnnotationValue.StringValue",
+                            "value": "NotUnique"
+                        },
+                        "name": {
+                            "type": "com.lightningkite.services.database.SerializableAnnotationValue.StringValue",
+                            "value": ""
                         }
                     }
                 }
@@ -2281,14 +2234,6 @@
                 {
                     "fqn": "com.lightningkite.services.data.IndexSet",
                     "values": {
-                        "unique": {
-                            "type": "com.lightningkite.services.database.SerializableAnnotationValue.StringValue",
-                            "value": "NotUnique"
-                        },
-                        "name": {
-                            "type": "com.lightningkite.services.database.SerializableAnnotationValue.StringValue",
-                            "value": ""
-                        },
                         "fields": {
                             "type": "com.lightningkite.services.database.SerializableAnnotationValue.ArrayValue",
                             "value": [
@@ -2309,6 +2254,14 @@
                                     "value": "disabledAt"
                                 }
                             ]
+                        },
+                        "unique": {
+                            "type": "com.lightningkite.services.database.SerializableAnnotationValue.StringValue",
+                            "value": "NotUnique"
+                        },
+                        "name": {
+                            "type": "com.lightningkite.services.database.SerializableAnnotationValue.StringValue",
+                            "value": ""
                         }
                     }
                 }
@@ -2558,14 +2511,6 @@
                 {
                     "fqn": "com.lightningkite.services.data.IndexSet",
                     "values": {
-                        "unique": {
-                            "type": "com.lightningkite.services.database.SerializableAnnotationValue.StringValue",
-                            "value": "NotUnique"
-                        },
-                        "name": {
-                            "type": "com.lightningkite.services.database.SerializableAnnotationValue.StringValue",
-                            "value": ""
-                        },
                         "fields": {
                             "type": "com.lightningkite.services.database.SerializableAnnotationValue.ArrayValue",
                             "value": [
@@ -2586,6 +2531,14 @@
                                     "value": "stale"
                                 }
                             ]
+                        },
+                        "unique": {
+                            "type": "com.lightningkite.services.database.SerializableAnnotationValue.StringValue",
+                            "value": "NotUnique"
+                        },
+                        "name": {
+                            "type": "com.lightningkite.services.database.SerializableAnnotationValue.StringValue",
+                            "value": ""
                         }
                     }
                 }
@@ -2873,14 +2826,6 @@
                 {
                     "fqn": "com.lightningkite.services.data.IndexSet",
                     "values": {
-                        "unique": {
-                            "type": "com.lightningkite.services.database.SerializableAnnotationValue.StringValue",
-                            "value": "NotUnique"
-                        },
-                        "name": {
-                            "type": "com.lightningkite.services.database.SerializableAnnotationValue.StringValue",
-                            "value": ""
-                        },
                         "fields": {
                             "type": "com.lightningkite.services.database.SerializableAnnotationValue.ArrayValue",
                             "value": [
@@ -2901,6 +2846,14 @@
                                     "value": "disabledAt"
                                 }
                             ]
+                        },
+                        "unique": {
+                            "type": "com.lightningkite.services.database.SerializableAnnotationValue.StringValue",
+                            "value": "NotUnique"
+                        },
+                        "name": {
+                            "type": "com.lightningkite.services.database.SerializableAnnotationValue.StringValue",
+                            "value": ""
                         }
                     }
                 }
@@ -3791,13 +3744,13 @@
             "parameters": [],
             "idField": null
         },
-        "com.lightningkite.services.files.ServerFile/DeferToContextualServerFileSerializer": {
-            "serialName": "com.lightningkite.services.files.ServerFile/DeferToContextualServerFileSerializer",
+        "com.lightningkite.services.files.ServerFile": {
+            "serialName": "com.lightningkite.services.files.ServerFile",
             "annotations": [],
             "fields": [
                 {
                     "index": 0,
-                    "name": "contextual",
+                    "name": "value",
                     "type": {
                         "serialName": "kotlinx.serialization.ContextualSerializer<ServerFile>",
                         "arguments": [],
@@ -4027,6 +3980,72 @@
             },
             "output": {
                 "serialName": "com.lightningkite.lightningserver.demo.endpoints.EmailValidationResponse",
+                "arguments": [],
+                "isNullable": false
+            },
+            "belongsToInterface": null
+        },
+        {
+            "docGroup": null,
+            "description": "Requires the caller's isSuperUser flag; returns 403 for everyone else.",
+            "summary": "Admin Only",
+            "method": "GET",
+            "path": "/auth-examples/admin-only",
+            "scopes": [
+                "*"
+            ],
+            "routes": {},
+            "input": {
+                "serialName": "kotlin.Unit",
+                "arguments": [],
+                "isNullable": false
+            },
+            "output": {
+                "serialName": "kotlin.String",
+                "arguments": [],
+                "isNullable": false
+            },
+            "belongsToInterface": null
+        },
+        {
+            "docGroup": null,
+            "description": "Greets anonymous callers generically and logged-in callers by email.",
+            "summary": "Greet",
+            "method": "GET",
+            "path": "/auth-examples/greet",
+            "scopes": [
+                "*"
+            ],
+            "routes": {},
+            "input": {
+                "serialName": "kotlin.Unit",
+                "arguments": [],
+                "isNullable": false
+            },
+            "output": {
+                "serialName": "kotlin.String",
+                "arguments": [],
+                "isNullable": false
+            },
+            "belongsToInterface": null
+        },
+        {
+            "docGroup": null,
+            "description": "Reads the authenticated caller's identity from the session.",
+            "summary": "Who Am I",
+            "method": "GET",
+            "path": "/auth-examples/whoami",
+            "scopes": [
+                "*"
+            ],
+            "routes": {},
+            "input": {
+                "serialName": "kotlin.Unit",
+                "arguments": [],
+                "isNullable": false
+            },
+            "output": {
+                "serialName": "com.lightningkite.lightningserver.demo.endpoints.AuthExamplesEndpoints.WhoAmIResponse",
                 "arguments": [],
                 "isNullable": false
             },
@@ -7005,7 +7024,7 @@
             "description": "Efficiently stores multiple key-value pairs in the cache",
             "summary": "Set multiple cache entries at once",
             "method": "POST",
-            "path": "/cache/cache/batch-set",
+            "path": "/cache/batch-set",
             "scopes": [],
             "routes": {},
             "input": {
@@ -7022,30 +7041,10 @@
         },
         {
             "docGroup": "CacheExamplesApi",
-            "description": "Removes all cached values whose keys start with the specified prefix",
-            "summary": "Clear cache entries by pattern",
-            "method": "POST",
-            "path": "/cache/cache/clear-pattern",
-            "scopes": [],
-            "routes": {},
-            "input": {
-                "serialName": "com.lightningkite.lightningserver.demo.endpoints.ClearPatternRequest",
-                "arguments": [],
-                "isNullable": false
-            },
-            "output": {
-                "serialName": "com.lightningkite.lightningserver.demo.endpoints.ClearPatternResponse",
-                "arguments": [],
-                "isNullable": false
-            },
-            "belongsToInterface": null
-        },
-        {
-            "docGroup": "CacheExamplesApi",
             "description": "Removes a key-value pair from the cache",
             "summary": "Delete a cached value",
             "method": "DELETE",
-            "path": "/cache/cache/delete/{key}",
+            "path": "/cache/delete/{key}",
             "scopes": [],
             "routes": {
                 "key": {
@@ -7071,7 +7070,7 @@
             "description": "Demonstrates cache-aside pattern: checks cache first, performs expensive operation if cache miss, then caches result",
             "summary": "Expensive operation with caching",
             "method": "GET",
-            "path": "/cache/cache/expensive-operation/{id}",
+            "path": "/cache/expensive-operation/{id}",
             "scopes": [],
             "routes": {
                 "id": {
@@ -7097,7 +7096,7 @@
             "description": "Fetches a cached value by key, returns null if not found or expired",
             "summary": "Retrieve a value from the cache",
             "method": "GET",
-            "path": "/cache/cache/get/{key}",
+            "path": "/cache/get/{key}",
             "scopes": [],
             "routes": {
                 "key": {
@@ -7123,7 +7122,7 @@
             "description": "Atomically increments a numeric value in the cache, useful for counters and rate limiting",
             "summary": "Increment a counter in the cache",
             "method": "POST",
-            "path": "/cache/cache/increment/{key}",
+            "path": "/cache/increment/{key}",
             "scopes": [],
             "routes": {
                 "key": {
@@ -7149,7 +7148,7 @@
             "description": "Saves a key-value pair in the cache with optional expiration time",
             "summary": "Store a value in the cache",
             "method": "POST",
-            "path": "/cache/cache/set",
+            "path": "/cache/set",
             "scopes": [],
             "routes": {},
             "input": {
@@ -7166,10 +7165,10 @@
         },
         {
             "docGroup": "FileExamplesApi",
-            "description": "Uploads a file to the server and returns file information including a signed URL",
+            "description": "Writes the given text content to storage and returns a signed URL for it",
             "summary": "Upload a file",
             "method": "POST",
-            "path": "/files/files/upload",
+            "path": "/files/upload",
             "scopes": [],
             "routes": {},
             "input": {
@@ -7186,10 +7185,10 @@
         },
         {
             "docGroup": "FileExamplesApi",
-            "description": "Uploads an image file with validation for image types (JPEG, PNG, GIF, WebP)",
+            "description": "Uploads a base64-encoded image with validation for image types (JPEG, PNG, GIF, WebP)",
             "summary": "Upload an image file",
             "method": "POST",
-            "path": "/files/files/upload-image",
+            "path": "/files/upload-image",
             "scopes": [],
             "routes": {},
             "input": {
@@ -7209,7 +7208,7 @@
             "description": "Removes a file from the storage system",
             "summary": "Delete a file",
             "method": "DELETE",
-            "path": "/files/files/{path}",
+            "path": "/files/{path}",
             "scopes": [],
             "routes": {
                 "path": {
@@ -7235,7 +7234,7 @@
             "description": "Retrieves metadata about a stored file",
             "summary": "Get file information",
             "method": "GET",
-            "path": "/files/files/{path}/info",
+            "path": "/files/{path}/info",
             "scopes": [],
             "routes": {
                 "path": {
@@ -7261,7 +7260,7 @@
             "description": "Creates a temporary signed URL that allows access to a private file",
             "summary": "Generate a signed URL for file access",
             "method": "GET",
-            "path": "/files/files/{path}/signed-url",
+            "path": "/files/{path}/signed-url",
             "scopes": [],
             "routes": {
                 "path": {
@@ -8487,6 +8486,26 @@
                 "arguments": [],
                 "isNullable": false
             }
+        },
+        {
+            "docGroup": "GitHubOAuth",
+            "description": "Returns a URL which, when opened in a browser, will allow you to log into the system with GitHub.",
+            "summary": "Log In via GitHub",
+            "method": "GET",
+            "path": "/proof/github/login",
+            "scopes": [],
+            "routes": {},
+            "input": {
+                "serialName": "kotlin.Unit",
+                "arguments": [],
+                "isNullable": false
+            },
+            "output": {
+                "serialName": "kotlin.String",
+                "arguments": [],
+                "isNullable": false
+            },
+            "belongsToInterface": null
         },
         {
             "docGroup": "TimeBasedOTPProof",
@@ -10655,11 +10674,121 @@
             }
         },
         {
+            "docGroup": null,
+            "description": "Sends a plain-text message through the configured EmailService.",
+            "summary": "Send Demo Email",
+            "method": "POST",
+            "path": "/service-examples/email",
+            "scopes": [
+                "*"
+            ],
+            "routes": {},
+            "input": {
+                "serialName": "com.lightningkite.services.data.EmailAddress",
+                "arguments": [],
+                "isNullable": false
+            },
+            "output": {
+                "serialName": "kotlin.String",
+                "arguments": [],
+                "isNullable": false
+            },
+            "belongsToInterface": null
+        },
+        {
+            "docGroup": null,
+            "description": "Sends a push notification to the given device token via the configured NotificationService.",
+            "summary": "Push Demo Notification",
+            "method": "POST",
+            "path": "/service-examples/notify",
+            "scopes": [
+                "*"
+            ],
+            "routes": {},
+            "input": {
+                "serialName": "kotlin.String",
+                "arguments": [],
+                "isNullable": false
+            },
+            "output": {
+                "serialName": "kotlin.String",
+                "arguments": [],
+                "isNullable": false
+            },
+            "belongsToInterface": null
+        },
+        {
+            "docGroup": null,
+            "description": "Starts a call, speaks a line, then hangs up.",
+            "summary": "Place Demo Phone Call",
+            "method": "POST",
+            "path": "/service-examples/phone-call",
+            "scopes": [
+                "*"
+            ],
+            "routes": {},
+            "input": {
+                "serialName": "com.lightningkite.services.data.PhoneNumber",
+                "arguments": [],
+                "isNullable": false
+            },
+            "output": {
+                "serialName": "kotlin.String",
+                "arguments": [],
+                "isNullable": false
+            },
+            "belongsToInterface": null
+        },
+        {
+            "docGroup": null,
+            "description": "Returns the current value of the someSecret setting.",
+            "summary": "Read Demo Secret",
+            "method": "GET",
+            "path": "/service-examples/secret",
+            "scopes": [
+                "*"
+            ],
+            "routes": {},
+            "input": {
+                "serialName": "kotlin.Unit",
+                "arguments": [],
+                "isNullable": false
+            },
+            "output": {
+                "serialName": "kotlin.String",
+                "arguments": [],
+                "isNullable": false
+            },
+            "belongsToInterface": null
+        },
+        {
+            "docGroup": null,
+            "description": "Sends a message through the configured SMS service.",
+            "summary": "Send Demo SMS",
+            "method": "POST",
+            "path": "/service-examples/sms",
+            "scopes": [
+                "*"
+            ],
+            "routes": {},
+            "input": {
+                "serialName": "com.lightningkite.services.data.PhoneNumber",
+                "arguments": [],
+                "isNullable": false
+            },
+            "output": {
+                "serialName": "kotlin.String",
+                "arguments": [],
+                "isNullable": false
+            },
+            "belongsToInterface": null
+        },
+        {
             "docGroup": "TaskExamplesApi",
             "description": "Creates a background task to send an email asynchronously",
             "summary": "Enqueue an email sending task",
             "method": "POST",
-            "path": "/tasks/tasks/enqueue-email",
+            "path": "/tasks/enqueue-email",
             "scopes": [],
             "routes": {},
             "input": {
@@ -10679,7 +10808,7 @@
             "description": "Creates a background task to process a batch of data items",
             "summary": "Enqueue a data processing task",
             "method": "POST",
-            "path": "/tasks/tasks/enqueue-processing",
+            "path": "/tasks/enqueue-processing",
             "scopes": [],
             "routes": {},
             "input": {
@@ -10699,7 +10828,7 @@
             "description": "Retrieves execution status and metrics for scheduled tasks",
             "summary": "Get scheduled task status",
             "method": "GET",
-            "path": "/tasks/tasks/scheduled/status",
+            "path": "/tasks/scheduled/status",
             "scopes": [],
             "routes": {},
             "input": {
@@ -11860,6 +11989,15 @@
         },
         {
             "matches": {
+                "serialName": "com.lightningkite.lightningserver.sessions.proofs.ProofClientEndpoints.Password",
+                "arguments": [],
+                "isNullable": false
+            },
+            "docGroup": "PasswordProof",
+            "path": "/proof/password"
+        },
+        {
+            "matches": {
                 "serialName": "com.lightningkite.lightningserver.typed.ClientModelRestEndpoints",
                 "arguments": [
                     {
@@ -11880,30 +12018,12 @@
         },
         {
             "matches": {
-                "serialName": "com.lightningkite.lightningserver.sessions.proofs.ProofClientEndpoints.Password",
-                "arguments": [],
-                "isNullable": false
-            },
-            "docGroup": "PasswordProof",
-            "path": "/proof/password"
-        },
-        {
-            "matches": {
                 "serialName": "com.lightningkite.lightningserver.sessions.proofs.ProofClientEndpoints.Sms",
                 "arguments": [],
                 "isNullable": false
             },
             "docGroup": "SmsProof",
             "path": "/proof/phone"
-        },
-        {
-            "matches": {
-                "serialName": "com.lightningkite.lightningserver.sessions.proofs.ProofClientEndpoints.TimeBasedOTP",
-                "arguments": [],
-                "isNullable": false
-            },
-            "docGroup": "TimeBasedOTPProof",
-            "path": "/proof/otp"
         },
         {
             "matches": {
@@ -11927,32 +12047,21 @@
         },
         {
             "matches": {
+                "serialName": "com.lightningkite.lightningserver.sessions.proofs.ProofClientEndpoints.TimeBasedOTP",
+                "arguments": [],
+                "isNullable": false
+            },
+            "docGroup": "TimeBasedOTPProof",
+            "path": "/proof/otp"
+        },
+        {
+            "matches": {
                 "serialName": "com.lightningkite.lightningserver.files.ClientUploadEarlyEndpoints",
                 "arguments": [],
                 "isNullable": false
             },
             "docGroup": "UploadEarlyEndpointApi",
             "path": "/upload"
-        },
-        {
-            "matches": {
-                "serialName": "com.lightningkite.lightningserver.sessions.proofs.AuthClientEndpoints",
-                "arguments": [
-                    {
-                        "serialName": "com.lightningkite.lightningserver.demo.User",
-                        "arguments": [],
-                        "isNullable": false
-                    },
-                    {
-                        "serialName": "kotlin.uuid.Uuid",
-                        "arguments": [],
-                        "isNullable": false
-                    }
-                ],
-                "isNullable": false
-            },
-            "docGroup": "UserAuth",
-            "path": "/auth"
         },
         {
             "matches": {
@@ -11984,6 +12093,26 @@
             },
             "docGroup": "UserAuth",
             "path": "/auth/sessions"
+        },
+        {
+            "matches": {
+                "serialName": "com.lightningkite.lightningserver.sessions.proofs.AuthClientEndpoints",
+                "arguments": [
+                    {
+                        "serialName": "com.lightningkite.lightningserver.demo.User",
+                        "arguments": [],
+                        "isNullable": false
+                    },
+                    {
+                        "serialName": "kotlin.uuid.Uuid",
+                        "arguments": [],
+                        "isNullable": false
+                    }
+                ],
+                "isNullable": false
+            },
+            "docGroup": "UserAuth",
+            "path": "/auth"
         },
         {
             "matches": {
