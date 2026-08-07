@@ -2,7 +2,7 @@ package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.definition.*
-import com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationError
+import com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationException
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.HasId
@@ -36,10 +36,11 @@ import kotlin.time.Duration.Companion.minutes
  *     companion object : PrincipalType<User, Uuid> {
  *         override val idSerializer = Uuid.serializer()
  *         override val subjectSerializer = serializer()
+ *         val table = DatabaseTableDefinition<User>()   // define once, reuse everywhere
  *
  *         context(server: ServerRuntime)
  *         override suspend fun fetch(id: Uuid): User {
- *             return database().table<User>().get(id)
+ *             return database().table(table).get(id)
  *                 ?: throw NotFoundException("User not found")
  *         }
  *     }
@@ -199,16 +200,12 @@ public interface PrincipalType<SUBJECT : HasId<ID>, ID : Comparable<ID>> {
  *    Consider adding a registration mechanism for indexed properties:
  *    ```kotlin
  *    val indices = mapOf(
- *        "email" to { email: String -> database().table<User>().find { it.email eq email }.first() }
+ *        "email" to { email: String -> database().table(userTable).find { it.email eq email }.first() }
  *    )
  *    ```
  *
  * 3. The hasProperty and getProperty methods use reflection-like behavior through serialization.
  *    For performance-critical paths, consider adding a compile-time code generation approach.
- *
- * 4. The permitMasquerade logic defaults to false (secure by default - good!), but users might
- *    not realize they need to override it. Consider adding a logging statement when masquerade
- *    is attempted but not permitted.
  *
  * 5. The precache list could benefit from a way to conditionally include keys based on scopes or
  *    other authentication properties to avoid loading unnecessary data.
@@ -219,7 +216,7 @@ private object PrincipalTypeRegistry : MapRegistryExtension<String, PrincipalTyp
 public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> ServerBuilder.register(type: PrincipalType<SUBJECT, ID>) {
     val registry = extensions[PrincipalTypeRegistry]
     registry[type.name]?.let {
-        if (it.subjectSerializer != type.subjectSerializer) throw DuplicateRegistrationError(
+        if (it.subjectSerializer != type.subjectSerializer) throw DuplicateRegistrationException(
             "Encountered two PrincipalTypes with the same name: ${type.name}",
             it,
             type

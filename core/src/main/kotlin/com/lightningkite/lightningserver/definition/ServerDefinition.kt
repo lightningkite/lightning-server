@@ -41,6 +41,7 @@ public data class ServerDefinition(
         public val exceptionHandler: ExceptionHttpHandler = DefaultExceptionHttpHandler,
 
         public val startupTasks: Map<PathSpec0, StartupTask>,
+        public val preDeployTasks: Map<PathSpec0, PreDeployTask>,
         public val tasks: Map<PathSpec0, Task<*>>,
         public val schedules: Map<PathSpec0, ScheduledTask>,
 
@@ -69,6 +70,7 @@ public data class ServerDefinition(
     public val exceptionHandler: ExceptionHttpHandler get() = flattened.exceptionHandler
 
     public val startupTasks: Map<PathSpec0, StartupTask> get() = flattened.startupTasks
+    public val preDeployTasks: Map<PathSpec0, PreDeployTask> get() = flattened.preDeployTasks
     public val tasks: Map<PathSpec0, Task<*>> get() = flattened.tasks
     public val schedules: Map<PathSpec0, ScheduledTask> get() = flattened.schedules
 
@@ -105,6 +107,10 @@ public data class ServerDefinition(
         startupTasks = startupTasks.toSealedMap().also {
             // Validate startup task dependencies for circular references
             validateStartupTaskDependencies(it.values)
+        },
+        preDeployTasks = preDeployTasks.toSealedMap().also {
+            // Validate pre-deploy task dependencies for circular references
+            validatePreDeployTaskDependencies(it.values)
         },
     )
 
@@ -157,7 +163,7 @@ public data class ServerDefinition(
                         get(path)
                             ?.let { previous ->
                                 val intersection = endpoints.http.keys.intersect(previous.http.keys)
-                                if (intersection.isNotEmpty()) throw DuplicateRegistrationError(
+                                if (intersection.isNotEmpty()) throw DuplicateRegistrationException(
                                     "Endpoints ${
                                         intersection.map {
                                             HttpEndpoint(
@@ -167,7 +173,7 @@ public data class ServerDefinition(
                                         }
                                     } already have registered handlers", previous.http, endpoints.http
                                 )
-                                if (previous.websocket != null && endpoints.websocket != null) throw DuplicateRegistrationError(
+                                if (previous.websocket != null && endpoints.websocket != null) throw DuplicateRegistrationException(
                                     "Path $path already has a registered websocket",
                                     previous.websocket,
                                     endpoints.websocket
@@ -212,6 +218,7 @@ public data class ServerDefinition(
             },
             exceptionHandler = thisLayer.exceptionHandler,
             startupTasks = flattenMap { it.startupTasks },
+            preDeployTasks = flattenMap { it.preDeployTasks },
         )
     }
 
@@ -257,6 +264,12 @@ public data class ServerDefinition(
     }
 
     public fun location(handler: StartupTask): PathSpec0? = reverseLookupStartupTask[handler]
+
+    private val reverseLookupPreDeployTask: Map<PreDeployTask, PathSpec0> by lazy {
+        preDeployTasks.entries.associate { it.value to it.key }
+    }
+
+    public fun location(handler: PreDeployTask): PathSpec0? = reverseLookupPreDeployTask[handler]
 
     private val reverseLookupScheduledTask: Map<ScheduledTask, PathSpec0> by lazy {
         schedules.entries.associate { it.value to it.key }

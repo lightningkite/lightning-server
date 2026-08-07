@@ -6,28 +6,40 @@ on:
       - master
       - version-**
   push:
+    tags:
+      - '*'
     branches:
       - master
       - version-**
+
+# Snapshot publishing only reads the repo; AWS/signing creds are injected per-step.
+permissions:
+  contents: read
+
+# Coalesce snapshot publishes per branch; cancel superseded pushes.
+concurrency:
+  group: snapshot-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   releaseServer:
     name: Server Test and Upload Release
     runs-on: macos-26
+    timeout-minutes: 90
     steps:
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
         with:
           java-version: '17'
           distribution: 'adopt'
           cache: gradle
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@94baf225fe0a508e581a564467443d0e2379123b # v4.3.0
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
@@ -41,7 +53,7 @@ jobs:
       - name: Test (normal)
         run: ./gradlew test
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         if: failure()
         with:
           name: test_results
@@ -54,6 +66,9 @@ jobs:
         env:
           ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
+          # SECURITY: the AWS access-key ID below is hardcoded. Move it to a
+          # repository secret (e.g. secrets.MAVENS3ACCESSKEY) and confirm the IAM
+          # principal is publish-only / least-privilege. (HARDENING_AUDIT §0.2)
           ORG_GRADLE_PROJECT_lightningKiteMavenAwsAccessKey: AKIARR4DEGXXROVKYNNP
           ORG_GRADLE_PROJECT_lightningKiteMavenAwsSecretAccessKey: ${{ secrets.MAVENS3SECRETKEY }}
         run: |

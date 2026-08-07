@@ -44,5 +44,15 @@ public suspend fun <PATH : PathSpec, STORAGE, T, A, B, C> subscribe(
     path3: C,
 ): Unit = connection.subscribe(topic.request(path1, path2, path3))
 
+context(connection: WebSocketConnection<PATH, STORAGE>)
+public suspend fun <PATH : PathSpec, STORAGE, T> unsubscribe(topic: WebSocketTopic<PathSpec0, T>): Unit =
+    connection.unsubscribe(topic.request())
+
+context(connection: WebSocketConnection<PATH, STORAGE>)
+public suspend fun <PATH : PathSpec, STORAGE, T, A> unsubscribe(
+    topic: WebSocketTopic<PathSpec1<A>, T>,
+    path1: A,
+): Unit = connection.unsubscribe(topic.request(path1))
+
 public suspend fun WebSocketConnection<*, *>.send(content: String): Unit = send(WebSocketFrame(content))
 public suspend fun WebSocketConnection<*, *>.send(content: ByteArray): Unit = send(WebSocketFrame(content))

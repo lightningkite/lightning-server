@@ -4,6 +4,7 @@ package com.lightningkite.lightningserver.notifications
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.require
 import com.lightningkite.lightningserver.definition.Runtime
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.ModelInfo
 import com.lightningkite.lightningserver.typed.modelInfo
@@ -51,9 +52,11 @@ data class TestModel(
 /**
  * Extension function to create a test ModelInfo with full permissions.
  */
+context(builder: ServerBuilder)
 inline fun <reified T : HasId<ID>, reified ID : Comparable<ID>> Runtime<Database>.testModelInfo(): ModelInfo<TestUser, T, ID> =
     modelInfo(
         TestUser.require(),
+        tableName = T::class.simpleName!!,
         permissions = { ModelPermissions.allowAll() }
     )
 

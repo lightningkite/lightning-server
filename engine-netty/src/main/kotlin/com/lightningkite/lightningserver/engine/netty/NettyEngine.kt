@@ -5,7 +5,10 @@ import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.engine.local.LocalEngine
+import com.lightningkite.lightningserver.engine.local.WsOversizePolicy
 import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
+import com.lightningkite.lightningserver.engine.local.LocalWebSocketConnection
+import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
@@ -40,7 +43,11 @@ import kotlinx.coroutines.channels.SendChannel
 import kotlinx.serialization.KSerializer
 import java.net.InetSocketAddress
 import java.net.URI
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import com.lightningkite.lightningserver.http.HttpHeaders as LsHttpHeaders
 import com.lightningkite.lightningserver.websockets.WebSocketFrame as LkWebSocketFrame
 import io.netty.handler.codec.http.HttpHeaders as NettyHttpHeaders
@@ -60,7 +67,8 @@ import io.netty.handler.codec.http.HttpHeaders as NettyHttpHeaders
  * - Configurable worker thread pool
  * - Graceful shutdown support
  * - Real IP header support for proxy deployments
- * - Idle connection timeout (120 seconds)
+ * - Idle connection timeout (configurable via [NettyRuntimeSettings.reliability]; default 120 seconds)
+ * - Per-request timeout (cooperative, default 30 seconds) and graceful SIGTERM drain
  *
  * **Performance characteristics:**
  * - Uses pooled byte buffer allocation for memory efficiency
@@ -176,7 +184,7 @@ public class NettyEngine(
         DIRECT_CHANNEL_KEY = AttributeKey.valueOf("DIRECT_CHANNEL")
 
         runBlocking { runStartupTasks() }
-        startSchedules()
+        startSchedules(cfg.reliability.scheduleLockTtl)
 
         val maxContentLength = cfg.maxAggregatedContentLength.bytes.coerceIn(0, Int.MAX_VALUE.toLong()).toInt()
         if (cfg.maxAggregatedContentLength.bytes > Int.MAX_VALUE.toLong())
@@ -210,7 +218,9 @@ public class NettyEngine(
                     p.addLast(HttpObjectAggregator(maxContentLength))
                     p.addLast(ChunkedWriteHandler())
                     if (cfg.websocketCompression) p.addLast(WebSocketServerCompressionHandler())
-                    p.addLast(IdleStateHandler(0, 0, 120))
+                    // 2.3: idle-connection timeout (Netty-only). Closes connections with no read/write
+                    // activity within reliability.idleTimeout.
+                    p.addLast(IdleStateHandler(0, 0, cfg.reliability.idleTimeout.inWholeSeconds.coerceIn(0, Int.MAX_VALUE.toLong()).toInt()))
                     p.addLast(NettyServerHandler(cfg))
                 }
             })
@@ -222,6 +232,8 @@ public class NettyEngine(
         val local = ch.localAddress() as? InetSocketAddress
         this@NettyEngine.boundAddress = local
         logger.info { "NettyEngine started on http://${cfg.host}:${local?.port ?: cfg.port}" }
+        // 2.4: graceful shutdown on SIGTERM/SIGINT — drain in-flight requests then disconnect services.
+        registerShutdownHook { shutdown() }
         ch.closeFuture().addListener { _ ->
             shutdown()
         }.sync()
@@ -231,14 +243,34 @@ public class NettyEngine(
     /**
      * Initiates a graceful shutdown of the Netty server.
      *
-     * This method shuts down both the worker and boss event loop groups, allowing
-     * in-flight requests to complete before fully terminating.
+     * Cancels schedules, stops accepting connections and drains in-flight requests by gracefully
+     * shutting down the boss/worker event loop groups (bounded by
+     * [EngineReliabilitySettings.shutdownDrainTimeout]), disconnects all services, then cancels the
+     * engine scope. Idempotent — safe to call from both the SIGTERM hook and the channel close
+     * listener.
      */
     public fun shutdown() {
-        try {
-            workerGroup.shutdownGracefully()
-            bossGroup.shutdownGracefully()
-        } catch (_: Throwable) {
+        val drain = if (::scope.isInitialized) nettyRunConfig().reliability.shutdownDrainTimeout else null
+        if (drain == null) {
+            // Never started; nothing to drain.
+            return
+        }
+        gracefulShutdown(drain) { timeout ->
+            // shutdownGracefully drains in-flight work over its quiet/timeout window. We do NOT block
+            // (.sync()) here: this drain may run on a Netty event-loop thread (via the channel
+            // close-future listener), and waiting for the worker group to terminate from one of its
+            // own threads would deadlock. The graceful window bounds the drain.
+            try {
+                val quietMillis = 0L
+                val timeoutMillis = timeout.inWholeMilliseconds.coerceAtLeast(quietMillis)
+                if (::bossGroup.isInitialized) {
+                    bossGroup.shutdownGracefully(quietMillis, timeoutMillis, java.util.concurrent.TimeUnit.MILLISECONDS)
+                }
+                if (::workerGroup.isInitialized) {
+                    workerGroup.shutdownGracefully(quietMillis, timeoutMillis, java.util.concurrent.TimeUnit.MILLISECONDS)
+                }
+            } catch (_: Throwable) {
+            }
         }
     }
 
@@ -257,6 +289,7 @@ public class NettyEngine(
                         scope.launch(ctx.executor().asCoroutineDispatcher()) {
                             try {
                                 try {
+                                    // Request timeout is enforced centrally in ServerRuntime.handle (per-handler HttpHandler.timeout).
                                     val result: HttpResponse = this@NettyEngine.handle(request)
                                     val nettyRes = result.toNettyResponse(msg.protocolVersion())
                                     val keepAlive = HttpUtil.isKeepAlive(msg)
@@ -298,14 +331,7 @@ public class NettyEngine(
                     val directChannel = ctx.channel().attr(DIRECT_CHANNEL_KEY).get()
                     val m = LkWebSocketFrame(msg.text())
                     if (directChannel != null) {
-                        // Direct mode - send to channel
-                        scope.launch(ctx.executor().asCoroutineDispatcher()) {
-                            try {
-                                directChannel.send(m)
-                            } catch (_: Exception) {
-                                // Channel closed
-                            }
-                        }
+                        deliverDirect(ctx, directChannel, m)
                     } else {
                         // Standard pub/sub mode
                         val mid = ctx.channel().attr(MID_KEY).get() ?: return
@@ -329,14 +355,7 @@ public class NettyEngine(
                     val bytes = ByteBufUtil.getBytes(msg.content())
                     val m = LkWebSocketFrame(bytes)
                     if (directChannel != null) {
-                        // Direct mode - send to channel
-                        scope.launch(ctx.executor().asCoroutineDispatcher()) {
-                            try {
-                                directChannel.send(m)
-                            } catch (_: Exception) {
-                                // Channel closed
-                            }
-                        }
+                        deliverDirect(ctx, directChannel, m)
                     } else {
                         // Standard pub/sub mode
                         val mid = ctx.channel().attr(MID_KEY).get() ?: return
@@ -390,6 +409,36 @@ public class NettyEngine(
             }
         }
 
+        /**
+         * 2.10: delivers an inbound WebSocket frame to the direct handler's bounded channel,
+         * applying [EngineReliabilitySettings.webSocketOversizePolicy] on overflow. For
+         * [WsOversizePolicy.CLOSE] a full buffer means the peer is outrunning the handler, so the
+         * socket is closed with code 1009 (message too big). DROP_OLDEST and SUSPEND are handled by
+         * the channel's own BufferOverflow policy via a (possibly suspending) send.
+         */
+        private fun deliverDirect(
+            ctx: ChannelHandlerContext,
+            directChannel: SendChannel<LkWebSocketFrame>,
+            frame: LkWebSocketFrame,
+        ) {
+            if (cfg.reliability.webSocketOversizePolicy == WsOversizePolicy.CLOSE) {
+                val result = directChannel.trySend(frame)
+                if (result.isFailure && !result.isClosed) {
+                    ctx.writeAndFlush(
+                        CloseWebSocketFrame(WebSocketClose.TOO_BIG.code.toInt(), "WebSocket inbound buffer overflow")
+                    ).addListener(ChannelFutureListener.CLOSE)
+                }
+            } else {
+                scope.launch(ctx.executor().asCoroutineDispatcher()) {
+                    try {
+                        directChannel.send(frame)
+                    } catch (_: Exception) {
+                        // Channel closed
+                    }
+                }
+            }
+        }
+
         private suspend fun handleWebSocketStartup(ctx: ChannelHandlerContext, req: FullHttpRequest) {
             val wsRequest = try {
                 req.toLightningWebSocketConnectRequest(ctx, cfg)
@@ -414,7 +463,15 @@ public class NettyEngine(
             val socketHandler = this@NettyEngine.server.compiledWebsocketInterceptors.intercept(match.value)
 
             val host = req.headers()[HOST] ?: "localhost"
-            val wsFactory = WebSocketServerHandshakerFactory("ws://$host${URI(req.uri()).path}", null, true)
+            // Netty's own default payload limit is 64 KiB; honour the configured one so both engines
+            // bound this peer-driven allocation the same way.
+            val wsFactory = WebSocketServerHandshakerFactory(
+                "ws://$host${URI(req.uri()).path}",
+                null,
+                true,
+                websocketSettings().maxFrameSize?.bytes?.coerceAtMost(Int.MAX_VALUE.toLong())?.toInt()
+                    ?: Int.MAX_VALUE,
+            )
             val handshaker = wsFactory.newHandshaker(req)
             if (handshaker == null) {
                 WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(ctx.channel())
@@ -427,8 +484,8 @@ public class NettyEngine(
                 @Suppress("UNCHECKED_CAST")
                 val directHandler = socketHandler as DirectExecutableWebSocketHandler<PathSpec>
 
-                // Create channel for incoming frames
-                val incomingChannel = Channel<LkWebSocketFrame>(Channel.UNLIMITED)
+                // 2.10: bounded inbound channel with backpressure instead of Channel.UNLIMITED.
+                val incomingChannel = newWebSocketInboundChannel<LkWebSocketFrame>(cfg.reliability)
                 ctx.channel().attr(DIRECT_CHANNEL_KEY).set(incomingChannel)
 
                 // Complete handshake and then run direct handler
@@ -631,7 +688,7 @@ public class NettyEngine(
             )
         }
 
-        private fun HttpResponse.toNettyResponse(version: HttpVersion): FullHttpResponse {
+        private suspend fun HttpResponse.toNettyResponse(version: HttpVersion): FullHttpResponse {
             val contentBuf = this.body?.data?.bytes()
                 ?.let { Unpooled.wrappedBuffer(it) }
                 ?: Unpooled.EMPTY_BUFFER
@@ -646,9 +703,11 @@ public class NettyEngine(
             this.body?.mediaType?.let { mt ->
                 res.headers()[CONTENT_TYPE] = mt.toString()
             }
-            if (contentBuf !== Unpooled.EMPTY_BUFFER) {
-                res.headers()[CONTENT_LENGTH] = contentBuf.readableBytes().toString()
-            }
+            // Always advertise the body length, including 0 for bodyless responses (redirects, etc.).
+            // Without a Content-Length (or 0) a keep-alive HTTP/1.1 client cannot tell the response is
+            // complete and stalls until the idle timeout closes the connection — a cross-engine
+            // conformance defect caught by EngineHttpConformanceSuite.trailing_slash_redirects_307.
+            res.headers()[CONTENT_LENGTH] = contentBuf.readableBytes().toString()
 
             return res
         }
@@ -658,45 +717,6 @@ public class NettyEngine(
 
     }
 
-    private abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
-        startingState: STORAGE,
-        override val request: WebSocketConnectRequest<PATH>,
-        val handler: WebSocketHandler<PATH, STORAGE>,
-        val scope: CoroutineScope,
-        server: ServerRuntime,
-        val pubSub: (request: WebSocketSubscriptionRequest<*, Any?>) -> com.lightningkite.services.pubsub.PubSubChannel<Any?>,
-    ) : WebSocketConnection<PATH, STORAGE>, ServerRuntime by server {
-        override var currentState: STORAGE = startingState
-        override suspend fun repullState(): STORAGE = currentState
-        override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE) {
-            currentState = modification(currentState)
-        }
-
-        override suspend fun updateStateImmediately(modification: (STORAGE) -> STORAGE): STORAGE {
-            currentState = modification(currentState)
-            return currentState
-        }
-
-        val subscriptions = HashMap<WebSocketTopic<*, *>, Job>()
-
-        override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-            @Suppress("UNCHECKED_CAST")
-            topic as WebSocketSubscriptionRequest<*, Any?>
-            subscriptions[topic.topic]?.cancel()
-            subscriptions[topic.topic] = scope.launch {
-                pubSub(topic).collect { value ->
-                    handler.messageFromSubscription(
-                        WebSocketSubscriptionMessage(topic.topic, topic.pathInContext.rawPathArguments, value),
-                    )
-                }
-                yield()
-            }
-        }
-
-        override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-            subscriptions[topic.topic]?.cancel()
-        }
-    }
 
     @JvmInline
     private value class TypeRetriever(val retriever: (KSerializer<*>) -> Any?) {

@@ -2,6 +2,7 @@
 package com.lightningkite.lightningserver.sessions
 
 import com.lightningkite.lightningserver.ForbiddenException
+import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.auth.GrantedScope
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.definition.Runtime
@@ -73,10 +74,12 @@ class AuthEndpointsIntegrationTest {
 
     class TestAuthEndpoints(
         database: Runtime<Database>,
+        cache: Runtime<Cache>,
         private val proofStrength: Int = 100,
     ) : AuthEndpoints<AuthTestUser, Uuid>(
         principal = AuthTestUser,
         database = database,
+        cache = cache,
         tokenFormat = Runtime { PrivateTinyTokenFormat() }
     ) {
         context(server: ServerRuntime)
@@ -112,7 +115,7 @@ class AuthEndpointsIntegrationTest {
                 proofExpiration = 1.hours
             )
 
-            val authEndpoints = path.path("auth") include TestAuthEndpoints(database = database)
+            val authEndpoints = path.path("auth") include TestAuthEndpoints(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 // Establish password
@@ -139,6 +142,53 @@ class AuthEndpointsIntegrationTest {
     }
 
     @Test
+    fun `a proof can mint only one session while proofsCheck stays re-callable`() = runBlocking {
+        AuthTestUser.users.clear()
+        val userId = Uuid.random()
+        val user = AuthTestUser(userId, "test@example.com", "555-1234")
+        AuthTestUser.users[userId] = user
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
+
+            val passwordEndpoints = path.path("proof").path("password") include PasswordProofEndpoints(
+                database = database,
+                cache = cache,
+                proofSigner = RuntimeDeferred.Cached { testBasis.signer("proof") },
+                proofExpiration = 1.hours
+            )
+
+            val authEndpoints = path.path("auth") include TestAuthEndpoints(database = database, cache = cache)
+        }.let { server ->
+            server.test({}) {
+                server.passwordEndpoints.establish(AuthTestUser, userId, EstablishPassword("securePassword123"))
+                val proof = server.passwordEndpoints.prove.test(
+                    null, IdentificationAndPassword(
+                        type = "AuthTestUser",
+                        property = "email",
+                        value = "test@example.com",
+                        password = "securePassword123"
+                    )
+                )
+
+                // proofsCheck mints nothing, so the same proof can be checked repeatedly (multi-step flow).
+                repeat(3) {
+                    assertTrue(server.authEndpoints.proofsCheck.test(null, listOf(proof)).readyToLogIn)
+                }
+
+                // The first login consumes the proof and mints a session.
+                assertNotNull(server.authEndpoints.login.test(null, listOf(proof)).refreshToken)
+
+                // Re-using the same proof to mint a second session is rejected (single-use at session creation).
+                assertFailsWith<HttpStatusException>("A consumed proof must not mint a second session") {
+                    server.authEndpoints.login.test(null, listOf(proof))
+                }.let { assertEquals("proof-already-used", it.detail) }
+            }
+        }
+    }
+
+    @Test
     fun `admin login with sufficient proof creates session`() = runBlocking {
         AuthTestUser.users.clear()
         val userId = Uuid.random()
@@ -157,7 +207,7 @@ class AuthEndpointsIntegrationTest {
                 proofExpiration = 1.hours
             )
 
-            val authEndpoints = path.path("auth") include TestAuthEndpoints(database = database)
+            val authEndpoints = path.path("auth") include TestAuthEndpoints(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 // Establish password
@@ -205,7 +255,7 @@ class AuthEndpointsIntegrationTest {
                 proofExpiration = 1.hours
             )
 
-            val authEndpoints = path.path("auth") include TestAuthEndpoints(database = database)
+            val authEndpoints = path.path("auth") include TestAuthEndpoints(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 // Establish password
@@ -254,7 +304,7 @@ class AuthEndpointsIntegrationTest {
                 proofExpiration = 1.hours
             )
 
-            val authEndpoints = path.path("auth") include TestAuthEndpoints(database = database)
+            val authEndpoints = path.path("auth") include TestAuthEndpoints(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 // Establish passwords for both users
@@ -306,7 +356,7 @@ class AuthEndpointsIntegrationTest {
                 proofExpiration = 1.hours
             )
 
-            val authEndpoints = path.path("auth") include TestAuthEndpoints(database = database)
+            val authEndpoints = path.path("auth") include TestAuthEndpoints(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 // Establish password
@@ -347,7 +397,7 @@ class AuthEndpointsIntegrationTest {
             val database = setting("database", Database.Settings("ram"))
             val cache = setting("cache", Cache.Settings("ram"))
 
-            val authEndpoints = path.path("auth") include TestAuthEndpoints(database = database)
+            val authEndpoints = path.path("auth") include TestAuthEndpoints(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 // Login with empty proofs should fail
@@ -373,7 +423,7 @@ class AuthEndpointsIntegrationTest {
                 proofExpiration = 1.hours
             )
 
-            val authEndpoints = path.path("auth") include TestAuthEndpoints(database = database)
+            val authEndpoints = path.path("auth") include TestAuthEndpoints(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 // Try to prove with nonexistent user
@@ -409,7 +459,7 @@ class AuthEndpointsIntegrationTest {
                 proofExpiration = 1.hours
             )
 
-            val authEndpoints = path.path("auth") include TestAuthEndpoints(database = database)
+            val authEndpoints = path.path("auth") include TestAuthEndpoints(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 // Establish password
@@ -456,7 +506,7 @@ class AuthEndpointsIntegrationTest {
                 proofExpiration = 1.hours
             )
 
-            val authEndpoints = path.path("auth") include TestAuthEndpoints(database = database)
+            val authEndpoints = path.path("auth") include TestAuthEndpoints(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 // Establish password
@@ -498,7 +548,7 @@ class AuthEndpointsIntegrationTest {
                 proofExpiration = 1.hours
             )
 
-            val authEndpoints = path.path("auth") include TestAuthEndpoints(database = database)
+            val authEndpoints = path.path("auth") include TestAuthEndpoints(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
                 // Establish password

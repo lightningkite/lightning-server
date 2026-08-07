@@ -48,6 +48,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 api(libs.kotlinx.datetime)
+                api(libs.kotlinx.serialization.json)
                 api(libs.services.database.shared)
                 api(project(":core-shared"))
                 api(project(":auth-shared"))
@@ -70,7 +71,7 @@ kotlin {
 }
 
 dependencies {
-    configurations.filter { it.name.startsWith("ksp") }.forEach {
+    configurations.filter { it.name.startsWith("ksp") && it.name != "ksp" }.forEach {
         add(it.name, libs.services.database.processor)
     }
 }

@@ -22,6 +22,7 @@ class ModelRestUpdatesWebsocketTest {
     object TestServer : ServerBuilder() {
         val database = setting("database", Database.Settings())
         val info = database.modelInfo<HasId<*>?, Sample, String>(
+            tableName = "Sample",
             auth = noAuth,
             permissions = { ModelPermissions.allowAll() }
         )
@@ -115,6 +116,94 @@ class ModelRestUpdatesWebsocketTest {
         }
     }
 
+    object KeyedServer : ServerBuilder() {
+        val database = setting("database", Database.Settings())
+        val info = database.modelInfo<HasId<*>?, Sample, String>(
+            tableName = "Sample",
+            auth = noAuth,
+            permissions = { ModelPermissions.allowAll() }
+        )
+        val ws = path.path("keyed").path("updates") include ModelRestUpdatesWebsocket(info, Sample_name)
+
+        init {
+            registerBasicMediaTypeCoders()
+        }
+    }
+
+    /**
+     * Regression test for the hash-topic fan-out. The publisher used to iterate its hash list without
+     * deduplicating it, so an N-row change whose rows share a key value published 2N messages (an old
+     * and a new hash per row) and each one carried the whole matching change set -- O(N^2) bytes out of
+     * a single database write. One grouped publish is the correct behaviour.
+     */
+    @Test
+    fun mass_update_sharing_a_key_publishes_once() = runBlocking {
+        KeyedServer.test(settings = {
+            generalSettings set GeneralServerSettings()
+            database set Database.Settings()
+        }) {
+            val rowCount = 5
+            KeyedServer.info.table().insert(
+                (1..rowCount).map { Sample(_id = it.toString(), name = "shared", note = "before") }
+            )
+
+            val socket = KeyedServer.ws.websocket.test()
+            val json = socket.server.externalSerialization.json
+
+            // An Equal condition on the key is what lets the server shard onto the hash topic.
+            val narrowed: Condition<Sample> = condition { it.name eq "shared" }
+            socket.send(
+                WebSocketFrame.Text(json.encodeToString(Condition.serializer(Sample.serializer()), narrowed))
+            )
+
+            var frames = 0
+            socket.onMessageSent = { frames++ }
+
+            // One database write touching every row, all of which share the key value "shared".
+            KeyedServer.info.table().updateMany(
+                condition { it.name eq "shared" },
+                modification { it.note assign "after" }
+            )
+
+            assertEquals(
+                1,
+                frames,
+                "A single mass update should publish once, not once per changed row"
+            )
+        }
+    }
+
+    /**
+     * The other shape of oversized payload: not many rows, but a few enormous ones. A size estimate
+     * derived from the descriptor cannot see this, because it has to assume a fixed size per string.
+     */
+    @Test
+    fun overload_triggers_for_a_few_very_large_rows() = runBlocking {
+        TestServer.test(settings = {
+            generalSettings set GeneralServerSettings()
+            database set Database.Settings()
+        }) {
+            val socket = TestServer.ws.websocket.test()
+            val json = socket.server.externalSerialization.json
+
+            val always: Condition<Sample> = Condition.Always
+            socket.send(WebSocketFrame.Text(json.encodeToString(Condition.serializer(Sample.serializer()), always)))
+
+            var last: WebSocketFrame? = null
+            socket.onMessageSent = { last = it }
+
+            val big = "x".repeat(50000)
+            val changes = CollectionChanges((1..6).map { i -> EntryChange<Sample>(null, Sample(i.toString(), big)) })
+            TestServer.ws.generalTopic.send(changes)
+
+            val upd = json.decodeFromString(
+                CollectionUpdates.serializer(Sample.serializer(), String.serializer()),
+                (last as WebSocketFrame.Text).text
+            )
+            assertTrue(upd.overload == true, "six 50k-character rows must overload")
+        }
+    }
+
     @Test
     fun overload_triggers_when_payload_large() = runBlocking {
         TestServer.test(settings = {
@@ -131,8 +220,7 @@ class ModelRestUpdatesWebsocketTest {
             var last: WebSocketFrame? = null
             socket.onMessageSent = { last = it }
 
-            val big = "x".repeat(50000)
-            val changes = CollectionChanges((1..6).map { i -> EntryChange<Sample>(null, Sample(i.toString(), big)) })
+            val changes = CollectionChanges((1..6000).map { i -> EntryChange<Sample>(null, Sample(i.toString(), "X")) })
             TestServer.ws.generalTopic.send(changes)
 
             val got = last as WebSocketFrame.Text
@@ -145,4 +233,4 @@ class ModelRestUpdatesWebsocketTest {
 
 @Serializable
 @GenerateDataClassPaths
-data class Sample(override val _id: String, val name: String) : HasId<String>
+data class Sample(override val _id: String, val name: String, val note: String = "") : HasId<String>

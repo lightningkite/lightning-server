@@ -4,23 +4,37 @@ on:
   pull_request:
     branches: version-*
 
+# Least privilege: this workflow only reads the repo. Bump per-step if a step
+# ever needs to write (e.g. posting check annotations).
+permissions:
+  contents: read
+
+# One in-flight run per PR; cancel superseded runs to save CI minutes.
+concurrency:
+  group: testPR-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test_project:
     runs-on: macos-26
+    timeout-minutes: 60
     steps:
 
-      - uses: actions/checkout@v4
+      # Pinned to the v4.2.2 commit. Action versions are bumped manually and
+      # deliberately (no Dependabot — automated dependency PRs are a supply-chain
+      # risk we accept the maintenance cost of avoiding).
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-tags: true
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
         with:
           java-version: '17'
           distribution: 'adopt'
           cache: gradle
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@94baf225fe0a508e581a564467443d0e2379123b # v4.3.0
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
@@ -28,17 +42,75 @@ jobs:
       - name: Clean
         run: ./gradlew clean
 
-      - name: Test (Multiplatform code, JVM only)
-        run: ./gradlew jvmTest
+      # `check` compiles multiplatform targets and runs test + apiCheck + verification
+      # tasks, exercising far more than the old `test`/`jvmTest`-only pipeline.
+      - name: Check (compile MPP + tests + verification)
+        run: ./gradlew check
 
-      - name: Test (normal)
-        run: ./gradlew test
+      # Static analysis (report-only in phase 1: build does not fail on findings).
+      - name: Detekt static analysis
+        run: ./gradlew detekt
 
-      - uses: actions/upload-artifact@v4
+      # Coverage gate. minBound is 0 today (see root build.gradle.kts) so it
+      # only fails on a regression below the bound; ratchet up over time.
+      - name: Kover coverage verification
+        run: ./gradlew koverVerify
+
+      - uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         if: failure()
         with:
           name: commitTestResults
           path: |
             build/reports/tests/**
             */build/reports/tests/**
+            build/reports/detekt/**
+            */build/reports/detekt/**
+          retention-days: 10
+
+  # ---------------------------------------------------------------------------
+  # CVE scan: OWASP dependency-check (ADVISORY / WARN-ONLY).
+  # ---------------------------------------------------------------------------
+  # Separate job so it can never gate the PR: the whole job is continue-on-error,
+  # and the Gradle plugin is report-only (failBuildOnCVSS = 11 => never fails).
+  # We deliberately do NOT auto-update anything — a CVE surfaces as a warning +
+  # downloadable report; upgrades stay manual/deliberate.
+  #
+  # The NVD database download is slow and rate-limited; NVD_API_KEY (if set as a
+  # repo secret) speeds it up and avoids throttling. A missing key or an NVD
+  # outage must never break CI, hence the advisory nature of this job.
+  cve_scan:
+    name: CVE scan (advisory)
+    runs-on: macos-26
+    timeout-minutes: 60
+    continue-on-error: true
+    steps:
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          java-version: '17'
+          distribution: 'adopt'
+          cache: gradle
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@94baf225fe0a508e581a564467443d0e2379123b # v4.3.0
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # Report-only: writes build/reports/dependency-check/. NVD_API_KEY is
+      # optional (advisory job tolerates its absence / NVD outages).
+      - name: OWASP dependency-check (report-only)
+        continue-on-error: true
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: ./gradlew dependencyCheckAggregate
+
+      - uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        if: always()
+        with:
+          name: dependency-check-report
+          path: |
+            build/reports/dependency-check/**
           retention-days: 10

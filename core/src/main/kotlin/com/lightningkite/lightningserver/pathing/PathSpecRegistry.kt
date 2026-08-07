@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.pathing
 
-import com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationError
+import com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationException
 import com.lightningkite.lightningserver.definition.builder.MapRegistry
 
 public interface PathSpecRegistry<V> : PathSpecMap<V>, MapRegistry<PathSpec, V>
@@ -10,7 +10,7 @@ internal class PathSpecRegistryImpl<V>(
 ) : PathSpecRegistry<V>, PathSpecMap<V> by wraps {
     override fun register(location: PathSpec, value: V) {
         wraps[location]?.let {
-            throw DuplicateRegistrationError("PathSpecRegistry already contains value $it at path $location", it, value)
+            throw DuplicateRegistrationException("PathSpecRegistry already contains value $it at path $location", it, value)
         }
 
         wraps[location] = value

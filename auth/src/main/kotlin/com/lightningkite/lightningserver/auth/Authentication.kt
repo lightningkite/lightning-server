@@ -251,7 +251,7 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
 
                     if (!masquerade.contains('/')) throw BadRequestException(
                         """Invalid masquerade value. Expected to be in the form: <principal-name>/<subject-id> (; encoding=[${
-                            validEncodings.keys.withIndex().joinToString("|") { (idx, enc) -> 
+                            validEncodings.keys.withIndex().joinToString(" | ") { (idx, enc) -> 
                                 if (idx == 0) "${enc}(default)"
                                 else enc
                             }
@@ -292,7 +292,10 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
                     )
 
                     if (principal.permitMasquerade(auth, mask)) return mask
-                    else throw ForbiddenException("You are not allowed to masquerade as $masquerade")
+                    else {
+                        server.logger.warn { "$auth denied masquerade as $masquerade" }
+                        throw ForbiddenException("You are not allowed to masquerade as $masquerade")
+                    }
                 }
 
                 return auth

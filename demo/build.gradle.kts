@@ -15,6 +15,7 @@ dependencies {
     api(project(":typed"))
     api(project(":load-test"))
     api(project(":engine-aws-serverless"))
+    api(project(":deploy-aws-ec2"))
     api(project(":engine-jdk-server"))
     api(project(":engine-netty"))
     api(project(":sessions"))

@@ -69,7 +69,7 @@ fun isExpired(): Boolean = expiration?.let { it < server.clock.now() } ?: false
 - [ ] **`PrincipalType.kt:191`** The fetchByProperty method could be more efficient with an index-based lookup system.
   Consider adding a registration mechanism for indexed properties:```kotlin
   val indices = mapOf(
-  "email" to { email: String -> database().table<User>().find { it.email eq email }.first() }
+  "email" to { email: String -> database().table(userTable).find { it.email eq email }.first() }
   )
 
 ```

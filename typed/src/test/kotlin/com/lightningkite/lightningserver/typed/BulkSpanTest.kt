@@ -12,18 +12,24 @@ import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
+import com.lightningkite.services.Namespaced
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.Database
-import com.lightningkite.services.otel.OpenTelemetrySettings
-import io.opentelemetry.api.trace.StatusCode
-import io.opentelemetry.sdk.OpenTelemetrySdk
-import io.opentelemetry.sdk.testing.exporter.InMemorySpanExporter
-import io.opentelemetry.sdk.trace.SdkTracerProvider
-import io.opentelemetry.sdk.trace.data.SpanData
-import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor
+import com.lightningkite.services.telemetry.Counter
+import com.lightningkite.services.telemetry.Histogram
+import com.lightningkite.services.telemetry.InFlight
+import com.lightningkite.services.telemetry.Lease
+import com.lightningkite.services.telemetry.LogLevel
+import com.lightningkite.services.telemetry.MetricUnit
+import com.lightningkite.services.telemetry.TelemetryAttributes
+import com.lightningkite.services.telemetry.TelemetryBackend
+import com.lightningkite.services.telemetry.TelemetryKey
+import com.lightningkite.services.telemetry.TelemetryTrace
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
+import java.util.Collections
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -36,27 +42,58 @@ import kotlin.test.fail
  */
 class BulkSpanTest {
 
-    /** Test-local in-memory OTEL plumbing; the equivalent helper in :core is internal. */
-    private object Memory {
+    /**
+     * A minimal in-memory [TelemetryBackend] that records each finished span — its name, the merged
+     * (initial + enriched) attributes keyed by attribute name, and whether the action completed
+     * successfully — into an inspectable list. This circumvents OpenTelemetry entirely: the test
+     * asserts directly against the recorded spans, with no OTEL SDK or exporter involved.
+     */
+    private object Recording : TelemetryBackend {
+        data class RecordedSpan(val name: String, val attributes: Map<String, Any?>, val ok: Boolean)
+
         @Volatile
-        private var _latest: InMemorySpanExporter = InMemorySpanExporter.create()
-        val latest: InMemorySpanExporter get() = _latest
+        var spans: MutableList<RecordedSpan> = Collections.synchronizedList(mutableListOf())
 
         init {
-            OpenTelemetrySettings.register("memory") { _, _, _ ->
-                val exporter = InMemorySpanExporter.create()
-                _latest = exporter
-                OpenTelemetrySdk.builder()
-                    .setTracerProvider(
-                        SdkTracerProvider.builder()
-                            .addSpanProcessor(SimpleSpanProcessor.create(exporter))
-                            .build()
-                    )
-                    .build()
+            TelemetryBackend.Settings.register("memory") { _, _, _ -> Recording }
+        }
+
+        override suspend fun <T> span(
+            owner: Namespaced,
+            opName: String,
+            attributes: TelemetryAttributes,
+            dimensions: Set<TelemetryKey<*>>,
+            action: suspend (TelemetryTrace) -> T,
+        ): T {
+            val enriched = LinkedHashMap<TelemetryKey<*>, Any?>()
+            val trace = object : TelemetryTrace {
+                override fun enrich(attributes: TelemetryAttributes) { enriched.putAll(attributes.map) }
+                override fun isLoggable(level: LogLevel): Boolean = false
+                override fun log(level: LogLevel, message: String, attributes: TelemetryAttributes) {}
+            }
+            var ok = true
+            try {
+                return action(trace)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                ok = false
+                throw e
+            } finally {
+                val merged = (attributes.map + enriched).mapKeys { it.key.name }
+                spans.add(RecordedSpan("${owner.name}.$opName", merged, ok))
             }
         }
 
-        fun finishedSpans(): List<SpanData> = _latest.finishedSpanItems.toList()
+        override fun histogram(owner: Namespaced, name: String, unit: MetricUnit, dimensions: Set<TelemetryKey<*>>): Histogram =
+            object : Histogram { override suspend fun record(amount: Double) {} }
+        override fun counter(owner: Namespaced, name: String, unit: MetricUnit, dimensions: Set<TelemetryKey<*>>): Counter =
+            object : Counter { override suspend fun increment(amount: Double) {} }
+        override fun inFlight(owner: Namespaced, name: String, dimensions: Set<TelemetryKey<*>>): InFlight =
+            object : InFlight { override suspend fun lease(): Lease = object : Lease { override fun release() {} } }
+        override fun gauge(owner: Namespaced, name: String, unit: MetricUnit, attributes: TelemetryAttributes, sample: () -> Long): AutoCloseable =
+            AutoCloseable {}
+        override fun reportError(throwable: Throwable, attributes: TelemetryAttributes) {}
     }
 
     object TestServer : ServerBuilder() {
@@ -88,10 +125,11 @@ class BulkSpanTest {
 
     @Test
     fun bulk_sub_requests_get_per_request_http_spans() {
+        Recording.spans = Collections.synchronizedList(mutableListOf())
         TestServer.test(
             settings = {
-                Memory  // ensure "memory" URL scheme is registered
-                telemetrySettings.set(OpenTelemetrySettings(url = "memory"))
+                Recording  // ensure the "memory" URL scheme is registered
+                telemetrySettings.set(TelemetryBackend.Settings(url = "memory"))
             }
         ) {
             runBlocking {
@@ -116,37 +154,37 @@ class BulkSpanTest {
                 )
             }
 
-            val spans = Memory.finishedSpans()
+            val spans = Recording.spans.toList()
 
-            val okSpan = spans.singleOrNull { it.name == "GET /ok" }
-                ?: fail("Expected per-sub-request span 'GET /ok'. Got: ${spans.map { it.name }}")
-            assertEquals("GET", okSpan.attributes.asMap().entries.first { it.key.key == "http.method" }.value)
-            assertEquals("/ok", okSpan.attributes.asMap().entries.first { it.key.key == "http.route" }.value)
-            assertEquals("/ok", okSpan.attributes.asMap().entries.first { it.key.key == "http.target" }.value)
-            assertEquals(200L, okSpan.attributes.asMap().entries.first { it.key.key == "http.status_code" }.value)
+            val okSpan = spans.singleOrNull { it.name == "lightningserver.GET /ok" }
+                ?: fail("Expected per-sub-request span 'lightningserver.GET /ok'. Got: ${spans.map { it.name }}")
+            assertEquals("GET", okSpan.attributes["http.method"])
+            assertEquals("/ok", okSpan.attributes["http.route"])
+            assertEquals("/ok", okSpan.attributes["http.target"])
+            assertEquals(200L, okSpan.attributes["http.status_code"])
 
-            val missingSpan = spans.singleOrNull { it.name == "GET /missing" }
-                ?: fail("Expected per-sub-request span 'GET /missing'. Got: ${spans.map { it.name }}")
+            val missingSpan = spans.singleOrNull { it.name == "lightningserver.GET /missing" }
+                ?: fail("Expected per-sub-request span 'lightningserver.GET /missing'. Got: ${spans.map { it.name }}")
             assertEquals(
                 404L,
-                missingSpan.attributes.asMap().entries.first { it.key.key == "http.status_code" }.value,
+                missingSpan.attributes["http.status_code"],
                 "Sub-request that threw NotFoundException should record http.status_code = 404",
             )
 
             // The bulk request itself still produces its own root span and reports success
             // because the endpoint always returns a 200 with per-sub-request results in the body.
-            val bulkRoot = spans.singleOrNull { it.name == "POST /meta/bulk" }
-                ?: fail("Expected root span 'POST /meta/bulk'. Got: ${spans.map { it.name }}")
-            assertEquals(200L, bulkRoot.attributes.asMap().entries.first { it.key.key == "http.status_code" }.value)
+            val bulkRoot = spans.singleOrNull { it.name == "lightningserver.POST /meta/bulk" }
+                ?: fail("Expected root span 'lightningserver.POST /meta/bulk'. Got: ${spans.map { it.name }}")
+            assertEquals(200L, bulkRoot.attributes["http.status_code"])
 
-            // The inner "handler" span for the failing sub-request gets ERROR status from the
-            // SpanBuilder.use{} extension because the exception propagated through it.
+            // The inner "handler" span for the failing sub-request should be marked errored (ok == false)
+            // because the exception propagated through telemetryTrace.
             val failingHandlerSpan = spans
-                .filter { it.name == "handler" }
-                .firstOrNull { it.status.statusCode == StatusCode.ERROR }
+                .filter { it.name == "lightningserver.handler" }
+                .firstOrNull { !it.ok }
             assertTrue(
                 failingHandlerSpan != null,
-                "Expected the inner 'handler' span for the failing sub-request to be marked ERROR",
+                "Expected the inner 'lightningserver.handler' span for the failing sub-request to be marked errored",
             )
         }
     }

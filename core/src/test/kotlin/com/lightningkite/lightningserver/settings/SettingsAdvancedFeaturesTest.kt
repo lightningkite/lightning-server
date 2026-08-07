@@ -76,9 +76,11 @@ class SettingsAdvancedFeaturesTest {
         settings.loadFromFile(file, EmptySerializersModule())
 
         val serializable = settings.allSerializable()
-        // The implementation trims after removing comments, so spaces are removed
-        assertEquals("value1", serializable[TestServer.setting1])
-        assertEquals("value2", serializable[TestServer.setting2])
+        // Standard .properties format does NOT support inline comments — '#' only acts as a
+        // comment marker when it is the first non-blank character on the line. A '#' inside a
+        // value (hex color, URL fragment, or text containing '#') must be preserved verbatim.
+        assertEquals("value1 # inline comment", serializable[TestServer.setting1])
+        assertEquals("value2# no space before comment", serializable[TestServer.setting2])
     }
 
     @Test

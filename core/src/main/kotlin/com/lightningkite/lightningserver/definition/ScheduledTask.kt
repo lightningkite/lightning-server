@@ -15,6 +15,18 @@ import kotlin.time.Duration.Companion.minutes
  * runtime based on their [schedule]. Common use cases include cleanup jobs, report generation,
  * data synchronization, and other periodic maintenance operations.
  *
+ * ## Graceful shutdown
+ *
+ * On server shutdown an in-flight tick is **cooperatively cancelled** and awaited only for a bounded
+ * window (the engine's `shutdownDrainTimeout`). A task that runs longer than that window — or longer
+ * than the orchestrator's termination grace period — will **not** be allowed to finish; a bounded
+ * shutdown cannot guarantee completion of arbitrarily long tasks. (Non-suspending, CPU-bound work
+ * cannot be cancelled cooperatively at all, so design such tasks to yield.)
+ *
+ * What *is* guaranteed is clean interruption: the single-instance run lock is always released even if
+ * the tick is cancelled, so the next scheduled run is not blocked. **Design scheduled tasks to be
+ * idempotent / resumable** so a cancelled-then-retried tick is safe.
+ *
  * @property schedule The schedule defining when this task should run
  * @property timeout Maximum duration this task is allowed to run before being cancelled. Defaults to 5 minutes.
  * @see StartupTask

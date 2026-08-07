@@ -12,14 +12,28 @@ import kotlinx.serialization.ExperimentalSerializationApi
  *   current ServerRuntime.externalSerialization serializers module. If it's missing or a different
  *   serializer is registered, a ClassCastException/IllegalStateException will occur.
  */
+@Deprecated("Replace with 'externalFile'", ReplaceWith("externalFile", "com.lightningkite.lightningserver.files.externalFile"))
+context(runtime: ServerRuntime)
+public val ServerFile.fileObject: ExternalFile get() = externalFile
+
+/**
+ * Helpers for working with ServerFile and FileObject values.
+ *
+ * Gotchas:
+ * - fileObject conversion relies on a contextual ExternalServerFileSerializer being registered in the
+ *   current ServerRuntime.externalSerialization serializers module. If it's missing or a different
+ *   serializer is registered, a ClassCastException/IllegalStateException will occur.
+ */
 @OptIn(ExperimentalSerializationApi::class)
 context(runtime: ServerRuntime)
-public val ServerFile.fileObject: FileObject
+public val ServerFile.externalFile: ExternalFile
     get() {
         val ext =
             runtime.externalSerialization.serializersModule.getContextual(ServerFile::class) as ExternalServerFileSerializer
-        // TODO: If multiple file systems are present, prefer a deterministic selection strategy instead of first match.
-        return ext.fileSystems.firstNotNullOfOrNull { it.parseInternalUrl(location) }
+        // Server-internal resolution: handles the canonical `sf://<name>/<path>` form a ServerFile stores, and falls
+        // back to the backend-specific absolute URLs written before that form existed. Never use it on client input —
+        // both forms are unsigned. The parser keys off the file system name, so multiple systems are unambiguous.
+        return ExternalFile.Parser(ext.fileSystems).parseOrNull(location)
             ?: throw IllegalStateException("No file systems available to parse $location")
     }
 
@@ -27,7 +41,7 @@ public val ServerFile.fileObject: FileObject
  * The file name without the last extension.
  * For names without a '.', the entire name is returned.
  */
-public val FileObject.nameWithoutExtension: String get() = name.substringBeforeLast('.')
+public val ExternalFile.nameWithoutExtension: String get() = name.substringBeforeLast('.')
 
 /*
 TODO(API):

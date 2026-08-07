@@ -1,7 +1,7 @@
 // by Claude
 package com.lightningkite.lightningserver.pathing
 
-import com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationError
+import com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationException
 import com.lightningkite.services.data.StringArrayFormat
 import kotlinx.serialization.modules.EmptySerializersModule
 import org.junit.Test
@@ -43,7 +43,7 @@ class PathSpecRegistryTest {
 
         registry.register(PathSpec.root, "first-value")
 
-        val error = assertFailsWith<DuplicateRegistrationError> {
+        val error = assertFailsWith<DuplicateRegistrationException> {
             registry.register(PathSpec.root, "second-value")
         }
 
@@ -58,7 +58,7 @@ class PathSpecRegistryTest {
 
         registry.register(path, 100)
 
-        val error = assertFailsWith<DuplicateRegistrationError> {
+        val error = assertFailsWith<DuplicateRegistrationException> {
             registry.register(path, 200)
         }
 

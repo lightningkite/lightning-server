@@ -86,45 +86,32 @@ data class User(
 ```kotlin
 object Server : ServerBuilder() {
     val database = setting("database", Database.Settings())
+    val cache = setting("cache", Cache.Settings())
     val email = setting("email", Email.Settings())
-    val sms = setting("sms", SMS.Settings())
 
-    // Define your user principal
-    val userPrincipal = PrincipalType(
-        name = "User",
-        subjectSerializer = User.serializer(),
-        idSerializer = Uuid.serializer(),
-        table = database.table("User")
-    )
-
-    // Create session manager
-    val userAuth = object : SessionManager<User, Uuid>(
-        principal = userPrincipal,
-        database = database
+    // AuthEndpoints subclasses SessionManager; one object provides both session
+    // management and authentication endpoints.
+    val auth = object : AuthEndpoints<User, Uuid>(
+        principal = UserPrincipal,  // your PrincipalType<User, Uuid> implementation
+        database = database,
+        cache = cache,
     ) {
-        context(ServerRuntime)
+        context(server: ServerRuntime)
         override suspend fun sessionExpiration(subject: User): Instant? =
-            Clock.System.now() + 30.days
+            server.clock.now() + 30.days
 
-        context(ServerRuntime)
+        context(server: ServerRuntime)
         override suspend fun sessionStaleAfter(subject: User): Duration? =
             7.days
-    }
 
-    // Create authentication endpoints
-    val auth = object : AuthEndpoints<User, Uuid>(
-        sessionManager = userAuth,
-        table = database.table("User"),
-        identifyUser = { email, email -> find { it.email eq email }.first() }
-    ) {
-        context(ServerRuntime)
-        override suspend fun requiredProofStrengthFor(user: User): Int = 10
+        context(server: ServerRuntime)
+        override suspend fun requiredProofStrengthFor(subject: User): Int = 100
     }
 
     // Add proof methods
     val pinHandler = PinHandler(
         cache = cache,
-        pin Generator = { BadWordList.avoidingPin(length = 6) },
+        pinGenerator = { BadWordList.avoidingPin(length = 6) },
         expiration = 10.minutes
     )
 
@@ -140,15 +127,12 @@ object Server : ServerBuilder() {
         }
     )
 
-    val passwordProof = PasswordProofEndpoints(
-        table = database.table<PasswordSecret>(),
-        getSubjectId = { it.email },
-        hash = { it.secureHash() }
-    )
+    // PasswordProofEndpoints registers its own "PasswordSecret" table and hashes
+    // passwords on write; you only hand it the database and cache.
+    val passwordProof = PasswordProofEndpoints(database, cache)
 
     // Include in your server
     init {
-        path.path("auth") include userAuth
         path.path("auth") include auth
         path.path("auth").path("proof").path("email") include emailProof
         path.path("auth").path("proof").path("password") include passwordProof

@@ -630,4 +630,21 @@ public object SDK {
     @OptIn(ExperimentalLightningServer::class)
     context(server: ServerRuntime)
     public fun Format.write(folder: KFile): Unit = write(Archive.folder(folder))
+
+    /**
+     * Runs [block] against a default-initialized runtime for a [server] offline, without binding a port or connecting
+     * to any service (used e.g. to capture the API schema for backward-compatibility diffing).
+     *
+     * Like [Format.writeUsingDefaultSettings], this spins up a throwaway [Runtime] and initializes all settings with
+     * their defaults via [com.lightningkite.lightningserver.settings.ServerSettings.readyUsingDefaults], so it is safe
+     * to run in CI. The provided [block] is executed with the temporary [ServerRuntime] as context.
+     *
+     * This lives inside [SDK] because it must access the package-private [Runtime] used by the SDK-generation path.
+     */
+    @OptIn(ExperimentalLightningServer::class)
+    public fun <T> withDefaultRuntime(server: ServerBuilder, block: context(ServerRuntime) () -> T): T {
+        val runtime = Runtime(server)
+        runtime.settings.readyUsingDefaults()
+        return context(runtime) { block() }
+    }
 }

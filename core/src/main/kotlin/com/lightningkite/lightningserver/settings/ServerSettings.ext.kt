@@ -166,11 +166,15 @@ internal fun settingsFormat(extension: String, module: SerializersModule): Strin
                     deserializer: DeserializationStrategy<T>,
                     string: String,
                 ): T {
+                    // A '#' only starts a comment when it is the first non-blank character on the
+                    // line (standard .properties behavior). Stripping at any '#' would corrupt
+                    // values that legitimately contain one, e.g. hex colors or URL fragments.
                     return properties.decodeFromStringMap(
                         deserializer,
-                        string.lines().map { it.substringBefore('#').trim() }.filter { it.isNotBlank() }.associate {
-                            it.substringBefore('=') to it.substringAfter('=')
-                        })
+                        string.lines().map { it.trim() }.filter { it.isNotBlank() && !it.startsWith('#') }
+                            .associate {
+                                it.substringBefore('=') to it.substringAfter('=')
+                            })
                 }
             }
         }
@@ -184,38 +188,3 @@ internal fun settingsFormat(extension: String, module: SerializersModule): Strin
         }
     }
 }
-
-/*
- * TODO: API Recommendations for ServerSettings.ext.kt
- *
- * 1. **POTENTIAL ISSUE**: Properties format parsing uses `substringAfter('=')` which only works
- *    for simple values. If a property value contains '=' (like a URL or connection string), only
- *    the first part is kept. Should use `substringAfter('=', missingDelimiterValue = "")` or similar.
- *
- * 2. **POTENTIAL ISSUE**: Properties parsing treats '#' as comment anywhere on line, but doesn't
- *    handle escaped '#'. A value like "color=#FF0000" would be truncated. Need proper escaping.
- *
- * 3. The file extension check for properties format only matches exactly "properties". Files like
- *    "config.props" or "settings.property" won't be detected. Consider contains() or regex.
- *
- * 4. loadFromFile() auto-generates a settings file with defaults if it doesn't exist, then throws
- *    MissingSettingFile. This is a good workflow but could be surprising - some might expect it
- *    to succeed using the defaults. Document this behavior prominently.
- *
- * 5. The decryption feature reads from environment variable but doesn't validate the password
- *    strength or check if decryption actually succeeded (could return garbage). Add validation.
- *
- * 6. When missing required settings, a "suggested" file is created but there's no indication of
- *    what changed between the original and suggested files. Consider generating a diff or
- *    annotating which settings were missing.
- *
- * 7. The "defaults" property feature (referencing another JSON file) is documented but not shown
- *    in this file. This feature appears to be implemented in SettingsSerializer.kt. Consider
- *    adding cross-reference docs or moving logic here.
- *
- * 8. No validation that the file isn't too large or contains malicious content. Consider adding
- *    size limits or sandboxing for untrusted settings files.
- *
- * 9. The settingsFormat function returns EmptySerializersModule for properties format but uses
- *    the provided module for actual serialization. This inconsistency is confusing.
- */

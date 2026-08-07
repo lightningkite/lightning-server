@@ -64,6 +64,7 @@ public class TimeBasedOTPProofEndpoints(
         }
 
     public val modelInfo: ModelInfo<HasId<*>, TotpSecret, Uuid> = database.modelInfo(
+        tableName = "TotpSecret",
         auth = proofMethodAuth or AuthRequirement.IsAdmin,
         permissions = {
             val admin = condition<TotpSecret>(AuthRequirement.IsAdmin.accepts(authOrNull))
@@ -153,13 +154,17 @@ public class TimeBasedOTPProofEndpoints(
             implementation = { input: IdentificationAndPassword ->
                 val now = now()
                 val gracePeriod = now().minus(5.seconds)
+                val subject = input.type
+                val handler = serverRuntime.server.principalTypes[subject]
+                    ?: throw IllegalArgumentException("No subject $subject recognized")
+                // Normalize BEFORE building the rate-limit key: the key must be derived from the canonical
+                // identifier so that case/whitespace variants of the same account share one bucket. Keying on
+                // the raw value would let an attacker dodge the limiter (and its exponential backoff) simply
+                // by varying case or whitespace.
+                val normalizedValue = handler.normalizePropertyValue(input.property, input.value)
                 cache().constrainAttemptRate(
-                    cacheKey = "totp-count-${input.property}-${input.value}"
+                    cacheKey = "totp-count-${input.property}-${normalizedValue}"
                 ) {
-                    val subject = input.type
-                    val handler = serverRuntime.server.principalTypes[subject]
-                        ?: throw IllegalArgumentException("No subject $subject recognized")
-                    val normalizedValue = handler.normalizePropertyValue(input.property, input.value)
                     val subjectId = handler.fetchUserIdString(input.property, normalizedValue)
                         ?: throw BadRequestException("User ID and code do not match")
 
@@ -167,17 +172,38 @@ public class TimeBasedOTPProofEndpoints(
                         it.subjectId.eq(subjectId) and it.subjectType.eq(subject) and active
                     }).toList()
 
-                    val matching = active.find {
-                        it.generator.isValid(input.password, now.toJavaInstant()) ||
-                                it.generator.isValid(input.password, gracePeriod.toJavaInstant())
+                    // Find both the secret AND the specific time-step whose code matched, so the code can be
+                    // marked single-use against that exact step.
+                    var matching: TotpSecret? = null
+                    var matchedAt: Instant = now
+                    for (secret in active) {
+                        when {
+                            secret.generator.isValid(input.password, now.toJavaInstant()) -> matchedAt = now
+                            secret.generator.isValid(input.password, gracePeriod.toJavaInstant()) -> matchedAt = gracePeriod
+                            else -> continue
+                        }
+                        matching = secret
+                        break
                     }
-                        ?: throw BadRequestException("User ID and code do not match")
+                    val matched = matching ?: throw BadRequestException("User ID and code do not match")
 
-                    // It's OK to reuse TOTPs.  That's inherently part of how they work - they're time based hashes.
-                    // There can't be more than one valid code at a time, so if a user needed to sign in multiple times,
-                    // then they have to be able to use them twice.
+                    // Enforce single-use (RFC 6238 §5.2): a code is valid for exactly one time-step, so the same
+                    // code must not mint two proofs. Key on the secret + the time-step that validated; reuse the
+                    // opaque "do not match" error so a replay is indistinguishable from a wrong code. claimOnce is
+                    // atomic, closing the race where two concurrent submissions of the same code both pass.
+                    val timeStepCounter = matchedAt.epochSeconds / matched.period.inWholeSeconds
+                    val claimed = cache().claimOnce(
+                        cacheKey = "totp-used-${matched._id}-$timeStepCounter",
+                        ttl = matched.period * 2 + 5.seconds,
+                    )
+                    // A reused code is reported plainly (unlike a wrong code, which stays opaque): revealing reuse
+                    // is harmless here — it only confirms a code the caller already supplied was once valid — and
+                    // a clear "wait for the next code" is far better UX than a misleading "does not match".
+                    if (!claimed) throw BadRequestException(
+                        "That code was already used. Please wait for your authenticator to show a new code."
+                    )
 
-                    modelInfo.table().updateOneById(matching._id, modification {
+                    modelInfo.table().updateOneById(matched._id, modification {
                         it.lastUsedAt assign now
                     })
 

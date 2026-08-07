@@ -61,6 +61,9 @@ import kotlin.uuid.Uuid
  * @property mode How the OAuth provider sends the authorization code (form_post or query)
  * @property settings Configuration for credentials serialization (standard or provider-specific)
  * @property scopeForProfile OAuth scopes required to retrieve user profile information
+ * @property supportsPkce Whether this provider accepts PKCE (RFC 7636) parameters on the authorization
+ *   and token requests. Defaults to `true`; all major providers support (and recommend) PKCE. Set to
+ *   `false` only for a non-compliant provider that rejects unknown `code_challenge`/`code_verifier` params.
  * @property getProfile Async function that retrieves user profile from the provider
  */
 public class OauthProviderInfo(
@@ -73,6 +76,7 @@ public class OauthProviderInfo(
     public val mode: OauthResponseMode = OauthResponseMode.form_post,
     public val settings: SettingInfo<*> = SettingInfo.standard,
     public val scopeForProfile: String,
+    public val supportsPkce: Boolean = true,
     public val getProfile: suspend context(ServerRuntime) (OauthResponse, OauthProviderCredentials?) -> ExternalProfile,
 ) {
     public data class SettingInfo<T : Any>(
@@ -96,6 +100,7 @@ public class OauthProviderInfo(
         accessType: OauthAccessType = OauthAccessType.online,
         prompt: OauthPromptType? = if (accessType == OauthAccessType.offline) OauthPromptType.consent else null,
         loginHint: String? = null,
+        codeChallenge: String? = null,
     ): String {
         val params = OauthCodeRequest(
             response_type = "code",
@@ -107,6 +112,8 @@ public class OauthProviderInfo(
             access_type = accessType,
             prompt = prompt,
             login_hint = loginHint,
+            code_challenge = codeChallenge,
+            code_challenge_method = codeChallenge?.let { "S256" },
         ).let { FormDataFormat(EmptySerializersModule()).encodeToString(OauthCodeRequest.serializer(), it) }
         return "$loginUrl?$params"
     }
@@ -116,11 +123,12 @@ public class OauthProviderInfo(
         credentials: Runtime<OauthProviderCredentials>,
         redirectUri: String,
         oauth: OauthCode,
+        codeVerifier: String? = null,
     ): OauthResponse {
         oauth.error?.let {
             throw BadRequestException("Got error code '${it}' from $niceName.")
         } ?: oauth.code?.let { code ->
-            return client.post(tokenUrl) {
+            val httpResponse = client.post(tokenUrl) {
                 setBody(
                     FormDataFormat(EmptySerializersModule()).encodeToString(
                         OauthTokenRequest.serializer(),
@@ -130,12 +138,28 @@ public class OauthProviderInfo(
                             client_secret = credentials().secret,
                             redirect_uri = redirectUri,
                             grant_type = OauthGrantTypes.authorizationCode,
+                            code_verifier = codeVerifier,
                         )
                     )
                 )
                 contentType(ContentType.Application.FormUrlEncoded)
                 accept(ContentType.Application.Json)
-            }.internalBody<OauthResponse>()
+            }
+            // Providers report token-exchange failures (expired/invalid code, PKCE mismatch, etc.)
+            // as a non-2xx status with an RFC 6749 §5.2 error body, e.g. {"error":"invalid_grant"}.
+            // That body doesn't satisfy OauthResponse's required fields, so decoding it directly would
+            // surface a raw MissingFieldException instead of a clean, expected BadRequestException.
+            // Check the status first and surface only the standardized `error` code - the provider's
+            // free-text `error_description` (or any other response content) is not relayed, since it's
+            // not meant for the end user and could contain provider-internal detail.
+            val bodyText = httpResponse.bodyAsText()
+            if (!httpResponse.status.isSuccess()) {
+                val errorCode = runCatching {
+                    runtime.externalSerialization.json.parseToJsonElement(bodyText).jsonObject["error"]?.jsonPrimitive?.content
+                }.getOrNull()
+                throw BadRequestException("Token exchange with $niceName failed" + (errorCode?.let { " ($it)" } ?: "."))
+            }
+            return runtime.externalSerialization.json.decodeFromString(OauthResponse.serializer(), bodyText)
         }
         throw BadRequestException("Code is empty")
     }
@@ -161,12 +185,6 @@ public class OauthProviderInfo(
 
 
     public companion object {
-        /**
-         * Registry of all available OAuth providers.
-         * Built-in providers are automatically added to this list.
-         */
-        public val all: ArrayList<OauthProviderInfo> = ArrayList<OauthProviderInfo>()
-
         public val google: OauthProviderInfo = OauthProviderInfo(
             niceName = "Google",
             loginUrl = "https://accounts.google.com/o/oauth2/v2/auth",
@@ -184,7 +202,7 @@ public class OauthProviderInfo(
                     name = response2.name?.takeUnless { it.isEmpty() },
                 )
             }
-        ).also { all.add(it) }
+        )
 
         public val apple: OauthProviderInfo = OauthProviderInfo(
             niceName = "Apple",
@@ -221,7 +239,7 @@ public class OauthProviderInfo(
 
                 ExternalProfile(email = email)
             }
-        ).also { all.add(it) }
+        )
 
         public val microsoft: OauthProviderInfo = OauthProviderInfo(
             niceName = "Microsoft",
@@ -239,7 +257,7 @@ public class OauthProviderInfo(
                     image = response2.picture,
                 )
             }
-        ).also { all.add(it) }
+        )
 
         public val github: OauthProviderInfo = OauthProviderInfo(
             niceName = "GitHub",
@@ -273,7 +291,7 @@ public class OauthProviderInfo(
                     name = user.name
                 )
             }
-        ).also { all.add(it) }
+        )
     }
 }
 

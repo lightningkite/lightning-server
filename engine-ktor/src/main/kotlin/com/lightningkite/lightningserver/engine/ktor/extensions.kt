@@ -34,7 +34,7 @@ internal fun Headers.adapt(): HttpHeaders = HttpHeaders(flattenEntries())
  * Falls back to the origin remote address if the header is not present.
  */
 context(server: ServerRuntimeBase)
-internal suspend fun ApplicationCall.adapt(): HttpRequest<PathSpec> {
+internal suspend fun ApplicationCall.adapt(maxBody: Long): HttpRequest<PathSpec> {
     return HttpRequest(
         path = RawHttpEndpoint(request.path().decodeURLPart(), HttpMethod(request.httpMethod.value)),
         queryParameters = QueryParameters(request.queryParameters.flattenEntries()),
@@ -47,11 +47,16 @@ internal suspend fun ApplicationCall.adapt(): HttpRequest<PathSpec> {
         } ?: request.origin.remoteAddress,
         body = run {
             // TODO: Add MultiPart support
-            val stream = receiveStream()
-
-            TypedData.sink(request.contentType().adapt(), request.contentLength() ?: -1) {
-                it.transferFrom(stream.asSource())
-            }
+            // Cooperative, non-blocking body read: back the body with Ktor's suspending ByteReadChannel so consuming
+            // it yields the event loop instead of blocking it (the original receiveStream()+runBlocking path could
+            // deadlock the event loop on slow/segmented bodies). maxBody is enforced during the suspending read.
+            val declaredLength = request.contentLength()
+            TypedData.suspending(
+                // declaredLength lets the source reject a body that ends before its declared Content-Length (A1).
+                source = KtorChannelSuspendingSource(receiveChannel(), maxBody, declaredLength),
+                mediaType = request.contentType().adapt(),
+                size = declaredLength,
+            )
         },
     )
 }

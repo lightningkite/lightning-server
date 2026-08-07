@@ -21,3 +21,12 @@ kotlin-js-store/
 local.version.txt
 local.auto.tfvars
 .fork
+.claude/worktrees
+
+# MkDocs generated site output
+site/
+# Python venv used for mkdocs builds
+tmp/mkdocs-venv/
+tmp
+site
+.claude/worktrees

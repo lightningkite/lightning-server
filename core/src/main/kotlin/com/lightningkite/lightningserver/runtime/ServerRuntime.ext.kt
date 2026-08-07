@@ -221,6 +221,14 @@ public context(runner: ServerRuntime)
 val StartupTask.location: PathSpec0 get() = runner.server.location(this) ?: throw UnregisteredException(this)
 
 /**
+ * Gets the location of a pre-deploy task.
+ *
+ * @throws UnregisteredException if the task is not registered with the server
+ */
+public context(runner: ServerRuntime)
+val PreDeployTask.location: PathSpec0 get() = runner.server.location(this) ?: throw UnregisteredException(this)
+
+/**
  * Gets the location of a scheduled task.
  *
  * @throws UnregisteredException if the task is not registered with the server

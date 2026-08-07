@@ -373,7 +373,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         }
         // SECURITY: Constant-time hash comparison to prevent timing attacks
         if (!plainTextSecret.checkAgainstHash(session.secretHash)) {
-            if (generalSettings().debug) println("Auth failed because hash verification failed ($plainTextSecret vs ${session.secretHash})")
+            if (generalSettings().debug) println("Auth failed because hash verification failed for session ${session._id}")
             throw UnauthorizedException("Incorrect hash for session")
         }
         if ((session.expires ?: Instant.DISTANT_FUTURE) < now()) {

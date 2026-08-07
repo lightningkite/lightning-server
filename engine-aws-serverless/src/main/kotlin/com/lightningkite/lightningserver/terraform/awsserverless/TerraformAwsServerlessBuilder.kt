@@ -28,6 +28,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
         get() = displayName.lowercase().replace(" ", "-").filter { it.isLetterOrDigit() || it == '-' }
     public open val storageBucketPath: String get() = projectPrefix
     public open val storageEncryptionEnabled: Boolean get() = true
+    public open val useStorageLockFile: Boolean get() = false
     override val terraformRoot: File get() = File("terraform/$projectPrefix")
     override val secretsSource: SecretSource by lazy {
         val fetcher = PasswordFetcher()
@@ -111,12 +112,45 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
      */
     public open val useCloudFrontForWebSocket: Boolean get() = false
 
-    override fun finalize() {
+    /** IP Stack Configuration. */
+    public open val enableIPv6: Boolean = true
+
+
+    internal class VpcInfoTerraformManaged(
+        val ipPrefix: String,
+        val availabilityZones: List<String>,
+        val natGateway: AwsVpc.NatGateway,
+        override val id: String, //= TerraformJsonObject.expression("module.vpc.vpc_id"),
+        override val securityGroup: String, //= TerraformJsonObject.expression("aws_security_group.internal.id"),
+        override val privateSubnets: String, //= TerraformJsonObject.expression("module.vpc.private_subnets"),
+        override val publicSubnets: String, //= TerraformJsonObject.expression("module.vpc.public_subnets"),
+        override val applicationSubnet: String, //= TerraformJsonObject.expression("module.vpc.public_subnets[0]"),
+        override val natGatewayIps: String, //= TerraformJsonObject.expression("module.vpc.nat_public_ips"),
+        override val cidr: String = "$ipPrefix.0.0/16",
+    ) : AwsVpc.VpcInfo
+
+    public fun terraformManagedVPC(
+        ipPrefix: String,
+        availabilityZones: List<String>,
+        natGateway: AwsVpc.NatGateway,
+    ): AwsVpc.VpcInfo = VpcInfoTerraformManaged(
+        ipPrefix = ipPrefix,
+        availabilityZones = availabilityZones,
+        natGateway = natGateway,
+        id = TerraformJsonObject.expression("module.vpc.vpc_id"),
+        securityGroup = TerraformJsonObject.expression("aws_security_group.internal.id"),
+        privateSubnets = TerraformJsonObject.expression("module.vpc.private_subnets"),
+        publicSubnets = TerraformJsonObject.expression("module.vpc.public_subnets"),
+        applicationSubnet = TerraformJsonObject.expression("module.vpc.public_subnets[0]"),
+        natGatewayIps = TerraformJsonObject.expression("module.vpc.nat_public_ips"),
+    )
+
+    override fun prepareForWrite() {
 
         if (projectPrefix.any { !it.isLetterOrDigit() && !(it == '-' || it == '_') })
             throw IllegalArgumentException("The projectPrefix has illegal characters in it. It can only contain: Letters, Digits, '-', and '_'.")
 
-        super.finalize()
+        super.prepareForWrite()
         require(TerraformProviderImport.aws)
         require(
             TerraformProvider(
@@ -233,6 +267,8 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                         "certificate_arn" - expression("aws_acm_certificate.http.arn")
                         "endpoint_type" - "REGIONAL"
                         "security_policy" - "TLS_1_2"
+                        if (enableIPv6)
+                            "ip_address_type" - "dualstack"
                     }
                     "depends_on" - listOf("aws_acm_certificate_validation.http")
                 }
@@ -251,6 +287,17 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                         "zone_id" - expression("aws_apigatewayv2_domain_name.http.domain_name_configuration[0].hosted_zone_id")
                     }
                 }
+                if (enableIPv6)
+                    "resource.aws_route53_record.httpAccessIpv6" {
+                        "type" - "AAAA"
+                        "name" - expression("aws_apigatewayv2_domain_name.http.domain_name")
+                        "zone_id" - zone
+                        "alias" {
+                            "evaluate_target_health" - false
+                            "name" - expression("aws_apigatewayv2_domain_name.http.domain_name_configuration[0].target_domain_name")
+                            "zone_id" - expression("aws_apigatewayv2_domain_name.http.domain_name_configuration[0].hosted_zone_id")
+                        }
+                    }
             }
         }
         emit("ws") {
@@ -352,6 +399,8 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                             "certificate_arn" - expression("aws_acm_certificate.ws.arn")
                             "endpoint_type" - "REGIONAL"
                             "security_policy" - "TLS_1_2"
+                            if (enableIPv6)
+                                "ip_address_type" - "dualstack"
                         }
                         "depends_on" - listOf("aws_acm_certificate_validation.ws")
                     }
@@ -370,6 +419,17 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                             "zone_id" - expression("aws_apigatewayv2_domain_name.ws.domain_name_configuration[0].hosted_zone_id")
                         }
                     }
+                    if (enableIPv6)
+                        "resource.aws_route53_record.wsAccessIpv6" {
+                            "type" - "AAAA"
+                            "name" - expression("aws_apigatewayv2_domain_name.ws.domain_name")
+                            "zone_id" - zone
+                            "alias" {
+                                "evaluate_target_health" - false
+                                "name" - expression("aws_apigatewayv2_domain_name.ws.domain_name_configuration[0].target_domain_name")
+                                "zone_id" - expression("aws_apigatewayv2_domain_name.ws.domain_name_configuration[0].hosted_zone_id")
+                            }
+                        }
                 }
             }
         }
@@ -514,10 +574,11 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 "role" - expression("aws_iam_role.main_exec.name")
                 "policy_arn" - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
             }
-            "resource.aws_iam_role_policy_attachment.main_policy_vpc" {
-                "role" - expression("aws_iam_role.main_exec.name")
-                "policy_arn" - "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
-            }
+            if (emitter.applicationVpc is AwsVpc.VpcInfo)
+                "resource.aws_iam_role_policy_attachment.main_policy_vpc" {
+                    "role" - expression("aws_iam_role.main_exec.name")
+                    "policy_arn" - "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+                }
             "resource.aws_iam_role_policy_attachment.insights_policy" {
                 "role" - expression("aws_iam_role.main_exec.id")
                 "policy_arn" - "arn:aws:iam::aws:policy/CloudWatchLambdaInsightsExecutionRolePolicy"
@@ -559,9 +620,11 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                     "apply_on" - "PublishedVersions"
                 }
 
-                if (emitter is TerraformEmitterAwsVpc) {
+                val vpcInfo = emitter.applicationVpc as? AwsVpc.VpcInfo
+                if (vpcInfo != null) {
                     "vpc_config" {
-                        "subnet_ids" - expression("module.vpc.private_subnets")
+                        "ipv6_allowed_for_dual_stack" - enableIPv6
+                        "subnet_ids" - vpcInfo.privateSubnets
                         "security_group_ids" - listOf(
                             expression("aws_security_group.internal.id"),
                             expression("aws_security_group.access_outside.id")
@@ -575,6 +638,11 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                     }
                 }
 
+                "logging_config" {
+                    "log_format" - "Text"
+                    "log_group" - expression("aws_cloudwatch_log_group.main.name")
+                }
+
                 "environment" {
                     "variables" {
                         "LIGHTNING_SERVER_SETTINGS_DECRYPTION" - expression("random_password.settings.result")
@@ -586,11 +654,34 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
 
                 "depends_on" - listOf("aws_s3_object.app_storage")
             }
+            // Pre-deploy gate: invoke the freshly-published function version with a {"predeploy":true}
+            // event and only proceed to the alias cutover if it reports "predeploy-ok". The payload is
+            // supplied via a file to avoid cross-platform shell quoting. Triggered on every code change.
+            // Note: with snapStart the new version is isolated so this truly gates cutover; without
+            // snapStart the alias tracks $LATEST, which is live as soon as the function updates.
+            "resource.local_file.predeploy_payload" {
+                "content" - "{\"predeploy\":true}"
+                "filename" - $$"${path.module}/build/predeploy-payload.json"
+            }
+            "resource.null_resource.predeploy" {
+                "triggers" {
+                    "code" - expression("aws_lambda_function.main.source_code_hash")
+                }
+                "depends_on" - listOf("aws_lambda_function.main", "local_file.predeploy_payload")
+                "provisioner.local-exec" {
+                    "command" - expression(
+                        $$"""local.is_windows ? "aws lambda invoke --function-name ${aws_lambda_function.main.function_name} --qualifier ${aws_lambda_function.main.version} --payload file://${path.module}/build/predeploy-payload.json --region $${emitter.applicationRegion} ${path.module}/build/predeploy-out.json | Out-Null; if(-not(Select-String -Path ${path.module}/build/predeploy-out.json -Pattern predeploy-ok -Quiet)){exit 1}" : "aws lambda invoke --function-name ${aws_lambda_function.main.function_name} --qualifier ${aws_lambda_function.main.version} --payload file://${path.module}/build/predeploy-payload.json --region $${emitter.applicationRegion} ${path.module}/build/predeploy-out.json > /dev/null && grep -q predeploy-ok ${path.module}/build/predeploy-out.json""" + "\""
+                    )
+                    "interpreter" - expression("local.is_windows ? [\"PowerShell\", \"-Command\"] : []")
+                }
+            }
             "resource.aws_lambda_alias.main" {
                 "name" - "prod"
                 "description" - "The current production version of the lambda."
                 "function_name" - expression("aws_lambda_function.main.arn")
                 "function_version" - (if (snapStart) expression("aws_lambda_function.main.version") else "\$LATEST")
+                // Cut over to the new version only after pre-deploy tasks succeed.
+                "depends_on" - listOf("null_resource.predeploy")
             }
             "resource.aws_cloudwatch_log_group.main" {
                 "name" - "${emitter.projectPrefix}-main-log"
@@ -617,7 +708,8 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
             }
             "resource.null_resource.lambda_jar_source" {
                 "triggers" {
-                    "always" - expression("timestamp()")
+                    "buildHash" - expression($$"""sha256(join("", [for f in fileset("${path.module}/../../build/dist/lambda", "**") : filesha256("${path.module}/../../build/dist/lambda/${f}")]))""")
+                    "settingsHash" - expression("local_sensitive_file.settings_raw.content_sha256")
                 }
                 "provisioner.local-exec" - (listOf(
                     terraformJsonObject {
@@ -635,7 +727,10 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                         )
                         "interpreter" - this@emit.expression("local.is_windows ? [\"PowerShell\", \"-Command\"] : []")
                     }, terraformJsonObject {
-                        "command" - $$"openssl enc -aes-256-cbc -md sha256 -in \"${local_sensitive_file.settings_raw.filename}\" -out \"${path.module}/build/lambda/settings.enc\" -pass pass:${random_password.settings.result}"
+                        "command" - $$"openssl enc -aes-256-cbc -md sha256 -in \"${local_sensitive_file.settings_raw.filename}\" -out \"${path.module}/build/lambda/settings.enc\" -pass env:SETTINGS_PASS"
+                        "environment" {
+                            "SETTINGS_PASS" - expression("random_password.settings.result")
+                        }
                         "interpreter" - this@emit.expression("local.is_windows ? [\"PowerShell\", \"-Command\"] : []")
                     }
                 ) + lambdaFiles.map { (filename, _) ->
@@ -648,11 +743,14 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
             }
             "resource.null_resource.settings_reread" {
                 "triggers" {
-                    "settingsRawHash" - expression("local_sensitive_file.settings_raw.content")
+                    "settingsRawHash" - expression("local_sensitive_file.settings_raw.content_sha256")
                 }
                 "depends_on" - listOf("null_resource.lambda_jar_source")
                 "provisioner.local-exec" {
-                    "command" - $$"openssl enc -d -aes-256-cbc -md sha256 -out \"${local_sensitive_file.settings_raw.filename}.decrypted.json\" -in \"${path.module}/build/lambda/settings.enc\" -pass pass:${random_password.settings.result}"
+                    "command" - $$"openssl enc -d -aes-256-cbc -md sha256 -out \"${local_sensitive_file.settings_raw.filename}.decrypted.json\" -in \"${path.module}/build/lambda/settings.enc\" -pass env:SETTINGS_PASS"
+                    "environment" {
+                        "SETTINGS_PASS" - expression("random_password.settings.result")
+                    }
                     "interpreter" - expression("local.is_windows ? [\"PowerShell\", \"-Command\"] : []")
                 }
             }
@@ -717,6 +815,8 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                     "key" - storageBucketPath
                     "region" - applicationRegion
                     "encrypt" - storageEncryptionEnabled
+                    if(useStorageLockFile)
+                        "use_lockfile" - true
                 }
             }
             if (terraformProviders.isNotEmpty()) {

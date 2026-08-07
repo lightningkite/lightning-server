@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.SettingContext
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.runBlocking
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Clock
 
@@ -84,6 +85,20 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
     override suspend fun <T> Task<T>.invoke(input: T) {
         this.executeInline(input)
     }
+
+    /**
+     * Runs all registered startup tasks in dependency order (test support).
+     *
+     * Exposes the protected [runStartupTasks] so tests can exercise startup behavior.
+     */
+    public suspend fun executeStartupTasks(): Unit = runStartupTasks()
+
+    /**
+     * Runs all registered pre-deploy tasks in dependency order (test support).
+     *
+     * Exposes the protected [runPreDeployTasks] so tests can exercise pre-deploy behavior.
+     */
+    public suspend fun executePreDeployTasks(): Unit = runPreDeployTasks()
 
     /**
      * Test wrapper for WebSocket connections.
@@ -218,4 +233,37 @@ public inline fun <SERVER : ServerBuilder> SERVER.test(
         this.settings.readyUsingDefaults()
     }
     action(runner, this)
+}
+
+/**
+ * Like [test], but the [action] block is a `suspend` lambda, so you can call suspending APIs
+ * (every `.test()` helper, database/cache calls, etc.) directly without wrapping the body in
+ * `runBlocking` yourself.
+ *
+ * The "Blocking" in the name reflects that this function blocks the calling thread until the test
+ * completes — it runs [action] inside [runBlocking]. Use it from ordinary (non-suspend) `@Test`
+ * methods.
+ *
+ * Example:
+ * ```kotlin
+ * MyServer.testBlocking(settings = { database.set(Database.Settings("ram")) }) {
+ *     val response = myEndpoint.test()        // suspend call — no runBlocking needed
+ *     assertEquals(HttpStatus.OK, response.status)
+ * }
+ * ```
+ *
+ * @param settings Configuration block for server settings
+ * @param action Suspending test code to execute with the test runner as context
+ */
+public fun <SERVER : ServerBuilder> SERVER.testBlocking(
+    settings: context(ServerSettings) SERVER.(SettingContext) -> Unit,
+    clock: () -> Clock = { Clock.System },
+    action: suspend context(TestRunner<SERVER>) SERVER.() -> Unit,
+) {
+    @Suppress("DEPRECATION") val runner = TestRunner(this, clock)
+    with(runner) {
+        context(this.settings) { settings(this@testBlocking, runner) }
+        this.settings.readyUsingDefaults()
+    }
+    runBlocking { action(runner, this@testBlocking) }
 }

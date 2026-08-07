@@ -44,9 +44,15 @@ Use this in your models instead of plain `ServerFile` when you want automatic pr
 data class Post(
     override val _id: Uuid = Uuid.random(),
     val title: String,
-    val image: ServerFileWithMetadata  // Instead of ServerFile
+    val image: ServerFileWithMetadata? = null  // Instead of ServerFile
 ) : HasId<Uuid>
 ```
+
+The processing helpers below address the field through a
+`DataClassPath<T, ServerFileWithMetadata?>`, so a nullable field is the path of least
+resistance.  For a non-nullable field, use `interceptImagesForProcessingNotNull`
+instead of `interceptImagesForProcessing`; `processImagesInBackground` has no
+non-nullable variant and requires a nullable field.
 
 ### MediaPreviewOptions
 
@@ -91,19 +97,30 @@ Process images immediately when records are created or updated. This blocks the 
 **Example:**
 
 ```kotlin
-context(runtime: ServerRuntime)
 object Server : ServerBuilder() {
     val database = setting("database", Database.Settings())
 
-    val posts = database
-        .table<Post>()
-        .interceptImagesForProcessing(
-            MediaPreviewOptions(sizeInPixels = 200),
-            MediaPreviewOptions(sizeInPixels = 800),
-            makePath = { it.path { it.image } }
-        )
+    // `signals` wraps the table on every access, so any write that goes through
+    // this ModelInfo generates previews — no endpoint has to remember to.
+    val postInfo = database.modelInfo<HasId<*>?, Post, Uuid>(
+        auth = noAuth,
+        tableName = "Post",
+        signals = { table ->
+            table.interceptImagesForProcessing(
+                MediaPreviewOptions(sizeInPixels = 200),
+                MediaPreviewOptions(sizeInPixels = 800),
+                makePath = { it.image },
+            )
+        },
+        permissions = { ModelPermissions.allowAll() },
+    )
+
+    val posts = path.path("posts") include ModelRestEndpoints(postInfo)
 }
 ```
+
+The interceptor must run against a live `Table<Post>`, which only exists inside a
+`ServerRuntime` — that is exactly what `signals` provides.
 
 ### 2. Background Processing (Tasks)
 
@@ -119,18 +136,23 @@ immediately available.
 **Example:**
 
 ```kotlin
-context(runtime: ServerRuntime)
 object Server : ServerBuilder() {
     val database = setting("database", Database.Settings())
 
-    // Define the task
-    val processPostImages = path.path("task").path("process-post-images").task bind
+    val postInfo = database.modelInfo<HasId<*>?, Post, Uuid>(
+        auth = noAuth,
+        tableName = "Post",
+        permissions = { ModelPermissions.allowAll() },
+    )
+
+    // Define the task; it listens for changes on postInfo's table
+    val processPostImages = path.path("task").path("process-post-images") bind
         processImagesInBackground(
-            info = typedEndpoints.posts,
+            info = postInfo,
             MediaPreviewOptions(sizeInPixels = 200),
             MediaPreviewOptions(sizeInPixels = 800),
             timeout = 5.minutes,
-            makePath = { it.path { it.image } }
+            makePath = { it.image },
         )
 }
 ```
@@ -170,33 +192,39 @@ Here's a complete example integrating media processing into an API:
 data class Product(
     override val _id: Uuid = Uuid.random(),
     val name: String,
-    val photo: ServerFileWithMetadata,
+    val photo: ServerFileWithMetadata? = null,
     val createdAt: Instant = Clock.System.now()
 ) : HasId<Uuid>
 
-context(runtime: ServerRuntime)
 object Server : ServerBuilder() {
     val database = setting("database", Database.Settings())
     val files = setting("files", Files.Settings())
 
-    // Use interceptor for immediate availability
-    val products = database
-        .table<Product>()
-        .interceptImagesForProcessing(
-            MediaPreviewOptions(sizeInPixels = 100),   // Thumbnail
-            MediaPreviewOptions(sizeInPixels = 400),   // Medium
-            MediaPreviewOptions(sizeInPixels = 1200),  // Large
-            makePath = { it.path { it.photo } }
-        )
+    val productInfo = database.modelInfo<HasId<*>?, Product, Uuid>(
+        auth = noAuth,
+        tableName = "Product",
+        // Use the interceptor for immediate availability
+        signals = { table ->
+            table.interceptImagesForProcessing(
+                MediaPreviewOptions(sizeInPixels = 100),   // Thumbnail
+                MediaPreviewOptions(sizeInPixels = 400),   // Medium
+                MediaPreviewOptions(sizeInPixels = 1200),  // Large
+                makePath = { it.photo },
+            )
+        },
+        permissions = { ModelPermissions.allowAll() },
+    )
 
-    // Or use background task for better performance
-    val processProductImages = path.path("task").path("process-images").task bind
+    val products = path.path("products") include ModelRestEndpoints(productInfo)
+
+    // Or use a background task for better response times — pick one, not both
+    val processProductImages = path.path("task").path("process-images") bind
         processImagesInBackground(
             info = productInfo,
             MediaPreviewOptions(sizeInPixels = 100),
             MediaPreviewOptions(sizeInPixels = 400),
             MediaPreviewOptions(sizeInPixels = 1200),
-            makePath = { it.path { it.photo } }
+            makePath = { it.photo },
         )
 }
 ```
@@ -247,12 +275,12 @@ The processing functions only process image files - other file types are returne
 
 ```kotlin
 // This is safe even if some uploads are PDFs or other non-image files
-val documents = database
-    .table<Document>()
-    .interceptImagesForProcessing(
+signals = { table ->
+    table.interceptImagesForProcessing(
         MediaPreviewOptions(sizeInPixels = 200),
-        makePath = { it.path { it.attachment } }
+        makePath = { it.attachment },
     )
+}
 ```
 
 ## Limitations

@@ -43,6 +43,7 @@ include(":engine-ktor")
 include(":engine-aws-serverless")
 include(":engine-netty")
 include(":engine-jdk-server")
+include(":deploy-aws-ec2")
 
 include(":ratelimit")
 
@@ -51,3 +52,5 @@ include(":secret-source-aws")
 include(":load-test")
 
 include(":demo")
+
+include(":docs-guide")

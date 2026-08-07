@@ -33,6 +33,10 @@ object Server : ServerBuilder() {
     val cache = setting("cache", Cache.Settings())
     val email = setting("email", EmailService.Settings())
 
+    // Defines the table, registers it, and creates its once-per-deploy prepare task.
+    // Invoke it inside a runtime context to get the live table: userTable()
+    val userTable = database.registerTable<User>("User")
+
     // Define your principal type (user authentication)
     object UserAuth : PrincipalType<User, Uuid> {
         override val idSerializer = Uuid.serializer()
@@ -41,15 +45,15 @@ object Server : ServerBuilder() {
 
         context(server: ServerRuntime)
         override suspend fun fetch(id: Uuid): User =
-            database().table<User>().get(id) ?: throw NotFoundException()
+            userTable().get(id) ?: throw NotFoundException()
 
         context(server: ServerRuntime)
         override suspend fun fetchByProperty(property: String, value: String): User? {
             return when (property) {
                 "email" -> {
-                    val existing = database().table<User>()
+                    val existing = userTable()
                         .findOne(condition { it.email eq value })
-                    existing ?: database().table<User>()
+                    existing ?: userTable()
                         .insertOne(User(email = value))
                 }
                 else -> super.fetchByProperty(property, value)
@@ -104,15 +108,15 @@ object UserAuth : PrincipalType<User, Uuid> {
 
     context(server: ServerRuntime)
     override suspend fun fetch(id: Uuid): User =
-        database().table<User>().get(id) ?: throw NotFoundException()
+        userTable().get(id) ?: throw NotFoundException()
 
     context(server: ServerRuntime)
     override suspend fun fetchByProperty(property: String, value: String): User? {
         return when (property) {
             "email" -> {
                 // Find or create user by email
-                database().table<User>().findOne(condition { it.email eq value })
-                    ?: database().table<User>().insertOne(User(email = value))
+                userTable().findOne(condition { it.email eq value })
+                    ?: userTable().insertOne(User(email = value))
             }
             else -> super.fetchByProperty(property, value)
         }
@@ -210,6 +214,7 @@ val optionalAuthEndpoint = path.path("optional").get bind ApiHttpHandler(
 ```kotlin
 val userInfo = database.modelInfo(
     auth = UserAuth.require() or AuthRequirement.None,
+    tableName = "User",
     permissions = {
         val user = authOrNull?.fetch()
         val self = condition<User> { it._id eq user?._id }
@@ -351,22 +356,29 @@ val access = AuthAccess(auth)
 
 ### Testing Endpoints Directly
 
-For testing typed endpoints with authentication:
+For testing typed endpoints with authentication, use `testAuth` inside a `Server.test { }` block.
+`testAuth` is a `context(server: ServerRuntime)` extension on `PrincipalType`, so it is only
+callable where a `ServerRuntime` is in context (i.e., inside `test { }`).
 
 ```kotlin
 @Test
-fun testEndpoint() = runBlocking {
-    with(TestHelper.testRunner) {
-        val user = User(email = "test@example.com", hashedPassword = "...")
-        Server.userInfo.table().insertOne(user)
+fun testEndpoint() {
+    Server.test(settings = {}) {
+        runBlocking {
+            val user = User(email = "test@example.com", hashedPassword = "...")
+            Server.userInfo.table().insertOne(user)
 
-        // Test with authentication header
-        val response = Server.protectedEndpoint.test(
-            headers = mapOf("Authorization" to "Bearer ${createTestToken(user)}")
-        )
-        assertEquals(HttpStatus.OK, response.status)
+            // Build a test Authentication without going through the real auth flow
+            val auth = Server.userPrincipal.testAuth(user)
+
+            val result = Server.protectedEndpoint.test(auth = auth, input = Unit)
+            assertEquals(expectedValue, result)
+        }
     }
 }
 ```
+
+`AuthAccess` is a typealias for `Access<*, *, SUBJECT>` — you rarely need to construct it directly;
+the `test(auth = ..., input = ...)` overloads on `ApiHttpHandler` accept `Authentication<USER>` directly.
 
 NEXT: [Typed Endpoints](typed-endpoints.md)

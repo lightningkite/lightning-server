@@ -25,7 +25,7 @@ Use `ApiHttpHandler` to create type-safe endpoints:
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 
 object MyApi : ServerBuilder() {
-    val hello = path.path("hello").get bind ApiHttpHandler<_, Unit?, Unit, String>(
+    val hello = path.path("hello").get bind ApiHttpHandler<PathSpec0, Unit?, Unit, String>(
         summary = "Hello World",
         description = "Returns a greeting message",
         auth = noAuth,
@@ -48,7 +48,7 @@ data class GreetRequest(
     val name: String
 )
 
-val greet = path.path("greet").post bind ApiHttpHandler<_, Unit?, GreetRequest, String>(
+val greet = path.path("greet").post bind ApiHttpHandler<PathSpec0, Unit?, GreetRequest, String>(
     summary = "Greet User",
     description = "Returns a personalized greeting",
     auth = noAuth,
@@ -65,7 +65,7 @@ For GET requests, input is parsed from query parameters. For POST/PUT/PATCH, inp
 Use path parameters for resource IDs:
 
 ```kotlin
-val getUser = path.path("users").arg<String>("userId").get bind ApiHttpHandler<_, User?, Unit, User>(
+val getUser = path.path("users").arg<String>("userId").get bind ApiHttpHandler<PathSpec1<String>, User?, Unit, User>(
     summary = "Get User",
     description = "Retrieves a user by ID",
     auth = authOptions<User>(),
@@ -86,16 +86,16 @@ Access path parameters via `route.arg1`, `route.arg2`, etc.
 Endpoints can require authentication:
 
 ```kotlin
-val protected = path.path("protected").get bind ApiHttpHandler<_, User, Unit, String>(
+val protected = path.path("protected").get bind ApiHttpHandler<PathSpec0, User, Unit, String>(
     summary = "Protected Resource",
     auth = authOptions<User>(), // Requires authenticated User
     implementation = {
-        "Hello, ${auth.user.email}!" // auth.user is non-null
+        "Hello, ${auth.fetch().email}!" // auth.fetch() is a suspend call that loads the subject
     }
 )
 ```
 
-Use `auth.user` to access the authenticated user.
+Use `auth.fetch()` (a suspend function) to load the authenticated user object.
 
 ## Input Validation
 
@@ -123,7 +123,7 @@ detailed error messages.
 Document possible errors for better API documentation:
 
 ```kotlin
-val update = path.path("items").arg<String>("id").put bind ApiHttpHandler<_, User?, Item, Item>(
+val update = path.path("items").arg<String>("id").put bind ApiHttpHandler<PathSpec1<String>, User?, Item, Item>(
     summary = "Update Item",
     auth = authOptions<User>(),
     errorCases = listOf(
@@ -164,6 +164,7 @@ object MyApi : ServerBuilder() {
 
     val postsInfo = database.modelInfo<User?, Post, Uuid>(
         auth = authOptions<User>(),
+        tableName = "Post",
         permissions = {
             // TODO: WARNING!  This exposes all create, edit, delete, and read capabilities!
             // We probably want something more restrictive, even for a demonstration.
@@ -239,14 +240,13 @@ Test endpoints using the test extension:
 
 ```kotlin
 @Test
-fun testGreeting() = runBlocking {
-    JsonFileDatabase // Ensure mock services loaded
-
-    val engine = LocalEngine(MyApi.build())
-    val response = MyApi.greet.test(engine, GreetRequest("Alice"))
-
-    assertEquals("Hello, Alice!", response.body!!.text())
-    assertEquals(200, response.status.code)
+fun testGreeting() {
+    MyApi.test(settings = {}) {
+        runBlocking {
+            val result = MyApi.greet.test(auth = null, input = GreetRequest("Alice"))
+            assertEquals("Hello, Alice!", result)
+        }
+    }
 }
 ```
 

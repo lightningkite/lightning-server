@@ -52,20 +52,23 @@ public fun StartupTask(
     }
 
 /**
- * Validates that there are no circular dependencies in the given startup tasks.
+ * Validates that there are no circular dependencies in a task dependency graph.
  *
- * Uses depth-first search to detect cycles in the dependency graph.
+ * Uses depth-first search to detect cycles. Shared by [StartupTask] and [PreDeployTask]; the
+ * [dependencies] accessor supplies each task's direct dependencies (for [PreDeployTask] this
+ * resolves the lazy dependency lambda).
  *
- * @param tasks Collection of startup tasks to validate
+ * @param tasks Collection of tasks to validate
+ * @param dependencies Accessor returning the direct dependencies of a task
  * @throws IllegalStateException if a circular dependency is detected
  */
-public fun validateStartupTaskDependencies(tasks: Collection<StartupTask>) {
+public fun <T> validateDependencyGraph(tasks: Collection<T>, dependencies: (T) -> Collection<T>) {
     if (tasks.isEmpty()) return
 
-    val visiting = mutableSetOf<StartupTask>()
-    val visited = mutableSetOf<StartupTask>()
+    val visiting = mutableSetOf<T>()
+    val visited = mutableSetOf<T>()
 
-    fun dfs(task: StartupTask, path: List<StartupTask>) {
+    fun dfs(task: T, path: List<T>) {
         if (task in visiting) {
             // Found a cycle
             val cycleStart = path.indexOf(task)
@@ -74,13 +77,13 @@ public fun validateStartupTaskDependencies(tasks: Collection<StartupTask>) {
                 it.toString().substringAfterLast('.').substringBefore('@')
             }
             throw IllegalStateException(
-                "Circular dependency detected in startup tasks: $cycleDescription"
+                "Circular dependency detected in tasks: $cycleDescription"
             )
         }
         if (task in visited) return
 
         visiting.add(task)
-        for (dep in task.dependencies) {
+        for (dep in dependencies(task)) {
             dfs(dep, path + task)
         }
         visiting.remove(task)
@@ -94,28 +97,11 @@ public fun validateStartupTaskDependencies(tasks: Collection<StartupTask>) {
     }
 }
 
-/*
- * TODO: API Recommendations for StartupTask.kt
+/**
+ * Validates that there are no circular dependencies in the given startup tasks.
  *
- * 1. Add failure handling options:
- *    - enum class FailureBehavior { FAIL_STARTUP, LOG_AND_CONTINUE, RETRY }
- *    - val failureBehavior: FailureBehavior
- *    Currently a failed startup task likely crashes the server.
- *
- * 2. Add task naming for better logging/debugging:
- *    - val name: String
- *    This would help identify which task failed during startup.
- *
- * 3. Consider adding priority within the same dependency level:
- *    - val priority: Int
- *    For tasks with no dependencies, determines execution order.
- *
- * 4. Add lifecycle hooks:
- *    - suspend fun onComplete()
- *    - suspend fun onFailure(exception: Exception)
- *    For observability and cleanup.
- *
- * 5. Consider adding conditional execution:
- *    - suspend fun shouldExecute(): Boolean
- *    Allows skipping tasks based on environment or configuration.
+ * @param tasks Collection of startup tasks to validate
+ * @throws IllegalStateException if a circular dependency is detected
  */
+public fun validateStartupTaskDependencies(tasks: Collection<StartupTask>): Unit =
+    validateDependencyGraph(tasks) { it.dependencies }

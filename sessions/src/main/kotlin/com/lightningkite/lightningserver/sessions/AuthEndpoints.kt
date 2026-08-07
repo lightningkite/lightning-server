@@ -8,16 +8,22 @@ import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.sessions.proofs.*
+import com.lightningkite.lightningserver.sessions.proofs.extensions.claimOnce
 import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.sessions.token.TokenFormat
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
+import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
+import java.security.MessageDigest
+import kotlin.io.encoding.Base64
 import kotlin.math.min
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
 
 /**
@@ -53,12 +59,12 @@ import kotlin.uuid.Uuid
  * @param ID The type of the subject's unique identifier
  * @param principal Defines the type of principal being authenticated and how to fetch/manage users
  * @param database Runtime access to the database for session storage
- * @param proofSigner Cryptographic signer for creating and validating proof signatures
  * @param tokenFormat Format for generating session tokens (defaults to PrivateTinyTokenFormat)
  */
 public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     principal: PrincipalType<SUBJECT, ID>,
     database: Runtime<Database>,
+    private val cache: Runtime<Cache>,
     tokenFormat: Runtime<TokenFormat> = Runtime { PrivateTinyTokenFormat() },
 ) : SessionManager<SUBJECT, ID>(principal, database, tokenFormat) {
     init {
@@ -131,13 +137,19 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         detail = "nonexistent-proof-method",
         message = "Could not find proof method for given proof."
     )
+    private val errorProofAlreadyUsed = LSError(
+        400,
+        detail = "proof-already-used",
+        message = "A proof has already been used to create a session."
+    )
 
     private val errors = listOf(
         errorNoSingleUser,
         errorInvalidProof,
         errorIrrelevantProof,
         errorExpiredProof,
-        errorNonexistentMethod
+        errorNonexistentMethod,
+        errorProofAlreadyUsed
     )
 
     /**
@@ -156,9 +168,21 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         request: LogInRequest,
         result: ProofsCheckResult<ID>,
     ): Pair<Session<SUBJECT, ID>, RefreshToken>? {
-        val subject = principal.fetch(result.id)
+        if (!result.readyToLogIn) return null
 
-        return if (result.readyToLogIn) newSession(
+        // Consume each proof single-use at the only state-changing step: session creation. proofsCheck
+        // mints nothing and stays freely re-callable (so the multi-step login UX is unaffected); burning
+        // the proofs only here means a stolen/replayed proof cannot be exchanged for a second session.
+        // Keyed on a deterministic hash of the signature (never the raw signature). claimOnce is atomic,
+        // so two concurrent logins racing the same proof set yield exactly one session.
+        request.proofs.forEach { proof ->
+            val remaining = (proof.expiresAt?.minus(now()) ?: 1.hours).coerceAtLeast(1.seconds)
+            if (!cache().claimOnce("proof-used-${proofSignatureFingerprint(proof.signature)}", remaining))
+                throw errorProofAlreadyUsed.toException(data = proof.via)
+        }
+
+        val subject = principal.fetch(result.id)
+        return newSession(
             subjectId = result.id,
             label = request.label,
             expires = run {
@@ -169,8 +193,12 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             scopes = request.scopes,
             stale = sessionStaleAfter(subject)?.let { now() + it }
         )
-        else null
     }
+
+    /** Deterministic SHA-256 fingerprint of a proof signature, used as a single-use cache key without
+     *  storing the raw signature (so a cache leak yields no replayable proof material). */
+    private fun proofSignatureFingerprint(signature: String): String =
+        Base64.UrlSafe.encode(MessageDigest.getInstance("SHA-256").digest(signature.encodeToByteArray()))
 
     /**
      * GET /auth-requirements

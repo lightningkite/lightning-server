@@ -118,9 +118,13 @@ data class User(
         override val idSerializer = Uuid.serializer()
         override val subjectSerializer = serializer()
 
+        // The table itself lives on the ServerBuilder, declared once:
+        //     val userTable = database.registerTable<User>("User")
+        // registerTable requires a ServerBuilder in context, so it cannot be
+        // declared here — reference it instead.
         context(server: ServerRuntime)
         override suspend fun fetch(id: Uuid): User {
-            return database().table<User>().get(id)
+            return Server.userTable().get(id)
                 ?: throw NotFoundException("User not found")
         }
 

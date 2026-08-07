@@ -9,7 +9,8 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.settings.set
-import com.lightningkite.services.otel.OpenTelemetrySettings
+import com.lightningkite.services.otel.OtelTelemetryBackend
+import com.lightningkite.services.telemetry.TelemetryBackend
 import io.opentelemetry.api.trace.SpanId
 import io.opentelemetry.sdk.OpenTelemetrySdk
 import io.opentelemetry.sdk.testing.exporter.InMemorySpanExporter
@@ -38,14 +39,19 @@ class HttpSpanTest {
     private val schemeName = "jdk-memory-${System.identityHashCode(this)}"
 
     init {
-        OpenTelemetrySettings.register(schemeName) { _, _, _ ->
-            OpenTelemetrySdk.builder()
-                .setTracerProvider(
-                    SdkTracerProvider.builder()
-                        .addSpanProcessor(SimpleSpanProcessor.create(exporter))
-                        .build()
-                )
-                .build()
+        // Register an in-memory OTel backend under a custom scheme so this test can read the spans
+        // the engine produces. telemetrySettings now resolves a TelemetryBackend.Settings (not the
+        // deprecated OpenTelemetrySettings), so the scheme registers on TelemetryBackend.Settings.
+        TelemetryBackend.Settings.register(schemeName) { _, _, _ ->
+            OtelTelemetryBackend(
+                OpenTelemetrySdk.builder()
+                    .setTracerProvider(
+                        SdkTracerProvider.builder()
+                            .addSpanProcessor(SimpleSpanProcessor.create(exporter))
+                            .build()
+                    )
+                    .build()
+            )
         }
     }
 
@@ -72,9 +78,10 @@ class HttpSpanTest {
             com.lightningkite.lightningserver.definition.generalSettings.useDefault()
             com.lightningkite.lightningserver.definition.secretBasis.useDefault()
             com.lightningkite.lightningserver.definition.loggingSettings.useDefault()
-            telemetrySettings.set(OpenTelemetrySettings(url = schemeName))
+            telemetrySettings.set(TelemetryBackend.Settings(url = schemeName))
             enginePubSub.useDefault()
             engineCache.useDefault()
+            com.lightningkite.lightningserver.websockets.websocketSettings.useDefault()
             forceWebSocketPubSub.useDefault()
             jdkRunConfig set JdkRuntimeSettings(host = "127.0.0.1", port = port)
         }
@@ -112,6 +119,6 @@ class HttpSpanTest {
         val spans = exporter.finishedSpanItems
         val root = spans.singleOrNull { it.parentSpanContext.spanId == SpanId.getInvalid() }
             ?: fail("Expected a single root span. Got: ${spans.map { it.name }}")
-        assertEquals("GET /things/{id}", root.name, "JDK engine should produce a route-pattern root span")
+        assertEquals("lightningserver.GET /things/{id}", root.name, "JDK engine should produce a route-pattern root span")
     }
 }

@@ -47,9 +47,12 @@ public interface HttpHandler<PATH : PathSpec> {
  *
  * Example:
  * ```kotlin
+ * // Define the table once and share it; it is the key backends use to locate the table.
+ * val userTable = database.registerTable<User>("User")
+ *
  * val getUser = path.path("users").arg<String>("id").get bind HttpHandler { request ->
  *     val userId = request.path.arg1
- *     val user = database().table<User>().get(userId)
+ *     val user = userTable().get(userId)
  *     HttpResponse.json(user)
  * }
  * ```

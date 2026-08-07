@@ -158,7 +158,7 @@ class ServerSettingsTest {
             TestServer.requiredSetting set "first"
 
             // Cannot set the same setting twice
-            assertFailsWith<com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationError> {
+            assertFailsWith<com.lightningkite.lightningserver.definition.builder.DuplicateRegistrationException> {
                 TestServer.requiredSetting set "second"
             }
         }
@@ -170,6 +170,27 @@ class ServerSettingsTest {
             println("Got ${serverRuntime.settings.overrides.size} overrides")
             assertEquals("A", a())
             assertEquals("A", b()) // should defer to 'a' as configured in the server
+        }
+    }
+
+    @Test
+    fun `resolving a setting caches its reentrantly-resolved dependencies`() {
+        // Guards get()'s copy-on-write publish: resolving `derived` reentrantly resolves `base`, and publishing
+        // derived must not clobber base's freshly-cached entry. If it did, `base` would be transformed twice.
+        val baseTransforms = java.util.concurrent.atomic.AtomicInteger(0)
+        object : ServerBuilder() {
+            val base = setting("base", "x", getter = { baseTransforms.incrementAndGet(); it })
+            val derived = setting("derived", "y")
+
+            init {
+                derived bind base
+            }
+        }.let { server ->
+            server.test({}) {
+                assertEquals("x", server.derived()) // reentrantly resolves and caches base
+                assertEquals("x", server.base())    // must hit the cache, not re-transform
+                assertEquals(1, baseTransforms.get(), "base should be transformed exactly once")
+            }
         }
     }
 }

@@ -118,19 +118,20 @@ private fun String.checkAgainstFastHash(againstHash: String): Boolean {
     val digest = MessageDigest.getInstance("SHA-256")
     digest.update(salt)
     digest.update(this.toByteArray(Charsets.UTF_8))
-    return Base64.encode(digest.digest()) == expectedHash
+    // Constant-time comparison (MessageDigest.isEqual) over the raw bytes to avoid leaking
+    // how many leading bytes matched via String.equals' early-exit.
+    return MessageDigest.isEqual(digest.digest(), Base64.decode(expectedHash))
 }
 
 private fun String.checkAgainstPbkdf2Hash(againstHash: String): Boolean {
     val against = againstHash.removePrefix(pbkdf2Prefix)
-    val start = System.nanoTime()
     val salt = Base64.decode(against.substringBefore('.'))
     val rest = against.substringAfter('.')
     val skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA512")
     val spec = PBEKeySpec(this.toCharArray(), salt, 100000, 512)
     val key = skf.generateSecret(spec)
-    val tookNs = System.nanoTime() - start
-    return Base64.encode(key.encoded) == rest
+    // Constant-time comparison over raw bytes (see checkAgainstFastHash).
+    return MessageDigest.isEqual(key.encoded, Base64.decode(rest))
 }
 
 /**

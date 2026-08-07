@@ -3,10 +3,12 @@
 package com.lightningkite.lightningserver.typed.kschema
 
 import com.lightningkite.lightningserver.HttpMethod
+import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.pathing.plus
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.lightningserver.typed.contract.diffApiContract
 import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SDK.sdk
 import com.lightningkite.services.database.*
@@ -18,6 +20,15 @@ private fun InterfaceInfo.virtualTypeReference(registry: SerializationRegistry):
         typeParameters.map { it.virtualTypeReference(registry) },
         isNullable = false
     )
+
+/**
+ * Captures the raw [LightningServerKSchema] for this server offline.
+ *
+ * Spins up a throwaway runtime with default settings (no port bound, no services connected) and captures the kschema.
+ * No normalization is applied — [diffApiContract] handles ordering/documentation insensitivity itself. Safe to run in CI.
+ */
+public val ServerBuilder.lightningServerKSchemaFromDefaultRuntime: LightningServerKSchema get() = SDK.withDefaultRuntime(this) { lightningServerKSchema }
+
 
 public context(runtime: ServerRuntime)
 val lightningServerKSchema: LightningServerKSchema

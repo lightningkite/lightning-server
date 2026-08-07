@@ -144,12 +144,11 @@ public sealed interface CronDays {
 /**
  * Represents a specific day-of-month specification in a cron pattern.
  *
- * Currently only [Day] (specific day number) is fully supported.
- * Advanced features like [Last] and [NearestWeekday] are not yet implemented.
+ * Supports [Day] (specific day number), [Last] (last day of the month), and
+ * [NearestWeekday] (the weekday nearest a given day, the cron `W` modifier).
  */
 public sealed class CronDayOfMonth {
-    /** Last day of the month. */
-    @Deprecated("This does not work yet")
+    /** Last day of the month (cron `L`). Resolves to 28/29/30/31 depending on the month. */
     public data object Last : CronDayOfMonth() {
         override fun toString(): String = "L"
     }
@@ -160,16 +159,19 @@ public sealed class CronDayOfMonth {
      * @property number The day of the month (1-31)
      */
     public data class Day(val number: Int) : CronDayOfMonth() {
+        init { require(number in 1..31) { "Day of month must be in 1..31, got $number" } }
         override fun toString(): String = number.toString()
     }
 
     /**
-     * The nearest weekday to a given day number.
+     * The weekday (Monday-Friday) nearest a given day number (cron `W`). If the day falls on a
+     * Saturday the preceding Friday is used; on a Sunday the following Monday is used. The result
+     * never crosses into an adjacent month — e.g. `1W` on a Saturday resolves to Monday the 3rd.
      *
-     * @property number The reference day number
+     * @property number The reference day number (1-31)
      */
-    @Deprecated("This does not work yet")
     public data class NearestWeekday(val number: Int) : CronDayOfMonth() {
+        init { require(number in 1..31) { "Day of month must be in 1..31, got $number" } }
         override fun toString(): String = "${number}W"
     }
 }
@@ -178,17 +180,22 @@ public sealed class CronDayOfMonth {
  * Represents a day-of-week specification in a cron pattern.
  *
  * @property day The day of the week
- * @property last Whether this is the last occurrence of this weekday in the month (not yet implemented)
- * @property recurrence Which occurrence in the month (e.g., 2 for "second Monday") (not yet implemented)
+ * @property last Whether this matches only the last occurrence of [day] in the month (cron `L`,
+ *   e.g. the last Friday). Mutually exclusive with [recurrence].
+ * @property recurrence Which occurrence of [day] within the month to match, 1-based (cron `#`,
+ *   e.g. `recurrence = 2` for "the second Monday"). Null matches every occurrence. Mutually
+ *   exclusive with [last].
  */
 public data class CronDayOfWeek(
     val day: DayOfWeek,
-    @Deprecated("This does not work yet")
     val last: Boolean = false,
-    @Deprecated("This does not work yet")
     val recurrence: Int? = null,
 ) {
-    @Suppress("Deprecation")
+    init {
+        require(!(last && recurrence != null)) { "CronDayOfWeek cannot set both last and recurrence" }
+        if (recurrence != null) require(recurrence in 1..5) { "Weekday recurrence must be in 1..5, got $recurrence" }
+    }
+
     override fun toString(): String = buildString {
         append(day.isoDayNumber)
         if (last) append('L')
@@ -288,46 +295,67 @@ private fun LocalDateTime.makeValid(pattern: CronPattern): LocalDateTime {
             continue
         }
 
-        when (val days = pattern.days) {
-            CronDays.All -> break
-            is CronDays.DaysOfMonth -> {
-                // TODO: Add support for CronDayOfMonth.Last and CronDayOfMonth.NearestWeekday
-                val validDays = days.days.mapNotNull { (it as? CronDayOfMonth.Day)?.number }.sorted()
-                if (dayOfMonth in validDays) break
+        if (pattern.days == CronDays.All) break
 
-                minute = pattern.minutes.first()
-                hour = pattern.hours.first()
-                dayOfMonth = validDays.find { it > dayOfMonth } ?: 32
+        // Resolve the day spec (days-of-month and/or days-of-week, including L / W / nth / last)
+        // into the concrete valid day numbers for this specific month, then advance to the next.
+        val validDays = pattern.days.validDaysOfMonth(year, month)
+        if (dayOfMonth in validDays) break
 
-                if (dayOfMonth > YearMonth(year, month).numberOfDays) {
-                    advanceMonth()
-                    continue
-                }
-            }
+        minute = pattern.minutes.first()
+        hour = pattern.hours.first()
+        dayOfMonth = validDays.find { it > dayOfMonth } ?: 32
 
-            is CronDays.DaysOfWeek -> {
-                val weekday = LocalDate(year, month, dayOfMonth).dayOfWeek
-                val allowed = days.days.map { it.day }.sorted()
-
-                val advanceDaysBy = allowed.find { it >= weekday }?.let {
-                    it.isoDayNumber - weekday.isoDayNumber
-                } ?: ((DayOfWeek.SUNDAY.isoDayNumber - weekday.isoDayNumber) + allowed.first().isoDayNumber)
-
-                minute = pattern.minutes.first()
-                hour = pattern.hours.first()
-                dayOfMonth += advanceDaysBy
-
-                if (dayOfMonth > YearMonth(year, month).numberOfDays) {
-                    advanceMonth()
-                    continue
-                }
-            }
+        if (dayOfMonth > YearMonth(year, month).numberOfDays) {
+            advanceMonth()
+            continue
         }
         break
     }
 
     return LocalDateTime(year, month, dayOfMonth, hour, minute)
 }
+
+/**
+ * Resolves a day specification into the concrete, sorted day-of-month numbers that match within the
+ * given [month] of [year]. This is where the `L` (last), `W` (nearest weekday), `#N` (nth weekday)
+ * and "last weekday" modifiers are expanded against the actual calendar.
+ */
+private fun CronDays.validDaysOfMonth(year: Int, month: Month): List<Int> {
+    val daysInMonth = YearMonth(year, month).numberOfDays
+    return when (this) {
+        CronDays.All -> (1..daysInMonth).toList()
+        is CronDays.DaysOfMonth -> days.flatMap { it.resolve(daysInMonth, year, month) }.distinct().sorted()
+        is CronDays.DaysOfWeek -> days.flatMap { it.resolve(year, month, daysInMonth) }.distinct().sorted()
+    }
+}
+
+private fun CronDayOfMonth.resolve(daysInMonth: Int, year: Int, month: Month): List<Int> = when (this) {
+    is CronDayOfMonth.Day -> if (number <= daysInMonth) listOf(number) else emptyList()
+    CronDayOfMonth.Last -> listOf(daysInMonth)
+    is CronDayOfMonth.NearestWeekday -> listOf(nearestWeekday(number.coerceAtMost(daysInMonth), year, month, daysInMonth))
+}
+
+private fun CronDayOfWeek.resolve(year: Int, month: Month, daysInMonth: Int): List<Int> {
+    val matching = (1..daysInMonth).filter { LocalDate(year, month, it).dayOfWeek == day }
+    return when {
+        last -> listOfNotNull(matching.lastOrNull())
+        recurrence != null -> listOfNotNull(matching.getOrNull(recurrence - 1))
+        else -> matching
+    }
+}
+
+/**
+ * The weekday (Monday-Friday) nearest [day] within the month, never crossing the month boundary:
+ * a Saturday shifts back to Friday (or forward to Monday if that Friday is in the previous month),
+ * and a Sunday shifts forward to Monday (or back to Friday if that Monday is in the next month).
+ */
+private fun nearestWeekday(day: Int, year: Int, month: Month, daysInMonth: Int): Int =
+    when (LocalDate(year, month, day).dayOfWeek) {
+        DayOfWeek.SATURDAY -> if (day > 1) day - 1 else day + 2
+        DayOfWeek.SUNDAY -> if (day < daysInMonth) day + 1 else day - 2
+        else -> day
+    }
 
 /**
  * Represents a range of days of the week.
@@ -352,25 +380,13 @@ public operator fun DayOfWeek.rangeTo(endInclusive: DayOfWeek): DayOfWeekRange =
 /*
  * TODO: API Recommendations for Cron.kt
  *
- * 1. Complete implementation of advanced day-of-month features:
- *    - CronDayOfMonth.Last (last day of month)
- *    - CronDayOfMonth.NearestWeekday (nearest weekday to a given day)
- *    - CronDayOfWeek.last and CronDayOfWeek.recurrence (nth occurrence patterns)
- *
- * 2. Add cron string parsing functionality:
- *    - CronPattern.parse(cronString: String): CronPattern
- *    This would allow users to create patterns from standard cron expressions
- *
- * 3. Add validation for day-of-month values (1-31) in CronDayOfMonth.Day constructor
- *    to fail fast on invalid input rather than at pattern execution time
- *
- * 4. Consider adding a nextOccurrence() or getNextRun() method that doesn't modify the
+ * 1. Consider adding a nextOccurrence() or getNextRun() method that doesn't modify the
  *    receiver datetime, making the API more explicit:
  *    - fun CronPattern.nextOccurrence(after: LocalDateTime): LocalDateTime
  *
- * 5. Add timezone-aware scheduling support by accepting Instant instead of just LocalDateTime,
+ * 2. Add timezone-aware scheduling support by accepting Instant instead of just LocalDateTime,
  *    to handle DST transitions correctly
  *
- * 6. Consider adding a method to list next N occurrences:
+ * 3. Consider adding a method to list next N occurrences:
  *    - fun CronPattern.nextOccurrences(after: LocalDateTime, count: Int): List<LocalDateTime>
  */
