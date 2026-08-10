@@ -106,14 +106,16 @@ class TypedApiTest {
         assertTrue(ts.contains("export type ") && Regex("""export type \w*Shape =""").containsMatchIn(ts),
             "sealed union type not emitted:\n$ts")
         // Flat-discriminator union members referencing the per-subtype interfaces.
-        assertTrue(Regex("""\| \(\{ type: "[^"]*Circle" \} & \w*ShapeCircle\)""").containsMatchIn(ts),
+        assertTrue(Regex("""\| \(\{ type: "[^"]*Circle" \} & \w*Shape\.Circle\)""").containsMatchIn(ts),
             "Circle union member not emitted in discriminator form:\n$ts")
-        assertTrue(Regex("""\| \(\{ type: "[^"]*Rectangle" \} & \w*ShapeRectangle\)""").containsMatchIn(ts),
+        assertTrue(Regex("""\| \(\{ type: "[^"]*Rectangle" \} & \w*Shape\.Rectangle\)""").containsMatchIn(ts),
             "Rectangle union member not emitted in discriminator form:\n$ts")
         // The subtype interfaces, with their fields.
-        assertTrue(Regex("""interface \w*ShapeCircle \{[^}]*radius: number""").containsMatchIn(ts),
+        assertTrue(Regex("""export namespace Shape""").containsMatchIn(ts),
             "Circle subtype interface/fields not emitted:\n$ts")
-        assertTrue(Regex("""interface \w*ShapeRectangle \{[^}]*width: number""").containsMatchIn(ts),
+        assertTrue(Regex("""interface \w*Circle \{[^}]*radius: number""").containsMatchIn(ts),
+            "Circle subtype interface/fields not emitted:\n$ts")
+        assertTrue(Regex("""interface \w*Rectangle \{[^}]*width: number""").containsMatchIn(ts),
             "Rectangle subtype interface/fields not emitted:\n$ts")
         Unit
     }

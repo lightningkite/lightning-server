@@ -195,7 +195,7 @@ public class KtorEngine(
                                 // response writes suspend for backpressure instead of blocking the event loop.
                                 // use() is what turns a mid-body failure into a cancelled channel — without it the
                                 // engine would frame a half-written body as a complete response.
-                                KtorChannelSuspendingSink(this).use { body.writeTo(it) }
+                                KtorChannelSuspendingSink(this).use { body.writeSuspending(it) }
                             }
                         }
                 }
