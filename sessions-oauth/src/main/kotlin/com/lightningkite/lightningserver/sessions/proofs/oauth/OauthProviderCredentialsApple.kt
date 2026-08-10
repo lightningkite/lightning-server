@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.runtime.now
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.EC
 import dev.whyoleg.cryptography.algorithms.ECDSA
+import dev.whyoleg.cryptography.algorithms.SHA256
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
@@ -44,57 +45,47 @@ public data class OauthProviderCredentialsApple(
         secret = generateJwt()
     )
 
-    @OptIn(ExperimentalEncodingApi::class)
     context(_: ServerRuntime)
     public fun generateJwt(): String {
-        return buildString {
-            val withDefaults = Json { encodeDefaults = true; explicitNulls = false }
-            append(
-                Base64.UrlSafe.encode(withDefaults.encodeToString(buildJsonObject {
-//                    put("typ", "JWT")
-                    put("kid", keyId)
-                    put("alg", "ES256")
-                }).toByteArray()).trimEnd('=')
-            )
-            append('.')
-            val issuedAt = now().minus(1.days)
-            append(
-                Base64.UrlSafe.encode(
-                    withDefaults.encodeToString(
-                        buildJsonObject {
-                            put("iss", teamId)
-                            put("iat", issuedAt.toEpochMilliseconds().div(1000))
-                            put("exp", issuedAt.plus(5.days).toEpochMilliseconds().div(1000))
-                            put("aud", "https://appleid.apple.com")
-                            put("sub", serviceId)
-                        }
-                    ).toByteArray()
-                ).trimEnd('=')
-            )
-            val soFar = this.toString()
-            append('.')
+        val withDefaults = Json { encodeDefaults = true; explicitNulls = false }
 
-            // Parse the ECDSA P-256 private key and sign
-            // The cryptography library API: get ECDSA algorithm, then get key decoder with curve only
-            val ecdsaAlgorithm = CryptographyProvider.Default.get(ECDSA)
-            val privateKeyDecoder = ecdsaAlgorithm.privateKeyDecoder(EC.Curve.P256)
-            val privateKey =
-                privateKeyDecoder.decodeFromByteArrayBlocking(EC.PrivateKey.Format.PEM, keyString.toByteArray())
+        val header = Base64.UrlSafe.encode(withDefaults.encodeToString(buildJsonObject {
+            put("kid", keyId)
+            put("alg", "ES256")
+        }).toByteArray()).trimEnd('=')
 
-            // We only have private key, but KeyPair interface requires both. Create a minimal public key.
-            val publicKeyDecoder = ecdsaAlgorithm.publicKeyDecoder(EC.Curve.P256)
-            val publicKey = publicKeyDecoder.decodeFromByteArrayBlocking(EC.PublicKey.Format.DER, ByteArray(0))
+        val issuedAt = now().minus(1.days)
+        val payload = Base64.UrlSafe.encode(withDefaults.encodeToString(buildJsonObject {
+            put("iss", teamId)
+            put("iat", issuedAt.toEpochMilliseconds().div(1000))
+            put("exp", issuedAt.plus(5.days).toEpochMilliseconds().div(1000))
+            put("aud", "https://appleid.apple.com")
+            put("sub", serviceId)
+        }).toByteArray()).trimEnd('=')
 
-            @OptIn(dev.whyoleg.cryptography.CryptographyProviderApi::class)
-            val keyPair = object : ECDSA.KeyPair {
-                override val privateKey = privateKey
-                override val publicKey = publicKey
-            }
-            val signer = keyPair.ES256()
+        val unsignedToken = "$header.$payload"
 
-            append(
-                Base64.UrlSafe.encode(signer.signBlocking(soFar.toByteArray())).trimEnd('=')
-            )
-        }
+        // 1. Ensure valid PEM formatting for the Apple .p8 key
+        val formattedPem = if (keyString.contains("-----BEGIN")) keyString else """
+        -----BEGIN PRIVATE KEY-----
+        $keyString
+        -----END PRIVATE KEY-----
+    """.trimIndent()
+
+        // 2. Decode the private key
+        val ecdsaAlgorithm = CryptographyProvider.Default.get(ECDSA)
+        val privateKeyDecoder = ecdsaAlgorithm.privateKeyDecoder(EC.Curve.P256)
+        val privateKey = privateKeyDecoder.decodeFromByteArrayBlocking(
+            EC.PrivateKey.Format.PEM,
+            formattedPem.toByteArray()
+        )
+
+        // 3. Create a generator directly from privateKey (using RAW/IEEE_P1363 format for JWTs)
+        val generator = privateKey.signatureGenerator(SHA256, ECDSA.SignatureFormat.RAW)
+        val signature = generator.generateSignatureBlocking(unsignedToken.toByteArray())
+
+        val encodedSignature = Base64.UrlSafe.encode(signature).trimEnd('=')
+
+        return "$unsignedToken.$encodedSignature"
     }
 }
