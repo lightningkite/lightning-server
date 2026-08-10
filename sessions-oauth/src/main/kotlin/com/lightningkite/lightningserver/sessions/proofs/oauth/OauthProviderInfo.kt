@@ -165,7 +165,10 @@ public class OauthProviderInfo(
     }
 
     context(runtime: ServerRuntime)
-    public suspend fun accessToken(credentials: Runtime<OauthProviderCredentials>, refreshToken: String): OauthResponse {
+    public suspend fun accessToken(
+        credentials: Runtime<OauthProviderCredentials>,
+        refreshToken: String
+    ): OauthResponse {
         return client.post(tokenUrl) {
             setBody(
                 FormDataFormat(EmptySerializersModule()).encodeToString(
@@ -197,6 +200,7 @@ public class OauthProviderInfo(
                     }
                 }.internalBody<GoogleResponse2>()
                 ExternalProfile(
+                    id = response2.id,
                     email = if (response2.verified_email) response2.email else null,
                     image = response2.picture?.takeUnless { it.isEmpty() },
                     name = response2.name?.takeUnless { it.isEmpty() },
@@ -225,19 +229,18 @@ public class OauthProviderInfo(
                 val claimsJson = serverRuntime.externalSerialization.json.parseToJsonElement(
                     serverRuntime.externalSerialization.json.encodeToString(claims)
                 ).jsonObject
+
+                val sub = claimsJson.get("sub")?.jsonPrimitive?.content
+                    ?: throw BadRequestException("Subject id must be present")
+
                 val emailVerified = claimsJson.get("email_verified")?.jsonPrimitive?.content?.toBooleanStrictOrNull()
                     ?: claimsJson.get("email_verified")?.jsonPrimitive?.boolean
-                    ?: throw BadRequestException("Missing email_verified claim in Apple ID token")
+                    ?: false
 
-                if (!emailVerified) {
-                    throw BadRequestException("Apple has not verified the email address.")
-                }
+                // Email may be null on 2nd+ logins
+                val email = if (emailVerified) claimsJson.get("email")?.jsonPrimitive?.content else null
 
-                // Extract email from verified claims
-                val email = claimsJson.get("email")?.jsonPrimitive?.content
-                    ?: throw BadRequestException("No email found in verified Apple ID token")
-
-                ExternalProfile(email = email)
+                ExternalProfile(id = sub, email = email)
             }
         )
 
@@ -253,6 +256,7 @@ public class OauthProviderInfo(
                     }
                 }.body()
                 ExternalProfile(
+                    id = response2.sub,
                     email = response2.email,
                     image = response2.picture,
                 )
@@ -285,6 +289,7 @@ public class OauthProviderInfo(
                     if (primary.verified) primary.email else null
                 }
                 ExternalProfile(
+                    id = user.id.toString(),
                     email = email,
                     username = user.login,
                     image = user.avatar_url,
@@ -303,6 +308,7 @@ private suspend inline fun <reified T> io.ktor.client.statement.HttpResponse.int
 
 @Serializable
 private data class GoogleResponse2(
+    val id: String? = null,
     val verified_email: Boolean,
     val email: String,
     val picture: String? = null,
@@ -311,6 +317,7 @@ private data class GoogleResponse2(
 
 @Serializable
 private data class MicrosoftAccountInfo(
+    val sub: String? = null,
     val email: String? = null,
     val picture: String? = null,
 )

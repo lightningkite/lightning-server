@@ -202,7 +202,7 @@ public object AppleJwtVerifier {
 
         // Create a verification-only signer
         return object : Signer {
-            override val generator = throw UnsupportedOperationException("This signer is verification-only")
+            override val generator get() = throw UnsupportedOperationException("This signer is verification-only")
             override val verifier = publicKey.signatureVerifier()
             override val name = "RS256"
         }
