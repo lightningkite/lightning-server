@@ -66,7 +66,7 @@ public fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> explicitApiHttpHan
     successCode: HttpStatus = HttpStatus.OK,
     errorCases: List<LSError> = emptyList(),
     examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = emptyList(),
-    timeout: Duration,
+    timeout: Duration = 30.seconds,
     implementation: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT,
 ): ApiHttpHandler<PATH, USER, INPUT, OUTPUT> =
     ApiHttpHandlerData(
