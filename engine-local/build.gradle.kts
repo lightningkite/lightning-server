@@ -30,7 +30,6 @@ kotlin {
     compilerOptions {
         optIn.add("kotlin.time.ExperimentalTime")
         optIn.add("kotlin.uuid.ExperimentalUuidApi")
-        freeCompilerArgs.add("-Xcontext-parameters")
     }
 }
 

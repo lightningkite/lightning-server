@@ -135,7 +135,7 @@ class GzipInterceptorTest {
         }
 
         val out = BufferSuspendingSink()
-        out.gzip().use { producer.writeTo(it) }
+        out.gzip().use { producer.writeSuspending(it) }
         val compressed = out.buffer.readByteArray()
 
         assertContentEquals(original, compressed.ungzip())
@@ -153,7 +153,7 @@ class GzipInterceptorTest {
         }
 
         val out = BufferSuspendingSink()
-        out.gzip().use { producer.writeTo(it) }
+        out.gzip().use { producer.writeSuspending(it) }
 
         assertContentEquals(original, out.buffer.readByteArray().ungzip())
     }
@@ -161,7 +161,7 @@ class GzipInterceptorTest {
     @Test
     fun `producer gzip round-trips an empty stream`() = runBlocking {
         val out = BufferSuspendingSink()
-        out.gzip().use { Data.SuspendingSink { }.writeTo(it) }
+        out.gzip().use { Data.SuspendingSink { }.writeSuspending(it) }
 
         assertContentEquals(ByteArray(0), out.buffer.readByteArray().ungzip())
     }
@@ -175,7 +175,7 @@ class GzipInterceptorTest {
         }
 
         val out = RecordingSink()
-        out.gzip().use { producer.writeTo(it) }
+        out.gzip().use { producer.writeSuspending(it) }
 
         assertEquals(cause, out.cancelCause, "the abandon must be forwarded to the consumer's sink")
         assertTrue(out.closedCleanly.not(), "an abandoned stream must never be reported as complete")

@@ -24,7 +24,6 @@ import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.Data
 import com.lightningkite.services.data.use
-import com.lightningkite.services.pubsub.PubSubChannel
 import io.ktor.http.*
 import io.ktor.http.HttpHeaders
 import io.ktor.server.application.*

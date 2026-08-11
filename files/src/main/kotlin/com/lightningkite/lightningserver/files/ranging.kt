@@ -144,7 +144,7 @@ public suspend fun TypedData.getRange(range: HttpRange, dataSize: Long): TypedDa
                 }
                 val start = range.rangeStart(dataSize)
                 Data.SuspendingSink(size = bytesToForward.takeIf { it != RANGE_UNTIL_END }) { out ->
-                    data.writeTo(RangeSlicingSink(out, skip = start, forward = bytesToForward))
+                    data.writeSuspending(RangeSlicingSink(out, skip = start, forward = bytesToForward))
                 }
             }
         }
