@@ -655,22 +655,22 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 "depends_on" - listOf("aws_s3_object.app_storage")
             }
             // Pre-deploy gate: invoke the freshly-published function version with a {"predeploy":true}
-            // event and only proceed to the alias cutover if it reports "predeploy-ok". The payload is
-            // supplied via a file to avoid cross-platform shell quoting. Triggered on every code change.
+            // event and only proceed to the alias cutover if it reports "predeploy-ok". Triggered on
+            // every code change.
+            // The payload is the base64 of {"predeploy":true} passed inline: AWS CLI v2 expects base64
+            // for --payload anyway, and the encoded form is bare alphanumerics, so it survives both
+            // /bin/sh and PowerShell without quoting. --cli-binary-format is passed explicitly so a
+            // profile-level cli_binary_format setting can't reinterpret it as raw text.
             // Note: with snapStart the new version is isolated so this truly gates cutover; without
             // snapStart the alias tracks $LATEST, which is live as soon as the function updates.
-            "resource.local_file.predeploy_payload" {
-                "content" - "{\"predeploy\":true}"
-                "filename" - $$"${path.module}/build/predeploy-payload.json"
-            }
             "resource.null_resource.predeploy" {
                 "triggers" {
                     "code" - expression("aws_lambda_function.main.source_code_hash")
                 }
-                "depends_on" - listOf("aws_lambda_function.main", "local_file.predeploy_payload")
+                "depends_on" - listOf("aws_lambda_function.main")
                 "provisioner.local-exec" {
                     "command" - expression(
-                        $$"""local.is_windows ? "aws lambda invoke --function-name ${aws_lambda_function.main.function_name} --qualifier ${aws_lambda_function.main.version} --payload file://${path.module}/build/predeploy-payload.json --region $${emitter.applicationRegion} ${path.module}/build/predeploy-out.json | Out-Null; if(-not(Select-String -Path ${path.module}/build/predeploy-out.json -Pattern predeploy-ok -Quiet)){exit 1}" : "aws lambda invoke --function-name ${aws_lambda_function.main.function_name} --qualifier ${aws_lambda_function.main.version} --payload file://${path.module}/build/predeploy-payload.json --region $${emitter.applicationRegion} ${path.module}/build/predeploy-out.json > /dev/null && grep -q predeploy-ok ${path.module}/build/predeploy-out.json""" + "\""
+                        $$"""local.is_windows ? "aws lambda invoke --function-name ${aws_lambda_function.main.function_name} --qualifier ${aws_lambda_function.main.version} --cli-binary-format base64 --payload eyJwcmVkZXBsb3kiOnRydWV9 --region $${emitter.applicationRegion} ${path.module}/build/predeploy-out.json | Out-Null; if(-not(Select-String -Path ${path.module}/build/predeploy-out.json -Pattern predeploy-ok -Quiet)){exit 1}" : "aws lambda invoke --function-name ${aws_lambda_function.main.function_name} --qualifier ${aws_lambda_function.main.version} --cli-binary-format base64 --payload eyJwcmVkZXBsb3kiOnRydWV9 --region $${emitter.applicationRegion} ${path.module}/build/predeploy-out.json > /dev/null && grep -q predeploy-ok ${path.module}/build/predeploy-out.json""" + "\""
                     )
                     "interpreter" - expression("local.is_windows ? [\"PowerShell\", \"-Command\"] : []")
                 }
