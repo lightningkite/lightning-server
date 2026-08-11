@@ -734,6 +734,11 @@ cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json << EOF
             "file_path": "/var/log/$$projectPrefix/redeploy.log",
             "log_group_name": "/ec2/$$projectPrefix/application",
             "log_stream_name": "{instance_id}/redeploy"
+          },
+          {
+            "file_path": "/var/log/$$projectPrefix/os-update.log",
+            "log_group_name": "/ec2/$$projectPrefix/application",
+            "log_stream_name": "{instance_id}/os-update"
           }
         ]
       }
