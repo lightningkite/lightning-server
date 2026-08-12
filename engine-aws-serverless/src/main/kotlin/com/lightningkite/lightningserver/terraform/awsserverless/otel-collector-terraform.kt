@@ -29,6 +29,23 @@ public enum class OtlpProtocol(
 }
 
 /**
+ * Environment variables the ADOT Collector Lambda layer reads to locate its configuration file.
+ * Without one of them the layer falls back to its built-in configuration, which exports traces to
+ * AWS X-Ray. `..._URI` is the current name
+ * (https://github.com/open-telemetry/opentelemetry-lambda/blob/main/collector/README.md); `..._FILE`
+ * is the older name that layers in the field still honor. Both get the same value, so whichever one
+ * a given layer build reads is correct.
+ */
+private val COLLECTOR_CONFIG_VARS = listOf(
+    "OPENTELEMETRY_COLLECTOR_CONFIG_URI",
+    "OPENTELEMETRY_COLLECTOR_CONFIG_FILE",
+)
+
+/** Name of the generated collector config within the Lambda package, and where the layer finds it. */
+private const val COLLECTOR_CONFIG_FILE = "collector.yaml"
+private const val COLLECTOR_CONFIG_PATH = "/var/task/$COLLECTOR_CONFIG_FILE"
+
+/**
  * Configures OpenTelemetry for AWS Lambda using the AWS Distro for OpenTelemetry (ADOT) Collector layer.
  *
  * This sets up the ADOT Collector Lambda extension which runs as a sidecar process in your Lambda
@@ -64,11 +81,15 @@ public enum class OtlpProtocol(
  * @param collectorLayerVersion The ADOT collector layer version string (e.g., "0-117-0" for v0.117.0).
  *                              Check https://github.com/aws-observability/aws-otel-lambda for the latest.
  * @param layerVersion The layer version number (typically 1 for new versions).
- * @param otlpEndpoint The OTLP endpoint to send telemetry to (e.g., "api.honeycomb.io:443").
+ * @param otlpEndpoint The OTLP endpoint the collector forwards to (e.g., "api.honeycomb.io:443").
  *                     If null, uses the default X-Ray exporter.
- * @param otlpProtocol The OTLP protocol to use: GRPC (default) or HTTP. Use HTTP when
- *                     your backend doesn't support gRPC or when going through HTTP-only proxies.
- * @param otlpHeaders Additional headers for OTLP export (e.g., API keys). Format: "key=value,key2=value2"
+ * @param otlpProtocol The protocol the collector uses to reach [otlpEndpoint]: GRPC (default) or HTTP.
+ *                     Use HTTP when your backend doesn't support gRPC (Grafana Cloud's OTLP gateway,
+ *                     for instance) or when going through HTTP-only proxies. The application always
+ *                     reaches the local collector over gRPC.
+ * @param otlpHeaders Headers for OTLP export, typically credentials. Values may be Terraform
+ *                    expressions; they are passed as Lambda environment variables and referenced from
+ *                    the collector config, so they never land in the deployment package.
  * @param serviceName The service name to use in telemetry. Defaults to the handler class name.
  * @param samplingRatio Trace sampling ratio (0.0 to 1.0). Set to 0.01 for 1% sampling. Only applies
  *                      to head-based sampling. For tail-based sampling with error capture, use an
@@ -78,8 +99,10 @@ public enum class OtlpProtocol(
  * @param enableLambdaTracing Whether to enable Lambda's built-in X-Ray tracing (tracing_config).
  *                            null = auto (true for X-Ray backend, false for OTLP endpoints).
  *                            Set to true for X-Ray integration, false to avoid duplicate traces with external backends.
- * @param customCollectorConfig Optional custom collector configuration YAML. If provided, this will
- *                              be written to a file and OPENTELEMETRY_COLLECTOR_CONFIG_FILE will point to it.
+ * @param customCollectorConfig Optional collector configuration YAML, replacing the generated one.
+ *                              It is written through a Terraform template, so any literal dollar-brace
+ *                              sequence in it (such as the collector's own `env:` references) must be
+ *                              escaped by doubling the dollar sign.
  */
 context(emitter: TerraformAwsServerlessBuilder<*>)
 public fun TerraformNeed<TelemetryBackend.Settings>.otelCollector(
@@ -87,7 +110,7 @@ public fun TerraformNeed<TelemetryBackend.Settings>.otelCollector(
     layerVersion: Int = 1,
     otlpEndpoint: String? = null,
     otlpProtocol: OtlpProtocol = OtlpProtocol.GRPC,
-    otlpHeaders: String? = null,
+    otlpHeaders: Map<String, String> = emptyMap(),
     serviceName: String? = null,
     samplingRatio: Double? = null,
     enableMetrics: Boolean = true,
@@ -111,28 +134,38 @@ public fun TerraformNeed<TelemetryBackend.Settings>.otelCollector(
     // Determine if using X-Ray (no custom endpoint)
     val usingXRay = otlpEndpoint == null
 
-    // Configure OTLP exporter endpoint
+    // Where the collector sends what it receives. This has to be expressed in the collector's own
+    // configuration file: the OTEL_* environment variables configure OpenTelemetry SDKs, and the
+    // collector reads none of them. Without a configuration file the layer uses its built-in one,
+    // which exports traces to X-Ray no matter what those variables say.
     if (otlpEndpoint != null) {
-        // User wants to export to a custom OTLP endpoint
-        emitter.lambdaEnvironment["OTEL_EXPORTER_OTLP_ENDPOINT"] =
-            if (otlpEndpoint.startsWith("http")) otlpEndpoint else "https://$otlpEndpoint"
-        emitter.lambdaEnvironment["OTEL_EXPORTER_OTLP_PROTOCOL"] = otlpProtocol.envValue
-
-        // Add authentication headers if provided
-        if (otlpHeaders != null) {
-            emitter.lambdaEnvironment["OTEL_EXPORTER_OTLP_HEADERS"] = otlpHeaders
+        // Header values are credentials, so they ride in Lambda environment variables and the
+        // configuration file only references them; nothing secret enters the deployment package.
+        val headerEnvVars = otlpHeaders.mapValues { (header, value) ->
+            val envVar = "OTLP_HEADER_" + header.map { if (it.isLetterOrDigit()) it.uppercaseChar() else '_' }
+                .joinToString("")
+            emitter.lambdaEnvironment[envVar] = value
+            envVar
         }
-
-        // Export to OTLP endpoint
-        emitter.lambdaEnvironment["OTEL_TRACES_EXPORTER"] = if (enableTraces) "otlp" else "none"
-        emitter.lambdaEnvironment["OTEL_METRICS_EXPORTER"] = if (enableMetrics) "otlp" else "none"
-        emitter.lambdaEnvironment["OTEL_LOGS_EXPORTER"] = "otlp"
+        emitter.lambdaFiles[COLLECTOR_CONFIG_FILE] = customCollectorConfig ?: collectorConfig(
+            endpoint = if (otlpEndpoint.startsWith("http")) otlpEndpoint else "https://$otlpEndpoint",
+            protocol = otlpProtocol,
+            headerEnvVars = headerEnvVars,
+            enableTraces = enableTraces,
+            enableMetrics = enableMetrics,
+        )
+        COLLECTOR_CONFIG_VARS.forEach { emitter.lambdaEnvironment[it] = COLLECTOR_CONFIG_PATH }
     } else {
-        // Default: export to X-Ray
-        emitter.lambdaEnvironment["OTEL_TRACES_EXPORTER"] = if (enableTraces) "xray" else "none"
-        emitter.lambdaEnvironment["OTEL_METRICS_EXPORTER"] = if (enableMetrics) "otlp" else "none"
-
-        // Attach X-Ray write policy for the Lambda execution role
+        // Default: the layer's built-in configuration, which exports traces to X-Ray using the
+        // execution role - so that role needs write access. Its pipelines are fixed, so the
+        // per-signal switches have nothing to act on.
+        require(enableTraces && enableMetrics) {
+            "enableTraces/enableMetrics require an otlpEndpoint; the X-Ray path uses the layer's built-in pipelines"
+        }
+        customCollectorConfig?.let {
+            emitter.lambdaFiles[COLLECTOR_CONFIG_FILE] = it
+            COLLECTOR_CONFIG_VARS.forEach { v -> emitter.lambdaEnvironment[v] = COLLECTOR_CONFIG_PATH }
+        }
         emitter.attachXRayPolicy = true
     }
 
@@ -152,15 +185,9 @@ public fun TerraformNeed<TelemetryBackend.Settings>.otelCollector(
         emitter.lambdaTracingMode = TerraformAwsServerlessBuilder.LambdaTracingMode.Active
     }
 
-    // Custom collector configuration
-    if (customCollectorConfig != null) {
-        emitter.lambdaFiles["collector.yaml"] = customCollectorConfig
-        emitter.lambdaEnvironment["OPENTELEMETRY_COLLECTOR_CONFIG_FILE"] = "/var/task/collector.yaml"
-    }
-
-    // Configure the app's OpenTelemetry settings to use the local collector
-    // Use HTTP on port 4318 or gRPC on port 4317 depending on protocol
-    val localCollectorUrl = "${otlpProtocol.urlScheme}://localhost:${otlpProtocol.defaultPort}"
+    // Point the application at the collector running beside it. Both ends are ours, so this link is
+    // always gRPC regardless of the protocol the collector uses to reach the backend.
+    val localCollectorUrl = "${OtlpProtocol.GRPC.urlScheme}://localhost:${OtlpProtocol.GRPC.defaultPort}"
     emitter.fulfillSetting(
         name, Json.encodeToJsonElement(
         OpenTelemetrySettings(
@@ -174,6 +201,54 @@ public fun TerraformNeed<TelemetryBackend.Settings>.otelCollector(
         ),
         sampling = samplingRatio?.let { OpenTelemetrySettings.Sampling(ratio = it, parentBased = true) }
     )))
+}
+
+/**
+ * Builds the collector configuration: OTLP receiver on localhost, every signal exported to [endpoint].
+ *
+ * @param headerEnvVars Header name to the environment variable holding its value.
+ */
+internal fun collectorConfig(
+    endpoint: String,
+    protocol: OtlpProtocol,
+    headerEnvVars: Map<String, String>,
+    enableTraces: Boolean,
+    enableMetrics: Boolean,
+): String {
+    val exporter = if (protocol == OtlpProtocol.HTTP) "otlphttp" else "otlp"
+    return buildString {
+        appendLine("receivers:")
+        appendLine("  otlp:")
+        appendLine("    protocols:")
+        appendLine("      grpc:")
+        appendLine("        endpoint: localhost:${OtlpProtocol.GRPC.defaultPort}")
+        appendLine("      http:")
+        appendLine("        endpoint: localhost:${OtlpProtocol.HTTP.defaultPort}")
+        // No processors: the application's own SDK batches before it reaches the collector, and the
+        // reduced collector in the Lambda layer publishes no list of the processors it ships with.
+        appendLine("exporters:")
+        appendLine("  $exporter:")
+        appendLine("    endpoint: $endpoint")
+        if (headerEnvVars.isNotEmpty()) {
+            appendLine("    headers:")
+            headerEnvVars.forEach { (header, envVar) ->
+                // The file is written through a Terraform template, and "$${" is Terraform's escape
+                // for a literal "${" - it is the collector, not Terraform, that resolves this.
+                appendLine("      $header: \"\$\${env:$envVar}\"")
+            }
+        }
+        appendLine("service:")
+        appendLine("  pipelines:")
+        listOfNotNull(
+            "traces".takeIf { enableTraces },
+            "metrics".takeIf { enableMetrics },
+            "logs",
+        ).forEach { pipeline ->
+            appendLine("    $pipeline:")
+            appendLine("      receivers: [otlp]")
+            appendLine("      exporters: [$exporter]")
+        }
+    }
 }
 
 /**
@@ -206,11 +281,9 @@ public fun TerraformNeed<TelemetryBackend.Settings>.otelHoneycomb(
         "variable.honeycomb_api_key" {}
     }
 
-    val headers = buildString {
-        append("x-honeycomb-team=\${var.honeycomb_api_key}")
-        if (dataset != null) {
-            append(",x-honeycomb-dataset=$dataset")
-        }
+    val headers = buildMap {
+        put("x-honeycomb-team", "\${var.honeycomb_api_key}")
+        if (dataset != null) put("x-honeycomb-dataset", dataset)
     }
 
     otelCollector(
@@ -232,6 +305,8 @@ public fun TerraformNeed<TelemetryBackend.Settings>.otelHoneycomb(
  * @param instanceId Your Grafana Cloud instance ID.
  * @param zone The Grafana Cloud zone (e.g., "prod-us-east-0").
  * @param samplingRatio Client-side sampling ratio.
+ * @param otlpProtocol Grafana Cloud's OTLP gateway only accepts OTLP over HTTP, so leave this alone
+ *                     unless you are pointing at something else.
  */
 context(emitter: TerraformAwsServerlessBuilder<*>)
 public fun TerraformNeed<TelemetryBackend.Settings>.otelGrafanaCloud(
@@ -240,7 +315,7 @@ public fun TerraformNeed<TelemetryBackend.Settings>.otelGrafanaCloud(
     instanceId: String,
     zone: String = "prod-us-east-0",
     samplingRatio: Double? = null,
-    otlpProtocol: OtlpProtocol = OtlpProtocol.GRPC,
+    otlpProtocol: OtlpProtocol = OtlpProtocol.HTTP,
 ): Unit {
     emitter.variable(object : TerraformNeed<String> {
         override val name: String = "grafana_cloud_api_key"
@@ -258,7 +333,7 @@ public fun TerraformNeed<TelemetryBackend.Settings>.otelGrafanaCloud(
         layerVersion = layerVersion,
         otlpEndpoint = "https://otlp-gateway-$zone.grafana.net/otlp",
         otlpProtocol = otlpProtocol,
-        otlpHeaders = "Authorization=Basic \${base64encode(\"$instanceId:\${var.grafana_cloud_api_key}\")}",
+        otlpHeaders = mapOf("Authorization" to "Basic \${base64encode(\"$instanceId:\${var.grafana_cloud_api_key}\")}"),
         samplingRatio = samplingRatio,
         enableLambdaTracing = false,  // Don't enable X-Ray tracing for external backends
     )

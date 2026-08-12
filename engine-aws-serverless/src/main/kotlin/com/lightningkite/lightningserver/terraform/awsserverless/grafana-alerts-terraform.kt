@@ -163,6 +163,10 @@ public data class GrafanaAlert(
  *               and [GrafanaAlert.httpLiveness] to build standard alerts, or construct [GrafanaAlert] directly.
  * @param contactEmail Email address for alert notifications. Defaults to [TerraformAwsServerlessBuilder.emergencyContact].
  * @param evaluationIntervalSeconds How often Grafana evaluates the alert rules.
+ * @param metricsDataSourceName The Prometheus data source the alert queries run against. Grafana
+ *        Cloud names the built-in one after the stack, which is what the default builds; override it
+ *        if your stack's data source is named differently (Grafana returns a 404 at apply time if
+ *        no data source by this name exists).
  */
 context(emitter: TerraformAwsServerlessBuilder<*>)
 public fun grafanaAlerts(
@@ -170,6 +174,7 @@ public fun grafanaAlerts(
     alerts: List<GrafanaAlert>,
     contactEmail: EmailAddress = emitter.emergencyContact,
     evaluationIntervalSeconds: Int = 60,
+    metricsDataSourceName: String = "grafanacloud-$grafanaCloudStackSlug-prom",
 ): Unit {
     if (alerts.isEmpty()) return
 
@@ -205,7 +210,7 @@ public fun grafanaAlerts(
     emitter.emit("grafanaAlerts") {
         // Look up the built-in Prometheus/Mimir data source
         "data.grafana_data_source.mimir_$safePrefix" {
-            "name" - "grafanacloud-metrics"
+            "name" - metricsDataSourceName
         }
 
         // Create a folder to isolate this project's alerts

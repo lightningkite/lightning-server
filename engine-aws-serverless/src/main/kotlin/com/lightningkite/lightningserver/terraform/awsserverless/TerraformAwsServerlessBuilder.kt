@@ -710,6 +710,12 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                 "triggers" {
                     "buildHash" - expression($$"""sha256(join("", [for f in fileset("${path.module}/../../build/dist/lambda", "**") : filesha256("${path.module}/../../build/dist/lambda/${f}")]))""")
                     "settingsHash" - expression("local_sensitive_file.settings_raw.content_sha256")
+                    // This step is what copies the lambda files into the package, so editing one has
+                    // to re-trigger it; the build hash above only covers the compiled output.
+                    lambdaFiles.keys.forEach { filename ->
+                        val resourceName = "lambda_" + filename.replace(".", "_").replace("/", "_")
+                        "${resourceName}Hash" - expression("local_file.$resourceName.content_sha256")
+                    }
                 }
                 "provisioner.local-exec" - (listOf(
                     terraformJsonObject {

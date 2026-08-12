@@ -1,35 +1,35 @@
 {
     "resource": {
         "aws_cloudwatch_event_rule": {
-            "scheduled_task_taskstasksscheduledhealthcheck": {
-                "name": "LightningServerDemo_taskstasksscheduledhealthcheck",
+            "scheduled_task_tasksscheduledcleanup": {
+                "name": "LightningServerDemo_tasksscheduledcleanup",
+                "schedule_expression": "rate(5 minutes)"
+            },
+            "scheduled_task_tasksscheduledhealthcheck": {
+                "name": "LightningServerDemo_tasksscheduledhealthcheck",
                 "schedule_expression": "rate(1 minute)"
             },
             "scheduled_task_uploadcleanupUploads": {
                 "name": "LightningServerDemo_uploadcleanupUploads",
                 "schedule_expression": "rate(1440 minutes)"
-            },
-            "scheduled_task_taskstasksscheduledcleanup": {
-                "name": "LightningServerDemo_taskstasksscheduledcleanup",
-                "schedule_expression": "rate(5 minutes)"
             }
         },
         "aws_cloudwatch_event_target": {
-            "scheduled_task_taskstasksscheduledhealthcheck": {
-                "input": "{\"scheduled\": \"/tasks/tasks/scheduled-health-check\"}",
-                "rule": "${aws_cloudwatch_event_rule.scheduled_task_taskstasksscheduledhealthcheck.name}",
+            "scheduled_task_tasksscheduledcleanup": {
+                "input": "{\"scheduled\": \"/tasks/scheduled-cleanup\"}",
+                "rule": "${aws_cloudwatch_event_rule.scheduled_task_tasksscheduledcleanup.name}",
+                "target_id": "lambda",
+                "arn": "${aws_lambda_alias.main.arn}"
+            },
+            "scheduled_task_tasksscheduledhealthcheck": {
+                "input": "{\"scheduled\": \"/tasks/scheduled-health-check\"}",
+                "rule": "${aws_cloudwatch_event_rule.scheduled_task_tasksscheduledhealthcheck.name}",
                 "target_id": "lambda",
                 "arn": "${aws_lambda_alias.main.arn}"
             },
             "scheduled_task_uploadcleanupUploads": {
                 "input": "{\"scheduled\": \"/upload/cleanupUploads\"}",
                 "rule": "${aws_cloudwatch_event_rule.scheduled_task_uploadcleanupUploads.name}",
-                "target_id": "lambda",
-                "arn": "${aws_lambda_alias.main.arn}"
-            },
-            "scheduled_task_taskstasksscheduledcleanup": {
-                "input": "{\"scheduled\": \"/tasks/tasks/scheduled-cleanup\"}",
-                "rule": "${aws_cloudwatch_event_rule.scheduled_task_taskstasksscheduledcleanup.name}",
                 "target_id": "lambda",
                 "arn": "${aws_lambda_alias.main.arn}"
             }

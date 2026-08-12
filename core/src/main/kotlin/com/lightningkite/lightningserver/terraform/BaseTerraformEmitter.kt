@@ -307,6 +307,7 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
 
         // Patch for MongoDB
         if (terraformProviders.any { it.import.name == "mongodbatlas" }) {
+            // TODO: WTF?  These things should define their own credential settings
             env["MONGODB_ATLAS_PUBLIC_KEY"] = secretsSource.get(MONGODB_ATLAS_PUBLIC_KEY)
             env["MONGODB_ATLAS_PRIVATE_KEY"] = secretsSource.get(MONGODB_ATLAS_PRIVATE_KEY)
         }

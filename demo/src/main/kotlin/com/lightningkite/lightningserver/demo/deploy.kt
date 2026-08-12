@@ -15,11 +15,15 @@ import com.lightningkite.services.email.javasmtp.awsSesDomainConfiguration
 import com.lightningkite.services.email.javasmtp.awsSesSmtp
 import com.lightningkite.services.email.ses.awsSesInbound
 import com.lightningkite.services.files.s3.awsS3Bucket
+import com.lightningkite.services.notifications.NotificationService
 import com.lightningkite.services.pubsub.aws.dynamoDb
 import com.lightningkite.services.terraform.AwsVpc
+import com.lightningkite.services.terraform.TerraformProvider
+import com.lightningkite.services.terraform.TerraformProviderImport
 import com.lightningkite.services.terraform.byVariable
 import com.lightningkite.services.terraform.direct
 import io.github.oshai.kotlinlogging.Level
+import kotlinx.serialization.json.JsonObject
 import software.amazon.awssdk.regions.Region
 import java.io.File
 import kotlin.reflect.KClass
@@ -58,8 +62,8 @@ object LkEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
     override val applicationVpc: AwsVpc = AwsVpc.None
 
     override fun Server.settings() {
-//        require(TerraformProviderImport.mongodbAtlas)
-//        require(TerraformProvider(TerraformProviderImport.mongodbAtlas, null, JsonObject(emptyMap())))
+        require(TerraformProviderImport.mongodbAtlas)
+        require(TerraformProvider(TerraformProviderImport.mongodbAtlas, null, JsonObject(emptyMap())))
 
 //        database.awsKeyspaces(pointInTimeRecovery = true)
         database.mongodbAtlasFree(orgId = "6323a65c43d66b56a2ea5aea", zoneName = "Zone 1")
@@ -84,11 +88,15 @@ object LkEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
                 )
             )
         )
-        telemetrySettings.otelCollector(
-            otlpEndpoint = "https://signoz.lightningkite.com",
-            otlpProtocol = OtlpProtocol.HTTP,
-            serviceName = displayName,
-//            samplingRatio = 0.1,
+        telemetrySettings.otelGrafanaCloud(
+            instanceId = "1548711",
+            zone = "prod-us-west-0",
+        )
+        grafanaAlerts(
+            grafanaCloudStackSlug = "lightningkite",
+            alerts = GrafanaAlert.httpErrors(displayName, errorThreshold = 5) +
+                    GrafanaAlert.httpLatency(displayName, p99ThresholdMs = 5000) +
+                    GrafanaAlert.httpLiveness(displayName),
         )
         cors.direct(
             CorsSettings(
@@ -114,6 +122,7 @@ object LkEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
         phoneCall.byVariable()
         voiceAgent.byVariable()
         githubOauth.byVariable()
+        notifications.direct(NotificationService.Settings("console"))
     }
 }
 
@@ -127,7 +136,10 @@ object LkEnvDeploy {
 
 object LkEnvEdit {
     @JvmStatic
-    fun main(vararg args: String) = LkEnv.editVars()
+    fun main(vararg args: String) {
+        println("EDIT TIME")
+        LkEnv.editVars()
+    }
 }
 
 object LkEnvDestroy {
