@@ -25,6 +25,29 @@ public fun KSerializer<*>.kotlinTypeString(): String {
 }
 
 @OptIn(ExperimentalSerializationApi::class)
+internal fun KSerializer<*>.kotlinTypeStringWithReplacements(
+    replacements: Map<KSerializer<*>, String>
+): String {
+    replacements.entries
+        .find { it.key deepEquals this@kotlinTypeStringWithReplacements }
+        ?.let { return it.value }
+
+    return when (this.descriptor.kind) {
+        StructureKind.MAP -> "Map<String, ${this.mapValueElement()!!.kotlinTypeStringWithReplacements(replacements)}>"
+
+        StructureKind.LIST -> "List<${this.listElement()!!.kotlinTypeStringWithReplacements(replacements)}>"
+        SerialKind.CONTEXTUAL -> descriptor.capturedKClass?.qualifiedName ?: descriptor.serialNameFQN()
+        else -> {
+            descriptor.serialName.substringBefore('/').substringBefore('<') +
+                    (typeParametersSerializersOrNull()
+                        ?.takeUnless { it.isEmpty() }
+                        ?.joinToString(", ", "<", ">") { it.kotlinTypeStringWithReplacements(replacements) }
+                        ?: "")
+        }
+    }
+}
+
+@OptIn(ExperimentalSerializationApi::class)
 context(server: ServerRuntime)
 public fun KSerializer<*>.kotlinSerializer(): String {
     nullElement()?.let { return it.kotlinSerializer() + ".nullable" }
@@ -50,10 +73,56 @@ public fun KSerializer<*>.kotlinSerializer(): String {
     }
 }
 
+
+@OptIn(ExperimentalSerializationApi::class)
+context(server: ServerRuntime)
+internal fun KSerializer<*>.kotlinSerializerWithReplacements(
+    replacements: Map<KSerializer<*>, String>
+): String {
+    replacements
+        .entries
+        .find { this@kotlinSerializerWithReplacements deepEquals it.key }
+        ?.let { return it.value }
+
+    nullElement()?.let { return it.kotlinSerializerWithReplacements(replacements) + ".nullable" }
+
+    return when (this.descriptor.kind) {
+        StructureKind.MAP -> "MapSerializer(String.serializer(), ${
+            this.mapValueElement()!!.kotlinSerializerWithReplacements(replacements)
+        })"
+
+        StructureKind.LIST -> "ListSerializer(${this.listElement()!!.kotlinSerializerWithReplacements(replacements)})"
+
+        SerialKind.CONTEXTUAL -> "ContextualSerializer(${kotlinTypeString()}::class, null, arrayOf(${
+            this.typeParametersSerializersOrNull()?.joinToString(", ") { it.kotlinSerializerWithReplacements(replacements) } ?: ""
+        }))"
+
+        else ->
+            if (descriptor.serialName == "kotlin.Nothing") "kotlinx.serialization.builtins.NothingSerializer()"
+            else descriptor.serialName
+                .substringBefore('/')
+                .substringBefore('<')
+                .plus(".serializer")
+                .plus(typeParametersSerializersOrNull()?.joinToString(", ", "(", ")") { it.kotlinSerializerWithReplacements(replacements) } ?: "()")
+    }
+}
+
 public fun KSerializer<*>.isUnit(): Boolean = descriptor.serialName == "kotlin.Unit"
 
 /** One subtype of a sealed type: its on-the-wire discriminator [name] and its [serializer]. */
 public class SealedOptionInfo(public val name: String, public val serializer: KSerializer<*>)
+
+public infix fun KSerializer<*>.deepEquals(other: KSerializer<*>): Boolean {
+    if (this.descriptor != other.descriptor) return false
+
+    val myTypes = this.typeParametersSerializersOrNull()
+    val otherTypes = other.typeParametersSerializersOrNull()
+
+    if (myTypes == null && otherTypes == null) return true
+    if (myTypes?.size != otherTypes?.size) return false
+
+    return myTypes.orEmpty().zip(otherTypes.orEmpty()).all { (a, b) -> a.deepEquals(b) }
+}
 
 /**
  * The subtypes of a sealed/polymorphic serializer, or null if this isn't one.

@@ -41,6 +41,20 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         message = "A unique constraint was violated.",
     )
 
+    public val default: ApiHttpHandler<PathSpec0, USER, Unit, T> =
+        path.path("_default_").get bind explicitApiHttpHandler(
+            summary = "Default",
+            description = "Returns the user's permissions for this collection.",
+            inputType = Unit.serializer(),
+            outputType = info.serializer,
+            auth = info.auth.subscope(ModelInfo.Scopes.read),
+            errorCases = emptyList(),
+            examples = emptyList(),
+            implementation = { _: Unit ->
+                info.defaultItem(authOrNull)
+            }
+        )
+
     public val permissions: ApiHttpHandler<PathSpec0, USER, Unit, ModelPermissions<T>> =
         path.path("_permissions_").get bind explicitApiHttpHandler(
             summary = "Permissions",

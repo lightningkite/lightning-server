@@ -1,13 +1,20 @@
 package com.lightningkite.lightningserver.typed.sdk
 
 import com.lightningkite.lightningserver.auth.naturalLanguage
+import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.pathing.PathSpecMany
 import com.lightningkite.lightningserver.pathing.plus
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.LiveVersion
 import com.lightningkite.lightningserver.typed.sdk.SDK.processToModules
 import com.lightningkite.lightningserver.typed.sdk.SDK.sdk
 import com.lightningkite.services.data.ExperimentalLightningServer
+import kotlinx.serialization.KSerializer
+import kotlin.reflect.KClass
+import kotlin.reflect.KType
+import kotlin.reflect.KTypeParameter
+import kotlin.reflect.full.functions
 
 /**
  * Kotlin SDK generator using Fetcher-based HTTP clients.
@@ -101,6 +108,7 @@ public class FetcherSdk(
         public data class MultipleFiles(
             val interfaceFilename: String,
             val liveFilename: String,
+            val generatedLiveVersionsFilename: String = "GeneratedLiveVersions.kt"
         ) : Structure
     }
 
@@ -116,7 +124,12 @@ public class FetcherSdk(
      */
     context(server: ServerRuntime)
     override fun write(archive: Archive) {
-        val processed = server.server.sdk(rootInfo).processToModules().ensureUniqueNames()
+        val data = server.server.sdk(rootInfo)
+        val processed = data.processToModules().ensureUniqueNames()
+
+        val needToGenerateLiveVersions = data.asSequence().any { node ->
+            node.layer.endpoints.keys.any { it?.item?.needsGeneration() == true }
+        }
 
         when (fileStructure) {
             is Structure.MultipleFiles -> {
@@ -137,6 +150,20 @@ public class FetcherSdk(
                     )
                     writeLive(processed)
                 }
+                if (needToGenerateLiveVersions) archive.appendableEntry(fileStructure.generatedLiveVersionsFilename) {
+                    appendLine("package $packageName")
+                    appendImports(
+                        processed,
+                        "com.lightningkite.lightningserver.HttpMethod",
+                        "com.lightningkite.lightningserver.typed.Fetcher",
+                        "com.lightningkite.lightningserver.typed.ClientWebSocket",
+                        "kotlinx.serialization.ContextualSerializer",
+                        "kotlinx.serialization.KSerializer",
+                        "kotlinx.serialization.builtins.*",
+                    )
+                    appendLine()
+                    writeGeneratedLiveVersions(data)
+                }
             }
 
             is Structure.SingleFile -> {
@@ -152,6 +179,7 @@ public class FetcherSdk(
                     )
                     writeInterface(processed)
                     writeLive(processed)
+                    if (needToGenerateLiveVersions) writeGeneratedLiveVersions(data)
                 }
             }
         }
@@ -190,25 +218,7 @@ public class FetcherSdk(
                 )
 
                 for (function in declaredFunctions) {
-                    if (includeDocComments) {
-                        val docs = buildList {
-                            fun line(string: String) {
-                                add(string); add("")
-                            }
-                            if (function.summary.isNotBlank()) line(function.summary)
-                            if (function.description.isNotBlank()) line(function.description)
-
-                            add(
-                                "**Auth Requirements:** ${
-                                    function.auth.naturalLanguage(true).replace("[", "[[").replace("]", "]]")
-                                }"
-                            )
-                        }
-
-                        appendIdtLine(depth + 1, "/**")
-                        for (line in docs) appendIdtLine(depth + 1, " * $line")
-                        appendIdtLine(depth + 1, " * */")
-                    }
+                    if (includeDocComments) append(function.kdoc(depth, includeAuth = true))
 
                     appendIdtLine(depth + 1, function.kotlinString())
                 }
@@ -229,25 +239,17 @@ public class FetcherSdk(
 
     context(server: ServerRuntime)
     private fun Appendable.writeLive(module: SDK.Module) {
-        fun PathSpec.toCodeString() = segments.joinToString("/", prefix = "\"", postfix = "\"") {
-            when (it) {
-                is PathSpec.Segment.Constant -> it.value
-                is PathSpec.Segment.Wildcard<*> -> $$"${fetcher.url($${it.name.functionCase()}, $${it.serializer.kotlinSerializer()})}"
-            }
-        }
-
         fun InterfaceInfo.liveString(path: PathSpec): String {
             val live = type.annotations
                 .filterIsInstance<LiveVersion>()
                 .firstOrNull()
-                ?.live
-                ?.let {
-                    it.qualifiedName
-                        ?: throw SDK.GenerationException("No qualified name found for live version of $this: $it")
-                }
-                ?: throw SDK.GenerationException("LiveVersion annotation required on client interfaces, please provide a live version of ${type.qualifiedName}.")
 
-            return "$live(fetcher, ${path.toCodeString()}, ${typeParameters.joinToString { it.kotlinSerializer() }})"
+            val name = live?.live
+                ?.let { it.qualifiedName ?: throw IllegalStateException("LiveVersion for $type has no qualified name") }
+                ?: type.simpleName?.let { "Live$it" } // generated name, will be in same package.
+                ?: throw IllegalStateException("$type has no simple name")
+
+            return "$name(fetcher, ${path.toCodeString()}, ${typeParameters.joinToString { it.kotlinSerializer() }})"
         }
 
         fun SDK.Module.writeLive(ancestors: List<SDK.Module>) {
@@ -318,14 +320,204 @@ public class FetcherSdk(
         module.writeLive(emptyList())
     }
 
-    private fun SDK.Function.kotlinString(): String {
-        val argString = arguments.joinToString { "${it.name.functionCase()}: ${it.type.kotlinTypeString()}" }
+    private fun InterfaceInfo.needsGeneration() =
+        type.annotations.none { it is LiveVersion }
+
+    context(server: ServerRuntime)
+    private fun Appendable.writeGeneratedLiveVersions(data: SDK.Data) {
+        data.asSequence()
+            .flatMap { it.layer.endpoints.entries }
+            .filter {
+                it.key?.item?.needsGeneration() == true
+            }
+            .distinctBy { it.key?.item?.type }
+            .sortedBy { it.key?.item?.type?.simpleName }
+            .forEach { (locationed, endpoints) ->
+                val inter = locationed?.item ?: return@forEach
+
+                if (inter.typeParameters.size != inter.type.typeParameters.size)
+                    throw SDK.GenerationException("Cannot generate live version for $inter: number of provided type parameter serializers does not match number of type parameters (${inter.typeParameters.size} vs ${inter.type.typeParameters.size})")
+
+                val name = inter.type.simpleName ?: throw SDK.GenerationException("Cannot generate live version for $inter: no simple name")
+
+                // for now it's assumed that any ServerBuilder that sets interfaceInfo the defined endpoints are a 1-to-1 match
+
+                val endpointEntries = endpoints.entries
+
+                val matched = inter.type.functions.filterNot { it.name == "equals" || it.name == "toString" || it.name == "hashCode" }.map { func ->
+                    endpointEntries.firstNotNullOfOrNull { (path, endpoints) ->
+                        val path = PathSpecMany(path.segments.drop(locationed.location.segments.size), path.after, path.wildcards)
+                        endpoints.http.entries
+                            .find { it.value.functionName == func.name }
+                            ?.let {
+                                SDK.Function.Endpoint(
+                                    handler = it.value,
+                                    endpoint = HttpEndpoint(path, it.key),
+                                    fromInterface = inter,
+                                    functionName = it.value.functionName
+                                )
+                            }
+                            ?: endpoints.websocket?.takeIf { it.functionName == func.name }?.let { websocket ->
+                                SDK.Function.Websocket(
+                                    handler = websocket,
+                                    path = path,
+                                    fromInterface = inter,
+                                    functionName = websocket.functionName
+                                )
+                            }
+                    }
+                    ?: throw SDK.GenerationException("Cannot generate live version for $inter: No endpoint with required method functionName \"${func.name}\" found.")
+                }
+
+                val paramsSerializersToValues = inter.typeParameters.zip(inter.type.typeParameters).map { (serializer, param) ->
+                    Triple(param, serializer, "${param.name.lowercase()}Serializer")
+                }
+
+                //  Generation Format:
+                //  open class Live{interfaceName}[<{args [: upperBound]},...>](
+                //      val fetcher: Fetcher,
+                //      val basePath: String,
+                //      [val {arg1}Serializer: KSerializer<{arg1}>,]
+                //      [val {arg2}Serializer: KSerializer<{arg2}>,]
+                //      ...
+                //  ): {interfaceName}[<{args},*>] [where {arg1}: {upperBound1}, {arg1}: {upperBound2}, ...]{
+                //
+
+                append("open class Live$name")
+                inter.type.typeParameters.joinToIfNotEmpty(this, prefix = "<", postfix = ">") { param ->
+                    val singleUpperBound = param.upperBounds.singleOrNull()
+                    if (singleUpperBound == null) param.name
+                    else "${param.name}: ${singleUpperBound.kotlinString()}"
+                }
+                appendLine("(")
+
+                appendIdtLine(1, "val fetcher: Fetcher,")
+                appendIdtLine(1, "val basePath: String,")
+                paramsSerializersToValues.joinToIfNotEmpty(this, ",\n", postfix = "\n") { (param, _, valueName) ->
+                    "\tval $valueName: KSerializer<${param.name}>"
+                }
+
+                append("): ${inter.type.qualifiedName}")    // ): ExtendsInterface
+                inter.type.typeParameters.joinToIfNotEmpty(this, prefix = "<", postfix = ">") { it.name } // ExtendsInterface<A, B, ...>
+
+                inter.type.typeParameters   // optional where clauses
+                    .filter { it.upperBounds.size > 1 }
+                    .flatMap { param -> param.upperBounds.map { param to it } }
+                    .joinToIfNotEmpty(this, prefix = "where ") { (param, upperBound) ->
+                        "${param.name}: ${upperBound.kotlinString()}"
+                    }
+
+                appendLine(" {")
+
+                val typeReplacements = paramsSerializersToValues.associate { it.second to it.first.name }
+                val serializerReplacements = paramsSerializersToValues.associate { it.second to it.third }
+
+                for ((idx, function) in matched.withIndex()) {
+                    if (idx > 0) appendLine()
+                    if (includeDocComments) append(function.kdoc(0, includeAuth = false))
+                    append("\toverride ${function.kotlinString(typeReplacements)} = ")
+                    when (function) {
+                        is SDK.Function.Endpoint -> {
+                            appendLine("fetcher(")
+                            appendIdtLine(
+                                2,
+                                if (function.path.let { it.segments.isEmpty() && it.after == PathSpec.Afterwards.None }) "basePath,"
+                                else $$"\"$basePath/$${function.path.toCodeString(false, serializerReplacements)}\","
+                            )
+                            appendIdtLine(2, "HttpMethod.${function.endpoint.method},")
+                            appendIdtLine(2, function.inputType.kotlinSerializerWithReplacements(serializerReplacements) + ",")
+                            appendIdtLine(2, if (function.inputType.isUnit()) "kotlin.Unit," else "input,")
+                            appendIdtLine(2, function.outputType.kotlinSerializerWithReplacements(serializerReplacements))
+                        }
+                        is SDK.Function.Websocket -> {
+                            appendLine("fetcher.websocket(")
+                            appendIdtLine(
+                                2,
+                                if (function.path.let { it.segments.isEmpty() && it.after == PathSpec.Afterwards.None }) "basePath,"
+                                else $$"\"$basePath/$${function.path.toCodeString(false, serializerReplacements)}\","
+                            )
+                            appendIdtLine(2, function.inputType.kotlinSerializerWithReplacements(serializerReplacements) + ",")
+                            appendIdtLine(2, function.outputType.kotlinSerializerWithReplacements(serializerReplacements))
+                        }
+                    }
+                    appendIdtLine(1, ")")
+                }
+
+                appendLine("}")
+                appendLine()
+            }
+    }
+
+    private fun KType.kotlinString(): String = buildString {
+        val classifier = classifier ?: throw SDK.GenerationException("No classifier provided for ${this@kotlinString}")
+        val name = (classifier as? KClass<*>)
+            ?.let { it.qualifiedName ?: throw SDK.GenerationException("No qualified name for KClass $it") }
+            ?: (classifier as? KTypeParameter)?.name
+            ?: throw SDK.GenerationException("Classifier was not a KClass or KTypeParameter (This shouldn't happen)")
+
+        append(name)
+
+        arguments.joinToIfNotEmpty(this, prefix = "<", postfix = ">") { arg ->
+            arg.type?.kotlinString() ?: "*"
+        }
+    }
+
+    private fun <T, A : Appendable> Collection<T>.joinToIfNotEmpty(
+        buffer: A,
+        separator: CharSequence = ", ",
+        prefix: CharSequence = "",
+        postfix: CharSequence = "",
+        transform: ((T) -> CharSequence)? = null
+    ) {
+        if (this.isNotEmpty()) joinTo(buffer, separator, prefix, postfix, transform = transform)
+    }
+
+    context(_: ServerRuntime)
+    private fun PathSpec.toCodeString(
+        quoted: Boolean = true,
+        replacements: Map<KSerializer<*>, String> = emptyMap()
+    ) = segments.joinToString(
+        separator = "/",
+        prefix = if (quoted) "\"" else "", postfix = if (quoted) "\"" else ""
+    ) {
+        when (it) {
+            is PathSpec.Segment.Constant -> it.value
+            is PathSpec.Segment.Wildcard<*> -> $$"${fetcher.url($${it.name.functionCase()}, $${it.serializer.kotlinSerializerWithReplacements(replacements)})}"
+        }
+    }
+
+    private fun SDK.Function.kotlinString(replacements: Map<KSerializer<*>, String> = emptyMap()): String {
+        val argString = arguments.joinToString { "${it.name.functionCase()}: ${it.type.kotlinTypeStringWithReplacements(replacements)}" }
         return when (this) {
             is SDK.Function.Endpoint ->
-                "suspend fun $functionName($argString)" + if (outputType.isUnit()) "" else ": ${outputType.kotlinTypeString()}"
+                "suspend fun $functionName($argString)" + if (outputType.isUnit()) "" else ": ${outputType.kotlinTypeStringWithReplacements(replacements)}"
 
             is SDK.Function.Websocket ->
-                "fun $functionName($argString): ClientWebSocket<${inputType.kotlinTypeString()}, ${outputType.kotlinTypeString()}>"
+                "fun $functionName($argString): ClientWebSocket<${inputType.kotlinTypeStringWithReplacements(replacements)}, ${outputType.kotlinTypeStringWithReplacements(replacements)}>"
         }
+    }
+
+    context(_: ServerRuntime)
+    private fun SDK.Function.kdoc(depth: Int, includeAuth: Boolean): String = buildString {
+        val lines = buildList {
+            if (summary.isNotBlank()) {
+                add(summary)
+                add("")
+            }
+            if (description.isNotBlank()) add(description)
+
+            if (includeAuth) {
+                add("")
+                add(
+                    "**Auth Requirements:** ${
+                        auth.naturalLanguage(true).replace("[", "[[").replace("]", "]]")
+                    }"
+                )
+            }
+        }
+
+        appendIdtLine(depth + 1, "/**")
+        for (line in lines) appendIdtLine(depth + 1, " * $line")
+        appendIdtLine(depth + 1, " * */")
     }
 }

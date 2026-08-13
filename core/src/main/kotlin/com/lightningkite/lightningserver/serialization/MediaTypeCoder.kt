@@ -120,11 +120,7 @@ public interface MediaTypeEncoder {
         invoke(mediaType, serializer, value).let {
             when (it.data) {
                 is Data.Text -> WebSocketFrame.Text(it.text())
-                else -> {
-                    val buffer = Buffer()
-                    it.write(buffer)
-                    WebSocketFrame.Binary(buffer.readByteArray())
-                }
+                else -> WebSocketFrame.Binary(it.data.bytes())
             }
         }
 

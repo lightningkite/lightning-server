@@ -185,7 +185,7 @@ public open class LiveClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID
         MapSerializer(String.serializer(), Int.serializer())
     )
 
-    override suspend fun groupCount2(input: GroupCountQuery<T>): Map<String, Int> = fetcher(
+    override suspend fun groupCount2(input: GroupCountQuery<T>): Map<String, Int> = fetcher(    // ?
         "$subpath/group-count-2",
         HttpMethod.POST,
         GroupCountQuery.serializer(serializer),
