@@ -269,6 +269,7 @@ public fun TerraformNeed<TelemetryBackend.Settings>.otelHoneycomb(
     dataset: String? = null,
     samplingRatio: Double? = null,
     otlpProtocol: OtlpProtocol = OtlpProtocol.GRPC,
+    serviceName: String? = null,
 ): Unit {
     // Create a variable for the API key
     emitter.variable(object : TerraformNeed<String> {
@@ -293,6 +294,7 @@ public fun TerraformNeed<TelemetryBackend.Settings>.otelHoneycomb(
         otlpProtocol = otlpProtocol,
         otlpHeaders = headers,
         samplingRatio = samplingRatio,
+        serviceName = serviceName,
         enableLambdaTracing = false,  // Don't enable X-Ray tracing for external backends
     )
 }
@@ -316,6 +318,7 @@ public fun TerraformNeed<TelemetryBackend.Settings>.otelGrafanaCloud(
     zone: String = "prod-us-east-0",
     samplingRatio: Double? = null,
     otlpProtocol: OtlpProtocol = OtlpProtocol.HTTP,
+    serviceName: String? = null,
 ): Unit {
     emitter.variable(object : TerraformNeed<String> {
         override val name: String = "grafana_cloud_api_key"
@@ -335,6 +338,7 @@ public fun TerraformNeed<TelemetryBackend.Settings>.otelGrafanaCloud(
         otlpProtocol = otlpProtocol,
         otlpHeaders = mapOf("Authorization" to "Basic \${base64encode(\"$instanceId:\${var.grafana_cloud_api_key}\")}"),
         samplingRatio = samplingRatio,
+        serviceName = serviceName,
         enableLambdaTracing = false,  // Don't enable X-Ray tracing for external backends
     )
 }
