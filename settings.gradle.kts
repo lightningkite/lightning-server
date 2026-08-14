@@ -54,3 +54,5 @@ include(":load-test")
 include(":demo")
 
 include(":docs-guide")
+
+include(":testdata")
