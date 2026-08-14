@@ -5,7 +5,7 @@ import com.lightningkite.services.Untested
 import com.lightningkite.services.terraform.*
 import com.lightningkite.services.terraform.TerraformJsonObject.Companion.expression
 import kotlinx.serialization.json.*
-import kotlin.math.absoluteValue
+import org.intellij.lang.annotations.Language
 
 /**
  * Terraform builder for deploying Lightning Server to a horizontally-scaled, load-balanced
@@ -208,6 +208,7 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
         emitAlb()
         emitAutoScaling()
         emitFleetRedeploy()
+        emitFleetUpdater()
         emitDnsResources()
         emitMonitoringResources()
     }
@@ -298,16 +299,22 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
 
     // === Golden AMI (EC2 Image Builder) ===
 
-    /** Semver-ish version derived from the install script so the AMI re-bakes only on change. */
-    private val imageVersion: String by lazy {
-        // Fold the component lists in too, so changing managed/hardening components re-bakes the AMI.
-        val saltInput = imageInstallScript() + baseImageSalt +
-                imageManagedComponents.joinToString() +
-                hardeningComponents.joinToString() +
-                jvmArgs.joinToString()
-        val patch = saltInput.hashCode().absoluteValue % 100000
-        "1.${expression("regex(\"[0-9]{8}\", data.aws_ami.ubuntu.name)")}.$patch"
-    }
+    /**
+     * Semver-ish version derived from the install script so the AMI re-bakes only on change.
+     *
+     * The patch node is `local.image_data_version` — a terraform-side hash of everything the image's
+     * content depends on. That is deliberately the *same* value the component document's S3 key is
+     * derived from: an Image Builder version is an immutable identity, so a document that changed
+     * while its version stayed put means a replace-at-an-existing-version that AWS rejects. Deriving
+     * both from one expression makes that drift impossible rather than merely unlikely.
+     *
+     * This version is stamped on both the component *and* the recipe, so the hash has to cover the
+     * recipe's inputs too (`local.image_recipe_inputs`) and not just the component document —
+     * otherwise bumping something like `volumeSizeGiB` on its own would rewrite the recipe body
+     * while leaving its version alone, which is the same rejection one resource over.
+     */
+    private val imageVersion: String
+        get() = "1.${expression("regex(\"[0-9]{8}\", data.aws_ami.ubuntu.name)")}.${expression("local.image_data_version")}"
 
     private fun emitImageBuilder() {
         emit("image") {
@@ -357,13 +364,21 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
                 "name" - "$projectPrefix-imagebuilder-profile"
                 "role" - expression("aws_iam_role.imagebuilder.name")
             }
-
+            "resource.aws_s3_object.image_data" {
+                "bucket" - expression("aws_s3_bucket.deployment.id")
+                "key" - $$"imagebuilder/component-${local.image_data_version}.yaml"
+                "content" - expression("local.image_data")
+                "content_type" - "text/yaml"
+            }
             // The install component: bakes base tooling + the redeploy script + systemd unit.
             "resource.aws_imagebuilder_component.install" {
                 "name" - "$projectPrefix-install"
                 "platform" - "Linux"
                 "version" - imageVersion
-                "data" - expression("local.image_data")
+                "uri" - $$"s3://${aws_s3_bucket.deployment.id}/${aws_s3_object.image_data.key}"
+                "depends_on" - listOf(
+                    "aws_s3_object.image_data"
+                )
             }
 
             "resource.aws_imagebuilder_image_recipe.this" {
@@ -432,6 +447,23 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
                     .flatMap { it.second.entries.map { "${it.key} = ${it.value}" } }
                     .joinToString(", ")
                 "image_data" - $$"""${templatefile("${path.module}/image_data.yaml", { $$replacements })}"""
+                "image_salt" - baseImageSalt
+                "image_components" - buildList<JsonElement> {
+                    imageManagedComponents.forEach { add(it.toRecipeComponent()) }
+                    hardeningComponents.forEach { add(it.toRecipeComponent()) }
+                }
+                // The recipe's own inputs, which are versioned by [imageVersion] just like the
+                // component document is. `parent_image` is not covered by the date in the minor
+                // node: two AMIs published on one day (a same-day republish, or the arm64 and
+                // amd64 builds of the same release) share that date, so only the id separates
+                // them -- and the id moving is exactly what a re-bake exists for.
+                "image_recipe_inputs" {
+                    "parent_image" - expression("data.aws_ami.ubuntu.id")
+                    "volume_size" - volumeSizeGiB
+                }
+                "image_data_version" - expression(
+                    "max(1, parseint(substr(sha256(jsonencode([local.image_data, local.image_salt, local.image_components, local.image_recipe_inputs])), 0, 7), 16))"
+                )
             }
         }
     }
@@ -443,16 +475,39 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
             appendLine("#!/bin/bash")
             appendLine("set -euo pipefail")
             appendLine("export DEBIAN_FRONTEND=noninteractive")
+            appendLine()
+
+            // Unattended upgrades have the chance of restarting the instance/process. Unexpected restarts should never
+            // happen on a production server. They must be controlled and planned.
+            appendLine("# === Disable unattended upgrades ===")
+            appendLine("# Patching happens by rebuilding this image and rolling the ASG, not in place on a")
+            appendLine("# live instance.")
+            appendLine("""echo "[INFO] Disabling unattended-upgrades and apt daily timers at $(date)"""")
+            appendLine("cat > /etc/apt/apt.conf.d/20auto-upgrades << 'AUTO_UPGRADES_EOF'")
+            appendLine("""APT::Periodic::Update-Package-Lists "0";""")
+            appendLine("""APT::Periodic::Download-Upgradeable-Packages "0";""")
+            appendLine("""APT::Periodic::Unattended-Upgrade "0";""")
+            appendLine("""APT::Periodic::AutocleanInterval "0";""")
+            appendLine("AUTO_UPGRADES_EOF")
+            appendLine("systemctl disable --now unattended-upgrades.service || true")
+            appendLine("systemctl mask unattended-upgrades.service || true")
+            appendLine("systemctl disable --now apt-daily.timer apt-daily-upgrade.timer || true")
+            appendLine("systemctl mask apt-daily.timer apt-daily-upgrade.timer apt-daily.service apt-daily-upgrade.service || true")
+            appendLine()
+
             // A freshly-booted Ubuntu holds the dpkg lock for the first few minutes (apt-daily/
-            // unattended-upgrades); wait for it instead of failing or appearing to hang. We intentionally
-            // do NOT run a blanket `apt-get upgrade` — the AWS-managed `update-linux` component (or a
-            // baseImageSalt bump onto the latest base AMI) is the controlled way to pick up patches.
+            // unattended-upgrades); wait for it instead of failing or appearing to hang.
             val apt = "apt-get -o DPkg::Lock::Timeout=$aptLockTimeoutSeconds"
             appendLine("$apt update -y")
+            // --with-new-pkgs because a plain `upgrade` never installs new packages, and kernel
+            // security updates arrive as a new package name (linux-image-X-generic) pulled in by a
+            // dependency change on the metapackage. Without it they are silently held back.
+            appendLine("$apt -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold upgrade --with-new-pkgs")
             appendLine("$apt install -y openjdk-17-jre-headless openssl curl gnupg ca-certificates unzip")
             if (additionalPackages.isNotEmpty()) {
                 appendLine("$apt install -y ${additionalPackages.joinToString(" ") { it.shellEscape() }}")
             }
+            appendLine("$apt -y autoremove")
             // The AWS CLI and the CloudWatch agent binary are installed by AWS-managed components
             // (see imageManagedComponents) that run before this one; we only write the agent config here.
             cloudwatchAgentConfig()
@@ -470,6 +525,7 @@ BUCKET="${'$'}DEPLOYMENT_BUCKET"
 REGION="${'$'}AWS_REGION_NAME"""",
                 localHealthUrl = "http://localhost:$appPort$healthCheckPath",
             )
+            instanceUpdateScript(localHealthUrl = "http://localhost:$appPort$healthCheckPath")
             if (instanceFiles.isNotEmpty() || instanceFilesRaw.isNotEmpty()) instanceFiles()
             // Enable (but do not start) the service so it auto-starts after the boot-time deploy.
             appendLine("systemctl enable $projectPrefix || true")
@@ -865,6 +921,237 @@ systemctl enable $$projectPrefix || true
         }
     }
 
+    private fun emitFleetUpdater() {
+        emitExtra("update-fleet.sh", fleetUpdateScript())
+    }
+
+    /**
+     * Installs `/usr/local/bin/os-update`, the on-instance script that applies OS package updates
+     * and restarts the service. It is driven across the fleet by `update-fleet.sh` via SSM; see
+     * [fleetUpdateScript] for the drain/update/reboot/verify sequence around it.
+     *
+     * There is no rollback: apt has no reliable "undo", so the script instead refuses to report
+     * success unless the service comes back active *and* [localHealthUrl] answers, which is what
+     * keeps a broken instance from being returned to the load balancer.
+     *
+     * Note that this script is emitted into `image_data.yaml`, which terraform runs through
+     * `templatefile()`, so it must not use shell parameter expansion (dollar-brace) or a literal
+     * percent-brace — terraform reads both as template interpolations and fails to render the
+     * file. Use bare `$NAME` and `cut`/`grep` instead.
+     */
+    @Language("Shell Script")
+    private fun StringBuilder.instanceUpdateScript(localHealthUrl: String) = appendLine($$"""
+# === Instance Emergency Update Script ===
+# Driven by update-fleet.sh via SSM as the emergency "a CVE landed and we are not
+# waiting for an AMI bake" lever. Routine patching still comes from rebuilding this
+# image and rolling the ASG; this only patches instances already running.
+#
+# It restarts the app unconditionally (the JRE is an apt package and may be replaced
+# underneath a running JVM), so it is only safe on an instance already drained from
+# the load balancer.
+#
+# Usage: os-update [package ...]
+#   with no arguments, applies a full upgrade; otherwise upgrades only the named packages.
+echo "[INFO] Creating OS Emergency Update Script"
+cat > /usr/local/bin/os-update << 'UPDATE_EOF'
+#!/bin/bash
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+
+log() { echo "[os-update] $(date '+%Y-%m-%d %H:%M:%S') $*"; }
+err() { echo "[os-update] $(date '+%Y-%m-%d %H:%M:%S') ERROR: $*" >&2; }
+
+LOG_FILE="/var/log/$$projectPrefix/os-update.log"
+PACKAGES="$*"
+
+mkdir -p "$(dirname "$LOG_FILE")"
+touch "$LOG_FILE"
+chown ubuntu:ubuntu "$LOG_FILE"
+exec > >(tee -a "$LOG_FILE" | logger -t os-update -s) 2>&1
+
+log "OS update started"
+apt-get -o DPkg::Lock::Timeout=600 update -y
+
+# Keep existing config files on conflict; an interactive dpkg prompt would hang the SSM command.
+APT_OPTS="-y -o DPkg::Lock::Timeout=600 -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
+if [ -n "$PACKAGES" ]; then
+    # `install --only-upgrade` exits 0 for a package that is not installed, so a typo'd or
+    # wrong-architecture name would report a clean patch while changing nothing at all. Check
+    # each name up front and fail loudly instead.
+    for p in $PACKAGES; do
+        name=$(echo "$p" | cut -d= -f1)
+        if ! dpkg-query -s "$name" 2>/dev/null | grep -q 'Status: install ok installed'; then
+            err "not installed on this host, refusing to report a successful update: $p"
+            exit 1
+        fi
+    done
+    log "Upgrading only: $PACKAGES"
+    apt-get $APT_OPTS install --only-upgrade $PACKAGES
+else
+    # --with-new-pkgs because a plain `upgrade` never installs new packages, and kernel security
+    # updates arrive as a new package name (linux-image-X-generic) pulled in by a dependency
+    # change on the metapackage. Without it the one update most likely to need the reboot this
+    # script performs is the one silently held back.
+    log "Applying full upgrade"
+    apt-get $APT_OPTS upgrade --with-new-pkgs
+    # Deliberately only on the full-upgrade path. `-p` means the operator asked for a minimal,
+    # auditable change to one or two packages; autoremove is a whole-system operation that will
+    # happily purge old kernels and anything else currently marked auto-and-no-longer-needed,
+    # which is not a blast radius to take on while chasing a single CVE.
+    apt-get $APT_OPTS autoremove
+fi
+
+log "Restarting $$displayName"
+systemctl restart $$projectPrefix
+sleep 5
+if ! systemctl is-active --quiet $$projectPrefix; then
+    err "Service failed to start after OS update"
+    tail -n 100 /var/log/$$projectPrefix/server.log >&2 || true
+    exit 1
+fi
+
+log "Waiting for liveness at $$localHealthUrl"
+healthy=0
+for i in $(seq 1 20); do
+    if curl -fsS -o /dev/null --max-time 5 "$$localHealthUrl"; then healthy=1; break; fi
+    sleep 3
+done
+if [ "$healthy" -ne 1 ]; then
+    err "Liveness endpoint $$localHealthUrl never returned success"
+    tail -n 100 /var/log/$$projectPrefix/server.log >&2 || true
+    exit 1
+fi
+
+# Breadcrumb for the CloudWatch log only. update-fleet.sh probes
+# /var/run/reboot-required with its own SSM command rather than reading this back,
+# because SSM truncates command output at 24,000 characters per stream and a full
+# apt upgrade can push a trailing marker past that cap.
+if [ -f /var/run/reboot-required ]; then log "REBOOT_REQUIRED=yes"; else log "REBOOT_REQUIRED=no"; fi
+log "Done"
+UPDATE_EOF
+
+chmod +x /usr/local/bin/os-update
+echo "[INFO] Creating OS Emergency Update Script - DONE"
+""")
+
+    /**
+     * The helper functions [fleetRedeployScript] and [fleetUpdateScript] share, with log output
+     * tagged `[tag]`. Both scripts walk the same ASG the same way — the only thing that differs is
+     * what they do to a drained instance — so the drain/restore machinery lives here, where a fix
+     * to it lands in both rather than in whichever one was open at the time.
+     *
+     * Defines `log`, `err`, `instance_ids`, `resume_and_restore`, `wait_ssm_online` and `ssm_run`.
+     * Callers must set `ASG_NAME`, `REGION`, `TG_ARN`, `APP_PORT` and `SUSPENDED` before this point,
+     * and arm the EXIT trap themselves — the two differ in how early they can afford to.
+     */
+    // language="Shell Script"
+    private fun fleetScriptHelpers(tag: String): String = $$"""
+log() { echo "[$$tag] $*"; }
+err() { echo "[$$tag] ERROR: $*" >&2; }
+
+instance_ids() {
+    aws autoscaling describe-auto-scaling-groups \
+        --auto-scaling-group-names "$ASG_NAME" \
+        --region "$REGION" \
+        --query 'AutoScalingGroups[0].Instances[?LifecycleState==`InService`].InstanceId' \
+        --output text
+}
+
+# Always restore the ASG to a clean state, even on abnormal exit: resume the suspended processes
+# and make sure every in-service instance is registered with the target group.
+resume_and_restore() {
+    log "Resuming ASG processes and re-registering all in-service instances"
+    aws autoscaling resume-processes --auto-scaling-group-name "$ASG_NAME" \
+        --scaling-processes $SUSPENDED --region "$REGION" || true
+    local id
+    for id in $(instance_ids); do
+        aws elbv2 register-targets --target-group-arn "$TG_ARN" \
+            --targets "Id=$id,Port=$APP_PORT" --region "$REGION" || true
+    done
+}
+
+wait_ssm_online() {
+    local id="$1"
+    for i in $(seq 1 60); do
+        status=$(aws ssm describe-instance-information \
+            --filters "Key=InstanceIds,Values=$id" --region "$REGION" \
+            --query 'InstanceInformationList[0].PingStatus' --output text 2>/dev/null || echo "None")
+        [ "$status" = "Online" ] && return 0
+        sleep 5
+    done
+    err "SSM agent never came Online for $id"
+    return 1
+}
+
+# Sends one command via SSM, waits for it to finish, and echoes its combined stdout+stderr.
+# Returns non-zero if the command failed or never finished within $attempts polls.
+#
+# Note that SSM returns only the first 24,000 characters of each stream, so anything the caller
+# needs a reliable *answer* from (as opposed to a log to read) must print little enough to stay
+# well under that cap. See needs_reboot.
+#
+# The remote command is interpolated into JSON, so it must not contain double quotes or
+# backslashes -- use single quotes inside it.
+ssm_run() {
+    local id="$1" timeout="$2" attempts="$3" comment="$4" remote_cmd="$5"
+    local cmd_id status i
+
+    cmd_id=$(aws ssm send-command \
+        --instance-ids "$id" \
+        --document-name "AWS-RunShellScript" \
+        --comment "$comment" \
+        --parameters "$(printf '{"commands":["%s"],"executionTimeout":["%s"]}' "$remote_cmd" "$timeout")" \
+        --region "$REGION" --query 'Command.CommandId' --output text)
+
+    for i in $(seq 1 "$attempts"); do
+        status=$(aws ssm get-command-invocation --command-id "$cmd_id" --instance-id "$id" \
+            --region "$REGION" --query 'Status' --output text 2>/dev/null || echo "Pending")
+        case "$status" in
+            Success)
+                aws ssm get-command-invocation --command-id "$cmd_id" --instance-id "$id" \
+                    --region "$REGION" --query 'join(``, [StandardOutputContent, StandardErrorContent])' \
+                    --output text || true
+                return 0 ;;
+            Cancelled|Failed|TimedOut)
+                err "$comment on $id finished with status: $status"
+                aws ssm get-command-invocation --command-id "$cmd_id" --instance-id "$id" \
+                    --region "$REGION" --query 'StandardErrorContent' --output text >&2 || true
+                return 1 ;;
+            *) sleep 5 ;;
+        esac
+    done
+    err "$comment on $id did not finish within polling window"
+    return 1
+}
+""".trim()
+
+    /**
+     * The batching driver both fleet scripts end with: run `process_instance` across `$IDS`,
+     * `$BATCH` at a time in parallel, halting the whole rollout if any member of a batch fails.
+     * [noun] names what failed in that message, e.g. `"A redeploy"`.
+     *
+     * Requires `IDS`, `BATCH` and a `process_instance` function to already be defined.
+     */
+    // language="Shell Script"
+    private fun fleetScriptDriver(noun: String): String = $$"""
+# Process in batches of $BATCH, in parallel within a batch; fail the whole run if any member fails.
+batch=()
+flush_batch() {
+    [ ${#batch[@]} -eq 0 ] && return 0
+    local pids=() id p fail=0
+    for id in "${batch[@]}"; do process_instance "$id" & pids+=("$!"); done
+    for p in "${pids[@]}"; do wait "$p" || fail=1; done
+    batch=()
+    if [ "$fail" -ne 0 ]; then err "$$noun in the batch failed; halting rollout."; exit 1; fi
+}
+
+for id in $IDS; do
+    batch+=("$id")
+    if [ ${#batch[@]} -ge "$BATCH" ]; then flush_batch; fi
+done
+flush_batch
+""".trim()
+
     // language="Shell Script"
     private fun fleetRedeployScript(): String = $$"""
 #!/usr/bin/env bash
@@ -888,68 +1175,14 @@ APP_PORT="$$appPort"
 BATCH="${LS_REDEPLOY_BATCH:-$$redeployBatchSize}"
 SUSPENDED="HealthCheck ReplaceUnhealthy AZRebalance AddToLoadBalancer"
 
-log() { echo "[redeploy-fleet] $*"; }
-err() { echo "[redeploy-fleet] ERROR: $*" >&2; }
+$${fleetScriptHelpers("redeploy-fleet")}
 
-instance_ids() {
-    aws autoscaling describe-auto-scaling-groups \
-        --auto-scaling-group-names "$ASG_NAME" \
-        --region "$REGION" \
-        --query 'AutoScalingGroups[0].Instances[?LifecycleState==`InService`].InstanceId' \
-        --output text
-}
-
-# Always restore the ASG to a clean state, even on abnormal exit: resume the suspended processes
-# and make sure every in-service instance is registered with the target group.
-resume_and_restore() {
-    log "Resuming ASG processes and re-registering all in-service instances"
-    aws autoscaling resume-processes --auto-scaling-group-name "$ASG_NAME" \
-        --scaling-processes $SUSPENDED --region "$REGION" || true
-    local id
-    for id in $(instance_ids); do
-        aws elbv2 register-targets --target-group-arn "$TG_ARN" \
-            --targets "Id=$id,Port=$APP_PORT" --region "$REGION" || true
-    done
-}
 trap resume_and_restore EXIT
 
-wait_ssm_online() {
-    local id="$1"
-    for i in $(seq 1 60); do
-        status=$(aws ssm describe-instance-information \
-            --filters "Key=InstanceIds,Values=$id" --region "$REGION" \
-            --query 'InstanceInformationList[0].PingStatus' --output text 2>/dev/null || echo "None")
-        [ "$status" = "Online" ] && return 0
-        sleep 5
-    done
-    err "SSM agent never came Online for $id"
-    return 1
-}
-
+# The on-instance redeploy script validates the new build itself and self-rolls-back on failure,
+# so its output is only interesting when it fails -- and ssm_run already prints stderr for us then.
 run_redeploy() {
-    local id="$1"
-    local cmd_id
-    cmd_id=$(aws ssm send-command \
-        --instance-ids "$id" \
-        --document-name "AWS-RunShellScript" \
-        --comment "terraform rolling redeploy" \
-        --parameters 'commands=/usr/local/bin/lightning-server-redeploy,executionTimeout=600' \
-        --region "$REGION" --query 'Command.CommandId' --output text)
-    for i in $(seq 1 180); do
-        status=$(aws ssm get-command-invocation --command-id "$cmd_id" --instance-id "$id" \
-            --region "$REGION" --query 'Status' --output text 2>/dev/null || echo "Pending")
-        case "$status" in
-            Success) return 0 ;;
-            Cancelled|Failed|TimedOut)
-                err "redeploy on $id finished with status: $status"
-                aws ssm get-command-invocation --command-id "$cmd_id" --instance-id "$id" \
-                    --region "$REGION" --query 'StandardErrorContent' --output text >&2 || true
-                return 1 ;;
-            *) sleep 5 ;;
-        esac
-    done
-    err "redeploy on $id did not finish within polling window"
-    return 1
+    ssm_run "$1" 600 180 "terraform rolling redeploy" "/usr/local/bin/lightning-server-redeploy" >/dev/null
 }
 
 # Drain -> redeploy -> validate healthy, for one instance. Returns non-zero on any failure.
@@ -964,6 +1197,7 @@ process_instance() {
     aws elbv2 wait target-deregistered --target-group-arn "$TG_ARN" \
         --targets "Id=$id,Port=$APP_PORT" --region "$REGION" || true
 
+    log "Running deploy script"
     if ! run_redeploy "$id"; then
         err "redeploy failed on $id (it self-heals to the previous version)"
         return 1
@@ -990,24 +1224,265 @@ if [ -z "$IDS" ]; then
     exit 0
 fi
 
-# Process in batches of $BATCH, in parallel within a batch; fail the whole run if any member fails.
-batch=()
-flush_batch() {
-    [ ${#batch[@]} -eq 0 ] && return 0
-    local pids=() id p fail=0
-    for id in "${batch[@]}"; do process_instance "$id" & pids+=("$!"); done
-    for p in "${pids[@]}"; do wait "$p" || fail=1; done
-    batch=()
-    if [ "$fail" -ne 0 ]; then err "A redeploy in the batch failed; halting rollout."; exit 1; fi
-}
-
-for id in $IDS; do
-    batch+=("$id")
-    if [ ${#batch[@]} -ge "$BATCH" ]; then flush_batch; fi
-done
-flush_batch
+$${fleetScriptDriver("A redeploy")}
 
 log "Rolling redeploy complete."
+""".trimIndent()
+
+
+    // language="Shell Script"
+    private fun fleetUpdateScript(): String = $$"""
+#!/usr/bin/env bash
+# Rolling, in-place Emergency OS package update across the Auto Scaling Group. This is the "a CVE just
+# landed and we are not waiting for an AMI bake" lever -- routine patching is meant to come from
+# rebuilding the image and letting the ASG instance refresh roll the fleet, which also fixes the
+# baseline that new scale-out instances launch from. This script does NOT update the AMI, so any
+# instance the ASG launches afterwards is still unpatched until the next image rebuild.
+#
+# The ASG is told to suspend the processes that would otherwise fight us -- HealthCheck and
+# ReplaceUnhealthy (so it can't terminate a drained instance) and AddToLoadBalancer/AZRebalance.
+# An EXIT trap always resumes them and re-registers every in-service instance, so even an abrupt
+# termination leaves the fleet serving rather than stranded.
+set -euo pipefail
+
+APP_PORT="$$appPort"
+SUSPENDED="HealthCheck ReplaceUnhealthy AZRebalance AddToLoadBalancer"
+
+$${fleetScriptHelpers("update-fleet")}
+
+usage() {
+    cat <<'USAGE'
+usage: update-fleet.sh <asg-name> <region> <target-group-arn> [options]
+
+Options:
+  -b, --batch N          instances to update in parallel (default 1)
+  -p, --packages "LIST"  space-separated packages to upgrade; omit for a full upgrade
+  -n, --no-reboot        leave instances that report reboot-required un-rebooted; they are
+                         still probed, and listed at the end of the run
+  -f, --force            allow a --batch that covers the whole fleet (accepts an outage)
+  -h, --help             show this help
+
+Example:
+  bash update-fleet.sh altitude-production us-west-2 "$TG_ARN" -p "openssl libssl3"
+USAGE
+}
+
+die() { err "$*"; echo >&2; usage >&2; exit 2; }
+
+BATCH=1
+PACKAGES=""
+REBOOT=1
+FORCE=0
+POSITIONAL=()
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -b|--batch)    [ $# -ge 2 ] || die "$1 requires a value"; BATCH="$2"; shift 2 ;;
+        -p|--packages) [ $# -ge 2 ] || die "$1 requires a value"; PACKAGES="$2"; shift 2 ;;
+        -n|--no-reboot) REBOOT=0; shift ;;
+        -f|--force)    FORCE=1; shift ;;
+        -h|--help)     usage; exit 0 ;;
+        --)            shift; POSITIONAL+=("$@"); break ;;
+        -*)            die "unknown option: $1" ;;
+        *)             POSITIONAL+=("$1"); shift ;;
+    esac
+done
+
+[ ${#POSITIONAL[@]} -eq 3 ] || die "expected 3 arguments (asg-name, region, target-group-arn), got ${#POSITIONAL[@]}"
+ASG_NAME="${POSITIONAL[0]}"
+REGION="${POSITIONAL[1]}"
+TG_ARN="${POSITIONAL[2]}"
+
+# Validated up front because a non-numeric batch would otherwise only surface deep in flush_batch,
+# after the ASG processes have already been suspended.
+case "$BATCH" in ''|*[!0-9]*) die "--batch must be a positive integer, got: $BATCH" ;; esac
+[ "$BATCH" -ge 1 ] || die "--batch must be at least 1"
+
+# --packages is interpolated into the SSM parameters JSON and then run as a root shell command on
+# every instance, so it is restricted to the characters real package specs need: names, versions
+# (=), and architecture qualifiers (:). That keeps a stray quote from producing malformed JSON and
+# a stray `;` from turning a typo into a fleet-wide root command. This is a guard against mistakes
+# rather than a security boundary -- whoever runs this already holds credentials that can do worse.
+PACKAGES_RE='^[a-zA-Z0-9._+:=~-]+([ ]+[a-zA-Z0-9._+:=~-]+)*$'
+if [ -n "$PACKAGES" ] && ! [[ "$PACKAGES" =~ $PACKAGES_RE ]]; then
+    die "--packages must be a space-separated list of package names, got: $PACKAGES"
+fi
+
+# Runs /usr/local/bin/os-update, baked into the AMI by image_data.yaml, and
+# echoes its combined output so the caller can inspect it. The updater logs through `logger -s`,
+# so most of its output arrives on stderr rather than stdout.
+run_update() {
+    local id="$1"
+    local remote_cmd="/usr/local/bin/os-update"
+    [ -n "$PACKAGES" ] && remote_cmd="$remote_cmd $PACKAGES"
+    ssm_run "$id" 1800 360 "os update" "$remote_cmd"
+}
+
+# Asks the instance directly whether a reboot is pending. Deliberately its own tiny command rather
+# than a marker grepped out of the updater's output: a full apt upgrade easily exceeds the 24,000
+# characters SSM returns per stream, and a truncated trailing marker would look exactly like "no
+# reboot needed" -- silently leaving a patched kernel un-activated, which is the one thing this
+# script exists to prevent.
+#
+# 0 = reboot required, 1 = not required, 2 = could not determine.
+needs_reboot() {
+    local id="$1" out
+    out=$(ssm_run "$id" 60 24 "reboot check" \
+        "test -f /var/run/reboot-required && echo REBOOT_REQUIRED=yes || echo REBOOT_REQUIRED=no") || return 2
+    case "$out" in
+        *REBOOT_REQUIRED=yes*) return 0 ;;
+        *REBOOT_REQUIRED=no*)  return 1 ;;
+        *) err "unexpected reboot-check output from $id: $out"; return 2 ;;
+    esac
+}
+
+# Boot id changes on every boot, so comparing it across a reboot is what actually proves the
+# instance cycled. Echoes an empty string if the instance cannot be reached.
+boot_id() {
+    local id="$1" out
+    out=$(ssm_run "$id" 60 12 "boot id" "cat /proc/sys/kernel/random/boot_id" 2>/dev/null) || out=""
+    printf '%s' "$out" | tr -d '[:space:]'
+}
+
+# The reboot command backgrounds itself so SSM can record it before the instance goes down. Safe
+# here because the instance is drained and the ASG cannot replace it.
+reboot_instance() {
+    local id="$1" before after i
+
+    before=$(boot_id "$id")
+    if [ -z "$before" ]; then
+        err "could not read the boot id for $id; refusing to reboot without a way to verify it"
+        return 1
+    fi
+
+    log "Rebooting $id (boot id $before)"
+    if ! ssm_run "$id" 60 12 "reboot" \
+        "nohup bash -c 'sleep 3; systemctl reboot' >/dev/null 2>&1 &" >/dev/null; then
+        err "failed to send the reboot command to $id"
+        return 1
+    fi
+
+    # Poll until the boot id actually changes. Waiting for SSM to report Online is not enough on
+    # its own: the pre-reboot agent keeps answering until the instance finishes shutting down, so
+    # a slow shutdown would let us continue against an instance still running the old kernel --
+    # and a reboot that never happened at all would look identical.
+    for i in $(seq 1 60); do
+        sleep 10
+        after=$(boot_id "$id")
+        if [ -n "$after" ] && [ "$after" != "$before" ]; then
+            log "$id back online after reboot (boot id $before -> $after)"
+            return 0
+        fi
+    done
+
+    err "$id never reported a new boot id; it does not appear to have rebooted"
+    return 1
+}
+
+# Drain -> update -> (reboot) -> validate healthy, for one instance. Returns non-zero on failure.
+process_instance() {
+    local id="$1"
+    log "=== Updating $id ==="
+    wait_ssm_online "$id" || return 1
+
+    log "Draining $id from the target group"
+    aws elbv2 deregister-targets --target-group-arn "$TG_ARN" \
+        --targets "Id=$id,Port=$APP_PORT" --region "$REGION"
+    aws elbv2 wait target-deregistered --target-group-arn "$TG_ARN" \
+        --targets "Id=$id,Port=$APP_PORT" --region "$REGION" || true
+
+    log "Running update script"
+    local output
+    if ! output=$(run_update "$id"); then
+        err "os update failed on $id; halting before it is returned to service"
+        return 1
+    fi
+    echo "$output"
+
+    # Probed unconditionally, including under --no-reboot: "which instances are still running the
+    # old kernel" is the fact this whole script exists to establish, and skipping the check when we
+    # are not going to act on it is how a half-patched fleet gets mistaken for a patched one.
+    local state=0
+    needs_reboot "$id" || state=$?
+    case "$state" in
+        0)  if [ "$REBOOT" != "0" ]; then
+                reboot_instance "$id" || return 1
+            else
+                log "$id needs a reboot; leaving it running the old kernel (--no-reboot)"
+                echo "$id" >> "$PENDING_REBOOT_FILE"
+            fi ;;
+        1)  log "$id does not require a reboot" ;;
+        # Undetermined is fatal only when we were going to reboot -- continuing there would mean
+        # returning a possibly-unpatched instance to service while believing it was handled. Under
+        # --no-reboot nothing was going to happen anyway, so record it and carry on.
+        *)  if [ "$REBOOT" != "0" ]; then
+                err "could not determine whether $id needs a reboot; halting rather than guessing"
+                return 1
+            fi
+            err "could not determine whether $id needs a reboot; assuming it does"
+            echo "$id" >> "$PENDING_REBOOT_FILE" ;;
+    esac
+
+    log "Returning $id to service"
+    aws elbv2 register-targets --target-group-arn "$TG_ARN" \
+        --targets "Id=$id,Port=$APP_PORT" --region "$REGION"
+    if ! aws elbv2 wait target-in-service --target-group-arn "$TG_ARN" \
+        --targets "Id=$id,Port=$APP_PORT" --region "$REGION"; then
+        err "$id did not become healthy after the os update"
+        return 1
+    fi
+    log "$id healthy"
+}
+
+IDS=$(instance_ids)
+if [ -z "$IDS" ]; then
+    log "No in-service instances found; nothing to update."
+    exit 0
+fi
+
+# A batch that covers the whole fleet drains every instance at once -- an outage, not a rolling
+# update. The steady-state ASG runs two instances, so `-b 2` is already the entire fleet, which is
+# not obvious from a flag that just says "in parallel". Checked before anything is suspended or
+# drained, so refusing costs nothing.
+#
+# Only an avoidable outage is refused. With a single instance in service there is no batch size
+# that avoids downtime, so that case warns and proceeds rather than blocking an emergency patch
+# behind a flag the operator never set.
+COUNT=$(echo $IDS | wc -w)
+if [ "$COUNT" -eq 1 ]; then
+    log "WARNING: only one instance is in service, so updating it means a brief outage."
+elif [ "$BATCH" -ge "$COUNT" ] && [ "$FORCE" != "1" ]; then
+    err "--batch $BATCH covers all $COUNT in-service instances: every instance would be drained at"
+    err "once, taking the service fully down. Use a smaller --batch, or --force if that is intended."
+    exit 2
+fi
+
+# Instances that finish still needing a reboot are recorded in a file rather than a variable:
+# process_instance runs in a background subshell, so an assignment there would never make it back
+# to the parent. Created here, next to the trap that cleans it up.
+PENDING_REBOOT_FILE=$(mktemp)
+
+report_pending_reboots() {
+    if [ -s "$PENDING_REBOOT_FILE" ]; then
+        err "These instances were patched but are still running the old kernel:"
+        while read -r pending; do err "  $pending"; done < "$PENDING_REBOOT_FILE"
+        err "Re-run without --no-reboot, or reboot them yourself, before calling the fleet patched."
+    fi
+    rm -f "$PENDING_REBOOT_FILE"
+}
+
+# Installed only now so the early exits above don't log a spurious restore of state never touched.
+trap 'resume_and_restore; report_pending_reboots' EXIT
+
+log "Suspending ASG processes during update: $SUSPENDED"
+aws autoscaling suspend-processes --auto-scaling-group-name "$ASG_NAME" \
+    --scaling-processes $SUSPENDED --region "$REGION"
+
+$${fleetScriptDriver("An update")}
+
+log "Fleet os update complete."
+log "NOTE: the AMI is unchanged. Instances launched by scale-out are still unpatched until the"
+log "      image is rebuilt. Treat this as a stopgap, not the patch of record."
 """.trimIndent()
 
     // === DNS ===
