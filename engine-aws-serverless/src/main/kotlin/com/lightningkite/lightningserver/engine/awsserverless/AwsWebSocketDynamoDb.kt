@@ -234,17 +234,21 @@ internal class AwsWebSocketDynamoDb(
         ensureTables()
         val result: StateAndConnectRequest?
         measureTime {
-            result = client.getItem {
+            val response = client.getItem {
                 it.tableName(tableStates)
                 it.key(mapOf(socketIdKey to AttributeValue.fromS(id)))
                 it.projectionExpression("$stateKey, $requestKey")
                 it.consistentRead(true)
-            }.await().item()?.let {
+            }.await()
+            // item() is an SDK auto-construct map: it returns empty rather than null when the socket
+            // has no row, so hasItem() is the only way to detect a missing socket.  Testing item() for
+            // null instead silently falls through to reading attributes that aren't there.
+            result = if (!response.hasItem()) null else response.item().let {
                 StateAndConnectRequest(
                     it[stateKey]!!.b().asByteArray(),
                     encoding.decodeFromByteArray(
                         WebSocketConnectRequest.serializer(NothingSerializer()),
-                        it.get(requestKey)!!.b().asByteArray()
+                        it[requestKey]!!.b().asByteArray()
                     ),
                 )
             }
