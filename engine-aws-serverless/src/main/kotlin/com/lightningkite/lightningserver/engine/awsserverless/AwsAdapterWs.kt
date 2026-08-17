@@ -17,6 +17,15 @@ import software.amazon.awssdk.services.lambda.model.InvocationType
 import software.amazon.awssdk.services.lambda.model.InvokeRequest
 import java.util.*
 
+/**
+ * Thrown when a socket's stored state is no longer in the database, meaning the socket has already
+ * disconnected and been cleaned up.  This is a normal race - a disconnect can land while another Lambda
+ * invocation is midway through handling a message - and is distinct from a genuine processing failure,
+ * so callers discard the work instead of reporting an error and closing an already-dead socket.
+ */
+internal class WebSocketStateGoneException(socketId: String) :
+    Exception("WebSocket $socketId has no stored state; it has already disconnected.")
+
 internal class AwsAdapterWs(val root: AwsAdapter) {
     val wsUrl: String get() = with(root) { generalSettings.invoke().wsUrl }
     val encoding: KotlinBytesFormat get() = root.internalSerialization.kotlinBytesFormat
@@ -72,9 +81,29 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
     ) : WebSocketConnection<P, T>, ServerRuntime by root {
         override var currentState: T = stateAnonType.value(encoding, handler.storageSerializer)
 
-        override suspend fun repullState(): T = webSocketDynamo.statesAlone(listOf(socketId))[socketId]!!
+        /**
+         * The exact bytes we believe are stored in the database right now, used as the comparison value
+         * for the optimistic lock in [AwsWebSocketDynamoDb.updateState].
+         *
+         * This must advance on every successful write and every re-read.  A handler commonly commits more
+         * than once per invocation - the multiplex handler alone commits once to register a channel and
+         * again when that channel subscribes - and if this kept pointing at the state the invocation
+         * started with, every commit after the first would deterministically lose its own lock.
+         *
+         * We keep the raw bytes rather than re-serializing [currentState] because serialization is not
+         * guaranteed to be byte-for-byte stable, and the lock compares bytes.
+         */
+        private var committedStateBytes: ByteArray = stateAnonType.serializedBytes()
+
+        override suspend fun repullState(): T = fetchStateBytes()
             .let { encoding.decodeFromByteArray(handler.storageSerializer, it) }
             .also { currentState = it }
+
+        /** Reads the socket's stored state, failing with [WebSocketStateGoneException] if the socket is no longer tracked. */
+        private suspend fun fetchStateBytes(): ByteArray =
+            (webSocketDynamo.statesAlone(listOf(socketId))[socketId]
+                ?: throw WebSocketStateGoneException(socketId))
+                .also { committedStateBytes = it }
 
         val queue = ArrayList<(T) -> T>()
         override suspend fun queueStateUpdate(modification: (T) -> T) {
@@ -83,9 +112,6 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
 
         suspend fun commit(): T {
             if (queue.isEmpty()) return currentState
-            var newState = currentState
-            // Track original bytes from DB to avoid serialization round-trip issues
-            var currentStateBytes: ByteArray = stateAnonType.serializedBytes()
             var attempts = 0
             val maxAttempts = 50 // Safety limit to prevent infinite loops
 
@@ -101,31 +127,24 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     )
                 }
 
-                // Use cached bytes if available (from DB), otherwise serialize current state
-                // This prevents infinite loops caused by non-deterministic serialization
-                val stateString = currentStateBytes
+                val newState = queue.fold(currentState) { item, apply -> apply(item) }
+                val newStateBytes = encoding.encodeToByteArray(handler.storageSerializer, newState)
 
-                newState = queue.fold(currentState) { item, apply -> apply(item) }
-                val newStateString = encoding.encodeToByteArray(handler.storageSerializer, newState)
-
-                if (webSocketDynamo.updateState(socketId, stateString, newStateString)) {
+                if (webSocketDynamo.updateState(socketId, committedStateBytes, newStateBytes)) {
                     if (attempts > 1) {
                         root.logger.debug { "WebSocket state committed for $socketId after $attempts attempts" }
                     }
-                    break
+                    committedStateBytes = newStateBytes
+                    queue.clear()
+                    currentState = newState
+                    return newState
                 }
 
-                // Pull fresh state from DB and cache the original bytes
-                // Critical: we must use the exact bytes from DB for the next optimistic lock check,
-                // not re-serialized bytes which may differ due to serialization non-determinism
+                // Another invocation (a didConnect, a publish, or another client message) beat us to it.
+                // Re-read the winning state and re-apply our queued modifications on top of it.
                 root.logger.debug { "WebSocket state update retry $attempts for $socketId" }
-                val freshBytes = webSocketDynamo.statesAlone(listOf(socketId))[socketId]!!
-                currentState = encoding.decodeFromByteArray(handler.storageSerializer, freshBytes)
-                currentStateBytes = freshBytes
+                currentState = encoding.decodeFromByteArray(handler.storageSerializer, fetchStateBytes())
             }
-            queue.clear()
-            currentState = newState
-            return newState
         }
 
         override suspend fun updateStateImmediately(modification: (T) -> T): T {
@@ -252,6 +271,8 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                                 )
                             )
                         }
+                    } catch (e: WebSocketStateGoneException) {
+                        root.logger.debug { "Socket $socketId disconnected while delivering topic '${event.topic}'; skipping." }
                     } catch (e: Exception) {
                         // Suppress, already reported inside *Tracked
                         root.logger.error(e) { "Closing socket $socketId because subscription message from topic '${p.pathSpec}' failed to process." }
@@ -331,6 +352,9 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                 )
                 return APIGatewayV2HTTPResponse(200)
             }
+        } catch (e: WebSocketStateGoneException) {
+            root.logger.info { "Socket ${event.socketId} disconnected before didConnect could finish; discarding." }
+            return APIGatewayV2HTTPResponse(204)
         } catch (e: Exception) {
             root.logger.error(e) { "Closing socket ${event.socketId} because didConnect failed." }
             webSocketClose(event.socketId, WebSocketClose.INTERNAL_ERROR)
@@ -472,6 +496,9 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         )
                         APIGatewayV2HTTPResponse(200)
                     }
+                } catch (e: WebSocketStateGoneException) {
+                    root.logger.info { "Socket ${event.requestContext.connectionId} disconnected while its message was being processed; discarding." }
+                    APIGatewayV2HTTPResponse(204)
                 } catch (e: Exception) {
                     root.logger.error(e) { "Closing socket ${event.requestContext.connectionId} because message from client failed to process (route key '${event.requestContext.routeKey}')." }
                     webSocketClose(event.requestContext.connectionId, WebSocketClose.INTERNAL_ERROR)

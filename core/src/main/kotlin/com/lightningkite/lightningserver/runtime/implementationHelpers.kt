@@ -291,7 +291,10 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
  */
 context(serverRuntime: ServerRuntime)
 public suspend fun <T> Task<T>.executeWithMetrics(location: PathSpec0, input: T) {
-    return instrument("task", TelemetryAttributes {
+    // Span name includes the location so traces distinguish one task from another, the same way
+    // HTTP root spans are named "$method $route". Locations are a fixed, static set, so this is
+    // low-cardinality.
+    return instrument("task $location", TelemetryAttributes {
         put(taskType, "TASK")
         put(taskRoute, location.toString())
     }) {
@@ -308,7 +311,7 @@ public suspend fun <T> Task<T>.executeWithMetrics(location: PathSpec0, input: T)
  */
 context(serverRuntime: ServerRuntime)
 public suspend fun ScheduledTask.executeWithMetrics(location: PathSpec0) {
-    return instrument("schedule", TelemetryAttributes {
+    return instrument("schedule $location", TelemetryAttributes {
         put(taskType, "SCHEDULE")
         put(taskRoute, location.toString())
     }) {
@@ -325,7 +328,7 @@ public suspend fun ScheduledTask.executeWithMetrics(location: PathSpec0) {
  */
 context(serverRuntime: ServerRuntime)
 public suspend fun StartupTask.executeWithMetrics(location: PathSpec0) {
-    return instrument("startup", TelemetryAttributes {
+    return instrument("startup $location", TelemetryAttributes {
         put(taskType, "STARTUP")
         put(taskRoute, location.toString())
     }) {
@@ -340,7 +343,7 @@ public suspend fun StartupTask.executeWithMetrics(location: PathSpec0) {
  */
 context(serverRuntime: ServerRuntime)
 public suspend fun PreDeployTask.executeWithMetrics(location: PathSpec0) {
-    return instrument("predeploy", TelemetryAttributes {
+    return instrument("predeploy $location", TelemetryAttributes {
         put(taskType, "PREDEPLOY")
         put(taskRoute, location.toString())
     }) {

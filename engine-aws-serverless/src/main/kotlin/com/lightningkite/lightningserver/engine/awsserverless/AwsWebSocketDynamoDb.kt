@@ -225,6 +225,11 @@ internal class AwsWebSocketDynamoDb(
         return out
     }
 
+    // Every state read below uses a consistent read.  Socket state is guarded by the compare-and-swap in
+    // updateState, and a stale read there is not merely out of date - it hands back a comparison value that
+    // is guaranteed to lose the swap, or omits a row that was written moments ago by the connect handler.
+    // Correctness here is worth the doubled read cost.
+
     suspend fun state(id: String): StateAndConnectRequest? {
         ensureTables()
         val result: StateAndConnectRequest?
@@ -233,6 +238,7 @@ internal class AwsWebSocketDynamoDb(
                 it.tableName(tableStates)
                 it.key(mapOf(socketIdKey to AttributeValue.fromS(id)))
                 it.projectionExpression("$stateKey, $requestKey")
+                it.consistentRead(true)
             }.await().item()?.let {
                 StateAndConnectRequest(
                     it[stateKey]!!.b().asByteArray(),
@@ -252,6 +258,7 @@ internal class AwsWebSocketDynamoDb(
         measureTime {
             val getState = KeysAndAttributes.builder()
                 .projectionExpression("$socketIdKey, $stateKey")
+                .consistentRead(true)
                 .keys(ids.map { mapOf(socketIdKey to AttributeValue.fromS(it)) }).build()
             client.batchGetItemPaginator {
                 it.requestItems(mapOf(tableStates to getState))
@@ -270,6 +277,7 @@ internal class AwsWebSocketDynamoDb(
         measureTime {
             val getState = KeysAndAttributes.builder()
                 .projectionExpression("$socketIdKey, $stateKey, $requestKey")
+                .consistentRead(true)
                 .keys(ids.map { mapOf(socketIdKey to AttributeValue.fromS(it)) }).build()
             client.batchGetItemPaginator {
                 it.requestItems(mapOf(tableStates to getState))
