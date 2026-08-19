@@ -30,3 +30,5 @@ tmp/mkdocs-venv/
 tmp
 site
 .claude/worktrees
+
+local.version.txt
