@@ -147,6 +147,26 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     /** EBS volume size in GiB. */
     public open val volumeSizeGiB: Int get() = 20
 
+    /**
+     * Size of the swap file to configure on the instance's root volume, or `null` (the default) for
+     * no swap at all. Useful for instance types with little RAM, where a build spike or a GC pause
+     * would otherwise get the JVM OOM-killed.
+     *
+     * The swap file lives at `/swapfile` on the root volume, so [volumeSizeGiB] must leave room for
+     * it on top of the OS, the JAR, and the logs.
+     *
+     * Configuring it is best-effort on both deployment styles: an instance whose swap file cannot be
+     * created still boots and serves, it just does so without the safety net.
+     */
+    public open val swapSize: DataSize? get() = null
+
+    /**
+     * `vm.swappiness` applied alongside [swapSize]; ignored when [swapSize] is `null`. The default of
+     * 10 keeps swap as an overflow safety net rather than something the kernel reaches for eagerly,
+     * which is what a latency-sensitive server wants.
+     */
+    public open val swapSwappiness: Int get() = 10
+
     /** Max body size for any request. */
     public open val maxBodySize: DataSize = 10.mebibytes
 
@@ -782,6 +802,116 @@ rm -rf aws/ awscliv2.zip
         )
     }
 
+    /**
+     * Writes the swap-file setup script, its systemd unit, and the matching `vm.swappiness` sysctl
+     * drop-in for [swapSize]. Emits nothing when [swapSize] is `null`.
+     *
+     * The file itself is allocated by `$projectPrefix-swap.service` at boot rather than right here, so
+     * the scaling builder's golden AMI does not carry a multi-GiB file around in its snapshot, and so
+     * an instance always ends up with the currently-configured size. Pass [activateNow] `true` (the
+     * default) from the boot-time single-instance path to also run it immediately; the AMI bake leaves
+     * it enabled for the next boot instead.
+     *
+     * That immediate activation is deliberately non-fatal. The caller's script runs under `set -e`, and
+     * losing the entire bootstrap — Angie, the systemd unit, the first deploy — because an overflow
+     * safety net could not be allocated is a far worse outcome than running without swap. It also matches
+     * the scaling path, where the baked unit is only ordered before the app, never required by it.
+     */
+    protected fun StringBuilder.swap(activateNow: Boolean = true) {
+        val swapSizeMiB = (swapSize ?: return).inWholeMebibytes
+        // language="Shell Script"
+        appendLine(
+            $$"""
+# === Swap ===
+echo "[INFO] Configuring $${swapSizeMiB}MiB swap file at $(date)"
+cat > /usr/local/bin/$$projectPrefix-swap-setup << 'SWAP_SETUP_EOF'
+#!/bin/bash
+set -euo pipefail
+
+SWAPFILE="/swapfile"
+SIZE_MIB=$$swapSizeMiB
+SIZE_BYTES=$((SIZE_MIB * 1024 * 1024))
+
+log() { echo "[swap-setup] $*"; }
+
+if swapon --show=NAME --noheadings 2>/dev/null | awk '{print $1}' | grep -qx "$SWAPFILE"; then
+    if [ "$(stat -c %s "$SWAPFILE")" -eq "$SIZE_BYTES" ]; then
+        log "$SWAPFILE is already active at $SIZE_MIB MiB"
+        exit 0
+    fi
+    log "Swap size changed; rebuilding $SWAPFILE"
+    swapoff "$SWAPFILE"
+fi
+
+# A reboot leaves the file on disk with swap off. Re-enabling it beats rewriting it, and on an
+# instance that had to fall back to dd it is the difference between an instant boot and writing the
+# whole file out again every single time. A file that is the right size but unusable (never mkswap'd,
+# truncated) simply fails swapon here and gets rebuilt below.
+if [ -f "$SWAPFILE" ] && [ "$(stat -c %s "$SWAPFILE")" -eq "$SIZE_BYTES" ]; then
+    chmod 600 "$SWAPFILE"
+    if swapon "$SWAPFILE" 2>/dev/null; then
+        log "Reusing existing $SWAPFILE at $SIZE_MIB MiB"
+        exit 0
+    fi
+    log "Existing $SWAPFILE could not be enabled; rebuilding"
+fi
+
+allocate() {
+    rm -f "$SWAPFILE"
+    if [ "$1" = "fallocate" ]; then
+        fallocate -l "$SIZE_MIB"M "$SWAPFILE"
+    else
+        dd if=/dev/zero of="$SWAPFILE" bs=1M count="$SIZE_MIB" status=none
+    fi
+    chmod 600 "$SWAPFILE"
+    mkswap "$SWAPFILE" >/dev/null
+}
+
+# fallocate is instant but can leave unwritten extents, which swapon refuses on some filesystems;
+# writing the file out with dd is the slow fallback that always produces a usable swap file.
+allocate fallocate
+if ! swapon "$SWAPFILE"; then
+    log "swapon rejected the preallocated file, rewriting it with dd"
+    allocate dd
+    swapon "$SWAPFILE"
+fi
+log "Swap enabled: $SIZE_MIB MiB"
+SWAP_SETUP_EOF
+chmod +x /usr/local/bin/$$projectPrefix-swap-setup
+
+cat > /etc/sysctl.d/60-$$projectPrefix-swap.conf << 'SWAP_SYSCTL_EOF'
+vm.swappiness=$$swapSwappiness
+SWAP_SYSCTL_EOF
+sysctl -p /etc/sysctl.d/60-$$projectPrefix-swap.conf >/dev/null || true
+
+cat > /etc/systemd/system/$$projectPrefix-swap.service << 'SWAP_UNIT_EOF'
+[Unit]
+Description=$${displayName} swap file
+After=local-fs.target
+Before=$$projectPrefix.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/$$projectPrefix-swap-setup
+
+[Install]
+WantedBy=multi-user.target
+SWAP_UNIT_EOF
+
+systemctl daemon-reload
+systemctl enable $$projectPrefix-swap.service
+"""
+        )
+        if (activateNow) {
+            appendLine(
+                "systemctl start $projectPrefix-swap.service || " +
+                        "echo \"[WARN] Swap setup failed; continuing without swap\""
+            )
+            appendLine()
+        }
+    }
+
     protected fun StringBuilder.systemD() {
         appendLine(
             $$"""
@@ -986,6 +1116,19 @@ echo "[INFO] Creating Lightning Server Redeploy Script - DONE"
         for ((name, _) in instanceFiles.keys + instanceFilesRaw.keys) {
             require(name.matches(Regex("[A-Za-z0-9._-]+"))) {
                 "Instance file names can only contain the characters A-Z a-z 0-9 ._-"
+            }
+        }
+
+        // Validate swap sizing against the root volume it has to fit on
+        swapSize?.let { swap ->
+            require(swap.inWholeMebibytes >= 1) {
+                "Invalid swapSize: must be at least 1 MiB when set"
+            }
+            require(swap.inWholeMebibytes < volumeSizeGiB.toLong() * 1024) {
+                "Invalid swapSize: ${swap.inWholeMebibytes} MiB does not fit on the ${volumeSizeGiB} GiB root volume"
+            }
+            require(swapSwappiness in 0..200) {
+                "Invalid swapSwappiness '$swapSwappiness': must be between 0 and 200"
             }
         }
 

@@ -549,6 +549,10 @@ apt install -y openjdk-17-jre-headless openssl curl gnupg ca-certificates unzip
                 appendLine()
             }
 
+            // Before the app is ever started, so a memory-tight instance has its safety net from
+            // the very first boot.
+            swap()
+
             cloudwatchAgent(emitter.applicationRegion)
 
             awsCli()
