@@ -15,6 +15,8 @@ import com.lightningkite.lightningserver.terraform.aws.ec2.stigBuildLinux
 import com.lightningkite.lightningserver.terraform.aws.ec2.TerraformAwsSingleEc2Builder
 import com.lightningkite.lightningserver.terraform.aws.ec2.VpcInfoTerraformManaged
 import com.lightningkite.services.cache.Cache
+import com.lightningkite.services.data.DataSize
+import com.lightningkite.services.data.DataSize.Companion.gibibytes
 import com.lightningkite.services.data.EmailAddress
 import com.lightningkite.services.pubsub.PubSub
 import com.lightningkite.services.terraform.AwsVpc
@@ -106,6 +108,43 @@ class Ec2BuilderGenerationTest {
         override val maxInstanceLifetimeSeconds = 604800
         override val terraformRoot = File(tmpRoot, "online")
         override fun OnlineServer.settings() = fulfillGlobals()
+    }
+
+    inner class SwapSingleDeployment : TerraformAwsSingleEc2Builder<TestServer>(TestServer) {
+        override val storageBucket = "test-tf-state"
+        override val region: Region = Region.US_WEST_2
+        override val displayName = "Swap Single Test"
+        override val domainZone = "example.com"
+        override val domain = "swap-single.example.com"
+        override val debug = true
+        override val emergencyContact = EmailAddress("ops@example.com")
+        override val instanceType = "t4g.medium"
+        override val instanceArchitecture = CPUArchitecture.Arm
+        override val applicationVpc = AwsVpc.Default
+        override val swapSize: DataSize? = 2.gibibytes
+        override val swapSwappiness = 30
+        override val terraformRoot = File(tmpRoot, "swap-single")
+        override fun TestServer.settings() = fulfillGlobals(cacheUrl = null)
+    }
+
+    inner class SwapScalingDeployment : TerraformAwsScalingEc2Builder<TestServer>(TestServer) {
+        override val storageBucket = "test-tf-state"
+        override val region: Region = Region.US_WEST_2
+        override val displayName = "Swap Scaling Test"
+        override val domainZone = "example.com"
+        override val domain = "swap-scaling.example.com"
+        override val debug = true
+        override val emergencyContact = EmailAddress("ops@example.com")
+        override val instanceType = "t4g.medium"
+        override val instanceArchitecture = CPUArchitecture.Arm
+        override val applicationVpc = terraformManagedVPC(
+            ipPrefix = "10.0",
+            availabilityZones = listOf("us-west-2a", "us-west-2b"),
+            natGateway = AwsVpc.NatGateway.Single,
+        )
+        override val swapSize: DataSize? = 2.gibibytes
+        override val terraformRoot = File(tmpRoot, "swap-scaling")
+        override fun TestServer.settings() = fulfillGlobals("redis://cache:6379")
     }
 
     inner class CmkScalingDeployment : TerraformAwsScalingEc2Builder<TestServer>(TestServer) {
@@ -224,6 +263,61 @@ class Ec2BuilderGenerationTest {
         assertContains(ignore, "desired_capacity")
         // CPU-only by default: no request-count policy.
         assertNull(d.terraformRoot.findResource("aws_autoscaling_policy", "requests"))
+    }
+
+    @Test
+    fun swapConfiguredOnlyWhenRequested() {
+        val plain = SingleDeployment()
+        plain.write()
+        val plainInit = File(plain.terraformRoot, "ec2_init.sh").readText()
+        assertFalse(plainInit.contains("swap-setup"), "Swap must not be configured without swapSize")
+
+        val single = SwapSingleDeployment()
+        single.write()
+        val init = File(single.terraformRoot, "ec2_init.sh").readText()
+        assertContains(init, "SIZE_MIB=2048")
+        assertContains(init, "vm.swappiness=30")
+        // The unit is installed, enabled, and — on the single instance — started during boot, but
+        // best-effort: ec2_init.sh runs under `set -e` and must not die over a missing safety net.
+        assertContains(init, "systemctl enable swap-single-test-swap.service")
+        assertContains(init, "systemctl start swap-single-test-swap.service || echo")
+        // An existing correctly-sized file is re-enabled rather than rewritten on every reboot.
+        assertContains(init, "Reusing existing")
+
+        val scaling = SwapScalingDeployment()
+        scaling.write()
+        val component = File(scaling.terraformRoot, "image_data.yaml").readText()
+        assertContains(component, "SIZE_MIB=2048")
+        // Default swappiness, and the AMI bake only enables the unit; the file is allocated at boot.
+        assertContains(component, "vm.swappiness=10")
+        assertContains(component, "systemctl enable swap-scaling-test-swap.service")
+        assertFalse(
+            component.contains("systemctl start swap-scaling-test-swap.service"),
+            "The AMI bake must not allocate the swap file",
+        )
+    }
+
+    @Test
+    fun swapLargerThanRootVolumeRejected() {
+        val ex = assertFailsWith<IllegalArgumentException> {
+            object : TerraformAwsSingleEc2Builder<TestServer>(TestServer) {
+                override val storageBucket = "test-tf-state"
+                override val region: Region = Region.US_WEST_2
+                override val displayName = "Swap Too Big"
+                override val domainZone = "example.com"
+                override val domain = "swap-big.example.com"
+                override val debug = true
+                override val emergencyContact = EmailAddress("ops@example.com")
+                override val instanceType = "t4g.medium"
+                override val instanceArchitecture = CPUArchitecture.Arm
+                override val applicationVpc = AwsVpc.Default
+                override val volumeSizeGiB = 8
+                override val swapSize: DataSize? = 16.gibibytes
+                override val terraformRoot = File(tmpRoot, "swap-too-big")
+                override fun TestServer.settings() = fulfillGlobals(cacheUrl = null)
+            }.write()
+        }
+        assertContains(ex.message!!, "does not fit")
     }
 
     @Test
