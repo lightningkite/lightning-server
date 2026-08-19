@@ -56,6 +56,7 @@ class ErrorCaseWarningTest {
         domain = "example.com",
         protocol = "https",
         sourceIp = "local",
+        requestId = generateRequestId(),
     )
 
     @Test

@@ -141,6 +141,7 @@ class BulkSpanTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
+                        requestId = generateRequestId(),
                         body = TypedData.text(
                             """
                             {

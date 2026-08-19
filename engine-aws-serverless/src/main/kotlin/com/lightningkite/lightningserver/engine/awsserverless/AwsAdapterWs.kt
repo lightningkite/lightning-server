@@ -394,6 +394,10 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     domain = event.requestContext.domainName,
                     protocol = "https",
                     sourceIp = event.requestContext.identity.sourceIp ?: "0.0.0.0",
+                    // The gateway's connection ID is stable for the socket's whole lifetime, which is
+                    // exactly the correlation scope wanted for a connection.
+                    requestId = event.requestContext.connectionId,
+                    upstreamRequestId = headers[HttpHeader.XRequestId]?.root,
                     engineSocketId = event.requestContext.connectionId
                 )
                 try {

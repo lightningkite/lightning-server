@@ -650,6 +650,10 @@ public class NettyEngine(
                 }
             } ?: ((ctx.channel().remoteAddress() as? InetSocketAddress)?.address?.hostAddress ?: "")
 
+            val identity = headers.requestIdentity(cfg.requestIdHeader) {
+                logger.warn { "Request ID header for proxy '${cfg.requestIdHeader}' was missing from the request." }
+            }
+
             return HttpRequest(
                 path = RawHttpEndpoint(parts.path(), HttpMethod(this.method().name())),
                 queryParameters = QueryParameters(
@@ -658,6 +662,8 @@ public class NettyEngine(
                 domain = domain.ifEmpty { (ctx.channel().localAddress() as? InetSocketAddress)?.hostString.orEmpty() },
                 protocol = "http",
                 sourceIp = sourceIp,
+                requestId = identity.requestId,
+                upstreamRequestId = identity.upstreamRequestId,
                 body = body,
             )
         }
@@ -677,6 +683,10 @@ public class NettyEngine(
                 }
             } ?: ((ctx.channel().remoteAddress() as? InetSocketAddress)?.address?.hostAddress ?: "")
 
+            val identity = headers.requestIdentity(cfg.requestIdHeader) {
+                logger.warn { "Request ID header for proxy '${cfg.requestIdHeader}' was missing from the request." }
+            }
+
             return WebSocketConnectRequest(
                 path = RawWebsocketPath(parts.path()),
                 queryParameters = QueryParameters(
@@ -685,6 +695,8 @@ public class NettyEngine(
                 domain = domain.ifEmpty { (ctx.channel().localAddress() as? InetSocketAddress)?.hostString.orEmpty() },
                 protocol = "http",
                 sourceIp = sourceIp,
+                requestId = identity.requestId,
+                upstreamRequestId = identity.upstreamRequestId,
             )
         }
 

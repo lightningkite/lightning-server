@@ -178,15 +178,10 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                     val otherHandler = match.value
                     @Suppress("UNCHECKED_CAST")
                     otherHandler as WebSocketHandler<PathSpec, Any?>
-                    val r = WebSocketConnectRequest<PathSpec>(
+                    val r = connection.request.subConnection<PathSpec>(
                         path = RawWebsocketPath<PathSpec>(PathSegments.parse(message.path!!), match),
                         queryParameters = QueryParameters(connection.request.queryParameters + (message.queryParams?.entries?.flatMap { it.value.map { v -> it.key to v } }
                             ?: listOf())),
-                        headers = connection.request.headers,
-                        domain = connection.request.domain,
-                        protocol = connection.request.protocol,
-                        sourceIp = connection.request.sourceIp,
-                        cache = connection.request.cache,
                     )
                     val storage = otherHandler.willConnectWithMetrics(match.path.pathSpec, connection, r)
                     connection.updateStateImmediately {

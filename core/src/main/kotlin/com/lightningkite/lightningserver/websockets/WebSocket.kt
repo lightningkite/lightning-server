@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.QueryParameters
+import com.lightningkite.lightningserver.http.generateRequestId
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.location
@@ -84,6 +85,14 @@ public data class WebSocketConnectRequest<PATH : PathSpec>(
     override val domain: String = "",
     override val protocol: String = "",
     override val sourceIp: String = "",
+    /**
+     * Identifies this connection for the lifetime of the socket. Every message and every push on
+     * this connection correlates back to it, since a long-lived socket is one logical session rather
+     * than one request.
+     */
+    override val requestId: String,
+    override val parentRequestId: String? = null,
+    override val upstreamRequestId: String? = null,
     override val cache: SerializableCache = SerializableCache(),
     /**
      * Engine-specific socket identifier for direct message sending.
@@ -91,7 +100,33 @@ public data class WebSocketConnectRequest<PATH : PathSpec>(
      * Used by CoroutineWebsocketHandler to bypass pub/sub for direct sends.
      */
     val engineSocketId: String? = null,
-) : Request<PATH>()
+) : Request<PATH>() {
+    /**
+     * Derives a logical sub-connection of this one, as multiplexing carries several logical sockets
+     * over a single physical connection.
+     *
+     * The sub-connection gets its own [requestId] with [parentRequestId] pointing back here, so each
+     * logical socket is independently attributable while remaining joinable to the physical
+     * connection carrying it. Use this only for a genuinely distinct logical connection — a shim that
+     * merely rewrites the path of the same socket should keep the existing [requestId].
+     */
+    public fun <PATH2 : PathSpec> subConnection(
+        path: RawWebsocketPath<PATH2>,
+        queryParameters: QueryParameters = this.queryParameters,
+    ): WebSocketConnectRequest<PATH2> = WebSocketConnectRequest(
+        path = path,
+        queryParameters = queryParameters,
+        headers = headers,
+        domain = domain,
+        protocol = protocol,
+        sourceIp = sourceIp,
+        requestId = generateRequestId(),
+        parentRequestId = requestId,
+        upstreamRequestId = upstreamRequestId,
+        cache = cache,
+        engineSocketId = engineSocketId,
+    )
+}
 
 /**
  * Represents an active WebSocket connection with stateful lifecycle management.

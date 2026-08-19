@@ -112,6 +112,7 @@ public suspend fun <USER : HasId<*>, INPUT, OUTPUT> ApiHttpHandler<PathSpec0, US
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
                 sourceIp = "localhost",
+                requestId = generateRequestId(),
                 body = TypedData.text(
                     test.externalSerialization.json.encodeToString(inputType, input),
                     MediaType.Application.Json
@@ -138,6 +139,7 @@ public suspend fun <USER : HasId<*>, INPUT, OUTPUT, A> ApiHttpHandler<PathSpec1<
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
                 sourceIp = "localhost",
+                requestId = generateRequestId(),
                 body = TypedData.text(
                     test.externalSerialization.json.encodeToString(inputType, input),
                     MediaType.Application.Json
@@ -165,6 +167,7 @@ public suspend fun <USER : HasId<*>, INPUT, OUTPUT, A, B> ApiHttpHandler<PathSpe
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
                 sourceIp = "localhost",
+                requestId = generateRequestId(),
                 body = TypedData.text(
                     test.externalSerialization.json.encodeToString(inputType, input),
                     MediaType.Application.Json
@@ -193,6 +196,7 @@ public suspend fun <USER : HasId<*>, INPUT, OUTPUT, A, B, C> ApiHttpHandler<Path
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
                 sourceIp = "localhost",
+                requestId = generateRequestId(),
                 body = TypedData.text(
                     test.externalSerialization.json.encodeToString(inputType, input),
                     MediaType.Application.Json
@@ -218,6 +222,7 @@ context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT>
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
                 sourceIp = "localhost",
+                requestId = generateRequestId(),
                 body = TypedData.text(
                     test.externalSerialization.json.encodeToString(inputType, input),
                     MediaType.Application.Json
@@ -244,6 +249,7 @@ context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT,
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
                 sourceIp = "localhost",
+                requestId = generateRequestId(),
                 body = TypedData.text(
                     test.externalSerialization.json.encodeToString(inputType, input),
                     MediaType.Application.Json
@@ -271,6 +277,7 @@ context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT,
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
                 sourceIp = "localhost",
+                requestId = generateRequestId(),
                 body = TypedData.text(
                     test.externalSerialization.json.encodeToString(inputType, input),
                     MediaType.Application.Json
@@ -299,6 +306,7 @@ context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT,
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
                 sourceIp = "localhost",
+                requestId = generateRequestId(),
                 body = TypedData.text(
                     test.externalSerialization.json.encodeToString(inputType, input),
                     MediaType.Application.Json

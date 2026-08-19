@@ -34,6 +34,26 @@ public abstract class Request<out PATH : PathSpec> : HasContextualPath<PATH>, Ca
     /** The source IP address of the client making the request. */
     public abstract val sourceIp: String
 
+    /**
+     * Server-controlled identifier correlating this request across every log the server writes.
+     *
+     * Never derived from an untrusted caller — see
+     * [com.lightningkite.lightningserver.http.requestIdentity] for how engines resolve it.
+     */
+    public abstract val requestId: String
+
+    /**
+     * The [requestId] of the request that dispatched this one, for sub-requests of a multiplexed
+     * request, or null for a request that arrived directly from a client.
+     */
+    public abstract val parentRequestId: String?
+
+    /**
+     * An identifier the caller supplied that was not trusted, kept for diagnostics only.
+     * Never used for correlation.
+     */
+    public abstract val upstreamRequestId: String?
+
     context(serverRuntime: ServerRuntime)
     override val pathInContext: ResolvedPath<PATH>
         get() = path.pathInContext

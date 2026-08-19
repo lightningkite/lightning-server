@@ -69,6 +69,7 @@ fun bulkTest() = BulkServer.testBlocking(settings = {}) {
             domain = "example.com",
             protocol = "https",
             sourceIp = "local",
+            requestId = generateRequestId(),
             body = TypedData.text(
                 """{"ping":{"path":"/ping","method":"GET"},"gone":{"path":"/missing","method":"GET"}}""",
                 MediaType.Application.Json,

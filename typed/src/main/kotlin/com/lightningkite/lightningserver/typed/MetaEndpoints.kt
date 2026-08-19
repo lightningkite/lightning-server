@@ -396,7 +396,7 @@ public class MetaEndpoints(
                             val start = TimeSource.Monotonic.markNow()
                             val sub = entry.value
                             val split = sub.path.split("?")
-                            val properRequest = originalRequest.copyWithNewPathType(
+                            val properRequest = originalRequest.subRequest(
                                 path = RawHttpEndpoint(split[0], method = HttpMethod(sub.method)),
                                 queryParameters = split.getOrNull(1)?.let { QueryParameters.parse(it) }
                                     ?: QueryParameters.EMPTY,

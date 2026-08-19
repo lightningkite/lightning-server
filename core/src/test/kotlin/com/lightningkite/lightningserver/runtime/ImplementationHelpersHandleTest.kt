@@ -140,6 +140,7 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
+                        requestId = generateRequestId(),
                     )
                 )
                 assertEquals(HttpStatus.OK, resp.status)
@@ -162,6 +163,7 @@ class ImplementationHelpersHandleTest {
                     domain = "example.com",
                     protocol = "https",
                     sourceIp = "local",
+                    requestId = generateRequestId(),
                 )
             )
             assertEquals(HttpStatus.OK, resp.status)
@@ -193,6 +195,7 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
+                        requestId = generateRequestId(),
                     )
                 )
                 // On success, translation should set NoContent and remove body
@@ -228,6 +231,7 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
+                        requestId = generateRequestId(),
                     )
                 )
                 // Should be NoContent with Access-Control-Allow-Methods including GET, POST, HEAD
@@ -265,6 +269,7 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
+                        requestId = generateRequestId(),
                     )
                 )
                 // Expect a redirect with Location header pointing to alternate form
@@ -301,6 +306,7 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
+                        requestId = generateRequestId(),
                     )
                 )
                 // Should succeed directly, NOT redirect (which would cause infinite loop)
@@ -334,6 +340,7 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
+                        requestId = generateRequestId(),
                     )
                 )
                 // Expect a redirect with Location header pointing to alternate form
@@ -367,6 +374,7 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
+                        requestId = generateRequestId(),
                     )
                 )
                 // Expect a redirect with Location header pointing to alternate form
@@ -407,6 +415,7 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
+                        requestId = generateRequestId(),
                     )
                 )
                 assertEquals(HttpStatus.ServiceUnavailable, resp.status)
@@ -430,6 +439,7 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
+                        requestId = generateRequestId(),
                     )
                 )
                 assertEquals(HttpStatus.NotFound, resp.status)
@@ -480,6 +490,7 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
+                        requestId = generateRequestId(),
                     )
                 )
                 assertEquals(HttpStatus.TooManyRequests, resp.status)
@@ -505,6 +516,7 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
+                        requestId = generateRequestId(),
                     )
                 )
                 assertEquals("nosniff", resp.headers[HttpHeader.XContentTypeOptions]?.root)
@@ -530,6 +542,7 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "http",
                         sourceIp = "local",
+                        requestId = generateRequestId(),
                     )
                 )
                 assertEquals("nosniff", resp.headers[HttpHeader.XContentTypeOptions]?.root)
@@ -555,6 +568,7 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
+                        requestId = generateRequestId(),
                     )
                 )
                 assertEquals(HttpStatus.NotFound, resp.status)
@@ -580,6 +594,7 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
+                        requestId = generateRequestId(),
                     )
                 )
                 assertEquals(HttpStatus.OK, resp.status)
@@ -614,6 +629,7 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
+                        requestId = generateRequestId(),
                     )
                 )
                 // Small payload should not be compressed even if gzip is accepted
@@ -649,6 +665,7 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
+                        requestId = generateRequestId(),
                     )
                 )
                 assertEquals(HttpStatus.OK, resp.status)
@@ -675,6 +692,7 @@ class ImplementationHelpersHandleTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
+                        requestId = generateRequestId(),
                     )
                 )
                 assertEquals(HttpStatus.OK, resp.status)

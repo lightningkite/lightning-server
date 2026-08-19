@@ -132,6 +132,10 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
                 domain = request.domain,
                 protocol = request.protocol,
                 sourceIp = request.sourceIp,
+                // Same physical socket, only the path is rewritten, so the identity carries over.
+                requestId = request.requestId,
+                parentRequestId = request.parentRequestId,
+                upstreamRequestId = request.upstreamRequestId,
                 cache = request.cache,
             )
         }

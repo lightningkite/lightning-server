@@ -35,10 +35,16 @@ internal fun Headers.adapt(): HttpHeaders = HttpHeaders(flattenEntries())
  */
 context(server: ServerRuntimeBase)
 internal suspend fun ApplicationCall.adapt(maxBody: Long): HttpRequest<PathSpec> {
+    val adaptedHeaders = request.headers.adapt()
+    val identity = adaptedHeaders.requestIdentity(ktorRunConfig().requestIdHeader) {
+        server.logger.warn { "Request ID header for proxy '${ktorRunConfig().requestIdHeader}' was missing from the request." }
+    }
     return HttpRequest(
         path = RawHttpEndpoint(request.path().decodeURLPart(), HttpMethod(request.httpMethod.value)),
         queryParameters = QueryParameters(request.queryParameters.flattenEntries()),
-        headers = request.headers.adapt(),
+        headers = adaptedHeaders,
+        requestId = identity.requestId,
+        upstreamRequestId = identity.upstreamRequestId,
         domain = request.origin.serverHost,
         protocol = request.origin.scheme,
         sourceIp = ktorRunConfig().realIpHeader?.let {

@@ -1,6 +1,7 @@
 // Fixed by Claude - added delay(50) after test() to allow didConnect() subscription to complete
 package com.lightningkite.lightningserver.websockets
 
+import com.lightningkite.lightningserver.http.generateRequestId
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.pathing.PathSpec0
@@ -86,6 +87,7 @@ class DirectWebSocketSenderTest {
         // Test that engineSocketId can be explicitly set in a request
         val request = WebSocketConnectRequest<PathSpec0>(
             path = RawWebsocketPath(PathSegments.EMPTY),
+            requestId = generateRequestId(),
             engineSocketId = "test-socket-123"
         )
 
@@ -97,6 +99,7 @@ class DirectWebSocketSenderTest {
         // Verify that Storage correctly preserves the request's engineSocketId
         val request = WebSocketConnectRequest<PathSpec0>(
             path = RawWebsocketPath(PathSegments.EMPTY),
+            requestId = generateRequestId(),
             engineSocketId = "aws-connection-id-xyz"
         )
 

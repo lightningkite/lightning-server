@@ -54,6 +54,10 @@ import kotlin.time.Instant
  * @property port The port number to listen on (defaults to 8080)
  * @property realIpHeader Optional header name to extract the real client IP from (useful behind proxies).
  *                        Common values: "X-Forwarded-For", "X-Real-IP"
+ * @property requestIdHeader Optional header name carrying a request ID stamped by a **trusted**
+ *   reverse proxy, adopted as the authoritative request ID. Leave null (the default) to always
+ *   generate one; a client-supplied ID is never trusted. Set to "X-Request-ID" behind Envoy so the
+ *   proxy's capture and the server's logs share an identifier.
  * @property reliability Shared engine reliability settings (request timeout, max body size, graceful
  *   shutdown drain, WebSocket backpressure). See [EngineReliabilitySettings]. Note that
  *   [EngineReliabilitySettings.idleTimeout] and [EngineReliabilitySettings.workerThreads] are
@@ -64,6 +68,7 @@ public data class KtorRuntimeSettings(
     val host: String = "0.0.0.0",
     val port: Int = 8080,
     val realIpHeader: String? = null,
+    val requestIdHeader: String? = null,
     val reliability: EngineReliabilitySettings = EngineReliabilitySettings(),
 )
 
@@ -215,10 +220,16 @@ public class KtorEngine(
                         })
 
                 val queryParams = parseQueryParams()
+                val adaptedHeaders = call.request.headers.adapt()
+                val identity = adaptedHeaders.requestIdentity(runConfig.requestIdHeader) {
+                    logger.warn { "Request ID header for proxy '${runConfig.requestIdHeader}' was missing from the request." }
+                }
                 val request = WebSocketConnectRequest(
                     path = RawWebsocketPath(queryParams["path"] ?: call.request.path().decodeURLPart()),
                     queryParameters = queryParams,
-                    headers = call.request.headers.adapt(),
+                    headers = adaptedHeaders,
+                    requestId = identity.requestId,
+                    upstreamRequestId = identity.upstreamRequestId,
                     domain = call.request.origin.serverHost,
                     protocol = call.request.origin.scheme,
                     sourceIp = runConfig.realIpHeader?.let {

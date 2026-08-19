@@ -49,6 +49,7 @@ class RateLimiterTest {
             domain = "Domain",
             protocol = "Http",
             sourceIp = "localhost",
+            requestId = generateRequestId(),
             body = null,
         )
         var successRequests = 0
@@ -247,6 +248,7 @@ class RateLimiterTest {
                     domain = "Domain",
                     protocol = "Http",
                     sourceIp = "localhost",
+                    requestId = generateRequestId(),
                     body = null,
                 )
                 var successRequests = 0

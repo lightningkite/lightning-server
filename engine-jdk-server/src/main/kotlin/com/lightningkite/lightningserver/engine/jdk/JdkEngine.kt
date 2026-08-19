@@ -32,6 +32,10 @@ import kotlin.time.Clock
  * @property host The host address to bind to (defaults to "0.0.0.0" for all interfaces)
  * @property port The port number to listen on (defaults to 8080)
  * @property realIpHeader Optional header name to extract the real client IP from (useful behind proxies)
+ * @property requestIdHeader Optional header name carrying a request ID stamped by a **trusted**
+ *   reverse proxy, adopted as the authoritative request ID. Leave null (the default) to always
+ *   generate one; a client-supplied ID is never trusted. Set to "X-Request-ID" behind Envoy so the
+ *   proxy's capture and the server's logs share an identifier.
  * @property reliability Shared engine reliability settings (request timeout, max body size, graceful
  *   shutdown drain, worker-thread pool size). See [EngineReliabilitySettings].
  */
@@ -40,6 +44,7 @@ public data class JdkRuntimeSettings(
     val host: String = "0.0.0.0",
     val port: Int = 8080,
     val realIpHeader: String? = null,
+    val requestIdHeader: String? = null,
     val reliability: EngineReliabilitySettings = EngineReliabilitySettings(),
 )
 
@@ -127,7 +132,7 @@ public class JdkEngine(
                     exchange.respondPlain(HttpStatus.PayloadTooLarge.code, "Payload Too Large")
                     return@createContext
                 }
-                val request = exchange.requestToLightningServer(cfg.realIpHeader, this@JdkEngine, maxBody)
+                val request = exchange.requestToLightningServer(cfg.realIpHeader, cfg.requestIdHeader, this@JdkEngine, maxBody)
                 // Request timeout is enforced centrally in ServerRuntime.handle (per-handler HttpHandler.timeout).
                 runBlocking {
                     val result: HttpResponse = this@JdkEngine.handle(request)
@@ -257,11 +262,13 @@ private suspend fun HttpExchange.write(response: HttpResponse) {
  * Converts a JDK HttpExchange to a Lightning Server HttpRequest.
  *
  * @param realIpHeader Optional header name to extract the real client IP from
+ * @param requestIdHeader Optional header name carrying a trusted proxy's request ID
  * @param engine The JdkEngine instance (used for logging)
  * @return The converted HttpRequest
  */
 private fun HttpExchange.requestToLightningServer(
     realIpHeader: String?,
+    requestIdHeader: String?,
     engine: JdkEngine,
     maxBody: Long,
 ): HttpRequest<PathSpec> {
@@ -289,6 +296,10 @@ private fun HttpExchange.requestToLightningServer(
         }
     } else null
 
+    val identity = headers.requestIdentity(requestIdHeader) {
+        engine.logger.warn { "Request ID header for proxy '$requestIdHeader' was missing from the request." }
+    }
+
     return HttpRequest(
         path = RawHttpEndpoint(uri.path ?: "/", HttpMethod(method)),
         queryParameters = queryParams,
@@ -296,6 +307,8 @@ private fun HttpExchange.requestToLightningServer(
         domain = domain,
         protocol = protocol,
         sourceIp = sourceIp,
+        requestId = identity.requestId,
+        upstreamRequestId = identity.upstreamRequestId,
         body = body
     )
 }
