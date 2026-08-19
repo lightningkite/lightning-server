@@ -402,41 +402,17 @@ public class MetaEndpoints(
                                     ?: QueryParameters.EMPTY,
                                 body = sub.body?.let { TypedData.text(it, MediaType.Application.Json) }
                             )
-                            entry.key to instrumentHttpRequest(properRequest) {
-                                try {
-                                    val result = instrument("handler") {
-                                        @Suppress("UNCHECKED_CAST")
-                                        (properRequest.path.match.value as HttpHandler<PathSpec>).handle(properRequest)
-                                    }
-                                    HttpInstrumentationResult(
-                                        value = BulkResponse(
-                                            durationMs = start.elapsedNow().inWholeMilliseconds,
-                                            result = result.body?.text()
-                                        ),
-                                        statusCode = result.status.code,
-                                    )
-                                } catch (e: Exception) {
-                                    val lsError = (when (e) {
-                                        is HttpStatusException -> e.toLSError()
-                                        else -> LSError(
-                                            500,
-                                            "unknown",
-                                            if (generalSettings().debug) e.message
-                                                ?: "An unknown server error occurred." else "An unknown server error occurred.",
-                                            if (generalSettings().debug) e.stackTraceToString() else ""
-                                        )
-                                    }).let {
-                                        if (generalSettings().debug) it.copy(stackTrace = e.stackTraceToString()) else it
-                                    }
-                                    HttpInstrumentationResult(
-                                        value = BulkResponse(
-                                            durationMs = start.elapsedNow().inWholeMilliseconds,
-                                            error = lsError,
-                                        ),
-                                        statusCode = lsError.http,
-                                        errorType = e::class.simpleName,
-                                    )
-                                }
+                            // Route the sub-request through the shared logical-request pipeline rather
+                            // than invoking its handler directly, so it passes every
+                            // LogicalRequestInterceptor (access logging, auditing, rate limiting)
+                            // instead of executing unobserved. handleSubRequest maps exceptions to
+                            // responses itself, so nothing escapes here.
+                            val response = serverRuntime.handleSubRequest(properRequest)
+                            val durationMs = start.elapsedNow().inWholeMilliseconds
+                            entry.key to if (response.status.success) {
+                                BulkResponse(durationMs = durationMs, result = response.body?.text())
+                            } else {
+                                BulkResponse(durationMs = durationMs, error = with(serverRuntime) { response.toLSError() })
                             }
                         }
                     }.awaitAll().associate { it }

@@ -25,7 +25,7 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
  */
 public class SecurityHeadersInterceptor(
     private val hstsMaxAgeSeconds: Long = DEFAULT_HSTS_MAX_AGE_SECONDS,
-) : HttpInterceptor {
+) : ConnectionInterceptor {
     override val name: String = "SecurityHeaders"
 
     public companion object {

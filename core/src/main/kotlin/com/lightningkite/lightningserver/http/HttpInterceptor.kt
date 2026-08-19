@@ -38,7 +38,7 @@ import kotlinx.coroutines.CancellationException
  * }
  * ```
  */
-public fun interface HttpInterceptor {
+public interface HttpInterceptor {
     /**
      * The name of this interceptor, used for instrumentation and debugging.
      * Defaults to the simple class name or "anonymous" for lambdas.
@@ -59,8 +59,11 @@ public fun interface HttpInterceptor {
     ): HttpResponse
 
     /**
-     * A no-op interceptor that simply passes requests through unchanged.
-     * Used as a placeholder when no interceptors are configured.
+     * The compiled chain for "nothing installed" — it passes requests straight through.
+     *
+     * This is chain machinery, not something to install: an interceptor is installed as a
+     * [ConnectionInterceptor] or a [LogicalRequestInterceptor], and a no-op of either kind would do
+     * nothing but cost a span. [compileAndInstrument] drops these rather than wrapping them.
      */
     public object NoOp : HttpInterceptor {
         context(runtime: ServerRuntime)
@@ -72,6 +75,35 @@ public fun interface HttpInterceptor {
         }
     }
 }
+
+
+/**
+ * An interceptor that runs once per physical HTTP request, outside routing.
+ *
+ * Correct for concerns tied to the connection or the wire format — CORS, compression, security
+ * headers — where running once per logical request would duplicate work or corrupt the response.
+ *
+ * ```kotlin
+ * val timing = ConnectionInterceptor { request, cont ->
+ *     val start = TimeSource.Monotonic.markNow()
+ *     cont(request).also { println("${'$'}{request.path} took ${'$'}{start.elapsedNow()}") }
+ * }
+ * ```
+ */
+public fun interface ConnectionInterceptor : HttpInterceptor
+
+/**
+ * An interceptor that runs for every logical request, including each sub-request of a multiplexed
+ * request such as `/meta/bulk`.
+ *
+ * Correct for concerns that describe what was actually done — access logging, auditing, rate
+ * limiting — where seeing only the outer request would report a single hit on `/meta/bulk` no matter
+ * how much was done inside it.
+ *
+ * An implementation must tolerate running several times within one physical request, and should
+ * attribute its work to [HttpRequest.requestId] rather than assuming one request per connection.
+ */
+public fun interface LogicalRequestInterceptor : HttpInterceptor
 
 /**
  * Wraps the intercept call with instrumentation for performance monitoring, and recovers from
@@ -120,29 +152,49 @@ public suspend inline fun HttpInterceptor.interceptInstrumented(
 }
 
 /**
+ * One link of a compiled chain, wrapping [interceptor] in its own instrumentation span.
+ *
+ * These are plain anonymous objects rather than SAM lambdas because [HttpInterceptor] itself is not a
+ * functional interface — only the two installable kinds are, and a compiled chain is neither of them.
+ */
+private fun instrumentedLink(interceptor: HttpInterceptor): HttpInterceptor = object : HttpInterceptor {
+    override val name: String get() = interceptor.name
+
+    context(runtime: ServerRuntime)
+    override suspend fun intercept(
+        request: HttpRequest<*>,
+        cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+    ): HttpResponse = interceptor.interceptInstrumented(request, cont)
+}
+
+/** Nests [inner] inside [outer], so [outer] runs first and can post-process what [inner] returns. */
+private fun composeLinks(outer: HttpInterceptor, inner: HttpInterceptor): HttpInterceptor = object : HttpInterceptor {
+    override val name: String get() = "${outer.name} -> ${inner.name}"
+
+    context(runtime: ServerRuntime)
+    override suspend fun intercept(
+        request: HttpRequest<*>,
+        cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+    ): HttpResponse = outer.intercept(request) { inner.interceptInstrumented(it, cont) }
+}
+
+/**
  * Compiles a list of interceptors into a single chained interceptor with instrumentation.
  *
- * This internal function is used by the framework to combine multiple interceptors into
- * an efficient execution chain. The first interceptor in the list executes first, followed
- * by each subsequent interceptor, and finally the actual handler.
+ * The first interceptor in the list executes first, followed by each subsequent interceptor, and
+ * finally the actual handler. [HttpInterceptor.NoOp] entries are dropped rather than wrapped, since
+ * a chain link around a pass-through only costs a span.
  *
- * @return A single HttpInterceptor that represents the entire chain
+ * Accepts any list of interceptors so the same machinery serves both the connection-scoped and the
+ * logical-request-scoped chain; which interceptors reach which chain is settled at installation by
+ * their type.
+ *
+ * @return A single HttpInterceptor representing the entire chain
  */
-internal fun List<HttpInterceptor>.compileAndInstrument(): HttpInterceptor = when (size) {
-    0 -> HttpInterceptor.NoOp
-    1 -> HttpInterceptor { request, cont -> first().interceptInstrumented(request, cont) }
-    else -> reduceIndexed { idx, acc, interceptor ->
-        when {
-            acc === HttpInterceptor.NoOp -> interceptor
-            interceptor === HttpInterceptor.NoOp -> acc
-
-            else -> HttpInterceptor { request, cont ->
-                // idx is of the current interceptor in the list, so will start at 1
-                if (idx == 1) acc.interceptInstrumented(request) { interceptor.interceptInstrumented(it, cont) }
-                else acc.intercept(request) { interceptor.interceptInstrumented(it, cont) }
-            }
-        }
-    }
+internal fun List<HttpInterceptor>.compileAndInstrument(): HttpInterceptor {
+    val effective = filter { it !== HttpInterceptor.NoOp }
+    if (effective.isEmpty()) return HttpInterceptor.NoOp
+    return effective.drop(1).fold(instrumentedLink(effective.first()), ::composeLinks)
 }
 
 /*

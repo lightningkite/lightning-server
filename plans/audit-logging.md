@@ -199,24 +199,60 @@ This never routes through `compiledHttpInterceptors`. Every sub-request therefor
 interceptors — not just access logging, but CORS, rate limiting, compression, and any future audit
 interceptor. N logical requests execute and the pipeline sees one.
 
-**Fix.** Extract "dispatch one logical request" from `ServerRuntime.handle`
-(`implementationHelpers.kt:69`) into a shared function that the bulk dispatcher re-enters, with a
-fresh `requestId` and `parentRequestId` set to the outer request.
+**Fixed.** `ServerRuntime.handle` now splits into two layers around routing:
 
-This requires interceptors to declare their scope, because re-running some of them per sub-request
-is wrong:
+- `handle` runs the connection-scoped chain once for the physical request, then delegates to
+- `dispatchLogicalRequest` — logical-scoped chain, route resolution, handler invocation, error
+  mapping — which is the single choke point every logical request passes through.
+
+`handleSubRequest` is the public entry a multiplexed endpoint uses to re-enter that choke point, and
+`MetaEndpoints.bulk` now calls it instead of invoking the matched handler directly. Sub-requests are
+derived with `HttpRequest.subRequest`, so each carries its own ID parented to the outer request.
+
+Two things fell out of the extraction:
+
+- The slash-redirect branch read `request.path.pathSegments` (the outer request) where it meant
+  `req.path` — harmless while there was only ever one request in scope, and an outright bug the
+  moment sub-requests re-enter. Fixed as part of the move.
+- Bulk previously hand-rolled its own exception-to-`BulkResponse` mapping. It now reads the outcome
+  off the response the pipeline produces, via `HttpResponse.toLSError()`.
+
+This requires interceptors to distinguish scope, because re-running some of them per sub-request is
+wrong. **Scope is carried by the type, not by a property**, so the two cannot be crossed:
 
 ```kotlin
-public enum class InterceptorScope {
-    /** Runs once for the physical HTTP request. CORS, compression, security headers. */
-    Connection,
-    /** Runs for every logical request, including multiplexed sub-requests. Audit, rate limiting. */
-    LogicalRequest,
-}
+/** Shared contract. Not installable — an interceptor is one of the two kinds below. */
+public interface HttpInterceptor { /* name, intercept */ }
+
+/** Once per physical request, outside routing. CORS, compression, security headers. */
+public fun interface ConnectionInterceptor : HttpInterceptor
+
+/** Every logical request, sub-requests included. Access log, audit, rate limiting. */
+public fun interface LogicalRequestInterceptor : HttpInterceptor
 ```
 
-Existing interceptors default to `Connection` to preserve current behaviour; `AccessLogInterceptor`
-and the new audit interceptor declare `LogicalRequest`.
+An earlier draft put an `InterceptorScope` enum on a single `HttpInterceptor` type. That was
+rejected: it leaves the invariant to convention, so an interceptor could be written for one scope and
+silently registered under the other, and nothing would catch it. With two types, `ServerBuilder`
+keeps two registries and two `install` overloads resolved at compile time, `ServerDefinition.Module`
+carries two lists, and there is no expressible way for an interceptor to end up in the wrong chain.
+`HttpInterceptor` survives only as the shared contract and as the type of a compiled chain — it
+cannot be installed.
+
+Classification as built:
+
+| Interceptor | Kind | Why |
+|---|---|---|
+| `GzipInterceptor` | `Connection` | compression applies to the physical body; per-sub-request would double-encode |
+| `SecurityHeadersInterceptor` | `Connection` | headers belong to the physical response |
+| `CorsInterceptor` | `Connection` | plus `WebSocketHandlerInterceptor`, as before |
+| `AccessLogInterceptor` | `LogicalRequest` | otherwise one line for `/meta/bulk` regardless of contents |
+| `RateLimitInterceptor` | `LogicalRequest` | otherwise a bulk request of 100 sub-requests costs one unit — a bypass |
+
+**Ordering consequence worth knowing:** interceptors nest by kind first and installation order
+second, so every `ConnectionInterceptor` wraps every `LogicalRequestInterceptor` regardless of
+install order. This only reorders a pair spanning both kinds, and the nesting it produces is the one
+you want — but it is a behaviour change for such a pair.
 
 ### 4.2 WebSockets are not access-logged at all
 

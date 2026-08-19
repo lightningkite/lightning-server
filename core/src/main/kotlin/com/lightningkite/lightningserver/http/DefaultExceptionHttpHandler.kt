@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.serialization.parse
 import com.lightningkite.lightningserver.serialization.toTypedData
 
 /**
@@ -69,3 +70,23 @@ internal object DefaultExceptionHttpHandler : ExceptionHttpHandler {
  * 5. The toTypedData call could fail if the Accept header specifies an unsupported format.
  *    Consider wrapping this in a try-catch and falling back to JSON or plain text.
  */
+
+/**
+ * Recovers the [LSError] from an error response produced by an [ExceptionHttpHandler].
+ *
+ * Used where a caller needs the structured error rather than the serialized body — notably a
+ * multiplexed endpoint reporting per-sub-request outcomes. Falls back to an error synthesized from
+ * the status when the body is absent or is not a serialized [LSError], which happens whenever a
+ * handler returns a failure status of its own rather than throwing.
+ */
+context(server: ServerRuntime)
+public suspend fun HttpResponse.toLSError(): LSError {
+    body?.let {
+        try {
+            return it.parse(LSError.serializer())
+        } catch (_: Exception) {
+            // Not a serialized LSError; fall through to synthesizing one from the status.
+        }
+    }
+    return LSError(http = status.code, detail = "unknown", message = status.toString())
+}

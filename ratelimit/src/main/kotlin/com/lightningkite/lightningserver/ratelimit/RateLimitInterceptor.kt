@@ -83,7 +83,7 @@ public class RateLimitInterceptor(
     private val settings: Runtime<RateLimitSettings?>,
     private val cache: Runtime<Cache>,
     private val requestLimits: suspend context(ServerRuntime) (Request<*>) -> RequestLimits?,
-) : HttpInterceptor, WebSocketHandlerInterceptor {
+) : LogicalRequestInterceptor, WebSocketHandlerInterceptor {
 
     private val logger = KotlinLogging.logger("com.lightningkite.lightningserver.ratelimit")
 

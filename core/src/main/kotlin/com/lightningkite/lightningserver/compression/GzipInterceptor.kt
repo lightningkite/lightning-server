@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.compression
 
 import com.lightningkite.lightningserver.http.HttpHeader
-import com.lightningkite.lightningserver.http.HttpInterceptor
+import com.lightningkite.lightningserver.http.ConnectionInterceptor
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -27,7 +27,9 @@ import kotlin.use
 /** Staging array size for moving bytes between a [Buffer] and a [java.io.OutputStream]. */
 private const val COPY_CHUNK: Int = 8 * 1024
 
-public class GzipInterceptor: HttpInterceptor {
+// Connection-scoped: compression applies to the physical response body. Re-running it per logical
+// request inside a multiplexed response would double-encode.
+public class GzipInterceptor: ConnectionInterceptor {
     context(runtime: ServerRuntime)
     override suspend fun intercept(
         request: HttpRequest<*>,

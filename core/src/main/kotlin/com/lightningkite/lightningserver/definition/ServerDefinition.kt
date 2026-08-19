@@ -36,7 +36,8 @@ public data class ServerDefinition(
         public val annotationValidators: Runtime<AnnotationValidators>,
 
         public val endpoints: PathSpecMap<ServerPathEndpoints>,
-        public val httpInterceptors: List<HttpInterceptor>,
+        public val connectionInterceptors: List<ConnectionInterceptor>,
+        public val logicalRequestInterceptors: List<LogicalRequestInterceptor>,
         public val websocketInterceptors: List<WebSocketHandlerInterceptor>,
         public val exceptionHandler: ExceptionHttpHandler = DefaultExceptionHttpHandler,
 
@@ -63,8 +64,13 @@ public data class ServerDefinition(
     public val annotationValidators: Runtime<AnnotationValidators> get() = flattened.annotationValidators
 
     public val endpoints: PathSpecMap<ServerPathEndpoints> get() = flattened.endpoints
-    public val httpInterceptors: List<HttpInterceptor> get() = flattened.httpInterceptors
-    public val compiledHttpInterceptors: HttpInterceptor by lazy { httpInterceptors.compileAndInstrument() }
+    /** Interceptors wrapping the whole physical request. See [ConnectionInterceptor]. */
+    public val connectionInterceptors: List<ConnectionInterceptor> get() = flattened.connectionInterceptors
+    public val compiledConnectionInterceptors: HttpInterceptor by lazy { connectionInterceptors.compileAndInstrument() }
+
+    /** Interceptors wrapping each logical request, sub-requests included. See [LogicalRequestInterceptor]. */
+    public val logicalRequestInterceptors: List<LogicalRequestInterceptor> get() = flattened.logicalRequestInterceptors
+    public val compiledLogicalRequestInterceptors: HttpInterceptor by lazy { logicalRequestInterceptors.compileAndInstrument() }
     public val websocketInterceptors: List<WebSocketHandlerInterceptor> get() = flattened.websocketInterceptors
     public val compiledWebsocketInterceptors: WebSocketHandlerInterceptor by lazy { websocketInterceptors.compileAndInstrument() }
     public val exceptionHandler: ExceptionHttpHandler get() = flattened.exceptionHandler
@@ -92,7 +98,8 @@ public data class ServerDefinition(
         internalSerializersModule = Runtime.Cached(internalSerializersModule),
         externalSerializersModule = Runtime.Cached(externalSerializersModule),
         annotationValidators = Runtime.Cached(annotationValidators),
-        httpInterceptors = httpInterceptors.toSealedList(),
+        connectionInterceptors = connectionInterceptors.toSealedList(),
+        logicalRequestInterceptors = logicalRequestInterceptors.toSealedList(),
         websocketInterceptors = websocketInterceptors.toSealedList(),
         endpoints = endpoints.toSealedPathSpecMap(),
         schedules = schedules.toSealedMap(),
@@ -153,7 +160,8 @@ public data class ServerDefinition(
             internalSerializersModule = { flattenedModuleItems.fold(thisLayer.internalSerializersModule()) { acc, module -> acc + module.internalSerializersModule() } },
             externalSerializersModule = { flattenedModuleItems.fold(thisLayer.externalSerializersModule()) { acc, module -> acc + module.externalSerializersModule() } },
             annotationValidators = { flattenedModuleItems.fold(thisLayer.annotationValidators()) { acc, module -> acc + module.annotationValidators() } },
-            httpInterceptors = flattenList { it.httpInterceptors },
+            connectionInterceptors = flattenList { it.connectionInterceptors },
+            logicalRequestInterceptors = flattenList { it.logicalRequestInterceptors },
             websocketInterceptors = flattenList { it.websocketInterceptors },
             endpoints = buildPathSpecMap { // We want to be able to override existing entries here, but we'll have to check for duplicate registration manually.
                 putAll(thisLayer.endpoints)

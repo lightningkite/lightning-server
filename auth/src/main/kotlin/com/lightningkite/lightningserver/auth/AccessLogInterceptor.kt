@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.data.get
-import com.lightningkite.lightningserver.http.HttpInterceptor
+import com.lightningkite.lightningserver.http.LogicalRequestInterceptor
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.logger
@@ -23,7 +23,7 @@ import kotlinx.coroutines.CancellationException
  * it is skipped entirely when INFO logging is off. A resolution failure (e.g. a malformed token) is
  * swallowed here so logging never breaks a request; the handler surfaces the real error itself.
  */
-public class AccessLogInterceptor : HttpInterceptor {
+public class AccessLogInterceptor : LogicalRequestInterceptor {
     override val name: String = "AccessLog"
 
     context(runtime: ServerRuntime)

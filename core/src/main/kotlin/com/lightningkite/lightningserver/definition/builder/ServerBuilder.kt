@@ -84,7 +84,8 @@ public abstract class ServerBuilder : Extendable {
     private val settings: ListRegistry<ServerSetting<*, *>> = ListRegistry()
     private val settingOverrides: MapRegistry<ServerSetting<*, *>, Runtime<*>> = MapRegistry()
 
-    private val httpInterceptors: ListRegistry<HttpInterceptor> = ListRegistry()
+    private val connectionInterceptors: ListRegistry<ConnectionInterceptor> = ListRegistry()
+    private val logicalRequestInterceptors: ListRegistry<LogicalRequestInterceptor> = ListRegistry()
     private val httpHandlers: PathSpecRegistry<MapRegistry<HttpMethod, HttpHandler<*>>> = PathSpecRegistry()
 
     private val websocketInterceptors: ListRegistry<WebSocketHandlerInterceptor> = ListRegistry()
@@ -106,17 +107,29 @@ public abstract class ServerBuilder : Extendable {
     private val imports: ListRegistry<Locationed<PathSpec0, ServerDefinition>> = ListRegistry()
     private val modules: ListRegistry<Locationed<PathSpec0, ServerBuilder>> = ListRegistry()
 
-    @JvmName("installHttpInterceptor")
-    public fun <T : HttpInterceptor> install(interceptor: T): T = interceptor.also { httpInterceptors.register(it) }
+    @JvmName("installConnectionInterceptor")
+    public fun <T : ConnectionInterceptor> install(interceptor: T): T =
+        interceptor.also { connectionInterceptors.register(it) }
+
+    @JvmName("installLogicalRequestInterceptor")
+    public fun <T : LogicalRequestInterceptor> install(interceptor: T): T =
+        interceptor.also { logicalRequestInterceptors.register(it) }
 
     @JvmName("installWebSocketHandlerInterceptor")
     public fun <T : WebSocketHandlerInterceptor> install(interceptor: T): T =
         interceptor.also { websocketInterceptors.register(it) }
 
-    @JvmName("installRequestInterceptor")
-    public fun <T> install(interceptor: T): T where T : HttpInterceptor, T : WebSocketHandlerInterceptor =
+    @JvmName("installConnectionAndWebSocketInterceptor")
+    public fun <T> install(interceptor: T): T where T : ConnectionInterceptor, T : WebSocketHandlerInterceptor =
         interceptor.also {
-            httpInterceptors.register(it)
+            connectionInterceptors.register(it)
+            websocketInterceptors.register(it)
+        }
+
+    @JvmName("installLogicalRequestAndWebSocketInterceptor")
+    public fun <T> install(interceptor: T): T where T : LogicalRequestInterceptor, T : WebSocketHandlerInterceptor =
+        interceptor.also {
+            logicalRequestInterceptors.register(it)
             websocketInterceptors.register(it)
         }
 
@@ -308,7 +321,8 @@ public abstract class ServerBuilder : Extendable {
             internalSerializersModule = internalSerialization,
             externalSerializersModule = externalSerialization,
             annotationValidators = annotationValidators,
-            httpInterceptors = httpInterceptors.toSealedList(),
+            connectionInterceptors = connectionInterceptors.toSealedList(),
+            logicalRequestInterceptors = logicalRequestInterceptors.toSealedList(),
             websocketInterceptors = websocketInterceptors.toSealedList(),
             endpoints = buildSealedPathSpecMap {
                 for (path in httpHandlers.keys + websocketHandlers.keys) {

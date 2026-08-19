@@ -55,6 +55,68 @@ private val errorType = TelemetryKey.OfString("error.type")
 public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpResponse = instrumentHttpRequest(request) {
     var errorType: String? = null
 
+    val response = try {
+        server.compiledConnectionInterceptors.intercept(request) { req ->
+            @Suppress("UNCHECKED_CAST")
+            val outcome = this@handle.dispatchLogicalRequest(req as HttpRequest<PathSpec>)
+            errorType = outcome.errorType
+            outcome.response
+        }
+    } catch (e: Exception) {
+        // Last-resort safety net. Exceptions thrown by an interceptor itself are now recovered
+        // inside HttpInterceptor.interceptInstrumented, at the point each interceptor is invoked,
+        // so outer interceptors (e.g. CORS) still get to post-process the resulting response. This
+        // catch only fires when there are no interceptors installed (the compiled chain is
+        // HttpInterceptor.NoOp, which bypasses interceptInstrumented) or some other exception
+        // escapes the chain machinery itself — headers from would-be interceptors are absent here.
+        this.logger.error(e) { "Exception in HTTP interceptor chain" }
+        errorType = "unhandled_exception"
+        try {
+            instrument("exceptionHandler") { server.exceptionHandler.handle(request, e) }
+        } catch (_: Exception) {
+            HttpResponse(status = HttpStatus.InternalServerError)
+        }
+    }
+    HttpInstrumentationResult(response, response.status.code, errorType)
+}
+
+/**
+ * Handles one logical sub-request dispatched by a multiplexed request such as `/meta/bulk`.
+ *
+ * A multiplexed endpoint must route its sub-requests through this rather than invoking the matched
+ * handler directly, or the sub-requests bypass every [LogicalRequestInterceptor] — access logging,
+ * auditing and rate limiting among them — and execute unobserved. [ConnectionInterceptor]s are
+ * deliberately not re-run: they already ran for the physical request that carried this one.
+ *
+ * @param request must be derived with [HttpRequest.subRequest], so it carries its own request ID
+ *   parented to the outer request. A sub-request that reused the outer ID would make the two
+ *   indistinguishable in the audit trail; one with no parent would be unattributable to the request
+ *   that actually carried it.
+ * @throws IllegalArgumentException if [request] was not derived as a sub-request.
+ */
+public suspend fun ServerRuntime.handleSubRequest(request: HttpRequest<PathSpec>): HttpResponse {
+    require(request.parentRequestId != null) {
+        "Sub-requests must be derived with HttpRequest.subRequest so they carry their own request ID " +
+            "parented to the outer request; ${request.path} arrived with no parentRequestId."
+    }
+    return instrumentHttpRequest(request) {
+        val outcome = dispatchLogicalRequest(request)
+        HttpInstrumentationResult(outcome.response, outcome.response.status.code, outcome.errorType)
+    }
+}
+
+/** The response for one logical request, plus the error label telemetry needs for it. */
+private class LogicalRequestOutcome(val response: HttpResponse, val errorType: String?)
+
+/**
+ * Runs the logical-request interceptor chain, resolves the route, and invokes the handler.
+ *
+ * This is the single choke point every logical request passes through, whether it arrived directly
+ * from a client or was dispatched inside a multiplexed one.
+ */
+private suspend fun ServerRuntime.dispatchLogicalRequest(request: HttpRequest<PathSpec>): LogicalRequestOutcome {
+    var errorType: String? = null
+
     suspend fun handleError(e: Exception, label: String? = e::class.simpleName): HttpResponse {
         errorType = label
         return try {
@@ -65,95 +127,84 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
         }
     }
 
-    val response = try {
-        server.compiledHttpInterceptors.intercept(request) { req ->
-            // Access logging (with the resolved principal) is provided by the opt-in AccessLogInterceptor in
-            // the auth module, not hardcoded here — so it can name the principal without core depending on auth.
-            // Map handler/route/compression exceptions to responses in-place so the surrounding
-            // interceptors (CORS, etc.) still post-process error responses.
-            try {
-                val result = try {
-                    // Route resolution must live inside this try so that a RouteNotFoundException (e.g. a HEAD
-                    // request with no HEAD handler, or a missing trailing slash) is caught below and recovered
-                    // via the HEAD->GET fallback / slash-redirect logic rather than escaping as a bare 404.
-                    @Suppress("UNCHECKED_CAST")
-                    val handler = req.path.match.value as HttpHandler<PathSpec>
-                    instrument("handler") {
-                        // Per-handler request timeout (HttpHandler.timeout, default 30s), enforced at this single
-                        // choke point shared by every engine instead of being duplicated (and high-risk) in each
-                        // engine adapter. Cooperative cancellation: only interrupts at suspension points.
-                        withTimeout(handler.timeout) {
-                            handler.handle(req as HttpRequest<PathSpec>)
-                        }
-                    }
-                } catch (notFound: RouteNotFoundException) {
-                    when (req.path.method) {
-                        HttpMethod.HEAD -> {
-                            // OK, we'll do a get and remove the body.
-                            val getRequest = req.copyWithNewPathType(path = req.path.copy(method = HttpMethod.GET))
-
-                            @Suppress("UNCHECKED_CAST")
-                            val headHandler = getRequest.path.match.value as HttpHandler<PathSpec>
-                            val getResult = instrument("handler") {
-                                withTimeout(headHandler.timeout) { headHandler.handle(getRequest) }
-                            }
-                            getResult.copy(
-                                body = null,
-                                status = if (getResult.status.success) HttpStatus.NoContent else getResult.status,
-                            )
-                        }
-
-                        else -> {
-                            this.logger.debug {
-                                "Not found: ${req.path.pathSegments.segments.map { "'$it'" }}, looking for slashes"
-                            }
-                            if (request.path.pathSegments.isNotEmpty()) {
-                                // Let's see if they just got their ending slash wrong.
-                                val altSlashEndpoint = req.path.copy(pathSegments = req.path.pathSegments.segments.let {
-                                    if (it.lastOrNull() == "") it.dropLast(1) else it + ""
-                                }.let(::PathSegments))
-                                try {
-                                    altSlashEndpoint.match
-                                    HttpResponse.pathMoved(to = "/" + altSlashEndpoint.pathSegments.toString())
-                                } catch (_: RouteNotFoundException) {
-                                    throw notFound
-                                }
-                            } else throw notFound
-                        }
+    val response = server.compiledLogicalRequestInterceptors.intercept(request) { req ->
+        // Access logging (with the resolved principal) is provided by the opt-in AccessLogInterceptor in
+        // the auth module, not hardcoded here — so it can name the principal without core depending on auth.
+        // Map handler/route/compression exceptions to responses in-place so the surrounding
+        // interceptors (CORS, etc.) still post-process error responses.
+        try {
+            val result = try {
+                // Route resolution must live inside this try so that a RouteNotFoundException (e.g. a HEAD
+                // request with no HEAD handler, or a missing trailing slash) is caught below and recovered
+                // via the HEAD->GET fallback / slash-redirect logic rather than escaping as a bare 404.
+                @Suppress("UNCHECKED_CAST")
+                val handler = req.path.match.value as HttpHandler<PathSpec>
+                instrument("handler") {
+                    // Per-handler request timeout (HttpHandler.timeout, default 30s), enforced at this single
+                    // choke point shared by every engine instead of being duplicated (and high-risk) in each
+                    // engine adapter. Cooperative cancellation: only interrupts at suspension points.
+                    withTimeout(handler.timeout) {
+                        handler.handle(req as HttpRequest<PathSpec>)
                     }
                 }
-                result
-            } catch (timeout: TimeoutCancellationException) {
-                // A handler exceeded its HttpHandler.timeout. This is a server-side condition (the server
-                // couldn't finish in time), so it maps to 503 Service Unavailable — NOT 408, which per
-                // RFC 7231 means the client was too slow sending its request. Routed through the normal
-                // exception handler so the error body is formatted consistently. (Other
-                // CancellationExceptions — e.g. client disconnect — are handled by the generic catch below.)
-                this.logger.warn { "Request to ${request.path} exceeded its handler timeout." }
-                handleError(
-                    HttpStatusException(
-                        status = HttpStatus.ServiceUnavailable,
-                        detail = "timeout",
-                        message = "The request handler exceeded its timeout.",
-                    ),
-                    label = "timeout",
-                )
-            } catch (e: Exception) {
-                this.logger.error(e) { "Exception in HTTP" }
-                handleError(e)
+            } catch (notFound: RouteNotFoundException) {
+                when (req.path.method) {
+                    HttpMethod.HEAD -> {
+                        // OK, we'll do a get and remove the body.
+                        val getRequest = req.copyWithNewPathType(path = req.path.copy(method = HttpMethod.GET))
+
+                        @Suppress("UNCHECKED_CAST")
+                        val headHandler = getRequest.path.match.value as HttpHandler<PathSpec>
+                        val getResult = instrument("handler") {
+                            withTimeout(headHandler.timeout) { headHandler.handle(getRequest) }
+                        }
+                        getResult.copy(
+                            body = null,
+                            status = if (getResult.status.success) HttpStatus.NoContent else getResult.status,
+                        )
+                    }
+
+                    else -> {
+                        this.logger.debug {
+                            "Not found: ${req.path.pathSegments.segments.map { "'$it'" }}, looking for slashes"
+                        }
+                        if (req.path.pathSegments.isNotEmpty()) {
+                            // Let's see if they just got their ending slash wrong.
+                            val altSlashEndpoint = req.path.copy(pathSegments = req.path.pathSegments.segments.let {
+                                if (it.lastOrNull() == "") it.dropLast(1) else it + ""
+                            }.let(::PathSegments))
+                            try {
+                                altSlashEndpoint.match
+                                HttpResponse.pathMoved(to = "/" + altSlashEndpoint.pathSegments.toString())
+                            } catch (_: RouteNotFoundException) {
+                                throw notFound
+                            }
+                        } else throw notFound
+                    }
+                }
             }
+            result
+        } catch (timeout: TimeoutCancellationException) {
+            // A handler exceeded its HttpHandler.timeout. This is a server-side condition (the server
+            // couldn't finish in time), so it maps to 503 Service Unavailable — NOT 408, which per
+            // RFC 7231 means the client was too slow sending its request. Routed through the normal
+            // exception handler so the error body is formatted consistently. (Other
+            // CancellationExceptions — e.g. client disconnect — are handled by the generic catch below.)
+            this.logger.warn { "Request to ${req.path} exceeded its handler timeout." }
+            handleError(
+                HttpStatusException(
+                    status = HttpStatus.ServiceUnavailable,
+                    detail = "timeout",
+                    message = "The request handler exceeded its timeout.",
+                ),
+                label = "timeout",
+            )
+        } catch (e: Exception) {
+            this.logger.error(e) { "Exception in HTTP" }
+            handleError(e)
         }
-    } catch (e: Exception) {
-        // Last-resort safety net. Exceptions thrown by an interceptor itself are now recovered
-        // inside HttpInterceptor.interceptInstrumented, at the point each interceptor is invoked,
-        // so outer interceptors (e.g. CORS) still get to post-process the resulting response. This
-        // catch only fires when there are no interceptors installed (compiledHttpInterceptors is
-        // HttpInterceptor.NoOp, which bypasses interceptInstrumented) or some other exception
-        // escapes the chain machinery itself — headers from would-be interceptors are absent here.
-        this.logger.error(e) { "Exception in HTTP interceptor chain" }
-        handleError(e)
     }
-    HttpInstrumentationResult(response, response.status.code, errorType)
+    return LogicalRequestOutcome(response, errorType)
 }
 
 
