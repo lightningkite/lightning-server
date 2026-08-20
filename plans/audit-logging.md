@@ -630,20 +630,36 @@ snapshot, and it must be re-resolved as a unit.
 Consequences: a permission revocation does not take effect until reconnect, and a long-lived
 connection becomes an unlogged data firehose operating under obsolete authorization.
 
-Recomputing permissions per push is too expensive. Two cheap mechanisms, both of which should be
-implemented:
+Recomputing permissions per push is too expensive — every subscriber would hit the database on every
+change. The fix treats permissions as **a cache with a deadline** rather than a fact settled at
+connect.
 
-**1. Bind connection authorization to credential lifetime.** A socket's authorization must never
-outlive the token that established it. The token's `exp` is already known; at expiry, force re-auth
-or disconnect. This alone bounds the exposure window at token TTL and needs no new infrastructure.
+**Implemented.** `ModelRestUpdatesWebsocketData` now carries `clientCondition` (what the client asked
+for, before permissions narrow it) and `permissionsCheckedAt`. Before any push,
+`permissionsStillValid()` runs two checks, cheapest first:
 
-**2. Permissions generation counter.** A per-principal integer in cache, bumped on anything that
-could affect permissions — role change, membership change, deactivation. Rather than reading it per
-push, **broadcast the bump over the existing websocket topic pub/sub** and have affected connections
-re-resolve reactively. Zero per-push cost, invalidation within milliseconds.
+1. **The credential's own lifetime.** Authorization must never outlive the token that established
+   it. `Authentication.expiration` is already on the stored auth, so this is a timestamp comparison
+   and runs on every push. Expired closes the socket with `VIOLATED_POLICY`.
+2. **Re-derivation of permissions**, at most once per `permissionRevalidation` (constructor
+   parameter, default 5 minutes). Re-resolving auth also surfaces a terminated session — resolution
+   fails outright, and the socket is closed rather than kept alive under a dead credential.
 
-Together: the generation counter handles explicit revocation immediately; token expiry bounds
-anything the counter misses.
+`clientCondition` has to be stored because revalidation must recompute *both* halves. Refreshing only
+the mask would leave `condition` — which rows the subscriber can see — derived from the old
+permissions, so a narrowed read condition would go unenforced.
+
+The client-message path already re-resolved auth to recompute its condition, but left the mask
+snapshotted; it now refreshes both, so the two can never come from different moments.
+
+**Not implemented: the generation counter.** The plan also called for a per-principal counter bumped
+on permission-affecting changes and broadcast over the websocket topic pub/sub, giving
+millisecond-latency invalidation instead of the bounded window above. It is deliberately deferred:
+the topic would have to be global, while topics are registered per-`ServerBuilder`, and — more
+importantly — *what counts as a permission-affecting change is domain knowledge the framework does
+not have*, the same problem as the audit subject key in 11.2. The mechanism above is correct without
+it; the counter only shortens the window. Revisit once there is a concrete deployment whose
+revocation latency requirement the interval cannot meet.
 
 ---
 

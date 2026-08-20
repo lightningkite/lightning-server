@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.runtime.send
 import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
@@ -13,15 +14,31 @@ import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.lightningserver.serialization.approximateJsonSize
 import com.lightningkite.services.database.*
 import kotlinx.serialization.KSerializer
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 
 
 // Condition<T>, CollectionUpdates<T, ID>
+/**
+ * @property user The authentication that established the connection.
+ * @property clientCondition What the client asked to watch, before permissions narrow it. Retained so
+ *   revalidation can recombine it with freshly-resolved permissions.
+ * @property condition [clientCondition] narrowed by the subject's read permissions, as of
+ *   [permissionsCheckedAt].
+ * @property mask The read mask in force as of [permissionsCheckedAt].
+ * @property permissionsCheckedAt When [condition] and [mask] were last derived. A socket outlives the
+ *   moment it connected, so these are a cache with a deadline, not a fact settled at connect.
+ */
 @Serializable
 public data class ModelRestUpdatesWebsocketData<T : HasId<ID>, ID : Comparable<ID>>(
     val user: Authentication<Nothing>?, //USER
+    val clientCondition: Condition<T> = Condition.Never,
     val condition: Condition<T> = Condition.Never,
     val mask: Mask<T>,
+    val permissionsCheckedAt: Instant = Instant.fromEpochMilliseconds(0),
     val topics: Set<String> = setOf(),
 ) {
     @Suppress("UNCHECKED_CAST")
@@ -33,9 +50,17 @@ public data class ModelRestUpdatesWebsocketData<T : HasId<ID>, ID : Comparable<I
  */
 private const val OVERLOAD_THRESHOLD_BYTES: Int = 24000
 
+/**
+ * @param permissionRevalidation How long a connection may keep using permissions it resolved earlier.
+ *   Permissions are re-derived on the first push after this elapses, so a revocation takes effect
+ *   within this window rather than at reconnect. Shorten it where disclosure matters more than the
+ *   cost of re-resolving; it is a ceiling on staleness, not a polling interval, so an idle connection
+ *   costs nothing.
+ */
 public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     public val info: ModelInfo<USER, T, ID>,
     public val key: SerializableProperty<T, *>? = null,
+    public val permissionRevalidation: Duration = 5.minutes,
 ) : ServerBuilder() {
     init {
         sdkSettings.clientInterface = ClientModelRestUpdatesWebsocket::class.info(info.serializer, info.idSerializer)
@@ -62,7 +87,8 @@ public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
             @Suppress("UNCHECKED_CAST")
             return ModelRestUpdatesWebsocketData(
                 user = access.authOrNull as? Authentication<Nothing>,
-                mask = info.table(access).mask()
+                mask = info.table(access).mask(),
+                permissionsCheckedAt = now(),
             )
         }
 
@@ -87,9 +113,15 @@ public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
                 key?.let { key -> c.relevantHashCodesForKey(key) }?.mapTo(HashSet()) {
                     hashTopic.request(it)
                 } ?: setOf(generalTopic.request())
+            // This path already re-resolved auth via info.table above, so the mask is refreshed here
+            // too — otherwise the condition and the mask would be derived from different moments.
+            val refreshedMask = p.mask()
             connection.queueStateUpdate { data ->
                 data.copy(
+                    clientCondition = frame,
                     condition = c,
+                    mask = refreshedMask,
+                    permissionsCheckedAt = now(),
                     topics = newTopics.mapTo(HashSet()) { it.pathInContext.path(connection.internalSerialization.stringArrayFormat) })
             }
             (oldTopics - newTopics.toHashSet()).forEach { connection.unsubscribe(it) }
@@ -99,6 +131,38 @@ public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
 
         context(connection: ApiWebsocketHandler.Connection<PathSpec0, ModelRestUpdatesWebsocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>>)
         override suspend fun messageFromSubscriptionTyped(topic: WebSocketSubscriptionMessage<*, *>) {
+            val state = connection.currentState
+            val now = now()
+
+            state.user?.expiration?.let { expiration ->
+                if (expiration <= now) {
+                    connection.close(WebSocketClose.VIOLATED_POLICY)
+                    return
+                }
+            }
+
+            if (now - state.permissionsCheckedAt > permissionRevalidation) {
+                val table = try {
+                    info.table(connection.auth())
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    // Auth no longer resolves — the session was terminated or the credential revoked.
+                    connection.close(WebSocketClose.VIOLATED_POLICY)
+                    return
+                }
+                // Resolved outside updateStateImmediately: its modification lambda is not suspending.
+                val refreshedCondition = table.fullCondition(state.clientCondition).simplify()
+                val refreshedMask = table.mask()
+                connection.updateStateImmediately {
+                    it.copy(
+                        condition = refreshedCondition,
+                        mask = refreshedMask,
+                        permissionsCheckedAt = now,
+                    )
+                }
+            }
+
             @Suppress("Unchecked_cast")
             val message = when (topic.topic) {
                 generalTopic -> topic.value
