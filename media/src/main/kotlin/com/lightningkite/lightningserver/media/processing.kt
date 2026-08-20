@@ -41,8 +41,6 @@ import kotlin.time.Duration.Companion.minutes
 context(runtime: ServerRuntime)
 public suspend fun ServerFileWithMetadata.process(options: Collection<MediaPreviewOptions>): ServerFileWithMetadata =
     withContext(Dispatchers.IO) {
-        if (options.isEmpty()) return@withContext this@process
-        if (previews.isNotEmpty()) return@withContext this@process
 
         val originalFile = original
         val originalFileObject = originalFile.externalFile
@@ -65,8 +63,10 @@ public suspend fun ServerFileWithMetadata.process(options: Collection<MediaPrevi
             height = basis.height
         )
 
+        if (options.isEmpty()) return@withContext out
+
         for (option in options) {
-            val result = basis.apply(option, content.mediaType) ?: continue
+            val result = basis.apply(option, option.type ?: content.mediaType) ?: continue
             // No NPE risk here; the file object has to be an actual file, not just the root directory.  This is safe.
             val fileObject =
                 originalFileObject.parent!!.then(originalFileObject.nameWithoutExtension + "-${option}." + result.mimeType.extension)
@@ -124,7 +124,7 @@ public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> processImagesI
     val task = Task(info.serializer, timeout) { model ->
         val new = path.get(model) ?: return@Task
         withContext(Dispatchers.IO) {
-            info.table().updateOneById(
+            info.baseTable().updateOneById(
                 model._id,
                 path.mapModification(
                     Modification.Assign(
