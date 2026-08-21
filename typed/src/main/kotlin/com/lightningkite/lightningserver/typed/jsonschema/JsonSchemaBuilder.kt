@@ -160,7 +160,7 @@ internal class JsonSchemaBuilder(
                 throw JsonSchemaException("Failed to handle MultipleReferences annotation", e)
             }
         }
-        annotation { it: MimeType -> copy(mimeType = it.types.joinToString(", ")) }
+        annotation { it: MimeType -> copy(mimeType = it.whitelist.joinToString(", ")) }
         override("com.lightningkite.lightningserver.files.ServerFile") {
             JsonSchemaType(
                 title = "Server File",
