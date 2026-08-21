@@ -512,6 +512,9 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
             // (see imageManagedComponents) that run before this one; we only write the agent config here.
             cloudwatchAgentConfig()
             ssm()
+            // Baked as an enabled unit only; the ASG's instances allocate the file when they boot,
+            // keeping it out of the AMI snapshot.
+            swap(activateNow = false)
             systemD()
             // Bake on-box agents (e.g. the OTel collector) into the AMI. They install + `enable`
             // here but do not start; the ASG starts them at boot, where the instance role can fetch
