@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.files
 
 import com.lightningkite.lightningserver.definition.Runtime
+import com.lightningkite.services.data.DataSize.Companion.bytes
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.MimeType
 import com.lightningkite.services.database.validation.AnnotationValidators
@@ -12,8 +13,16 @@ private val fileValidators = Runtime {
             val head = file.externalFile.head()
             when {
                 head == null -> "File does not exist"
-                head.size.bytes > maxSize -> "File is too big; max size is $maxSize bytes but file is ${head.size.bytes} bytes"
-                types.isNotEmpty() && types.none { MediaType(it).accepts(head.type) } -> "File type ${head.type} does not match any of ${types.contentToString()}"
+                head.size.bytes > maxSize ->
+                    "File is too big; max size is ${maxSize.bytes.toStringDecimalAbbreviated()} bytes but file is ${head.size.toStringDecimalAbbreviated()} bytes"
+
+                (blacklist.contains("*/*") && head.type.toString() in setOf("*/*", "/", "")) ||
+                        blacklist.any { MediaType(it).accepts(head.type) && it != "*/*" } ->
+                    "File type ${head.type} is not allowed${if (whitelist.isNotEmpty()) "; allowed types are ${whitelist.contentToString()}" else ""}"
+
+                whitelist.isNotEmpty() && whitelist.none { MediaType(it).accepts(head.type) } ->
+                    "File type ${head.type} does not match any of ${whitelist.contentToString()}"
+
                 else -> null
             }
         }
