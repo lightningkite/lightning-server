@@ -225,20 +225,30 @@ internal class AwsWebSocketDynamoDb(
         return out
     }
 
+    // Every state read below uses a consistent read.  Socket state is guarded by the compare-and-swap in
+    // updateState, and a stale read there is not merely out of date - it hands back a comparison value that
+    // is guaranteed to lose the swap, or omits a row that was written moments ago by the connect handler.
+    // Correctness here is worth the doubled read cost.
+
     suspend fun state(id: String): StateAndConnectRequest? {
         ensureTables()
         val result: StateAndConnectRequest?
         measureTime {
-            result = client.getItem {
+            val response = client.getItem {
                 it.tableName(tableStates)
                 it.key(mapOf(socketIdKey to AttributeValue.fromS(id)))
                 it.projectionExpression("$stateKey, $requestKey")
-            }.await().item()?.let {
+                it.consistentRead(true)
+            }.await()
+            // item() is an SDK auto-construct map: it returns empty rather than null when the socket
+            // has no row, so hasItem() is the only way to detect a missing socket.  Testing item() for
+            // null instead silently falls through to reading attributes that aren't there.
+            result = if (!response.hasItem()) null else response.item().let {
                 StateAndConnectRequest(
                     it[stateKey]!!.b().asByteArray(),
                     encoding.decodeFromByteArray(
                         WebSocketConnectRequest.serializer(NothingSerializer()),
-                        it.get(requestKey)!!.b().asByteArray()
+                        it[requestKey]!!.b().asByteArray()
                     ),
                 )
             }
@@ -252,6 +262,7 @@ internal class AwsWebSocketDynamoDb(
         measureTime {
             val getState = KeysAndAttributes.builder()
                 .projectionExpression("$socketIdKey, $stateKey")
+                .consistentRead(true)
                 .keys(ids.map { mapOf(socketIdKey to AttributeValue.fromS(it)) }).build()
             client.batchGetItemPaginator {
                 it.requestItems(mapOf(tableStates to getState))
@@ -270,6 +281,7 @@ internal class AwsWebSocketDynamoDb(
         measureTime {
             val getState = KeysAndAttributes.builder()
                 .projectionExpression("$socketIdKey, $stateKey, $requestKey")
+                .consistentRead(true)
                 .keys(ids.map { mapOf(socketIdKey to AttributeValue.fromS(it)) }).build()
             client.batchGetItemPaginator {
                 it.requestItems(mapOf(tableStates to getState))

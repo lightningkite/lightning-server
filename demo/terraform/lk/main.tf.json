@@ -1,5 +1,14 @@
 {
     "provider": {
+        "mongodbatlas": [
+            {}
+        ],
+        "grafana": [
+            {
+                "url": "https://lightningkite.grafana.net",
+                "auth": "${var.grafana_cloud_service_account_token}"
+            }
+        ],
         "aws": [
             {
                 "region": "us-west-2"
@@ -15,6 +24,10 @@
             "mongodbatlas": {
                 "source": "mongodb/mongodbatlas",
                 "version": "~> 2.7.0"
+            },
+            "grafana": {
+                "source": "grafana/grafana",
+                "version": "~> 4.27.0"
             },
             "aws": {
                 "source": "hashicorp/aws",

@@ -42,6 +42,7 @@ import com.lightningkite.services.files.*
 import com.lightningkite.services.files.s3.*
 import com.lightningkite.services.http.*
 import com.lightningkite.services.notifications.NotificationService
+import com.lightningkite.services.otel.OtelTelemetryBackend
 import com.lightningkite.services.phonecall.PhoneCallService
 import com.lightningkite.services.phonecall.twilio.TwilioPhoneCallService
 import com.lightningkite.services.pubsub.PubSub
@@ -110,6 +111,7 @@ object Server : ServerBuilder() {
         OpenAIVoiceAgentService
         DynamoDbPubSub
         RedisPubSub
+        OtelTelemetryBackend
     }
 
     // Seed an admin user. This runs as a pre-deploy task (once per deploy, before the new version

@@ -1,0 +1,146 @@
+{
+    "data": {
+        "grafana_data_source": {
+            "mimir_lightningserverdemo": {
+                "name": "grafanacloud-lightningkite-prom"
+            }
+        }
+    },
+    "resource": {
+        "grafana_contact_point": {
+            "lightningserverdemo": {
+                "name": "Lightning Server Demo Alerts",
+                "email": {
+                    "single_email": true,
+                    "addresses": [
+                        "joseph@lightningkite.com"
+                    ]
+                }
+            }
+        },
+        "grafana_folder": {
+            "lightningserverdemo": {
+                "title": "Lightning Server Demo Alerts"
+            }
+        },
+        "grafana_rule_group": {
+            "lightningserverdemo": {
+                "folder_uid": "${grafana_folder.lightningserverdemo.uid}",
+                "interval_seconds": 60,
+                "name": "Lightning Server Demo Application Alerts",
+                "rule": [
+                    {
+                        "condition": "A",
+                        "data": {
+                            "ref_id": "A",
+                            "datasource_uid": "${data.grafana_data_source.mimir_lightningserverdemo.uid}",
+                            "relative_time_range": {
+                                "from": 600,
+                                "to": 0
+                            },
+                            "model": "{\"expr\":\"sum(increase(http_server_errors_total{service_name=\\\"Lightning Server Demo\\\"}[5m])) > 5\",\"refId\":\"A\"}"
+                        },
+                        "name": "Lightning Server Demo: High 5xx Error Rate",
+                        "for": "300s",
+                        "annotations": {
+                            "summary": "High rate of 5xx errors detected",
+                            "description": "More than 5 server errors in the last 5 minutes for service Lightning Server Demo."
+                        },
+                        "labels": {
+                            "severity": "critical",
+                            "service": "LightningServerDemo"
+                        }
+                    },
+                    {
+                        "condition": "A",
+                        "data": {
+                            "ref_id": "A",
+                            "datasource_uid": "${data.grafana_data_source.mimir_lightningserverdemo.uid}",
+                            "relative_time_range": {
+                                "from": 600,
+                                "to": 0
+                            },
+                            "model": "{\"expr\":\"(sum(rate(http_server_response_status_category_total{service_name=\\\"Lightning Server Demo\\\", http_status_category=\\\"5xx\\\"}[5m]))) / (sum(rate(http_server_response_status_category_total{service_name=\\\"Lightning Server Demo\\\", http_status_category=\\\"5xx\\\"}[30m])) + 0.001) > 10\",\"refId\":\"A\"}"
+                        },
+                        "name": "Lightning Server Demo: 5xx Error Rate Spike",
+                        "for": "300s",
+                        "annotations": {
+                            "summary": "5xx error rate spike detected",
+                            "description": "5xx error rate has increased more than 10x over the 30-minute baseline for service Lightning Server Demo."
+                        },
+                        "labels": {
+                            "severity": "warning",
+                            "service": "LightningServerDemo"
+                        }
+                    },
+                    {
+                        "condition": "A",
+                        "data": {
+                            "ref_id": "A",
+                            "datasource_uid": "${data.grafana_data_source.mimir_lightningserverdemo.uid}",
+                            "relative_time_range": {
+                                "from": 600,
+                                "to": 0
+                            },
+                            "model": "{\"expr\":\"histogram_quantile(0.99, sum(rate(http_server_request_duration_bucket{service_name=\\\"Lightning Server Demo\\\"}[5m])) by (le)) > 5000\",\"refId\":\"A\"}"
+                        },
+                        "name": "Lightning Server Demo: High P99 Latency",
+                        "for": "300s",
+                        "annotations": {
+                            "summary": "P99 request latency is too high",
+                            "description": "P99 latency exceeds 5000ms for service Lightning Server Demo."
+                        },
+                        "labels": {
+                            "severity": "warning",
+                            "service": "LightningServerDemo"
+                        }
+                    },
+                    {
+                        "condition": "A",
+                        "data": {
+                            "ref_id": "A",
+                            "datasource_uid": "${data.grafana_data_source.mimir_lightningserverdemo.uid}",
+                            "relative_time_range": {
+                                "from": 600,
+                                "to": 0
+                            },
+                            "model": "{\"expr\":\"histogram_quantile(0.95, sum(rate(http_server_request_duration_bucket{service_name=\\\"Lightning Server Demo\\\"}[5m])) by (le)) > 3000\",\"refId\":\"A\"}"
+                        },
+                        "name": "Lightning Server Demo: High P95 Latency",
+                        "for": "300s",
+                        "annotations": {
+                            "summary": "P95 request latency is too high",
+                            "description": "P95 latency exceeds 3000ms for service Lightning Server Demo."
+                        },
+                        "labels": {
+                            "severity": "warning",
+                            "service": "LightningServerDemo"
+                        }
+                    },
+                    {
+                        "condition": "A",
+                        "data": {
+                            "ref_id": "A",
+                            "datasource_uid": "${data.grafana_data_source.mimir_lightningserverdemo.uid}",
+                            "relative_time_range": {
+                                "from": 600,
+                                "to": 0
+                            },
+                            "model": "{\"expr\":\"sum(rate(http_server_request_count_total{service_name=\\\"Lightning Server Demo\\\"}[15m])) == 0\",\"refId\":\"A\"}"
+                        },
+                        "name": "Lightning Server Demo: No Traffic Detected",
+                        "for": "900s",
+                        "annotations": {
+                            "summary": "No traffic detected",
+                            "description": "No HTTP requests received in the last 15 minutes for service Lightning Server Demo. Service may be down."
+                        },
+                        "labels": {
+                            "severity": "warning",
+                            "service": "LightningServerDemo"
+                        }
+                    }
+                ]
+            }
+        }
+    }
+}

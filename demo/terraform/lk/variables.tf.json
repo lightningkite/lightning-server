@@ -1,5 +1,6 @@
 {
     "variable": {
+        "grafana_cloud_service_account_token": {},
         "sms": {
             "type": "string"
         },
@@ -9,6 +10,7 @@
         "voiceAgent": {
             "type": "string"
         },
+        "grafana_cloud_api_key": {},
         "smsInbound": {
             "type": "string"
         },

@@ -4,7 +4,8 @@
             "lambda": {
                 "depends_on": [
                     "null_resource.lambda_jar_source",
-                    "null_resource.settings_reread"
+                    "null_resource.settings_reread",
+                    "local_file.lambda_collector_yaml"
                 ],
                 "output_path": "${path.module}/build/lambda.jar",
                 "type": "zip",
@@ -16,36 +17,15 @@
         }
     },
     "resource": {
-        "local_sensitive_file": {
-            "settings_raw": {
-                "filename": "${path.module}/build/raw-settings.json",
-                "content": "${jsonencode(local.settings_raw)}"
-            }
-        },
-        "aws_iam_role_policy_attachment": {
-            "insights_policy": {
-                "policy_arn": "arn:aws:iam::aws:policy/CloudWatchLambdaInsightsExecutionRolePolicy",
-                "role": "${aws_iam_role.main_exec.id}"
-            },
-            "main_policy_exec": {
-                "policy_arn": "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
-                "role": "${aws_iam_role.main_exec.name}"
-            },
-            "main_policy_vpc": {
-                "policy_arn": "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole",
-                "role": "${aws_iam_role.main_exec.name}"
-            },
-            "servicesAccess": {
-                "policy_arn": "${aws_iam_policy.servicesAccess.arn}",
-                "role": "${aws_iam_role.main_exec.name}"
-            }
-        },
         "null_resource": {
             "settings_reread": {
                 "provisioner": {
                     "local-exec": {
+                        "environment": {
+                            "SETTINGS_PASS": "${random_password.settings.result}"
+                        },
                         "interpreter": "${local.is_windows ? [\"PowerShell\", \"-Command\"] : []}",
-                        "command": "openssl enc -d -aes-256-cbc -md sha256 -out \"${local_sensitive_file.settings_raw.filename}.decrypted.json\" -in \"${path.module}/build/lambda/settings.enc\" -pass pass:${random_password.settings.result}"
+                        "command": "openssl enc -d -aes-256-cbc -md sha256 -out \"${local_sensitive_file.settings_raw.filename}.decrypted.json\" -in \"${path.module}/build/lambda/settings.enc\" -pass env:SETTINGS_PASS"
                     }
                 },
                 "depends_on": [
@@ -67,20 +47,37 @@
                             "command": "${local.is_windows ? \"cp -r -force \\\"${path.module}/../../build/dist/lambda/.\\\" \\\"${path.module}/build/lambda/\\\"\" : \"cp -rf \\\"${path.module}/../../build/dist/lambda/.\\\" \\\"${path.module}/build/lambda/\\\"\"}"
                         },
                         {
+                            "environment": {
+                                "SETTINGS_PASS": "${random_password.settings.result}"
+                            },
                             "interpreter": "${local.is_windows ? [\"PowerShell\", \"-Command\"] : []}",
-                            "command": "openssl enc -aes-256-cbc -md sha256 -in \"${local_sensitive_file.settings_raw.filename}\" -out \"${path.module}/build/lambda/settings.enc\" -pass pass:${random_password.settings.result}"
+                            "command": "openssl enc -aes-256-cbc -md sha256 -in \"${local_sensitive_file.settings_raw.filename}\" -out \"${path.module}/build/lambda/settings.enc\" -pass env:SETTINGS_PASS"
+                        },
+                        {
+                            "interpreter": "${local.is_windows ? [\"PowerShell\", \"-Command\"] : []}",
+                            "command": "cp \"${local_file.lambda_collector_yaml.filename}\" \"${path.module}/build/lambda/collector.yaml\""
                         }
                     ]
                 },
                 "triggers": {
-                    "always": "${timestamp()}"
+                    "lambda_collector_yamlHash": "${local_file.lambda_collector_yaml.content_sha256}",
+                    "buildHash": "${sha256(join(\"\", [for f in fileset(\"${path.module}/../../build/dist/lambda\", \"**\") : filesha256(\"${path.module}/../../build/dist/lambda/${f}\")]))}",
+                    "settingsHash": "${local_sensitive_file.settings_raw.content_sha256}"
                 }
-            }
-        },
-        "aws_cloudwatch_log_group": {
-            "main": {
-                "retention_in_days": 30,
-                "name": "LightningServerDemo-main-log"
+            },
+            "predeploy": {
+                "provisioner": {
+                    "local-exec": {
+                        "interpreter": "${local.is_windows ? [\"PowerShell\", \"-Command\"] : []}",
+                        "command": "${local.is_windows ? \"aws lambda invoke --function-name ${aws_lambda_function.main.function_name} --qualifier ${aws_lambda_function.main.version} --cli-binary-format base64 --payload eyJwcmVkZXBsb3kiOnRydWV9 --region us-west-2 ${path.module}/build/predeploy-out.json | Out-Null; if(-not(Select-String -Path ${path.module}/build/predeploy-out.json -Pattern predeploy-ok -Quiet)){exit 1}\" : \"aws lambda invoke --function-name ${aws_lambda_function.main.function_name} --qualifier ${aws_lambda_function.main.version} --cli-binary-format base64 --payload eyJwcmVkZXBsb3kiOnRydWV9 --region us-west-2 ${path.module}/build/predeploy-out.json > /dev/null && grep -q predeploy-ok ${path.module}/build/predeploy-out.json\"}"
+                    }
+                },
+                "depends_on": [
+                    "aws_lambda_function.main"
+                ],
+                "triggers": {
+                    "code": "${aws_lambda_function.main.source_code_hash}"
+                }
             }
         },
         "aws_lambda_permission": {
@@ -95,6 +92,38 @@
                 "source_arn": "arn:aws:events:us-west-2:${data.aws_caller_identity.lambda_current.account_id}:rule/LightningServerDemo*"
             }
         },
+        "aws_iam_role": {
+            "main_exec": {
+                "name": "LightningServerDemo-main-exec",
+                "assume_role_policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Effect\":\"Allow\",\"Sid\":\"\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"}}]}"
+            }
+        },
+        "local_sensitive_file": {
+            "settings_raw": {
+                "filename": "${path.module}/build/raw-settings.json",
+                "content": "${jsonencode(local.settings_raw)}"
+            }
+        },
+        "aws_iam_role_policy_attachment": {
+            "insights_policy": {
+                "policy_arn": "arn:aws:iam::aws:policy/CloudWatchLambdaInsightsExecutionRolePolicy",
+                "role": "${aws_iam_role.main_exec.id}"
+            },
+            "main_policy_exec": {
+                "policy_arn": "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+                "role": "${aws_iam_role.main_exec.name}"
+            },
+            "servicesAccess": {
+                "policy_arn": "${aws_iam_policy.servicesAccess.arn}",
+                "role": "${aws_iam_role.main_exec.name}"
+            }
+        },
+        "aws_cloudwatch_log_group": {
+            "main": {
+                "retention_in_days": 30,
+                "name": "LightningServerDemo-main-log"
+            }
+        },
         "aws_iam_policy": {
             "servicesAccess": {
                 "path": "/lightningserverdemo/servicesAccess/",
@@ -105,16 +134,13 @@
         },
         "aws_lambda_alias": {
             "main": {
+                "depends_on": [
+                    "null_resource.predeploy"
+                ],
                 "function_name": "${aws_lambda_function.main.arn}",
                 "name": "prod",
                 "description": "The current production version of the lambda.",
                 "function_version": "${aws_lambda_function.main.version}"
-            }
-        },
-        "aws_iam_role": {
-            "main_exec": {
-                "name": "LightningServerDemo-main-exec",
-                "assume_role_policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Effect\":\"Allow\",\"Sid\":\"\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"}}]}"
             }
         },
         "random_password": {
@@ -136,16 +162,18 @@
                 "s3_bucket": "${aws_s3_bucket.lambda_bucket.id}",
                 "timeout": 900,
                 "memory_size": 1024,
+                "logging_config": {
+                    "log_format": "Text",
+                    "log_group": "${aws_cloudwatch_log_group.main.name}"
+                },
                 "environment": {
                     "variables": {
-                        "OTEL_SERVICE_NAME": "Lightning Server Demo",
-                        "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
-                        "OTEL_RESOURCE_ATTRIBUTES": "service.name=Lightning Server Demo,deployment.environment=LightningServerDemo",
-                        "OTEL_METRICS_EXPORTER": "otlp",
-                        "OTEL_TRACES_EXPORTER": "otlp",
-                        "OTEL_LOGS_EXPORTER": "otlp",
+                        "OTEL_SERVICE_NAME": "com.lightningkite.lightningserver.demo.AwsHandler",
+                        "OTEL_RESOURCE_ATTRIBUTES": "service.name=com.lightningkite.lightningserver.demo.AwsHandler,deployment.environment=LightningServerDemo",
+                        "OPENTELEMETRY_COLLECTOR_CONFIG_FILE": "/var/task/collector.yaml",
+                        "OTLP_HEADER_AUTHORIZATION": "Basic ${base64encode(\"1548711:${var.grafana_cloud_api_key}\")}",
+                        "OPENTELEMETRY_COLLECTOR_CONFIG_URI": "/var/task/collector.yaml",
                         "LIGHTNING_SERVER_SETTINGS_DECRYPTION": "${random_password.settings.result}",
-                        "OTEL_EXPORTER_OTLP_ENDPOINT": "https://signoz.lightningkite.com",
                         "OTEL_PROPAGATORS": "tracecontext,baggage,xray"
                     }
                 },
@@ -175,6 +203,12 @@
                 "source": "${data.archive_file.lambda.output_path}",
                 "source_hash": "${data.archive_file.lambda.output_md5}",
                 "key": "lambda-functions.zip"
+            }
+        },
+        "local_file": {
+            "lambda_collector_yaml": {
+                "filename": "${path.module}/build/collector.yaml",
+                "content": "receivers:\n  otlp:\n    protocols:\n      grpc:\n        endpoint: localhost:4317\n      http:\n        endpoint: localhost:4318\nexporters:\n  otlphttp:\n    endpoint: https://otlp-gateway-prod-us-west-0.grafana.net/otlp\n    headers:\n      Authorization: \"$${env:OTLP_HEADER_AUTHORIZATION}\"\nservice:\n  pipelines:\n    traces:\n      receivers: [otlp]\n      exporters: [otlphttp]\n    metrics:\n      receivers: [otlp]\n      exporters: [otlphttp]\n    logs:\n      receivers: [otlp]\n      exporters: [otlphttp]\n"
             }
         }
     },
@@ -230,8 +264,8 @@
             },
             "awsApiGatewayWsEndpointSetting": "${aws_apigatewayv2_stage.ws.invoke_url}",
             "telemetry": {
-                "url": "otlp-http://localhost:4318",
-                "serviceName": "Lightning Server Demo",
+                "url": "otlp-grpc://localhost:4317",
+                "serviceName": "com.lightningkite.lightningserver.demo.AwsHandler",
                 "batching": {
                     "frequency": "PT10S",
                     "maxQueueSize": 512,
@@ -243,7 +277,8 @@
             "voiceAgent": "${var.voiceAgent}",
             "smsInbound": "${var.smsInbound}",
             "email": "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587?fromEmail=noreply@lightningserver.cs.lightningkite.com",
-            "pubSub": "dynamodb-pubsub://us-west-2/LightningServerDemo_pubSub_pubsub?pollInterval=15"
+            "pubSub": "dynamodb-pubsub://us-west-2/LightningServerDemo_pubSub_pubsub?pollInterval=15",
+            "notifications": "console"
         },
         "is_windows": "${substr(pathexpand(\"~\"), 0, 1) == \"/\" ? false : true}",
         "servicesAccessPolicy": {
@@ -251,11 +286,22 @@
             "Statement": [
                 {
                     "Action": [
-                        "s3:*"
+                        "s3:ListBucket",
+                        "s3:GetBucketLocation"
                     ],
                     "Effect": "Allow",
                     "Resource": [
-                        "${aws_s3_bucket.files.arn}",
+                        "${aws_s3_bucket.files.arn}"
+                    ]
+                },
+                {
+                    "Action": [
+                        "s3:GetObject",
+                        "s3:PutObject",
+                        "s3:DeleteObject"
+                    ],
+                    "Effect": "Allow",
+                    "Resource": [
                         "${aws_s3_bucket.files.arn}/*"
                     ]
                 },

@@ -54,7 +54,7 @@
                 "scan_enabled": true,
                 "name": "LightningServerDemo-emailInbound-receive",
                 "rule_set_name": "${aws_ses_receipt_rule_set.emailInbound.rule_set_name}",
-                "tls_policy": "Optional",
+                "tls_policy": "Require",
                 "enabled": true
             }
         },
