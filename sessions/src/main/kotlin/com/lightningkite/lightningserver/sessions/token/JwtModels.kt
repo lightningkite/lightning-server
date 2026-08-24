@@ -19,8 +19,6 @@ public data class JwtClaims(
     val thp: String? = null,
     val sid: String? = null,
     val cache: String? = null,
-    val email: String? = null,
-    val emailVerified: Boolean? = null
 )
 
 public open class TokenException(message: String, override val cause: Throwable? = null) : Exception(message)

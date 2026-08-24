@@ -225,7 +225,22 @@ public class OauthProviderInfo(
                     expectedAudience = clientId
                 )
 
-                ExternalProfile(id = claims.sub, email = claims.email)
+                // Apple tokens include email_verified claim - check it
+                val claimsJson = serverRuntime.externalSerialization.json.parseToJsonElement(
+                    serverRuntime.externalSerialization.json.encodeToString(claims)
+                ).jsonObject
+
+                val sub = claimsJson.get("sub")?.jsonPrimitive?.content
+                    ?: throw BadRequestException("Subject id must be present")
+
+                val emailVerified = claimsJson.get("email_verified")?.jsonPrimitive?.content?.toBooleanStrictOrNull()
+                    ?: claimsJson.get("email_verified")?.jsonPrimitive?.boolean
+                    ?: false
+
+                // Email may be null on 2nd+ logins
+                val email = if (emailVerified) claimsJson.get("email")?.jsonPrimitive?.content else null
+
+                ExternalProfile(id = sub, email = email)
             }
         )
 
