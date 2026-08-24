@@ -60,13 +60,14 @@ public suspend fun ServerFileWithMetadata.process(options: Collection<MediaPrevi
 
         out = out.copy(
             width = basis.width,
-            height = basis.height
+            height = basis.height,
+            previews = emptyList()
         )
 
         if (options.isEmpty()) return@withContext out
 
         for (option in options) {
-            val result = basis.apply(option, option.type ?: content.mediaType) ?: continue
+            val result = basis.apply(option, content.mediaType) ?: continue
             // No NPE risk here; the file object has to be an actual file, not just the root directory.  This is safe.
             val fileObject =
                 originalFileObject.parent!!.then(originalFileObject.nameWithoutExtension + "-${option}." + result.mimeType.extension)
