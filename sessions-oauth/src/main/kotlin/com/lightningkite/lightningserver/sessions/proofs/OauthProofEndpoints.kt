@@ -102,7 +102,6 @@ public class OauthProofEndpoints(
         cache = cache,
     ) { response: OauthResponse, _: Uuid ->
         val profile = provider.getProfile(response, credentials())
-        val email = profile.email ?: throw BadRequestException("No email was found for this profile.")
         // Open-redirect note: the final destination is produced entirely by the app-supplied
         // `continueUiAuthUrl` from a server-generated, signed Proof. No user- or attacker-controllable
         // value (query param or `state`) feeds into it, so the redirect target is app-controlled and
