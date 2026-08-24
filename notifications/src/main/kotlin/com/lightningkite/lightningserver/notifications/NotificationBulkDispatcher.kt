@@ -48,7 +48,7 @@ import kotlin.uuid.Uuid
  * scheduled notifications, bulking them, formatting them, and sending them.
  *
  * ## Usage
- * - Provide only the [ModelInfo] for your notifications, both [ModelRestEndpoints] and [ModelRestUpdatesWebsocket] will be automatically created
+ * - Provide only the [ModelInfo] for your notifications, both [ModelRestEndpoints] and [ModelRestUpdatesWebSocket] will be automatically created
  * - Provide your `USER` contact information by implementing the various abstract methods.
  * - To control bulking and formatting of notifications, override the appropriate `make{method}Notifications` function. These take in a user and the list of
  *   scheduled notifications, and returns the formatted and bulked list of method-specific send formats.
@@ -64,7 +64,7 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
     public val push: (Runtime<NotificationService>)? = null,
     public val refreshSchedule: Schedule = Schedule.Frequency(1.minutes),
     public val timeout: Duration = 5.minutes,
-    websocketKey: SerializableProperty<Notification<UID, CONTENT>, *>? = info.serializer.fieldInApp,
+    webSocketKey: SerializableProperty<Notification<UID, CONTENT>, *>? = info.serializer.fieldInApp,
 ) : ServerBuilder(), NotificationEndpoints.Dispatcher<UID, CONTENT> {
     init {
         sdkSettings.defaultInfo = SdkModule.Info("NotificationsApi")
@@ -178,8 +178,8 @@ public abstract class NotificationBulkDispatcher<USER : HasId<UID>, UID : Compar
      * REST and WebSocket endpoints for managing notifications.
      * Mounted at `/rest`. Provides CRUD operations and real-time updates for notifications.
      */
-    public val rest: ModelRestEndpointsAndUpdatesWebsocket<*, Notification<UID, CONTENT>, Uuid> =
-        path.path("rest") include ModelRestEndpointsAndUpdatesWebsocket(info, websocketKey)
+    public val rest: ModelRestEndpointsAndUpdatesWebSocket<*, Notification<UID, CONTENT>, Uuid> =
+        path.path("rest") include ModelRestEndpointsAndUpdatesWebSocket(info, webSocketKey)
 
     //_____Refreshing and sending notifications_____
     // Notifications are created with a 'sendAt' time, this specifies when the notification should be sent

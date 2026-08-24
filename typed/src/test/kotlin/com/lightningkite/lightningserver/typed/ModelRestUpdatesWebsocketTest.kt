@@ -17,7 +17,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import kotlin.test.*
 
-class ModelRestUpdatesWebsocketTest {
+class ModelRestUpdatesWebSocketTest {
 
     object TestServer : ServerBuilder() {
         val database = setting("database", Database.Settings())
@@ -27,7 +27,7 @@ class ModelRestUpdatesWebsocketTest {
             permissions = { ModelPermissions.allowAll() }
         )
         val rest = path.path("model") include ModelRestEndpoints(info)
-        val ws = path.path("model").path("updates") include ModelRestUpdatesWebsocket(info)
+        val ws = path.path("model").path("updates") include ModelRestUpdatesWebSocket(info)
 
         init {
             registerBasicMediaTypeCoders()
@@ -40,7 +40,7 @@ class ModelRestUpdatesWebsocketTest {
             generalSettings set GeneralServerSettings()
             database set Database.Settings()
         }) {
-            val socket = TestServer.ws.websocket.test()
+            val socket = TestServer.ws.webSocket.test()
             val json = socket.server.externalSerialization.json
 
             // Send a condition from client: Always
@@ -93,7 +93,7 @@ class ModelRestUpdatesWebsocketTest {
             generalSettings set GeneralServerSettings()
             database set Database.Settings()
         }) {
-            val socket = TestServer.ws.websocket.test()
+            val socket = TestServer.ws.webSocket.test()
             val json = socket.server.externalSerialization.json
 
             var count = 0
@@ -123,7 +123,7 @@ class ModelRestUpdatesWebsocketTest {
             auth = noAuth,
             permissions = { ModelPermissions.allowAll() }
         )
-        val ws = path.path("keyed").path("updates") include ModelRestUpdatesWebsocket(info, Sample_name)
+        val ws = path.path("keyed").path("updates") include ModelRestUpdatesWebSocket(info, Sample_name)
 
         init {
             registerBasicMediaTypeCoders()
@@ -147,7 +147,7 @@ class ModelRestUpdatesWebsocketTest {
                 (1..rowCount).map { Sample(_id = it.toString(), name = "shared", note = "before") }
             )
 
-            val socket = KeyedServer.ws.websocket.test()
+            val socket = KeyedServer.ws.webSocket.test()
             val json = socket.server.externalSerialization.json
 
             // An Equal condition on the key is what lets the server shard onto the hash topic.
@@ -183,7 +183,7 @@ class ModelRestUpdatesWebsocketTest {
             generalSettings set GeneralServerSettings()
             database set Database.Settings()
         }) {
-            val socket = TestServer.ws.websocket.test()
+            val socket = TestServer.ws.webSocket.test()
             val json = socket.server.externalSerialization.json
 
             val always: Condition<Sample> = Condition.Always
@@ -210,7 +210,7 @@ class ModelRestUpdatesWebsocketTest {
             generalSettings set GeneralServerSettings()
             database set Database.Settings()
         }) {
-            val socket = TestServer.ws.websocket.test()
+            val socket = TestServer.ws.webSocket.test()
             val json = socket.server.externalSerialization.json
 
             val always: Condition<Sample> = Condition.Always

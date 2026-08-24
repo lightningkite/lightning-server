@@ -9,15 +9,10 @@ import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryKey
 import com.lightningkite.services.telemetry.TelemetryKeys
-import com.lightningkite.services.telemetry.TelemetryTrace
 import com.lightningkite.services.telemetry.emptyTelemetryAttributes
-import com.lightningkite.services.data.Data
-import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.telemetry.telemetryTrace
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
-import kotlinx.io.*
-import java.util.zip.GZIPOutputStream
 
 // Pre-allocated TelemetryKey instances for custom WebSocket and task attributes (backend caches by equality).
 private val wsRoute = TelemetryKey.OfString("ws.route")
@@ -56,7 +51,7 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
     var errorType: String? = null
 
     val response = try {
-        server.compiledConnectionInterceptors.intercept(request) { req ->
+        server.compiledHttpConnectionInterceptors.intercept(request) { req ->
             @Suppress("UNCHECKED_CAST")
             val outcome = this@handle.dispatchLogicalRequest(req as HttpRequest<PathSpec>)
             errorType = outcome.errorType
@@ -84,8 +79,8 @@ public suspend fun ServerRuntime.handle(request: HttpRequest<PathSpec>): HttpRes
  * Handles one logical sub-request dispatched by a multiplexed request such as `/meta/bulk`.
  *
  * A multiplexed endpoint must route its sub-requests through this rather than invoking the matched
- * handler directly, or the sub-requests bypass every [LogicalRequestInterceptor] — access logging,
- * auditing and rate limiting among them — and execute unobserved. [ConnectionInterceptor]s are
+ * handler directly, or the sub-requests bypass every [HttpLogicalInterceptor] — access logging,
+ * auditing and rate limiting among them — and execute unobserved. [HttpConnectionInterceptor]s are
  * deliberately not re-run: they already ran for the physical request that carried this one.
  *
  * @param request must be derived with [HttpRequest.subRequest], so it carries its own request ID
@@ -127,7 +122,7 @@ private suspend fun ServerRuntime.dispatchLogicalRequest(request: HttpRequest<Pa
         }
     }
 
-    val response = server.compiledLogicalRequestInterceptors.intercept(request) { req ->
+    val response = server.compiledHttpLogicalInterceptors.intercept(request) { req ->
         // Access logging (with the resolved principal) is provided by the opt-in AccessLogInterceptor in
         // the auth module, not hardcoded here — so it can name the principal without core depending on auth.
         // Map handler/route/compression exceptions to responses in-place so the surrounding

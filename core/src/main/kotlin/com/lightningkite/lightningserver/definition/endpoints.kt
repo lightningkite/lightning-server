@@ -11,38 +11,38 @@ import com.lightningkite.lightningserver.websockets.WebSocketHandler
  * This interface provides a unified view of all handlers available at a given path location.
  *
  * @property http A map of HTTP methods to their corresponding handlers for this path
- * @property websocket An optional WebSocket handler for this path, or null if no WebSocket is registered
+ * @property webSocket An optional WebSocket handler for this path, or null if no WebSocket is registered
  */
 public interface ServerPathEndpoints {
     public val http: Map<HttpMethod, HttpHandler<*>>
-    public val websocket: WebSocketHandler<*, *>?
+    public val webSocket: WebSocketHandler<*, *>?
 }
 
 private data class ServerPathEndpointsData(
     override val http: Map<HttpMethod, HttpHandler<*>>,
-    override val websocket: WebSocketHandler<*, *>?,
+    override val webSocket: WebSocketHandler<*, *>?,
 ) : ServerPathEndpoints
 
 /**
  * Creates a [ServerPathEndpoints] instance with the specified HTTP and WebSocket handlers.
  *
  * @param http A map of HTTP methods to handlers for this path
- * @param websocket An optional WebSocket handler for this path
+ * @param webSocket An optional WebSocket handler for this path
  * @return A new [ServerPathEndpoints] instance
  */
 public fun ServerPathEndpoints(
     http: Map<HttpMethod, HttpHandler<*>>,
-    websocket: WebSocketHandler<*, *>?,
-): ServerPathEndpoints = ServerPathEndpointsData(http, websocket)
+    webSocket: WebSocketHandler<*, *>?,
+): ServerPathEndpoints = ServerPathEndpointsData(http, webSocket)
 
 /**
  * A mutable implementation of [ServerPathEndpoints] that allows adding handlers after construction.
  *
  * This is used during server building to accumulate handlers before creating the final immutable
- * [ServerDefinition]. HTTP handlers can be added to the mutable [http] map, and the [websocket]
+ * [ServerDefinition]. HTTP handlers can be added to the mutable [http] map, and the [webSocket]
  * handler can be set directly.
  */
 public class MutableServerPathEndpoints : ServerPathEndpoints {
     override val http: MutableMap<HttpMethod, HttpHandler<*>> = HashMap()
-    override var websocket: WebSocketHandler<*, *>? = null
+    override var webSocket: WebSocketHandler<*, *>? = null
 }

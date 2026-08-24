@@ -8,7 +8,7 @@ import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.lightningserver.typed.ApiWebsocketHandler
+import com.lightningkite.lightningserver.typed.ApiWebSocketHandler
 import com.lightningkite.lightningserver.typed.sdk.SDK.sdk
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.services.data.*
@@ -139,7 +139,7 @@ public object SDK {
      *     module.functions.forEach { function ->
      *         when (function) {
      *             is SDK.Function.Endpoint -> generateHttpMethod(function)
-     *             is SDK.Function.Websocket -> generateWebSocketMethod(function)
+     *             is SDK.Function.WebSocket -> generateWebSocketMethod(function)
      *         }
      *     }
      *
@@ -389,8 +389,8 @@ public object SDK {
                     )
         }
 
-        public data class Websocket(
-            val handler: ApiWebsocketHandler<*, *, *, *, *>,
+        public data class WebSocket(
+            val handler: ApiWebSocketHandler<*, *, *, *, *>,
             override val path: PathSpec,
             override val fromInterface: InterfaceInfo?,
             override val functionName: String = handler.functionName.functionCase(),
@@ -512,8 +512,8 @@ public object SDK {
         extendsInterfaces = layer.endpoints.keys.filterNotNull().filterSupertypes(),
         functions = layer.endpoints.flatMap { (inter, endpoints) ->
             endpoints.flatMap { (path, endpoints) ->
-                val websocket = endpoints.websocket?.let {
-                    Function.Websocket(
+                val webSocket = endpoints.webSocket?.let {
+                    Function.WebSocket(
                         handler = it,
                         path = path,
                         fromInterface = inter?.item,
@@ -528,7 +528,7 @@ public object SDK {
                     )
                 }
 
-                http + listOfNotNull(websocket)
+                http + listOfNotNull(webSocket)
             }
         },
         children = children.map { (path, def) -> def.processToModules(path) },

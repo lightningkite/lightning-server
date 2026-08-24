@@ -46,8 +46,8 @@ val lightningServerKSchema: LightningServerKSchema
                     registry.registerVirtualDeep(handler.outputType)
                 }
             }
-            endpoints.websocket?.let { handler ->
-                if (handler is ApiWebsocketHandler<*, *, *, *, *>) {
+            endpoints.webSocket?.let { handler ->
+                if (handler is ApiWebSocketHandler<*, *, *, *, *>) {
                     registry.registerVirtualDeep(handler.inputType)
                     registry.registerVirtualDeep(handler.outputType)
                 }
@@ -86,7 +86,7 @@ val lightningServerKSchema: LightningServerKSchema
                             )
                         }
 
-                        val websocket = endpoints.websocket?.let {
+                        val webSocket = endpoints.webSocket?.let {
                             LightningServerKSchemaEndpoint(
                                 docGroup = docGroup,
                                 method = HttpMethod.WEBSOCKET.toString(),
@@ -101,7 +101,7 @@ val lightningServerKSchema: LightningServerKSchema
                             )
                         }
 
-                        http + listOfNotNull(websocket)
+                        http + listOfNotNull(webSocket)
                     }
                 }
             }.toList(),

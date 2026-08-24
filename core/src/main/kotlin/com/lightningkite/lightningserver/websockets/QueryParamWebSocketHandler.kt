@@ -112,7 +112,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
         val match = serverRuntime.server.endpoints.match(
             serverRuntime.externalSerialization.stringArrayFormat,
             rawPath
-        ) { it.websocket }
+        ) { it.webSocket }
             ?: throw NotFoundException("No web socket handler found for '$rawPath'")
         val request = run {
             val fixedQueryParameters = QueryParameters(request.queryParameters.mapNotNull {
@@ -126,7 +126,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
             } + (request.headers["x-path"]?.root?.substringAfter('?')?.let { QueryParameters.parse(it).entries }
                 ?: listOf()))
             WebSocketConnectRequest<PathSpec>(
-                path = RawWebsocketPath<PathSpec>(PathSegments.parse(rawPath), match),
+                path = RawWebSocketPath<PathSpec>(PathSegments.parse(rawPath), match),
                 queryParameters = fixedQueryParameters,
                 headers = request.headers,
                 domain = request.domain,

@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
 
 /**
- * A websocket connection held open in this process, backed by pub/sub for topic subscriptions.
+ * A webSocket connection held open in this process, backed by pub/sub for topic subscriptions.
  *
  * Shared by every engine that owns a real socket. Subclasses supply only the transport: `send` to write
  * a frame and `close` to tear the socket down.

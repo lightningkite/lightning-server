@@ -60,11 +60,11 @@ class TestAwsAdapter(server: ServerDefinition) : AwsAdapter(server) {
         }
     }
 
-    val websocketChannels = HashMap<String, Channel<String>>()
-    fun websocketChannel(id: String): Channel<String> = websocketChannels.getOrPut(id) { Channel() }
+    val webSocketChannels = HashMap<String, Channel<String>>()
+    fun webSocketChannel(id: String): Channel<String> = webSocketChannels.getOrPut(id) { Channel() }
     override suspend fun apiGatewayWsDeleteConnection(request: DeleteConnectionRequest): DeleteConnectionResponse {
         println("delete ${request.connectionId()}")
-        request.connectionId().let { websocketChannels.remove(it)?.close() }
+        request.connectionId().let { webSocketChannels.remove(it)?.close() }
         return DeleteConnectionResponse.builder().apply {
             sdkHttpResponse(
                 SdkHttpResponse.builder().statusCode(200).build()
@@ -74,7 +74,7 @@ class TestAwsAdapter(server: ServerDefinition) : AwsAdapter(server) {
 
     override suspend fun apiGatewayWsPostToConnection(request: PostToConnectionRequest): PostToConnectionResponse {
         println("post ${request.connectionId()} ${request.data().asUtf8String()}")
-        websocketChannels.getOrPut(request.connectionId()) { Channel() }.send(request.data().asUtf8String())
+        webSocketChannels.getOrPut(request.connectionId()) { Channel() }.send(request.data().asUtf8String())
         return PostToConnectionResponse.builder().apply {
             sdkHttpResponse(
                 SdkHttpResponse.builder().statusCode(200).build()

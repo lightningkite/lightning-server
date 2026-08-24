@@ -48,7 +48,7 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
 
     override val settings: ServerSettings = super.settings + awsApiGatewayWsEndpointSetting
 
-    override val websocketHandlersRunOnSameMachine: Boolean get() = false
+    override val webSocketHandlersRunOnSameMachine: Boolean get() = false
 
     init {
         logger.info { "Initializing AwsAdapter..." }
@@ -230,12 +230,12 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
                             internalSerialization.json.decodeFromJsonElement<APIGatewayV2HTTPEvent>(asJson)
                         )
 
-                        asJson.containsKey("storage") -> ws.handleWebsocketDidConnect(
+                        asJson.containsKey("storage") -> ws.handleWebSocketDidConnect(
                             internalSerialization.json.decodeFromJsonElement<AwsAdapterWs.WebSocketDidConnect>(asJson)
                         )
 
-                        asJson["requestContext"]?.jsonObject?.containsKey("connectionId") == true -> ws.handleWebsocket(
-                            internalSerialization.json.decodeFromJsonElement<APIGatewayV2WebsocketRequest>(asJson)
+                        asJson["requestContext"]?.jsonObject?.containsKey("connectionId") == true -> ws.handleWebSocket(
+                            internalSerialization.json.decodeFromJsonElement<APIGatewayV2WebSocketRequest>(asJson)
                         )
 
                         asJson.containsKey("scheduled") -> {

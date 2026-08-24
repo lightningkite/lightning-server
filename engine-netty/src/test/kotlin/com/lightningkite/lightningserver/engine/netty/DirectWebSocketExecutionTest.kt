@@ -17,7 +17,7 @@ import kotlin.test.*
 /**
  * Tests for DirectExecutableWebSocketHandler optimization in NettyEngine.
  *
- * These tests verify that CoroutineWebsocketHandler works correctly with:
+ * These tests verify that CoroutineWebSocketHandler works correctly with:
  * 1. Direct execution (default) - bypasses pub/sub
  * 2. Pub/sub mode (forceWebSocketPubSub=true) - uses standard pub/sub path
  */
@@ -26,8 +26,8 @@ class DirectWebSocketExecutionTest {
     object TestServer : ServerBuilder() {
         val pubsub = setting("pubSub", PubSub.Settings())
 
-        // Echo handler using CoroutineWebsocketHandler
-        val echoHandler = path.path("echo") include object : CoroutineWebsocketHandler() {
+        // Echo handler using CoroutineWebSocketHandler
+        val echoHandler = path.path("echo") include object : CoroutineWebSocketHandler() {
             override val pubSub = this@TestServer.pubsub
 
             context(serverRuntime: ServerRuntime)
@@ -45,7 +45,7 @@ class DirectWebSocketExecutionTest {
         }
 
         // Handler that sends greeting after connect
-        val greetingHandler = path.path("greeting") include object : CoroutineWebsocketHandler() {
+        val greetingHandler = path.path("greeting") include object : CoroutineWebSocketHandler() {
             override val pubSub = this@TestServer.pubsub
 
             context(serverRuntime: ServerRuntime)
@@ -62,7 +62,7 @@ class DirectWebSocketExecutionTest {
         }
 
         // Handler that sends multiple messages
-        val multiMessageHandler = path.path("multi") include object : CoroutineWebsocketHandler() {
+        val multiMessageHandler = path.path("multi") include object : CoroutineWebSocketHandler() {
             override val pubSub = this@TestServer.pubsub
 
             context(serverRuntime: ServerRuntime)
@@ -96,7 +96,7 @@ class DirectWebSocketExecutionTest {
             com.lightningkite.lightningserver.definition.loggingSettings.useDefault()
             com.lightningkite.lightningserver.engine.local.enginePubSub.useDefault()
             com.lightningkite.lightningserver.engine.local.engineCache.useDefault()
-            com.lightningkite.lightningserver.websockets.websocketSettings.useDefault()
+            com.lightningkite.lightningserver.websockets.webSocketSettings.useDefault()
             TestServer.pubsub.useDefault()  // Set the handler's pubsub setting
             forceWebSocketPubSub set forcePubSub
             nettyRunConfig set NettyRuntimeSettings(host = "127.0.0.1", port = port)

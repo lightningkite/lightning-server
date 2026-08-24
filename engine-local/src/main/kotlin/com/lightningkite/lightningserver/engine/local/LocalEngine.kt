@@ -9,7 +9,7 @@ import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
-import com.lightningkite.lightningserver.websockets.websocketSettings
+import com.lightningkite.lightningserver.websockets.webSocketSettings
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
 import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryKey
@@ -103,7 +103,7 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
         enginePubSub,
         engineCache,
         forceWebSocketPubSub,
-        websocketSettings,
+        webSocketSettings,
     )
 
     /**

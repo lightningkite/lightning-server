@@ -37,7 +37,7 @@ class KtorSinkResponseTest {
             loggingSettings.useDefault()
             enginePubSub.useDefault()
             engineCache.useDefault()
-            com.lightningkite.lightningserver.websockets.websocketSettings.useDefault()
+            com.lightningkite.lightningserver.websockets.webSocketSettings.useDefault()
             ktorRunConfig set KtorRuntimeSettings(host = "127.0.0.1", port = 0)
         }
         engine.settings.readyUsingDefaults()

@@ -6,7 +6,7 @@ import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.pathing.buildPathSpecMap
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.lightningserver.typed.ApiWebsocketHandler
+import com.lightningkite.lightningserver.typed.ApiWebSocketHandler
 import com.lightningkite.services.database.nullElement
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -39,7 +39,7 @@ public fun SDK.Module.ensureUniqueNames(): SDK.Module = copy(
                 if (idx == 0) it
                 else when (it) {
                     is SDK.Function.Endpoint -> it.copy(functionName = it.functionName + (idx + 1))
-                    is SDK.Function.Websocket -> it.copy(functionName = it.functionName + (idx + 1))
+                    is SDK.Function.WebSocket -> it.copy(functionName = it.functionName + (idx + 1))
                 }
             }
         }
@@ -115,8 +115,8 @@ public fun ServerRuntime.usedTypes(): Collection<KSerializer<*>> {
                 )
             }
         }
-        endpoints.websocket?.let { handler ->
-            if (handler !is ApiWebsocketHandler<*, *, *, *, *>) return@let
+        endpoints.webSocket?.let { handler ->
+            if (handler !is ApiWebSocketHandler<*, *, *, *, *>) return@let
 
             try {
                 registerRecursive(handler.inputType)

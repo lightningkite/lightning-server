@@ -43,11 +43,11 @@ public interface ServerRuntime : SettingContext, Namespaced {
     public val server: ServerDefinition
 
     /**
-     * Whether the different parts of the websocket handler (willConnect, didConnect, messageFromClient,
+     * Whether the different parts of the webSocket handler (willConnect, didConnect, messageFromClient,
      * messageFromSubscription, disconnect) all occur in the same process.  If they do, you can use RAM to store
      * information between those events.
      */
-    public val websocketHandlersRunOnSameMachine: Boolean get() = true
+    public val webSocketHandlersRunOnSameMachine: Boolean get() = true
 
     /**
      * The public URL at which this server is accessible.
@@ -93,7 +93,7 @@ public interface ServerRuntime : SettingContext, Namespaced {
      * Optional direct WebSocket sender for engines that support it (e.g., AWS).
      *
      * When available, allows bypassing the pub/sub mechanism for direct message sending
-     * to specific sockets. Used by [com.lightningkite.lightningserver.websockets.CoroutineWebsocketHandler]
+     * to specific sockets. Used by [com.lightningkite.lightningserver.websockets.CoroutineWebSocketHandler]
      * to optimize message delivery.
      *
      * @return DirectWebSocketSender implementation if supported, null otherwise

@@ -295,7 +295,7 @@ public class FetcherSdk(
                                 function.outputType.kotlinSerializer()
                             ).joinToString() + ')'
 
-                            is SDK.Function.Websocket -> "fetcher.websocket(" + listOf(
+                            is SDK.Function.WebSocket -> "fetcher.webSocket(" + listOf(
                                 function.path.absolute().toCodeString(),
                                 function.inputType.kotlinSerializer(),
                                 function.outputType.kotlinSerializer()
@@ -324,7 +324,7 @@ public class FetcherSdk(
             is SDK.Function.Endpoint ->
                 "suspend fun $functionName($argString)" + if (outputType.isUnit()) "" else ": ${outputType.kotlinTypeString()}"
 
-            is SDK.Function.Websocket ->
+            is SDK.Function.WebSocket ->
                 "fun $functionName($argString): ClientWebSocket<${inputType.kotlinTypeString()}, ${outputType.kotlinTypeString()}>"
         }
     }

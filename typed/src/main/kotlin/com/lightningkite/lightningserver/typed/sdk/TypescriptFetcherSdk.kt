@@ -425,8 +425,8 @@ public class TypescriptFetcherSdk(
                 }
                 when (func) {
                     is SDK.Function.Endpoint -> append("Promise<${func.outputType.tsType()}>")
-                    is SDK.Function.Websocket -> {
-                        // Websockets not supported yet
+                    is SDK.Function.WebSocket -> {
+                        // WebSockets not supported yet
                     }
                 }
                 appendLine()
@@ -500,8 +500,8 @@ public class TypescriptFetcherSdk(
                         appendLine()
                     }
 
-                    is SDK.Function.Websocket -> {
-                        // websockets not supported yet
+                    is SDK.Function.WebSocket -> {
+                        // webSockets not supported yet
                     }
                 }
             }

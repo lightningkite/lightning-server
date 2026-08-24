@@ -21,12 +21,12 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 /**
- * `ModelRestUpdatesWebsocket` used to resolve the read mask once, at connect, and reuse it for the
+ * `ModelRestUpdatesWebSocket` used to resolve the read mask once, at connect, and reuse it for the
  * whole life of the socket. A long-lived connection therefore kept disclosing under permissions that
  * may have been revoked minutes or hours earlier, and a revocation only took effect on reconnect.
  *
  * These tests pin the fix: permissions are a cache with a deadline, re-derived on the first push
- * after [ModelRestUpdatesWebsocket.permissionRevalidation] elapses.
+ * after [ModelRestUpdatesWebSocket.permissionRevalidation] elapses.
  */
 class WebSocketPermissionStalenessTest {
 
@@ -57,7 +57,7 @@ class WebSocketPermissionStalenessTest {
             permissions = { Permissions.current }
         )
         val ws = path.path("stale").path("updates") include
-                ModelRestUpdatesWebsocket(info, permissionRevalidation = revalidateAfter)
+                ModelRestUpdatesWebSocket(info, permissionRevalidation = revalidateAfter)
 
         init {
             registerBasicMediaTypeCoders()
@@ -85,7 +85,7 @@ class WebSocketPermissionStalenessTest {
             clock = { clock },
         ) {
             runBlocking {
-                val socket = fixture.ws.websocket.test()
+                val socket = fixture.ws.webSocket.test()
                 val json = socket.server.externalSerialization.json
                 val watchEverything = WebSocketFrame.Text(
                     json.encodeToString(Condition.serializer(Sample.serializer()), Condition.Always)

@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.compression
 
 import com.lightningkite.lightningserver.http.HttpHeader
-import com.lightningkite.lightningserver.http.ConnectionInterceptor
+import com.lightningkite.lightningserver.http.HttpConnectionInterceptor
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -9,7 +9,6 @@ import com.lightningkite.lightningserver.runtime.gzip
 import com.lightningkite.services.data.AbstractSuspendingSink
 import com.lightningkite.services.data.AbstractSuspendingSource
 import com.lightningkite.services.data.Data
-import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.SuspendingSink
 import com.lightningkite.services.data.SuspendingSource
 import com.lightningkite.services.data.TypedData
@@ -29,7 +28,7 @@ private const val COPY_CHUNK: Int = 8 * 1024
 
 // Connection-scoped: compression applies to the physical response body. Re-running it per logical
 // request inside a multiplexed response would double-encode.
-public class GzipInterceptor: ConnectionInterceptor {
+public class GzipInterceptor: HttpConnectionInterceptor {
     context(runtime: ServerRuntime)
     override suspend fun intercept(
         request: HttpRequest<*>,

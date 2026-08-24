@@ -65,7 +65,7 @@ public typealias FullyCustomizableSubscriptions<USER, UID> = FullyCustomizableSu
  * change is controlled by [DefaultSubscriptionUpdateBehavior].
  *
  * ## Endpoints
- * - REST API and updates websocket at `/rest` for subscription CRUD operations
+ * - REST API and updates webSocket at `/rest` for subscription CRUD operations
  * 
  * ## Important Note
  * The auto-subscription updater created by this class bulk-deletes and inserts subscriptions to update them. 
@@ -79,7 +79,7 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
     info: ModelInfo<AUTH, NotificationEventSubscription<UID>, UserEventType<UID>>,
     users: ModelInfo<*, USER, UID>,
     private val principal: PrincipalType<USER, UID>,
-    websocketKey: SerializableProperty<NotificationEventSubscription<UID>, *> = info.serializer.field_id,
+    webSocketKey: SerializableProperty<NotificationEventSubscription<UID>, *> = info.serializer.field_id,
     private val suppressRejectedAuthenticationWarnings: Boolean = false,
 ) : NotificationEndpoints.Subscriptions<USER, UID>, ServerBuilder() {
 
@@ -111,11 +111,11 @@ public class FullyCustomizableSubscriptionsWithAuth<AUTH : HasId<*>?, USER : Has
         }
 
     /**
-     * REST endpoints and updates websocket for managing user notification subscriptions.
+     * REST endpoints and updates webSocket for managing user notification subscriptions.
      * Mounted at `/rest`. Provides CRUD operations for subscriptions.
      */
-    public val rest: ModelRestEndpointsAndUpdatesWebsocket<AUTH, NotificationEventSubscription<UID>, UserEventType<UID>> =
-        path.path("rest") include ModelRestEndpointsAndUpdatesWebsocket(info, websocketKey)
+    public val rest: ModelRestEndpointsAndUpdatesWebSocket<AUTH, NotificationEventSubscription<UID>, UserEventType<UID>> =
+        path.path("rest") include ModelRestEndpointsAndUpdatesWebSocket(info, webSocketKey)
 
     private val self = DataClassPathSelf(info.serializer)
 

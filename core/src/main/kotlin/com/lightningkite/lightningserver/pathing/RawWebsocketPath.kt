@@ -9,21 +9,21 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * Custom serializer for [RawWebsocketPath] that stores the path as a string.
+ * Custom serializer for [RawWebSocketPath] that stores the path as a string.
  */
-public class PathSerializer<T : PathSpec>(ignored: KSerializer<T>) : KSerializer<RawWebsocketPath<T>> {
+public class PathSerializer<T : PathSpec>(ignored: KSerializer<T>) : KSerializer<RawWebSocketPath<T>> {
     override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor(" com.lightningkite.lightningserver.pathing.RawWebsocketPath", PrimitiveKind.STRING)
+        PrimitiveSerialDescriptor(" com.lightningkite.lightningserver.pathing.RawWebSocketPath", PrimitiveKind.STRING)
 
     override fun serialize(
         encoder: Encoder,
-        value: RawWebsocketPath<T>,
+        value: RawWebSocketPath<T>,
     ) {
         encoder.encodeString(value.pathSegments.toString())
     }
 
-    override fun deserialize(decoder: Decoder): RawWebsocketPath<T> {
-        return RawWebsocketPath<T>(PathSegments.parse(decoder.decodeString()))
+    override fun deserialize(decoder: Decoder): RawWebSocketPath<T> {
+        return RawWebSocketPath<T>(PathSegments.parse(decoder.decodeString()))
     }
 }
 
@@ -36,7 +36,7 @@ public class PathSerializer<T : PathSpec>(ignored: KSerializer<T>) : KSerializer
  * **Usage:**
  * ```kotlin
  * context(serverRuntime) {
- *     val wsPath = RawWebsocketPath<PathSpec0>("/chat")
+ *     val wsPath = RawWebSocketPath<PathSpec0>("/chat")
  *     val resolved = wsPath.pathInContext // Matches against registered WebSocket paths
  * }
  * ```
@@ -48,7 +48,7 @@ public class PathSerializer<T : PathSpec>(ignored: KSerializer<T>) : KSerializer
  * @see HasContextualPath
  */
 @Serializable(with = PathSerializer::class)
-public class RawWebsocketPath<PATH : PathSpec>(public val pathSegments: PathSegments) : HasContextualPath<PATH> {
+public class RawWebSocketPath<PATH : PathSpec>(public val pathSegments: PathSegments) : HasContextualPath<PATH> {
     /** Constructs a raw WebSocket path from a string. */
     public constructor(path: String) : this(PathSegments.parse(path))
 
@@ -65,7 +65,7 @@ public class RawWebsocketPath<PATH : PathSpec>(public val pathSegments: PathSegm
                 this.matchIfPresent = server.server.endpoints.match(
                     server.externalSerialization.stringArrayFormat,
                     pathSegments
-                ) { it.websocket }
+                ) { it.webSocket }
             }
             return this.matchIfPresent
                 ?: throw NullPointerException("No match for path: $pathSegments. Registered paths are ${server.server.endpoints.keys}")
@@ -78,42 +78,42 @@ public class RawWebsocketPath<PATH : PathSpec>(public val pathSegments: PathSegm
         this.matchIfPresent = match
     }
 
-    override fun equals(other: Any?): Boolean = other is RawWebsocketPath<*> && other.pathSegments == pathSegments
+    override fun equals(other: Any?): Boolean = other is RawWebSocketPath<*> && other.pathSegments == pathSegments
     override fun hashCode(): Int = pathSegments.hashCode() + 1
     override fun toString(): String = "/$pathSegments"
 }
 
 context(server: ServerRuntime)
-public fun <PATH : PathSpec> RawWebsocketPath(path: ResolvedPath<PATH>): RawWebsocketPath<PATH> =
-    RawWebsocketPath(path.pathSegments(server.internalSerialization.stringArrayFormat))
+public fun <PATH : PathSpec> RawWebSocketPath(path: ResolvedPath<PATH>): RawWebSocketPath<PATH> =
+    RawWebSocketPath(path.pathSegments(server.internalSerialization.stringArrayFormat))
 
 context(serverRuntime: ServerRuntime)
-public fun RawWebsocketPath(spec: PathSpec0, trailingSegments: PathSegments? = null): RawWebsocketPath<PathSpec0> =
-    RawWebsocketPath(ResolvedPath(spec, trailingSegments))
+public fun RawWebSocketPath(spec: PathSpec0, trailingSegments: PathSegments? = null): RawWebSocketPath<PathSpec0> =
+    RawWebSocketPath(ResolvedPath(spec, trailingSegments))
 
 context(serverRuntime: ServerRuntime)
-public fun <A> RawWebsocketPath(
+public fun <A> RawWebSocketPath(
     spec: PathSpec1<A>,
     path1: A,
     trailingSegments: PathSegments? = null,
-): RawWebsocketPath<PathSpec1<A>> =
-    RawWebsocketPath(ResolvedPath(spec, path1, trailingSegments))
+): RawWebSocketPath<PathSpec1<A>> =
+    RawWebSocketPath(ResolvedPath(spec, path1, trailingSegments))
 
 context(serverRuntime: ServerRuntime)
-public fun <A, B> RawWebsocketPath(
+public fun <A, B> RawWebSocketPath(
     spec: PathSpec2<A, B>,
     path1: A,
     path2: B,
     trailingSegments: PathSegments? = null,
-): RawWebsocketPath<PathSpec2<A, B>> =
-    RawWebsocketPath(ResolvedPath(spec, path1, path2, trailingSegments))
+): RawWebSocketPath<PathSpec2<A, B>> =
+    RawWebSocketPath(ResolvedPath(spec, path1, path2, trailingSegments))
 
 context(serverRuntime: ServerRuntime)
-public fun <A, B, C> RawWebsocketPath(
+public fun <A, B, C> RawWebSocketPath(
     spec: PathSpec3<A, B, C>,
     path1: A,
     path2: B,
     path3: C,
     trailingSegments: PathSegments? = null,
-): RawWebsocketPath<PathSpec3<A, B, C>> =
-    RawWebsocketPath(ResolvedPath(spec, path1, path2, path3, trailingSegments))
+): RawWebSocketPath<PathSpec3<A, B, C>> =
+    RawWebSocketPath(ResolvedPath(spec, path1, path2, path3, trailingSegments))

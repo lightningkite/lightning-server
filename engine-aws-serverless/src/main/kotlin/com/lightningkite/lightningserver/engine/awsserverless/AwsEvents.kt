@@ -49,14 +49,14 @@ internal data class APIGatewayV2HTTPResponse(
     val statusCode: Int? = null,
     val body: String? = null,
     val isBase64Encoded: Boolean = false,
-    // Enabling this breaks websockets?!
+    // Enabling this breaks webSockets?!
 //    val cookies: List<String> = emptyList(),
     val headers: Map<String, String> = mapOf(),
 )
 
 
 @Serializable
-internal data class APIGatewayV2WebsocketRequest(
+internal data class APIGatewayV2WebSocketRequest(
     val headers: Map<String, String>? = null,
     val multiValueHeaders: Map<String, List<String>>? = null,
     val queryStringParameters: Map<String, String>? = null,

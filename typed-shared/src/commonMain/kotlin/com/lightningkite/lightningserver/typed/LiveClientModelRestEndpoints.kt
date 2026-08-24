@@ -221,7 +221,7 @@ public open class LiveClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID
 }
 
 /**
- * Live WebSocket implementation of [ClientModelRestUpdatesWebsocket].
+ * Live WebSocket implementation of [ClientModelRestUpdatesWebSocket].
  *
  * Connects to a WebSocket endpoint that provides real-time updates for a model collection.
  *
@@ -232,14 +232,14 @@ public open class LiveClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID
  * @property serializer Serializer for the model type
  * @property idSerializer Serializer for the ID type
  */
-public open class LiveClientModelRestUpdatesWebsocket<T : HasId<ID>, ID : Comparable<ID>>(
+public open class LiveClientModelRestUpdatesWebSocket<T : HasId<ID>, ID : Comparable<ID>>(
     public val fetcher: Fetcher,
     public val subpath: String,
     public val serializer: KSerializer<T>,
     public val idSerializer: KSerializer<ID>,
-) : ClientModelRestUpdatesWebsocket<T, ID> {
+) : ClientModelRestUpdatesWebSocket<T, ID> {
     override fun updates(): ClientWebSocket<Condition<T>, CollectionUpdates<T, ID>> =
-        fetcher.websocket(
+        fetcher.webSocket(
             subpath,
             Condition.serializer(serializer),
             CollectionUpdates.serializer(serializer, idSerializer)
@@ -249,7 +249,7 @@ public open class LiveClientModelRestUpdatesWebsocket<T : HasId<ID>, ID : Compar
 /**
  * Combined live implementation providing both REST endpoints and WebSocket updates.
  *
- * Uses delegation to combine [LiveClientModelRestEndpoints] and [LiveClientModelRestUpdatesWebsocket].
+ * Uses delegation to combine [LiveClientModelRestEndpoints] and [LiveClientModelRestUpdatesWebSocket].
  *
  * @param T The model type
  * @param ID The ID type
@@ -258,14 +258,14 @@ public open class LiveClientModelRestUpdatesWebsocket<T : HasId<ID>, ID : Compar
  * @property serializer Serializer for the model type
  * @property idSerializer Serializer for the ID type
  */
-public class LiveClientModelRestEndpointsAndUpdatesWebsocket<T : HasId<ID>, ID : Comparable<ID>>(
+public class LiveClientModelRestEndpointsAndUpdatesWebSocket<T : HasId<ID>, ID : Comparable<ID>>(
     public val fetcher: Fetcher,
     public val subpath: String,
     public val serializer: KSerializer<T>,
     public val idSerializer: KSerializer<ID>,
-) : ClientModelRestEndpointsAndUpdatesWebsocket<T, ID>,
+) : ClientModelRestEndpointsAndUpdatesWebSocket<T, ID>,
     ClientModelRestEndpoints<T, ID> by LiveClientModelRestEndpoints(fetcher, subpath, serializer, idSerializer),
-    ClientModelRestUpdatesWebsocket<T, ID> by LiveClientModelRestUpdatesWebsocket(
+    ClientModelRestUpdatesWebSocket<T, ID> by LiveClientModelRestUpdatesWebSocket(
         fetcher,
         subpath,
         serializer,

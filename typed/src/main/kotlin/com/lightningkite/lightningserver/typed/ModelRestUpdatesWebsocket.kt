@@ -33,7 +33,7 @@ import kotlin.time.Instant
  *   moment it connected, so these are a cache with a deadline, not a fact settled at connect.
  */
 @Serializable
-public data class ModelRestUpdatesWebsocketData<T : HasId<ID>, ID : Comparable<ID>>(
+public data class ModelRestUpdatesWebSocketData<T : HasId<ID>, ID : Comparable<ID>>(
     val user: Authentication<Nothing>?, //USER
     val clientCondition: Condition<T> = Condition.Never,
     val condition: Condition<T> = Condition.Never,
@@ -57,21 +57,21 @@ private const val OVERLOAD_THRESHOLD_BYTES: Int = 24000
  *   cost of re-resolving; it is a ceiling on staleness, not a polling interval, so an idle connection
  *   costs nothing.
  */
-public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
+public class ModelRestUpdatesWebSocket<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     public val info: ModelInfo<USER, T, ID>,
     public val key: SerializableProperty<T, *>? = null,
     public val permissionRevalidation: Duration = 5.minutes,
 ) : ServerBuilder() {
     init {
-        sdkSettings.clientInterface = ClientModelRestUpdatesWebsocket::class.info(info.serializer, info.idSerializer)
+        sdkSettings.clientInterface = ClientModelRestUpdatesWebSocket::class.info(info.serializer, info.idSerializer)
         sdkSettings.defaultInfo = SdkModule.Info(
-            interfaceName = info.tableName.pascalCase() + "RestUpdatesWebsocket",
-            valueName = "websocket"
+            interfaceName = info.tableName.pascalCase() + "RestUpdatesWebSocket",
+            valueName = "webSocket"
         )
     }
 
-    private inner class Websocket :
-        ApiWebsocketHandler<PathSpec0, ModelRestUpdatesWebsocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>> {
+    private inner class WebSocket :
+        ApiWebSocketHandler<PathSpec0, ModelRestUpdatesWebSocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>> {
         override val auth: AuthRequirement<USER> = info.auth
         override val inputType: KSerializer<Condition<T>> = Condition.serializer(info.serializer)
         override val outputType: KSerializer<CollectionUpdates<T, ID>> =
@@ -79,24 +79,24 @@ public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
         override val summary: String = "Updates"
         override val description: String = "Streams updates about items that fulfill your condition."
         override val errorCases: List<LSError> get() = listOf()
-        override val innerStorageSerializer: KSerializer<ModelRestUpdatesWebsocketData<T, ID>> =
-            ModelRestUpdatesWebsocketData.serializer(info.serializer, info.idSerializer)
+        override val innerStorageSerializer: KSerializer<ModelRestUpdatesWebSocketData<T, ID>> =
+            ModelRestUpdatesWebSocketData.serializer(info.serializer, info.idSerializer)
 
         context(serverRuntime: ServerRuntime)
-        override suspend fun willConnectTyped(access: WebSocketConnectRequestAccess<PathSpec0, USER>): ModelRestUpdatesWebsocketData<T, ID> {
+        override suspend fun willConnectTyped(access: WebSocketConnectRequestAccess<PathSpec0, USER>): ModelRestUpdatesWebSocketData<T, ID> {
             @Suppress("UNCHECKED_CAST")
-            return ModelRestUpdatesWebsocketData(
+            return ModelRestUpdatesWebSocketData(
                 user = access.authOrNull as? Authentication<Nothing>,
                 mask = info.table(access).mask(),
                 permissionsCheckedAt = now(),
             )
         }
 
-        context(connection: ApiWebsocketHandler.Connection<PathSpec0, ModelRestUpdatesWebsocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>>)
+        context(connection: ApiWebSocketHandler.Connection<PathSpec0, ModelRestUpdatesWebSocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>>)
         override suspend fun didConnectTyped() {
         }
 
-        context(connection: ApiWebsocketHandler.Connection<PathSpec0, ModelRestUpdatesWebsocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>>)
+        context(connection: ApiWebSocketHandler.Connection<PathSpec0, ModelRestUpdatesWebSocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>>)
         override suspend fun messageFromClientTyped(frame: Condition<T>) {
             val p = info.table(connection.auth())
             val c = p.fullCondition(frame).simplify()
@@ -129,7 +129,7 @@ public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
             connection.send(CollectionUpdates(condition = frame))
         }
 
-        context(connection: ApiWebsocketHandler.Connection<PathSpec0, ModelRestUpdatesWebsocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>>)
+        context(connection: ApiWebSocketHandler.Connection<PathSpec0, ModelRestUpdatesWebSocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>>)
         override suspend fun messageFromSubscriptionTyped(topic: WebSocketSubscriptionMessage<*, *>) {
             val state = connection.currentState
             val now = now()
@@ -197,13 +197,13 @@ public class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
             }
         }
 
-        context(connection: ApiWebsocketHandler.Connection<PathSpec0, ModelRestUpdatesWebsocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>>)
+        context(connection: ApiWebSocketHandler.Connection<PathSpec0, ModelRestUpdatesWebSocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>>)
         override suspend fun disconnectTyped(reason: WebSocketClose) {
         }
     }
 
-    public val websocket: ApiWebsocketHandler<PathSpec0, ModelRestUpdatesWebsocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>> =
-        path bind Websocket()
+    public val webSocket: ApiWebSocketHandler<PathSpec0, ModelRestUpdatesWebSocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>> =
+        path bind WebSocket()
 
     public val generalTopic: WebSocketTopic<PathSpec0, CollectionChanges<T>> =
         path.path("general").topic(CollectionChanges.serializer(info.serializer))

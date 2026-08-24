@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.engine.conformance
 
-import com.lightningkite.lightningserver.http.ConnectionInterceptor
 import com.lightningkite.lightningserver.cors.CorsInterceptor
 import com.lightningkite.lightningserver.cors.CorsSettings
 import com.lightningkite.lightningserver.definition.ServerDefinition

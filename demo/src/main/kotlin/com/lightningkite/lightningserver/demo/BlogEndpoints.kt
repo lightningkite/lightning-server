@@ -5,7 +5,7 @@ import com.lightningkite.lightningserver.auth.require
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.demo.models.BlogPost
 import com.lightningkite.lightningserver.typed.*
-import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebsocket.Companion.plus
+import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebSocket.Companion.plus
 import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.ModelPermissions
 
@@ -21,7 +21,7 @@ object BlogEndpoints : ServerBuilder() {
                 ModelPermissions(read = Condition.Always, manage = Condition.Never)
         },
     )
-    val rest = path.path("rest") include ModelRestEndpoints(info) + ModelRestUpdatesWebsocket(info)
+    val rest = path.path("rest") include ModelRestEndpoints(info) + ModelRestUpdatesWebSocket(info)
 }
 
 
@@ -34,5 +34,5 @@ object BlogEndpoints : ServerBuilder() {
 //            ModelPermissions.allowAll<BlogPost>()
 //        },
 //    )
-//    val rest = path.path("rest") include ModelRestEndpoints(info) + ModelRestUpdatesWebsocket(info)
+//    val rest = path.path("rest") include ModelRestEndpoints(info) + ModelRestUpdatesWebSocket(info)
 //}

@@ -3,11 +3,11 @@ package com.lightningkite.lightningserver.typed.sdk
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.definition.ServerPathEndpoints
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.lightningserver.typed.ApiWebsocketHandler
+import com.lightningkite.lightningserver.typed.ApiWebSocketHandler
 
 public data class ServerApiEndpoints(
     override val http: Map<HttpMethod, ApiHttpHandler<*, *, *, *>>,
-    override val websocket: ApiWebsocketHandler<*, *, *, *, *>?,
+    override val webSocket: ApiWebSocketHandler<*, *, *, *, *>?,
 ) : ServerPathEndpoints {
     public constructor(endpoints: ServerPathEndpoints) : this(
         http = buildMap {
@@ -15,10 +15,10 @@ public data class ServerApiEndpoints(
                 if (endpoint is ApiHttpHandler<*, *, *, *>) put(key, endpoint)
             }
         },
-        websocket = endpoints.websocket as? ApiWebsocketHandler<*, *, *, *, *>
+        webSocket = endpoints.webSocket as? ApiWebSocketHandler<*, *, *, *, *>
     )
 
-    public fun isEmpty(): Boolean = http.isEmpty() && websocket == null
+    public fun isEmpty(): Boolean = http.isEmpty() && webSocket == null
     public fun isNotEmpty(): Boolean = !isEmpty()
 
     public fun filterSafeEndpoints(): ServerApiEndpoints = copy(

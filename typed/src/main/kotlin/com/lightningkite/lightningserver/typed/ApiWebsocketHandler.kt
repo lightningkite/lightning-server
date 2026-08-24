@@ -14,8 +14,8 @@ import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.*
 
-public interface ApiWebsocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?, INPUT, OUTPUT>
-    : WebSocketHandler<PATH, ApiWebsocketStorage<STORAGE>>, SDK.Documentable {
+public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?, INPUT, OUTPUT>
+    : WebSocketHandler<PATH, ApiWebSocketStorage<STORAGE>>, SDK.Documentable {
     override val auth: AuthRequirement<USER>
     override val inputType: KSerializer<INPUT>
     override val outputType: KSerializer<OUTPUT>
@@ -23,8 +23,8 @@ public interface ApiWebsocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
     public val errorCases: List<LSError>
     public val innerStorageSerializer: KSerializer<STORAGE>
 
-    override val storageSerializer: KSerializer<ApiWebsocketStorage<STORAGE>>
-        get() = ApiWebsocketStorage.serializer(innerStorageSerializer)
+    override val storageSerializer: KSerializer<ApiWebSocketStorage<STORAGE>>
+        get() = ApiWebSocketStorage.serializer(innerStorageSerializer)
 
     public interface Connection<PATH : PathSpec, STORAGE, USER : HasId<*>?, INPUT, OUTPUT> : ServerRuntime {
         public val request: WebSocketConnectRequest<PATH>
@@ -56,9 +56,9 @@ public interface ApiWebsocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
 
 
     override context(serverRuntime: ServerRuntime)
-    suspend fun willConnect(request: WebSocketConnectRequest<PATH>): ApiWebsocketStorage<STORAGE> {
+    suspend fun willConnect(request: WebSocketConnectRequest<PATH>): ApiWebSocketStorage<STORAGE> {
         return willConnectTyped(WebSocketConnectRequestAccess(request, request.auth(auth))).let {
-            ApiWebsocketStorage(
+            ApiWebSocketStorage(
                 request.headers.accept.firstOrNull()?.takeUnless { it.type == "*" }
                     ?: request.headers.contentType?.takeUnless { it.type == "*" }
                     ?: request.queryParameters.get("Accept")?.let { MediaType(it) }?.takeUnless { it.type == "*" }
@@ -67,12 +67,12 @@ public interface ApiWebsocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
         }
     }
 
-    override context(connection: WebSocketConnection<PATH, ApiWebsocketStorage<STORAGE>>)
+    override context(connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>)
     suspend fun didConnect() {
         with(ConnectionWrapper<PATH, STORAGE, USER, INPUT, OUTPUT>(connection, outputType, auth)) { didConnectTyped() }
     }
 
-    override context(connection: WebSocketConnection<PATH, ApiWebsocketStorage<STORAGE>>)
+    override context(connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>)
     suspend fun messageFromClient(frame: WebSocketFrame) {
         val parsed = try {
             connection.currentState.mediaType.decoder!!(frame, inputType)
@@ -88,7 +88,7 @@ public interface ApiWebsocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
         ) { messageFromClientTyped(parsed) }
     }
 
-    override context(connection: WebSocketConnection<PATH, ApiWebsocketStorage<STORAGE>>)
+    override context(connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>)
     suspend fun messageFromSubscription(topic: WebSocketSubscriptionMessage<*, *>) {
         with(
             ConnectionWrapper<PATH, STORAGE, USER, INPUT, OUTPUT>(
@@ -99,7 +99,7 @@ public interface ApiWebsocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
         ) { messageFromSubscriptionTyped(topic) }
     }
 
-    override context(connection: WebSocketConnection<PATH, ApiWebsocketStorage<STORAGE>>)
+    override context(connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>)
     suspend fun disconnect(reason: WebSocketClose) {
         with(ConnectionWrapper<PATH, STORAGE, USER, INPUT, OUTPUT>(connection, outputType, auth)) {
             disconnectTyped(
@@ -111,10 +111,10 @@ public interface ApiWebsocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
 
 
 private class ConnectionWrapper<PATH : PathSpec, STORAGE, USER : HasId<*>?, INPUT, OUTPUT>(
-    val wraps: WebSocketConnection<PATH, ApiWebsocketStorage<STORAGE>>,
+    val wraps: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>,
     val outputSerializer: KSerializer<OUTPUT>,
     val authRequirement: AuthRequirement<USER>,
-) : ApiWebsocketHandler.Connection<PATH, STORAGE, USER, INPUT, OUTPUT>, ServerRuntime by wraps {
+) : ApiWebSocketHandler.Connection<PATH, STORAGE, USER, INPUT, OUTPUT>, ServerRuntime by wraps {
     override suspend fun auth(): Authentication<USER & Any>? = wraps.request.auth(authRequirement)
     override val request: WebSocketConnectRequest<PATH> get() = wraps.request
     override val currentState: STORAGE get() = wraps.currentState.storage
@@ -135,7 +135,7 @@ private class ConnectionWrapper<PATH : PathSpec, STORAGE, USER : HasId<*>?, INPU
 
 
 @Serializable
-public data class ApiWebsocketStorage<STORAGE>(
+public data class ApiWebSocketStorage<STORAGE>(
     val mediaType: MediaType,
     val storage: STORAGE,
     val respondToPings: Boolean = true,

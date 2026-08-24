@@ -52,7 +52,7 @@ import kotlinx.serialization.builtins.serializer
  * @property defaultSms The default frequency for sms when constructing events
  * @property defaultPush The default frequency for push when constructing events
  * @property defaultInApp The default frequency for inApp when constructing events
- * @property websocketKey The key provided to [com.lightningkite.lightningserver.typed.ModelRestUpdatesWebsocket] to optimize updates (defaults to `inApp`)
+ * @property webSocketKey The key provided to [com.lightningkite.lightningserver.typed.ModelRestUpdatesWebSocket] to optimize updates (defaults to `inApp`)
  * @property userIdSerializer The serializer for the user's ID, only needed if the type parameter serializer cannot be inferred automatically.
  */
 public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Comparable<UID>>(
@@ -61,7 +61,7 @@ public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Compara
     public val defaultSms: Frequency? = Frequency.immediately(),
     public val defaultPush: Frequency? = Frequency.immediately(),
     public val defaultInApp: Frequency? = Frequency.immediately(),
-    websocketKey: SerializableProperty<NotificationSendMethods<UID>, *>? = info.serializer.fieldInApp,
+    webSocketKey: SerializableProperty<NotificationSendMethods<UID>, *>? = info.serializer.fieldInApp,
     userIdSerializer: KSerializer<UID>? = null,
 ) : ServerBuilder(), NotificationEndpoints.Subscriptions<USER, UID> {
     private val logger: KLogger =
@@ -156,8 +156,8 @@ public class FrequencyCustomizableSubscriptions<USER : HasId<UID>, UID : Compara
      * REST and WebSocket endpoints for managing delivery frequency preferences.
      * Mounted at `/rest`. Provides CRUD operations and real-time updates for preferences.
      */
-    public val rest: ModelRestEndpointsAndUpdatesWebsocket<USER, NotificationSendMethods<UID>, UserEventType<UID>> =
-        path.path("rest") include ModelRestEndpointsAndUpdatesWebsocket(info, websocketKey)
+    public val rest: ModelRestEndpointsAndUpdatesWebSocket<USER, NotificationSendMethods<UID>, UserEventType<UID>> =
+        path.path("rest") include ModelRestEndpointsAndUpdatesWebSocket(info, webSocketKey)
 
     @Suppress("UNCHECKED_CAST")
     private val returnTypeSerializer = NotificationSendMethods.DbOrDefault.serializer(

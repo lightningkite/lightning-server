@@ -106,7 +106,7 @@ private fun VirtualTypeReference.render(): String =
  * - **Non-breaking:** endpoint added; optional input field added; output field added; output enum loses options;
  *   input enum gains options; auth loosened; documentation changes (never inspected, so invisible).
  *
- * Websocket outbound messages are treated exactly like HTTP outputs.
+ * WebSocket outbound messages are treated exactly like HTTP outputs.
  *
  * @param allowlist Suppressions for intentional breaks; matched changes are reported with `suppressed = true`.
  */

@@ -5,7 +5,7 @@ import com.lightningkite.lightningserver.http.generateRequestId
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.pathing.RawWebsocketPath
+import com.lightningkite.lightningserver.pathing.RawWebSocketPath
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.services.pubsub.PubSub
@@ -28,7 +28,7 @@ class DirectWebSocketSenderTest {
         val pubsub = setting("pubSub", PubSub.Settings())
 
         // Echo handler - for testing basic send functionality
-        val echoHandler = path.path("echo") include object : CoroutineWebsocketHandler() {
+        val echoHandler = path.path("echo") include object : CoroutineWebSocketHandler() {
             override val pubSub = this@TestServer.pubsub
 
             context(serverRuntime: ServerRuntime)
@@ -50,7 +50,7 @@ class DirectWebSocketSenderTest {
     fun engineSocketId_defaults_to_null(): Unit = runBlocking {
         // Verify that the default WebSocketConnectRequest has null engineSocketId
         TestServer.test(settings = { }) {
-            val ws = TestServer.echoHandler.websocketHandler.test()
+            val ws = TestServer.echoHandler.webSocketHandler.test()
 
             // Verify the request has null engineSocketId (default behavior)
             assertEquals(null, ws.request.engineSocketId)
@@ -63,7 +63,7 @@ class DirectWebSocketSenderTest {
     fun fallback_topic_send_works_when_engineSocketId_is_null(): Unit = runBlocking {
         // When engineSocketId is null, the fallback topic-based send should work
         TestServer.test(settings = { }) {
-            val ws = TestServer.echoHandler.websocketHandler.test()
+            val ws = TestServer.echoHandler.webSocketHandler.test()
 
             // Allow didConnect() subscription to complete before sending
             delay(50)
@@ -86,7 +86,7 @@ class DirectWebSocketSenderTest {
     fun engineSocketId_can_be_set_in_request(): Unit = runBlocking {
         // Test that engineSocketId can be explicitly set in a request
         val request = WebSocketConnectRequest<PathSpec0>(
-            path = RawWebsocketPath(PathSegments.EMPTY),
+            path = RawWebSocketPath(PathSegments.EMPTY),
             requestId = generateRequestId(),
             engineSocketId = "test-socket-123"
         )
@@ -98,13 +98,13 @@ class DirectWebSocketSenderTest {
     fun storage_preserves_engineSocketId(): Unit = runBlocking {
         // Verify that Storage correctly preserves the request's engineSocketId
         val request = WebSocketConnectRequest<PathSpec0>(
-            path = RawWebsocketPath(PathSegments.EMPTY),
+            path = RawWebSocketPath(PathSegments.EMPTY),
             requestId = generateRequestId(),
             engineSocketId = "aws-connection-id-xyz"
         )
 
         // The Storage data class wraps the request
-        val storage = CoroutineWebsocketHandler.Storage(request = request)
+        val storage = CoroutineWebSocketHandler.Storage(request = request)
 
         // Verify we can access the engineSocketId through storage
         assertEquals("aws-connection-id-xyz", storage.request.engineSocketId)

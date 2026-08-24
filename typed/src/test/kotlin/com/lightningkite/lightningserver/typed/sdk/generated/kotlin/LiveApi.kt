@@ -31,7 +31,7 @@ class LiveApi(val fetcher: Fetcher) : Api {
 		override suspend fun inlinedEndpoint2(id: kotlin.uuid.Uuid, category: kotlin.uuid.Uuid): kotlin.Int =
 			fetcher("m1/inline/action/${fetcher.url(id, kotlin.uuid.Uuid.serializer())}/${fetcher.url(category, kotlin.uuid.Uuid.serializer())}", HttpMethod.POST, kotlin.Unit.serializer(), kotlin.Unit, kotlin.Int.serializer())
 
-		inner class LiveDefaultEndpoints : Api.ModuleApi.DefaultEndpoints, com.lightningkite.lightningserver.typed.ClientModelRestEndpointsAndUpdatesWebsocket<com.lightningkite.lightningserver.typed.sdk.TestModel, com.lightningkite.lightningserver.typed.sdk.TestModel.ID> by com.lightningkite.lightningserver.typed.LiveClientModelRestEndpointsAndUpdatesWebsocket(fetcher, "m1/second/rest", com.lightningkite.lightningserver.typed.sdk.TestModel.serializer(), com.lightningkite.lightningserver.typed.sdk.TestModel.ID.serializer()) {
+		inner class LiveDefaultEndpoints : Api.ModuleApi.DefaultEndpoints, com.lightningkite.lightningserver.typed.ClientModelRestEndpointsAndUpdatesWebSocket<com.lightningkite.lightningserver.typed.sdk.TestModel, com.lightningkite.lightningserver.typed.sdk.TestModel.ID> by com.lightningkite.lightningserver.typed.LiveClientModelRestEndpointsAndUpdatesWebSocket(fetcher, "m1/second/rest", com.lightningkite.lightningserver.typed.sdk.TestModel.serializer(), com.lightningkite.lightningserver.typed.sdk.TestModel.ID.serializer()) {
 			override suspend fun testSdkEndpoint(second: kotlin.String, input: com.lightningkite.lightningserver.typed.sdk.TestInput): kotlin.String =
 				fetcher("m1/second/endpoint/${fetcher.url(second, kotlin.String.serializer())}", HttpMethod.POST, com.lightningkite.lightningserver.typed.sdk.TestInput.serializer(), input, kotlin.String.serializer())
 
@@ -43,7 +43,7 @@ class LiveApi(val fetcher: Fetcher) : Api {
 		}
 		override val default = LiveDefaultEndpoints()
 
-		inner class LiveDefaultEndpoints2 : Api.ModuleApi.DefaultEndpoints2, com.lightningkite.lightningserver.typed.ClientModelRestEndpointsAndUpdatesWebsocket<com.lightningkite.lightningserver.typed.sdk.TestModel, com.lightningkite.lightningserver.typed.sdk.TestModel.ID> by com.lightningkite.lightningserver.typed.LiveClientModelRestEndpointsAndUpdatesWebsocket(fetcher, "m1/duplicate/rest", com.lightningkite.lightningserver.typed.sdk.TestModel.serializer(), com.lightningkite.lightningserver.typed.sdk.TestModel.ID.serializer()) {
+		inner class LiveDefaultEndpoints2 : Api.ModuleApi.DefaultEndpoints2, com.lightningkite.lightningserver.typed.ClientModelRestEndpointsAndUpdatesWebSocket<com.lightningkite.lightningserver.typed.sdk.TestModel, com.lightningkite.lightningserver.typed.sdk.TestModel.ID> by com.lightningkite.lightningserver.typed.LiveClientModelRestEndpointsAndUpdatesWebSocket(fetcher, "m1/duplicate/rest", com.lightningkite.lightningserver.typed.sdk.TestModel.serializer(), com.lightningkite.lightningserver.typed.sdk.TestModel.ID.serializer()) {
 			override suspend fun testSdkEndpoint(second: kotlin.String, input: com.lightningkite.lightningserver.typed.sdk.TestInput): kotlin.String =
 				fetcher("m1/duplicate/endpoint/${fetcher.url(second, kotlin.String.serializer())}", HttpMethod.POST, com.lightningkite.lightningserver.typed.sdk.TestInput.serializer(), input, kotlin.String.serializer())
 
@@ -57,7 +57,7 @@ class LiveApi(val fetcher: Fetcher) : Api {
 	}
 	override val module = LiveModuleApi()
 
-	inner class LiveCustomEndpoints : Api.CustomEndpoints, com.lightningkite.lightningserver.typed.ClientModelRestEndpointsAndUpdatesWebsocket<com.lightningkite.lightningserver.typed.sdk.TestModel, com.lightningkite.lightningserver.typed.sdk.TestModel.ID> by com.lightningkite.lightningserver.typed.LiveClientModelRestEndpointsAndUpdatesWebsocket(fetcher, "m2/rest", com.lightningkite.lightningserver.typed.sdk.TestModel.serializer(), com.lightningkite.lightningserver.typed.sdk.TestModel.ID.serializer()) {
+	inner class LiveCustomEndpoints : Api.CustomEndpoints, com.lightningkite.lightningserver.typed.ClientModelRestEndpointsAndUpdatesWebSocket<com.lightningkite.lightningserver.typed.sdk.TestModel, com.lightningkite.lightningserver.typed.sdk.TestModel.ID> by com.lightningkite.lightningserver.typed.LiveClientModelRestEndpointsAndUpdatesWebSocket(fetcher, "m2/rest", com.lightningkite.lightningserver.typed.sdk.TestModel.serializer(), com.lightningkite.lightningserver.typed.sdk.TestModel.ID.serializer()) {
 		override suspend fun testSdkEndpoint(second: kotlin.String, input: com.lightningkite.lightningserver.typed.sdk.TestInput): kotlin.String =
 			fetcher("m2/endpoint/${fetcher.url(second, kotlin.String.serializer())}", HttpMethod.POST, com.lightningkite.lightningserver.typed.sdk.TestInput.serializer(), input, kotlin.String.serializer())
 

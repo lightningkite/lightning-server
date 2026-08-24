@@ -82,7 +82,7 @@ class JdkSinkResponseTest {
             telemetrySettings.useDefault()
             enginePubSub.useDefault()
             engineCache.useDefault()
-            com.lightningkite.lightningserver.websockets.websocketSettings.useDefault()
+            com.lightningkite.lightningserver.websockets.webSocketSettings.useDefault()
             forceWebSocketPubSub.useDefault()
             jdkRunConfig set JdkRuntimeSettings(host = "127.0.0.1", port = port)
         }

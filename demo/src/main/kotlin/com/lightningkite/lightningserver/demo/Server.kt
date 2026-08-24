@@ -198,7 +198,7 @@ object Server : ServerBuilder() {
      * File Examples - File upload, download, and signed URLs.
      *
      * Mounted at root (not path.path("files")) because the endpoints below already declare
-     * their own "files" prefix - same convention as [basic] and [websocketExamples]. Mounting
+     * their own "files" prefix - same convention as [basic] and [webSocketExamples]. Mounting
      * at "files" too would double it into /files/files/upload.
      */
     val fileExamples = path module FileExamplesEndpoints(files)
@@ -206,7 +206,7 @@ object Server : ServerBuilder() {
     /**
      * WebSocket Examples - Real-time communication patterns.
      */
-    val websocketExamples = path include WebSocketExamplesEndpoints
+    val webSocketExamples = path include WebSocketExamplesEndpoints
 
     /**
      * Cache Examples - Caching patterns and operations. Mounted at root; see [fileExamples].
@@ -240,8 +240,8 @@ object Server : ServerBuilder() {
 
     val multiplex = path.path("multiplex") bind MultiplexWebSocketHandler()
 
-    // Simple test WebSocket using CoroutineWebsocketHandler for isolated testing
-    val testCoroutineWs = path.path("test-coroutine-ws") include object : CoroutineWebsocketHandler() {
+    // Simple test WebSocket using CoroutineWebSocketHandler for isolated testing
+    val testCoroutineWs = path.path("test-coroutine-ws") include object : CoroutineWebSocketHandler() {
         override val pubSub = this@Server.pubsub
 
         context(serverRuntime: ServerRuntime)
@@ -255,7 +255,7 @@ object Server : ServerBuilder() {
             waitForFullConnect()
 
             // Send a greeting to confirm connection worked
-            send(WebSocketFrame.Text("""{"type":"connected","message":"CoroutineWebsocketHandler ready"}"""))
+            send(WebSocketFrame.Text("""{"type":"connected","message":"CoroutineWebSocketHandler ready"}"""))
 
             // Echo all incoming messages with a prefix
             incoming.collect { frame ->

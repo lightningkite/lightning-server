@@ -79,7 +79,7 @@ public data class WebSocketSubscriptionMessage<PATH : PathSpec, T>(
  */
 @Serializable
 public data class WebSocketConnectRequest<PATH : PathSpec>(
-    override val path: RawWebsocketPath<PATH>,
+    override val path: RawWebSocketPath<PATH>,
     override val queryParameters: QueryParameters = QueryParameters.EMPTY,
     override val headers: HttpHeaders = HttpHeaders.EMPTY,
     override val domain: String = "",
@@ -97,7 +97,7 @@ public data class WebSocketConnectRequest<PATH : PathSpec>(
     /**
      * Engine-specific socket identifier for direct message sending.
      * For AWS API Gateway, this is the connection ID.
-     * Used by CoroutineWebsocketHandler to bypass pub/sub for direct sends.
+     * Used by CoroutineWebSocketHandler to bypass pub/sub for direct sends.
      */
     val engineSocketId: String? = null,
 ) : Request<PATH>() {
@@ -111,7 +111,7 @@ public data class WebSocketConnectRequest<PATH : PathSpec>(
      * merely rewrites the path of the same socket should keep the existing [requestId].
      */
     public fun <PATH2 : PathSpec> subConnection(
-        path: RawWebsocketPath<PATH2>,
+        path: RawWebSocketPath<PATH2>,
         queryParameters: QueryParameters = this.queryParameters,
     ): WebSocketConnectRequest<PATH2> = WebSocketConnectRequest(
         path = path,

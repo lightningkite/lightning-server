@@ -9,13 +9,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 
-class CoroutineWebsocketHandlerSimpleTest {
+class CoroutineWebSocketHandlerSimpleTest {
 
     object TestServer : ServerBuilder() {
         val pubsub = setting("pubSub", PubSub.Settings())
 
         // Non-blocking handler - doesn't collect, just signals ready
-        val simpleHandler = path.path("simple") include object : CoroutineWebsocketHandler() {
+        val simpleHandler = path.path("simple") include object : CoroutineWebSocketHandler() {
             override val pubSub = this@TestServer.pubsub
 
             context(serverRuntime: ServerRuntime)
@@ -38,8 +38,8 @@ class CoroutineWebsocketHandlerSimpleTest {
     fun simple_connect_test(): Unit = runBlocking {
         println("[SimpleTest] Test starting...")
         TestServer.test(settings = { }) {
-            println("[SimpleTest] Creating websocket connection...")
-            val ws = TestServer.simpleHandler.websocketHandler.test()
+            println("[SimpleTest] Creating webSocket connection...")
+            val ws = TestServer.simpleHandler.webSocketHandler.test()
             println("[SimpleTest] Connection created successfully!")
             ws.close()
             println("[SimpleTest] Test completed")

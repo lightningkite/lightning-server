@@ -59,7 +59,7 @@ internal fun originMatches(allowed: List<String>, origin: String): Boolean {
  *
  * @param config Runtime configuration for CORS behavior
  **/
-public class CorsInterceptor(private val config: Runtime<CorsSettings>) : ConnectionInterceptor, WebSocketHandlerInterceptor {
+public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpConnectionInterceptor, WebSocketConnectionInterceptor {
     override val name: String = "CORS"
 
     public companion object {

@@ -33,40 +33,40 @@ class WebSocketCloseTest {
         assertEquals(codes.size, codes.distinct().size)
     }
 
-    // ========== bestWebsocketCloseCode Tests ==========
+    // ========== bestWebSocketCloseCode Tests ==========
 
     @Test
     fun `1xx status returns NORMAL`() {
-        assertEquals(WebSocketClose.NORMAL, HttpStatus.Continue.bestWebsocketCloseCode)
-        assertEquals(WebSocketClose.NORMAL, HttpStatus.SwitchingProtocols.bestWebsocketCloseCode)
+        assertEquals(WebSocketClose.NORMAL, HttpStatus.Continue.bestWebSocketCloseCode)
+        assertEquals(WebSocketClose.NORMAL, HttpStatus.SwitchingProtocols.bestWebSocketCloseCode)
     }
 
     @Test
     fun `2xx status returns NORMAL`() {
-        assertEquals(WebSocketClose.NORMAL, HttpStatus.OK.bestWebsocketCloseCode)
-        assertEquals(WebSocketClose.NORMAL, HttpStatus.Created.bestWebsocketCloseCode)
-        assertEquals(WebSocketClose.NORMAL, HttpStatus.NoContent.bestWebsocketCloseCode)
+        assertEquals(WebSocketClose.NORMAL, HttpStatus.OK.bestWebSocketCloseCode)
+        assertEquals(WebSocketClose.NORMAL, HttpStatus.Created.bestWebSocketCloseCode)
+        assertEquals(WebSocketClose.NORMAL, HttpStatus.NoContent.bestWebSocketCloseCode)
     }
 
     @Test
     fun `3xx status returns NORMAL`() {
-        assertEquals(WebSocketClose.NORMAL, HttpStatus.MovedPermanently.bestWebsocketCloseCode)
-        assertEquals(WebSocketClose.NORMAL, HttpStatus.Found.bestWebsocketCloseCode)
-        assertEquals(WebSocketClose.NORMAL, HttpStatus.TemporaryRedirect.bestWebsocketCloseCode)
+        assertEquals(WebSocketClose.NORMAL, HttpStatus.MovedPermanently.bestWebSocketCloseCode)
+        assertEquals(WebSocketClose.NORMAL, HttpStatus.Found.bestWebSocketCloseCode)
+        assertEquals(WebSocketClose.NORMAL, HttpStatus.TemporaryRedirect.bestWebSocketCloseCode)
     }
 
     @Test
     fun `4xx status returns VIOLATED_POLICY`() {
-        assertEquals(WebSocketClose.VIOLATED_POLICY, HttpStatus.BadRequest.bestWebsocketCloseCode)
-        assertEquals(WebSocketClose.VIOLATED_POLICY, HttpStatus.Unauthorized.bestWebsocketCloseCode)
-        assertEquals(WebSocketClose.VIOLATED_POLICY, HttpStatus.Forbidden.bestWebsocketCloseCode)
-        assertEquals(WebSocketClose.VIOLATED_POLICY, HttpStatus.NotFound.bestWebsocketCloseCode)
+        assertEquals(WebSocketClose.VIOLATED_POLICY, HttpStatus.BadRequest.bestWebSocketCloseCode)
+        assertEquals(WebSocketClose.VIOLATED_POLICY, HttpStatus.Unauthorized.bestWebSocketCloseCode)
+        assertEquals(WebSocketClose.VIOLATED_POLICY, HttpStatus.Forbidden.bestWebSocketCloseCode)
+        assertEquals(WebSocketClose.VIOLATED_POLICY, HttpStatus.NotFound.bestWebSocketCloseCode)
     }
 
     @Test
     fun `5xx status returns INTERNAL_ERROR`() {
-        assertEquals(WebSocketClose.INTERNAL_ERROR, HttpStatus.InternalServerError.bestWebsocketCloseCode)
-        assertEquals(WebSocketClose.INTERNAL_ERROR, HttpStatus.BadGateway.bestWebsocketCloseCode)
-        assertEquals(WebSocketClose.INTERNAL_ERROR, HttpStatus.ServiceUnavailable.bestWebsocketCloseCode)
+        assertEquals(WebSocketClose.INTERNAL_ERROR, HttpStatus.InternalServerError.bestWebSocketCloseCode)
+        assertEquals(WebSocketClose.INTERNAL_ERROR, HttpStatus.BadGateway.bestWebSocketCloseCode)
+        assertEquals(WebSocketClose.INTERNAL_ERROR, HttpStatus.ServiceUnavailable.bestWebSocketCloseCode)
     }
 }

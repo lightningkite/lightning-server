@@ -464,7 +464,7 @@ class ImplementationHelpersHandleTest {
 
         init {
             install(com.lightningkite.lightningserver.cors.CorsInterceptor(setting("cors", cors)))
-            install(ConnectionInterceptor { _, _ ->
+            install(HttpConnectionInterceptor { _, _ ->
                 throw HttpStatusException(
                     status = HttpStatus.TooManyRequests,
                     detail = "boom-interceptor",

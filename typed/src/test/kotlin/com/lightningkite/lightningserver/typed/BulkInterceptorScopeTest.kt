@@ -12,7 +12,6 @@ import com.lightningkite.lightningserver.runtime.handleSubRequest
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
-import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
@@ -28,7 +27,7 @@ import kotlin.test.assertTrue
  * `/meta/bulk` used to invoke each sub-request's handler directly, so sub-requests bypassed the
  * entire interceptor chain — access logging, auditing and rate limiting among them. N logical
  * requests executed while the pipeline saw one. These tests pin the fixed behaviour: a
- * [LogicalRequestInterceptor] observes every sub-request, a [ConnectionInterceptor] still observes
+ * [HttpLogicalInterceptor] observes every sub-request, a [HttpConnectionInterceptor] still observes
  * only the physical request, and each sub-request is independently attributable via its own
  * request ID.
  */
@@ -51,7 +50,7 @@ class BulkInterceptorScopeTest {
         into.add(Seen("/" + request.path.pathSegments.toString(), request.requestId, request.parentRequestId))
     }
 
-    private inner class LogicalRecorder : LogicalRequestInterceptor {
+    private inner class LogicalRecorder : HttpLogicalInterceptor {
         override val name: String = "LogicalRecorder"
 
         context(runtime: ServerRuntime)
@@ -64,7 +63,7 @@ class BulkInterceptorScopeTest {
         }
     }
 
-    private inner class ConnectionRecorder : ConnectionInterceptor {
+    private inner class ConnectionRecorder : HttpConnectionInterceptor {
         override val name: String = "ConnectionRecorder"
 
         context(runtime: ServerRuntime)

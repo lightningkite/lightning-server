@@ -33,7 +33,7 @@ class NettyWebSocketBackpressureTest {
         val pubsub = setting("pubSub", PubSub.Settings())
 
         // A direct handler that connects but never drains `incoming`, so the bounded buffer fills.
-        val stuck = path.path("stuck") include object : CoroutineWebsocketHandler() {
+        val stuck = path.path("stuck") include object : CoroutineWebSocketHandler() {
             override val pubSub = this@TestServer.pubsub
 
             context(serverRuntime: ServerRuntime)
@@ -71,7 +71,7 @@ class NettyWebSocketBackpressureTest {
             com.lightningkite.lightningserver.engine.local.enginePubSub.useDefault()
             com.lightningkite.lightningserver.engine.local.engineCache.useDefault()
             com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub.useDefault()
-            com.lightningkite.lightningserver.websockets.websocketSettings.useDefault()
+            com.lightningkite.lightningserver.websockets.webSocketSettings.useDefault()
             TestServer.pubsub.useDefault()
             nettyRunConfig set NettyRuntimeSettings(
                 host = "127.0.0.1",

@@ -62,7 +62,7 @@ public interface HttpInterceptor {
      * The compiled chain for "nothing installed" — it passes requests straight through.
      *
      * This is chain machinery, not something to install: an interceptor is installed as a
-     * [ConnectionInterceptor] or a [LogicalRequestInterceptor], and a no-op of either kind would do
+     * [HttpConnectionInterceptor] or a [HttpLogicalInterceptor], and a no-op of either kind would do
      * nothing but cost a span. [compileAndInstrument] drops these rather than wrapping them.
      */
     public object NoOp : HttpInterceptor {
@@ -84,13 +84,13 @@ public interface HttpInterceptor {
  * headers — where running once per logical request would duplicate work or corrupt the response.
  *
  * ```kotlin
- * val timing = ConnectionInterceptor { request, cont ->
+ * val timing = HttpConnectionInterceptor { request, cont ->
  *     val start = TimeSource.Monotonic.markNow()
  *     cont(request).also { println("${'$'}{request.path} took ${'$'}{start.elapsedNow()}") }
  * }
  * ```
  */
-public fun interface ConnectionInterceptor : HttpInterceptor
+public fun interface HttpConnectionInterceptor : HttpInterceptor
 
 /**
  * An interceptor that runs for every logical request, including each sub-request of a multiplexed
@@ -103,7 +103,7 @@ public fun interface ConnectionInterceptor : HttpInterceptor
  * An implementation must tolerate running several times within one physical request, and should
  * attribute its work to [HttpRequest.requestId] rather than assuming one request per connection.
  */
-public fun interface LogicalRequestInterceptor : HttpInterceptor
+public fun interface HttpLogicalInterceptor : HttpInterceptor
 
 /**
  * Wraps the intercept call with instrumentation for performance monitoring, and recovers from

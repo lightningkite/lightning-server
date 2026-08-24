@@ -7,7 +7,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.plus
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.lightningserver.typed.ApiWebsocketHandler
+import com.lightningkite.lightningserver.typed.ApiWebSocketHandler
 import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SDK.sdk
 import com.lightningkite.services.data.MediaType
@@ -260,8 +260,8 @@ public val openApiDescription: OpenApiRoot
                     builder[handler.outputType]
                 }
             }
-            endpoints.websocket?.let { handler ->
-                if (handler is ApiWebsocketHandler<*, *, *, *, *>) {
+            endpoints.webSocket?.let { handler ->
+                if (handler is ApiWebSocketHandler<*, *, *, *, *>) {
                     builder[handler.inputType]
                     builder[handler.outputType]
                 }

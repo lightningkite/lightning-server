@@ -61,11 +61,17 @@ public interface Fetcher {
      * @param outSerializer Serializer for incoming messages
      * @return A WebSocket client configured for this connection
      */
-    public fun <I, O> websocket(
+    public fun <I, O> webSocket(
         url: String,
         inSerializer: KSerializer<I>,
         outSerializer: KSerializer<O>,
     ): ClientWebSocket<I, O>
+    @Deprecated("Use webSocket, the proper spelling", ReplaceWith("webSocket"))
+    public fun <I, O> websocket(
+        url: String,
+        inSerializer: KSerializer<I>,
+        outSerializer: KSerializer<O>,
+    ): ClientWebSocket<I, O> = webSocket(url, inSerializer, outSerializer)
 
     /**
      * Encodes a value to a URL-safe string representation for use in path parameters.

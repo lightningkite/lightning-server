@@ -12,13 +12,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.runBlocking
 import kotlin.test.*
 
-class CoroutineWebsocketHandlerTest {
+class CoroutineWebSocketHandlerTest {
 
     object TestServer : ServerBuilder() {
         val pubsub = setting("pubSub", PubSub.Settings())
 
         // Echo handler - echoes all incoming messages back
-        val echoHandler = path.path("echo") include object : CoroutineWebsocketHandler() {
+        val echoHandler = path.path("echo") include object : CoroutineWebSocketHandler() {
             override val pubSub = this@TestServer.pubsub
 
             context(serverRuntime: ServerRuntime)
@@ -39,7 +39,7 @@ class CoroutineWebsocketHandlerTest {
         }
 
         // Handler that sends a greeting message after connect
-        val greetingHandler = path.path("greeting") include object : CoroutineWebsocketHandler() {
+        val greetingHandler = path.path("greeting") include object : CoroutineWebSocketHandler() {
             override val pubSub = this@TestServer.pubsub
 
             context(serverRuntime: ServerRuntime)
@@ -58,7 +58,7 @@ class CoroutineWebsocketHandlerTest {
         }
 
         // Handler that throws an error immediately
-        val errorHandler = path.path("error") include object : CoroutineWebsocketHandler() {
+        val errorHandler = path.path("error") include object : CoroutineWebSocketHandler() {
             override val pubSub = this@TestServer.pubsub
 
             context(serverRuntime: ServerRuntime)
@@ -73,7 +73,7 @@ class CoroutineWebsocketHandlerTest {
         }
 
         // Handler that delays before signaling ready (to test timeout)
-        val slowStartHandler = path.path("slow") include object : CoroutineWebsocketHandler() {
+        val slowStartHandler = path.path("slow") include object : CoroutineWebSocketHandler() {
             override val pubSub = this@TestServer.pubsub
 
             context(serverRuntime: ServerRuntime)
@@ -90,7 +90,7 @@ class CoroutineWebsocketHandlerTest {
         }
 
         // Handler that sends multiple messages
-        val multiMessageHandler = path.path("multi") include object : CoroutineWebsocketHandler() {
+        val multiMessageHandler = path.path("multi") include object : CoroutineWebSocketHandler() {
             override val pubSub = this@TestServer.pubsub
 
             context(serverRuntime: ServerRuntime)
@@ -114,7 +114,7 @@ class CoroutineWebsocketHandlerTest {
     @Test
     fun basic_echo_works(): Unit = runBlocking {
         TestServer.test(settings = { }) {
-            val ws = TestServer.echoHandler.websocketHandler.test()
+            val ws = TestServer.echoHandler.webSocketHandler.test()
 
             // TEST: Add delay after test() to allow didConnect() subscription to complete
             delay(50)
@@ -138,7 +138,7 @@ class CoroutineWebsocketHandlerTest {
     @Test
     fun binary_message_echo_works(): Unit = runBlocking {
         TestServer.test(settings = { }) {
-            val ws = TestServer.echoHandler.websocketHandler.test()
+            val ws = TestServer.echoHandler.webSocketHandler.test()
 
             // TEST: Add delay after test() to allow didConnect() subscription to complete
             delay(50)
@@ -164,7 +164,7 @@ class CoroutineWebsocketHandlerTest {
     @Test
     fun greeting_message_sent_on_connect(): Unit = runBlocking {
         TestServer.test(settings = { }) {
-            val ws = TestServer.greetingHandler.websocketHandler.test()
+            val ws = TestServer.greetingHandler.webSocketHandler.test()
 
             val messages = mutableListOf<WebSocketFrame>()
             ws.onMessageSent = {
@@ -187,7 +187,7 @@ class CoroutineWebsocketHandlerTest {
     @Test
     fun multiple_messages_received(): Unit = runBlocking {
         TestServer.test(settings = { }) {
-            val ws = TestServer.multiMessageHandler.websocketHandler.test()
+            val ws = TestServer.multiMessageHandler.webSocketHandler.test()
 
             val messages = mutableListOf<WebSocketFrame>()
             ws.onMessageSent = { messages.add(it) }
@@ -210,7 +210,7 @@ class CoroutineWebsocketHandlerTest {
         TestServer.test(settings = { }) {
             // The error handler throws immediately, which should cause willConnect to fail
             assertFailsWith<Exception> {
-                TestServer.errorHandler.websocketHandler.test()
+                TestServer.errorHandler.webSocketHandler.test()
             }
         }
     }
@@ -220,7 +220,7 @@ class CoroutineWebsocketHandlerTest {
         TestServer.test(settings = { }) {
             // The slow start handler delays for 10 seconds, but timeout is 5 seconds
             assertFailsWith<Exception> {
-                TestServer.slowStartHandler.websocketHandler.test()
+                TestServer.slowStartHandler.webSocketHandler.test()
             }
         }
     }
@@ -228,7 +228,7 @@ class CoroutineWebsocketHandlerTest {
     @Test
     fun multiple_sequential_messages_echo_correctly(): Unit = runBlocking {
         TestServer.test(settings = { }) {
-            val ws = TestServer.echoHandler.websocketHandler.test()
+            val ws = TestServer.echoHandler.webSocketHandler.test()
 
             // TEST: Add delay after test() to allow didConnect() subscription to complete
             delay(50)
@@ -257,7 +257,7 @@ class CoroutineWebsocketHandlerTest {
     @Test
     fun disconnect_stops_handler(): Unit = runBlocking {
         TestServer.test(settings = { }) {
-            val ws = TestServer.echoHandler.websocketHandler.test()
+            val ws = TestServer.echoHandler.webSocketHandler.test()
 
             // TEST: Add delay after test() to allow didConnect() subscription to complete
             delay(50)

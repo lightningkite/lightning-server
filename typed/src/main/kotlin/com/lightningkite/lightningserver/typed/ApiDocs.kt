@@ -383,9 +383,9 @@ internal val ServerDefinition.locationedApiHttpHandlers: List<Locationed<HttpEnd
     }
         .sortedBy { it.location.run { "$method $path" } }
 
-internal val ServerDefinition.locationedApiWebsocketHandlers: List<Locationed<PathSpec, ApiWebsocketHandler<*, *, *, *, *>>>
+internal val ServerDefinition.locationedApiWebSocketHandlers: List<Locationed<PathSpec, ApiWebSocketHandler<*, *, *, *, *>>>
     get() = endpoints.entries.mapNotNull {
-        (it.value.websocket as? ApiWebsocketHandler<*, *, *, *, *>)
+        (it.value.webSocket as? ApiWebSocketHandler<*, *, *, *, *>)
             ?.let { h -> Locationed(it.key, h) }
     }
         .sortedBy { it.location.toString() }

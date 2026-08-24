@@ -16,7 +16,7 @@ public enum class WebSocketClose(public val code: Short) {
     TRY_AGAIN_LATER(1013);
 }
 
-public val HttpStatus.bestWebsocketCloseCode: WebSocketClose
+public val HttpStatus.bestWebSocketCloseCode: WebSocketClose
     get() = when (code / 100) {
         1, 2, 3 -> WebSocketClose.NORMAL
         4 -> WebSocketClose.VIOLATED_POLICY

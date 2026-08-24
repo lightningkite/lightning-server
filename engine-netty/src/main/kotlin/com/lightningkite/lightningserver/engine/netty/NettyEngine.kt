@@ -8,7 +8,6 @@ import com.lightningkite.lightningserver.engine.local.LocalEngine
 import com.lightningkite.lightningserver.engine.local.WsOversizePolicy
 import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
 import com.lightningkite.lightningserver.engine.local.LocalWebSocketConnection
-import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
@@ -38,16 +37,11 @@ import io.netty.handler.timeout.IdleStateEvent
 import io.netty.handler.timeout.IdleStateHandler
 import io.netty.util.AttributeKey
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.serialization.KSerializer
 import java.net.InetSocketAddress
 import java.net.URI
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.Instant
 import com.lightningkite.lightningserver.http.HttpHeaders as LsHttpHeaders
 import com.lightningkite.lightningserver.websockets.WebSocketFrame as LkWebSocketFrame
 import io.netty.handler.codec.http.HttpHeaders as NettyHttpHeaders
@@ -217,7 +211,7 @@ public class NettyEngine(
                     p.addLast(HttpServerExpectContinueHandler())
                     p.addLast(HttpObjectAggregator(maxContentLength))
                     p.addLast(ChunkedWriteHandler())
-                    if (cfg.websocketCompression) p.addLast(WebSocketServerCompressionHandler())
+                    if (cfg.webSocketCompression) p.addLast(WebSocketServerCompressionHandler())
                     // 2.3: idle-connection timeout (Netty-only). Closes connections with no read/write
                     // activity within reliability.idleTimeout.
                     p.addLast(IdleStateHandler(0, 0, cfg.reliability.idleTimeout.inWholeSeconds.coerceIn(0, Int.MAX_VALUE.toLong()).toInt()))
@@ -280,7 +274,7 @@ public class NettyEngine(
                 is FullHttpRequest -> {
                     val connection = msg.headers()[CONNECTION]?.lowercase() ?: ""
                     val upgrade = msg.headers()[UPGRADE]?.lowercase() ?: ""
-                    if (connection.contains("upgrade") && upgrade == "websocket") {  // Is it a websocket?
+                    if (connection.contains("upgrade") && upgrade == "websocket") {  // Is it a webSocket?
                         scope.launch(ctx.executor().asCoroutineDispatcher()) {
                             handleWebSocketStartup(ctx, msg)
                         }
@@ -343,7 +337,7 @@ public class NettyEngine(
                             } catch (e: Exception) {
                                 mid.close(
                                     ((e as? HttpStatusException)?.status
-                                        ?: HttpStatus.InternalServerError).bestWebsocketCloseCode
+                                        ?: HttpStatus.InternalServerError).bestWebSocketCloseCode
                                 )
                             }
                         }
@@ -367,7 +361,7 @@ public class NettyEngine(
                             } catch (e: Exception) {
                                 mid.close(
                                     ((e as? HttpStatusException)?.status
-                                        ?: HttpStatus.InternalServerError).bestWebsocketCloseCode
+                                        ?: HttpStatus.InternalServerError).bestWebSocketCloseCode
                                 )
                             }
                         }
@@ -391,7 +385,7 @@ public class NettyEngine(
                                 } catch (e: Exception) {
                                     mid.close(
                                         ((e as? HttpStatusException)?.status
-                                            ?: HttpStatus.InternalServerError).bestWebsocketCloseCode
+                                            ?: HttpStatus.InternalServerError).bestWebSocketCloseCode
                                     )
                                 }
                             }
@@ -451,16 +445,16 @@ public class NettyEngine(
             val match = this@NettyEngine.server.endpoints.match(
                 this@NettyEngine.externalSerialization.stringArrayFormat,
                 wsRequest.path.pathSegments
-            ) { it.websocket }
+            ) { it.webSocket }
                 ?: run {
-                    val exception = NotFoundException("No websocket at '${wsRequest.path}'")
+                    val exception = NotFoundException("No webSocket at '${wsRequest.path}'")
                     logger.error(exception) { "" }
                     val res = DefaultFullHttpResponse(req.protocolVersion(), HttpResponseStatus.NOT_FOUND)
                     ctx.writeAndFlush(res).addListener(ChannelFutureListener.CLOSE)
                     return
                 }
 
-            val socketHandler = this@NettyEngine.server.compiledWebsocketInterceptors.intercept(match.value)
+            val socketHandler = this@NettyEngine.server.interceptIncomingSocket(match.value)
 
             val host = req.headers()[HOST] ?: "localhost"
             // Netty's own default payload limit is 64 KiB; honour the configured one so both engines
@@ -469,7 +463,7 @@ public class NettyEngine(
                 "ws://$host${URI(req.uri()).path}",
                 null,
                 true,
-                websocketSettings().maxFrameSize?.bytes?.coerceAtMost(Int.MAX_VALUE.toLong())?.toInt()
+                webSocketSettings().maxFrameSize?.bytes?.coerceAtMost(Int.MAX_VALUE.toLong())?.toInt()
                     ?: Int.MAX_VALUE,
             )
             val handshaker = wsFactory.newHandshaker(req)
@@ -688,7 +682,7 @@ public class NettyEngine(
             }
 
             return WebSocketConnectRequest(
-                path = RawWebsocketPath(parts.path()),
+                path = RawWebSocketPath(parts.path()),
                 queryParameters = QueryParameters(
                     parts.parameters().flatMap { (key, values) -> values.map { key to it } }),
                 headers = headers,

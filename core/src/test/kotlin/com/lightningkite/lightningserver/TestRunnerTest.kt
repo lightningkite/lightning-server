@@ -25,14 +25,14 @@ class TestRunnerTest {
         val testEndpointWithArg = path.path("test").arg<String>("arg1").get bind HttpHandler {
             HttpResponse.plainText("Hello, ${it.arg1}!")
         }
-        val testWebsocketTopic = path.path("broadcast").topic(String.serializer())
+        val testWebSocketTopic = path.path("broadcast").topic(String.serializer())
 
-        val testWebsocket = path.path("mirror") bind WebSocketHandler(
+        val testWebSocket = path.path("mirror") bind WebSocketHandler(
             storageSerializer = Unit.serializer(),
             willConnect = { Unit },
-            didConnect = { subscribe(testWebsocketTopic) },
+            didConnect = { subscribe(testWebSocketTopic) },
             topicHandlers = {
-                testWebsocketTopic bind {
+                testWebSocketTopic bind {
                     println("Topic hit!")
                     send(WebSocketFrame(it.value))
                 }
@@ -56,12 +56,12 @@ class TestRunnerTest {
             else HttpResponse(status = HttpStatus.NotFound)
         }
 
-        val modelWebsocket = path.path("mirror") bind WebSocketHandler(
+        val modelWebSocket = path.path("mirror") bind WebSocketHandler(
             storageSerializer = Unit.serializer(),
             willConnect = { Unit },
-            didConnect = { subscribe(TestServer.testWebsocketTopic) },
+            didConnect = { subscribe(TestServer.testWebSocketTopic) },
             topicHandlers = {
-                TestServer.testWebsocketTopic bind {
+                TestServer.testWebSocketTopic bind {
                     println("Topic hit!")
                     send(WebSocketFrame(it.value))
                 }
@@ -95,14 +95,14 @@ class TestRunnerTest {
                 assertEquals("Hello, Todd!", response.body!!.text())
             }
             runBlocking {
-                val socket = testWebsocket.test()
+                val socket = testWebSocket.test()
                 var lastMessage: WebSocketFrame? = null
                 socket.onMessageSent = {
                     lastMessage = it
                 }
                 socket.send(WebSocketFrame("Ping!"))
                 assertEquals(WebSocketFrame("Ping!"), lastMessage)
-                testWebsocketTopic.send("Pong.")
+                testWebSocketTopic.send("Pong.")
                 assertEquals(WebSocketFrame("Pong."), lastMessage)
                 socket.close()
             }
@@ -124,8 +124,8 @@ class TestRunnerTest {
                 assertEquals("Really cool imo", response.body!!.text())
             }
             runBlocking {
-                val rootSocket = testWebsocket.test()
-                val modelSocket = modelEndpoints.modelWebsocket.test()
+                val rootSocket = testWebSocket.test()
+                val modelSocket = modelEndpoints.modelWebSocket.test()
                 var lastRootMessage: WebSocketFrame? = null
                 var lastModelMessage: WebSocketFrame? = null
                 rootSocket.onMessageSent = {
@@ -138,7 +138,7 @@ class TestRunnerTest {
                 assertEquals(WebSocketFrame("Ping!"), lastRootMessage)
                 modelSocket.send(WebSocketFrame("Ping!"))
                 assertEquals(WebSocketFrame("Ping!"), lastModelMessage)
-                testWebsocketTopic.send("Pong.")
+                testWebSocketTopic.send("Pong.")
                 assertEquals(WebSocketFrame("Pong."), lastRootMessage)
                 assertEquals(WebSocketFrame("Pong."), lastModelMessage)
                 rootSocket.close()

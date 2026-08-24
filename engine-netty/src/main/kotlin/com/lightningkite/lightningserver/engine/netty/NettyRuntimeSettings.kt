@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.engine.local.EngineReliabilitySettings
 import com.lightningkite.services.data.DataSize
 import com.lightningkite.services.data.DataSize.Companion.bytes
 import com.lightningkite.services.data.DataSize.Companion.mebibytes
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -23,7 +24,7 @@ import kotlinx.serialization.Serializable
  *   proxy's capture and the server's logs share an identifier.
  * @property workerThreads Number of worker threads for handling requests. If null or 0, Netty chooses automatically (typically 2x CPU cores)
  * @property maxAggregatedContentLength Maximum size of aggregated HTTP content (request body). Defaults to 16 MiB. Limited to Int.MAX_VALUE (~2 GiB)
- * @property websocketCompression Whether to enable WebSocket per-message deflate compression (defaults to false)
+ * @property webSocketCompression Whether to enable WebSocket per-message deflate compression (defaults to false)
  * @property backlog The maximum number of pending connections in the accept queue (defaults to 4096 bytes, used as int)
  * @property recvBufBytes Optional TCP receive buffer size. If null, uses system default
  * @property sendBufBytes Optional TCP send buffer size. If null, uses system default
@@ -42,7 +43,7 @@ public data class NettyRuntimeSettings(
     val requestIdHeader: String? = null,
     val workerThreads: Int? = null,
     val maxAggregatedContentLength: DataSize = 16.mebibytes,
-    val websocketCompression: Boolean = false,
+    val webSocketCompression: Boolean = false,
     val backlog: DataSize = 4096.bytes,
     val recvBufBytes: DataSize? = null,
     val sendBufBytes: DataSize? = null,

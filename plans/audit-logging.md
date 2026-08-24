@@ -225,10 +225,10 @@ wrong. **Scope is carried by the type, not by a property**, so the two cannot be
 public interface HttpInterceptor { /* name, intercept */ }
 
 /** Once per physical request, outside routing. CORS, compression, security headers. */
-public fun interface ConnectionInterceptor : HttpInterceptor
+public fun interface HttpConnectionInterceptor : HttpInterceptor
 
 /** Every logical request, sub-requests included. Access log, audit, rate limiting. */
-public fun interface LogicalRequestInterceptor : HttpInterceptor
+public fun interface HttpLogicalInterceptor : HttpInterceptor
 ```
 
 An earlier draft put an `InterceptorScope` enum on a single `HttpInterceptor` type. That was
@@ -243,39 +243,94 @@ Classification as built:
 
 | Interceptor | Kind | Why |
 |---|---|---|
-| `GzipInterceptor` | `Connection` | compression applies to the physical body; per-sub-request would double-encode |
-| `SecurityHeadersInterceptor` | `Connection` | headers belong to the physical response |
-| `CorsInterceptor` | `Connection` | plus `WebSocketHandlerInterceptor`, as before |
-| `AccessLogInterceptor` | `LogicalRequest` | otherwise one line for `/meta/bulk` regardless of contents |
-| `RateLimitInterceptor` | `LogicalRequest` | otherwise a bulk request of 100 sub-requests costs one unit — a bypass |
+| `GzipInterceptor` | `HttpConnection` | compression applies to the physical body; per-sub-request would double-encode |
+| `SecurityHeadersInterceptor` | `HttpConnection` | headers belong to the physical response |
+| `CorsInterceptor` | `HttpConnection` | plus `WebSocketInterceptor`, as before |
+| `AccessLogInterceptor` | `HttpLogical` | otherwise one line for `/meta/bulk` regardless of contents |
+| `RateLimitInterceptor` | `HttpLogical` | otherwise a bulk request of 100 sub-requests costs one unit — a bypass |
 
 **Ordering consequence worth knowing:** interceptors nest by kind first and installation order
-second, so every `ConnectionInterceptor` wraps every `LogicalRequestInterceptor` regardless of
+second, so every `HttpConnectionInterceptor` wraps every `HttpLogicalInterceptor` regardless of
 install order. This only reorders a pair spanning both kinds, and the nesting it produces is the one
 you want — but it is a behaviour change for such a pair.
 
 ### 4.2 WebSockets are not access-logged at all
 
-`AccessLogInterceptor` implements only `HttpInterceptor`. `WebSocketHandlerInterceptor` exists and
-`CorsInterceptor` already implements both, so the pattern is established — the access log simply does
-not use it. `MultiplexWebSocketHandler` then hides many logical sockets inside one physical
-connection, so even connection-level logging would under-report.
+`AccessLogInterceptor` implemented only the HTTP interceptor interface. `WebSocketInterceptor`
+exists and `CorsInterceptor` already implemented both, so the pattern was established — the access log
+simply did not use it.
 
-**Fix.** `AccessLogInterceptor` implements both interfaces. Log connect, disconnect (with close code
-and reason), and each logical multiplexed socket open/close, all carrying the `connectionId` from
-3.4.
+**Fixed**, and the investigation turned up a second, larger defect behind it.
+
+**`MultiplexWebSocketHandler` bypassed the WebSocket interceptor chain entirely.** All six of its
+lifecycle paths resolved the sub-handler as `match.value` — the raw handler from the route table —
+instead of passing it through `the WebSocket interceptor chain`. Every virtual socket inside a
+multiplexed connection therefore escaped *every* WebSocket interceptor: access logging, rate limiting,
+CORS. This is the same defect `/meta/bulk` had on the HTTP side
+([4.1](#41-metabulk-bypasses-the-entire-interceptor-chain)), in the same shape — many logical
+connections executing while the pipeline saw one — and it was not visible from the access-log symptom
+that led here. All six sites now intercept.
+
+`AccessLogInterceptor` implements both interfaces and logs connect and disconnect (with close
+reason), each carrying the connection ID from [3.4](#34-non-http-entry-points). Because virtual
+sockets now pass through the chain, they are logged too, with the physical connection as parent.
+
+#### 4.2.1 WebSocket interceptors are split by scope, as HTTP interceptors are
+
+Routing virtual sockets through the chain created the mirror-image problem: an interceptor would now
+run *both* for the physical connection and again for each virtual socket inside it. For a
+connection-scoped concern that is wrong — CORS would re-decide an origin question about a request
+that never crossed the network.
+
+So `WebSocketInterceptor` is split the same way, and for the same reason, as
+[4.1](#41-metabulk-bypasses-the-entire-interceptor-chain) split the HTTP side:
+
+```kotlin
+/** Shared contract. Not installable — an interceptor is one of the two kinds below. */
+public interface WebSocketInterceptor { /* name, intercept */ }
+
+/** Once per physical socket the client opened. Origin checks, transport policy. */
+public interface WebSocketConnectionInterceptor : WebSocketInterceptor
+
+/** Every logical socket, virtual ones included. Access log, audit, rate limiting. */
+public interface WebSocketLogicalInterceptor : WebSocketInterceptor
+```
+
+`ServerBuilder` keeps two registries and compile-time-resolved `install` overloads, so an interceptor
+cannot reach the wrong chain — the same guarantee, by the same mechanism, as the HTTP kinds.
+
+Composition lives in one place, `ServerDefinition.interceptIncomingSocket`: connection-scoped
+outside, logical-scoped inside. The physical socket is itself a logical socket, so it gets both; a
+virtual socket gets only the logical chain. That parallels HTTP exactly, where `handle` applies both
+chains and `handleSubRequest` applies only the logical one.
+
+| Interceptor | Kind | Why |
+|---|---|---|
+| `CorsInterceptor` | `WebSocketConnection` | decides about the origin of the one real socket |
+| `RateLimitInterceptor` | `WebSocketLogical` | else a multiplexed connection is one unit however many sockets it carries |
+| `AccessLogInterceptor` | `WebSocketLogical` | a line per logical socket, not one per client connection |
+
+Connection-scoped WebSocket interceptors have only CORS today. The kind exists anyway, so the
+distinction is settled at the type level before something needs it — the invariant is pinned by a
+test either way.
 
 ### 4.3 The access log records too little, too early
 
-`AccessLogInterceptor.kt:42` logs *before* calling `cont(request)`:
+It logged *before* calling `cont(request)`, so a line carried no status and no duration, and a request
+that died mid-handler read as a clean "accessed".
 
-- No status code, duration, or response size. A request that dies mid-handler still reads as a clean
-  "accessed."
-- The principal is snapshotted before the handler runs, so a masquerade established inside the
-  handler is attributed to the wrong actor.
+**Fixed.** The line is emitted after `cont` returns, inside a `finally` so a handler that threw still
+produces one — marked with its status, or `failed` if nothing came back at all. An access log with
+silent gaps is worse than one that records the failure. Duration and the correlation IDs from
+[section 3](#3-layer-0-request-identity) are included, with the parent ID rendered for sub-requests
+and virtual sockets so a line can be tied back to the request that carried it.
 
-**Fix.** Emit after `cont` returns, in a `finally` so failures are still recorded, with outcome and
-duration included, and re-read the resolved principal at that point.
+**Correction to an earlier claim in this document.** An earlier draft also asserted that the early
+snapshot meant "a masquerade established inside the handler is attributed to the wrong actor". That is
+wrong, and no fix was needed for it: masquerade is resolved from the `X-Masquerade` header inside
+`Authentication.CacheKey.calculate` and memoized per request, so it is a property of the request
+rather than something a handler establishes. Reading the principal before or after yields the same
+value. The real reasons to emit late are outcome and duration.
 
 ---
 
@@ -621,9 +676,9 @@ rather than a hard delete, and the `"test"` IP placeholder wants to fail rather 
 
 Independent of audit, this is a live permissions bug and should be fixed alongside.
 
-`ModelRestUpdatesWebsocket` snapshots the mask at connect time
-(`ModelRestUpdatesWebsocket.kt:65`, `mask = info.table(access).mask()`) and stores it in
-`ModelRestUpdatesWebsocketData`. Every subsequent pushed update is masked with that snapshot. The
+`ModelRestUpdatesWebSocket` snapshots the mask at connect time
+(`ModelRestUpdatesWebSocket.kt:65`, `mask = info.table(access).mask()`) and stores it in
+`ModelRestUpdatesWebSocketData`. Every subsequent pushed update is masked with that snapshot. The
 stored `Authentication` is stale in exactly the same way — the whole structure is a permissions
 snapshot, and it must be re-resolved as a unit.
 
@@ -634,7 +689,7 @@ Recomputing permissions per push is too expensive — every subscriber would hit
 change. The fix treats permissions as **a cache with a deadline** rather than a fact settled at
 connect.
 
-**Implemented.** `ModelRestUpdatesWebsocketData` now carries `clientCondition` (what the client asked
+**Implemented.** `ModelRestUpdatesWebSocketData` now carries `clientCondition` (what the client asked
 for, before permissions narrow it) and `permissionsCheckedAt`. Before any push,
 `permissionsStillValid()` runs two checks, cheapest first:
 

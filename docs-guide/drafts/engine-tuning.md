@@ -236,15 +236,15 @@ Set the handler timeout based on what your handler actually needs, rather than r
 
 `NettyRuntimeSettings` exposes additional Netty tuning beyond the shared reliability object:
 
-| Field | Default | Purpose |
-|---|---|---|
-| `workerThreads` | `null` (Netty default: 2× CPUs) | Worker event-loop thread count. |
+| Field                        | Default | Purpose |
+|------------------------------|---|---|
+| `workerThreads`              | `null` (Netty default: 2× CPUs) | Worker event-loop thread count. |
 | `maxAggregatedContentLength` | `16 MiB` | Netty's HTTP aggregator body cap (instead of `reliability.maxBodySize`). |
-| `websocketCompression` | `false` | Enable per-message deflate WebSocket compression. |
-| `backlog` | `4096` | TCP `SO_BACKLOG` — accept queue depth. |
-| `recvBufBytes` | `null` (system default) | TCP `SO_RCVBUF` receive buffer size. |
-| `sendBufBytes` | `null` (system default) | TCP `SO_SNDBUF` send buffer size. |
-| `autoRead` | `true` | Set to `false` to enable manual flow control via Netty. |
+| `webSocketCompression`       | `false` | Enable per-message deflate WebSocket compression. |
+| `backlog`                    | `4096` | TCP `SO_BACKLOG` — accept queue depth. |
+| `recvBufBytes`               | `null` (system default) | TCP `SO_RCVBUF` receive buffer size. |
+| `sendBufBytes`               | `null` (system default) | TCP `SO_SNDBUF` send buffer size. |
+| `autoRead`                   | `true` | Set to `false` to enable manual flow control via Netty. |
 
 ```json
 {
@@ -252,7 +252,7 @@ Set the handler timeout based on what your handler actually needs, rather than r
     "host": "0.0.0.0",
     "port": 8080,
     "maxAggregatedContentLength": "32MiB",
-    "websocketCompression": true,
+    "webSocketCompression": true,
     "workerThreads": 8,
     "reliability": {
       "idleTimeout": "60s",

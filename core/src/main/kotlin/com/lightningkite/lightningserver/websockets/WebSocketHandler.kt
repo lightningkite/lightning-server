@@ -32,7 +32,7 @@ public interface WebSocketHandler<PATH : PathSpec, STORAGE> {
  * can call [handleDirect] instead of going through the standard lifecycle
  * (willConnect → task → pub/sub → messageFromClient).
  *
- * This is particularly useful for [CoroutineWebsocketHandler] which normally
+ * This is particularly useful for [CoroutineWebSocketHandler] which normally
  * uses pub/sub channels to communicate between the connection and background task.
  * In local engines, this overhead is unnecessary since everything runs in-process.
  */

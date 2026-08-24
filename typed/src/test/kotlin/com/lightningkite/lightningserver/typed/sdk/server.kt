@@ -7,7 +7,7 @@ import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec1
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.*
-import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebsocket.Companion.plus
+import com.lightningkite.lightningserver.typed.ModelRestEndpointsAndUpdatesWebSocket.Companion.plus
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.withSdkInfo
 import com.lightningkite.services.database.*
@@ -142,7 +142,7 @@ object SecondModule : ServerBuilder() {
         permissions = { ModelPermissions.allowAll<TestModel>() }
     )
 
-    val rest = path.path("rest") include ModelRestEndpoints(info) + ModelRestUpdatesWebsocket(info)
+    val rest = path.path("rest") include ModelRestEndpoints(info) + ModelRestUpdatesWebSocket(info)
 
     val nonInlined = path.path("noinline") module Inlined.withSdkInfo("NotInlinedApi")
 

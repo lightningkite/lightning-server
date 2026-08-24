@@ -33,7 +33,7 @@ class NettyHttpConformanceTest : EngineHttpConformanceSuite() {
             enginePubSub.useDefault()
             engineCache.useDefault()
             forceWebSocketPubSub.useDefault()
-            com.lightningkite.lightningserver.websockets.websocketSettings.useDefault()
+            com.lightningkite.lightningserver.websockets.webSocketSettings.useDefault()
             applyConformanceAppDefaults()
             nettyRunConfig set NettyRuntimeSettings(
                 host = "127.0.0.1",

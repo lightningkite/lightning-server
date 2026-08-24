@@ -53,10 +53,10 @@ class AwsAdapterWsTest {
     }
 
 
-    private fun baseMessage(connectionId: String) = APIGatewayV2WebsocketRequest(
+    private fun baseMessage(connectionId: String) = APIGatewayV2WebSocketRequest(
         multiValueHeaders = mapOf(),
         multiValueQueryStringParameters = mapOf(),
-        requestContext = APIGatewayV2WebsocketRequest.RequestContext(
+        requestContext = APIGatewayV2WebSocketRequest.RequestContext(
             routeKey = "",
             eventType = "",
             extendedRequestId = "",
@@ -65,7 +65,7 @@ class AwsAdapterWsTest {
             stage = "",
             connectedAt = 0L,
             requestTimeEpoch = 0L,
-            identity = APIGatewayV2WebsocketRequest.RequestContext.Identity("", ""),
+            identity = APIGatewayV2WebSocketRequest.RequestContext.Identity("", ""),
             requestId = "",
             domainName = "",
             connectionId = connectionId,
@@ -86,7 +86,7 @@ class AwsAdapterWsTest {
     fun repeatedCommitsInOneInvocationKeepTheOptimisticLock() {
         val adapter = TestAwsAdapter(SampleServer.build())
         val connectionId = "counter-socket"
-        val channel = adapter.websocketChannel(connectionId)
+        val channel = adapter.webSocketChannel(connectionId)
         val sent = CompletableDeferred<String>()
         GlobalScope.launch { sent.complete(channel.receive()) }
 
@@ -126,7 +126,7 @@ class AwsAdapterWsTest {
     fun fullSocket() {
         val adapter = TestAwsAdapter(SampleServer.build())
         val connectionId = "test"
-        val channel = adapter.websocketChannel(connectionId)
+        val channel = adapter.webSocketChannel(connectionId)
         GlobalScope.launch {
             while (true) {
                 println("Sent " + channel.receive())

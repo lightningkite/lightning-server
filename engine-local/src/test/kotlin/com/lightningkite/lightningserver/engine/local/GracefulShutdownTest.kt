@@ -75,7 +75,7 @@ class GracefulShutdownTest {
             enginePubSub.useDefault()
             engineCache.useDefault()
             forceWebSocketPubSub.useDefault()
-            com.lightningkite.lightningserver.websockets.websocketSettings.useDefault()
+            com.lightningkite.lightningserver.websockets.webSocketSettings.useDefault()
             TestServer.fake.useDefault()
         }
         engine.settings.readyUsingDefaults()

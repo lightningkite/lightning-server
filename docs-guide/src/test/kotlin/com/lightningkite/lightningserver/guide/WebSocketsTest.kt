@@ -6,7 +6,7 @@ import kotlin.test.Test
 
 class WebSocketsTest {
     @Test
-    fun `echo websocket reflects frames back to client`() { echoWsTest() }
+    fun `echo webSocket reflects frames back to client`() { echoWsTest() }
 
     @Test
     fun `broadcast topic pushes to all subscribed connections`() { broadcastWsTest() }

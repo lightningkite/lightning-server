@@ -13,8 +13,7 @@ import com.lightningkite.lightningserver.engine.local.LocalWebSocketConnection
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.RawWebsocketPath
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.pathing.RawWebSocketPath
 import com.lightningkite.lightningserver.runtime.didConnectWithMetrics
 import com.lightningkite.lightningserver.runtime.disconnectWithMetrics
 import com.lightningkite.lightningserver.runtime.handle
@@ -37,15 +36,10 @@ import io.ktor.util.*
 import io.ktor.utils.io.asSink
 import io.ktor.websocket.*
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
 import kotlinx.io.buffered
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.Instant
 
 /**
  * Configuration settings for the Ktor HTTP server engine.
@@ -120,7 +114,7 @@ public class KtorEngine(
      * Sets up routing for both HTTP and WebSocket connections.
      */
     internal fun Application.adapt() {
-        val wsSettings = websocketSettings()
+        val wsSettings = webSocketSettings()
         install(WebSockets) {
             // Ktor disables server-side pings by default, and its pong timeout has no effect without
             // them. That leaves no way to notice a peer that has stopped reading: the ping send itself
@@ -225,7 +219,7 @@ public class KtorEngine(
                     logger.warn { "Request ID header for proxy '${runConfig.requestIdHeader}' was missing from the request." }
                 }
                 val request = WebSocketConnectRequest(
-                    path = RawWebsocketPath(queryParams["path"] ?: call.request.path().decodeURLPart()),
+                    path = RawWebSocketPath(queryParams["path"] ?: call.request.path().decodeURLPart()),
                     queryParameters = queryParams,
                     headers = adaptedHeaders,
                     requestId = identity.requestId,
@@ -241,7 +235,7 @@ public class KtorEngine(
                 val match = server.endpoints.match(
                     externalSerialization.stringArrayFormat,
                     request.path.pathSegments
-                ) { it.websocket } ?: run {
+                ) { it.webSocket } ?: run {
                     this@webSocket.close(
                         CloseReason(
                             CloseReason.Codes.CANNOT_ACCEPT,
@@ -250,7 +244,7 @@ public class KtorEngine(
                     )
                     return@webSocket
                 }
-                val socketHandler = server.compiledWebsocketInterceptors.intercept(match.value)
+                val socketHandler = server.interceptIncomingSocket(match.value)
 
                 // Check for direct execution capability - bypasses pub/sub overhead
                 if (socketHandler is DirectExecutableWebSocketHandler<*> && !forceWebSocketPubSub()) {
@@ -356,7 +350,7 @@ public class KtorEngine(
                                 match.pathSpec,
                                 mid,
                                 ((e as? HttpStatusException)?.status
-                                    ?: HttpStatus.InternalServerError).bestWebsocketCloseCode
+                                    ?: HttpStatus.InternalServerError).bestWebSocketCloseCode
                             )
                         }
                     }

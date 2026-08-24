@@ -208,8 +208,8 @@ public interface ClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>> {
  * @param T The model type being watched
  * @param ID The type of the model's ID field
  */
-@LiveVersion(LiveClientModelRestUpdatesWebsocket::class)
-public interface ClientModelRestUpdatesWebsocket<T : HasId<ID>, ID : Comparable<ID>> {
+@LiveVersion(LiveClientModelRestUpdatesWebSocket::class)
+public interface ClientModelRestUpdatesWebSocket<T : HasId<ID>, ID : Comparable<ID>> {
     /**
      * Creates a WebSocket for receiving real-time collection updates.
      *
@@ -230,9 +230,9 @@ public interface ClientModelRestUpdatesWebsocket<T : HasId<ID>, ID : Comparable<
  * @param T The model type being managed
  * @param ID The type of the model's ID field
  */
-@LiveVersion(LiveClientModelRestEndpointsAndUpdatesWebsocket::class)
-public interface ClientModelRestEndpointsAndUpdatesWebsocket<T : HasId<ID>, ID : Comparable<ID>> :
-    ClientModelRestEndpoints<T, ID>, ClientModelRestUpdatesWebsocket<T, ID>
+@LiveVersion(LiveClientModelRestEndpointsAndUpdatesWebSocket::class)
+public interface ClientModelRestEndpointsAndUpdatesWebSocket<T : HasId<ID>, ID : Comparable<ID>> :
+    ClientModelRestEndpoints<T, ID>, ClientModelRestUpdatesWebSocket<T, ID>
 
 /*
  * TODO: API Improvements

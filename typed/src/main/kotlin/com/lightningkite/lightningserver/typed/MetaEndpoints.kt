@@ -280,7 +280,7 @@ public class MetaEndpoints(
                             endpoints.value.http.entries.sortedBy { it.key.toString() }.forEach { (method, handler) ->
                                 li { a(href = endpoints.key.toString()) { +"$method ${endpoints.key}" } }
                             }
-                            endpoints.value.websocket?.let { handler ->
+                            endpoints.value.webSocket?.let { handler ->
                                 li { a(href = wsTester.location.toString() + "?path=${endpoints.key}") { +"WS ${endpoints.key}" } }
                             }
                         }
@@ -404,7 +404,7 @@ public class MetaEndpoints(
                             )
                             // Route the sub-request through the shared logical-request pipeline rather
                             // than invoking its handler directly, so it passes every
-                            // LogicalRequestInterceptor (access logging, auditing, rate limiting)
+                            // HttpLogicalInterceptor (access logging, auditing, rate limiting)
                             // instead of executing unobserved. handleSubRequest maps exceptions to
                             // responses itself, so nothing escapes here.
                             val response = serverRuntime.handleSubRequest(properRequest)

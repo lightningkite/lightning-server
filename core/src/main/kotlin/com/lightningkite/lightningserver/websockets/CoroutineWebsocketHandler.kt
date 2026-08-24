@@ -8,8 +8,8 @@ import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpec1
 import com.lightningkite.lightningserver.runtime.*
-import com.lightningkite.lightningserver.websockets.CoroutineWebsocketHandler.SerializableWebSocketFrame.Companion.serializable
-import com.lightningkite.lightningserver.websockets.CoroutineWebsocketHandler.SerializableWebSocketFrame.Companion.standard
+import com.lightningkite.lightningserver.websockets.CoroutineWebSocketHandler.SerializableWebSocketFrame.Companion.serializable
+import com.lightningkite.lightningserver.websockets.CoroutineWebSocketHandler.SerializableWebSocketFrame.Companion.standard
 import com.lightningkite.services.pubsub.PubSub
 import com.lightningkite.services.pubsub.PubSubChannel
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -20,9 +20,9 @@ import kotlinx.coroutines.flow.*
 import kotlinx.serialization.*
 import kotlin.uuid.Uuid
 
-private val logger = KotlinLogging.logger("CoroutineWebsocketHandler")
+private val logger = KotlinLogging.logger("CoroutineWebSocketHandler")
 
-public abstract class CoroutineWebsocketHandler : ServerBuilder() {
+public abstract class CoroutineWebSocketHandler : ServerBuilder() {
     protected abstract val pubSub: Runtime<PubSub>
 
     @Serializable
@@ -133,7 +133,7 @@ public abstract class CoroutineWebsocketHandler : ServerBuilder() {
         }
     }
 
-    public val websocketHandler: WebSocketHandler<PathSpec0, Storage> =
+    public val webSocketHandler: WebSocketHandler<PathSpec0, Storage> =
         path bind (object : WebSocketHandler<PathSpec0, Storage>, DirectExecutableWebSocketHandler<PathSpec0> {
 
             override val storageSerializer: KSerializer<Storage> = Storage.serializer()
@@ -167,7 +167,7 @@ public abstract class CoroutineWebsocketHandler : ServerBuilder() {
                     close(WebSocketClose.GOING_AWAY)
                 } catch (e: HttpStatusException) {
                     logger.warn(e) { "handleDirect: HTTP exception" }
-                    close(e.status.bestWebsocketCloseCode)
+                    close(e.status.bestWebSocketCloseCode)
                 } catch (e: Exception) {
                     logger.error(e) { "handleDirect: unexpected exception" }
                     close(WebSocketClose.INTERNAL_ERROR)

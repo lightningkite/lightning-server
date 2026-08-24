@@ -36,9 +36,9 @@ public suspend fun <STORAGE> WebSocketHandler<PathSpec0, STORAGE>.test(
     sourceIp: String = "local",
     requestId: String = generateRequestId(),
 ): TestRunner<*>.TestWebSocket<PathSpec0, STORAGE> {
-    val intercepted = test.server.compiledWebsocketInterceptors.intercept(this@test)
+    val intercepted = test.server.interceptIncomingSocket(this@test)
     val request = WebSocketConnectRequest(
-        RawWebsocketPath(location, trailingSegments = trailingWildcard),
+        RawWebSocketPath(location, trailingSegments = trailingWildcard),
         queryParameters = queryParameters,
         headers = headers,
         domain = domain,
@@ -63,9 +63,9 @@ public suspend fun <STORAGE, A> WebSocketHandler<PathSpec1<A>, STORAGE>.test(
     sourceIp: String = "local",
     requestId: String = generateRequestId(),
 ): TestRunner<*>.TestWebSocket<PathSpec1<A>, STORAGE> {
-    val intercepted = test.server.compiledWebsocketInterceptors.intercept(this@test)
+    val intercepted = test.server.interceptIncomingSocket(this@test)
     val request = WebSocketConnectRequest(
-        RawWebsocketPath(location, path1, trailingSegments = trailingWildcard),
+        RawWebSocketPath(location, path1, trailingSegments = trailingWildcard),
         queryParameters = queryParameters,
         headers = headers,
         domain = domain,
@@ -91,9 +91,9 @@ public suspend fun <STORAGE, A, B> WebSocketHandler<PathSpec2<A, B>, STORAGE>.te
     sourceIp: String = "local",
     requestId: String = generateRequestId(),
 ): TestRunner<*>.TestWebSocket<PathSpec2<A, B>, STORAGE> {
-    val intercepted = test.server.compiledWebsocketInterceptors.intercept(this@test)
+    val intercepted = test.server.interceptIncomingSocket(this@test)
     val request = WebSocketConnectRequest(
-        RawWebsocketPath(location, path1, path2, trailingSegments = trailingWildcard),
+        RawWebSocketPath(location, path1, path2, trailingSegments = trailingWildcard),
         queryParameters = queryParameters,
         headers = headers,
         domain = domain,
@@ -120,9 +120,9 @@ public suspend fun <STORAGE, A, B, C> WebSocketHandler<PathSpec3<A, B, C>, STORA
     sourceIp: String = "local",
     requestId: String = generateRequestId(),
 ): TestRunner<*>.TestWebSocket<PathSpec3<A, B, C>, STORAGE> {
-    val intercepted = test.server.compiledWebsocketInterceptors.intercept(this@test)
+    val intercepted = test.server.interceptIncomingSocket(this@test)
     val request = WebSocketConnectRequest(
-        RawWebsocketPath(location, path1, path2, path3),
+        RawWebSocketPath(location, path1, path2, path3),
         queryParameters = queryParameters,
         headers = headers,
         domain = domain,

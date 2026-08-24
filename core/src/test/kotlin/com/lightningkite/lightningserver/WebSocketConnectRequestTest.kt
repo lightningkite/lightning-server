@@ -4,7 +4,7 @@ import com.lightningkite.lightningserver.data.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.pathing.RawWebsocketPath
+import com.lightningkite.lightningserver.pathing.RawWebSocketPath
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.serializerOrContextual
@@ -23,7 +23,7 @@ class WebSocketConnectRequestTest {
     @Test
     fun serialization(): Unit = runBlocking {
         val r = WebSocketConnectRequest<PathSpec0>(
-            path = RawWebsocketPath(PathSegments.parse("a/b/c")),
+            path = RawWebSocketPath(PathSegments.parse("a/b/c")),
             queryParameters = QueryParameters(listOf("a" to "b", "c" to "d")),
             headers = HttpHeaders {
                 setCookie("test", "asdf")

@@ -238,7 +238,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     h = rootWs as WebSocketHandler<PathSpec, Any?>
                 } else {
                     val match =
-                        root.server.endpoints.match(root.externalSerialization.stringArrayFormat, path) { it.websocket }
+                        root.server.endpoints.match(root.externalSerialization.stringArrayFormat, path) { it.webSocket }
                             ?: run {
                                 root.logger.warn { "No handler found for $path" }
                                 return@forSubscribers
@@ -246,7 +246,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     p = match.path
                     @Suppress("UNCHECKED_CAST")
                     h =
-                        root.server.compiledWebsocketInterceptors.intercept(match.value) as WebSocketHandler<PathSpec, Any?>
+                        root.server.interceptIncomingSocket(match.value) as WebSocketHandler<PathSpec, Any?>
                 }
                 // TODO: could retrieve more states at once?
                 val states = webSocketDynamo.states(ids)
@@ -287,7 +287,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
         return APIGatewayV2HTTPResponse(200)
     }
 
-    val rootWs = root.server.compiledWebsocketInterceptors.intercept(QueryParamWebSocketHandler())
+    val rootWs = root.server.interceptIncomingSocket(QueryParamWebSocketHandler())
     val rootPath = PathSpec0(listOf(), PathSpec.Afterwards.None)
     suspend fun <T> publish(topic: String, serializer: KSerializer<T>, output: T) {
         try {
@@ -336,7 +336,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
         }
     }
 
-    suspend fun handleWebsocketDidConnect(event: WebSocketDidConnect): APIGatewayV2HTTPResponse {
+    suspend fun handleWebSocketDidConnect(event: WebSocketDidConnect): APIGatewayV2HTTPResponse {
         try {
             @Suppress("UNCHECKED_CAST")
             withMid(
@@ -362,7 +362,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
         }
     }
 
-    suspend fun handleWebsocket(event: APIGatewayV2WebsocketRequest): APIGatewayV2HTTPResponse {
+    suspend fun handleWebSocket(event: APIGatewayV2WebSocketRequest): APIGatewayV2HTTPResponse {
         val headers =
             HttpHeaders(event.multiValueHeaders?.entries?.flatMap { it.value.map { v -> it.key to v } } ?: listOf())
         val body: WebSocketFrame? = event.body?.let { raw ->
@@ -388,7 +388,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     else listOf(it)
                 }
                 val lkEvent = WebSocketConnectRequest(
-                    path = RawWebsocketPath<PathSpec0>(PathSegments.EMPTY),
+                    path = RawWebSocketPath<PathSpec0>(PathSegments.EMPTY),
                     queryParameters = QueryParameters(queryParams),
                     headers = headers,
                     domain = event.requestContext.domainName,
@@ -491,7 +491,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                                 )
                             }
                         } catch (e: Exception) {
-                            root.logger.error(e) { "Failed to run debug websocket processing" }
+                            root.logger.error(e) { "Failed to run debug webSocket processing" }
                         }
                         rootWs.messageFromClientWithMetrics(
                             rootPath,

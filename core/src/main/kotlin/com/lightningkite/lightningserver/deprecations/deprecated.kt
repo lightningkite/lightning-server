@@ -38,7 +38,7 @@ public fun PathSpec0.head(string: String): HttpEndpoint<PathSpec0> = path(string
 
 @Deprecated("Use standard syntax", ReplaceWith("path.path(string)"), DeprecationLevel.ERROR)
 context(builder: ServerBuilder)
-public fun PathSpec0.websocket(handler: WebSocketHandler<PathSpec0, *>): WebSocketHandler<PathSpec0, *> = TODO()
+public fun PathSpec0.webSocket(handler: WebSocketHandler<PathSpec0, *>): WebSocketHandler<PathSpec0, *> = TODO()
 
 @Deprecated("Use standard syntax", ReplaceWith("path.path(string)"), DeprecationLevel.ERROR)
 public fun ServerBuilder.path(string: String): PathSpec0 = TODO()

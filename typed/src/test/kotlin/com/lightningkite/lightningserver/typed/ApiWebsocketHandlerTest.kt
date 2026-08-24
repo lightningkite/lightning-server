@@ -11,12 +11,12 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class ApiWebsocketHandlerTest {
+class ApiWebSocketHandlerTest {
 
     @Test
     fun updateStateImmediatelyWorks() {
         val TestServer = object : ServerBuilder() {
-            val ws = path.path("testws") bind ApiWebsocketHandler<PathSpec0, Int, Nothing?, Int, Int>(
+            val ws = path.path("testws") bind ApiWebSocketHandler<PathSpec0, Int, Nothing?, Int, Int>(
                 summary = "running sum",
                 auth = noAuth,
                 willConnectType = { 0 },
@@ -49,7 +49,7 @@ class ApiWebsocketHandlerTest {
     @Test
     fun queueStateUpdatesWorks() {
         val TestServer = object : ServerBuilder() {
-            val ws = path.path("testws") bind ApiWebsocketHandler<PathSpec0, Int, Nothing?, Int, Int>(
+            val ws = path.path("testws") bind ApiWebSocketHandler<PathSpec0, Int, Nothing?, Int, Int>(
                 summary = "running sum",
                 auth = noAuth,
                 willConnectType = { 0 },
