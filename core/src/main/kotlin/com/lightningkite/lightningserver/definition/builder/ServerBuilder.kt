@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.serialization.*
+import com.lightningkite.lightningserver.typedoutput.TypedOutputInterceptor
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.Setting
 import com.lightningkite.services.SettingContext
@@ -93,6 +94,8 @@ public abstract class ServerBuilder : Extendable {
     private val webSocketHandlers: PathSpecRegistry<WebSocketHandler<*, *>> = PathSpecRegistry()
     private val webSocketTopics: PathSpecRegistry<WebSocketTopic<*, *>> = PathSpecRegistry()
 
+    private val typedOutputInterceptors: ListRegistry<TypedOutputInterceptor> = ListRegistry()
+
     private var exceptionHandler: ExceptionHttpHandler = DefaultExceptionHttpHandler
 
     private val preDeployTasks: MapRegistry<PathSpec0, PreDeployTask> = MapRegistry()
@@ -137,6 +140,10 @@ public abstract class ServerBuilder : Extendable {
             httpLogicalInterceptors.register(it)
             webSocketLogicalInterceptors.register(it)
         }
+
+    @JvmName("installTypedOutputInterceptor")
+    public fun <T : TypedOutputInterceptor> install(interceptor: T): T =
+        interceptor.also { typedOutputInterceptors.register(it) }
 
     public infix fun <PATH : PathSpec, HANDLER : HttpHandler<PATH>> HttpEndpoint<PATH>.bind(handler: HANDLER): HANDLER {
         httpHandlers.getOrRegister(this.path, ::MapRegistry).register(this.method, handler)
@@ -330,6 +337,7 @@ public abstract class ServerBuilder : Extendable {
             httpLogicalInterceptors = httpLogicalInterceptors.toSealedList(),
             webSocketConnectionInterceptors = webSocketConnectionInterceptors.toSealedList(),
             webSocketLogicalInterceptors = webSocketLogicalInterceptors.toSealedList(),
+            typedOutputInterceptors = typedOutputInterceptors.toSealedList(),
             endpoints = buildSealedPathSpecMap {
                 for (path in httpHandlers.keys + webSocketHandlers.keys) {
                     put(
