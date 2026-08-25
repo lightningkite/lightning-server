@@ -1,23 +1,39 @@
 package com.lightningkite.lightningserver.testdata
 
+import com.lightningkite.lightningserver.typed.ModelInfo
+import com.lightningkite.services.database.HasId
 import kotlinx.serialization.KSerializer
 import kotlin.random.Random
 import kotlin.uuid.Uuid
 
-public data class TestDataGeneration<T>(
-    val type: KSerializer<T>,
-    val genId: GenId,
-    val seed: Int
+public data class TestDataGeneration<T : HasId<ID>, ID : Comparable<ID>>(
+    val info: ModelInfo<*, T, ID>,
+    val seed: Int,
+    val genId: GenId = GenId.random(),
 ) {
-    val typeName: String get() = type.descriptor.serialName
+    val serializer: KSerializer<T> get() = info.serializer
 
     @JvmInline
-    public value class GenId(public val id: Long)
+    public value class GenId private constructor(public val long: Long) {
+        public companion object {
+            private const val MASK: Long = 0xFFFFFFFF
 
-    override fun hashCode(): Int = seed + (31 * typeName.hashCode()) + (7 * genId.id.hashCode())
-    override fun equals(other: Any?): Boolean = other is TestDataGeneration<*> && other.hashCode() == this.hashCode()
+            public fun random(rng: Random = Random.Default): GenId = GenId(rng.nextLong() and MASK)
+
+            public fun fromUntruncatedLong(long: Long): GenId = GenId(long and MASK)
+        }
+    }
+
+    override fun hashCode(): Int = seed + (31 * info.tableName.hashCode()) + (7 * genId.long.hashCode())
+    override fun equals(other: Any?): Boolean = other is TestDataGeneration<*, *> && other.hashCode() == this.hashCode()
 
     public val rng: Random by lazy { Random(this.hashCode()) }
+
+    public data class Result<T : HasId<ID>, ID : Comparable<ID>>(
+        val request: TestDataGeneration<T, ID>,
+        val generated: T,
+        val sideEffects: List<Result<*, *>>
+    )
 }
 
 /**
@@ -48,9 +64,9 @@ private const val TEST_DATA_FLAG: Long = 0xDL
  * `d000000000000003` into its fields: `d` is [TEST_DATA_FLAG] and `000000000000003` is the
  * iteration (`3`).
  */
-context(generation: TestDataGeneration<T>)
-public fun <T> Uuid.Companion.seeded(): Uuid {
-    val msb = (TEST_DATA_FLAG shl 60) or (generation.genId.id and 0xFFFFFFFFL)
+context(generation: TestDataGeneration<T, ID>)
+public fun <T : HasId<ID>, ID : Comparable<ID>> Uuid.Companion.seeded(): Uuid {
+    val msb = (TEST_DATA_FLAG shl 60) or generation.genId.long
     val lsb = generation.rng.nextLong()
     return Uuid.fromLongs(msb, lsb)
 }

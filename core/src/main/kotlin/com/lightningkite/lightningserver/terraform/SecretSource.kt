@@ -7,6 +7,7 @@ import dev.whyoleg.cryptography.algorithms.AES
 import dev.whyoleg.cryptography.algorithms.SHA256
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.EmptySerializersModule
 import java.io.File
@@ -49,7 +50,7 @@ public interface SecretSource {
  * A [SecretSource] that can interactively prompt the user for missing secrets.
  * Typically used during development or initial deployment setup.
  */
-public interface InteractiveSecretSource {
+public interface InteractiveSecretSource : SecretSource {
     /**
      * Prompts the user to provide a value for the given secret.
      * @return The value entered by the user
@@ -133,11 +134,8 @@ public fun SecretSource.runGuiEditor(variables: List<TerraformNeed<*>>) {
     val interactive = this as? InteractiveSecretSource
 
     while (true) {
-        fun emitAny(serializer: KSerializer<Any?>, value: Any): String {
-            return if (serializer.descriptor.kind is PrimitiveKind)
-                StringArrayFormat(EmptySerializersModule()).encodeToString(serializer, value)
-            else Json.encodeToString(serializer, value)
-        }
+        fun emitAny(serializer: KSerializer<Any?>, value: Any): String =
+            serializer.descriptor.tryFormatting { it.encodeToString(serializer, value) }
 
         val optionLabels = (variables.map { v ->
             val current = try {
@@ -366,6 +364,18 @@ public class ManySecretSources(
     }
 }
 
+private fun SerialDescriptor.isPrimitive(): Boolean =
+    kind is PrimitiveKind || (isInline && getElementDescriptor(0).isPrimitive())
+
+private inline fun <T> SerialDescriptor.tryFormatting(action: (StringFormat) -> T): T =
+    if (isPrimitive()) try {
+        // if this is a primitive (or a primitive wrapper type) then try using StringArrayFormat first to avoid escaping
+        action(StringArrayFormat(EmptySerializersModule()))
+    } catch (_: SerializationException) {
+        action(Json)
+    }
+    else action(Json)
+
 /**
  * Parses a string into the type represented by this serializer.
  * Handles both primitive types (using StringArrayFormat) and complex types (using JSON).
@@ -373,24 +383,16 @@ public class ManySecretSources(
  * @throws IllegalArgumentException if the string doesn't match the expected format
  */
 private fun <T> KSerializer<T>.parse(string: String): T = try {
-    if (this.descriptor.kind is PrimitiveKind)
-        StringArrayFormat(EmptySerializersModule()).decodeFromString(this, string)
-    else
-        Json.decodeFromString(this, string)
+    descriptor.tryFormatting { it.decodeFromString(this, string) }
 } catch (e: SerializationException) {
-    throw IllegalArgumentException("Does not fit format.  Expecting a ${this.descriptor.serialName}")
+    throw IllegalArgumentException("Does not fit format. Expecting a ${this.descriptor.serialName}." + (e.message?.let { " ($it)" } ?: ""))
 }
 
 /**
  * Serializes a value to a string representation.
  * Handles both primitive types (using StringArrayFormat) and complex types (using JSON).
  */
-private fun <T> KSerializer<T>.emit(value: T): String =
-    if (this.descriptor.kind is PrimitiveKind) StringArrayFormat(EmptySerializersModule()).encodeToString(
-        this,
-        value
-    )
-    else Json.encodeToString(this, value)
+private fun <T> KSerializer<T>.emit(value: T): String = descriptor.tryFormatting { it.encodeToString(this, value) }
 
 /**
  * Reads input from stdin and processes it, retrying on IllegalArgumentException.
