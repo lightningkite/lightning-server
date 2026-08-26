@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.location
 import kotlinx.serialization.KSerializer
@@ -42,7 +43,7 @@ public data class WebSocketSubscriptionRequest<PATH : PathSpec, T>(
     val topic: WebSocketTopic<PATH, T>,
     val rawPathArguments: List<Any?>,
 ) : HasContextualPath<PATH> {
-    context(server: ServerRuntime)
+    context(server: Engine)
     override val pathInContext: ResolvedPath<PATH> get() = ResolvedPath(topic.location, rawPathArguments)
 }
 
@@ -63,7 +64,7 @@ public data class WebSocketSubscriptionMessage<PATH : PathSpec, T>(
     val rawPathArguments: List<Any?>,
     val value: T,
 ) : HasContextualPath<PATH> {
-    context(server: ServerRuntime)
+    context(server: Engine)
     override val pathInContext: ResolvedPath<PATH> get() = ResolvedPath(topic.location, rawPathArguments)
 }
 

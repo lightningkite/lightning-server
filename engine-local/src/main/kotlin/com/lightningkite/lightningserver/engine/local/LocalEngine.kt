@@ -75,7 +75,7 @@ public val forceWebSocketPubSub: ServerSetting.Direct<Boolean> = ServerSetting(
  *
  * @param server The server definition to run
  */
-public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(server) {
+public abstract class LocalEngine(server: ServerDefinition) : EngineBase(server) {
     /**
      * The coroutine scope used for launching background tasks and schedules.
      * Defaults to GlobalScope but can be overridden for testing or custom lifecycle management.
@@ -163,12 +163,14 @@ public abstract class LocalEngine(server: ServerDefinition) : ServerRuntimeBase(
      * The task is launched in the engine's coroutine scope and errors are caught and reported.
      *
      * @param input The input value for the task
+     * @param cause The execution launching it, carried straight through: a single-process engine
+     *   hands the task to a coroutine rather than a queue, but the parentage recorded is the same.
      */
-    override suspend fun <T> Task<T>.invoke(input: T) {
+    override suspend fun <T> Task<T>.invoke(input: T, cause: ExecutionCause?) {
         scope.launch {
             try {
                 logger.debug { "Handling task: $location" }
-                executeWithMetrics(location, input)
+                executeWithMetrics(location, input, cause)
             } catch (e: Exception) {
                 /*squish; already reported*/
             }

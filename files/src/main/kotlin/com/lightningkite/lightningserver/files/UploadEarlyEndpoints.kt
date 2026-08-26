@@ -9,7 +9,7 @@ import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.now
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.engine
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.registerTable
 import com.lightningkite.lightningserver.typed.sdk.*
@@ -56,7 +56,7 @@ public class UploadEarlyEndpoint(
      */
     public val serializer: Runtime<ExternalServerFileSerializer> = Runtime.Cached {
         ExternalServerFileSerializer(
-            clock = serverRuntime.clock,
+            clock = engine.clock,
             scanners = fileScanner(),
             jail = files().root.then(jailFilePath),
             ready = files().root.then(filePath),

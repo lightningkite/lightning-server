@@ -634,11 +634,14 @@ public class NettyEngine(
                 // Standard pub/sub mode
                 val mid = ctx.channel().attr(MID_KEY).get()
                 val handler = ctx.channel().attr(HANDLER_KEY).get()
-                if (mid != null && handler != null) {
+                val socketInitiator = ctx.channel().attr(INITIATOR_KEY).get()
+                if (mid != null && handler != null && socketInitiator != null) {
                     try {
                         scope.launch {
                             logger.error { "Disconnected because channel is inactive " }
-                            with(this@NettyEngine) { handler.disconnect(mid, WebSocketClose.GOING_AWAY) }
+                            with(this@NettyEngine.forExecution(socketInitiator.phase(Initiator.WebSocket.Phase.Disconnect))) {
+                                handler.disconnect(mid, WebSocketClose.GOING_AWAY)
+                            }
                         }
                     } catch (_: Throwable) {
                     }

@@ -70,7 +70,7 @@ here as illustrative rather than as a drift-checked sample region.
 
 The `internalSerializersModule` property on the engine provides the
 serializers module that `loadFromFile` needs to parse custom settings types.
-It is a property of the engine (a `ServerRuntime`), not of `built` directly.
+It is a property of the engine (an `Engine`), not of `built` directly.
 
 ```kotlin
 // Illustrative — verified against demo/src/main/kotlin/.../main.kt.
@@ -84,7 +84,7 @@ fun main() {
     val built = Server.build()
     KtorEngine(built).apply {
         // loadFromFile reads settings.json and populates all declared ServerSetting values.
-        // internalSerializersModule is on the engine (a ServerRuntime) — it supplies the
+        // internalSerializersModule is on the engine (an Engine) — it supplies the
         // serializers needed to parse custom setting types registered by your ServerBuilder.
         settings.loadFromFile(KFile("settings.json"), internalSerializersModule)
         // start(Netty) blocks until the process is stopped.

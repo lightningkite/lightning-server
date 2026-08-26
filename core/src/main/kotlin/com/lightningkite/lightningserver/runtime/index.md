@@ -6,15 +6,24 @@ This package contains the core runtime system for Lightning Server applications.
 
 ### Core Runtime Interfaces
 
-- **[ServerRuntime.kt](ServerRuntime.kt)** - Primary interface for a running server instance. Defines the contract for
-  server execution including settings access, serialization, task execution, and WebSocket messaging.
+- **[Engine.kt](Engine.kt)** - Primary interface for a running server instance, one per process. Defines the contract
+  for server execution including settings access, serialization, task execution, and WebSocket messaging.
 
-- **[ServerRuntimeBase.kt](ServerRuntimeBase.kt)** - Abstract base implementation providing common functionality for all
-  runtimes including settings initialization, serialization setup, shared resources management, and startup task
+- **[EngineBase.kt](EngineBase.kt)** - Abstract base implementation providing common functionality for all
+  engines including settings initialization, serialization setup, shared resources management, and startup task
   orchestration.
 
-- **[ServerRuntime.ext.kt](ServerRuntime.ext.kt)** - Extension functions for convenient runtime operations including
-  setting access via `invoke()`, WebSocket topic messaging, task execution, and location lookups for handlers and tasks.
+- **[ServerRuntime.kt](ServerRuntime.kt)** - An engine running one execution, attributed to an [Initiator]. Declaring
+  `context(ServerRuntime)` rather than `context(Engine)` is how a declaration says its work is attributable. Also holds
+  the runtime-scoped extensions: WebSocket topic messaging and task launching.
+
+- **[Initiator.kt](Initiator.kt)** - What started one execution, and what caused it to start. Serializable, so
+  parentage survives a task queue.
+
+- **[ExecutionRuntime.kt](ExecutionRuntime.kt)** - Mints a [ServerRuntime] from an engine plus an initiator.
+
+- **[Engine.ext.kt](Engine.ext.kt)** - Extension functions for convenient engine operations including
+  setting access via `invoke()`, the clock, and location lookups for handlers and tasks.
 
 ### Request Handling
 
@@ -43,8 +52,9 @@ This package contains the core runtime system for Lightning Server applications.
 
 ### Context Receivers
 
-This package makes extensive use of Kotlin context receivers to provide implicit access to the ServerRuntime. This
-allows clean code like:
+This package makes extensive use of Kotlin context parameters to provide implicit access to the engine or runtime.
+Take a `ServerRuntime` when the work is done on someone's behalf and could be audited; take an `Engine` when it is not,
+such as boot or settings resolution. This allows clean code like:
 
 ```kotlin
 context(serverRuntime: ServerRuntime)

@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.definition
 
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.services.Setting
 import com.lightningkite.services.SettingContext
 import com.lightningkite.services.terraform.TerraformNeed
@@ -24,7 +24,7 @@ public fun interface RuntimeDeferred<out T> {
      *
      * @return The computed value
      */
-    context(server: ServerRuntime)
+    context(server: Engine)
     public suspend fun await(): T
 
     /**
@@ -42,7 +42,7 @@ public fun interface RuntimeDeferred<out T> {
         private var cache: NullWrapper<T>? = null
         private val mutex = Mutex()
 
-        context(server: ServerRuntime)
+        context(server: Engine)
         override suspend fun await(): T =
             cache?.value ?: mutex.withLock {
                 cache?.value?.let { return@withLock it }
@@ -57,8 +57,10 @@ public fun interface RuntimeDeferred<out T> {
  * Represents a computation that can be deferred until runtime and executed synchronously.
  *
  * Runtime is the core abstraction for lazy initialization and dependency injection in Lightning Server.
- * It allows values to be computed on-demand within a [ServerRuntime] context, providing access to
- * settings, services, and other runtime resources.
+ * It allows values to be computed on-demand within an [Engine] context, providing access to
+ * settings, services, and other runtime resources. Resolving one is process-wide work with no
+ * execution behind it, which is why it takes an engine rather than a
+ * [com.lightningkite.lightningserver.runtime.ServerRuntime].
  *
  * Example:
  * ```kotlin
@@ -77,10 +79,10 @@ public fun interface Runtime<out T> : RuntimeDeferred<T> {
      *
      * @return The computed value
      */
-    context(server: ServerRuntime)
+    context(server: Engine)
     public operator fun invoke(): T
 
-    context(server: ServerRuntime)
+    context(server: Engine)
     override suspend fun await(): T = invoke()
 
     /**
@@ -95,7 +97,7 @@ public fun interface Runtime<out T> : RuntimeDeferred<T> {
     public data class Cached<out T>(private val wraps: Runtime<T>) : Runtime<T> {
 
         private class Computed<T>(
-            val runtime: WeakReference<ServerRuntime>,
+            val runtime: WeakReference<Engine>,
             val result: T,
         )
 
@@ -103,7 +105,7 @@ public fun interface Runtime<out T> : RuntimeDeferred<T> {
         private var cache: Computed<T>? = null
         private val lock = Any()
 
-        context(server: ServerRuntime)
+        context(server: Engine)
         override operator fun invoke(): T {
             synchronized(lock) {
                 val c = cache
@@ -116,11 +118,11 @@ public fun interface Runtime<out T> : RuntimeDeferred<T> {
     /**
      * A Runtime wrapper for a constant value.
      *
-     * Always returns the same value without requiring a ServerRuntime context.
+     * Always returns the same value without requiring an Engine context.
      * Useful for testing or when a value is known at compile time.
      */
     public data class Constant<out T>(public val value: T) : Runtime<T> {
-        context(server: ServerRuntime)
+        context(server: Engine)
         override operator fun invoke(): T = value
 
 //        public operator fun invoke(): T = value
@@ -133,7 +135,7 @@ public fun interface Runtime<out T> : RuntimeDeferred<T> {
  * @param transform Function to apply to the Runtime's value
  * @return A new Runtime that applies the transformation
  */
-public fun <T, R> Runtime<T>.map(transform: context(ServerRuntime) (T) -> R): Runtime<R> = Runtime { transform(this()) }
+public fun <T, R> Runtime<T>.map(transform: context(Engine) (T) -> R): Runtime<R> = Runtime { transform(this()) }
 
 /**
  * Transforms the result of this RuntimeDeferred using an async function.
@@ -141,7 +143,7 @@ public fun <T, R> Runtime<T>.map(transform: context(ServerRuntime) (T) -> R): Ru
  * @param transform Suspend function to apply to the RuntimeDeferred's value
  * @return A new RuntimeDeferred that applies the transformation
  */
-public fun <T, R> RuntimeDeferred<T>.mapSuspending(transform: suspend context(ServerRuntime) (T) -> R): RuntimeDeferred<R> =
+public fun <T, R> RuntimeDeferred<T>.mapSuspending(transform: suspend context(Engine) (T) -> R): RuntimeDeferred<R> =
     RuntimeDeferred { transform(this.await()) }
 
 /**
@@ -199,7 +201,7 @@ public interface ServerSetting<SETTING, RESULT> : Runtime<RESULT>, TerraformNeed
         override fun get(setting: Setting): Setting = setting
     }
 
-    context(server: ServerRuntime)
+    context(server: Engine)
     override fun invoke(): RESULT = server.settings.get(this)
 }
 

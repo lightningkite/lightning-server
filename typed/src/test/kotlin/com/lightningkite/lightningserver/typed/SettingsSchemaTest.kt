@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.typed.sdk.SDK
 import kotlinx.serialization.json.JsonObject
@@ -27,7 +27,7 @@ class SettingsSchemaTest {
     @Test
     fun generatesValidRootSchema() {
         val root: JsonObject = SDK.withDefaultRuntime(SchemaServer) {
-            SchemaServer.settingsSchemaJson(contextOf<ServerRuntime>().internalSerializersModule)
+            SchemaServer.settingsSchemaJson(contextOf<Engine>().internalSerializersModule)
         }
 
         // additionalProperties:false at root flags typo'd keys

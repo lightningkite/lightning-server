@@ -6,7 +6,7 @@ import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
-import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
+import com.lightningkite.lightningserver.runtime.EngineBase
 import kotlin.uuid.Uuid
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
@@ -34,7 +34,7 @@ internal fun Headers.adapt(): HttpHeaders = HttpHeaders(flattenEntries())
  * Extracts the real client IP from the configured proxy header if available.
  * Falls back to the origin remote address if the header is not present.
  */
-context(server: ServerRuntimeBase)
+context(server: EngineBase)
 internal suspend fun ApplicationCall.adapt(maxBody: Long): Pair<HttpRequest<PathSpec>, Uuid> {
     val adaptedHeaders = request.headers.adapt()
     val identity = adaptedHeaders.requestIdentity(ktorRunConfig().requestIdHeader) {
