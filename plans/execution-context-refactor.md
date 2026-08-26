@@ -87,7 +87,8 @@ Three real sources of parentage, no more:
 `causedBy` must live on `Initiator` rather than only in `RequestRecord`, otherwise launching a task
 from a request could not stamp parentage without a database read.
 
-`rootExecutionId` is carried as well. With parent pointers alone, "show me everything that happened
+`rootExecutionId` is carried as well (**approved**; it originated as a recommendation rather than a
+requirement). With parent pointers alone, "show me everything that happened
 because of request X" is a recursive join — and that query is the entire point of the audit system.
 With a root it is one indexed lookup, for 16 bytes on a row that already holds two UUIDs. This is
 consistent with `audit-logging.md`'s rule that parentage lives in the request log and is not repeated
@@ -180,7 +181,11 @@ public sealed interface Initiator {
     @Serializable @SerialName("predeploy")
     public data class PreDeploy(..., val location: PathSegments) : Initiator
 
-    /** Executions with no server-side origin: `TestRunner`, manual invocation. */
+    /**
+     * Executions with no server-side origin: `TestRunner`, manual invocation. A deliberate hole in
+     * "every execution names what started it" — without it nothing outside the server could build a
+     * `ServerRuntime` at all.
+     */
     @Serializable @SerialName("direct")
     public data class Direct(...) : Initiator
 }
@@ -274,6 +279,18 @@ Each stage is one commit, must compile, and must leave `./gradlew check` no wors
   `RequestRecordInterceptor` each hand-write all five methods to pass four of them straight through.
 - **Fix `WebSocketInterceptor.compileAndInstrument()`**: its 3-branch `when` drops the `name` override
   in the `else` branch and never filters `None`. The HTTP side is a clean `fold`. Unify them.
+
+### Stage 2b — the typed socket loses the fusion too
+
+Stage 2 left `ApiWebSocketHandler.Connection` extending `ServerRuntime`, on the grounds that breaking
+it reaches every *typed* socket in user code rather than only hand-written ones. Confirmed as
+acceptable: very few custom sockets exist downstream, typed ones included, and most systems use
+`ModelRestUpdatesSocket`, which is updated here in the same commit.
+
+So `ApiWebSocketHandler.Connection` drops `: ServerRuntime`, `ConnectionWrapper` stops delegating,
+and the typed lifecycle methods take the runtime as a context alongside the connection — the same
+shape Stage 2 gave the raw handler, for the same reason. `ModelRestUpdatesWebsocket` and every other
+typed socket in the repo follow.
 
 ### Stage 3 — `Initiator`
 
