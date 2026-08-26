@@ -107,10 +107,14 @@ public fun interface Runtime<out T> : RuntimeDeferred<T> {
 
         context(server: Engine)
         override operator fun invoke(): T {
+            // Keyed on the process-wide engine, never on the context handed in. A fresh
+            // ServerRuntime is minted per execution, so keying on the receiver would compare two
+            // different objects on every call and recompute what is by definition process-wide work.
+            val key = server.processEngine
             synchronized(lock) {
                 val c = cache
-                if (c != null && c.runtime.get() == server) return c.result
-                return wraps.invoke().also { cache = Computed(WeakReference(server), it) }
+                if (c != null && c.runtime.get() == key) return c.result
+                return wraps.invoke().also { cache = Computed(WeakReference(key), it) }
             }
         }
     }

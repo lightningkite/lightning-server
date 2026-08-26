@@ -34,6 +34,16 @@ import kotlin.time.Clock
  * execution, and is an engine plus that attribution.
  */
 public interface Engine : SettingContext, Namespaced {
+    /**
+     * The process-wide engine underneath this context. An engine is its own; a [ServerRuntime]
+     * resolves to the engine it was minted from.
+     *
+     * Anything caching at process scope must key on this rather than on the context it was handed. A
+     * fresh runtime is minted for every execution, so a cache keyed on the received context compares
+     * two different objects every time, misses, and recomputes per request.
+     */
+    public val processEngine: Engine get() = this
+
     /** Fixed namespace used when naming spans in the metrics backend. */
     override val name: String get() = "lightningserver"
 
