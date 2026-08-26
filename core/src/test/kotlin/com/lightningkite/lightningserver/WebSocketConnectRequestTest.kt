@@ -32,7 +32,6 @@ class WebSocketConnectRequestTest {
             domain = "localhost",
             protocol = "https",
             sourceIp = "127.0.0.1",
-            requestId = generateRequestId(),
         )
         r.roundTripTest()
         object : ServerBuilder() {}.test(

@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.engine.jdk
 
+import kotlin.uuid.Uuid
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.definition.ServerDefinition
@@ -132,10 +133,11 @@ public class JdkEngine(
                     exchange.respondPlain(HttpStatus.PayloadTooLarge.code, "Payload Too Large")
                     return@createContext
                 }
-                val request = exchange.requestToLightningServer(cfg.realIpHeader, cfg.requestIdHeader, this@JdkEngine, maxBody)
+                val (request, executionId) =
+                    exchange.requestToLightningServer(cfg.realIpHeader, cfg.requestIdHeader, this@JdkEngine, maxBody)
                 // Request timeout is enforced centrally in ServerRuntime.handle (per-handler HttpHandler.timeout).
                 runBlocking {
-                    val result: HttpResponse = this@JdkEngine.handle(request)
+                    val result: HttpResponse = this@JdkEngine.handle(request, executionId)
                     exchange.write(result)
                 }
             } catch (e: BodyTooLargeException) {
@@ -271,7 +273,7 @@ private fun HttpExchange.requestToLightningServer(
     requestIdHeader: String?,
     engine: JdkEngine,
     maxBody: Long,
-): HttpRequest<PathSpec> {
+): Pair<HttpRequest<PathSpec>, Uuid> {
     val method = this.requestMethod
     val uri = this.requestURI
     val queryParams = QueryParameters.parse(uri.rawQuery ?: "")
@@ -300,17 +302,17 @@ private fun HttpExchange.requestToLightningServer(
         engine.logger.warn { "Request ID header for proxy '$requestIdHeader' was missing from the request." }
     }
 
-    return HttpRequest(
-        path = RawHttpEndpoint(uri.path ?: "/", HttpMethod(method)),
+    val adapted = HttpRequest(
+        path = RawHttpEndpoint<PathSpec>(uri.path ?: "/", HttpMethod(method)),
         queryParameters = queryParams,
         headers = headers,
         domain = domain,
         protocol = protocol,
         sourceIp = sourceIp,
-        requestId = identity.requestId,
         upstreamRequestId = identity.upstreamRequestId,
         body = body
     )
+    return adapted to identity.requestId
 }
 
 /**

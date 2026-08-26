@@ -17,9 +17,13 @@ import kotlin.uuid.Uuid
  * deliberately fail-open: "the access log must never be the reason a request fails" is the opposite
  * of what a fail-closed log needs from the thing it references.
  *
- * @property _id The request id itself. Using it as the primary key means no second column and no
+ * @property _id The execution id itself. Using it as the primary key means no second column and no
  *   second index, and it makes a duplicate id a primary-key violation rather than a silent merge of
  *   two principals' activity under one identifier.
+ * @property rootExecutionId The execution at the head of this row's causal chain, equal to [_id] when
+ *   [parentRequestId] is null. Carried as well as the parent so that "everything that happened
+ *   because of request X" is one indexed lookup rather than a recursive walk of parent pointers —
+ *   which is the query this table exists to answer.
  * @property endpoint The matched route pattern rather than the literal target. The literal target
  *   carries record ids, which would duplicate — and spread — data the disclosure log already records
  *   precisely, and would give this column unbounded cardinality.
@@ -41,6 +45,7 @@ import kotlin.uuid.Uuid
 public data class RequestRecord(
     override val _id: Uuid,
     @Index val parentRequestId: Uuid? = null,
+    @Index val rootExecutionId: Uuid,
     @Index val at: Instant,
     @Index val principal: String? = null,
     val sourceIp: String,

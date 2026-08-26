@@ -755,6 +755,29 @@ unrecorded in memory. A per-protocol split was not worth two code paths.
 Disclosures within one request batch into a single `insert`, so the per-request cost is two writes
 plus one.
 
+#### 5.8.2 A socket's row is keyed by the socket, not by the phase (open)
+
+Since the [execution-context refactor](execution-context-refactor.md), each of a WebSocket's five
+lifecycle phases is a separate execution with its own `executionId` — on a serverless engine they are
+literally separate invocations. The record for a socket is nonetheless keyed by `Initiator.WebSocket.socketId`.
+
+It has to be, for [5.8.1](#581-write-ordering-resolved) to work at all: the row is written at connect
+and updated at close, and those are two different executions. A row keyed by either one's
+`executionId` could not be found by the other, and every socket record would sit at `outcome = null`
+forever.
+
+**What that gives up.** `messageFromClient` and `messageFromSubscription` are executions that can
+disclose. With socket-keyed rows their disclosures point at the socket, so the audit answer for a
+long-lived connection is "sometime during this session" rather than "in response to this message".
+
+**Why it is not a regression.** Before the refactor a socket's correlation id was deliberately
+constant for the socket's whole lifetime, so disclosures on a socket already attributed to the
+session rather than to a frame. Socket-keying reproduces that exactly.
+
+**The open question**, for this plan rather than for the refactor: whether per-phase attribution is
+worth a `RequestRecord` row per phase execution. For a chatty socket that is a row per client
+message, against a table whose write path is fail-closed. Not decided here.
+
 ### 5.9 Sinks
 
 The audit stream is a typed event stream with pluggable sinks, not a single log. Auditors need to

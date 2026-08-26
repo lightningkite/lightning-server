@@ -1,5 +1,8 @@
+@file:OptIn(InternalLightningServerApi::class)
+
 package com.lightningkite.lightningserver.engine.netty
 
+import kotlin.uuid.Uuid
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.NotFoundException
@@ -7,7 +10,11 @@ import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.engine.local.LocalEngine
 import com.lightningkite.lightningserver.engine.local.WsOversizePolicy
 import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.engine.local.LocalWebSocketConnection
+import com.lightningkite.lightningserver.runtime.Initiator
+import com.lightningkite.lightningserver.runtime.forExecution
+import com.lightningkite.lightningserver.runtime.phase
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
@@ -111,6 +118,7 @@ public class NettyEngine(
     private lateinit var HANDSHAKER_KEY: AttributeKey<WebSocketServerHandshaker>
     private lateinit var MID_KEY: AttributeKey<WebSocketConnection<PathSpec, Any?>>
     private lateinit var PATHSPEC_KEY: AttributeKey<PathSpec>
+    private lateinit var INITIATOR_KEY: AttributeKey<Initiator.WebSocket>
     private lateinit var HANDLER_KEY: AttributeKey<WebSocketHandler<PathSpec, Any?>>
     private lateinit var DIRECT_CHANNEL_KEY: AttributeKey<SendChannel<LkWebSocketFrame>>
 
@@ -174,6 +182,7 @@ public class NettyEngine(
         HANDSHAKER_KEY = AttributeKey.valueOf("HANDSHAKER")
         MID_KEY = AttributeKey.valueOf("MID")
         PATHSPEC_KEY = AttributeKey.valueOf("PATHSPEC")
+        INITIATOR_KEY = AttributeKey.valueOf("SOCKET_INITIATOR")
         HANDLER_KEY = AttributeKey.valueOf("SOCKET_HANDLER")
         DIRECT_CHANNEL_KEY = AttributeKey.valueOf("DIRECT_CHANNEL")
 
@@ -279,12 +288,12 @@ public class NettyEngine(
                             handleWebSocketStartup(ctx, msg)
                         }
                     } else {
-                        val request = msg.toLightningHttpRequest(ctx, cfg)
+                        val (request, executionId) = msg.toLightningHttpRequest(ctx, cfg)
                         scope.launch(ctx.executor().asCoroutineDispatcher()) {
                             try {
                                 try {
                                     // Request timeout is enforced centrally in ServerRuntime.handle (per-handler HttpHandler.timeout).
-                                    val result: HttpResponse = this@NettyEngine.handle(request)
+                                    val result: HttpResponse = this@NettyEngine.handle(request, executionId)
                                     val nettyRes = result.toNettyResponse(msg.protocolVersion())
                                     val keepAlive = HttpUtil.isKeepAlive(msg)
                                     if (keepAlive) {
@@ -331,9 +340,16 @@ public class NettyEngine(
                         val mid = ctx.channel().attr(MID_KEY).get() ?: return
                         val handler = ctx.channel().attr(HANDLER_KEY).get() ?: return
                         val pathspec = ctx.channel().attr(PATHSPEC_KEY).get() ?: return
+                        val socketInitiator = ctx.channel().attr(INITIATOR_KEY).get() ?: return
                         scope.launch(ctx.executor().asCoroutineDispatcher()) {
                             try {
-                                handler.messageFromClientWithMetrics(pathspec, this@NettyEngine, mid, m)
+                                handler.messageFromClientWithMetrics(
+                                    pathspec,
+                                    this@NettyEngine,
+                                    socketInitiator.phase(Initiator.WebSocket.Phase.ClientMessage),
+                                    mid,
+                                    m,
+                                )
                             } catch (e: Exception) {
                                 mid.close(
                                     ((e as? HttpStatusException)?.status
@@ -355,9 +371,16 @@ public class NettyEngine(
                         val mid = ctx.channel().attr(MID_KEY).get() ?: return
                         val handler = ctx.channel().attr(HANDLER_KEY).get() ?: return
                         val pathspec = ctx.channel().attr(PATHSPEC_KEY).get() ?: return
+                        val socketInitiator = ctx.channel().attr(INITIATOR_KEY).get() ?: return
                         scope.launch(ctx.executor().asCoroutineDispatcher()) {
                             try {
-                                handler.messageFromClientWithMetrics(pathspec, this@NettyEngine, mid, m)
+                                handler.messageFromClientWithMetrics(
+                                    pathspec,
+                                    this@NettyEngine,
+                                    socketInitiator.phase(Initiator.WebSocket.Phase.ClientMessage),
+                                    mid,
+                                    m,
+                                )
                             } catch (e: Exception) {
                                 mid.close(
                                     ((e as? HttpStatusException)?.status
@@ -378,10 +401,17 @@ public class NettyEngine(
                         val mid = ctx.channel().attr(MID_KEY).get()
                         val handler = ctx.channel().attr(HANDLER_KEY).get()
                         val pathspec = ctx.channel().attr(PATHSPEC_KEY).get()
-                        if (mid != null && handler != null && pathspec != null) {
+                        val socketInitiator = ctx.channel().attr(INITIATOR_KEY).get()
+                        if (mid != null && handler != null && pathspec != null && socketInitiator != null) {
                             scope.launch(ctx.executor().asCoroutineDispatcher()) {
                                 try {
-                                    handler.disconnectWithMetrics(pathspec, this@NettyEngine, mid, WebSocketClose.NORMAL)
+                                    handler.disconnectWithMetrics(
+                                        pathspec,
+                                        this@NettyEngine,
+                                        socketInitiator.phase(Initiator.WebSocket.Phase.Disconnect),
+                                        mid,
+                                        WebSocketClose.NORMAL,
+                                    )
                                 } catch (e: Exception) {
                                     mid.close(
                                         ((e as? HttpStatusException)?.status
@@ -434,7 +464,7 @@ public class NettyEngine(
         }
 
         private suspend fun handleWebSocketStartup(ctx: ChannelHandlerContext, req: FullHttpRequest) {
-            val wsRequest = try {
+            val (wsRequest, wsInitiator) = try {
                 req.toLightningWebSocketConnectRequest(ctx, cfg)
             } catch (e: Throwable) {
                 logger.error(e) { "" }
@@ -486,8 +516,10 @@ public class NettyEngine(
                 handshaker.handshake(ctx.channel(), req).addListener {
                     scope.launch {
                         try {
+                            // A directly-run socket is not phase-structured — the whole session runs
+                            // in this one coroutine — so it is one execution, named by the socket it is.
                             directHandler.handleDirect(
-                                serverRuntime = this@NettyEngine,
+                                serverRuntime = this@NettyEngine.forExecution(wsInitiator),
                                 request = wsRequest,
                                 incoming = incomingChannel,
                                 send = { frame ->
@@ -516,7 +548,7 @@ public class NettyEngine(
                 socketHandler as WebSocketHandler<PathSpec, Any?>
 
                 val startingState = try {
-                    socketHandler.willConnectWithMetrics(match.pathSpec, this@NettyEngine, wsRequest)
+                    socketHandler.willConnectWithMetrics(match.pathSpec, this@NettyEngine, wsInitiator, wsRequest)
                 } catch (e: HttpStatusException) {
                     logger.error(e) { "" }
                     val res = DefaultFullHttpResponse(req.protocolVersion(), HttpResponseStatus.valueOf(e.status.code))
@@ -532,6 +564,7 @@ public class NettyEngine(
                 val mid = object : LocalWebSocketConnection<PathSpec, Any?>(
                     startingState = startingState,
                     request = wsRequest,
+                    connectInitiator = wsInitiator,
                     handler = socketHandler,
                     scope = CoroutineScope(Dispatchers.IO),
                     server = this@NettyEngine,
@@ -565,11 +598,17 @@ public class NettyEngine(
                 ctx.channel().attr(MID_KEY).set(mid)
                 ctx.channel().attr(HANDLER_KEY).set(socketHandler)
                 ctx.channel().attr(PATHSPEC_KEY).set(match.pathSpec)
+                ctx.channel().attr(INITIATOR_KEY).set(wsInitiator)
 
                 handshaker.handshake(ctx.channel(), req).addListener {
                     scope.launch {
                         try {
-                            socketHandler.didConnectWithMetrics(match.pathSpec, this@NettyEngine, mid)
+                            socketHandler.didConnectWithMetrics(
+                                match.pathSpec,
+                                this@NettyEngine,
+                                wsInitiator.phase(Initiator.WebSocket.Phase.Connected),
+                                mid,
+                            )
                         } catch (_: Throwable) {
                         }
                     }
@@ -618,7 +657,7 @@ public class NettyEngine(
         private fun FullHttpRequest.toLightningHttpRequest(
             ctx: ChannelHandlerContext,
             cfg: NettyRuntimeSettings,
-        ): HttpRequest<PathSpec> {
+        ): Pair<HttpRequest<PathSpec>, Uuid> {
 
             val parts = QueryStringDecoder(this.uri())
             val headers = (this.headers() as NettyHttpHeaders).toLightningHeaders()
@@ -646,24 +685,24 @@ public class NettyEngine(
                 logger.warn { "Request ID header for proxy '${cfg.requestIdHeader}' was missing from the request." }
             }
 
-            return HttpRequest(
-                path = RawHttpEndpoint(parts.path(), HttpMethod(this.method().name())),
+            val adapted = HttpRequest(
+                path = RawHttpEndpoint<PathSpec>(parts.path(), HttpMethod(this.method().name())),
                 queryParameters = QueryParameters(
                     parts.parameters().flatMap { (key, values) -> values.map { key to it } }),
                 headers = headers,
                 domain = domain.ifEmpty { (ctx.channel().localAddress() as? InetSocketAddress)?.hostString.orEmpty() },
                 protocol = "http",
                 sourceIp = sourceIp,
-                requestId = identity.requestId,
                 upstreamRequestId = identity.upstreamRequestId,
                 body = body,
             )
+            return adapted to identity.requestId
         }
 
         private fun FullHttpRequest.toLightningWebSocketConnectRequest(
             ctx: ChannelHandlerContext,
             cfg: NettyRuntimeSettings,
-        ): WebSocketConnectRequest<PathSpec> {
+        ): Pair<WebSocketConnectRequest<PathSpec>, Initiator.WebSocket> {
             val parts = QueryStringDecoder(this.uri())
             val headers = (this.headers() as NettyHttpHeaders).toLightningHeaders()
             val hostHeader = this.headers()[HOST] ?: ""
@@ -679,16 +718,23 @@ public class NettyEngine(
                 logger.warn { "Request ID header for proxy '${cfg.requestIdHeader}' was missing from the request." }
             }
 
-            return WebSocketConnectRequest(
-                path = RawWebSocketPath(parts.path()),
+            val adapted = WebSocketConnectRequest(
+                path = RawWebSocketPath<PathSpec>(parts.path()),
                 queryParameters = QueryParameters(
                     parts.parameters().flatMap { (key, values) -> values.map { key to it } }),
                 headers = headers,
                 domain = domain.ifEmpty { (ctx.channel().localAddress() as? InetSocketAddress)?.hostString.orEmpty() },
                 protocol = "http",
                 sourceIp = sourceIp,
-                requestId = identity.requestId,
                 upstreamRequestId = identity.upstreamRequestId,
+            )
+            // The socket's identity is minted once, at connect, and every phase derives its own
+            // execution from it, so a socket stays one thing across five separate executions.
+            return adapted to Initiator.WebSocket(
+                executionId = identity.requestId,
+                socketId = identity.requestId,
+                path = adapted.path,
+                phase = Initiator.WebSocket.Phase.Connect,
             )
         }
 

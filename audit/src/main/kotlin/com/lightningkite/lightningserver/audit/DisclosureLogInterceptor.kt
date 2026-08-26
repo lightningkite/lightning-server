@@ -47,7 +47,7 @@ public class DisclosureLogInterceptor(
             disclosures.map {
                 DisclosureRecord(
                     _id = Uuid.random(),
-                    requestId = request.requestId,
+                    requestId = runtime.initiator.requestRecordId,
                     modelId = it.modelId,
                     fields0 = it.bits.fields0,
                     fields1 = it.bits.fields1,

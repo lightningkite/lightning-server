@@ -2,6 +2,7 @@
 
 package com.lightningkite.lightningserver.engine.awsserverless
 
+import com.lightningkite.lightningserver.runtime.Initiator
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.services.serializers.KotlinBytesFormat
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -23,7 +24,16 @@ internal class AwsWebSocketDynamoDb(
     val baseTableName: String,
     val encoding: KotlinBytesFormat,
 ) {
-    class StateAndConnectRequest(val state: ByteArray, val connectRequest: WebSocketConnectRequest<*>)
+    class StateAndConnectRequest(
+        val state: ByteArray,
+        val connectRequest: WebSocketConnectRequest<*>,
+        /**
+         * The socket's connect initiator. Persisted beside the request because each of the five
+         * lifecycle phases is a separate Lambda invocation: without it, nothing after `${'$'}connect`
+         * could say which socket it belongs to.
+         */
+        val initiator: Initiator.WebSocket,
+    )
 
     private val socketExpiration = 8.hours
     private val tableSubs = "$baseTableName-ws-subs"
@@ -42,6 +52,7 @@ internal class AwsWebSocketDynamoDb(
         private const val stateKey = "wsState"
         private const val fromStateKey = "wsFromState"
         private const val requestKey = "wsRequest"
+        private const val initiatorKey = "wsInitiator"
     }
 
     private val initMutex = Mutex()
@@ -210,7 +221,7 @@ internal class AwsWebSocketDynamoDb(
         val out = HashMap<String, StateAndConnectRequest>()
         client.scanPaginator {
             it.tableName(tableStates)
-            it.projectionExpression("$socketIdKey, $stateKey, $requestKey")
+            it.projectionExpression("$socketIdKey, $stateKey, $requestKey, $initiatorKey")
         }.asFlow().collect {
             it.items()?.forEach {
                 out[it[socketIdKey]!!.s()] = StateAndConnectRequest(
@@ -218,6 +229,10 @@ internal class AwsWebSocketDynamoDb(
                     encoding.decodeFromByteArray(
                         WebSocketConnectRequest.serializer(NothingSerializer()),
                         it[requestKey]!!.b().asByteArray()
+                    ),
+                    encoding.decodeFromByteArray(
+                        Initiator.WebSocket.serializer(),
+                        it[initiatorKey]!!.b().asByteArray()
                     )
                 )
             }
@@ -237,7 +252,7 @@ internal class AwsWebSocketDynamoDb(
             val response = client.getItem {
                 it.tableName(tableStates)
                 it.key(mapOf(socketIdKey to AttributeValue.fromS(id)))
-                it.projectionExpression("$stateKey, $requestKey")
+                it.projectionExpression("$stateKey, $requestKey, $initiatorKey")
                 it.consistentRead(true)
             }.await()
             // item() is an SDK auto-construct map: it returns empty rather than null when the socket
@@ -249,6 +264,10 @@ internal class AwsWebSocketDynamoDb(
                     encoding.decodeFromByteArray(
                         WebSocketConnectRequest.serializer(NothingSerializer()),
                         it[requestKey]!!.b().asByteArray()
+                    ),
+                    encoding.decodeFromByteArray(
+                        Initiator.WebSocket.serializer(),
+                        it[initiatorKey]!!.b().asByteArray()
                     ),
                 )
             }
@@ -280,7 +299,7 @@ internal class AwsWebSocketDynamoDb(
         val out = HashMap<String, StateAndConnectRequest>()
         measureTime {
             val getState = KeysAndAttributes.builder()
-                .projectionExpression("$socketIdKey, $stateKey, $requestKey")
+                .projectionExpression("$socketIdKey, $stateKey, $requestKey, $initiatorKey")
                 .consistentRead(true)
                 .keys(ids.map { mapOf(socketIdKey to AttributeValue.fromS(it)) }).build()
             client.batchGetItemPaginator {
@@ -292,6 +311,10 @@ internal class AwsWebSocketDynamoDb(
                         encoding.decodeFromByteArray(
                             WebSocketConnectRequest.serializer(NothingSerializer()),
                             it[requestKey]!!.b().asByteArray()
+                        ),
+                        encoding.decodeFromByteArray(
+                            Initiator.WebSocket.serializer(),
+                            it[initiatorKey]!!.b().asByteArray()
                         )
                     )
                 }
@@ -300,7 +323,12 @@ internal class AwsWebSocketDynamoDb(
         return out
     }
 
-    suspend fun setState(socketId: String, request: WebSocketConnectRequest<*>, toState: ByteArray) {
+    suspend fun setState(
+        socketId: String,
+        request: WebSocketConnectRequest<*>,
+        initiator: Initiator.WebSocket,
+        toState: ByteArray,
+    ) {
         ensureTables()
         measureTime {
             client.putItem {
@@ -316,6 +344,11 @@ internal class AwsWebSocketDynamoDb(
                                     WebSocketConnectRequest.serializer(NothingSerializer()),
                                     request as WebSocketConnectRequest<Nothing>
                                 )
+                            )
+                        ),
+                        initiatorKey to AttributeValue.fromB(
+                            SdkBytes.fromByteArray(
+                                encoding.encodeToByteArray(Initiator.WebSocket.serializer(), initiator)
                             )
                         ),
                         expireKey to AttributeValue.fromN(

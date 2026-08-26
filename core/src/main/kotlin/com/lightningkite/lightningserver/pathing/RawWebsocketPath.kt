@@ -48,7 +48,7 @@ public class PathSerializer<T : PathSpec>(ignored: KSerializer<T>) : KSerializer
  * @see HasContextualPath
  */
 @Serializable(with = PathSerializer::class)
-public class RawWebSocketPath<PATH : PathSpec>(public val pathSegments: PathSegments) : HasContextualPath<PATH> {
+public class RawWebSocketPath<out PATH : PathSpec>(public val pathSegments: PathSegments) : HasContextualPath<PATH> {
     /** Constructs a raw WebSocket path from a string. */
     public constructor(path: String) : this(PathSegments.parse(path))
 

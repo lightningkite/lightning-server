@@ -43,6 +43,22 @@ public interface ServerRuntime : SettingContext, Namespaced {
     public val server: ServerDefinition
 
     /**
+     * What started the execution this runtime is serving.
+     *
+     * ## Why it lives here rather than being passed as a parameter
+     * Not a stylistic choice, and not a candidate for "simplification" into an argument. The sites
+     * that must attribute their work are the two logical interceptors *and the inside of a handler
+     * body*: disclosure auditing hangs off `emitTypedOutput`, which is called from within
+     * `ApiHttpHandler` and `ApiWebSocketHandler`. Reaching that by parameter would mean adding one to
+     * `HttpHandler.handle`, and so to every endpoint handler in the framework and in user code. The
+     * runtime context is the only carrier already threaded to all three.
+     *
+     * A runtime obtained outside any execution — the engine itself, during boot — carries
+     * [Initiator.Direct].
+     */
+    public val initiator: Initiator
+
+    /**
      * Whether the different parts of the webSocket handler (willConnect, didConnect, messageFromClient,
      * messageFromSubscription, disconnect) all occur in the same process.  If they do, you can use RAM to store
      * information between those events.

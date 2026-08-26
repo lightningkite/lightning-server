@@ -79,14 +79,13 @@ class AccessLogInterceptorTest {
         domain = "example.com",
         protocol = "https",
         sourceIp = "10.0.0.1",
-        requestId = requestIdUnderTest,
     )
 
     @Test
     fun `an http line carries the outcome and the request id`() {
         var lines: List<String> = emptyList()
         TestServer.test(settings = {}) {
-            lines = capturing { runBlocking { serverRuntime.handle(get("/ok")) } }
+            lines = capturing { runBlocking { serverRuntime.handle(get("/ok"), requestIdUnderTest) } }
         }
         val line = accessLines(lines).singleOrNull() ?: fail("expected one access line; got $lines")
         assertTrue(line.contains("-> 200"), "line should carry the status; was: $line")
@@ -101,7 +100,7 @@ class AccessLogInterceptorTest {
         var lines: List<String> = emptyList()
         TestServer.test(settings = {}) {
             lines = capturing {
-                runBlocking { runCatching { serverRuntime.handle(get("/boom")) } }
+                runBlocking { runCatching { serverRuntime.handle(get("/boom"), requestIdUnderTest) } }
             }
         }
         val line = accessLines(lines).singleOrNull() ?: fail("expected one access line; got $lines")

@@ -1,5 +1,8 @@
 package com.lightningkite.lightningserver.http
 
+import com.lightningkite.lightningserver.runtime.subRequest
+import com.lightningkite.lightningserver.runtime.Initiator
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
@@ -119,46 +122,41 @@ class RequestIdentityTest {
         assertNotEquals(Uuid.NIL, identity.requestId)
     }
 
-    private fun request(id: Uuid) = HttpRequest<PathSpec>(
-        path = RawHttpEndpoint(asString = "/outer", method = HttpMethod.POST),
-        queryParameters = QueryParameters.EMPTY,
-        headers = HttpHeaders.EMPTY,
-        domain = "example.com",
-        protocol = "https",
-        sourceIp = "local",
-        requestId = id,
+    private val outerId = Uuid.parse("00000000-0000-4000-8000-0000000000d4")
+
+    @OptIn(InternalLightningServerApi::class)
+    private fun outer() = Initiator.Http(
+        executionId = outerId,
+        endpoint = RawHttpEndpoint(asString = "/outer", method = HttpMethod.POST),
     )
 
-    private val outerId = Uuid.parse("00000000-0000-4000-8000-0000000000d4")
+    private fun endpoint(path: String) = RawHttpEndpoint<PathSpec>(asString = path, method = HttpMethod.GET)
 
     @Test
     fun `subRequest gets its own id parented to the outer request`() {
-        val outer = request(outerId)
-        val sub = outer.subRequest<PathSpec>(RawHttpEndpoint(asString = "/inner", method = HttpMethod.GET))
+        val sub = outer().subRequest(endpoint("/inner"))
 
-        assertNotEquals(outer.requestId, sub.requestId)
-        assertEquals(outerId, sub.parentRequestId)
+        assertNotEquals(outerId, sub.executionId)
+        assertEquals(outerId, sub.causedBy)
+        assertEquals(outerId, sub.rootExecutionId)
     }
 
     @Test
     fun `sibling sub-requests get distinct ids and share a parent`() {
-        val outer = request(outerId)
-        val a = outer.subRequest<PathSpec>(RawHttpEndpoint(asString = "/a", method = HttpMethod.GET))
-        val b = outer.subRequest<PathSpec>(RawHttpEndpoint(asString = "/b", method = HttpMethod.GET))
+        val outer = outer()
+        val a = outer.subRequest(endpoint("/a"))
+        val b = outer.subRequest(endpoint("/b"))
 
-        assertNotEquals(a.requestId, b.requestId)
-        assertEquals(outerId, a.parentRequestId)
-        assertEquals(outerId, b.parentRequestId)
+        assertNotEquals(a.executionId, b.executionId)
+        assertEquals(outerId, a.causedBy)
+        assertEquals(outerId, b.causedBy)
     }
 
     @Test
-    fun `copyWithNewPathType preserves identity`() {
-        val outer = request(outerId)
-        val copied = outer.copyWithNewPathType<PathSpec>(
-            RawHttpEndpoint(asString = "/elsewhere", method = HttpMethod.GET)
-        )
+    fun `nesting keeps the root while the parent follows the nesting`() {
+        val inner = outer().subRequest(endpoint("/a")).subRequest(endpoint("/b"))
 
-        assertEquals(outerId, copied.requestId)
-        assertNull(copied.parentRequestId)
+        assertEquals(outerId, inner.rootExecutionId)
+        assertNotEquals(outerId, inner.causedBy)
     }
 }

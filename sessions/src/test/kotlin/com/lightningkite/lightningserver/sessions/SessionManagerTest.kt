@@ -144,8 +144,8 @@ class SessionManagerTest {
                                 domain = "example.com",
                                 protocol = "https",
                                 sourceIp = "local",
-                                requestId = generateRequestId(),
-                            )
+                            ),
+                            generateRequestId(),
                         )
                     }
                 } finally {

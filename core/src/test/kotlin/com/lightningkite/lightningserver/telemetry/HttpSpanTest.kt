@@ -62,8 +62,8 @@ class HttpSpanTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
-                        requestId = generateRequestId(),
-                    )
+                    ),
+                    generateRequestId(),
                 )
             }
 
@@ -125,8 +125,8 @@ class HttpSpanTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
-                        requestId = generateRequestId(),
-                    )
+                    ),
+                    generateRequestId(),
                 )
             }
 

@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.http.HttpLogicalInterceptor
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.runtime.Initiator
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.websockets.DelegatingWebSocketHandler
@@ -64,7 +65,7 @@ public class RequestRecordInterceptor(
         try {
             return cont(request).also { outcome = it.status.code.toString() }
         } finally {
-            complete(request.requestId, outcome, started.elapsedNow().inWholeMilliseconds)
+            complete(runtime.initiator.requestRecordId, outcome, started.elapsedNow().inWholeMilliseconds)
         }
     }
 
@@ -83,15 +84,16 @@ public class RequestRecordInterceptor(
                 } finally {
                     // A socket's duration is its whole lifetime, which no monotonic mark taken here
                     // could measure, so it is left to be derived from `at` and the close time.
-                    complete(connection.request.requestId, reason.toString(), durationMs = null)
+                    complete(serverRuntime.initiator.requestRecordId, reason.toString(), durationMs = null)
                 }
             }
         }
 
     context(runtime: ServerRuntime)
     private suspend fun Request<*>.opening(endpoint: String, method: String) = RequestRecord(
-        _id = requestId,
-        parentRequestId = parentRequestId,
+        _id = runtime.initiator.requestRecordId,
+        parentRequestId = runtime.initiator.causedBy,
+        rootExecutionId = runtime.initiator.rootExecutionId,
         at = now(),
         principal = principalOrNull(),
         sourceIp = sourceIp,
@@ -150,3 +152,25 @@ private suspend fun Request<*>.principalOrNull(): String? = try {
 } catch (_: Exception) {
     null
 }
+
+/**
+ * The id the request log row for this execution is keyed by.
+ *
+ * For a socket that is the socket id rather than the phase's own execution id: the row is opened at
+ * connect and completed at disconnect, which are separate executions on a serverless engine, and a
+ * row keyed by either one of them could not be found by the other. It is also what every disclosure
+ * on that socket points at, so the two must agree — hence one definition rather than two.
+ *
+ * ## The attribution this gives up
+ * A socket's message phases are executions in their own right and can disclose. Keying by the socket
+ * means their disclosures attribute to the socket, so the audit answer for a long-lived connection is
+ * "sometime during this session" rather than "in response to this message". That is exactly what the
+ * server did before the initiator existed — a socket's correlation id was deliberately constant for
+ * its whole lifetime — so this is non-regressing rather than a new gap.
+ *
+ * Closing it would mean a row per phase execution, which for a chatty socket is a row per client
+ * message. That is an audit-design decision with a real cost, and it belongs with the rest of the
+ * audit work in `plans/audit-logging.md` (§5.8), not with the refactor that made it visible.
+ */
+internal val Initiator.requestRecordId: Uuid
+    get() = (this as? Initiator.WebSocket)?.socketId ?: executionId

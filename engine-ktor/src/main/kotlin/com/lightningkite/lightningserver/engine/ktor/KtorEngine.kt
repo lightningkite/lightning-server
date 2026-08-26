@@ -1,3 +1,5 @@
+@file:OptIn(InternalLightningServerApi::class)
+
 package com.lightningkite.lightningserver.engine.ktor
 
 import com.lightningkite.lightningserver.HttpStatusException
@@ -14,6 +16,10 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawWebSocketPath
+import com.lightningkite.lightningserver.InternalLightningServerApi
+import com.lightningkite.lightningserver.runtime.Initiator
+import com.lightningkite.lightningserver.runtime.forExecution
+import com.lightningkite.lightningserver.runtime.phase
 import com.lightningkite.lightningserver.runtime.didConnectWithMetrics
 import com.lightningkite.lightningserver.runtime.disconnectWithMetrics
 import com.lightningkite.lightningserver.runtime.handle
@@ -140,10 +146,10 @@ public class KtorEngine(
                         call.respondText("Payload Too Large", status = HttpStatusCode.PayloadTooLarge)
                         return@handle
                     }
-                    val request = call.adapt(maxBody)
+                    val (request, executionId) = call.adapt(maxBody)
                     // Request timeout is enforced centrally in ServerRuntime.handle (per-handler HttpHandler.timeout).
                     val result: HttpResponse = try {
-                        this@KtorEngine.handle(request)
+                        this@KtorEngine.handle(request, executionId)
                     } catch (_: BodyTooLargeException) {
                         // 2.5: streamed body exceeded the cap mid-read.
                         HttpResponse.plainText("Payload Too Large", HttpStatus.PayloadTooLarge)
@@ -222,7 +228,6 @@ public class KtorEngine(
                     path = RawWebSocketPath(queryParams["path"] ?: call.request.path().decodeURLPart()),
                     queryParameters = queryParams,
                     headers = adaptedHeaders,
-                    requestId = identity.requestId,
                     upstreamRequestId = identity.upstreamRequestId,
                     domain = call.request.origin.serverHost,
                     protocol = call.request.origin.scheme,
@@ -245,6 +250,15 @@ public class KtorEngine(
                     return@webSocket
                 }
                 val socketHandler = server.interceptIncomingSocket(match.value)
+
+                // The socket's identity is minted once, here, and every phase below derives its own
+                // execution from it, so a socket stays one thing across five separate executions.
+                val connectInitiator = Initiator.WebSocket(
+                    executionId = identity.requestId,
+                    socketId = identity.requestId,
+                    path = request.path,
+                    phase = Initiator.WebSocket.Phase.Connect,
+                )
 
                 // Check for direct execution capability - bypasses pub/sub overhead
                 if (socketHandler is DirectExecutableWebSocketHandler<*> && !forceWebSocketPubSub()) {
@@ -282,8 +296,10 @@ public class KtorEngine(
                     }
 
                     // Run handler directly - no pub/sub, no task indirection
+                    // A directly-run socket is not phase-structured — the whole session runs in this
+                    // one coroutine — so it is one execution, named by the socket it is.
                     directHandler.handleDirect(
-                        serverRuntime = this@KtorEngine,
+                        serverRuntime = this@KtorEngine.forExecution(connectInitiator),
                         request = request,
                         incoming = incomingChannel,
                         send = { frame ->
@@ -301,13 +317,15 @@ public class KtorEngine(
                     @Suppress("UNCHECKED_CAST")
                     socketHandler as WebSocketHandler<PathSpec, Any?>
 
-                    val startingState = socketHandler.willConnectWithMetrics(match.pathSpec, this@KtorEngine, request)
+                    val startingState =
+                        socketHandler.willConnectWithMetrics(match.pathSpec, this@KtorEngine, connectInitiator, request)
                     var closingMid: WebSocketConnection<PathSpec, Any?>? = null
                     try {
 
                         val mid = object : LocalWebSocketConnection<PathSpec, Any?>(
                             startingState = startingState,
                             request = request,
+                            connectInitiator = connectInitiator,
                             handler = socketHandler,
                             scope = this@webSocket,
                             server = this@KtorEngine,
@@ -328,7 +346,12 @@ public class KtorEngine(
                         }
                         closingMid = mid
 
-                        socketHandler.didConnectWithMetrics(match.pathSpec, this@KtorEngine, mid)
+                        socketHandler.didConnectWithMetrics(
+                            match.pathSpec,
+                            this@KtorEngine,
+                            connectInitiator.phase(Initiator.WebSocket.Phase.Connected),
+                            mid,
+                        )
 
                         for (incoming in this.incoming) {
                             val m = when (incoming) {
@@ -338,13 +361,20 @@ public class KtorEngine(
                                 is Frame.Ping -> continue
                                 is Frame.Pong -> continue
                             }
-                            socketHandler.messageFromClientWithMetrics(match.pathSpec, this@KtorEngine, mid, m)
+                            socketHandler.messageFromClientWithMetrics(
+                                match.pathSpec,
+                                this@KtorEngine,
+                                connectInitiator.phase(Initiator.WebSocket.Phase.ClientMessage),
+                                mid,
+                                m,
+                            )
                         }
 
                         closingMid.let { mid ->
                             socketHandler.disconnectWithMetrics(
                                 match.pathSpec,
                                 this@KtorEngine,
+                                connectInitiator.phase(Initiator.WebSocket.Phase.Disconnect),
                                 mid,
                                 WebSocketClose.NORMAL
                             )
@@ -354,6 +384,7 @@ public class KtorEngine(
                             socketHandler.disconnectWithMetrics(
                                 match.pathSpec,
                                 this@KtorEngine,
+                                connectInitiator.phase(Initiator.WebSocket.Phase.Disconnect),
                                 mid,
                                 ((e as? HttpStatusException)?.status
                                     ?: HttpStatus.InternalServerError).bestWebSocketCloseCode
