@@ -78,7 +78,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
         val handler: WebSocketHandler<P, T>,
         val socketId: String,
         val stateAnonType: AnonType,
-    ) : WebSocketConnection<P, T>, ServerRuntime by root {
+    ) : WebSocketConnection<P, T> {
         override var currentState: T = stateAnonType.value(encoding, handler.storageSerializer)
 
         /**
@@ -153,11 +153,11 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
         }
 
         override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-            webSocketDynamo.subscribe(path.toString(), topic.path(), socketId)
+            webSocketDynamo.subscribe(path.toString(), with(root) { topic.path() }, socketId)
         }
 
         override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-            webSocketDynamo.unsubscribe(topic.path(), socketId)
+            webSocketDynamo.unsubscribe(with(root) { topic.path() }, socketId)
         }
 
         override suspend fun send(frame: WebSocketFrame) {
@@ -263,6 +263,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         ) { mid ->
                             h.messageFromSubscriptionWithMetrics(
                                 p.pathSpec,
+                                root,
                                 mid,
                                 WebSocketSubscriptionMessage(
                                     fullTopicMatch.value,
@@ -348,6 +349,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
             ) { mid ->
                 rootWs.didConnectWithMetrics(
                     rootPath,
+                    root,
                     mid
                 )
                 return APIGatewayV2HTTPResponse(200)
@@ -454,6 +456,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     ) { mid ->
                         rootWs.disconnectWithMetrics(
                             rootPath,
+                            root,
                             mid,
                             WebSocketClose.NORMAL
                         )
@@ -497,6 +500,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         }
                         rootWs.messageFromClientWithMetrics(
                             rootPath,
+                            root,
                             mid,
                             WebSocketFrame(event.body)
                         )

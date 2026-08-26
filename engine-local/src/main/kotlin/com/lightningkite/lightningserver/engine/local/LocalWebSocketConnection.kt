@@ -23,9 +23,10 @@ public abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
     override val request: WebSocketConnectRequest<PATH>,
     private val handler: WebSocketHandler<PATH, STORAGE>,
     private val scope: CoroutineScope,
-    server: ServerRuntime,
+    /** Needed to deliver a subscription message, which is a fresh execution rather than part of one. */
+    private val server: ServerRuntime,
     private val pubSub: (request: WebSocketSubscriptionRequest<*, Any?>) -> PubSubChannel<Any?>,
-) : WebSocketConnection<PATH, STORAGE>, ServerRuntime by server {
+) : WebSocketConnection<PATH, STORAGE> {
 
     override var currentState: STORAGE = startingState
     override suspend fun repullState(): STORAGE = currentState
@@ -49,9 +50,12 @@ public abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
         subscriptions.remove(topic)?.cancel()
         subscriptions[topic] = scope.launch {
             pubSub(topic).collect { value ->
-                handler.messageFromSubscription(
-                    WebSocketSubscriptionMessage(topic.topic, topic.pathInContext.rawPathArguments, value),
-                )
+                with(server) {
+                    handler.messageFromSubscription(
+                        this@LocalWebSocketConnection,
+                        WebSocketSubscriptionMessage(topic.topic, topic.pathInContext.rawPathArguments, value),
+                    )
+                }
             }
             yield()
         }

@@ -7,13 +7,13 @@ import com.lightningkite.lightningserver.http.HttpLogicalInterceptor
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.websockets.DelegatingWebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketConnection
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketLogicalInterceptor
 import kotlinx.coroutines.CancellationException
-import kotlinx.serialization.KSerializer
 import kotlin.time.TimeSource
 
 /**
@@ -73,9 +73,7 @@ public class AccessLogInterceptor : HttpLogicalInterceptor, WebSocketLogicalInte
     }
 
     override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> =
-        object : WebSocketHandler<PATH, T> {
-            override val storageSerializer: KSerializer<T> get() = handler.storageSerializer
-
+        object : DelegatingWebSocketHandler<PATH, T>(handler) {
             context(serverRuntime: ServerRuntime)
             override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
                 if (serverRuntime.logger.isInfoEnabled()) {
@@ -85,31 +83,20 @@ public class AccessLogInterceptor : HttpLogicalInterceptor, WebSocketLogicalInte
                             request.idSuffix(idLabel = "conn")
                     }
                 }
-                return handler.willConnect(request)
+                return wrapped.willConnect(request)
             }
 
-            context(connection: WebSocketConnection<PATH, T>)
-            override suspend fun didConnect(): Unit = handler.didConnect()
-
-            context(connection: WebSocketConnection<PATH, T>)
-            override suspend fun messageFromClient(frame: com.lightningkite.lightningserver.websockets.WebSocketFrame): Unit =
-                handler.messageFromClient(frame)
-
-            context(connection: WebSocketConnection<PATH, T>)
-            override suspend fun messageFromSubscription(topic: com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage<*, *>): Unit =
-                handler.messageFromSubscription(topic)
-
-            context(connection: WebSocketConnection<PATH, T>)
-            override suspend fun disconnect(reason: WebSocketClose) {
-                if (connection.logger.isInfoEnabled()) {
+            context(serverRuntime: ServerRuntime)
+            override suspend fun disconnect(connection: WebSocketConnection<PATH, T>, reason: WebSocketClose) {
+                if (serverRuntime.logger.isInfoEnabled()) {
                     val request = connection.request
-                    val principal = with(connection as ServerRuntime) { request.principalName() }
-                    connection.logger.info {
+                    val principal = request.principalName()
+                    serverRuntime.logger.info {
                         "ws ${request.path} closed by $principal (${request.sourceIp}) " +
                             "-> $reason ${request.idSuffix(idLabel = "conn")}"
                     }
                 }
-                handler.disconnect(reason)
+                wrapped.disconnect(connection, reason)
             }
         }
 }

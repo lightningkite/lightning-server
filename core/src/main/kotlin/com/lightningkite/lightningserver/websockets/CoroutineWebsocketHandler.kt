@@ -177,8 +177,8 @@ public abstract class CoroutineWebSocketHandler : ServerBuilder() {
             // --- Standard WebSocketHandler implementation ---
             // Used by distributed engines (AWS Lambda) that need pub/sub
 
-            context(connection: WebSocketConnection<PathSpec0, Storage>)
-            override suspend fun didConnect() {
+            context(serverRuntime: ServerRuntime)
+            override suspend fun didConnect(connection: WebSocketConnection<PathSpec0, Storage>) {
                 // Only subscribe to outbound topic if direct send is not available
                 // This avoids unnecessary DynamoDB subscription when using direct API Gateway
                 if (connection.currentState.request.engineSocketId == null) {
@@ -230,20 +230,29 @@ public abstract class CoroutineWebSocketHandler : ServerBuilder() {
                 return@coroutineScope s
             }
 
-            context(connection: WebSocketConnection<PathSpec0, Storage>)
-            override suspend fun messageFromClient(frame: WebSocketFrame) {
+            context(serverRuntime: ServerRuntime)
+            override suspend fun messageFromClient(
+                connection: WebSocketConnection<PathSpec0, Storage>,
+                frame: WebSocketFrame,
+            ) {
                 connection.currentState.inbound().emit(frame.serializable())
             }
 
-            context(connection: WebSocketConnection<PathSpec0, Storage>)
-            override suspend fun messageFromSubscription(topic: WebSocketSubscriptionMessage<*, *>) {
+            context(serverRuntime: ServerRuntime)
+            override suspend fun messageFromSubscription(
+                connection: WebSocketConnection<PathSpec0, Storage>,
+                topic: WebSocketSubscriptionMessage<*, *>,
+            ) {
                 if (topic.topic == outboundTopic) {
                     connection.send((topic.value as SerializableWebSocketFrame).standard())
                 }
             }
 
-            context(connection: WebSocketConnection<PathSpec0, Storage>)
-            override suspend fun disconnect(reason: WebSocketClose) {
+            context(serverRuntime: ServerRuntime)
+            override suspend fun disconnect(
+                connection: WebSocketConnection<PathSpec0, Storage>,
+                reason: WebSocketClose,
+            ) {
                 connection.currentState.inbound().emit(SerializableWebSocketFrame(close = true))
             }
         })

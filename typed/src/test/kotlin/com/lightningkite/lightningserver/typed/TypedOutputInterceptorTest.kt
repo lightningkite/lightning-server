@@ -181,7 +181,7 @@ class TypedOutputInterceptorTest {
         }) {
             Observed.reset()
             val socket = TestServer.updates.webSocket.test()
-            val json = socket.server.externalSerialization.json
+            val json = contextOf<ServerRuntime>().externalSerialization.json
             val always: Condition<Sample> = Condition.Always
             socket.send(WebSocketFrame.Text(json.encodeToString(Condition.serializer(Sample.serializer()), always)))
 

@@ -10,19 +10,17 @@ import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
+import com.lightningkite.lightningserver.websockets.DelegatingWebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketConnection
-import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketLogicalInterceptor
-import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.services.database.Table
 import com.lightningkite.services.database.modification
 import com.lightningkite.services.database.updateOneByIdIgnoringResult
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CancellationException
-import kotlinx.serialization.KSerializer
 import kotlin.time.TimeSource
 import kotlin.uuid.Uuid
 
@@ -71,35 +69,21 @@ public class RequestRecordInterceptor(
     }
 
     override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> =
-        object : WebSocketHandler<PATH, T> {
-            override val storageSerializer: KSerializer<T> get() = handler.storageSerializer
-
+        object : DelegatingWebSocketHandler<PATH, T>(handler) {
             context(serverRuntime: ServerRuntime)
             override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
                 table().insert(listOf(request.opening(endpoint = request.route(), method = "WEBSOCKET")))
-                return handler.willConnect(request)
+                return wrapped.willConnect(request)
             }
 
-            context(connection: WebSocketConnection<PATH, T>)
-            override suspend fun didConnect(): Unit = handler.didConnect()
-
-            context(connection: WebSocketConnection<PATH, T>)
-            override suspend fun messageFromClient(frame: WebSocketFrame): Unit = handler.messageFromClient(frame)
-
-            context(connection: WebSocketConnection<PATH, T>)
-            override suspend fun messageFromSubscription(topic: WebSocketSubscriptionMessage<*, *>): Unit =
-                handler.messageFromSubscription(topic)
-
-            context(connection: WebSocketConnection<PATH, T>)
-            override suspend fun disconnect(reason: WebSocketClose) {
+            context(serverRuntime: ServerRuntime)
+            override suspend fun disconnect(connection: WebSocketConnection<PATH, T>, reason: WebSocketClose) {
                 try {
-                    handler.disconnect(reason)
+                    wrapped.disconnect(connection, reason)
                 } finally {
                     // A socket's duration is its whole lifetime, which no monotonic mark taken here
                     // could measure, so it is left to be derived from `at` and the close time.
-                    with(connection as ServerRuntime) {
-                        complete(connection.request.requestId, reason.toString(), durationMs = null)
-                    }
+                    complete(connection.request.requestId, reason.toString(), durationMs = null)
                 }
             }
         }

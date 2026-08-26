@@ -49,7 +49,7 @@ public suspend fun <STORAGE> WebSocketHandler<PathSpec0, STORAGE>.test(
     )
     val storage = intercepted.willConnect(request)
     return test.TestWebSocket(intercepted, request, storage).also {
-        with(it.server) { intercepted.didConnect() }
+        with(test) { intercepted.didConnect(it.server) }
     }
 }
 
@@ -76,7 +76,7 @@ public suspend fun <STORAGE, A> WebSocketHandler<PathSpec1<A>, STORAGE>.test(
     )
     val storage = intercepted.willConnect(request)
     return test.TestWebSocket(intercepted, request, storage).also {
-        with(it.server) { intercepted.didConnect() }
+        with(test) { intercepted.didConnect(it.server) }
     }
 }
 
@@ -104,7 +104,7 @@ public suspend fun <STORAGE, A, B> WebSocketHandler<PathSpec2<A, B>, STORAGE>.te
     )
     val storage = with(test) { intercepted.willConnect(request) }
     return test.TestWebSocket(intercepted, request, storage).also {
-        with(it.server) { intercepted.didConnect() }
+        with(test) { intercepted.didConnect(it.server) }
     }
 }
 
@@ -133,7 +133,7 @@ public suspend fun <STORAGE, A, B, C> WebSocketHandler<PathSpec3<A, B, C>, STORA
     )
     val storage = with(test) { intercepted.willConnect(request) }
     return test.TestWebSocket(this, request, storage).also {
-        with(it.server) { intercepted.didConnect() }
+        with(test) { intercepted.didConnect(it.server) }
     }
 }
 

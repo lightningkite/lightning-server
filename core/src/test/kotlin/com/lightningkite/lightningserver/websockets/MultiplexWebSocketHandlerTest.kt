@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.websockets
 
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.MultiplexMessage
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.send
@@ -55,7 +56,7 @@ class MultiplexWebSocketHandlerTest {
     fun multiplex_basic_flow() = runBlocking {
         TestServer.test(settings = {}) {
             val mux = TestServer.multiplex.test()
-            val json = mux.server.externalSerialization.json
+            val json = contextOf<ServerRuntime>().externalSerialization.json
             var last: WebSocketFrame? = null
             mux.onMessageSent = { last = it }
             // Start channel a -> /mirror
@@ -118,7 +119,7 @@ class MultiplexWebSocketHandlerTest {
     fun unsubscribe_actually_stops_delivery() = runBlocking {
         TestServer.test(settings = {}) {
             val mux = TestServer.multiplex.test()
-            val json = mux.server.externalSerialization.json
+            val json = contextOf<ServerRuntime>().externalSerialization.json
             var last: WebSocketFrame? = null
             mux.onMessageSent = { last = it }
 
