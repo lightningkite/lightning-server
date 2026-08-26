@@ -167,10 +167,20 @@ there is no separate untrusted claim, so `upstreamRequestId` stays null.
 out-of-the-box behaviour is to trust nothing. It deliberately mirrors the existing `realIpHeader`
 setting, which solves the same trust problem for source IP.
 
-**AWS serverless needs no such setting.** API Gateway mints `requestContext.requestId` itself, so it
-is authoritative with no configuration, and it matches the ID in the gateway's own access logs. For
-WebSockets the adapter uses `requestContext.connectionId`, which is stable for the socket's whole
-lifetime — exactly the correlation scope wanted for a connection.
+**AWS serverless needs no such setting either, but for a different reason.** An earlier version of
+this plan had the adapter adopt `requestContext.requestId` (and `requestContext.connectionId` for
+WebSockets) as the authoritative id. That was abandoned when request ids became `Uuid`s: API Gateway
+ids are not UUIDs and not even 128 bits, so there is nothing to adopt. The adapter now mints its own
+`Uuid` on both paths.
+
+The join to the gateway's own access log is preserved rather than lost. The gateway's id is kept in
+`RequestRecord.engineRequestId` — trusted, because the engine supplied it rather than the caller, and
+therefore deliberately a separate column from the untrusted `upstreamRequestId`. The join is:
+gateway log `requestId` → `engineRequestId` → our `Uuid`. For WebSockets the connection id already
+lives in `engineSocketId` and is surfaced through the same property, so a socket keeps one identity
+for its whole lifetime without storing the value twice.
+
+See [`execution-context-refactor.md`](execution-context-refactor.md) §2.6.
 
 ### 3.3 Aligning with the proxy and with telemetry
 

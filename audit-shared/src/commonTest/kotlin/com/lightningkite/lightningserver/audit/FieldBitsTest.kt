@@ -50,7 +50,7 @@ class FieldBitsTest {
         val bits = FieldBits.of(indices.toList())
         return DisclosureRecord(
             _id = Uuid.NIL,
-            requestId = "r",
+            requestId = Uuid.NIL,
             modelId = 0,
             fields0 = bits.fields0,
             fields1 = bits.fields1,

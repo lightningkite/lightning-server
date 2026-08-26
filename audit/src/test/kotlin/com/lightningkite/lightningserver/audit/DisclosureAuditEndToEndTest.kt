@@ -68,7 +68,10 @@ class DisclosureAuditEndToEndTest {
         )
     }
 
-    private fun request(path: String, method: HttpMethod = HttpMethod.GET, id: String, body: String? = null) =
+    /** A fixed, readable request id, so a record can be asserted against the request that wrote it. */
+    private fun testId(n: Int) = Uuid.parse("00000000-0000-4000-8000-" + n.toString().padStart(12, '0'))
+
+    private fun request(path: String, method: HttpMethod = HttpMethod.GET, id: Uuid, body: String? = null) =
         HttpRequest<PathSpec>(
             path = RawHttpEndpoint(asString = path, method = method),
             queryParameters = QueryParameters.EMPTY,
@@ -119,15 +122,15 @@ class DisclosureAuditEndToEndTest {
 
     @Test
     fun `a disclosed record is recorded against the request that disclosed it`() = onServer {
-        val response = serverRuntime.handle(request("/patient", id = "req-1"))
+        val response = serverRuntime.handle(request("/patient", id = testId(1)))
         assertEquals(HttpStatus.OK, response.status)
 
         val disclosure = disclosures().single()
-        assertEquals("req-1", disclosure.requestId)
+        assertEquals(testId(1), disclosure.requestId)
         assertEquals(TestServer.ada._id, disclosure.recordId)
         assertEquals(setOf("name", "ssn"), pathsOf(disclosure))
 
-        val record = requests().single { it._id == "req-1" }
+        val record = requests().single { it._id == testId(1) }
         assertEquals("10.0.0.1", record.sourceIp)
         assertEquals("GET", record.method)
         assertEquals("200", record.outcome)
@@ -137,10 +140,10 @@ class DisclosureAuditEndToEndTest {
 
     @Test
     fun `a request that discloses nothing still gets a request record and no disclosures`() = onServer {
-        serverRuntime.handle(request("/plain", id = "req-2"))
+        serverRuntime.handle(request("/plain", id = testId(2)))
 
         assertEquals(emptyList(), disclosures())
-        assertEquals("200", requests().single { it._id == "req-2" }.outcome)
+        assertEquals("200", requests().single { it._id == testId(2) }.outcome)
     }
 
     /**
@@ -149,7 +152,7 @@ class DisclosureAuditEndToEndTest {
      */
     @Test
     fun `every disclosure refers to a request record that exists`() = onServer {
-        serverRuntime.handle(request("/patient", id = "req-3"))
+        serverRuntime.handle(request("/patient", id = testId(3)))
 
         val known = requests().map { it._id }.toSet()
         disclosures().forEach {
@@ -163,14 +166,14 @@ class DisclosureAuditEndToEndTest {
             request(
                 "/meta/bulk",
                 HttpMethod.POST,
-                id = "outer",
+                id = testId(4),
                 body = """{"a":{"path":"/patient","method":"GET"},"b":{"path":"/plain","method":"GET"}}""",
             )
         )
 
-        val subs = requests().filter { it.parentRequestId == "outer" }
+        val subs = requests().filter { it.parentRequestId == testId(4) }
         assertEquals(2, subs.size, "expected one request record per sub-request; saw ${requests().map { it._id }}")
-        assertTrue(requests().any { it._id == "outer" }, "the carrying request was not recorded")
+        assertTrue(requests().any { it._id == testId(4) }, "the carrying request was not recorded")
 
         val disclosure = disclosures().single()
         assertTrue(
@@ -185,10 +188,10 @@ class DisclosureAuditEndToEndTest {
      */
     @Test
     fun `a duplicate request id fails the request and discloses nothing`() = onServer {
-        val first = serverRuntime.handle(request("/patient", id = "same"))
+        val first = serverRuntime.handle(request("/patient", id = testId(5)))
         assertEquals(HttpStatus.OK, first.status)
 
-        val second = serverRuntime.handle(request("/patient", id = "same"))
+        val second = serverRuntime.handle(request("/patient", id = testId(5)))
 
         assertEquals(
             HttpStatus.InternalServerError,

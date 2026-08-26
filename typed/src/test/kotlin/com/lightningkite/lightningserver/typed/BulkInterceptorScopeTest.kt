@@ -22,6 +22,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import kotlin.uuid.Uuid
 
 /**
  * `/meta/bulk` used to invoke each sub-request's handler directly, so sub-requests bypassed the
@@ -33,7 +34,9 @@ import kotlin.test.assertTrue
  */
 class BulkInterceptorScopeTest {
 
-    private data class Seen(val path: String, val requestId: String, val parentRequestId: String?)
+    private data class Seen(val path: String, val requestId: Uuid, val parentRequestId: Uuid?)
+
+    private val outerRequestId = Uuid.parse("00000000-0000-4000-8000-000000000001")
 
     private object Observed {
         val logical: MutableList<Seen> = Collections.synchronizedList(mutableListOf())
@@ -122,7 +125,7 @@ class BulkInterceptorScopeTest {
                     domain = "example.com",
                     protocol = "https",
                     sourceIp = "local",
-                    requestId = "outer-request",
+                    requestId = outerRequestId,
                     body = TypedData.text(body, MediaType.Application.Json),
                 )
             )
@@ -156,9 +159,9 @@ class BulkInterceptorScopeTest {
     ) {
         val subs = Observed.logical.filter { it.path != "/meta/bulk" }
         assertEquals(2, subs.size, "expected two sub-requests, saw ${Observed.logical.map { it.path }}")
-        subs.forEach { assertEquals("outer-request", it.parentRequestId) }
+        subs.forEach { assertEquals(outerRequestId, it.parentRequestId) }
         assertEquals(2, subs.map { it.requestId }.toSet().size, "sub-requests must have distinct ids")
-        assertTrue(subs.none { it.requestId == "outer-request" }, "a sub-request reused the outer id")
+        assertTrue(subs.none { it.requestId == outerRequestId }, "a sub-request reused the outer id")
     }
 
     /**
@@ -176,7 +179,7 @@ class BulkInterceptorScopeTest {
                 domain = "example.com",
                 protocol = "https",
                 sourceIp = "local",
-                requestId = "hand-rolled",
+                requestId = Uuid.random(),
             )
             val failure = assertFailsWith<IllegalArgumentException> {
                 runBlocking { serverRuntime.handleSubRequest(notASubRequest) }

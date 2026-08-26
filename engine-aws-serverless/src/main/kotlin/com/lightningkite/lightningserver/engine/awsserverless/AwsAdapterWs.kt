@@ -394,9 +394,11 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     domain = event.requestContext.domainName,
                     protocol = "https",
                     sourceIp = event.requestContext.identity.sourceIp ?: "0.0.0.0",
-                    // The gateway's connection ID is stable for the socket's whole lifetime, which is
-                    // exactly the correlation scope wanted for a connection.
-                    requestId = event.requestContext.connectionId,
+                    // Generated once here, at $connect, and persisted with the connection state, so it
+                    // is stable for the socket's whole lifetime — the correlation scope wanted for a
+                    // connection. The gateway's connection ID is not a UUID and stays in
+                    // [engineSocketId], which is where the join to the gateway's logs comes from.
+                    requestId = generateRequestId(),
                     upstreamRequestId = headers[HttpHeader.XRequestId]?.root,
                     engineSocketId = event.requestContext.connectionId
                 )

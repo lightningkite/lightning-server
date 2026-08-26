@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.services.data.TypedData
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import kotlin.uuid.Uuid
 
 /**
  * Represents an HTTP request with all associated data.
@@ -43,9 +44,10 @@ public data class HttpRequest<PATH : PathSpec>(
     override val domain: String,
     override val protocol: String,
     override val sourceIp: String,
-    override val requestId: String,
-    override val parentRequestId: String? = null,
+    override val requestId: Uuid,
+    override val parentRequestId: Uuid? = null,
     override val upstreamRequestId: String? = null,
+    override val engineRequestId: String? = null,
     override val cache: SerializableCache = SerializableCache(),
     @Transient public val body: TypedData? = null,
 ) : Request<PATH>() {
@@ -66,9 +68,10 @@ public data class HttpRequest<PATH : PathSpec>(
         domain: String = this.domain,
         protocol: String = this.protocol,
         sourceIp: String = this.sourceIp,
-        requestId: String = this.requestId,
-        parentRequestId: String? = this.parentRequestId,
+        requestId: Uuid = this.requestId,
+        parentRequestId: Uuid? = this.parentRequestId,
         upstreamRequestId: String? = this.upstreamRequestId,
+        engineRequestId: String? = this.engineRequestId,
         cache: SerializableCache = this.cache,
         body: TypedData? = this.body,
     ): HttpRequest<PATH2> = HttpRequest(
@@ -81,6 +84,7 @@ public data class HttpRequest<PATH : PathSpec>(
         requestId = requestId,
         parentRequestId = parentRequestId,
         upstreamRequestId = upstreamRequestId,
+        engineRequestId = engineRequestId,
         cache = cache,
         body = body,
     )

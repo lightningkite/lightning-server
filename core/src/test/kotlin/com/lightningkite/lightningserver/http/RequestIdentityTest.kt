@@ -8,6 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.uuid.Uuid
 
 class RequestIdentityTest {
 
@@ -16,7 +17,7 @@ class RequestIdentityTest {
     @Test
     fun `generates a fresh id when no trusted header is configured`() {
         val identity = headers().requestIdentity(trustedRequestIdHeader = null)
-        assertTrue(identity.requestId.isNotBlank())
+        assertNotEquals(Uuid.NIL, identity.requestId)
         assertNull(identity.upstreamRequestId)
     }
 
@@ -33,57 +34,63 @@ class RequestIdentityTest {
      */
     @Test
     fun `a client supplied id is never adopted when no trusted header is configured`() {
-        val identity = headers(HttpHeader.XRequestId to "attacker-chosen")
+        val claimed = Uuid.parse("00000000-0000-4000-8000-0000000000a1")
+        val identity = headers(HttpHeader.XRequestId to claimed.toString())
             .requestIdentity(trustedRequestIdHeader = null)
 
-        assertNotEquals("attacker-chosen", identity.requestId)
-        assertEquals("attacker-chosen", identity.upstreamRequestId)
+        assertNotEquals(claimed, identity.requestId)
+        assertEquals(claimed.toString(), identity.upstreamRequestId)
     }
 
     @Test
     fun `a client supplied id is not adopted when the trusted header is a different header`() {
-        val identity = headers(HttpHeader.XRequestId to "attacker-chosen")
+        val claimed = Uuid.parse("00000000-0000-4000-8000-0000000000a1")
+        val identity = headers(HttpHeader.XRequestId to claimed.toString())
             .requestIdentity(trustedRequestIdHeader = "X-Proxy-Request-Id")
 
-        assertNotEquals("attacker-chosen", identity.requestId)
-        assertEquals("attacker-chosen", identity.upstreamRequestId)
+        assertNotEquals(claimed, identity.requestId)
+        assertEquals(claimed.toString(), identity.upstreamRequestId)
     }
 
     @Test
     fun `adopts the id from the configured trusted header`() {
-        val identity = headers("X-Proxy-Request-Id" to "proxy-123")
+        val proxyId = Uuid.parse("00000000-0000-4000-8000-0000000000b2")
+        val identity = headers("X-Proxy-Request-Id" to proxyId.toString())
             .requestIdentity(trustedRequestIdHeader = "X-Proxy-Request-Id")
 
-        assertEquals("proxy-123", identity.requestId)
+        assertEquals(proxyId, identity.requestId)
     }
 
     @Test
     fun `records a separate untrusted claim alongside the trusted id`() {
+        val proxyId = Uuid.parse("00000000-0000-4000-8000-0000000000b2")
         val identity = headers(
-            "X-Proxy-Request-Id" to "proxy-123",
+            "X-Proxy-Request-Id" to proxyId.toString(),
             HttpHeader.XRequestId to "attacker-chosen",
         ).requestIdentity(trustedRequestIdHeader = "X-Proxy-Request-Id")
 
-        assertEquals("proxy-123", identity.requestId)
+        assertEquals(proxyId, identity.requestId)
         assertEquals("attacker-chosen", identity.upstreamRequestId)
     }
 
     /** The Envoy arrangement: the proxy stamps X-Request-ID, so there is no separate untrusted claim. */
     @Test
     fun `no upstream id is recorded when the trusted header is X-Request-ID itself`() {
-        val identity = headers(HttpHeader.XRequestId to "envoy-abc")
+        val proxyId = Uuid.parse("00000000-0000-4000-8000-0000000000c3")
+        val identity = headers(HttpHeader.XRequestId to proxyId.toString())
             .requestIdentity(trustedRequestIdHeader = HttpHeader.XRequestId)
 
-        assertEquals("envoy-abc", identity.requestId)
+        assertEquals(proxyId, identity.requestId)
         assertNull(identity.upstreamRequestId)
     }
 
     @Test
     fun `header matching is case insensitive`() {
-        val identity = headers("x-request-id" to "envoy-abc")
+        val proxyId = Uuid.parse("00000000-0000-4000-8000-0000000000c3")
+        val identity = headers("x-request-id" to proxyId.toString())
             .requestIdentity(trustedRequestIdHeader = "X-Request-ID")
 
-        assertEquals("envoy-abc", identity.requestId)
+        assertEquals(proxyId, identity.requestId)
         assertNull(identity.upstreamRequestId)
     }
 
@@ -95,11 +102,24 @@ class RequestIdentityTest {
             .requestIdentity(trustedRequestIdHeader = "X-Proxy-Request-Id") { warned = true }
 
         assertTrue(warned)
-        assertNotEquals("attacker-chosen", identity.requestId)
         assertEquals("attacker-chosen", identity.upstreamRequestId)
     }
 
-    private fun request(id: String) = HttpRequest<PathSpec>(
+    /**
+     * A proxy that stamps something other than a UUID is a misconfiguration of the same kind as one
+     * that stamps nothing, and is handled the same way: correlation degrades, the request does not.
+     */
+    @Test
+    fun `generates an id and reports when the trusted header does not hold a UUID`() {
+        var warned = false
+        val identity = headers("X-Proxy-Request-Id" to "not-a-uuid")
+            .requestIdentity(trustedRequestIdHeader = "X-Proxy-Request-Id") { warned = true }
+
+        assertTrue(warned)
+        assertNotEquals(Uuid.NIL, identity.requestId)
+    }
+
+    private fun request(id: Uuid) = HttpRequest<PathSpec>(
         path = RawHttpEndpoint(asString = "/outer", method = HttpMethod.POST),
         queryParameters = QueryParameters.EMPTY,
         headers = HttpHeaders.EMPTY,
@@ -109,34 +129,36 @@ class RequestIdentityTest {
         requestId = id,
     )
 
+    private val outerId = Uuid.parse("00000000-0000-4000-8000-0000000000d4")
+
     @Test
     fun `subRequest gets its own id parented to the outer request`() {
-        val outer = request("outer-id")
+        val outer = request(outerId)
         val sub = outer.subRequest<PathSpec>(RawHttpEndpoint(asString = "/inner", method = HttpMethod.GET))
 
         assertNotEquals(outer.requestId, sub.requestId)
-        assertEquals("outer-id", sub.parentRequestId)
+        assertEquals(outerId, sub.parentRequestId)
     }
 
     @Test
     fun `sibling sub-requests get distinct ids and share a parent`() {
-        val outer = request("outer-id")
+        val outer = request(outerId)
         val a = outer.subRequest<PathSpec>(RawHttpEndpoint(asString = "/a", method = HttpMethod.GET))
         val b = outer.subRequest<PathSpec>(RawHttpEndpoint(asString = "/b", method = HttpMethod.GET))
 
         assertNotEquals(a.requestId, b.requestId)
-        assertEquals("outer-id", a.parentRequestId)
-        assertEquals("outer-id", b.parentRequestId)
+        assertEquals(outerId, a.parentRequestId)
+        assertEquals(outerId, b.parentRequestId)
     }
 
     @Test
     fun `copyWithNewPathType preserves identity`() {
-        val outer = request("outer-id")
+        val outer = request(outerId)
         val copied = outer.copyWithNewPathType<PathSpec>(
             RawHttpEndpoint(asString = "/elsewhere", method = HttpMethod.GET)
         )
 
-        assertEquals("outer-id", copied.requestId)
+        assertEquals(outerId, copied.requestId)
         assertNull(copied.parentRequestId)
     }
 }

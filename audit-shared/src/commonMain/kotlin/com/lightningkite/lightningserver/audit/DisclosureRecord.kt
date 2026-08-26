@@ -41,7 +41,7 @@ import kotlin.uuid.Uuid
 @Serializable
 public data class DisclosureRecord(
     override val _id: Uuid,
-    @Index val requestId: String,
+    @Index val requestId: Uuid,
     val modelId: Int,
     /** Bits 0..31 of the disclosed-field set. See [FieldBits]. */
     val fields0: Int = 0,

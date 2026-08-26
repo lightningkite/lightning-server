@@ -24,6 +24,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.KSerializer
 import kotlin.time.TimeSource
+import kotlin.uuid.Uuid
 
 private val logger = KotlinLogging.logger("com.lightningkite.lightningserver.audit.RequestRecordInterceptor")
 
@@ -112,11 +113,12 @@ public class RequestRecordInterceptor(
         sourceIp = sourceIp,
         endpoint = endpoint,
         method = method,
+        engineRequestId = engineRequestId,
         upstreamRequestId = upstreamRequestId,
     )
 
     context(runtime: ServerRuntime)
-    private suspend fun complete(requestId: String, outcome: String, durationMs: Long?) {
+    private suspend fun complete(requestId: Uuid, outcome: String, durationMs: Long?) {
         try {
             table().updateOneByIdIgnoringResult(requestId, modification(RequestRecord.path) {
                 it.outcome assign outcome

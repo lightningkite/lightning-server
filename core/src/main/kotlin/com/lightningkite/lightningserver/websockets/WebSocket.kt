@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.location
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlin.uuid.Uuid
 
 
 /**
@@ -90,8 +91,8 @@ public data class WebSocketConnectRequest<PATH : PathSpec>(
      * this connection correlates back to it, since a long-lived socket is one logical session rather
      * than one request.
      */
-    override val requestId: String,
-    override val parentRequestId: String? = null,
+    override val requestId: Uuid,
+    override val parentRequestId: Uuid? = null,
     override val upstreamRequestId: String? = null,
     override val cache: SerializableCache = SerializableCache(),
     /**
@@ -101,6 +102,9 @@ public data class WebSocketConnectRequest<PATH : PathSpec>(
      */
     val engineSocketId: String? = null,
 ) : Request<PATH>() {
+    /** The gateway's identifier for a socket is the socket itself, so there is nothing else to hold. */
+    override val engineRequestId: String? get() = engineSocketId
+
     /**
      * Derives a logical sub-connection of this one, as multiplexing carries several logical sockets
      * over a single physical connection.
