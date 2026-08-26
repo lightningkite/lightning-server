@@ -1,5 +1,9 @@
 package com.lightningkite.lightningserver.audit
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.serverRuntime
@@ -11,6 +15,7 @@ import com.lightningkite.services.database.Database
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
+import org.slf4j.LoggerFactory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -51,13 +56,34 @@ class AuditRegistryTest {
         suspend fun allFields() = TestServer.fields().find(Condition.Always).toList()
     }
 
+    /** Collects WARN lines from the registry's logger for the duration of a test. */
+    private class Warnings {
+        private val logger = LoggerFactory.getLogger(
+            "com.lightningkite.lightningserver.audit.AuditRegistry"
+        ) as Logger
+        private val appender = ListAppender<ILoggingEvent>().apply { start() }
+
+        init {
+            logger.addAppender(appender)
+        }
+
+        fun messages(): List<String> = appender.list.filter { it.level == Level.WARN }.map { it.formattedMessage }
+
+        fun stop() {
+            logger.detachAppender(appender)
+            appender.stop()
+        }
+    }
+
+    private fun captureWarnings(): Warnings = Warnings()
+
     @Test
     fun `a first deploy assigns bits in declaration order`() = onServer {
         deploy(VersionedV1.serializer())
 
         val registry = registry()
         val modelId = registry.modelId("Versioned")
-        assertEquals(mapOf("_id" to 0, "a" to 1), registry.fields(modelId))
+        assertEquals(mapOf("a" to 0), registry.fields(modelId))
     }
 
     @Test
@@ -76,7 +102,7 @@ class AuditRegistryTest {
 
         val registry = registry()
         val modelId = registry.modelId("Versioned")
-        assertEquals(mapOf("_id" to 0, "a" to 1, "b" to 2), registry.fields(modelId))
+        assertEquals(mapOf("a" to 0, "b" to 1), registry.fields(modelId))
     }
 
     /**
@@ -92,7 +118,7 @@ class AuditRegistryTest {
         val registry = registry()
         val modelId = registry.modelId("Versioned")
         assertEquals(
-            mapOf("_id" to 0, "a" to 1, "b" to 2, "renamed" to 3),
+            mapOf("a" to 0, "b" to 1, "renamed" to 2),
             registry.fields(modelId),
             "the retired name must still resolve, and the new one must not reuse its bit",
         )
@@ -106,7 +132,7 @@ class AuditRegistryTest {
         val patient = registry.modelId(Patient.serializer().descriptor.serialName)
         val doctor = registry.modelId(Doctor.serializer().descriptor.serialName)
         assertTrue(patient != doctor, "the two models shared an id")
-        assertEquals(setOf("_id", "name"), registry.fields(doctor).keys)
+        assertEquals(setOf("name"), registry.fields(doctor).keys)
         assertTrue("doctor" in registry.fields(patient).keys, "the parent still records that a doctor was disclosed")
     }
 
@@ -133,9 +159,40 @@ class AuditRegistryTest {
     fun `a model too wide for the available bits is rejected with the remedy`() = onServer {
         val failure = assertFailsWith<IllegalStateException> { deploy(Wide.serializer()) }
         assertTrue(
-            "@Audited" in failure.message.orEmpty(),
-            "the message should name the way out; was ${failure.message}",
+            "@Audited" in failure.message.orEmpty() && "reused" in failure.message.orEmpty(),
+            "the message should name the way out and why bits are scarce; was ${failure.message}",
         )
+    }
+
+    /**
+     * Running out of bits fails a deploy, and finding out then is the worst possible time. Bits are
+     * consumed permanently, so a model creeps towards the ceiling rather than jumping at it.
+     */
+    @Test
+    fun `a model approaching the bit ceiling is warned about while there is room to act`() = onServer {
+        val warnings = captureWarnings()
+        try {
+            deploy(Roomy.serializer())
+        } finally {
+            warnings.stop()
+        }
+
+        assertTrue(
+            warnings.messages().any { "Roomy" in it && "50 of 64" in it },
+            "expected a capacity warning naming the model and its usage; saw ${warnings.messages()}",
+        )
+    }
+
+    @Test
+    fun `a model with room to spare is not warned about`() = onServer {
+        val warnings = captureWarnings()
+        try {
+            deploy(VersionedV1.serializer())
+        } finally {
+            warnings.stop()
+        }
+
+        assertEquals(emptyList(), warnings.messages())
     }
 
     @Test

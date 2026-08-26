@@ -10,8 +10,12 @@ import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.descriptors.elementDescriptors
 
-/** Whether this descriptor's model is marked [Audited]. */
-public val SerialDescriptor.isAudited: Boolean get() = annotations.any { it is Audited }
+/** Whether this descriptor's *class* is marked [Audited], meaning its instances get their own records. */
+internal val SerialDescriptor.isAudited: Boolean get() = annotations.any { it is Audited }
+
+/** Whether the property at [index] is marked [Audited], meaning it gets a bit of its own. */
+internal fun SerialDescriptor.isElementAudited(index: Int): Boolean =
+    getElementAnnotations(index).any { it is Audited }
 
 /**
  * The serial name with any nullability marker removed.
@@ -19,7 +23,7 @@ public val SerialDescriptor.isAudited: Boolean get() = annotations.any { it is A
  * kotlinx wraps a nullable descriptor in a delegate that appends `?` to the serial name and changes
  * nothing else. Registry keys must be the same whether a model appears nullable or not.
  */
-public val SerialDescriptor.auditSerialName: String get() = serialName.removeSuffix("?")
+internal val SerialDescriptor.auditSerialName: String get() = serialName.removeSuffix("?")
 
 /**
  * Every [Audited] model reachable through this descriptor, keyed by [auditSerialName].
@@ -29,7 +33,7 @@ public val SerialDescriptor.auditSerialName: String get() = serialName.removeSuf
  * concrete types are not known statically — which is why an audited model that arrives at runtime
  * with no registry entry fails the request rather than being logged as unknown.
  */
-public fun SerialDescriptor.auditedModels(): Map<String, SerialDescriptor> {
+internal fun SerialDescriptor.auditedModels(): Map<String, SerialDescriptor> {
     val found = LinkedHashMap<String, SerialDescriptor>()
     val visited = HashSet<SerialDescriptor>()
 
@@ -44,8 +48,12 @@ public fun SerialDescriptor.auditedModels(): Map<String, SerialDescriptor> {
 }
 
 /**
- * The dotted field paths of an audited model, in declaration order — the paths that get permanent
- * bit indices.
+ * The dotted paths of the properties an audited model itemises, in declaration order — the paths
+ * that get permanent bit indices.
+ *
+ * **Only properties marked [Audited] get a path.** The walk still descends through everything, so an
+ * annotated property is found however deeply it is nested, including inside types that are not
+ * themselves audited. An unannotated property contributes nothing but is still traversed.
  *
  * The walk descends through structures that have no record of their own and stops at anything that
  * does:
@@ -63,7 +71,7 @@ public fun SerialDescriptor.auditedModels(): Map<String, SerialDescriptor> {
  * Keeping a path for the container as well as its leaves is what distinguishes "no address was
  * disclosed" from "an address was disclosed, all of whose fields held defaults".
  */
-public fun SerialDescriptor.auditFieldPaths(): List<String> = FieldPathWalk().also { it.members(this, "") }.paths
+internal fun SerialDescriptor.auditFieldPaths(): List<String> = FieldPathWalk().also { it.members(this, "") }.paths
 
 /**
  * Mutual recursion between "list the members of this structure" and "descend into one member",
@@ -78,7 +86,7 @@ private class FieldPathWalk {
     fun members(descriptor: SerialDescriptor, prefix: String) {
         for (index in 0 until descriptor.elementsCount) {
             val path = prefix + descriptor.getElementName(index)
-            paths.add(path)
+            if (descriptor.isElementAudited(index)) paths.add(path)
             descend(descriptor.getElementDescriptor(index), path)
         }
     }

@@ -29,15 +29,15 @@ class FieldBitsTest {
 
     @Test
     fun `contains reports exactly the indices that were added`() {
-        val bits = FieldBits.of(listOf(0, 31, 32, 95, 96, 127))
-        listOf(0, 31, 32, 95, 96, 127).forEach { assertTrue(it in bits, "$it should be present") }
-        listOf(1, 30, 33, 94, 97, 126).forEach { assertFalse(it in bits, "$it should be absent") }
+        val bits = FieldBits.of(listOf(0, 31, 32, 63))
+        listOf(0, 31, 32, 63).forEach { assertTrue(it in bits, "$it should be present") }
+        listOf(1, 30, 33, 62).forEach { assertFalse(it in bits, "$it should be absent") }
     }
 
     @Test
     fun `union merges every column`() {
-        val merged = FieldBits.of(listOf(1, 40)) + FieldBits.of(listOf(70, 100))
-        assertEquals(listOf(1, 40, 70, 100), merged.indices())
+        val merged = FieldBits.of(listOf(1, 40)) + FieldBits.of(listOf(7, 60))
+        assertEquals(listOf(1, 7, 40, 60), merged.indices())
     }
 
     @Test
@@ -54,8 +54,6 @@ class FieldBitsTest {
             modelId = 0,
             fields0 = bits.fields0,
             fields1 = bits.fields1,
-            fields2 = bits.fields2,
-            fields3 = bits.fields3,
             recordId = Uuid.NIL,
         )
     }
@@ -69,7 +67,7 @@ class FieldBitsTest {
         val condition: Condition<DisclosureRecord> = disclosedAll(listOf(3, 40))
 
         assertTrue(condition(record(3, 40)))
-        assertTrue(condition(record(3, 40, 100)), "extra disclosed fields must not exclude a record")
+        assertTrue(condition(record(3, 40, 50)), "extra disclosed fields must not exclude a record")
         assertFalse(condition(record(3)))
         assertFalse(condition(record(40)))
         assertFalse(condition(record()))
@@ -86,12 +84,12 @@ class FieldBitsTest {
         assertFalse(condition(record()))
     }
 
-    /** A field high in the range is the case a single-Int layout would silently drop. */
+    /** A field past the first column is the case a single-Int layout would silently drop. */
     @Test
-    fun `queries reach fields in the fourth column`() {
-        assertTrue(disclosedAny(listOf(96))(record(96)))
-        assertTrue(disclosedAll(listOf(96, 100))(record(96, 100)))
-        assertFalse(disclosedAll(listOf(96, 100))(record(96)))
+    fun `queries reach fields in the second column`() {
+        assertTrue(disclosedAny(listOf(40))(record(40)))
+        assertTrue(disclosedAll(listOf(40, 50))(record(40, 50)))
+        assertFalse(disclosedAll(listOf(40, 50))(record(40)))
     }
 
     /**
@@ -105,8 +103,8 @@ class FieldBitsTest {
     @Test
     fun `the top bit of a column produces the mask and column the layout promises`() {
         assertEquals(
-            Condition.OnField(DisclosureRecord_fields3, Condition.IntBitsAnySet(1 shl 31)),
-            (disclosedAny(listOf(127)) as Condition.Or).conditions.single(),
+            Condition.OnField(DisclosureRecord_fields1, Condition.IntBitsAnySet(1 shl 31)),
+            (disclosedAny(listOf(63)) as Condition.Or).conditions.single(),
         )
         assertEquals(
             Condition.OnField(DisclosureRecord_fields0, Condition.IntBitsSet(1 shl 31)),
@@ -116,8 +114,8 @@ class FieldBitsTest {
 
     @Test
     fun `a query spanning columns produces one condition per column touched`() {
-        val any = disclosedAny(listOf(1, 33, 100)) as Condition.Or
-        assertEquals(3, any.conditions.size, "expected one condition per column; was $any")
+        val any = disclosedAny(listOf(1, 33)) as Condition.Or
+        assertEquals(2, any.conditions.size, "expected one condition per column; was $any")
 
         val all = disclosedAll(listOf(1, 2)) as Condition.And
         assertEquals(1, all.conditions.size, "same-column indices belong in one mask; was $all")

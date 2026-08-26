@@ -4,11 +4,14 @@ import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.Table
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlin.uuid.Uuid
+
+private val logger = KotlinLogging.logger("com.lightningkite.lightningserver.audit.AuditRegistry")
 
 /**
  * The permanent meaning of one model id.
@@ -57,10 +60,7 @@ public class AuditRegistry internal constructor(
     private val modelIds: Map<String, Int>,
     private val bitIndices: Map<Int, Map<String, Int>>,
 ) {
-    /** The serial names of every registered audited model. */
-    public val registeredModels: Set<String> get() = modelIds.keys
-
-    public fun modelIdOrNull(serialName: String): Int? = modelIds[serialName]
+    private fun modelIdOrNull(serialName: String): Int? = modelIds[serialName]
 
     /**
      * The permanent id of an audited model.
@@ -75,7 +75,7 @@ public class AuditRegistry internal constructor(
             "It reached a client through a serializer the deploy-time scan could not resolve statically."
     )
 
-    public fun bitIndexOrNull(modelId: Int, fieldPath: String): Int? = bitIndices[modelId]?.get(fieldPath)
+    internal fun bitIndexOrNull(modelId: Int, fieldPath: String): Int? = bitIndices[modelId]?.get(fieldPath)
 
     public fun bitIndex(modelId: Int, fieldPath: String): Int =
         bitIndexOrNull(modelId, fieldPath) ?: throw IllegalStateException(
@@ -131,9 +131,11 @@ internal suspend fun reconcileAuditRegistry(
 
         descriptor.auditFieldPaths().filter { it !in byPath }.map { path ->
             if (nextBit >= FieldBits.CAPACITY) throw IllegalStateException(
-                "Audited model \"$serialName\" needs more than ${FieldBits.CAPACITY} field bits " +
-                    "(ran out at \"$path\"). Mark one of its nested types @Audited so that it becomes " +
-                    "its own disclosure record instead of more bits on this one."
+                "Audited model \"$serialName\" has run out of field bits at \"$path\": " +
+                    "${assigned.size} of ${FieldBits.CAPACITY} are already assigned. Indices are never " +
+                    "reused, so renamed and removed fields still hold theirs. Remove @Audited from " +
+                    "properties that do not need itemising, or mark a nested entity type @Audited so " +
+                    "it becomes its own disclosure record."
             )
             AuditFieldRegistration(
                 _id = "$modelId/$path",
@@ -144,6 +146,30 @@ internal suspend fun reconcileAuditRegistry(
         }
     }
     if (newFields.isNotEmpty()) fields.insert(newFields)
+
+    warnOnLowCapacity(modelIds, existingFields, newFields)
+}
+
+/**
+ * Warns while there is still room to act.
+ *
+ * Running out of bits fails a deploy, and finding out then is the worst time to find out. Bits are
+ * consumed permanently, so a model creeps towards the ceiling over its life rather than jumping.
+ */
+private fun warnOnLowCapacity(
+    modelIds: Map<String, Int>,
+    existing: Map<Int, List<AuditFieldRegistration>>,
+    added: List<AuditFieldRegistration>,
+) {
+    val total = existing.mapValues { it.value.size }.toMutableMap()
+    added.groupBy { it.modelId }.forEach { (modelId, rows) -> total[modelId] = total.getOrElse(modelId) { 0 } + rows.size }
+    val names = modelIds.entries.associate { it.value to it.key }
+    total.filter { it.value >= FieldBits.CAPACITY * 3 / 4 }.forEach { (modelId, used) ->
+        logger.warn {
+            "Audited model \"${names[modelId] ?: modelId}\" has used $used of ${FieldBits.CAPACITY} " +
+                "field bits. Indices are never reused, so this only grows."
+        }
+    }
 }
 
 /**

@@ -348,33 +348,77 @@ value. The real reasons to emit late are outcome and duration.
 
 The layer that delivers the actual compliance value.
 
-**Status: partially implemented.** The interception system, the marker, the record shape, and the
-bit registry are in (`:audit`, `:audit-shared`, and `TypedOutputInterceptor` in `core`). Extraction
-of disclosures from a value and the sinks are not yet built.
+**Status: implemented.** `:audit`, `:audit-shared`, and `TypedOutputInterceptor` in `core`. Turned on
+by including the `DisclosureAudit` module — `path.path("audit") include DisclosureAudit(database)` —
+and nothing audits until it is. It is an ordinary [ServerBuilder] module like `ModelRestEndpoints`,
+which is what it should be: everything it registers (tables, pre-deploy tasks, interceptors) is what
+a module carries, and mounting it at a path namespaces its pre-deploy tasks instead of scattering
+them at the root.
 
 ### 5.1 Marking
 
 ```kotlin
 @SerialInfo
-@Target(AnnotationTarget.CLASS)
+@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY)
 @Retention(AnnotationRetention.RUNTIME)
 public annotation class Audited
 ```
+
+One annotation, two scopes. **On a class:** every instance that reaches a client produces its own
+[DisclosureRecord]. **On a property:** that field is *itemised* — a bit is reserved for it, and each
+disclosure records whether it carried a value.
 
 `@SerialInfo` is not decoration. A plain Kotlin annotation is invisible to a `SerialDescriptor`, and
 this whole design walks descriptors rather than reflecting — so that it sees exactly what the
 serializer will emit and behaves the same on every target. It also means the marker only has an
 effect on `@Serializable` classes, which audited models always are.
 
-**The model must be keyed by `Uuid`.** One disclosure row is written per record disclosed
-([5.3](#53-record-shape--one-row-per-record-disclosed)), which makes the identifier the most-written
-column in the system. A `Uuid` is sixteen bytes in every backend; a string key is larger and indexed
-poorly. Marking a model whose `_id` is absent or is not a `Uuid` fails at deploy.
+#### 5.1.1 Itemising is opt-in; disclosure is not
+
+**Resolved after initially getting this backwards.** The first design itemised every field of an
+audited model automatically, on the reasoning that opt-in would let an engineer add a sensitive field
+and leave it silently unaudited.
+
+That reasoning was wrong on the facts. Because one row is written per record disclosed
+([5.3](#53-record-shape--one-row-per-record-disclosed)), **the disclosure record exists whether or
+not any property is annotated** — it is driven by `@Audited` on the *class*. So "who saw this record,
+under which request, when" stays completely covered regardless. Field bits are refinement on top:
+*which fields were in the payload*. Opt-in makes that refinement coarser by default; it does not make
+a disclosure disappear.
+
+The residual risk is narrow and reviewable: someone adds a regulated element to a model already
+marked `@Audited` and forgets to mark the property, so "which requests disclosed an SSN" misses it.
+That is a code-review concern on a model already flagged sensitive.
+
+Against that, automatic itemising cost real things:
+
+- **Bits, permanently.** Indices are never reused ([5.4](#54-the-field-registry--append-only-and-the-sole-record-of-what-a-bit-means)),
+  so a model accumulates dead bits through every rename and removal. Headroom shrinks monotonically
+  over a model's life, and nested paths grow faster than property counts. Reserving indices for
+  `sortOrder` and `createdAt` spends capacity that never comes back.
+- **Signal.** A field-set where forty of forty-five bits are noise makes the interesting query harder
+  to write and harder to trust.
+
+Two consequences worth stating so they are not read as bugs later:
+
+- **A disclosure with no bits set is normal and correct** — "this record was disclosed, and none of
+  the fields we track were in its payload".
+- **`_id` gets no bit.** It is already recorded as `recordId` on every row, so itemising it would
+  spend a bit restating the row's own identity.
+
+An annotated property is found anywhere in the graph, including inside types that are not themselves
+audited: `@Audited val street: String` inside an `Address` becomes `address.street` on the record
+holding it. The walk traverses unannotated properties too — it just allocates nothing for them.
 
 **`@AuditedOperation` was dropped.** It was specified as a class annotation on an endpoint, but
 endpoints in this framework are not classes — they are `ApiHttpHandler(...)` factory calls producing
 a private data class, so there is nothing to annotate. Auditing non-disclosure operations is
 deferred; if it returns it belongs as a parameter on the handler factories, not as an annotation.
+
+**The model must be keyed by `Uuid`.** One disclosure row is written per record disclosed, which
+makes the identifier the most-written column in the system. A `Uuid` is sixteen bytes in every
+backend; a string key is larger and indexed poorly. Marking a class whose `_id` is absent or is not a
+`Uuid` fails at deploy.
 
 ### 5.2 Interception: a new typed-output layer
 
@@ -401,7 +445,7 @@ a server that does not audit pays nothing per response.
 the send — which is how [5.6](#56-failure-behaviour-fail-closed) is enforced.
 
 **Installation is explicit, and that is the right granularity.** Nothing audits until a deployment
-installs the disclosure interceptor, and likewise nothing records conditions until it installs the
+includes the `DisclosureAudit` module, and likewise nothing records conditions until it installs the
 table interceptor ([6.1](#61-extend-it-to-reads-every-condition-and-every-sort)). `@Audited` on a
 model does nothing on its own. The circumvention this design guards against is an *endpoint* built
 without auditing, not a deployment that chose not to audit — and once installed, no endpoint can
@@ -437,10 +481,12 @@ The volume is paid down inside the row instead:
 1. **Request-constant data lives once.** IP, principal, timestamp, endpoint, and outcome are
    properties of the request, recorded once in the layer-1 record and referenced by `requestId`.
    Disclosure records never repeat them.
-2. **The identifier is a `Uuid`, not a string.** Sixteen bytes in every backend, and indexable.
+2. **The field set is two `Int`s, not four.** Itemising is opt-in ([5.1.1](#511-itemising-is-opt-in-disclosure-is-not)),
+   so a model reserves bits for the handful of fields that matter rather than for all of them.
+3. **The identifier is a `Uuid`, not a string.** Sixteen bytes in every backend, and indexable.
    A list of stringly-typed ids is both larger and, in most engines, stored poorly — which is why
    [`@Audited` is restricted to models keyed by `Uuid`](#51-marking), enforced at deploy.
-3. **No parent request id.** A sub-request's parentage is recorded once in the request log; carrying
+4. **No parent request id.** A sub-request's parentage is recorded once in the request log; carrying
    it on every disclosure row would be storing the same join key twice.
 
 ```kotlin
@@ -450,10 +496,8 @@ public data class DisclosureRecord(
     override val _id: Uuid,
     @Index val requestId: String,
     val modelId: Int,          // from the registry
-    val fields0: Int,          // bits 0..31    } disclosed-field bitfield;
-    val fields1: Int,          // bits 32..63   } see 5.4 for indices,
-    val fields2: Int,          // bits 64..95   } 5.3.1 for why four Ints
-    val fields3: Int,          // bits 96..127  }
+    val fields0: Int,          // bits 0..31   } disclosed-field bitfield; see 5.4 for
+    val fields1: Int,          // bits 32..63  } indices, 5.3.1 for why Int columns
     val recordId: Uuid,        // the _id of the record disclosed
 ) : HasId<Uuid>
 ```
@@ -465,7 +509,7 @@ disclose* (`requestId`) and *who has seen this record* (`modelId, recordId`).
 observed with a serializer in hand and nothing else — the table a value came from is not knowable at
 that point, and an audited model need not be a table at all.
 
-#### 5.3.1 Why four `Int`s and not `Long`, `ULong`, or `ByteArray`
+#### 5.3.1 Why `Int` columns and not `Long`, `ULong`, or `ByteArray`
 
 **Because `Int` is the only type the framework can query bitwise.** The entire bitwise condition
 surface is `Condition<Int>`:
@@ -485,8 +529,10 @@ Layout: bit index `i` lives in column `i / 32` at bit `i % 32`. `FieldBits` owns
 `disclosedAll(indices)` and `disclosedAny(indices)` build one condition per column touched and
 combine them with `And` / `Or`.
 
-128 bits is the working ceiling. Extending later means adding a `fields4` column defaulting to `0`,
-which is automatically correct for historical records — absent means not disclosed.
+**64 bits is the working ceiling, and two columns is deliberate.** Adding a `fields2` column later
+defaults to `0`, which reads correctly for every historical record — absent means not disclosed — so
+the migration out is benign. Buying headroom up front would cost eight bytes on every row of the
+highest-volume table in the system to insure against a problem that is cheap to fix if it arrives.
 
 #### 5.3.2 Blocking prerequisite: the bitwise conditions were broken in every engine
 
@@ -590,31 +636,39 @@ after a rename must consider both bits — a query-time concern, not a correctne
 #### 5.4.1 Nested fields
 
 Bit indices are assigned to **dotted paths**, not property names. The walk descends through
-structures that have no record of their own and stops at anything that does:
+everything, but only annotates what was asked for:
 
 | Shape | Rule | Example path |
 |---|---|---|
-| Property | a path, always | `ssn` |
-| Nested non-audited struct | descend; a path for the container *and* each leaf | `address`, `address.street` |
-| Nested `@Audited` model | **stop** — it produces its own record under its own `modelId` | `doctor` |
-| List/Set | a path for the property; descend into the element with `[]` | `phones`, `phones[].number` |
-| Map | a path for the property; descend into the value with `{}` | `tags`, `tags{}.label` |
-| Sealed | a path for the property; descend per subclass | `payment`, `payment(Card).last4` |
-| Open polymorphic, contextual | a path only — the concrete type is not known statically | `blob` |
+| Property marked `@Audited` | a path | `ssn` |
+| Property not marked | no path, but still descended into | — |
+| Nested `@Audited` class | **stop** — it produces its own record under its own `modelId` | `doctor` |
+| List/Set | descend into the element with `[]` | `phones[].number` |
+| Map | descend into the value with `{}` | `tags{}.label` |
+| Sealed | descend per subclass | `payment(Card).last4` |
+| Open polymorphic, contextual | nothing beneath — the concrete type is not known statically | `blob` |
 
-Keeping a path for the container as well as its leaves is what distinguishes "no address was
-disclosed" from "an address was disclosed, all of whose fields held defaults".
+Descending regardless of annotation is what lets `@Audited val street: String` inside a plain
+`Address` become `address.street` on the record holding it, without `Address` itself having to be
+audited or `address` itself having to be annotated.
+
+Annotating a container *as well as* its leaves is what distinguishes "no address was disclosed" from
+"an address was disclosed, all of whose fields held defaults" — worth a bit when that distinction
+matters, and skippable when it does not.
 
 Three failures fall out, all deliberate:
 
-- A model whose walk exceeds 128 bits **fails at deploy**, with the remedy in the message: mark one
-  of its nested types `@Audited` so it splits into its own record.
-- An `@Audited` descriptor with no `_id` element **fails at deploy** — a disclosure record that can
-  name no records is close to worthless.
+- A model that runs out of bits **fails at deploy**. The message names how many of the 64 are already
+  assigned and says that indices are never reused, so renamed and removed fields still hold theirs —
+  which is usually the surprising part. The remedies are to drop `@Audited` from properties that do
+  not need itemising, or to mark a nested *entity* type `@Audited` so it becomes its own record.
+  A **warning fires at 75% of capacity**, because running out at deploy time is the worst moment to
+  discover it and the ceiling is approached gradually rather than all at once.
+- An `@Audited` class with no `Uuid` `_id` **fails at deploy** — a disclosure record that can name no
+  record is close to worthless, and a string key is too wide for this table.
 - An audited model reaching the encoder with no registry entry **fails the request**. Registration
-  scans every registered table serializer ∪ every endpoint input/output descriptor, which covers
-  everything but a contextual serializer resolving to an unregistered audited type. That case should
-  be loud, not silent.
+  scans every endpoint input/output descriptor, which covers everything but a contextual serializer
+  resolving to an unregistered audited type. That case should be loud, not silent.
 
 ### 5.5 Field presence semantics
 
@@ -696,6 +750,30 @@ plus one.
 The audit stream is a typed event stream with pluggable sinks, not a single log. Auditors need to
 *query*; an encrypted object store is unqueryable by design. Expect at minimum a queryable sink
 (Postgres or a SIEM) for investigation alongside the tamper-evident total-log as system of record.
+
+**Shipped:** the database sink, written by `DisclosureLogInterceptor` straight into the
+`DisclosureRecord` table. It catches nothing, so an extraction that cannot resolve a model, a record
+with no `_id`, or a sink that will not take the write all abort the send before the value is
+serialized.
+
+### 5.10 How extraction works
+
+`DisclosureExtractor` walks the outgoing value with its own serializer, as a custom `Encoder`. Using
+the serializer rather than reflection means what is observed is exactly what the client will receive,
+and that a model cannot slip through a shape the walk does not understand.
+
+Three things are worth knowing about it:
+
+- **Field presence is judged on the value, not on the format.** A default is a default whether or not
+  the encoder in use would have elided it, which keeps [5.5](#55-field-presence-semantics) true
+  regardless of content negotiation.
+- **Paths are resolved once per (model, position, descriptor) and cached.** A list of ten thousand
+  records enters the same descriptor at the same path ten thousand times; without the cache every
+  field of every record would rebuild its path string and hash it against the registry.
+- **`Partial` is unwrapped explicitly.** `PartialSerializer` builds a descriptor named for `Partial`
+  that carries none of the model's class annotations, so `@Audited` is invisible on it. The extractor
+  reads `PartialSerializer.source` instead. Without that, a partial query would have disclosed an
+  audited model with no record at all — the exact hole this design exists to close.
 
 ---
 
@@ -916,13 +994,11 @@ Sequenced so each step is independently shippable and testable, and so prerequis
    ([section 5.3.2](#532-blocking-prerequisite-the-bitwise-conditions-were-broken-in-every-engine))
    — blocks the disclosure log's queryability, and is a live bug worth fixing on its own merits.
    Must ship with per-engine conformance tests, not in-memory ones.
-6. **Disclosure log** ([section 5](#5-layer-2-the-disclosure-log-audited)) — the largest piece.
-   - ~~Typed-output interception, marker, record shape, bit registry~~ — **DONE.** `:audit`,
-     `:audit-shared`, and `TypedOutputInterceptor` in `core`.
-   - **Extraction, the request record, and sinks** — remaining. A recording `Encoder` that walks a
-     value with its serializer and emits one record per audited instance it finds; the
-     [`RequestRecord`](#58-the-request-record--what-requestid-points-at) table the disclosures refer
-     to; and the fail-closed database sink. Implements the `_id`-in-partials rule from 5.3.3.
+6. ~~**Disclosure log**~~ ([section 5](#5-layer-2-the-disclosure-log-audited)) — **DONE.** Typed-output
+   interception, the marker, the record shape and bit registry, the recording `Encoder`, the
+   [`RequestRecord`](#58-the-request-record--what-requestid-points-at) table with its two-write
+   lifecycle, the fail-closed database sink, and the `_id`-in-partials rule from 5.3.3. Included as
+   the `DisclosureAudit` module.
 7. **Data access log: conditions and sorts** ([section 6.1](#61-extend-it-to-reads-every-condition-and-every-sort))
    — moved ahead of the total-log, because it is what closes the aggregation and oracle channels
    rather than a later refinement. Extends the existing write auditing at the database layer to
@@ -1016,14 +1092,17 @@ appends, so recording a read of the log simply produces one more record.
 Separation of duties between reading the log and administering it remains worth having, but it is an
 IAM/deployment concern, not a framework design concern.
 
-### 11.5 Bitfield width — four `Int`s (resolved)
+### 11.5 Bitfield width — two `Int`s (resolved)
 
-128 bits across four `Int` columns. See
-[5.3.1](#531-why-four-ints-and-not-long-ulong-or-bytearray) for the reasoning — `Int` is the only
+64 bits across two `Int` columns. See
+[5.3.1](#531-why-int-columns-and-not-long-ulong-or-bytearray) for the reasoning — `Int` is the only
 bitwise-queryable type in the framework — and
 [5.3.2](#532-blocking-prerequisite-the-bitwise-conditions-were-broken-in-every-engine) for the two
 rounds of engine bugs that had to be fixed first.
 
-Widened from 96 during implementation: 128 leaves more headroom, and with nested fields getting their
-own bit indices ([5.4.1](#541-nested-fields)) a model's path count grows faster than its property
-count.
+Went 96 → 128 → 64 during implementation. It was widened when every field was itemised automatically,
+because nested paths ([5.4.1](#541-nested-fields)) grow faster than property counts and dead indices
+accumulate forever. Making itemising opt-in
+([5.1.1](#511-itemising-is-opt-in-disclosure-is-not)) removed the pressure entirely: a model reserves
+bits for the few fields that matter to an audit, so two columns is ample and saves eight bytes on
+every row.

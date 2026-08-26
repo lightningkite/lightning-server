@@ -19,30 +19,31 @@ class DescriptorWalkTest {
         assertTrue(found.any { it.endsWith("Order") }, "found $found")
     }
 
+    /**
+     * Only annotated properties get paths, but the walk still traverses everything — `phones` is not
+     * itemised yet `phones[].number` beneath it is, and the whole `tags` subtree contributes nothing.
+     */
     @Test
-    fun `field paths descend into structures and stop at anything with its own record`() {
+    fun `paths are the annotated properties, found however deeply they nest`() {
         assertEquals(
-            listOf(
-                "_id",
-                "name",
-                "ssn",
-                "address",
-                "address.street",
-                "address.city",
-                "phones",
-                "phones[].number",
-                "phones[].label",
-                "tags",
-                "doctor",
-            ),
+            listOf("name", "ssn", "address", "address.street", "phones[].number", "doctor"),
             Patient.serializer().descriptor.auditFieldPaths(),
         )
     }
 
+    /** `_id` is recorded as the disclosure's `recordId`, so spending a bit on it would be redundant. */
     @Test
-    fun `a sealed field gets a path per subclass`() {
-        val paths = Order.serializer().descriptor.auditFieldPaths()
-        assertEquals(listOf("_id", "payment", "payment(Card).last4", "payment(Cash).amount"), paths)
+    fun `an unannotated id gets no bit`() {
+        assertTrue("_id" !in Patient.serializer().descriptor.auditFieldPaths())
+    }
+
+    @Test
+    fun `a sealed field gets a path per annotated subclass field`() {
+        assertEquals(
+            listOf("payment", "payment(Card).last4"),
+            Order.serializer().descriptor.auditFieldPaths(),
+            "Cash.amount is not annotated, so it contributes nothing",
+        )
     }
 
     /** A model that contains itself must not walk forever. */
