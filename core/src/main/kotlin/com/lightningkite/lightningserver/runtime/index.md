@@ -22,6 +22,10 @@ This package contains the core runtime system for Lightning Server applications.
 
 - **[ExecutionRuntime.kt](ExecutionRuntime.kt)** - Mints a [ServerRuntime] from an engine plus an initiator.
 
+- **[ExecutionInterceptor.kt](ExecutionInterceptor.kt)** - Wraps every execution the server runs, of every kind — HTTP,
+  each WebSocket phase, tasks, schedules, startup and pre-deploy — rather than one kind each, as the HTTP and WebSocket
+  interceptors do. Installed on a `ServerBuilder`; first installed is outermost.
+
 - **[Engine.ext.kt](Engine.ext.kt)** - Extension functions for convenient engine operations including
   setting access via `invoke()`, the clock, and location lookups for handlers and tasks.
 
