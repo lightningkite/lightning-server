@@ -1,6 +1,6 @@
 # Plan: Execution Context Refactor (`Engine` / `ServerRuntime` / `Initiator`)
 
-Status: **approved, in implementation**
+Status: **complete.** All stages landed; see the commits named below.
 Target: Lightning Server 5.x
 Prerequisite for: the remaining layers of [`audit-logging.md`](audit-logging.md)
 
@@ -311,7 +311,11 @@ typed socket in the repo follow.
 
 - Add per 3.4, install on `ServerBuilder`, apply at the seam.
 - Collapse the four `executeWithMetrics` overloads into one.
-- Existing telemetry becomes a built-in interceptor.
+- ~~Existing telemetry becomes a built-in interceptor.~~ **Not done, and it should not be.**
+  An interceptor sees only `(runtime, cont)`, but the spans need attributes the initiator
+  deliberately does not carry (§2.3), post-hoc enrichment a bare generic `T` cannot reach, and
+  per-kind span names. Converting would reshape spans that production dashboards observe. This
+  bullet was an aspiration that does not survive contact with what the spans actually carry.
 
 ---
 
@@ -319,3 +323,34 @@ typed socket in the repo follow.
 
 Everything downstream in `audit-logging.md` — the disclosure log, data access log and auth event log
 build on this, but none of them change here.
+
+
+---
+
+## 6. As-built notes
+
+Two things differ from the plan above, both deliberate:
+
+- **Stage 3 carried the initiator on the runtime and started minting at the seam**, which section 4
+  assigned to Stage 4. It was forced, not chosen: `DisclosureLogInterceptor` is reached through
+  `emitTypedOutput` from *inside handler bodies*, so a parameter would have to be added to
+  `HttpHandler.handle` and thus to every endpoint handler in the framework and in user code. The
+  runtime context is the only carrier already threaded to all three audit sites. Stage 4 therefore
+  changed *what* is minted, not *where*.
+- **Telemetry stays as `instrument` / `instrumentHttpRequest`**, per the struck bullet above.
+
+### Known gaps left behind
+
+- `RequestRecord` for a socket is keyed by `socketId`, so a disclosure during a message phase answers
+  "sometime during this session" rather than "in response to this message". Non-regressing, since a
+  socket's correlation id was already lifetime-constant. Finer attribution means a row per phase —
+  see `audit-logging.md` §5.8.2.
+- `Runtime<T>` resolves against an `Engine`, so anything inside a `Runtime { }` lambda can never read
+  an initiator. That includes the file validators in `files/validation.kt`, whose lambdas run during
+  request handling.
+- An `ExecutionInterceptor` cannot substitute the `ServerRuntime` seen by the handler; the seam holds
+  the runtime it minted.
+- `TestRunner` drives WebSocket phases directly rather than through the `*WithMetrics` helpers, so
+  neither execution interceptors nor telemetry fire for sockets under test.
+- Eight typed test helpers in `typed/testing.kt` still run on `Initiator.Direct`, so disclosures from
+  them reference no `RequestRecord`. Pre-existing, and true before this work too.
