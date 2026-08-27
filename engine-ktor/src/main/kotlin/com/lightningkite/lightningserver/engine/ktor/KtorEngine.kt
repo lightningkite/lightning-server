@@ -320,6 +320,25 @@ public class KtorEngine(
                     val startingState =
                         socketHandler.willConnectWithMetrics(match.pathSpec, this@KtorEngine, connectInitiator, request)
                     var closingMid: WebSocketConnection<PathSpec, Any?>? = null
+
+                    // Disconnect is the socket's cleanup phase, so it has to outlive the cancellation
+                    // that ends the socket. Shutting the server down cancels this coroutine, and a
+                    // suspending call in a cancelled coroutine fails before it runs anything, which
+                    // skipped the handler's cleanup and its span together and left the socket's last
+                    // phase with no trace at all.
+                    suspend fun emitDisconnect(
+                        mid: WebSocketConnection<PathSpec, Any?>,
+                        reason: WebSocketClose,
+                    ): Unit = withContext(NonCancellable) {
+                        socketHandler.disconnectWithMetrics(
+                            match.pathSpec,
+                            this@KtorEngine,
+                            connectInitiator.phase(Initiator.WebSocket.Phase.Disconnect),
+                            mid,
+                            reason,
+                        )
+                    }
+
                     try {
 
                         val mid = object : LocalWebSocketConnection<PathSpec, Any?>(
@@ -370,24 +389,13 @@ public class KtorEngine(
                             )
                         }
 
-                        closingMid.let { mid ->
-                            socketHandler.disconnectWithMetrics(
-                                match.pathSpec,
-                                this@KtorEngine,
-                                connectInitiator.phase(Initiator.WebSocket.Phase.Disconnect),
-                                mid,
-                                WebSocketClose.NORMAL
-                            )
-                        }
+                        closingMid.let { mid -> emitDisconnect(mid, WebSocketClose.NORMAL) }
                     } catch (e: Throwable) {
                         closingMid?.let { mid ->
-                            socketHandler.disconnectWithMetrics(
-                                match.pathSpec,
-                                this@KtorEngine,
-                                connectInitiator.phase(Initiator.WebSocket.Phase.Disconnect),
+                            emitDisconnect(
                                 mid,
                                 ((e as? HttpStatusException)?.status
-                                    ?: HttpStatus.InternalServerError).bestWebSocketCloseCode
+                                    ?: HttpStatus.InternalServerError).bestWebSocketCloseCode,
                             )
                         }
                     }
