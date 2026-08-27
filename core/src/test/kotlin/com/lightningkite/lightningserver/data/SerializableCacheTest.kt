@@ -10,10 +10,21 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import kotlin.test.*
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Instant
 
 class SerializableCacheTest {
     object TestServer : ServerBuilder()
+
+    /**
+     * A clock the test advances by hand. Expiry is a property of the server's clock, so sleeping a
+     * real thread past a short deadline only tests how loaded the machine is: under a full parallel
+     * build a single `set` has taken 170ms, longer than the 100ms deadline it was establishing.
+     */
+    private class MovableClock(var instant: Instant) : Clock {
+        override fun now(): Instant = instant
+    }
 
     @Serializable
     data class User(val name: String, val age: Int)
@@ -49,8 +60,10 @@ class SerializableCacheTest {
 
     @Test
     fun testWithExpiration() {
+        val clock = MovableClock(Instant.fromEpochSeconds(1_700_000_000))
         TestServer.test(
-            settings = { generalSettings set GeneralServerSettings() }
+            settings = { generalSettings set GeneralServerSettings() },
+            clock = { clock },
         ) {
             runBlocking {
                 val cache = SerializableCache()
@@ -63,8 +76,7 @@ class SerializableCacheTest {
                 cache.set(key, "test")
                 assertEquals("test", cache.get(key))
 
-                // Wait for expiration
-                kotlinx.coroutines.delay(20)
+                clock.instant += 20.milliseconds
 
                 // Should be expired now
                 assertNull(cache.get(key))
@@ -325,8 +337,10 @@ class SerializableCacheTest {
 
     @Test
     fun testExpirationCleansUpCache() {
+        val clock = MovableClock(Instant.fromEpochSeconds(1_700_000_000))
         TestServer.test(
-            settings = { generalSettings set GeneralServerSettings() }
+            settings = { generalSettings set GeneralServerSettings() },
+            clock = { clock },
         ) {
             runBlocking {
                 val cache = SerializableCache()
@@ -339,8 +353,7 @@ class SerializableCacheTest {
                 cache.set(key, "test")
                 assertTrue(cache.containsKey(key))
 
-                // Wait for expiration
-                kotlinx.coroutines.delay(200)
+                clock.instant += 200.milliseconds
 
                 // Accessing expired key should return null and clean up
                 assertNull(cache.get(key))
