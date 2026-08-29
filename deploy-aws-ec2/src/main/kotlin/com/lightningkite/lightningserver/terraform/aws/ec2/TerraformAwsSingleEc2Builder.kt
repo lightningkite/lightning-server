@@ -764,15 +764,15 @@ for i in $(seq 1 60); do
     sleep 5
 done
 
-# Wait for cloud-init (ec2_init.sh) to finish so the redeploy script and
-# systemd unit are guaranteed to be installed. On first apply this blocks
-# until ec2_init completes; on subsequent applies it returns immediately.
+# Wait for cloud-init (ec2_init.sh) to finish so the redeploy scripts are
+# guaranteed to be installed. cloud-init returns 2 for a completed-but-
+# degraded boot; accept that outcome only when both required scripts exist.
 log "Waiting for cloud-init to complete on $INSTANCE_ID..."
 WAIT_CMD_ID=$(aws ssm send-command \
     --instance-ids "$INSTANCE_ID" \
     --document-name "AWS-RunShellScript" \
     --comment "terraform redeploy: wait for cloud-init" \
-    --parameters 'commands=["cloud-init status --wait"],executionTimeout=900' \
+    --parameters 'commands=["set +e; cloud-init status --wait; cloud_init_exit=$?; set -e; if [ \"$cloud_init_exit\" -eq 0 ]; then exit 0; fi; if [ \"$cloud_init_exit\" -eq 2 ] && [ -x /usr/local/bin/lightning-server-redeploy ] && [ -x /usr/local/bin/lightning-server-predeploy ]; then echo \"cloud-init completed degraded; required deployment scripts are present\"; exit 0; fi; echo \"cloud-init did not complete provisioning (exit $cloud_init_exit)\" >&2; exit \"$cloud_init_exit\""],executionTimeout=900' \
     --region "$REGION" \
     --query 'Command.CommandId' \
     --output text)
