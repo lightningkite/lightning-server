@@ -56,7 +56,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
     public open val alarms: Map<String, LambdaAlarm>
         get() = LambdaAlarm.defaultSpendAlarms(
             computeSecondsPerMonth = (monthlyBudgetUsd / memory.gibibytes / 0.0000166667).seconds,
-            description = "$displayName Lambda Spend"
+            description = "$deploymentTag Lambda Spend"
         ).associate { it.description.lowercase().filter { it.isLetterOrDigit() || it == '-' } to it }
 
     override val additionalSettings: Set<ServerSetting<*, *>> = setOf(

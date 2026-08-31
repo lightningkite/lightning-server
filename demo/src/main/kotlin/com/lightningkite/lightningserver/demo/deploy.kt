@@ -94,9 +94,9 @@ object LkEnv : TerraformAwsServerlessDomainBuilder<Server>(Server) {
         )
         grafanaAlerts(
             grafanaCloudStackSlug = "lightningkite",
-            alerts = GrafanaAlert.httpErrors(displayName, errorThreshold = 5) +
-                    GrafanaAlert.httpLatency(displayName, p99ThresholdMs = 5000) +
-                    GrafanaAlert.httpLiveness(displayName),
+            alerts = GrafanaAlert.httpErrors(deploymentTag, errorThreshold = 5) +
+                    GrafanaAlert.httpLatency(deploymentTag, p99ThresholdMs = 5000) +
+                    GrafanaAlert.httpLiveness(deploymentTag),
         )
         cors.direct(
             CorsSettings(

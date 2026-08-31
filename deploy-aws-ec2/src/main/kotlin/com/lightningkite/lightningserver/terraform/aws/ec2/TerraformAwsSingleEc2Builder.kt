@@ -211,7 +211,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                 }
 
                 "tags" {
-                    "Name" - displayName
+                    "Name" - deploymentTag
                 }
 
                 "depends_on" - (listOf(
@@ -394,7 +394,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
             "resource.aws_eip.main" {
                 "domain" - "vpc"
                 "tags" {
-                    "Name" - displayName
+                    "Name" - deploymentTag
                 }
             }
 
@@ -423,7 +423,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
 
                     "resource.aws_security_group.ec2" {
                         "name" - "$projectPrefix-ec2"
-                        "description" - "$displayName single-instance access"
+                        "description" - "$deploymentTag single-instance access"
                         "vpc_id" - expression("data.aws_vpc.default.id")
                     }
                 }
@@ -432,7 +432,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
 
                     "resource.aws_security_group.ec2" {
                         "name" - "$projectPrefix-ec2"
-                        "description" - "$displayName single-instance access"
+                        "description" - "$deploymentTag single-instance access"
                         "vpc_id" - vpcInfo.id
                     }
                 }

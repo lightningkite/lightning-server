@@ -223,13 +223,13 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
             // ALB security group: accepts public HTTP/HTTPS, forwards to the instances.
             "resource.aws_security_group.alb" {
                 "name" - "$projectPrefix-alb"
-                "description" - "$displayName load balancer"
+                "description" - "$deploymentTag load balancer"
                 "vpc_id" - applicationVpc.id
             }
             // Instance security group: only the ALB may reach the application port.
             "resource.aws_security_group.instance" {
                 "name" - "$projectPrefix-instance"
-                "description" - "$displayName application instances"
+                "description" - "$deploymentTag application instances"
                 "vpc_id" - applicationVpc.id
             }
 
@@ -541,7 +541,7 @@ REGION="${'$'}AWS_REGION_NAME"""",
         val indentedScript = imageInstallScript().lines().joinToString("\n") { "              $it" }
         return """
 name: $projectPrefix-install
-description: Install base tooling for $displayName
+description: Install base tooling for $deploymentTag
 schemaVersion: 1.0
 phases:
   - name: build
@@ -788,7 +788,7 @@ $indentedScript
                 "tag_specifications" {
                     "resource_type" - "instance"
                     "tags" {
-                        "Name" - displayName
+                        "Name" - deploymentTag
                     }
                 }
             }
@@ -824,7 +824,7 @@ $indentedScript
                 "tag" - listOf(
                     terraformJsonObject {
                         "key" - "Name"
-                        "value" - displayName
+                        "value" - deploymentTag
                         "propagate_at_launch" - true
                     },
                     terraformJsonObject {
@@ -1004,7 +1004,7 @@ else
     apt-get $APT_OPTS autoremove
 fi
 
-log "Restarting $$displayName"
+log "Restarting $$deploymentTag"
 systemctl restart $$projectPrefix
 sleep 5
 if ! systemctl is-active --quiet $$projectPrefix; then
