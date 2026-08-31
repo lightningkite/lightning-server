@@ -398,7 +398,7 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
                     }
                 }
                 "resource.aws_kms_key.main" {
-                    "description" - "Customer-managed key for $displayName"
+                    "description" - "Customer-managed key for $deploymentTag"
                     "enable_key_rotation" - true
                     "policy" - kmsKeyPolicyJson()
                     // Ensure the SLR named in the key policy exists before the policy is validated.
@@ -548,7 +548,7 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
             "resource.aws_iam_policy.servicesAccess" {
                 "name" - "$projectPrefix-servicesAccess"
                 "path" - "/${projectPrefixPath}/servicesAccess/"
-                "description" - "Access to $displayName services"
+                "description" - "Access to $deploymentTag services"
                 "policy" - expression("jsonencode(local.servicesAccessPolicy)")
             }
             "resource.aws_iam_role_policy_attachment.servicesAccess" {
@@ -586,7 +586,7 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
                 "type" - "SecureString"
                 "value" - expression("random_password.settings.result")
                 if (sharedKmsKeyArn != null) "key_id" - expression("aws_kms_key.main.arn")
-                "description" - "AES-256 passphrase used to encrypt/decrypt the $displayName settings bundle"
+                "description" - "AES-256 passphrase used to encrypt/decrypt the $deploymentTag settings bundle"
             }
 
             // Settings file (raw)
@@ -894,7 +894,7 @@ sysctl -p /etc/sysctl.d/60-$$projectPrefix-swap.conf >/dev/null || true
 
 cat > /etc/systemd/system/$$projectPrefix-swap.service << 'SWAP_UNIT_EOF'
 [Unit]
-Description=$${displayName} swap file
+Description=$${deploymentTag} swap file
 After=local-fs.target
 Before=$$projectPrefix.service
 
@@ -924,10 +924,10 @@ systemctl enable $$projectPrefix-swap.service
         appendLine(
             $$"""
 # === Systemd Service ===
-echo "[INFO] Creating Systemd unit for $$displayName"
+echo "[INFO] Creating Systemd unit for $$deploymentTag"
 cat > /etc/systemd/system/$$projectPrefix.service << 'UNIT_EOF'
 [Unit]
-Description=$${displayName}
+Description=$${deploymentTag}
 After=network.target
 Requires=network.target
 
@@ -1075,7 +1075,7 @@ rm -f "$APP_DIR/settings.enc"
 chown -R ubuntu:ubuntu "$APP_DIR"
 chmod 600 "$APP_DIR/settings.json"
 
-log "Restarting $$displayName"
+log "Restarting $$deploymentTag"
 systemctl restart $$projectPrefix
 sleep 5
 if ! systemctl is-active --quiet $$projectPrefix; then

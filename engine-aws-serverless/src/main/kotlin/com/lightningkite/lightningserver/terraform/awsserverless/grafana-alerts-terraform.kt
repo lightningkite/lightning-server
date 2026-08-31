@@ -151,9 +151,9 @@ public data class GrafanaAlert(
  *     telemetrySettings.otelGrafanaCloud(instanceId = "123456", zone = "prod-us-east-0")
  *     grafanaAlerts(
  *         grafanaCloudStackSlug = "myteam",
- *         alerts = GrafanaAlert.httpErrors(displayName, errorThreshold = 5) +
- *                  GrafanaAlert.httpLatency(displayName, p99ThresholdMs = 5000) +
- *                  GrafanaAlert.httpLiveness(displayName),
+ *         alerts = GrafanaAlert.httpErrors(deploymentTag, errorThreshold = 5) +
+ *                  GrafanaAlert.httpLatency(deploymentTag, p99ThresholdMs = 5000) +
+ *                  GrafanaAlert.httpLiveness(deploymentTag),
  *     )
  * }
  * ```
@@ -215,12 +215,12 @@ public fun grafanaAlerts(
 
         // Create a folder to isolate this project's alerts
         "resource.grafana_folder.$safePrefix" {
-            "title" - "${emitter.displayName} Alerts"
+            "title" - "${emitter.deploymentTag} Alerts"
         }
 
         // Create a contact point for this project
         "resource.grafana_contact_point.$safePrefix" {
-            "name" - "${emitter.displayName} Alerts"
+            "name" - "${emitter.deploymentTag} Alerts"
             "email" {
                 "addresses" - listOf(contactEmail.raw)
                 "single_email" - true
@@ -229,13 +229,13 @@ public fun grafanaAlerts(
 
         // Create rule group with all alerts
         "resource.grafana_rule_group.$safePrefix" {
-            "name" - "${emitter.displayName} Application Alerts"
+            "name" - "${emitter.deploymentTag} Application Alerts"
             "folder_uid" - expression("grafana_folder.$safePrefix.uid")
             "interval_seconds" - evaluationIntervalSeconds
 
             for (alert in alerts) {
                 "rule" - terraformJsonObject {
-                    "name" - "${emitter.displayName}: ${alert.name}"
+                    "name" - "${emitter.deploymentTag}: ${alert.name}"
                     "condition" - "A"
                     "for" - "${alert.forDuration.inWholeSeconds}s"
 
