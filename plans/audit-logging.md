@@ -869,10 +869,27 @@ it.
 
 Two things that effort has to settle:
 
-- **`requestId` must be reachable from the database layer**, or these records cannot join to
-  anything. Today a `Table` is obtained inside a `ServerRuntime`, which does not by itself carry the
-  request. **Resolved in principle: change the `ModelInfo` signature** so the request travels with
-  the table rather than being fished out of ambient context.
+- ~~**`requestId` must be reachable from the database layer**~~ — **no longer a prerequisite, and the
+  proposed signature change is unnecessary.** Since the execution-context refactor a `ServerRuntime`
+  carries `initiator.executionId`, and every seam below already runs in one. Nothing needs to travel
+  with the table.
+- **The insertion point already exists and is unused.** `ModelInfo` declares a `log` decorator slot
+  (`typed/.../ModelInfo.kt:103`):
+
+  ```kotlin
+  log: context(ServerRuntime) AuthAccess<USER>?.(Table<T>) -> Table<T> = { it },
+  ```
+
+  It defaults to identity, nothing in either repository passes it, and it is applied in **both**
+  `table(auth)` and `table()` — so a decorator installed here sees the privileged internal reads that
+  [2.1](#21-why-the-typed-layer-and-not-the-database-layer-for-disclosure) requires this layer to
+  cover, as well as user-facing ones. It sits below permissions, which is where a recorder of
+  *attempted* access belongs.
+
+  Consequence for sizing: this is a `Table` decorator in `lightning-server`, wrapping the read and
+  write methods and recording `(condition, sort, modification)`. **No `service-abstractions` change
+  is required** — `Table` is the interface, and the decorator lives on this side of it. What is still
+  unspecified is the record shape.
 - **Scope and failure mode.** Recording every query on every model would be a firehose; this should
   be scoped to audited models, and should be fail-closed there for the same reason disclosure is.
 
@@ -1134,6 +1151,14 @@ accepts the added key management.
 This must be decided per model *before* its sinks receive their first record, because it determines
 how records are encrypted at rest. It cannot be retrofitted to existing records — that is the whole
 point of crypto-shredding.
+
+> **Unbuilt, and this section being "resolved" hides a shipping hazard.** `AuditSubjectKey` does not
+> exist in the repository — it is design-only, verified 2026-09. The disclosure log
+> ([step 6](#9-implementation-order)) *has* shipped. Because the decision above cannot be applied
+> retroactively, any deployment that might ever face an erasure request must not enable audited
+> models until this mechanism exists: records written before it are permanently unshreddable. For a
+> US-only deployment that is the intended default and no action is needed. This is an ordering
+> constraint on deployment, not on implementation, which is why it does not appear in section 9.
 
 ### 11.3 Auth events — resolved, see section 7
 
