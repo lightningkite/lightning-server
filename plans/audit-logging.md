@@ -1048,18 +1048,37 @@ Sequenced so each step is independently shippable and testable, and so prerequis
    lifecycle, the fail-closed database sink, and the `_id`-in-partials rule from 5.3.3. Included as
    the `DisclosureAudit` module.
 7. **Data access log: conditions and sorts** ([section 6.1](#61-extend-it-to-reads-every-condition-and-every-sort))
+   — **NOT STARTED, and larger than described.** Section 6 opens by asserting "write auditing already
+   exists at `ModelPermissionsTable`". Verified 2026-09: it does not. That class enforces permissions
+   and records nothing; `simpleSignals.kt` provides generic `postCreate`/`postChange`/`postDelete`
+   decorators, but nothing in either repository writes an audit record from the database layer. So
+   this step is a build of the recording layer for reads *and* writes, not an extension of an
+   existing one, and no record shape is specified anywhere yet.
+
+   The `requestId`-reachability blocker below is, however, largely resolved: `ModelInfo.table()` is
+   already `context(ServerRuntime)`, and since the execution-context refactor a `ServerRuntime`
+   carries `initiator.executionId`. The remaining question is placement — `ModelPermissionsTable`
+   lives in service-abstractions and cannot see Lightning Server types, so the recording decorator
+   belongs on this side.
    — moved ahead of the total-log, because it is what closes the aggregation and oracle channels
    rather than a later refinement. Extends the existing write auditing at the database layer to
    record every condition and sort applied to an audited model.
 8. **Total-log: hash chaining and anchoring** ([section 5.7](#57-integrity-not-in-the-database-log))
    — separate from the database log, and what lets audited models stream over WebSockets.
 9. **Auth event log** ([section 7](#7-layer-4-the-authentication-event-log)) — the largest greenfield
-   piece, since nothing exists to extend. Start with the two cheap unblocking changes: give
-   `sessionInfo` a `signals` parameter ([7.2](#72-no-usable-extension-point-exists)), and turn the
-   existing debug `println` failure strings into a failure-reason enum
-   ([7.3](#73-design)). The three adverse findings in
-   [7.1](#71-survey-findings) — hard-deletable session rows, self-destroying backup-code evidence,
-   and the fabricated `"test"` IP — are independently worth fixing and can ship ahead of the rest.
+   piece, since nothing exists to extend. **Groundwork done; the event log itself is not.** Both
+   cheap unblockers have shipped: `sessionInfo` now takes a `signals` parameter
+   ([7.2](#72-no-usable-extension-point-exists)), and the debug `println` failure strings are now the
+   `AuthFailureReason` enum behind a single seam ([7.3](#73-design)). All three adverse findings in
+   [7.1](#71-survey-findings) are fixed: session rows are no longer deletable (termination remains),
+   a redeemed backup code is retained and marked rather than deleted, and the fabricated `"test"` IP
+   and empty user agent are no longer recorded. What remains is the event record type, its sinks,
+   and emission at each of the events listed in [7.3](#73-design).
+
+   Correction found while doing that work: 7.2 says the table-decoration approach is unavailable for
+   `sessionInfo`. That is true of `signals` specifically, but `ModelInfo.registerChangeListener` is
+   public, already applied to the session table, and already sufficient to observe creates, updates
+   and deletes. The `signals` seam is still the wider one — it also sees reads.
 
 ## 10. Out of scope: external capture layer
 
