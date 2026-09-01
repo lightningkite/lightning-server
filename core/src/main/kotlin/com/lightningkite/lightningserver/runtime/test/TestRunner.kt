@@ -18,6 +18,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Clock
+import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**
@@ -63,7 +64,9 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
      * invocation that mints [Initiator.Direct] — see its documentation for why that hole exists.
      */
     @OptIn(InternalLightningServerApi::class)
-    override val initiator: Initiator = Initiator.Direct(Uuid.random())
+    override val initiator: Initiator = Initiator.Direct(
+        @OptIn(ExperimentalUuidApi::class) Uuid.generateV7NonMonotonicAt(clock.now())
+    )
 
     public companion object {
         internal val logger = KotlinLogging.logger("com.lightningkite.lightningserver.TestRunner")

@@ -10,7 +10,6 @@ import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.Initiator
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.websockets.DelegatingWebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
@@ -94,7 +93,6 @@ public class RequestRecordInterceptor(
         _id = runtime.initiator.requestRecordId,
         parentRequestId = runtime.initiator.causedBy,
         rootExecutionId = runtime.initiator.rootExecutionId,
-        at = now(),
         principal = principalOrNull(),
         sourceIp = sourceIp,
         endpoint = endpoint,

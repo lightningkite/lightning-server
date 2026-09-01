@@ -5,6 +5,7 @@ import com.lightningkite.services.data.Index
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.Serializable
 import kotlin.time.Instant
+import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**
@@ -16,6 +17,16 @@ import kotlin.uuid.Uuid
  * [com.lightningkite.lightningserver.auth.AccessLogInterceptor], which writes log lines and is
  * deliberately fail-open: "the access log must never be the reason a request fails" is the opposite
  * of what a fail-closed log needs from the thing it references.
+ *
+ * ## When is embedded in the id, not stored
+ * There is no `at` column. The execution id is a version-7 UUID minted at the instant an execution
+ * began (see [com.lightningkite.lightningserver.http.generateRequestId]), so the mint time is in the
+ * id itself and [at] is derived from it. Keeping the instant out of the row means the id's
+ * time-ordering (its reason for being v7) and the row's timestamp can never disagree, and time-window
+ * queries range over the primary key rather than an indexed copy of the same instant. The single
+ * thing this trades away is sub-millisecond precision: v7 encodes whole milliseconds, the instant
+ * that once lived here could have carried nanoseconds, and a lost request will now name the
+ * millisecond it began in rather than its exact tick.
  *
  * @property _id The execution id itself. Using it as the primary key means no second column and no
  *   second index, and it makes a duplicate id a primary-key violation rather than a silent merge of
@@ -46,7 +57,6 @@ public data class RequestRecord(
     override val _id: Uuid,
     @Index val parentRequestId: Uuid? = null,
     @Index val rootExecutionId: Uuid,
-    @Index val at: Instant,
     @Index val principal: String? = null,
     val sourceIp: String,
     val endpoint: String,
@@ -56,5 +66,25 @@ public data class RequestRecord(
     val engineRequestId: String? = null,
     val upstreamRequestId: String? = null,
 ) : HasId<Uuid> {
+    /** The instant this execution began, derived from the version-7 [_id]'s embedded timestamp. */
+    @OptIn(ExperimentalUuidApi::class)
+    public val at: Instant
+        get() = Instant.fromEpochMilliseconds(_id.epochMilliseconds)
+
     public companion object
 }
+
+/**
+ * The epoch-millisecond timestamp a version-7 UUID embeds, or 0 for any other version.
+ *
+ * V7 lays the 48-bit millisecond timestamp into the top bits of the most-significant word, so a
+ * right-shift by 16 recovers it. Any other version (an adopted proxy id, a legacy v4) stores no
+ * timestamp there, so reading the bits blindly would report a plausible-looking but meaningless
+ * instant; we check the version nibble first and return 0 instead, which [RequestRecord.at] renders
+ * as the epoch — candid about "unknown" rather than wrong.
+ */
+@OptIn(ExperimentalUuidApi::class)
+private val Uuid.epochMilliseconds: Long
+    get() = toULongs { mostSignificantBits, _ ->
+        if (((mostSignificantBits shr 12) and 0xFUL) != 0x7UL) 0L else (mostSignificantBits shr 16).toLong()
+    }

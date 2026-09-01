@@ -721,22 +721,32 @@ fail-closed log needs from its referent. The audit package carries its own:
 ```kotlin
 @Serializable
 public data class RequestRecord(
-    override val _id: String,          // the requestId itself: no extra column, join on the PK
-    val parentRequestId: String? = null,
-    val at: Instant,
-    val principal: String?,
+    override val _id: Uuid,            // the execution id itself: no extra column, join on the PK
+    val parentRequestId: Uuid? = null,
+    val rootExecutionId: Uuid,         // the head of this row's causal chain
+    // no `at` column — see below
+    val principal: String? = null,
     val sourceIp: String,
     val endpoint: String,              // the route pattern, not the literal target
     val method: String,
     val outcome: String? = null,       // null while the request is still in flight
     val durationMs: Long? = null,
+    val engineRequestId: String? = null, // the gateway's own id, for joining back to its logs
     val upstreamRequestId: String? = null,
-) : HasId<String>
+) : HasId<Uuid>
 ```
 
 A duplicate `_id` **fails the request**. A repeated trusted request id means a misconfigured proxy is
 about to merge two principals' activity under one identifier, which is exactly what
 [3.2](#32-sourcing-and-the-trust-rule)'s trust rule exists to prevent, so it must be loud.
+
+**The timestamp is in the id, not a column.** Every execution id is a version-7 UUID minted at the
+instant the execution began (see `execution-context-refactor.md` §2.6), so `_id` embeds its own mint
+time and `RequestRecord.at` is a derived property that recovers it. This is why the id is v7 at all:
+it orders the append-mostly log by insertion time (range queries over the PK instead of an indexed
+copy) and keeps the row's "when" permanently consistent with its id. The price is whole-millisecond
+precision only. Ids that were *adopted* from a trusted proxy (which may be any version) carry no
+timestamp and degrade to the epoch rather than misreporting — honest about "unknown."
 
 #### 5.8.1 Write ordering (resolved)
 

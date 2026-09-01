@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.engine.awsserverless
 
-import kotlin.uuid.Uuid
 import com.lightningkite.lightningserver.AnonType
 import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.definition.generalSettings
@@ -267,7 +266,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                             h.messageFromSubscriptionWithMetrics(
                                 p.pathSpec,
                                 root,
-                                s.initiator.phase(Initiator.WebSocket.Phase.SubscriptionMessage),
+                                with(root) { s.initiator.phase(Initiator.WebSocket.Phase.SubscriptionMessage) },
                                 mid,
                                 WebSocketSubscriptionMessage(
                                     fullTopicMatch.value,
@@ -354,7 +353,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                 rootWs.didConnectWithMetrics(
                     rootPath,
                     root,
-                    event.initiator.phase(Initiator.WebSocket.Phase.Connected),
+                    with(root) { event.initiator.phase(Initiator.WebSocket.Phase.Connected) },
                     mid
                 )
                 return APIGatewayV2HTTPResponse(200)
@@ -408,7 +407,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                 // is one identity across the five separate Lambda invocations its lifetime is made of.
                 // The gateway's connection ID is not a UUID and stays in [engineSocketId], which is where
                 // the join to the gateway's own logs comes from.
-                val socketId = Uuid.random()
+                val socketId = with(root) { generateRequestId() }
                 val connectInitiator = Initiator.WebSocket(
                     executionId = socketId,
                     socketId = socketId,
@@ -474,7 +473,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         rootWs.disconnectWithMetrics(
                             rootPath,
                             root,
-                            state.initiator.phase(Initiator.WebSocket.Phase.Disconnect),
+                            with(root) { state.initiator.phase(Initiator.WebSocket.Phase.Disconnect) },
                             mid,
                             WebSocketClose.NORMAL
                         )
@@ -519,7 +518,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         rootWs.messageFromClientWithMetrics(
                             rootPath,
                             root,
-                            state.initiator.phase(Initiator.WebSocket.Phase.ClientMessage),
+                            with(root) { state.initiator.phase(Initiator.WebSocket.Phase.ClientMessage) },
                             mid,
                             WebSocketFrame(event.body)
                         )

@@ -126,7 +126,7 @@ public suspend fun ServerRuntime.handleSubRequest(request: HttpRequest<PathSpec>
         "Sub-requests may only be dispatched from inside an HTTP execution, so that they can be " +
             "parented to the request that carried them; ${request.path} was dispatched from $outer."
     }
-    val runtime = forExecution(outer.subRequest(request.path))
+    val runtime = forExecution(with(this) { outer.subRequest(request.path) })
     return with(runtime) {
         instrumentHttpRequest(request) {
             val outcome = runtime.inExecution { runtime.dispatchLogicalRequest(request) }
@@ -440,7 +440,7 @@ private suspend fun Engine.executeTaskLike(
     cause: ExecutionCause?,
     body: suspend context(ServerRuntime) () -> Unit,
 ) {
-    val executionId = Uuid.random()
+    val executionId = with(this) { generateRequestId() }
     val runtime = forExecution(
         kind.initiator(
             executionId,

@@ -96,11 +96,19 @@ per disclosure; it just lets the request log answer in one hop.
 
 Both are **framework-set**. User code never constructs an `Initiator`.
 
-### 2.6 Ids are `Uuid`, and AWS ids are never adopted
+### 2.6 Ids are `Uuid`, are version 7, minted at the selected clock — and AWS ids are never adopted
 
-`generateRequestId()` currently calls `SecureRandom.getInstanceStrong()` **per request** — a provider
+`generateRequestId()` originally called `SecureRandom.getInstanceStrong()` **per request** — a provider
 lookup every time, and on Linux the default strong algorithm is `NativePRNGBlocking`, i.e. a blocking
-`/dev/random` read on the request path. `Uuid.random()` replaces it.
+`/dev/random` read on the request path. The ids are now **version-7 UUIDs** minted as
+`Uuid.generateV7NonMonotonicAt(engine.clock.now())` — `Uuid.random()` (v4) in two steps replaced by one
+call that reads the **selected clock for the execution** (the same `Engine.clock` as
+[`now()`](execution-context-refactor.md)), so a test's injected clock controls the id's embedded
+timestamp. Using v7 does two things: it makes the ids roughly time-ordered (so the append-mostly
+audit log inserts and its "last N" scans stay hot), and it *embeds the mint time in the id itself*,
+which is what lets `RequestRecord` drop its separate `at` column and derive the instant from the id.
+Every execution-id minting site — engines, initiator sub-request/phase/sub-connection, task runs,
+and `TestRunner.Direct` — goes through this generator so the derivation and the ordering are uniform.
 
 API Gateway ids are **not** UUIDs and not 128 bits (HTTP API request ids and WebSocket connection ids
 are both the compact ~11-byte base64 form). We do not attempt to map them. We always mint our own.
@@ -256,13 +264,18 @@ phases, tasks, schedules, startup **and** pre-deploy uniformly.
 
 Each stage is one commit, must compile, and must leave `./gradlew check` no worse than the baseline.
 
-### Stage 1 — Request ids become `Uuid`
+### Stage 1 — Request ids become `Uuid` (version 7, at the selected clock)
 
-- `generateRequestId()` → `Uuid.random()`; drop the `SecureRandom` path entirely.
+- `generateRequestId()` → `Uuid.generateV7NonMonotonicAt(engine.clock.now())` as a
+  `context(engine: Engine)` function; drop the `SecureRandom` path entirely. Route every
+  execution-id minting site (engines, `subRequest`/`phase`/`subConnection`, task runs,
+  `TestRunner.Direct`) through it.
 - `Request.requestId` / `parentRequestId` → `Uuid` / `Uuid?`.
 - `RequestRecord._id` / `parentRequestId` → `Uuid` / `Uuid?`; `DisclosureRecord.requestId` → `Uuid`.
+- `RequestRecord` drops its `at` column; `RequestRecord.at` becomes a derived property reading the
+  v7 timestamp from `_id`. See `audit-logging.md` §5.8.
 - Add `RequestRecord.engineRequestId: String?` (see 2.6), separate from `upstreamRequestId`.
-- AWS: mint our own `Uuid`; put `requestContext.requestId` in `engineRequestId`. Do **not** adopt.
+- AWS: mint our own `Uuid` (v7); put `requestContext.requestId` in `engineRequestId`. Do **not** adopt.
   WebSocket keeps `connectionId` in `engineSocketId` as it already does.
 - Trusted-proxy header path: parse to `Uuid`, generate on failure.
 - Known break, already documented and accepted in `audit-logging.md` §3.1: DynamoDB rows holding a
