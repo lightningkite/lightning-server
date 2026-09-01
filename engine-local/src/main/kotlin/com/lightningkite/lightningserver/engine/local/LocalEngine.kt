@@ -84,6 +84,20 @@ public abstract class LocalEngine(server: ServerDefinition) : EngineBase(server)
     protected open val scope: CoroutineScope = GlobalScope
 
     /**
+     * Scope for work that is *triggered by* teardown and therefore cannot live under [scope].
+     *
+     * A socket's disconnect phase is the motivating case: shutdown closes the channel, closing the
+     * channel is what asks us to run disconnect, and shutdown also cancels [scope]. Launching that
+     * cleanup into [scope] yields a coroutine that is born already cancelled and never runs its body
+     * at all, so the socket's final phase — its unsubscribes, its span, its audit row — is silently
+     * lost for every socket still open at shutdown.
+     *
+     * [gracefulShutdown] drains this scope while the services those handlers write to are still
+     * connected, and cancels it last.
+     */
+    protected val cleanupScope: CoroutineScope = CoroutineScope(SupervisorJob() + CoroutineName("engine-cleanup"))
+
+    /**
      * A unique identifier for this server instance, derived from the network interface's hardware address.
      * Falls back to "?" if no network interfaces are available.
      */
@@ -295,9 +309,11 @@ public abstract class LocalEngine(server: ServerDefinition) : EngineBase(server)
      *    [EngineReliabilitySettings.shutdownDrainTimeout]) for in-flight requests to finish. Each
      *    engine supplies its own drain because the mechanism is engine-specific (Netty event-loop
      *    shutdown, JDK `HttpServer.stop`, Ktor `ApplicationEngine.stop`).
-     * 3. Disconnects every service goal (mirrors the AWS adapter's connect/disconnect loop) so
+     * 3. Drains [cleanupScope] — the socket disconnects this shutdown just raised — so they complete
+     *    while the services they depend on are still connected.
+     * 4. Disconnects every service goal (mirrors the AWS adapter's connect/disconnect loop) so
      *    pooled connections are released cleanly.
-     * 4. Cancels the engine [scope].
+     * 5. Cancels the engine [scope], then [cleanupScope].
      *
      * Idempotent: only the first invocation runs; subsequent calls return immediately.
      *
@@ -325,6 +341,27 @@ public abstract class LocalEngine(server: ServerDefinition) : EngineBase(server)
             // services they depend on are still connected. A tick longer than the window is abandoned — a
             // bounded shutdown grace period cannot guarantee completion of arbitrarily long tasks.
             withTimeoutOrNull(drainTimeout) { cancelledScheduleJobs.joinAll() }
+            // Socket disconnects raised by this shutdown run in cleanupScope. Let them finish here,
+            // while the services they write to are still connected. Bounded by the same drain window:
+            // a handler that outlasts it is abandoned, same as an over-long schedule tick.
+            withTimeoutOrNull(drainTimeout) {
+                // Treat the scope as drained only after seeing it empty twice in a row. These
+                // disconnects are enqueued from engine callbacks — a channel going inactive — so an
+                // empty reading taken at the moment the last channel closed can arrive just ahead of
+                // the work it is supposed to wait for. Re-reading also picks up disconnects enqueued
+                // while we were joining the previous batch. Costs a few ms on a clean shutdown.
+                var consecutiveEmpty = 0
+                while (consecutiveEmpty < 2) {
+                    val pending = cleanupScope.coroutineContext.job.children.toList()
+                    if (pending.isEmpty()) {
+                        consecutiveEmpty++
+                        delay(25)
+                    } else {
+                        consecutiveEmpty = 0
+                        pending.joinAll()
+                    }
+                }
+            }
             settings.allGoals().values.forEach { goal ->
                 (goal as? Service)?.let {
                     try {
@@ -339,6 +376,9 @@ public abstract class LocalEngine(server: ServerDefinition) : EngineBase(server)
         // Cancel the engine scope's Job if it has one. The default scope is GlobalScope, which has no
         // Job and cannot be cancelled; engines with a managed scope (e.g. Netty) get cancelled here.
         scope.coroutineContext[Job]?.cancel()
+        // Last, so that a disconnect raised late — a channel that finished closing after the drain
+        // window above — still has somewhere live to run rather than being discarded on arrival.
+        cleanupScope.cancel()
         logger.info { "Graceful shutdown complete." }
     }
 
