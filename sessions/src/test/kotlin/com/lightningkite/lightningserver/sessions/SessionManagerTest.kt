@@ -22,6 +22,7 @@ import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
+import com.lightningkite.services.database.get
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -183,6 +184,41 @@ class SessionManagerTest {
 
                 assertNotNull(accessToken)
                 assertTrue(accessToken.isNotEmpty())
+            }
+        }
+    }
+
+    /**
+     * The session's `ips` and `userAgents` sets are the closest thing this system has to an
+     * authentication audit trail, so an unobserved value must be absent from them rather than
+     * present as a placeholder — an empty-string user agent reads as a real observation to anyone
+     * querying it, exactly as the literal "test" ip did on the request-less path.
+     */
+    @Test
+    fun `an unobserved user agent is not recorded as a placeholder`() = runBlocking {
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(database = database)
+        }.let { server ->
+            server.test({}) {
+                val (session, refreshToken) = server.sessions.newSession(userId)
+                // The harness supplies a source ip but no User-Agent header.
+                server.sessions.tokenSimple.test(null, refreshToken.string)
+
+                val stored = with(serverRuntime) { server.sessions.sessionInfo.table().get(session._id) }
+                assertNotNull(stored)
+                assertEquals(
+                    emptySet(),
+                    stored.userAgents,
+                    "an absent user agent was recorded as a value",
+                )
+                // The ip was genuinely observed, so it is genuinely recorded.
+                assertEquals(setOf("localhost"), stored.ips)
             }
         }
     }

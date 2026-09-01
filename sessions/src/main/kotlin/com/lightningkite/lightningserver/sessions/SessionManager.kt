@@ -395,8 +395,12 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         // Update session metadata on each use for audit trail and sliding expiration
         sessionInfo.table().updateOneById(_id, modification(spath) {
             it.lastUsed assign now()
-            it.userAgents addAll setOf(request?.headers?.get(HttpHeader.UserAgent)?.root ?: "")
-            it.ips addAll setOf(request?.sourceIp ?: "test")
+            // Record only what was actually observed. These sets are the closest thing the system
+            // has to an authentication audit trail, and a placeholder in them is indistinguishable
+            // from a real observation: a literal "test" ip read as a genuine origin, and an empty
+            // user agent as a genuine one. Absent is absent.
+            it.userAgents addAll setOfNotNull(request?.headers?.get(HttpHeader.UserAgent)?.root)
+            it.ips addAll setOfNotNull(request?.sourceIp)
 
             // Reset staleness window on each use (sliding expiration)
             sessionStaleAfter(subject)?.let { length ->
