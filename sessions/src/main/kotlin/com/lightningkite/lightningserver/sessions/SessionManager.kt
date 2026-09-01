@@ -351,41 +351,54 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
      * @return The validated Session, or null if token is malformed
      * @throws UnauthorizedException if token is well-formed but invalid (wrong secret, expired, etc.)
      */
+    /**
+     * The single point every authentication rejection passes through.
+     *
+     * Exists so the reason is a value rather than a sentence: the auth event log
+     * (`plans/audit-logging.md` section 7) has to record *why* an attempt failed, and a debug string
+     * printed to stdout is not something that can be counted or alerted on. Reporting stays gated on
+     * the debug setting exactly as before; the enum is what makes this seam worth hooking later.
+     */
+    context(server: ServerRuntime)
+    private fun authFailed(reason: AuthFailureReason, detail: String? = null) {
+        if (generalSettings().debug) println("Auth failed: $reason" + (detail?.let { " ($it)" } ?: ""))
+    }
+
     context(server: ServerRuntime)
     private suspend fun RefreshToken.session(request: Request<*>?): Session<SUBJECT, ID>? {
         if (!valid) {
-            if (generalSettings().debug) println("Auth failed because !valid")
+            authFailed(AuthFailureReason.TokenMalformed)
             return null
         }
         if (type != principal.name) {
-            if (generalSettings().debug) println("Auth failed because type != handler.name")
+            authFailed(AuthFailureReason.TokenTypeMismatch)
             return null
         }
 
         val session = sessionInfo.table().get(_id) ?: run {
-            if (generalSettings().debug) println("No such session")
+            authFailed(AuthFailureReason.NoSuchSession)
             throw UnauthorizedException("No such session")
         }
         val subject = principal.fetch(session.subjectId)
         if(!permitAuthentication(subject)){
-            if (generalSettings().debug) println("Permit Authentication failed")
+            authFailed(AuthFailureReason.AuthenticationNotPermitted)
             throw ForbiddenException()
         }
         // SECURITY: Constant-time hash comparison to prevent timing attacks
         if (!plainTextSecret.checkAgainstHash(session.secretHash)) {
-            if (generalSettings().debug) println("Auth failed because hash verification failed for session ${session._id}")
+            authFailed(AuthFailureReason.SecretMismatch, "session ${session._id}")
             throw UnauthorizedException("Incorrect hash for session")
         }
         if ((session.expires ?: Instant.DISTANT_FUTURE) < now()) {
-            if (generalSettings().debug) println("Auth failed because (session.expires ?: Instant.DISTANT_FUTURE) < now()")
+            authFailed(AuthFailureReason.SessionExpired)
             throw UnauthorizedException("Session has expired (hard).")
         }
         if ((session.stale ?: Instant.DISTANT_FUTURE) < now()) {
-            if (generalSettings().debug) println("Auth failed because (session.stale ?: Instant.FUTURE) < now()")
+            authFailed(AuthFailureReason.SessionStale)
             throw UnauthorizedException("Session has expired (stale).")
         }
         if (session.terminated != null) {
-            if (generalSettings().debug) println("Auth failed because session.terminated != null")
+            authFailed(AuthFailureReason.SessionTerminated)
             throw UnauthorizedException("Session has been terminated.")
         }
 
