@@ -6,6 +6,8 @@ import com.lightningkite.services.data.IndexSet
 import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.Serializable
+import kotlin.time.Instant
+import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**
@@ -50,6 +52,19 @@ public data class DisclosureRecord(
     val recordId: Uuid,
 ) : HasId<Uuid> {
     public val fields: FieldBits get() = FieldBits.ofColumns(fields0, fields1)
+
+    /**
+     * The instant this disclosure was recorded, derived from the version-7 [_id].
+     *
+     * Kept in the id for the same reason [RequestRecord] does it — no column, no second index, and a
+     * row whose "when" cannot drift from its own key. It matters more here: [requestId] points at a
+     * socket's row rather than at the phase that disclosed (see `audit-logging.md` 5.8.2), so
+     * without this a disclosure on a long-lived connection could only be placed "sometime during
+     * this session".
+     */
+    @OptIn(ExperimentalUuidApi::class)
+    public val at: Instant
+        get() = Instant.fromEpochMilliseconds(_id.epochMilliseconds)
 
     public companion object
 }

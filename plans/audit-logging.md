@@ -488,9 +488,14 @@ disclosed the same way" is not a claim an audit log gets to make. Every disclosu
 
 The volume is paid down inside the row instead:
 
-1. **Request-constant data lives once.** IP, principal, timestamp, endpoint, and outcome are
+1. **Request-constant data lives once.** IP, principal, endpoint, and outcome are
    properties of the request, recorded once in the layer-1 record and referenced by `requestId`.
-   Disclosure records never repeat them.
+   Disclosure records never repeat them. The row's own instant is the exception, and it costs
+   nothing: `_id` is a version-7 UUID, so `DisclosureRecord.at` derives the moment of disclosure from
+   the key itself. That is worth having here rather than deferring to the request record, because a
+   socket's `requestId` names the socket rather than the phase that disclosed
+   ([5.8.2](#582-a-sockets-row-is-keyed-by-the-socket-not-by-the-phase-open)) — without it, a
+   disclosure on a long-lived connection can only be placed "sometime during this session".
 2. **The field set is two `Int`s, not four.** Itemising is opt-in ([5.1.1](#511-itemising-is-opt-in-disclosure-is-not)),
    so a model reserves bits for the handful of fields that matter rather than for all of them.
 3. **The identifier is a `Uuid`, not a string.** Sixteen bytes in every backend, and indexable.
@@ -503,8 +508,8 @@ The volume is paid down inside the row instead:
 @IndexSet(fields = ["modelId", "recordId"], name = "byRecord")
 @Serializable
 public data class DisclosureRecord(
-    override val _id: Uuid,
-    @Index val requestId: String,
+    override val _id: Uuid,    // v7: `at` derives the disclosure instant from it
+    @Index val requestId: Uuid,
     val modelId: Int,          // from the registry
     val fields0: Int,          // bits 0..31   } disclosed-field bitfield; see 5.4 for
     val fields1: Int,          // bits 32..63  } indices, 5.3.1 for why Int columns

@@ -22,6 +22,8 @@ import com.lightningkite.services.database.Database
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -117,6 +119,29 @@ class DisclosureAuditEndToEndTest {
             val byBit = registry.fields(record.modelId).entries.associate { it.value to it.key }
             return record.fields.indices().map { byBit.getValue(it) }.toSet()
         }
+    }
+
+    /**
+     * A disclosure row's instant comes from its own version-7 id, so it must reflect the engine's
+     * selected clock. Pinned end-to-end because the minting happens in the interceptor: a row minted
+     * with a v4 id would still serialize, still join, and still read back — it would just silently
+     * answer "epoch" when asked when the disclosure happened.
+     */
+    @Test
+    fun `a disclosure row carries the mint time of the clock that wrote it`() = runBlocking {
+        val fixed = Instant.fromEpochMilliseconds(1_700_000_123_456)
+        TestServer.test(
+            settings = { database set Database.Settings(); cache set Cache.Settings() },
+            clock = { object : Clock { override fun now(): Instant = fixed } },
+        ) {
+            runPreDeployTasks(serverRuntime)
+            with(serverRuntime) {
+                val response = handle(request("/patient"), testId(20))
+                assertEquals(HttpStatus.OK, response.status)
+                assertEquals(fixed, Reader().run { disclosures() }.single().at)
+            }
+        }
+        Unit
     }
 
     @Test

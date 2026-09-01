@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typedoutput.TypedOutputInterceptor
 import com.lightningkite.services.database.Table
 import kotlinx.serialization.KSerializer
+import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**
@@ -22,6 +23,7 @@ import kotlin.uuid.Uuid
  * The practical consequence is worth stating plainly: an outage of the audit database is an outage
  * of every endpoint that returns an audited model.
  */
+@OptIn(ExperimentalUuidApi::class)
 public class DisclosureLogInterceptor(
     registry: RuntimeDeferred<AuditRegistry>,
     private val table: Runtime<Table<DisclosureRecord>>,
@@ -46,7 +48,9 @@ public class DisclosureLogInterceptor(
         table().insert(
             disclosures.map {
                 DisclosureRecord(
-                    _id = Uuid.random(),
+                    // v7 so the row carries its own insert time; DisclosureRecord.at reads it back.
+                    // Not generateRequestId(): that names execution ids, and this is a row id.
+                    _id = Uuid.generateV7NonMonotonicAt(runtime.clock.now()),
                     requestId = runtime.initiator.requestRecordId,
                     modelId = it.modelId,
                     fields0 = it.bits.fields0,
