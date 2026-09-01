@@ -92,6 +92,19 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     public val principal: PrincipalType<SUBJECT, ID>,
     database: Runtime<Database>,
     public val tokenFormat: Runtime<TokenFormat> = Runtime { PrivateTinyTokenFormat() },
+    /**
+     * Decorates the session table, so a deployment can observe session creation, update and
+     * termination without reaching into this class.
+     *
+     * The write paths here are deliberately sealed — `newSession` is not open,
+     * `terminateSessionById` is private — so before this existed there was no seam at all for the
+     * auth event log (`plans/audit-logging.md` 7.2) to attach to. Applied ahead of permissions, so a
+     * decorator sees privileged and unprivileged access alike.
+     *
+     * For write-only observation, `sessionInfo.registerChangeListener` is already sufficient and
+     * needs nothing from here; this is the wider seam, which also sees reads.
+     */
+    private val sessionSignals: context(ServerRuntime) (Table<Session<SUBJECT, ID>>) -> Table<Session<SUBJECT, ID>> = { it },
 ) : ServerBuilder(), Authentication.Reader<SUBJECT> {
     public object Scopes {
         public val self: RequiredScope = RequiredScope("auth:self")
@@ -168,6 +181,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             serializer = Session.serializer(principal.subjectSerializer, principal.idSerializer),
             idSerializer = Uuid.serializer(),
             tableName = principal.name + "Session",
+            signals = { sessionSignals(it) },
             permissions = {
                 val auth = this.authOrNull
                 val canUse: Condition<Session<SUBJECT, ID>> = when {

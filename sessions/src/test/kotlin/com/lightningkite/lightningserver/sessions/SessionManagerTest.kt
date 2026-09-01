@@ -23,6 +23,8 @@ import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.get
+import com.lightningkite.services.database.Table
+import com.lightningkite.services.database.postCreate
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -60,10 +62,12 @@ class SessionManagerTest {
         database: Runtime<Database>,
         private val expirationDuration: Duration? = 30.days,
         private val staleDuration: Duration? = 7.days,
+        sessionSignals: context(ServerRuntime) (Table<Session<SessionTestUser, Uuid>>) -> Table<Session<SessionTestUser, Uuid>> = { it },
     ) : SessionManager<SessionTestUser, Uuid>(
         principal = SessionTestUser,
         database = database,
-        tokenFormat = Runtime { PrivateTinyTokenFormat() }
+        tokenFormat = Runtime { PrivateTinyTokenFormat() },
+        sessionSignals = sessionSignals,
     ) {
         context(server: ServerRuntime)
         override suspend fun sessionExpiration(subject: SessionTestUser): Instant? =
@@ -219,6 +223,34 @@ class SessionManagerTest {
                 )
                 // The ip was genuinely observed, so it is genuinely recorded.
                 assertEquals(setOf("localhost"), stored.ips)
+            }
+        }
+    }
+
+    /**
+     * The auth event log needs to observe session creation and termination, and the write paths that
+     * do both are sealed — `newSession` is not open, `terminateSessionById` is private. The signals
+     * seam is what makes them observable from outside without unsealing anything.
+     */
+    @Test
+    fun `the signals seam sees session writes`() = runBlocking {
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
+
+        val created = mutableListOf<Uuid>()
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(
+                database = database,
+                sessionSignals = { table -> table.postCreate { created += it._id } },
+            )
+        }.let { server ->
+            server.test({}) {
+                val (session, _) = server.sessions.newSession(userId)
+                assertEquals(listOf(session._id), created, "the seam did not observe session creation")
             }
         }
     }
