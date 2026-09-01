@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.encryption.SecretBasis
 import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.cache.Cache
@@ -90,7 +91,8 @@ class BackupCodeEndpointsTest {
                         BackupCodeSecret(
                             code = "abcdefghij",
                             subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name
+                            subjectType = TestUser.name,
+                            createdAt = now()
                         )
                     )
                 )
@@ -136,7 +138,8 @@ class BackupCodeEndpointsTest {
                         BackupCodeSecret(
                             code = "testbackupcode",
                             subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name
+                            subjectType = TestUser.name,
+                            createdAt = now()
                         )
                     )
                 )
@@ -160,7 +163,7 @@ class BackupCodeEndpointsTest {
     }
 
     @Test
-    fun `backup code is deleted after use`() = runBlocking {
+    fun `a used backup code is retained and marked, not deleted`() = runBlocking {
         TestUser.users.clear()
         val userId = Uuid.random()
         val user = TestUser(userId, "test@example.com")
@@ -190,7 +193,8 @@ class BackupCodeEndpointsTest {
                         BackupCodeSecret(
                             code = "onetimecode",
                             subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name
+                            subjectType = TestUser.name,
+                            createdAt = now()
                         )
                     )
                 )
@@ -211,11 +215,21 @@ class BackupCodeEndpointsTest {
                     )
                 )
 
-                // Verify code was deleted
-                codeCount = table.find(condition<BackupCodeSecret> {
+                // The row survives — it is the only evidence the code was ever used — but is spent.
+                val after = table.find(condition<BackupCodeSecret> {
                     it.subjectId.eq(TestUser.idString(userId))
-                }).count()
-                assertEquals(0, codeCount)
+                }).toList()
+                assertEquals(1, after.size, "using a backup code destroyed the record that it existed")
+                assertNotNull(after.single().usedAt, "a used backup code was not marked as used")
+
+                // And it no longer counts as an established method.
+                assertEquals(
+                    0,
+                    table.find(condition<BackupCodeSecret> {
+                        it.subjectId.eq(TestUser.idString(userId)) and it.usedAt.eq(null)
+                    }).count(),
+                    "a spent backup code still reads as usable",
+                )
             }
         }
     }
@@ -251,7 +265,8 @@ class BackupCodeEndpointsTest {
                         BackupCodeSecret(
                             code = "singlusecode",
                             subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name
+                            subjectType = TestUser.name,
+                            createdAt = now()
                         )
                     )
                 )
@@ -312,7 +327,8 @@ class BackupCodeEndpointsTest {
                         BackupCodeSecret(
                             code = "validcode",
                             subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name
+                            subjectType = TestUser.name,
+                            createdAt = now()
                         )
                     )
                 )
@@ -363,7 +379,8 @@ class BackupCodeEndpointsTest {
                         BackupCodeSecret(
                             code = "abcdefghij",
                             subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name
+                            subjectType = TestUser.name,
+                            createdAt = now()
                         )
                     )
                 )
@@ -417,7 +434,8 @@ class BackupCodeEndpointsTest {
                         BackupCodeSecret(
                             code = "backupcode",
                             subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name
+                            subjectType = TestUser.name,
+                            createdAt = now()
                         )
                     )
                 )
@@ -463,7 +481,8 @@ class BackupCodeEndpointsTest {
                         BackupCodeSecret(
                             code = "useronecode",
                             subjectId = TestUser.idString(userId1),
-                            subjectType = TestUser.name
+                            subjectType = TestUser.name,
+                            createdAt = now()
                         )
                     )
                 )
@@ -485,7 +504,8 @@ class BackupCodeEndpointsTest {
                         BackupCodeSecret(
                             code = "usertwocode",
                             subjectId = TestUser.idString(userId2),
-                            subjectType = TestUser.name
+                            subjectType = TestUser.name,
+                            createdAt = now()
                         )
                     )
                 )
@@ -547,7 +567,8 @@ class BackupCodeEndpointsTest {
                         BackupCodeSecret(
                             code = "firstcode",
                             subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name
+                            subjectType = TestUser.name,
+                            createdAt = now()
                         )
                     )
                 )
@@ -556,7 +577,8 @@ class BackupCodeEndpointsTest {
                         BackupCodeSecret(
                             code = "secondcode",
                             subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name
+                            subjectType = TestUser.name,
+                            createdAt = now()
                         )
                     )
                 )
@@ -565,12 +587,13 @@ class BackupCodeEndpointsTest {
                         BackupCodeSecret(
                             code = "thirdcode",
                             subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name
+                            subjectType = TestUser.name,
+                            createdAt = now()
                         )
                     )
                 )
 
-                // All codes should work (and be deleted after use)
+                // All codes should work (and be marked spent after use)
                 server.backupCodes.prove.test(
                     null, IdentificationAndPassword(
                         type = "TestUser",
@@ -580,13 +603,18 @@ class BackupCodeEndpointsTest {
                     )
                 )
 
-                // Verify second code was deleted but others remain
-                val remainingCodes = table.find(condition<BackupCodeSecret> {
+                // Every row survives; only the redeemed one is spent, and the others stay usable.
+                val allCodes = table.find(condition<BackupCodeSecret> {
                     it.subjectId.eq(TestUser.idString(userId))
                 }).toList()
+                assertEquals(3, allCodes.size, "using one code removed rows")
+                assertEquals(listOf("secondcode"), allCodes.filter { it.usedAt != null }.map { it.code })
 
-                assertEquals(2, remainingCodes.size)
-                assertTrue(remainingCodes.none { it.code == "secondcode" })
+                val stillUsable = table.find(condition<BackupCodeSecret> {
+                    it.subjectId.eq(TestUser.idString(userId)) and it.usedAt.eq(null)
+                }).toList()
+                assertEquals(2, stillUsable.size)
+                assertTrue(stillUsable.none { it.code == "secondcode" })
             }
         }
     }
@@ -624,7 +652,8 @@ class BackupCodeEndpointsTest {
                         BackupCodeSecret(
                             code = "validcode",
                             subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name
+                            subjectType = TestUser.name,
+                            createdAt = now()
                         )
                     )
                 )
