@@ -200,7 +200,13 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                         )
                     ),
                     update = isRoot,
-                    delete = isRoot,
+                    // Sessions are terminated, never erased. The row is the only record that a
+                    // session ever existed, and two comments in this file already promise it is
+                    // "kept for audit trail" — but delete was exposed over REST, so a super-user
+                    // could erase the evidence and nothing recorded that they had. Termination
+                    // (Session.terminated) remains available and is what callers want; it goes
+                    // through table(), which does not consult these permissions.
+                    delete = Condition.Never,
                 )
             }
         )

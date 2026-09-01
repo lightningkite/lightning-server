@@ -24,6 +24,8 @@ import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.get
 import com.lightningkite.services.database.Table
+import com.lightningkite.services.database.Condition
+import com.lightningkite.lightningserver.typed.AuthAccess
 import com.lightningkite.services.database.postCreate
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
@@ -251,6 +253,45 @@ class SessionManagerTest {
             server.test({}) {
                 val (session, _) = server.sessions.newSession(userId)
                 assertEquals(listOf(session._id), created, "the seam did not observe session creation")
+            }
+        }
+    }
+
+    /**
+     * A session row is the only record that a session ever existed, and this file twice promises it
+     * is "kept for audit trail" — but delete was granted to super-users and exposed over REST, so
+     * the evidence could be erased with nothing recording that it had been. Termination is the
+     * supported operation and is unaffected: it goes through table(), which does not consult these
+     * permissions.
+     */
+    @Test
+    fun `session rows cannot be deleted, even by a super user`() = runBlocking {
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(database = database)
+
+            init {
+                // Make the test subject a super user, so `isRoot` resolves to Always. Without this
+                // every branch collapses to Never for an unprivileged caller and the assertion below
+                // would hold no matter what delete was granted.
+                AuthRequirement.isSuperUser = SessionTestUser.require()
+            }
+        }.let { server ->
+            server.test({}) {
+                val (session, _) = server.sessions.newSession(userId)
+                val auth = with(server.sessions) { session.toAuth() }
+                val permissions = with(serverRuntime) {
+                    server.sessions.sessionInfo.permissions(AuthAccess(auth))
+                }
+                assertTrue(
+                    permissions.delete == Condition.Never,
+                    "a super user can delete session rows, erasing the only record the session existed",
+                )
             }
         }
     }
