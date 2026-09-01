@@ -1,7 +1,9 @@
 // by Claude
 package com.lightningkite.lightningserver.websockets
 
+import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.http.HttpStatus
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -68,5 +70,37 @@ class WebSocketCloseTest {
         assertEquals(WebSocketClose.INTERNAL_ERROR, HttpStatus.InternalServerError.bestWebSocketCloseCode)
         assertEquals(WebSocketClose.INTERNAL_ERROR, HttpStatus.BadGateway.bestWebSocketCloseCode)
         assertEquals(WebSocketClose.INTERNAL_ERROR, HttpStatus.ServiceUnavailable.bestWebSocketCloseCode)
+    }
+
+    // ========== webSocketCloseReason Tests ==========
+
+    /**
+     * The distinction that matters: a cancelled socket is being torn down by its scope — in practice
+     * a server shutdown — and must not be reported as a server fault. Every engine used to derive
+     * this from [HttpStatus.InternalServerError] regardless, so routine shutdowns showed up in
+     * telemetry as 1011s and buried the real ones.
+     */
+    @Test
+    fun `cancellation closes as GOING_AWAY, not an error`() {
+        assertEquals(WebSocketClose.GOING_AWAY, CancellationException("shutting down").webSocketCloseReason)
+    }
+
+    @Test
+    fun `a cancellation subclass is still GOING_AWAY`() {
+        // Coroutine cancellation arrives as subclasses (e.g. JobCancellationException), never as the
+        // base type, so an equality check on the class would miss every real case.
+        class Nested(message: String) : CancellationException(message)
+        assertEquals(WebSocketClose.GOING_AWAY, Nested("child cancelled").webSocketCloseReason)
+    }
+
+    @Test
+    fun `an HttpStatusException keeps its status mapping`() {
+        assertEquals(WebSocketClose.VIOLATED_POLICY, HttpStatusException(HttpStatus.Forbidden).webSocketCloseReason)
+        assertEquals(WebSocketClose.INTERNAL_ERROR, HttpStatusException(HttpStatus.BadGateway).webSocketCloseReason)
+    }
+
+    @Test
+    fun `an ordinary failure is still INTERNAL_ERROR`() {
+        assertEquals(WebSocketClose.INTERNAL_ERROR, RuntimeException("boom").webSocketCloseReason)
     }
 }

@@ -1,6 +1,8 @@
 package com.lightningkite.lightningserver.websockets
 
+import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.http.HttpStatus
+import kotlin.coroutines.cancellation.CancellationException
 
 public enum class WebSocketClose(public val code: Short) {
     NORMAL(1000),
@@ -22,3 +24,19 @@ public val HttpStatus.bestWebSocketCloseCode: WebSocketClose
         4 -> WebSocketClose.VIOLATED_POLICY
         else -> WebSocketClose.INTERNAL_ERROR
     }
+
+/**
+ * The close code to report for a socket that ended because this exception was thrown.
+ *
+ * Cancellation is not a failure of the socket: it is the socket's scope tearing it down, which in
+ * practice means the server is shutting down. That is [WebSocketClose.GOING_AWAY] — RFC 6455 names
+ * "a server going down" as the example for 1001, and clients already read it as "reconnect later".
+ * Deriving the code from [HttpStatus.InternalServerError] instead, as every engine used to, reported
+ * every routine shutdown as a server fault and buried real 1011s in the noise.
+ *
+ * (1012 `SERVICE_RESTART` is arguably more precise, but it is only in the IANA registry rather than
+ * RFC 6455 proper, so client support for it is thinner. 1001 is the interoperable choice.)
+ */
+public val Throwable.webSocketCloseReason: WebSocketClose
+    get() = if (this is CancellationException) WebSocketClose.GOING_AWAY
+    else ((this as? HttpStatusException)?.status ?: HttpStatus.InternalServerError).bestWebSocketCloseCode

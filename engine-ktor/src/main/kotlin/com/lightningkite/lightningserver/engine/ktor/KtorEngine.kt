@@ -391,13 +391,13 @@ public class KtorEngine(
 
                         closingMid.let { mid -> emitDisconnect(mid, WebSocketClose.NORMAL) }
                     } catch (e: Throwable) {
-                        closingMid?.let { mid ->
-                            emitDisconnect(
-                                mid,
-                                ((e as? HttpStatusException)?.status
-                                    ?: HttpStatus.InternalServerError).bestWebSocketCloseCode,
-                            )
-                        }
+                        closingMid?.let { mid -> emitDisconnect(mid, e.webSocketCloseReason) }
+                        // Cleanup above must run for a cancelled socket too — that is what
+                        // emitDisconnect's NonCancellable is for — but the cancellation itself has to
+                        // keep travelling. Swallowing it would report this coroutine as having
+                        // completed normally and leave whoever cancelled us waiting on a child that
+                        // never acknowledges the request.
+                        if (e is CancellationException) throw e
                     }
                 }
             }
