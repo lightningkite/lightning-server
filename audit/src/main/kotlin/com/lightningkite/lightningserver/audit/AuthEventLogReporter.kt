@@ -28,7 +28,6 @@ private val authEventLogger = KotlinLogging.logger("com.lightningkite.lightnings
 @OptIn(ExperimentalUuidApi::class)
 public class AuthEventLogReporter(
     private val table: Runtime<Table<AuthEventRecord>>,
-    private val chain: Runtime<AuditChain>,
 ) : AuthEventReporter {
     override val name: String = "AuthEventLog"
 
@@ -59,10 +58,7 @@ public class AuthEventLogReporter(
             failureReason = detail,
         )
         try {
-            with(runtime) {
-                table().insertOne(record)
-                chain().fold(auditHash(record.chainInput()))
-            }
+            with(runtime) { table().insertOne(record) }
         } catch (e: Exception) {
             // Cancellation is the caller being torn down, not a sink failure. Swallowing it here
             // would report this coroutine as having completed normally and break structured

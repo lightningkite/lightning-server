@@ -38,31 +38,23 @@ bigger claim, and it deserves an explicit decision rather than inheriting one.
 **Options if that is unacceptable:** scope the decorator to user-facing tables only (weakens the
 guarantee the layer exists for), or make failure policy configurable per model.
 
-## 2. The in-process chain is a local check, not tamper-evidence
+## 2. There is no integrity mechanism in this system at all
 
-**Scope corrected: the real total-log is a separate system outside Lightning Server**, and the
-integrity guarantees belong to it. What is in this repository is a modest in-process chain that audit
-writes fold into. Read the following as "known properties of a local check", not as a list of security
-holes — the docs and plan now say the same.
+Stated plainly so nobody assumes otherwise: **nothing here makes the audit log tamper-evident.** The
+tables are ordinary rows in an ordinary database. Anyone who can write them can edit or delete
+records, and no artefact in this repository would reveal it.
 
-It detects an entry altered or removed, which catches accident and corruption. It does **not** detect
-truncation at the end of a chain, does **not** detect deletion of the records an entry covers
-(`contentHash` is a fold with no membership recorded, so nobody can recompute it), and its `hash` is
-unkeyed, so anyone who can write the table can recompute the chain and it verifies clean. Those are
-properties only something outside the process can supply.
+That is deliberate. Tamper-evidence belongs to the emergency total-log, a separate system outside
+Lightning Server, reached for only if these logs prove insufficient or bypassable. An in-process chain
+was built here and then removed: with an unkeyed hash and no external anchor it could not resist
+anyone able to write its own table, so it could never have provided the property it was named for —
+while adding a second write to the path of every audited read, including privileged internal ones,
+where a hash failure could halt a schedule tick or a startup task.
 
-The one thing worth watching: nothing in the code or the tests will stop someone describing this as
-tamper-evidence in a compliance conversation. It is not.
-
-**Two defects were found in it after committing** — a distributed-locked seal that would have left
-every instance but one unattested, and a state advance before the write that would have broken the
-chain permanently on one transient database error. Both were caught by re-reading, not by a test.
-Given the reduced scope this matters less than it would have, but it is the honest signal about how
-much scrutiny hand-written chain code needs.
-
-**Specifically unexamined:** concurrent folds under load (the mutex is believed correct, never
-stress-tested), and `chainId` collisions — it is `serverId + bootMillis`, and `serverId` derives from
-a MAC address, so containers sharing a host interface and starting in the same millisecond collide.
+The practical consequence: **the integrity of this log rests entirely on deployment controls** — who
+can write the audit tables, whether the store is append-only at the infrastructure level, and whether
+anything ships records off-box. None of that is enforced by code here, and #4 makes it matter more,
+since these tables now hold the sensitive values they audit.
 
 ## 4. The audit log now stores the sensitive values it exists to audit
 
@@ -184,9 +176,11 @@ Not defects, but they will surprise someone:
 
 1. Decide #1 — whether fail-closed on privileged reads is acceptable, because it gates whether this
    can be turned on at all.
-2. Make sure nobody describes the in-process chain (#2) as tamper-evidence. The real total-log is a
-   separate system and that is where the guarantee lives.
-3. Revisit 11.4 in light of #4.
+2. Treat #2 as a deployment requirement, not a code one: decide who can write the audit tables and
+   whether the store is append-only at the infrastructure level. Nothing in this repository enforces
+   it.
+3. Revisit 11.4 in light of #2 and #4 — its "no special mechanism needed" resolution rested partly on
+   a hash chain that no longer exists here.
 
 #3 in the original list — "get this reviewed by someone who did not write it" — has now happened, and
 found a silent bypass plus four data gaps that my own reading missed. The three defects I had already

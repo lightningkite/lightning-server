@@ -27,7 +27,6 @@ import kotlin.uuid.Uuid
 public class DisclosureLogInterceptor(
     registry: RuntimeDeferred<AuditRegistry>,
     private val table: Runtime<Table<DisclosureRecord>>,
-    private val chain: Runtime<AuditChain>,
 ) : TypedOutputInterceptor {
     override val name: String = "DisclosureLog"
 
@@ -59,10 +58,5 @@ public class DisclosureLogInterceptor(
             )
         }
         table().insert(rows)
-        // Folded after the write, deliberately. A record attested but not stored would be a chain
-        // that vouches for something an auditor cannot read; the reverse — stored but not yet
-        // attested — is the window 5.7.1 documents and accepts.
-        val chain = chain()
-        rows.forEach { chain.fold(auditHash(it.chainInput())) }
     }
 }

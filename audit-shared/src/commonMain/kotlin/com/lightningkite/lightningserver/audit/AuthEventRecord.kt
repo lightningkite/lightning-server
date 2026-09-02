@@ -78,9 +78,3 @@ public data class AuthEventRecord(
     public companion object
 }
 
-/** As [DisclosureRecord.chainInput], for an auth event. */
-public fun AuthEventRecord.chainInput(): String =
-    listOf(
-        _id.toString(), requestId.toString(), type.name, principal ?: "", actor ?: "",
-        sessionId ?: "", sourceIp ?: "", userAgent ?: "", failureReason ?: "",
-    ).joinToString(FIELD_SEPARATOR)

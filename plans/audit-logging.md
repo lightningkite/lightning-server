@@ -704,76 +704,20 @@ prevents the body from ever being built.
 **Confirmed to include the database sink.** The queryable log is a database table, so an audit
 database outage is an outage for audited endpoints. That is the intended trade.
 
-### 5.7 Integrity: not in the database log
+### 5.7 Integrity: out of scope here
 
-Hash chaining and the tamper-evidence it provides belong to the total-log, not to the queryable
-database log. The database log's job is investigation; the total-log's job is proving nothing was
-altered. Splitting them keeps the highest-volume table free of chain columns it would never use.
+Hash chaining and tamper-evidence belong to the **emergency total-log**, a separate system outside
+Lightning Server. It exists for the case where these logs are later found insufficient or bypassable;
+it is not a component of this design and nothing in this repository implements it.
 
-Anchoring — periodically emitting a chain head as an ordinary HTTP request so the proxy captures a
-commitment to records it could not see — likewise belongs with the total-log, since it is meaningless
-without a chain to commit to.
-
-#### 5.7.1 Design (a placeholder for something that lives elsewhere)
-
-> **Scope, corrected.** The real total-log is a separate system that lives **outside Lightning
-> Server**, and the integrity story belongs to it. What is implemented here is a modest in-process
-> chain: useful as a local consistency check and as somewhere for audit writes to fold into, but it is
-> not the thing that makes the log tamper-evident and should not be described or relied on as such.
->
-> That reframing settles most of what would otherwise be alarming below. An in-process chain with an
-> unkeyed hash and no external anchor cannot resist an operator who can write its table, and it does
-> not need to — the external log is what an auditor trusts. Everything here was designed while
-> implementing rather than specified, so treat the specifics as provisional.
-
-**The chain commits to hashes, in batches, not to records one by one.** The disclosure log writes one
-row per record disclosed, so a single query can produce ten thousand rows; a chain entry per row would
-double the largest table in the system and serialise every write behind a chain head. Instead each
-audit write folds its record's hash into a running value, and a chain entry is sealed periodically,
-committing to everything folded in since the previous entry.
-
-```kotlin
-@Serializable
-public data class TotalLogEntry(
-    override val _id: Uuid,       // v7: ordered, and carries its own seal time
-    @Index val chainId: String,   // which chain — see below
-    val sequence: Long,           // strictly increasing within a chain, from 0
-    val previousHash: String,     // the previous entry's `hash`; "" at sequence 0
-    val contentHash: String,      // fold of every record hash sealed into this entry
-    val count: Long,              // how many records that fold covers
-    val hash: String,             // SHA-256 over chainId, sequence, previousHash, contentHash, count
-) : HasId<Uuid>
-```
-
-**Sealing is volume-driven, not scheduled.** A `ScheduledTask` is the obvious way to seal
-periodically and is wrong here: schedules are coordinated by a distributed lock, so exactly one
-instance runs each tick, while chains are per process and held in memory. A scheduled seal would seal
-the winning instance's chain and leave every other instance accumulating records attested by nothing.
-Sealing therefore happens on whichever instance owns the chain, driven by its own volume
-(`sealThreshold`). The residual gap is a quiet instance's tail, unsealed until its next fold.
-
-**A failed write must not advance the chain.** Sealing builds the entry, writes it, and only then
-moves `sequence` and `previousHash`. The other order would leave the chain past a position no row
-occupies, so every later entry links to a hash that does not exist and the chain reports itself
-permanently broken over what may have been a transient database error.
-
-**One chain per process, not one per deployment.** A single global chain would need every instance to
-agree on the next `sequence`, which is a distributed lock on the hot path of every audited write. So
-`chainId` is the server instance plus its boot time, and each process owns its chain exclusively.
-What that gives up is total ordering *between* instances: the log proves no entry within a chain was
-altered or removed, and proves nothing about the interleaving of two chains.
-
-**What this actually provides.** Altering or deleting a sealed entry breaks the link to its
-successor, which verification detects — against accident and against a caller that is not trying to
-cover its tracks. It does not detect truncation at the end of a chain, it does not detect deletion of
-the *records* an entry covers (entries store a fold, not membership), and its hash is unkeyed, so
-anyone who can write the table can recompute the whole chain. None of that is worth fixing in
-process: those are the properties the external total-log exists to supply.
-
-**What it does not provide, at all.** Fabrication at write time. A record that was never written
-cannot be detected as missing, and a false record written through the normal path chains correctly.
-The chain proves the log has not been edited *since it was written*; it says nothing about whether it
-was truthful when written.
+An earlier revision of this plan specified an in-process chain, and one was built and then removed. It
+is worth recording why, because the reasoning generalises: an in-process chain with an unkeyed hash
+and no external anchor cannot resist anyone who can write its table, so it could never have been the
+tamper-evidence it was named for. What it did instead was add a second write to the path of every
+audited read — including privileged internal ones — which meant a hash failure could halt a schedule
+tick or a startup task. It bought a property it could not actually provide, at a real availability
+cost. The guarantee belongs outside the process, where it can be held by something the operator does
+not control.
 
 ### 5.8 The request record — what `requestId` points at
 
@@ -1230,11 +1174,9 @@ Sequenced so each step is independently shippable and testable, and so prerequis
    — moved ahead of the total-log, because it is what closes the aggregation and oracle channels
    rather than a later refinement. Extends the existing write auditing at the database layer to
    record every condition and sort applied to an audited model.
-8. **Total-log: hash chaining and anchoring** ([section 5.7](#57-integrity-not-in-the-database-log))
-   — **out of scope here.** The real total-log is a separate system outside Lightning Server. What
-   ships in this repository is an in-process chain (5.7.1) that audit writes fold into: a local
-   consistency check and an integration point, not the tamper-evidence. Anchoring is not built and is
-   not this repository's job.
+8. ~~**Total-log: hash chaining and anchoring**~~ ([section 5.7](#57-integrity-out-of-scope-here))
+   — **removed from scope.** The emergency total-log is a separate system outside Lightning Server,
+   reached for only if these logs prove insufficient or bypassable. Nothing here implements it.
 9. **Auth event log** ([section 7](#7-layer-4-the-authentication-event-log)) — the largest greenfield
    piece, since nothing exists to extend. **Groundwork done; the event log itself is not.** Both
    cheap unblockers have shipped: `sessionInfo` now takes a `signals` parameter
@@ -1264,10 +1206,9 @@ out of process — into the reverse proxy — and the code-side implications are
 
   **Resolved: build neither.** High-sensitivity deployments today already do not stream audited
   models, and the goal is to lift that restriction rather than entrench it. The
-  [anchoring mechanism](#57-integrity-not-in-the-database-log)
-  achieves that without any WS parsing: WS disclosures are recorded by layer 2 and made
-  tamper-evident by committing the chain head through the HTTP path the proxy already captures.
-  The residual gap versus direct capture is fabrication-at-write-time.
+  emergency total-log, if it is ever needed, achieves that without any WS parsing: WS disclosures are
+  recorded by layer 2, and making them tamper-evident is that separate system's job rather than this
+  one's. The residual gap versus direct capture is fabrication-at-write-time.
 - If the proxy stamps `x-request-id` and forwards the same value, the external capture and the
   in-process logs join for free (see [3.3](#33-aligning-with-the-proxy-and-with-telemetry)).
 
@@ -1333,10 +1274,18 @@ evidence, and a fabricated `"test"` IP placeholder.
 ### 11.4 Auditing reads of the audit log — no special mechanism needed (resolved)
 
 Earlier drafts called for a separate credential path. That was overcomplicated. Reading the audit log
-is an ordinary endpoint, and its records land in the same stream as everything else. The total-log's
-hash chain (5.7) and its append-only sink mean a reader cannot erase the evidence of their own read,
-which is the property that actually matters. Self-reference is not a problem here: the log only ever
-appends, so recording a read of the log simply produces one more record.
+is an ordinary endpoint, and its records land in the same stream as everything else. Self-reference is
+not a problem: the log only ever appends, so recording a read of the log simply produces one more
+record.
+
+**Weakened since this was resolved, twice over.** The original argument rested on a hash chain making
+it impossible for a reader to erase the evidence of their own read; that chain is now
+[out of scope](#57-integrity-out-of-scope-here), so what remains is an append-only *convention*, not an
+enforced property — anyone with write access to the audit tables can delete their own row. And
+[6.2](#62-record-shape-and-installation-resolved) now stores serialized query conditions, so the audit
+log holds the sensitive values it audits and is worth protecting more carefully than "an ordinary
+endpoint" implies. The resolution still stands for framework *design* — no special credential path is
+needed — but the deployment-side controls it assumes are doing more work than this section credits.
 
 Separation of duties between reading the log and administering it remains worth having, but it is an
 IAM/deployment concern, not a framework design concern.

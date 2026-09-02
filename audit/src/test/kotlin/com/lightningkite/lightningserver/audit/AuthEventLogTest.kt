@@ -77,16 +77,4 @@ class AuthEventLogTest {
         assertEquals("administrator", event.actor)
     }
 
-    /** Auth events are attested by the same chain as every other audit record. */
-    @Test
-    fun `a recorded event is folded into the tamper-evidence chain`() = onServer { runtime ->
-        runtime.server.authEventReporters.single().report(type = "SessionCreated", principal = "user-1")
-
-        val chain = with(runtime) { TestServer.audit.chain() }
-        assertEquals(1L, chain.pendingCount())
-
-        val sealed = chain.seal()
-        assertTrue(sealed != null)
-        assertEquals(1L, sealed.count)
-    }
 }

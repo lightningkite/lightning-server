@@ -53,14 +53,6 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 public class DisclosureAudit(
     database: Runtime<Database>,
     /**
-     * Seal the tamper-evidence chain once this many records are pending.
-     *
-     * Volume-driven rather than time-driven on purpose: a scheduled seal would be coordinated by a
-     * distributed lock and so would only ever seal one instance's chain. See [AuditChain]. Lower
-     * values narrow the window in which recent records are unattested, at one row per seal.
-     */
-    private val sealThreshold: Int = 64,
-    /**
      * Erasure subject per audited model, keyed by serial name. See [AuditSubjectKey].
      *
      * Absent by default, which is correct for the US regime this targets first. Supplying keys does
@@ -100,30 +92,7 @@ public class DisclosureAudit(
     public val dataAccess: DatabaseTableRegistration<DataAccessRecord> =
         database.registerTable("AuditDataAccess", DataAccessRecord.serializer())
 
-    /**
-     * The tamper-evidence chain. Sealed periodically rather than per record; see
-     * `plans/audit-logging.md` 5.7.1 and [AuditChain].
-     */
-    public val totalLog: DatabaseTableRegistration<TotalLogEntry> =
-        database.registerTable("AuditTotalLog", TotalLogEntry.serializer())
 
-    /**
-     * This process's chain head.
-     *
-     * One per process — see [TotalLogEntry.chainId]. Created lazily against the engine's identity so
-     * that two runtimes built from the same definition do not share a head.
-     */
-    public val chain: Runtime<AuditChain> = Runtime.Cached(Runtime {
-        val engine = contextOf<Engine>()
-        val bootMillis = engine.clock.now().toEpochMilliseconds()
-        val table = with(engine) { totalLog() }
-        AuditChain(
-            chainId = engine.serverId + "-" + bootMillis,
-            sealThreshold = sealThreshold,
-            nowMillis = { engine.clock.now().toEpochMilliseconds() },
-            write = { table.insertOne(it) },
-        )
-    })
 
     /** Authentication events — the history a mutable session row cannot provide. See 7.1. */
     public val authEvents: DatabaseTableRegistration<AuthEventRecord> =
@@ -174,8 +143,8 @@ public class DisclosureAudit(
 
     init {
         install(RequestRecordInterceptor(requests))
-        install(DisclosureLogInterceptor(registry, disclosures, chain))
-        install(AuthEventLogReporter(authEvents, chain))
+        install(DisclosureLogInterceptor(registry, disclosures))
+        install(AuthEventLogReporter(authEvents))
     }
 }
 

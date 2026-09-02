@@ -70,13 +70,6 @@ public fun <T : Any> DisclosureAudit.dataAccessLogged(table: Table<T>): Table<T>
         executionId = initiator.executionId,
         json = runtime.internalSerialization.json,
         nowMillis = { runtime.clock.now().toEpochMilliseconds() },
-        write = {
-            with(runtime) {
-                dataAccess().insertOne(it)
-                // After the write, for the same reason as the disclosure log: the chain must never
-                // vouch for a record an auditor cannot read.
-                chain().fold(auditHash(it.chainInput()))
-            }
-        },
+        write = { with(runtime) { dataAccess().insertOne(it) } },
     )
 }
