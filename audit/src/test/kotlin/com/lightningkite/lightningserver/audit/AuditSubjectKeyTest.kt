@@ -81,9 +81,11 @@ class AuditSubjectKeyTest {
     @Test
     fun `supplying a key for every audited model lets the deploy proceed`() {
         val server = object : Base(
+            // Through the helper, which is the whole point of it existing: pairing a serial name
+            // with a key by hand is what lets Patient's entry hold a Doctor's key and still compile.
             keys = mapOf(
-                Patient.serializer().descriptor.serialName to AuditSubjectKey<Patient> { it._id.toString() },
-                Doctor.serializer().descriptor.serialName to AuditSubjectKey<Doctor> { it._id.toString() },
+                auditSubjectKey(Patient.serializer()) { it._id.toString() },
+                auditSubjectKey(Doctor.serializer()) { it._id.toString() },
             ),
             require = true,
         ) {}

@@ -136,13 +136,6 @@ public class DisclosureAudit(
         database.registerTable("AuditFieldRegistration", AuditFieldRegistration.serializer())
 
     /**
-     * Assigns permanent ids and bit indices to anything audited that lacks them.
-     *
-     * A pre-deploy task rather than a startup task, so assignment happens once per deploy and
-     * instances never race to allocate the same index. It is convergent, so re-running it on every
-     * deploy — which is what the framework does — is a no-op.
-     */
-    /**
      * Fails the deploy when [requireSubjectKeys] is on and an audited model has no erasure subject.
      *
      * A pre-deploy task specifically so it runs *before* the new version can write anything: once a
@@ -159,6 +152,13 @@ public class DisclosureAudit(
         )
     }
 
+    /**
+     * Assigns permanent ids and bit indices to anything audited that lacks them.
+     *
+     * A pre-deploy task rather than a startup task, so assignment happens once per deploy and
+     * instances never race to allocate the same index. It is convergent, so re-running it on every
+     * deploy — which is what the framework does — is a no-op.
+     */
     private val assignBits: PreDeployTask = path.path("assign-audit-bits") bind PreDeployTask(
         dependencies = { listOf(registrations.preDeployTask, fieldRegistrations.preDeployTask) },
     ) {
