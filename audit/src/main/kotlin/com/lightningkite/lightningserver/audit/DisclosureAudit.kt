@@ -43,6 +43,8 @@ import kotlinx.serialization.descriptors.SerialDescriptor
  *
  * @property requests Who asked, from where, and when — what a [DisclosureRecord.requestId] refers to.
  * @property disclosures One row per audited record that reached a client.
+ * @property dataAccess One row per query against an audited model, including privileged internal
+ *   reads. Unlike the other two this is opt-in per model, because it attaches to a `ModelInfo`.
  * @property registry What every model id and every bit permanently mean. Needed to read the log:
  *   a [DisclosureRecord]'s bits are meaningless without it.
  */
@@ -52,6 +54,14 @@ public class DisclosureAudit(database: Runtime<Database>) : ServerBuilder() {
 
     public val disclosures: DatabaseTableRegistration<DisclosureRecord> =
         database.registerTable("AuditDisclosure", DisclosureRecord.serializer())
+
+    /**
+     * Every query issued against an audited model — the layer that closes the aggregation and oracle
+     * channels the disclosure log cannot see. Only populated for models whose `ModelInfo` passes
+     * [dataAccessLogged]; see `plans/audit-logging.md` 6.2.
+     */
+    public val dataAccess: DatabaseTableRegistration<DataAccessRecord> =
+        database.registerTable("AuditDataAccess", DataAccessRecord.serializer())
 
     private val registrations: DatabaseTableRegistration<AuditModelRegistration> =
         database.registerTable("AuditModelRegistration", AuditModelRegistration.serializer())

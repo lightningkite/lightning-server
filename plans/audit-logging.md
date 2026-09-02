@@ -932,6 +932,15 @@ so passing it uniformly is safe, and only audited models generate rows. This kee
 are audited" decision in exactly one place, the `@Audited` annotation, rather than splitting it
 between the annotation and a list of decorated tables.
 
+**An audited model needs an endpoint before it can be logged here — a real limitation.** Model ids
+are assigned by scanning **endpoint serializers**, never tables (see [`DisclosureAudit`]'s reasoning:
+scanning tables made disclosure coverage look complete when it was not). The decorator keys off the
+`@Audited` annotation and then resolves the id, which *throws* when there is none. So an audited model
+that no endpoint's serializer can reach has no id, and its reads fail rather than going unrecorded —
+correct as a fail-closed rule, but it means a model that is only ever read internally cannot be
+data-access-logged until something makes it reachable. Resolving this properly means either a second
+registration space for table-only models or an explicit opt-in list on the module; **not decided**.
+
 **Fail-closed, with the same reasoning as 5.6.** A read of an audited model whose query cannot be
 recorded does not happen. That makes an outage of the audit database an outage for reads of audited
 models, which is a strictly larger blast radius than the disclosure log's — that one only fails

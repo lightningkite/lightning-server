@@ -1,11 +1,13 @@
 package com.lightningkite.lightningserver.audit
 
+import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
 
 @Serializable
+@GenerateDataClassPaths
 @Audited
 data class Patient(
     override val _id: Uuid,
@@ -193,3 +195,8 @@ data class Roomy(
     @Audited val f48: String = "",
     @Audited val f49: String = "",
 ) : HasId<Uuid>
+
+/** Not audited, so the data access log must pass it through untouched. */
+@Serializable
+@GenerateDataClassPaths
+data class PlainThing(override val _id: Uuid, val value: String) : HasId<Uuid>

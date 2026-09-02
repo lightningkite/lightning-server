@@ -60,7 +60,13 @@ public class AuditRegistry internal constructor(
     private val modelIds: Map<String, Int>,
     private val bitIndices: Map<Int, Map<String, Int>>,
 ) {
-    private fun modelIdOrNull(serialName: String): Int? = modelIds[serialName]
+    /**
+     * The model's permanent id, or null when it is not audited.
+     *
+     * Unlike [modelId] this does not throw: the data access log wraps every table it is installed on
+     * and uses a null here to mean "record nothing", which is how an unaudited model opts out.
+     */
+    internal fun modelIdOrNull(serialName: String): Int? = modelIds[serialName]
 
     /**
      * The permanent id of an audited model.
