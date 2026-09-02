@@ -380,8 +380,13 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
      * the debug setting exactly as before; the enum is what makes this seam worth hooking later.
      */
     context(server: ServerRuntime)
-    private fun authFailed(reason: AuthFailureReason, detail: String? = null) {
+    private suspend fun authFailed(reason: AuthFailureReason, detail: String? = null) {
         if (generalSettings().debug) println("Auth failed: $reason" + (detail?.let { " ($it)" } ?: ""))
+        // Reporters must not throw (see AuthEventReporter): this path is already rejecting a login,
+        // and a second failure here would obscure the first.
+        server.server.authEventReporters.forEach {
+            it.report(type = "AuthenticationFailed", detail = reason.name, sessionId = detail)
+        }
     }
 
     context(server: ServerRuntime)

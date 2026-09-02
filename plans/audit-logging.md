@@ -1086,6 +1086,27 @@ Two ordering notes for implementation. **Failure reasons already exist** as the 
 And **`sessionInfo` gaining a `signals` parameter is the cheapest first step**, since it makes
 session creation, update, and termination observable without touching sealed methods.
 
+#### 7.3.1 The seam, and one deliberate asymmetry
+
+`AuthEventReporter` lives in `core` rather than in `sessions` or `audit`, because those two do not
+depend on each other and should not have to: `sessions` raises events, an audit module installs a
+reporter that records them, and a deployment with no reporter installed pays a null check. Events are
+passed as strings so `core` does not own the taxonomy.
+
+**Reporters must not throw, and that is a real weakening.** The disclosure and data access logs gate
+*disclosure* — the guarded thing must not happen unless it was recorded, so they fail closed. An
+authentication event has already happened by the time it is reported, and is usually reported from a
+path that is itself rejecting something; throwing there would replace a clean "your login failed"
+with an unrelated server error and lose the original reason. So `AuthEventLogReporter` logs and
+swallows write failures. The consequence, stated plainly: **an attacker who can make the audit
+database unavailable can make authentication events go unrecorded while authentication keeps
+working.** That is the opposite of the guarantee the other two layers give, and it is a choice, not
+an oversight.
+
+**Coverage so far is partial.** The seam exists and rejected authentications report through it. The
+remaining events in the list above — issuance, refresh, termination, per-method proof results,
+masquerade — are not yet raised; the reporter will record them as soon as the call sites do.
+
 The three adverse findings in 7.1 should be fixed alongside: session rows want `delete =
 Condition.Never` with soft-termination only, backup-code use wants a soft-disable with a timestamp
 rather than a hard delete, and the `"test"` IP placeholder wants to fail rather than fabricate.

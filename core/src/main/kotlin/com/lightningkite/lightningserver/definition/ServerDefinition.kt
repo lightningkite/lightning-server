@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.runtime.AuthEventReporter
 import com.lightningkite.lightningserver.runtime.ExecutionInterceptor
 import com.lightningkite.lightningserver.runtime.compileAndInstrument
 import com.lightningkite.lightningserver.serialization.*
@@ -40,6 +41,7 @@ public data class ServerDefinition(
 
         public val endpoints: PathSpecMap<ServerPathEndpoints>,
         public val executionInterceptors: List<ExecutionInterceptor>,
+        public val authEventReporters: List<AuthEventReporter>,
         public val httpConnectionInterceptors: List<HttpConnectionInterceptor>,
         public val httpLogicalInterceptors: List<HttpLogicalInterceptor>,
         public val webSocketConnectionInterceptors: List<WebSocketConnectionInterceptor>,
@@ -73,6 +75,9 @@ public data class ServerDefinition(
 
     /** Interceptors wrapping every execution the server runs, of every kind. See [ExecutionInterceptor]. */
     public val executionInterceptors: List<ExecutionInterceptor> get() = flattened.executionInterceptors
+
+    /** Everything that wants to hear about authentication events. Empty unless a module installs one. */
+    public val authEventReporters: List<AuthEventReporter> get() = flattened.authEventReporters
     public val compiledExecutionInterceptors: ExecutionInterceptor by lazy { executionInterceptors.compileAndInstrument() }
 
     /** Interceptors wrapping the whole physical request. See [HttpConnectionInterceptor]. */
@@ -135,6 +140,7 @@ public data class ServerDefinition(
         externalSerializersModule = Runtime.Cached(externalSerializersModule),
         annotationValidators = Runtime.Cached(annotationValidators),
         executionInterceptors = executionInterceptors.toSealedList(),
+        authEventReporters = authEventReporters.toSealedList(),
         httpConnectionInterceptors = httpConnectionInterceptors.toSealedList(),
         httpLogicalInterceptors = httpLogicalInterceptors.toSealedList(),
         webSocketConnectionInterceptors = webSocketConnectionInterceptors.toSealedList(),
@@ -200,6 +206,7 @@ public data class ServerDefinition(
             externalSerializersModule = { flattenedModuleItems.fold(thisLayer.externalSerializersModule()) { acc, module -> acc + module.externalSerializersModule() } },
             annotationValidators = { flattenedModuleItems.fold(thisLayer.annotationValidators()) { acc, module -> acc + module.annotationValidators() } },
             executionInterceptors = flattenList { it.executionInterceptors },
+            authEventReporters = flattenList { it.authEventReporters },
             httpConnectionInterceptors = flattenList { it.httpConnectionInterceptors },
             httpLogicalInterceptors = flattenList { it.httpLogicalInterceptors },
             webSocketConnectionInterceptors = flattenList { it.webSocketConnectionInterceptors },

@@ -92,6 +92,10 @@ public class DisclosureAudit(
         AuditChain(chainId = "${'$'}{serverId}-${'$'}{clock.now().toEpochMilliseconds()}")
     })
 
+    /** Authentication events — the history a mutable session row cannot provide. See 7.1. */
+    public val authEvents: DatabaseTableRegistration<AuthEventRecord> =
+        database.registerTable("AuditAuthEvent", AuthEventRecord.serializer())
+
     private val registrations: DatabaseTableRegistration<AuditModelRegistration> =
         database.registerTable("AuditModelRegistration", AuditModelRegistration.serializer())
 
@@ -134,6 +138,7 @@ public class DisclosureAudit(
     init {
         install(RequestRecordInterceptor(requests))
         install(DisclosureLogInterceptor(registry, disclosures, chain))
+        install(AuthEventLogReporter(authEvents, chain))
     }
 }
 

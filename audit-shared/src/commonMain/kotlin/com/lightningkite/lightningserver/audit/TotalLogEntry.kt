@@ -91,7 +91,7 @@ public fun verifyChain(entries: List<TotalLogEntry>, hasher: (String) -> String)
  * layout ambiguous: two different records could hash to the same bytes. NUL cannot appear in any of
  * them.
  */
-private const val FIELD_SEPARATOR = "\u0000"
+internal const val FIELD_SEPARATOR = "\u0000"
 
 /**
  * The exact bytes an entry's [TotalLogEntry.hash] covers.
