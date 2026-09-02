@@ -57,7 +57,17 @@ public enum class DataAccessOperation {
  * @property sort The ordering applied, where the operation takes one. A sort is an oracle too.
  * @property modification The change applied, for write operations.
  * @property groupBy The field path an aggregation grouped on — the thing that makes a group query an
- *   enumeration of that field's values.
+ *   enumeration of that field's values. Also the vector field of a similarity search.
+ * @property skip Offset applied. Recorded because *this is the walk*: an ordering plus a moving skip
+ *   enumerates a sensitive field one value at a time, and without the offset two probes a thousand
+ *   rows apart are byte-identical records.
+ * @property limit Page size applied. A limit of 1 alongside a moving [skip] is the signature of that
+ *   walk.
+ * @property fields Which fields a partial read asked for. `findPartial({ssn})` and
+ *   `findPartial({name})` are the same query but not the same disclosure.
+ * @property aggregate The aggregation applied, and for a similarity search the query parameters. A
+ *   `Max` over a sensitive numeric field is a value-revealing oracle that a bare "Aggregate" cannot
+ *   be told apart from a `Count`.
  */
 @GenerateDataClassPaths
 @Serializable
@@ -71,6 +81,10 @@ public data class DataAccessRecord(
     val sort: String? = null,
     val modification: String? = null,
     val groupBy: String? = null,
+    val skip: Int? = null,
+    val limit: Int? = null,
+    val fields: String? = null,
+    val aggregate: String? = null,
 ) : HasId<Uuid> {
     /** When the query ran, derived from the version-7 [_id]. See [RequestRecord] for why it lives there. */
     @OptIn(ExperimentalUuidApi::class)

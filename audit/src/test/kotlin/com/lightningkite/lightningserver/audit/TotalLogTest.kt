@@ -154,11 +154,15 @@ class TotalLogTest {
      * later cannot silently change what past hashes covered. This pins the layout, including the NUL
      * separator — a separator that could occur inside a field would let two different records hash
      * identically, and the serialized conditions in a DataAccessRecord contain spaces and commas.
+     *
+     * `_id` is covered too. Leaving it out made the entry's seal time — which derives from the v7 id
+     * — freely rewritable with the chain still verifying clean.
      */
     @Test
     fun `the hash input is a stable, hand-built layout`() {
+        val id = kotlin.uuid.Uuid.parse("00000000-0000-7000-8000-000000000001")
         val entry = TotalLogEntry(
-            _id = kotlin.uuid.Uuid.random(),
+            _id = id,
             chainId = "c",
             sequence = 7,
             previousHash = "prev",
@@ -167,6 +171,9 @@ class TotalLogTest {
             hash = "ignored",
         )
 
-        assertEquals(listOf("c", "7", "prev", "content", "3").joinToString("\u0000"), entry.hashInput())
+        assertEquals(
+            listOf(id.toString(), "c", "7", "prev", "content", "3").joinToString("\u0000"),
+            entry.hashInput(),
+        )
     }
 }

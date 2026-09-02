@@ -1,8 +1,9 @@
 package com.lightningkite.lightningserver.audit
 
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.Table
+import com.lightningkite.services.database.condition
+import com.lightningkite.services.database.eq
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -30,6 +31,11 @@ public fun auditHash(input: String): String =
  * seal the winning instance's chain and leave every other instance accumulating records that are
  * never attested by anything. Sealing therefore happens on whichever instance owns the chain, driven
  * by its own volume.
+ *
+ * ## What this attests to, and what it does not
+ * An entry commits to a fold of record hashes but records no membership, so [verifyChain] can prove
+ * the chain is self-consistent and cannot prove that the records it covers still exist. See
+ * [TotalLogEntry] for the full statement of that limitation.
  *
  * ## Unsealed work is unattested
  * Records folded but not yet sealed are covered by no entry, so they are present in the queryable log
@@ -110,4 +116,9 @@ public class AuditChain internal constructor(
  */
 context(server: ServerRuntime)
 public suspend fun Table<TotalLogEntry>.verify(chainId: String): List<ChainBreak> =
-    verifyChain(find(Condition.Always).toList().filter { it.chainId == chainId }, ::auditHash)
+    // Filtered in the query, not in memory: chainId is indexed, and a whole-table scan to verify one
+    // chain would get slower exactly as the log grows more worth verifying.
+    verifyChain(
+        find(condition { it.chainId.eq(chainId) }).toList(),
+        ::auditHash,
+    )

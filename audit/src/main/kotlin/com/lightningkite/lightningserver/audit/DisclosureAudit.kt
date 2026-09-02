@@ -77,6 +77,12 @@ public class DisclosureAudit(
      * face an erasure request should turn this on from its first deploy, so that adding an audited
      * model without deciding its subject fails the deploy rather than silently producing records that
      * can never be erased.
+     *
+     * **The assurance is narrower than it looks.** The check covers the models the deploy-time scan
+     * can see, which is endpoint serializers only — the same limitation that gives an audited model
+     * no id when no endpoint can return it. A model reachable only through a table, or through an
+     * open-polymorphic or contextual serializer, passes this check and can still produce unshreddable
+     * records. Build the key list from what the deployment actually audits, not from a green deploy.
      */
     private val requireSubjectKeys: Boolean = false,
 ) : ServerBuilder() {

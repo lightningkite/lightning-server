@@ -63,8 +63,9 @@ public class AuditRegistry internal constructor(
     /**
      * The model's permanent id, or null when it is not audited.
      *
-     * Unlike [modelId] this does not throw: the data access log wraps every table it is installed on
-     * and uses a null here to mean "record nothing", which is how an unaudited model opts out.
+     * Unlike [modelId] this does not throw. Currently unused — the data access log gates on the
+     * `@Audited` annotation and then resolves through [modelId], so that an audited model missing
+     * from the registry fails rather than going unrecorded.
      */
     internal fun modelIdOrNull(serialName: String): Int? = modelIds[serialName]
 

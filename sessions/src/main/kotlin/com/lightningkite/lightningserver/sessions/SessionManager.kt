@@ -380,50 +380,61 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
      * the debug setting exactly as before; the enum is what makes this seam worth hooking later.
      */
     context(server: ServerRuntime)
-    private suspend fun authFailed(reason: AuthFailureReason, detail: String? = null) {
-        if (generalSettings().debug) println("Auth failed: $reason" + (detail?.let { " ($it)" } ?: ""))
+    private suspend fun authFailed(
+        reason: AuthFailureReason,
+        sessionId: String? = null,
+        request: Request<*>? = null,
+    ) {
+        if (generalSettings().debug) println("Auth failed: $reason" + (sessionId?.let { " ($it)" } ?: ""))
         // Reporters must not throw (see AuthEventReporter): this path is already rejecting a login,
         // and a second failure here would obscure the first.
         server.server.authEventReporters.forEach {
-            it.report(type = "AuthenticationFailed", detail = reason.name, sessionId = detail)
+            it.report(
+                type = "AuthenticationFailed",
+                sessionId = sessionId,
+                // Only what was actually observed; a placeholder would read as a real origin.
+                sourceIp = request?.sourceIp,
+                userAgent = request?.headers?.get(HttpHeader.UserAgent)?.root,
+                detail = reason.name,
+            )
         }
     }
 
     context(server: ServerRuntime)
     private suspend fun RefreshToken.session(request: Request<*>?): Session<SUBJECT, ID>? {
         if (!valid) {
-            authFailed(AuthFailureReason.TokenMalformed)
+            authFailed(AuthFailureReason.TokenMalformed, request = request)
             return null
         }
         if (type != principal.name) {
-            authFailed(AuthFailureReason.TokenTypeMismatch)
+            authFailed(AuthFailureReason.TokenTypeMismatch, request = request)
             return null
         }
 
         val session = sessionInfo.table().get(_id) ?: run {
-            authFailed(AuthFailureReason.NoSuchSession)
+            authFailed(AuthFailureReason.NoSuchSession, request = request)
             throw UnauthorizedException("No such session")
         }
         val subject = principal.fetch(session.subjectId)
         if(!permitAuthentication(subject)){
-            authFailed(AuthFailureReason.AuthenticationNotPermitted)
+            authFailed(AuthFailureReason.AuthenticationNotPermitted, request = request)
             throw ForbiddenException()
         }
         // SECURITY: Constant-time hash comparison to prevent timing attacks
         if (!plainTextSecret.checkAgainstHash(session.secretHash)) {
-            authFailed(AuthFailureReason.SecretMismatch, "session ${session._id}")
+            authFailed(AuthFailureReason.SecretMismatch, sessionId = session._id.toString(), request = request)
             throw UnauthorizedException("Incorrect hash for session")
         }
         if ((session.expires ?: Instant.DISTANT_FUTURE) < now()) {
-            authFailed(AuthFailureReason.SessionExpired)
+            authFailed(AuthFailureReason.SessionExpired, request = request)
             throw UnauthorizedException("Session has expired (hard).")
         }
         if ((session.stale ?: Instant.DISTANT_FUTURE) < now()) {
-            authFailed(AuthFailureReason.SessionStale)
+            authFailed(AuthFailureReason.SessionStale, request = request)
             throw UnauthorizedException("Session has expired (stale).")
         }
         if (session.terminated != null) {
-            authFailed(AuthFailureReason.SessionTerminated)
+            authFailed(AuthFailureReason.SessionTerminated, request = request)
             throw UnauthorizedException("Session has been terminated.")
         }
 

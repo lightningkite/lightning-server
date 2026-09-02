@@ -200,3 +200,14 @@ data class Roomy(
 @Serializable
 @GenerateDataClassPaths
 data class PlainThing(override val _id: Uuid, val value: String) : HasId<Uuid>
+
+/**
+ * Not audited itself, but reaches an audited model through a field.
+ *
+ * The shape that used to slip past the data access log: gating on the table's own descriptor found no
+ * `@Audited` here and returned the table undecorated, so every read of the Patient inside went
+ * unrecorded.
+ */
+@Serializable
+@GenerateDataClassPaths
+data class PatientWrapper(override val _id: Uuid, val patient: Patient) : HasId<Uuid>

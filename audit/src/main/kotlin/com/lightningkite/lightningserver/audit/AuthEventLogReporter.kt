@@ -38,6 +38,8 @@ public class AuthEventLogReporter(
         principal: String?,
         actor: String?,
         sessionId: String?,
+        sourceIp: String?,
+        userAgent: String?,
         detail: String?,
     ) {
         val parsed = AuthEventType.entries.firstOrNull { it.name == type }
@@ -52,6 +54,8 @@ public class AuthEventLogReporter(
             principal = principal,
             actor = actor,
             sessionId = sessionId,
+            sourceIp = sourceIp,
+            userAgent = userAgent,
             failureReason = detail,
         )
         try {
@@ -60,6 +64,10 @@ public class AuthEventLogReporter(
                 chain().fold(auditHash(record.chainInput()))
             }
         } catch (e: Exception) {
+            // Cancellation is the caller being torn down, not a sink failure. Swallowing it here
+            // would report this coroutine as having completed normally and break structured
+            // concurrency on every cancelled request.
+            if (e is kotlin.coroutines.cancellation.CancellationException) throw e
             authEventLogger.error(e) { "Failed to record auth event $parsed; authentication continued unrecorded." }
         }
     }

@@ -16,12 +16,24 @@ import kotlin.uuid.Uuid
  * it would never read. See `plans/audit-logging.md` 5.7 and 5.7.1.
  *
  * ## What a chain proves, and what it does not
- * Altering or removing any sealed entry breaks the link to its successor, which [verifyChain]
- * detects. **Truncating a chain at its end does not** — the surviving prefix is internally
- * consistent — and closing that requires anchoring a head somewhere the operator does not control.
- * Nothing here addresses fabrication at write time: a false record written through the normal path
- * chains perfectly well. The chain proves the log has not been edited since it was written, not that
- * it was true when written.
+ * Altering or removing a sealed entry breaks the link to its successor, which [verifyChain] detects
+ * — **against an adversary who cannot recompute the chain.** [hash] is an unkeyed SHA-256 with no
+ * secret, so anyone who can write this table can recompute every entry and the result verifies
+ * clean. Real tamper-evidence needs either a key held outside the database operator's reach or an
+ * external anchor; neither exists yet.
+ *
+ * Two further limits, both currently open:
+ * - **Truncating a chain at its end is undetectable** — the surviving prefix is internally
+ *   consistent, and nothing inside the system knows how long the chain should have been.
+ * - **[contentHash] is not verifiable against the records.** An entry commits to a fold of record
+ *   hashes but stores no record ids and no ordering key, and the records carry no chain position, so
+ *   nobody can recompute the fold. Deleting an audit record is therefore undetectable: today the
+ *   chain attests to its own integrity, not to the log's. Fixing it means storing membership — an id
+ *   list or an id range per entry.
+ *
+ * And nothing here addresses fabrication at write time: a false record written through the normal
+ * path chains perfectly well. The chain proves the log has not been edited since it was written, not
+ * that it was true when written.
  *
  * @property chainId The process that owns this chain — its server id and boot time. One chain per
  *   process, because a chain shared between instances would need them to agree on [sequence], which
@@ -100,7 +112,7 @@ internal const val FIELD_SEPARATOR = "\u0000"
  * cannot silently change what historical hashes were computed over and invalidate every chain.
  */
 public fun TotalLogEntry.hashInput(): String =
-    listOf(chainId, sequence.toString(), previousHash, contentHash, count.toString())
+    listOf(_id.toString(), chainId, sequence.toString(), previousHash, contentHash, count.toString())
         .joinToString(FIELD_SEPARATOR)
 
 /**

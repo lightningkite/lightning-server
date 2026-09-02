@@ -20,6 +20,7 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.fail
 import kotlin.uuid.Uuid
 
 /**
@@ -41,6 +42,9 @@ class DataAccessLogTest {
 
         /** Not audited, so it must generate no rows at all. */
         val plain = database.registerTable("Plain", PlainThing.serializer())
+
+        /** Not audited itself, but contains an audited model — the shape that used to slip through. */
+        val wrappers = database.registerTable("Wrapper", PatientWrapper.serializer())
 
         /**
          * The audit registry assigns ids by scanning endpoint serializers, never tables, so an
@@ -119,12 +123,80 @@ class DataAccessLogTest {
 
     /** Writes go through the same choke point; the modification is what says intent. */
     @Test
-    fun `a write records its modification`() = onServer {
+    fun `an update records its modification`() = onServer {
         val table = auditedTable()
-        table.insert(listOf(Patient(_id = Uuid.random(), name = "Ada", ssn = "s")))
+        val id = Uuid.random()
+        table.insert(listOf(Patient(_id = id, name = "Ada", ssn = "s")))
+        table.updateOneById(id, modification<Patient> { it.ssn assign "changed" })
 
-        val row = logged().single()
-        assertEquals(DataAccessOperation.Insert, row.operation)
+        val update = logged().single { it.operation == DataAccessOperation.Update }
+        assertTrue(
+            update.modification?.contains("changed") == true,
+            "the modification was not recoverable from the record: ${update.modification}",
+        )
+    }
+
+    /**
+     * The central guarantee, and until now untested: a query whose record cannot be written must not
+     * run. Everything else here checks that rows appear; this checks that the read does not happen
+     * when they cannot.
+     */
+    @Test
+    fun `a query whose record cannot be written does not run`() = onServer { runtime ->
+        var reads = 0
+        val counting = object : com.lightningkite.services.database.Table<Patient> by TestServer.patients() {
+            override suspend fun count(condition: com.lightningkite.services.database.Condition<Patient>): Int {
+                reads++
+                return 0
+            }
+        }
+        val table = DataAccessLogTable(
+            wraps = counting,
+            modelId = { 1 },
+            requestId = Uuid.random(),
+            executionId = Uuid.random(),
+            json = runtime.internalSerialization.json,
+            nowMillis = { 1L },
+            write = { throw RuntimeException("audit sink down") },
+        )
+
+        try {
+            table.count(Condition.Always)
+            fail("the read happened even though its record could not be written")
+        } catch (_: RuntimeException) {
+        }
+        assertEquals(0, reads, "the underlying table was read despite the audit write failing")
+    }
+
+    /**
+     * An ordering plus a moving offset walks values one at a time. Without skip and limit on the
+     * record, the first probe and the four-thousandth are byte-identical, and the enumeration this
+     * layer exists to expose stays invisible.
+     */
+    @Test
+    fun `two probes at different offsets are distinguishable`() = onServer {
+        val table = auditedTable()
+        val sort = listOf(SortPart(Patient.path.ssn))
+        table.find(Condition.Always, orderBy = sort, skip = 0, limit = 1).toList()
+        table.find(Condition.Always, orderBy = sort, skip = 4_000, limit = 1).toList()
+
+        val offsets = logged().sortedBy { it.skip }.map { it.skip }
+        assertEquals(listOf(0, 4_000), offsets, "the walk's offsets were not recorded")
+    }
+
+    /**
+     * A table whose declared type is not itself audited but whose children are must be refused, not
+     * quietly passed through: a sealed parent's descriptor carries no annotation, so gating on that
+     * alone would leave every read of its audited children unrecorded and silent.
+     */
+    @Test
+    fun `a table that merely contains audited models is refused`() = onServer {
+        try {
+            TestServer.audit.dataAccessLogged(TestServer.wrappers())
+            fail("a table containing audited models was silently left unlogged")
+        } catch (e: IllegalStateException) {
+            assertTrue("Patient" in (e.message ?: ""), "the contained model was not named: ${e.message}")
+        }
     }
 
     /** The decorator is meant to be passed on every model; an unaudited one must cost nothing. */

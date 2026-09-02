@@ -36,6 +36,10 @@ public interface AuthEventReporter {
      * @param principal The subject the event is about, or null when the attempt failed before one
      *   was resolved.
      * @param actor The principal that caused the event when it differs from [principal].
+     * @param sessionId The session the event concerns, where there is one.
+     * @param sourceIp Where the attempt came from, when it was actually observed. Pass null rather
+     *   than a placeholder: a fabricated origin reads as a real one to whoever queries the log.
+     * @param userAgent As [sourceIp].
      * @param detail Free text for the reason, where there is one.
      */
     context(runtime: ServerRuntime)
@@ -44,6 +48,8 @@ public interface AuthEventReporter {
         principal: String? = null,
         actor: String? = null,
         sessionId: String? = null,
+        sourceIp: String? = null,
+        userAgent: String? = null,
         detail: String? = null,
     )
 }

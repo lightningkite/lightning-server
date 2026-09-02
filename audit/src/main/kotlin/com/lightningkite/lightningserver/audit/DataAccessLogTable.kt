@@ -46,6 +46,10 @@ internal class DataAccessLogTable<T : Any>(
         sort: String? = null,
         modification: String? = null,
         groupBy: String? = null,
+        skip: Int? = null,
+        limit: Int? = null,
+        fields: String? = null,
+        aggregate: String? = null,
     ) {
         val modelId = modelId()
         write(
@@ -59,6 +63,10 @@ internal class DataAccessLogTable<T : Any>(
                 sort = sort,
                 modification = modification,
                 groupBy = groupBy,
+                skip = skip,
+                limit = limit,
+                fields = fields,
+                aggregate = aggregate,
             )
         )
     }
@@ -70,7 +78,7 @@ internal class DataAccessLogTable<T : Any>(
         limit: Int,
         maxQueryMs: Long,
     ): Flow<T> {
-        record(DataAccessOperation.Find, condition, sort = sortText(orderBy))
+        record(DataAccessOperation.Find, condition, sort = sortText(orderBy), skip = skip, limit = limit)
         return wraps.find(condition, orderBy, skip, limit, maxQueryMs)
     }
 
@@ -87,7 +95,10 @@ internal class DataAccessLogTable<T : Any>(
         limit: Int,
         maxQueryMs: Long,
     ): Flow<Partial<T>> {
-        record(DataAccessOperation.Find, condition, sort = sortText(orderBy))
+        record(
+            DataAccessOperation.Find, condition, sort = sortText(orderBy), skip = skip, limit = limit,
+            fields = fields.joinToString(",") { it.toString() },
+        )
         return wraps.findPartial(fields, condition, orderBy, skip, limit, maxQueryMs)
     }
 
@@ -97,7 +108,11 @@ internal class DataAccessLogTable<T : Any>(
         condition: Condition<T>,
         maxQueryMs: Long,
     ): Flow<ScoredResult<T>> {
-        record(DataAccessOperation.Find, condition, groupBy = vectorField.toString())
+        // params carries the query vector, which *is* the probe in a similarity search.
+        record(
+            DataAccessOperation.Find, condition, groupBy = vectorField.toString(),
+            aggregate = params.toString(),
+        )
         return wraps.findSimilar(vectorField, params, condition, maxQueryMs)
     }
 
@@ -107,7 +122,10 @@ internal class DataAccessLogTable<T : Any>(
         condition: Condition<T>,
         maxQueryMs: Long,
     ): Flow<ScoredResult<T>> {
-        record(DataAccessOperation.Find, condition, groupBy = vectorField.toString())
+        record(
+            DataAccessOperation.Find, condition, groupBy = vectorField.toString(),
+            aggregate = params.toString(),
+        )
         return wraps.findSimilarSparse(vectorField, params, condition, maxQueryMs)
     }
 
@@ -147,7 +165,10 @@ internal class DataAccessLogTable<T : Any>(
         condition: Condition<T>,
         property: DataClassPath<T, N>,
     ): Double? {
-        record(DataAccessOperation.Aggregate, condition, groupBy = property.toString())
+        record(
+            DataAccessOperation.Aggregate, condition, groupBy = property.toString(),
+            aggregate = aggregate.toString(),
+        )
         return wraps.aggregate(aggregate, condition, property)
     }
 
@@ -157,13 +178,19 @@ internal class DataAccessLogTable<T : Any>(
         groupBy: DataClassPath<T, Key>,
         property: DataClassPath<T, N>,
     ): Map<Key, Double?> {
-        record(DataAccessOperation.GroupAggregate, condition, groupBy = groupBy.toString())
+        record(
+            DataAccessOperation.GroupAggregate, condition, groupBy = groupBy.toString(),
+            aggregate = aggregate.toString() + " over " + property.toString(),
+        )
         return wraps.groupAggregate(aggregate, condition, groupBy, property)
     }
 
     override suspend fun insert(models: Iterable<T>): List<T> {
         val list = models.toList()
-        record(DataAccessOperation.Insert, Condition.Never, modification = "${list.size} inserted")
+        // Condition.Never because an insert matches nothing, and the count goes in `limit` rather
+        // than in `modification`: that column is serialized JSON everywhere else and mixing free
+        // text into it makes the whole column untrustworthy to a query.
+        record(DataAccessOperation.Insert, Condition.Never, limit = list.size)
         return wraps.insert(list)
     }
 

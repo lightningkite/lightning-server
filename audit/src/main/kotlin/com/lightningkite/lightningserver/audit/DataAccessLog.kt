@@ -47,9 +47,20 @@ import com.lightningkite.services.database.insertOne
 context(runtime: ServerRuntime)
 public fun <T : Any> DisclosureAudit.dataAccessLogged(table: Table<T>): Table<T> {
     val descriptor = table.serializer.descriptor
-    // Keyed on the annotation, not on the registry. A registry miss for a model that *is* audited is
-    // a failure, not a licence to record nothing — see modelIdOrAudited below.
-    if (!descriptor.isAudited) return table
+    // Reachability, not a single annotation. `isAudited` inspects one descriptor, so gating on it
+    // would return a sealed parent's table — or any wrapper's — untouched even though its children
+    // are audited, and every read of them would go unrecorded in silence. `auditedModels()` walks.
+    val reachable = descriptor.auditedModels()
+    if (reachable.isEmpty()) return table
+    // The row names one model, so a table that merely *contains* audited data cannot be attributed.
+    // Fail loudly rather than pick one: inconsistent coverage hides the gap instead of failing on it,
+    // which is the same rule the registry applies to an unregistered model.
+    if (!descriptor.isAudited) throw IllegalStateException(
+        "Table \"" + descriptor.serialName + "\" is not itself @Audited but can contain audited " +
+            "models (" + reachable.keys.sorted().joinToString(", ") + "). A data access record names " +
+            "one model, so this shape cannot be attributed and is refused rather than logged " +
+            "inconsistently."
+    )
     val serialName = descriptor.auditSerialName
     val initiator = runtime.initiator
     return DataAccessLogTable(

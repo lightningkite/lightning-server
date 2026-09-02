@@ -15,7 +15,7 @@ package com.lightningkite.lightningserver.audit
  * val audit = path.path("audit") include DisclosureAudit(
  *     database = database,
  *     subjectKeys = mapOf(
- *         Patient.serializer().descriptor.serialName to AuditSubjectKey<Patient> { it.subjectId },
+ *         auditSubjectKey(Patient.serializer()) { it.subjectId },
  *     ),
  * )
  * ```
@@ -41,3 +41,19 @@ public fun interface AuditSubjectKey<T> {
      */
     public fun subject(model: T): String?
 }
+
+/**
+ * Builds a [subjectKeys][com.lightningkite.lightningserver.audit] entry, tying the key to the model
+ * it derives from.
+ *
+ * The map itself is `Map<String, AuditSubjectKey<*>>`, which cannot express that the key's type
+ * matches its serial name — so pairing them by hand lets `Patient`'s entry hold a `Doctor` key and
+ * compile. This does not: the serializer supplies both halves.
+ */
+public fun <T> auditSubjectKey(
+    serializer: kotlinx.serialization.KSerializer<T>,
+    key: AuditSubjectKey<T>,
+): Pair<String, AuditSubjectKey<*>> =
+    // Same normalisation the registry uses: a nullable descriptor's serial name carries a trailing
+    // "?", and keying on the raw name would silently miss the model it refers to.
+    serializer.descriptor.serialName.removeSuffix("?") to key
