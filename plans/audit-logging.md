@@ -494,7 +494,7 @@ The volume is paid down inside the row instead:
    nothing: `_id` is a version-7 UUID, so `DisclosureRecord.at` derives the moment of disclosure from
    the key itself. That is worth having here rather than deferring to the request record, because a
    socket's `requestId` names the socket rather than the phase that disclosed
-   ([5.8.2](#582-a-sockets-row-is-keyed-by-the-socket-not-by-the-phase-open)) — without it, a
+   ([5.8.2](#582-a-sockets-row-is-keyed-by-the-socket-not-by-the-phase-resolved)) — without it, a
    disclosure on a long-lived connection can only be placed "sometime during this session".
 2. **The field set is two `Int`s, not four.** Itemising is opt-in ([5.1.1](#511-itemising-is-opt-in-disclosure-is-not)),
    so a model reserves bits for the handful of fields that matter rather than for all of them.
@@ -814,7 +814,7 @@ unrecorded in memory. A per-protocol split was not worth two code paths.
 Disclosures within one request batch into a single `insert`, so the per-request cost is two writes
 plus one.
 
-#### 5.8.2 A socket's row is keyed by the socket, not by the phase (open)
+#### 5.8.2 A socket's row is keyed by the socket, not by the phase (resolved)
 
 Since the [execution-context refactor](execution-context-refactor.md), each of a WebSocket's five
 lifecycle phases is a separate execution with its own `executionId` — on a serverless engine they are
@@ -833,9 +833,21 @@ long-lived connection is "sometime during this session" rather than "in response
 constant for the socket's whole lifetime, so disclosures on a socket already attributed to the
 session rather than to a frame. Socket-keying reproduces that exactly.
 
-**The open question**, for this plan rather than for the refactor: whether per-phase attribution is
-worth a `RequestRecord` row per phase execution. For a chatty socket that is a row per client
-message, against a table whose write path is fail-closed. Not decided here.
+**Resolved: keep socket-keyed rows, and carry the execution id on the records instead.**
+
+The question was whether per-phase attribution justified a `RequestRecord` row per phase execution —
+for a chatty socket, a row per client message, against a fail-closed write path. It does not, because
+the precision that was actually wanted can be had without those rows. Both record types written
+during a socket's life now carry `executionId` alongside `requestId`:
+[`DataAccessRecord`](#62-record-shape-and-installation-resolved) from the outset, and any record that
+needs it can follow. `requestId` still names the socket, so the join to the request record is
+unchanged and one row per socket remains; `executionId` names the phase, so "which message caused
+this" is answerable by reading the record rather than by multiplying request records.
+
+`DisclosureRecord` does **not** yet carry it, and that is the remaining gap: a disclosure on a
+long-lived socket can still only be placed within the session, though its own v7 `_id` now timestamps
+it to the millisecond, which in practice identifies the message. Adding the column is 16 bytes on the
+highest-volume table in the system and should be weighed against that.
 
 ### 5.9 Sinks
 
@@ -967,7 +979,7 @@ join on their contents.
 **Both ids are recorded.** `requestId` matches [5.8](#58-the-request-record--what-requestid-points-at)
 so a query joins to the same request record as a disclosure — which for a socket names the socket.
 `executionId` is the phase that actually issued the query. Carrying both costs 16 bytes and recovers
-the per-phase precision [5.8.2](#582-a-sockets-row-is-keyed-by-the-socket-not-by-the-phase-open)
+the per-phase precision [5.8.2](#582-a-sockets-row-is-keyed-by-the-socket-not-by-the-phase-resolved)
 gives up, without a `RequestRecord` row per phase.
 
 **Installation is the `log` slot, and scope is the registry.** The decorator is passed as
@@ -1181,8 +1193,12 @@ Sequenced so each step is independently shippable and testable, and so prerequis
    [`RequestRecord`](#58-the-request-record--what-requestid-points-at) table with its two-write
    lifecycle, the fail-closed database sink, and the `_id`-in-partials rule from 5.3.3. Included as
    the `DisclosureAudit` module.
-7. **Data access log: conditions and sorts** ([section 6.1](#61-extend-it-to-reads-every-condition-and-every-sort))
-   — **NOT STARTED, and larger than described.** Section 6 opens by asserting "write auditing already
+7. ~~**Data access log: conditions and sorts**~~ ([section 6.1](#61-extend-it-to-reads-every-condition-and-every-sort))
+   — **DONE**, to the record shape and installation in 6.2. Two limitations recorded there: an
+   audited model that no endpoint's serializer reaches has no id and its reads fail rather than going
+   unrecorded, and fail-closed here covers privileged internal reads so its blast radius exceeds the
+   disclosure log's. Originally described as an extension of existing write auditing, which
+   **did not exist**: Section 6 opens by asserting "write auditing already
    exists at `ModelPermissionsTable`". Verified 2026-09: it does not. That class enforces permissions
    and records nothing; `simpleSignals.kt` provides generic `postCreate`/`postChange`/`postDelete`
    decorators, but nothing in either repository writes an audit record from the database layer. So
@@ -1198,7 +1214,11 @@ Sequenced so each step is independently shippable and testable, and so prerequis
    rather than a later refinement. Extends the existing write auditing at the database layer to
    record every condition and sort applied to an audited model.
 8. **Total-log: hash chaining and anchoring** ([section 5.7](#57-integrity-not-in-the-database-log))
-   — separate from the database log, and what lets audited models stream over WebSockets.
+   — **chain DONE, anchoring NOT DONE.** The chain, its sealing schedule and verification are built
+   to the design in 5.7.1, which was written during implementation and is flagged there as needing
+   review. Anchoring — emitting a chain head through the path the proxy captures — is **not built**,
+   and without it the chain detects modification but not truncation, so the tamper-evidence is
+   materially weaker than 5.7 implies.
 9. **Auth event log** ([section 7](#7-layer-4-the-authentication-event-log)) — the largest greenfield
    piece, since nothing exists to extend. **Groundwork done; the event log itself is not.** Both
    cheap unblockers have shipped: `sessionInfo` now takes a `signals` parameter
