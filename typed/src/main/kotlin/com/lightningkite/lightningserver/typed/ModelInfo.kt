@@ -46,7 +46,7 @@ public interface ModelInfo<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<I
      */
     @UnauditedDatabaseAccess
     context(server: ServerRuntime)
-    public fun dangerouslyDirectTable(): Table<T>
+    public fun dangerouslyDirectTable(): Table<T> = registration()
 
     context(server: ServerRuntime)
     public fun table(): Table<T>
