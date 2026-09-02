@@ -657,6 +657,12 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
             // Pre-deploy gate: invoke the freshly-published function version with a {"predeploy":true}
             // event and only proceed to the alias cutover if it reports "predeploy-ok". Triggered on
             // every code change.
+            // A brand-new function - and, with snapStart, every newly published version while its
+            // snapshot is being built - sits in state Pending for a while, and invoking it in that
+            // state fails with ResourceConflictException. So wait for the exact qualifier we are
+            // about to invoke to reach Active first; the waiter polls every 5s for up to 5 minutes.
+            // The qualifier is single-quoted because without snapStart it is the literal $LATEST,
+            // which /bin/sh would otherwise expand away.
             // The payload is the base64 of {"predeploy":true} passed inline: AWS CLI v2 expects base64
             // for --payload anyway, and the encoded form is bare alphanumerics, so it survives both
             // /bin/sh and PowerShell without quoting. --cli-binary-format is passed explicitly so a
@@ -668,12 +674,18 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                     "code" - expression("aws_lambda_function.main.source_code_hash")
                 }
                 "depends_on" - listOf("aws_lambda_function.main")
-                "provisioner.local-exec" {
-                    "command" - expression(
-                        $$"""local.is_windows ? "aws lambda invoke --function-name ${aws_lambda_function.main.function_name} --qualifier ${aws_lambda_function.main.version} --cli-binary-format base64 --payload eyJwcmVkZXBsb3kiOnRydWV9 --region $${emitter.applicationRegion} ${path.module}/build/predeploy-out.json | Out-Null; if(-not(Select-String -Path ${path.module}/build/predeploy-out.json -Pattern predeploy-ok -Quiet)){exit 1}" : "aws lambda invoke --function-name ${aws_lambda_function.main.function_name} --qualifier ${aws_lambda_function.main.version} --cli-binary-format base64 --payload eyJwcmVkZXBsb3kiOnRydWV9 --region $${emitter.applicationRegion} ${path.module}/build/predeploy-out.json > /dev/null && grep -q predeploy-ok ${path.module}/build/predeploy-out.json""" + "\""
-                    )
-                    "interpreter" - expression("local.is_windows ? [\"PowerShell\", \"-Command\"] : []")
-                }
+                "provisioner.local-exec" - listOf(
+                    terraformJsonObject {
+                        "command" - $$"""aws lambda wait function-active --function-name ${aws_lambda_function.main.function_name} --qualifier '${aws_lambda_function.main.version}' --region $${emitter.applicationRegion}"""
+                        "interpreter" - this@emit.expression("local.is_windows ? [\"PowerShell\", \"-Command\"] : []")
+                    },
+                    terraformJsonObject {
+                        "command" - this@emit.expression(
+                            $$"""local.is_windows ? "aws lambda invoke --function-name ${aws_lambda_function.main.function_name} --qualifier '${aws_lambda_function.main.version}' --cli-binary-format base64 --payload eyJwcmVkZXBsb3kiOnRydWV9 --region $${emitter.applicationRegion} ${path.module}/build/predeploy-out.json | Out-Null; if(-not(Select-String -Path ${path.module}/build/predeploy-out.json -Pattern predeploy-ok -Quiet)){exit 1}" : "aws lambda invoke --function-name ${aws_lambda_function.main.function_name} --qualifier '${aws_lambda_function.main.version}' --cli-binary-format base64 --payload eyJwcmVkZXBsb3kiOnRydWV9 --region $${emitter.applicationRegion} ${path.module}/build/predeploy-out.json > /dev/null && grep -q predeploy-ok ${path.module}/build/predeploy-out.json""" + "\""
+                        )
+                        "interpreter" - this@emit.expression("local.is_windows ? [\"PowerShell\", \"-Command\"] : []")
+                    }
+                )
             }
             "resource.aws_lambda_alias.main" {
                 "name" - "prod"
