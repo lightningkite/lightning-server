@@ -45,11 +45,17 @@ system has always been. **The only integrity mechanism is whether the server doe
 does.** Code running in the server can lie about what the server did, and nothing in the server can
 prevent that.
 
-What a chain *could* have defended, built properly, is narrower: an adversary who can write the audit
-tables but cannot deploy code — a DBA, a leaked database credential, someone editing rows after the
-fact. An HMAC keyed from a secret store that principal cannot read would make silent edits detectable.
-Ours was an unkeyed hash living in the same database it protected, so it was recomputable by exactly
-that adversary; it defended nobody while putting a second write on the path of every audited read.
+What a chain *could* have defended is narrower than it first sounds: an adversary who can write the
+audit tables but cannot read the key. Since the server computes the chain, the key lives with the
+application's runtime secrets — so the defence exists only where database write and that secret are
+genuinely separate principals, which is a deployment property nothing here can verify. And even then
+it catches edits and middle deletions but not truncation, because nothing in process knows how long
+the chain should have been.
+
+Ours was worse than that narrow case: an unkeyed hash in the database it protected, recomputable by
+exactly the adversary it was meant to catch, while putting a second write on the path of every audited
+read. For the same threat, prevention beats detection — see below — which is why removing it was right
+rather than merely acceptable.
 
 So this is a deliberate scope decision, not an oversight: **that narrower guarantee is bought with
 deployment controls, not code.** Restrict who can write the audit tables; make the store append-only

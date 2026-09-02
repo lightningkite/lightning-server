@@ -724,18 +724,30 @@ server*, and there are two different adversaries hiding in that:
 | Can write the audit tables, cannot deploy code (a DBA, a leaked DB credential, an operator editing rows after the fact) | **Helps, if built properly** — an HMAC keyed from a secret store the DB principal cannot read makes silent edits detectable | Helps |
 | Can run code on the server (deploy access, RCE, a malicious change) | **Useless** — they hold the key and the code, and can recompute anything | Helps, but see below |
 
-So an in-process chain is not inherently worthless; it defends the first row. What made *ours*
-worthless was building it with an unkeyed hash, in the same database it was protecting. That version
-could be recomputed by exactly the adversary it was supposed to catch, while adding a second write to
-the path of every audited read — including privileged internal ones, where a hash failure could halt a
-schedule tick or a startup task. It bought a property it could not provide, at a real availability
-cost.
+That first row is narrower than it looks, and the "if built properly" is carrying most of the weight.
+The key has to be readable by the server, since the server computes the chain — so it lives wherever
+the application's runtime secrets live, and the defence exists only where some principal holds
+database write *without* that secret. That separation is a deployment property the framework can
+neither create nor verify. It collapses entirely against code execution, against anyone who can read
+the app's environment, and against a vault compromise that yields both credentials.
 
-The decision is therefore not "integrity is impossible in-process" but **"we are not paying for the
-narrower guarantee here."** Deployment controls are expected to cover the first row: restrict who can
-write the audit tables, and make the store append-only at the infrastructure level where it is
-available. If that turns out to be insufficient, the emergency total-log ([section 10](#10-out-of-scope-external-capture-layer))
-is the answer, and it is a better one than a chain would have been.
+Even where it holds it is **partial**: an HMAC chain catches an edited row and a deletion from the
+middle, but not truncation — delete everything after time T and the surviving prefix verifies clean,
+because nothing in process knows how long the chain should have been. The DBA who edits one row to
+cover a specific access is caught; the one who drops the tail is not.
+
+Ours was worse than the narrow case anyway: an unkeyed hash, stored in the database it protected,
+recomputable by exactly the adversary it was meant to catch — while adding a second write to the path
+of every audited read, including privileged internal ones, where a hash failure could halt a schedule
+tick or a startup task.
+
+**So the conclusion is not "integrity is impossible in-process" but that the in-process version is a
+bad trade.** For the same adversary, the better answer is prevention rather than detection: restrict
+who can write the audit tables, and make the store append-only at the infrastructure level where that
+is available. That stops the tampering instead of detecting a subset of it afterwards, costs nothing
+on the audited path, and adds no subsystem to get wrong. Where prevention is not achievable, the
+answer is the emergency total-log ([section 10](#10-out-of-scope-external-capture-layer)), outside the
+server, not a chain inside it.
 
 ### 5.8 The request record — what `requestId` points at
 
