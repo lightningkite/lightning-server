@@ -896,6 +896,49 @@ Two things that effort has to settle:
 Operations that are neither model reads nor model writes rely on the action log for now, since
 `@AuditedOperation` was dropped ([section 5.1](#51-marking)).
 
+### 6.2 Record shape and installation (resolved)
+
+```kotlin
+@Serializable
+public data class DataAccessRecord(
+    override val _id: Uuid,               // v7: `at` derives the query's instant from the key
+    @Index val requestId: Uuid,           // joins to RequestRecord, socket-keyed like a disclosure
+    @Index val executionId: Uuid,         // the precise execution, which requestId blurs for sockets
+    @Index val modelId: Int,              // same registry as DisclosureRecord
+    val operation: DataAccessOperation,
+    val condition: String,                // serialized Condition<T>
+    val sort: String? = null,             // serialized List<SortPart<T>>, where the operation takes one
+    val modification: String? = null,     // serialized Modification<T>, for writes
+    val groupBy: String? = null,          // the field path an aggregation grouped on
+) : HasId<Uuid>
+```
+
+**Why the query is stored as text.** `Condition<T>` and `Modification<T>` are serializable, but only
+against the model's own serializer, and this table holds rows for every audited model at once. A
+generic record type would mean a table per model. The condition is serialized with the model's
+serializer at write time and stored as JSON, which stays readable and greppable and gives up only
+the ability to query *inside* a recorded condition — an investigation reads these rows, it does not
+join on their contents.
+
+**Both ids are recorded.** `requestId` matches [5.8](#58-the-request-record--what-requestid-points-at)
+so a query joins to the same request record as a disclosure — which for a socket names the socket.
+`executionId` is the phase that actually issued the query. Carrying both costs 16 bytes and recovers
+the per-phase precision [5.8.2](#582-a-sockets-row-is-keyed-by-the-socket-not-by-the-phase-open)
+gives up, without a `RequestRecord` row per phase.
+
+**Installation is the `log` slot, and scope is the registry.** The decorator is passed as
+`ModelInfo`'s `log` parameter (see 6.1), and no-ops for any model the audit registry does not know —
+so passing it uniformly is safe, and only audited models generate rows. This keeps the "which models
+are audited" decision in exactly one place, the `@Audited` annotation, rather than splitting it
+between the annotation and a list of decorated tables.
+
+**Fail-closed, with the same reasoning as 5.6.** A read of an audited model whose query cannot be
+recorded does not happen. That makes an outage of the audit database an outage for reads of audited
+models, which is a strictly larger blast radius than the disclosure log's — that one only fails
+requests that actually disclose, while this one fails privileged internal reads too, including ones
+made during startup or a schedule tick. **This is the single riskiest thing in this plan** and is
+called out again in the deployment notes.
+
 ---
 
 ## 7. Layer 4: the authentication event log
