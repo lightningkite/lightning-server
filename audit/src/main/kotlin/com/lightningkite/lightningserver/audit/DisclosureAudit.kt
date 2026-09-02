@@ -60,6 +60,25 @@ public class DisclosureAudit(
      * records unattested — shorter is safer and costs one row per interval. See 5.7.1.
      */
     private val sealInterval: Duration = 1.minutes,
+    /**
+     * Erasure subject per audited model, keyed by serial name. See [AuditSubjectKey].
+     *
+     * Absent by default, which is correct for the US regime this targets first. Supplying keys does
+     * **not** by itself encrypt anything — crypto-shredding is not implemented (11.2). What they do
+     * today is satisfy [requireSubjectKeys], so a deployment that will need erasure can prove it has
+     * made the decision for every audited model *before* records exist to be shredded.
+     */
+    private val subjectKeys: Map<String, AuditSubjectKey<*>> = emptyMap(),
+    /**
+     * Refuse to deploy unless every audited model has an entry in [subjectKeys].
+     *
+     * Exists because the erasure decision cannot be retrofitted: records written before a key is
+     * registered were written unwrapped and stay unshreddable forever. A deployment that may ever
+     * face an erasure request should turn this on from its first deploy, so that adding an audited
+     * model without deciding its subject fails the deploy rather than silently producing records that
+     * can never be erased.
+     */
+    private val requireSubjectKeys: Boolean = false,
 ) : ServerBuilder() {
     public val requests: DatabaseTableRegistration<RequestRecord> =
         database.registerTable("AuditRequest", RequestRecord.serializer())
@@ -109,6 +128,23 @@ public class DisclosureAudit(
      * instances never race to allocate the same index. It is convergent, so re-running it on every
      * deploy — which is what the framework does — is a no-op.
      */
+    /**
+     * Fails the deploy when [requireSubjectKeys] is on and an audited model has no erasure subject.
+     *
+     * A pre-deploy task specifically so it runs *before* the new version can write anything: once a
+     * record exists it is too late to decide how it should have been encrypted.
+     */
+    private val checkSubjectKeys: PreDeployTask = path.path("check-audit-subject-keys") bind PreDeployTask {
+        if (!requireSubjectKeys) return@PreDeployTask
+        val missing = auditedModelsOnServer().keys.filter { it !in subjectKeys }.sorted()
+        if (missing.isNotEmpty()) throw IllegalStateException(
+            "requireSubjectKeys is on, but these audited models have no AuditSubjectKey: " +
+                missing.joinToString(", ") + ". The erasure decision cannot be made after records " +
+                "exist — see plans/audit-logging.md 11.2 — so this fails the deploy rather than " +
+                "producing records that can never be erased."
+        )
+    }
+
     private val assignBits: PreDeployTask = path.path("assign-audit-bits") bind PreDeployTask(
         dependencies = { listOf(registrations.preDeployTask, fieldRegistrations.preDeployTask) },
     ) {

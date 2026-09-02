@@ -1269,13 +1269,17 @@ This must be decided per model *before* its sinks receive their first record, be
 how records are encrypted at rest. It cannot be retrofitted to existing records — that is the whole
 point of crypto-shredding.
 
-> **Unbuilt, and this section being "resolved" hides a shipping hazard.** `AuditSubjectKey` does not
-> exist in the repository — it is design-only, verified 2026-09. The disclosure log
-> ([step 6](#9-implementation-order)) *has* shipped. Because the decision above cannot be applied
-> retroactively, any deployment that might ever face an erasure request must not enable audited
-> models until this mechanism exists: records written before it are permanently unshreddable. For a
-> US-only deployment that is the intended default and no action is needed. This is an ordering
-> constraint on deployment, not on implementation, which is why it does not appear in section 9.
+> **The interface exists; crypto-shredding does not.** `AuditSubjectKey` is now declared, and
+> `DisclosureAudit` takes a `subjectKeys` map plus a `requireSubjectKeys` flag whose pre-deploy check
+> fails the deploy when an audited model has no subject. That exists precisely because the decision
+> cannot be retrofitted: it turns "you will discover in a year that these records can never be
+> erased" into "this deploy fails until you decide".
+>
+> **No encryption is performed.** Supplying a key wraps nothing today; records are written in the
+> clear and a shred operation does not exist. So a deployment that will need erasure should turn
+> `requireSubjectKeys` on from its first deploy — that costs nothing and preserves the option — but
+> must not assume erasure works until the wrapping and shredding are built. A US-only deployment needs
+> none of this, which is why the flag is off by default.
 
 ### 11.3 Auth events — resolved, see section 7
 
