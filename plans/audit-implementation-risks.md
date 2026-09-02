@@ -8,6 +8,12 @@ Two things are worth knowing before reading. First, several of the designs below
 implementing**, not specified in advance — those are marked. Second, nothing here has run in
 production or under concurrent load; the evidence is unit and integration tests only.
 
+An independent adversarial review has since run over all four implementation commits. It found one
+silent bypass and several data gaps, all now fixed (`494f65eb`), and it independently confirmed the
+two things I most wanted confirmed: `Table` coverage has no holes (21 of 23 members overridden, the
+three others touch no data), and nothing in either repository unwraps `.wraps`. Where its findings
+changed the picture below, the sections say so.
+
 ---
 
 ## 1. Fail-closed on reads can take the whole server down — including at boot
@@ -31,6 +37,27 @@ bigger claim, and it deserves an explicit decision rather than inheriting one.
 
 **Options if that is unacceptable:** scope the decorator to user-facing tables only (weakens the
 guarantee the layer exists for), or make failure policy configurable per model.
+
+## 1b. The chain attests to itself, not to the log — deleting a record is undetectable
+
+**Found by review; not fixed, because fixing it is a design change.**
+
+A chain entry commits to `contentHash`, a fold of the record hashes sealed into it, plus a count. It
+stores **no record ids and no ordering key**, and the records carry no chain position. Fold order is
+the nondeterministic interleave of concurrent requests, so no verifier can recompute the fold — and
+`verifyChain` never tries, it only feeds `contentHash` into the entry's own hash.
+
+The consequence is stark: **deleting a `DisclosureRecord`, `DataAccessRecord` or `AuthEventRecord` is
+undetectable.** The chain proves the chain has not been edited. It does not currently prove anything
+about the log it exists to protect.
+
+Fixing it means storing membership per entry — an id list, or an id range — which is a real schema and
+volume decision, not a patch.
+
+Related, and also found by review: `hash` is an **unkeyed** SHA-256 with no secret. Anyone who can
+write `AuditTotalLog` can recompute every entry, and the result verifies clean. Tamper-evidence needs
+a key held outside the database operator's reach, or an external anchor. The KDoc now says all of
+this; the code still does none of it.
 
 ## 2. The chain does not detect truncation, and nothing anchors it
 
@@ -82,6 +109,18 @@ conditions were stored, and is worth revisiting.
 
 It also interacts with erasure (#6): shredding a subject's records does not shred a condition in a
 data access row that happens to contain their identifier.
+
+## 4b. `ModelInfo.baseTable()` bypasses the log, and is used today
+
+**Found by review.** I had worried about `Table.wraps`; the reviewer confirmed nothing unwraps it, and
+pointed at the real surface instead. `ModelInfo.baseTable()` and `DatabaseTableRegistration.invoke()`
+are both public and sit *below* the `log` decorator, so anything holding a `ModelInfo` can read or
+mutate an audited model with no record. It is not hypothetical: `media/.../processing.kt:128` calls
+`info.baseTable().updateOneById(...)` today.
+
+This is not fixable by the decorator — it is a question of whether `baseTable()` should be public at
+all, or whether the audit module should refuse to start when an audited model's `ModelInfo` is
+reachable without decoration. Undecided.
 
 ## 5. An audited model that no endpoint returns cannot be read at all
 
@@ -135,20 +174,21 @@ availability problem — see #1.
 
 ## 9. Smaller things, and latent hazards
 
-- **`DataAccessLogTable` exposes the undecorated table through `wraps`.** Nothing in either repository
-  currently unwraps it (verified), but `wraps` is part of the `Table` interface and any future code
-  that follows it bypasses logging entirely. The existing `simpleSignals` decorators do the same, so
-  this is a shared convention rather than a new mistake.
-- **`insert` records a condition of `Condition.Never` and a count string in `modification`.** Both
-  fields are the wrong shape for an insert; the modification column stops being a serialized
-  `Modification` for that one operation. It works, but it is untidy in a way that will confuse a
-  query someday.
+- **`DataAccessLogTable` exposes the undecorated table through `wraps`.** Confirmed by review that
+  nothing in either repository unwraps it, and that `Table` has no sub-interfaces or downcasts that
+  would. Latent only — see 4b for the surface that is not latent.
 - **`groupBy` is recorded via `DataClassPath.toString()`**, which is not a documented stable format.
-  If it changes, historical rows become harder to interpret.
+  If it changes, historical rows become harder to interpret. The same applies to the `aggregate`
+  column, which now holds `Aggregate.toString()` and search params.
 - **Coverage of `Table` was verified by enumeration** — 21 of 23 members overridden, the two skipped
   (`fullCondition`, `mask`) return metadata rather than data. That check should be repeated whenever
   `Table` gains a member, and nothing enforces it. A test that fails when an un-overridden data
   method appears would be worth more than the manual check.
+- **The `requireSubjectKeys` guard is narrower than its message implies** — it checks only the models
+  the endpoint scan can see, so a table-only or open-polymorphic audited model passes it and still
+  produces unshreddable records. Now stated in its KDoc.
+- **An unrecognised event type string is dropped after logging**, which is the price of the stringly
+  typed seam between `core` and the audit module. A typo silently loses events.
 - **`DisclosureRecord` still does not carry `executionId`**, so a disclosure on a long-lived socket is
   placed within the session rather than at a message. Its v7 id timestamps it to the millisecond,
   which in practice identifies the message, but that is inference rather than attribution.
@@ -169,7 +209,14 @@ Not defects, but they will surprise someone:
 
 1. Decide #1 — whether fail-closed on privileged reads is acceptable, because it gates whether this
    can be turned on at all.
-2. Get #3 reviewed by someone who did not write it.
-3. Build anchoring (#2), or stop describing the chain as tamper-evidence and call it tamper-detection
-   for edits only.
-4. Revisit 11.4 in light of #4.
+2. Fix #1b, or stop calling the total-log tamper-evidence. As built it attests to itself and not to
+   the records, so the property most people would assume it has, it does not have.
+3. Build anchoring (#2) and key the hash, which together are what make #1b and truncation
+   detectable by anyone outside the database.
+4. Decide #4b — whether `baseTable()` should be reachable at all once a model is audited.
+5. Revisit 11.4 in light of #4.
+
+#3 in the original list — "get this reviewed by someone who did not write it" — has now happened, and
+found a silent bypass plus four data gaps that my own reading missed. The three defects I had already
+found in the chain, it found independently. That is the strongest available argument for doing the
+same to whatever is built next.
