@@ -739,6 +739,18 @@ public data class TotalLogEntry(
 ) : HasId<Uuid>
 ```
 
+**Sealing is volume-driven, not scheduled.** A `ScheduledTask` is the obvious way to seal
+periodically and is wrong here: schedules are coordinated by a distributed lock, so exactly one
+instance runs each tick, while chains are per process and held in memory. A scheduled seal would seal
+the winning instance's chain and leave every other instance accumulating records attested by nothing.
+Sealing therefore happens on whichever instance owns the chain, driven by its own volume
+(`sealThreshold`). The residual gap is a quiet instance's tail, unsealed until its next fold.
+
+**A failed write must not advance the chain.** Sealing builds the entry, writes it, and only then
+moves `sequence` and `previousHash`. The other order would leave the chain past a position no row
+occupies, so every later entry links to a hash that does not exist and the chain reports itself
+permanently broken over what may have been a transient database error.
+
 **One chain per process, not one per deployment.** A single global chain would need every instance to
 agree on the next `sequence`, which is a distributed lock on the hot path of every audited write. So
 `chainId` is the server instance plus its boot time, and each process owns its chain exclusively.

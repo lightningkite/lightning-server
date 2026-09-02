@@ -4,6 +4,7 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 /**
  * The chain's job is proving the log has not been edited since it was written. These tests pin both
@@ -11,14 +12,25 @@ import kotlin.test.assertTrue
  */
 class TotalLogTest {
 
+    /** A chain that never auto-seals, so each batch below is sealed explicitly. */
+    private fun manualChain(
+        at: LongArray = longArrayOf(1_700_000_000_000L),
+        write: suspend (TotalLogEntry) -> Unit = {},
+    ) = AuditChain(
+        chainId = "test-chain",
+        sealThreshold = Int.MAX_VALUE,
+        nowMillis = { at[0].also { at[0] = it + 1_000 } },
+        write = write,
+    )
+
     private fun chainOf(vararg batches: List<String>): List<TotalLogEntry> = runBlocking {
-        val chain = AuditChain("test-chain")
-        var at = 1_700_000_000_000L
-        batches.mapNotNull { batch ->
+        val written = mutableListOf<TotalLogEntry>()
+        val chain = manualChain(write = { written.add(it) })
+        batches.forEach { batch ->
             batch.forEach { chain.fold(auditHash(it)) }
-            at += 1_000
-            chain.seal(at)
+            chain.seal()
         }
+        written
     }
 
     @Test
@@ -78,15 +90,63 @@ class TotalLogTest {
     /** An idle server must not grow entries attesting to nothing, or length stops meaning anything. */
     @Test
     fun `sealing with nothing pending produces no entry`() = runBlocking {
-        val chain = AuditChain("test-chain")
-        assertEquals(null, chain.seal(1L))
+        val chain = manualChain()
+        assertEquals(null, chain.seal())
 
         chain.fold(auditHash("a"))
         assertEquals(1L, chain.pendingCount())
-        val sealed = chain.seal(2L)
-        assertTrue(sealed != null)
+        assertTrue(chain.seal() != null)
         assertEquals(0L, chain.pendingCount())
-        assertEquals(null, chain.seal(3L))
+        assertEquals(null, chain.seal())
+    }
+
+    /** Volume-driven, because a scheduled seal is distributed-locked and would only seal one instance. */
+    @Test
+    fun `the chain seals itself once enough is pending`() = runBlocking {
+        val written = mutableListOf<TotalLogEntry>()
+        val chain = AuditChain("test-chain", sealThreshold = 3, nowMillis = { 1L }, write = { written.add(it) })
+
+        repeat(2) { chain.fold(auditHash("x")) }
+        assertEquals(0, written.size, "sealed before reaching the threshold")
+
+        chain.fold(auditHash("x"))
+        assertEquals(1, written.size, "did not seal on reaching the threshold")
+        assertEquals(3L, written.single().count)
+        assertEquals(0L, chain.pendingCount())
+    }
+
+    /**
+     * A failed write must not advance the chain. Advancing first would leave `sequence` and
+     * `previousHash` moved past an entry that no row carries, so every later entry would link to a
+     * hash that does not exist and the chain would report itself permanently broken over what may
+     * have been a transient database error.
+     */
+    @Test
+    fun `a failed write leaves the chain where it was`() = runBlocking {
+        var failNext = true
+        val written = mutableListOf<TotalLogEntry>()
+        val chain = AuditChain(
+            chainId = "test-chain",
+            sealThreshold = Int.MAX_VALUE,
+            nowMillis = { 1L },
+            write = { if (failNext) throw RuntimeException("sink down") else written.add(it) },
+        )
+
+        chain.fold(auditHash("a"))
+        try {
+            chain.seal()
+            fail("the write failure was swallowed")
+        } catch (_: RuntimeException) {
+        }
+        assertEquals(1L, chain.pendingCount(), "the record was dropped by a failed seal")
+
+        failNext = false
+        chain.fold(auditHash("b"))
+        val recovered = chain.seal()
+        assertTrue(recovered != null)
+        assertEquals(0L, recovered.sequence, "the chain skipped a sequence number over a failed write")
+        assertEquals(2L, recovered.count, "the record pending at the time of failure was lost")
+        assertEquals(emptyList(), verifyChain(written, ::auditHash))
     }
 
     /**

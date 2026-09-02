@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.definition.PreDeployTask
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.ApiWebSocketHandler
@@ -11,10 +12,6 @@ import com.lightningkite.lightningserver.typed.DatabaseTableRegistration
 import com.lightningkite.lightningserver.typed.registerTable
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.insertOne
-import com.lightningkite.lightningserver.definition.ScheduledTask
-import com.lightningkite.lightningserver.runtime.now
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.minutes
 import kotlinx.serialization.descriptors.SerialDescriptor
 
 /**
@@ -56,10 +53,13 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 public class DisclosureAudit(
     database: Runtime<Database>,
     /**
-     * How often the tamper-evidence chain is sealed. Also the window in which a crash leaves recent
-     * records unattested — shorter is safer and costs one row per interval. See 5.7.1.
+     * Seal the tamper-evidence chain once this many records are pending.
+     *
+     * Volume-driven rather than time-driven on purpose: a scheduled seal would be coordinated by a
+     * distributed lock and so would only ever seal one instance's chain. See [AuditChain]. Lower
+     * values narrow the window in which recent records are unattested, at one row per seal.
      */
-    private val sealInterval: Duration = 1.minutes,
+    private val sealThreshold: Int = 64,
     /**
      * Erasure subject per audited model, keyed by serial name. See [AuditSubjectKey].
      *
@@ -108,7 +108,15 @@ public class DisclosureAudit(
      * that two runtimes built from the same definition do not share a head.
      */
     public val chain: Runtime<AuditChain> = Runtime.Cached(Runtime {
-        AuditChain(chainId = "${'$'}{serverId}-${'$'}{clock.now().toEpochMilliseconds()}")
+        val engine = contextOf<Engine>()
+        val bootMillis = engine.clock.now().toEpochMilliseconds()
+        val table = with(engine) { totalLog() }
+        AuditChain(
+            chainId = engine.serverId + "-" + bootMillis,
+            sealThreshold = sealThreshold,
+            nowMillis = { engine.clock.now().toEpochMilliseconds() },
+            write = { table.insertOne(it) },
+        )
     })
 
     /** Authentication events — the history a mutable session row cannot provide. See 7.1. */
@@ -157,19 +165,6 @@ public class DisclosureAudit(
      */
     public val registry: RuntimeDeferred<AuditRegistry> =
         RuntimeDeferred.Cached(RuntimeDeferred { loadAuditRegistry(registrations(), fieldRegistrations()) })
-
-    /**
-     * Turns everything folded since the last seal into a chain entry.
-     *
-     * On a schedule rather than per record because folding is in-memory and cheap while sealing is a
-     * write; see [AuditChain]. The interval is the window in which a crash leaves recent records
-     * unattested — present in the queryable log, covered by no entry.
-     */
-    public val sealChain: ScheduledTask = path.path("seal-audit-chain") bind ScheduledTask(
-        frequency = sealInterval,
-    ) {
-        chain().seal(now().toEpochMilliseconds())?.let { totalLog().insertOne(it) }
-    }
 
     init {
         install(RequestRecordInterceptor(requests))

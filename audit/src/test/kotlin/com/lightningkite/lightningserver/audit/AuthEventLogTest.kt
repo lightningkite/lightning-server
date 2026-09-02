@@ -85,7 +85,7 @@ class AuthEventLogTest {
         val chain = with(runtime) { TestServer.audit.chain() }
         assertEquals(1L, chain.pendingCount())
 
-        val sealed = chain.seal(1_700_000_000_000)
+        val sealed = chain.seal()
         assertTrue(sealed != null)
         assertEquals(1L, sealed.count)
     }
