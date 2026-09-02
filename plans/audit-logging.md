@@ -695,6 +695,19 @@ question, and it is measurable at the typed layer without reaching below it. The
 consequence is that a field whose true value equals its default is indistinguishable from a masked
 one. That is acceptable — in both cases the client learned nothing beyond the default.
 
+### 5.5.1 The layers are independently includable (resolved)
+
+`AuditCore` carries the request log and the bit registry; `DisclosureLog`, `DataAccessLog` and
+`AuthEventLog` are separate modules a deployment includes or does not. `DisclosureAudit` remains as a
+bundle meaning "all of them".
+
+The reason is volume. The data access log writes a row per *query* rather than per disclosure, so on a
+read-heavy model it dwarfs every other layer combined — and since these tables sit on fail-closed
+write paths, including a layer is also taking on a dependency for availability, not just for storage.
+A deployment that wants disclosure auditing should not be made to pay either cost for a layer it did
+not ask for. This mirrors the split every cloud provider already makes: GCP separates always-on Admin
+Activity logs from Data Access logs that are off by default and billed.
+
 ### 5.6 Failure behaviour: fail-closed
 
 If the audit write fails, the request fails. For audited models the disclosure must not happen unless
@@ -703,6 +716,20 @@ prevents the body from ever being built.
 
 **Confirmed to include the database sink.** The queryable log is a database table, so an audit
 database outage is an outage for audited endpoints. That is the intended trade.
+
+**Per layer, and not configurable (resolved).** Disclosure and data access fail closed: the thing they
+guard must not happen unrecorded. Authentication events fail open, because the event has already
+happened by the time it is reported and throwing would replace a clean "your login failed" with an
+unrelated error while losing the original reason. The request log's *completion* write cannot fail
+closed at all — the response is already produced.
+
+There is deliberately **no fail-open switch**. The happy-path cost is identical either way, so nothing
+is bought by the option; what it would cost is real. A security control with an off switch gets
+switched off during the first incident and stays off, and it makes "was this deployment fail-open at
+the time?" a question whose answer lives in configuration rather than in the log. The cases where
+fail-open is genuinely right are handled structurally instead: auth events hard-code it, targeted
+bypasses go through `dangerouslyDirectTable()` where they are greppable, and a deployment that wants
+no auditing simply does not include the layer.
 
 ### 5.7 Integrity: out of scope here
 

@@ -45,7 +45,7 @@ import com.lightningkite.services.database.insertOne
  * the disclosure log's, because it covers privileged reads too — see 6.2.
  */
 context(runtime: ServerRuntime)
-public fun <T : Any> DisclosureAudit.dataAccessLogged(table: Table<T>): Table<T> {
+public fun <T : Any> DataAccessLog.dataAccessLogged(table: Table<T>): Table<T> {
     val descriptor = table.serializer.descriptor
     // Reachability, not a single annotation. `isAudited` inspects one descriptor, so gating on it
     // would return a sealed parent's table — or any wrapper's — untouched even though its children
