@@ -56,8 +56,8 @@ public class AuditChain internal constructor(
     private var sequence = 0L
     private var previousHash = ""
 
-    /** Records folded but not yet sealed. */
-    public suspend fun pendingCount(): Long = mutex.withLock { pendingCount }
+    /** Records folded but not yet sealed. Observable for tests; nothing in the system branches on it. */
+    internal suspend fun pendingCount(): Long = mutex.withLock { pendingCount }
 
     /**
      * Commits one audit record to the chain's next entry, sealing if enough has accumulated.

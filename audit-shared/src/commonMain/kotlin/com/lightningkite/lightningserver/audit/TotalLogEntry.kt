@@ -127,4 +127,8 @@ public fun DataAccessRecord.chainInput(): String =
     listOf(
         _id.toString(), requestId.toString(), executionId.toString(), modelId.toString(),
         operation.name, condition, sort ?: "", modification ?: "", groupBy ?: "",
+        // The four the record argues hardest for. Omitting them left the offset of a walk, the
+        // fields a partial read asked for, and a similarity probe's query vector all editable
+        // without breaking the chain — attesting to everything except the discriminating evidence.
+        skip?.toString() ?: "", limit?.toString() ?: "", fields ?: "", aggregate ?: "",
     ).joinToString(FIELD_SEPARATOR)

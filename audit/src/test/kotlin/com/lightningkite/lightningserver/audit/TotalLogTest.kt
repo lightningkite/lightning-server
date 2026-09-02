@@ -150,6 +150,39 @@ class TotalLogTest {
     }
 
     /**
+     * Every column a record carries must be inside what the chain attests to.
+     *
+     * The hand-written layouts are deliberate — a serialized form would let a new field silently
+     * change what past hashes covered — but the cost is that adding a column and forgetting the
+     * layout is invisible. It happened: skip, limit, fields and aggregate were added to
+     * DataAccessRecord as the discriminating evidence and left out of chainInput, so the offset of a
+     * walk could be edited without breaking the chain. This asserts the two cannot drift again.
+     */
+    @Test
+    fun `a data access record attests to every field it carries`() {
+        val record = DataAccessRecord(
+            _id = kotlin.uuid.Uuid.parse("00000000-0000-7000-8000-000000000002"),
+            requestId = kotlin.uuid.Uuid.parse("00000000-0000-7000-8000-000000000003"),
+            executionId = kotlin.uuid.Uuid.parse("00000000-0000-7000-8000-000000000004"),
+            modelId = 9,
+            operation = DataAccessOperation.Find,
+            condition = "COND",
+            sort = "SORT",
+            modification = "MOD",
+            groupBy = "GROUP",
+            skip = 4_000,
+            limit = 1,
+            fields = "FIELDS",
+            aggregate = "AGG",
+        )
+
+        val attested = record.chainInput()
+        for (value in listOf("COND", "SORT", "MOD", "GROUP", "4000", "1", "FIELDS", "AGG")) {
+            assertTrue(value in attested, "\"$value\" is not covered by the chain: $attested")
+        }
+    }
+
+    /**
      * The hashed bytes are built by hand rather than from a serialized form, so that adding a field
      * later cannot silently change what past hashes covered. This pins the layout, including the NUL
      * separator — a separator that could occur inside a field would let two different records hash

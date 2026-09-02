@@ -60,14 +60,6 @@ public class AuditRegistry internal constructor(
     private val modelIds: Map<String, Int>,
     private val bitIndices: Map<Int, Map<String, Int>>,
 ) {
-    /**
-     * The model's permanent id, or null when it is not audited.
-     *
-     * Unlike [modelId] this does not throw. Currently unused — the data access log gates on the
-     * `@Audited` annotation and then resolves through [modelId], so that an audited model missing
-     * from the registry fails rather than going unrecorded.
-     */
-    internal fun modelIdOrNull(serialName: String): Int? = modelIds[serialName]
 
     /**
      * The permanent id of an audited model.
@@ -77,7 +69,7 @@ public class AuditRegistry internal constructor(
      * client through a path the deploy-time scan could not see — an open-polymorphic or contextual
      * serializer — and the fix is to make that model reachable from a registered table or endpoint.
      */
-    public fun modelId(serialName: String): Int = modelIdOrNull(serialName) ?: throw IllegalStateException(
+    public fun modelId(serialName: String): Int = modelIds[serialName] ?: throw IllegalStateException(
         "Audited model \"$serialName\" has no registry entry, so its disclosure cannot be recorded. " +
             "It reached a client through a serializer the deploy-time scan could not resolve statically."
     )
