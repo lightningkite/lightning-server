@@ -38,63 +38,31 @@ bigger claim, and it deserves an explicit decision rather than inheriting one.
 **Options if that is unacceptable:** scope the decorator to user-facing tables only (weakens the
 guarantee the layer exists for), or make failure policy configurable per model.
 
-## 1b. The chain attests to itself, not to the log — deleting a record is undetectable
+## 2. The in-process chain is a local check, not tamper-evidence
 
-**Found by review; not fixed, because fixing it is a design change.**
+**Scope corrected: the real total-log is a separate system outside Lightning Server**, and the
+integrity guarantees belong to it. What is in this repository is a modest in-process chain that audit
+writes fold into. Read the following as "known properties of a local check", not as a list of security
+holes — the docs and plan now say the same.
 
-A chain entry commits to `contentHash`, a fold of the record hashes sealed into it, plus a count. It
-stores **no record ids and no ordering key**, and the records carry no chain position. Fold order is
-the nondeterministic interleave of concurrent requests, so no verifier can recompute the fold — and
-`verifyChain` never tries, it only feeds `contentHash` into the entry's own hash.
+It detects an entry altered or removed, which catches accident and corruption. It does **not** detect
+truncation at the end of a chain, does **not** detect deletion of the records an entry covers
+(`contentHash` is a fold with no membership recorded, so nobody can recompute it), and its `hash` is
+unkeyed, so anyone who can write the table can recompute the chain and it verifies clean. Those are
+properties only something outside the process can supply.
 
-The consequence is stark: **deleting a `DisclosureRecord`, `DataAccessRecord` or `AuthEventRecord` is
-undetectable.** The chain proves the chain has not been edited. It does not currently prove anything
-about the log it exists to protect.
+The one thing worth watching: nothing in the code or the tests will stop someone describing this as
+tamper-evidence in a compliance conversation. It is not.
 
-Fixing it means storing membership per entry — an id list, or an id range — which is a real schema and
-volume decision, not a patch.
+**Two defects were found in it after committing** — a distributed-locked seal that would have left
+every instance but one unattested, and a state advance before the write that would have broken the
+chain permanently on one transient database error. Both were caught by re-reading, not by a test.
+Given the reduced scope this matters less than it would have, but it is the honest signal about how
+much scrutiny hand-written chain code needs.
 
-Related, and also found by review: `hash` is an **unkeyed** SHA-256 with no secret. Anyone who can
-write `AuditTotalLog` can recompute every entry, and the result verifies clean. Tamper-evidence needs
-a key held outside the database operator's reach, or an external anchor. The KDoc now says all of
-this; the code still does none of it.
-
-## 2. The chain does not detect truncation, and nothing anchors it
-
-The total-log detects a modified entry and a removed one. It does **not** detect a chain cut off at
-its end — the surviving prefix verifies clean, and nothing inside the system knows how long the chain
-should have been. There is a test that asserts exactly this, so it cannot be quietly forgotten.
-
-Anchoring is what closes it: periodically committing a chain head through the HTTP path the reverse
-proxy captures, so the operator cannot retract a claim about the chain's length. **Anchoring is not
-built.** Until it is, the tamper-evidence is materially weaker than section 5.7 implies — it protects
-against editing history, not against discarding the end of it.
-
-The interaction with per-process chains makes this worse: an entire instance's chain plus its records
-could be deleted, and with no external anchor there is nothing to notice the chain ever existed.
-
-## 3. The total-log design is mine, and was never reviewed
-
-Section 5.7 gave ten lines with no record shape, chain format, sink, or cadence. Everything in 5.7.1
-was decided during implementation — batching, per-process chains, the hash layout, the sealing
-trigger. It is security-critical and it has had one author.
-
-Two defects were already found and fixed *after* the first version was committed, which is the honest
-argument for a second reader:
-
-- Sealing was on a `ScheduledTask`. Schedules are distributed-locked, so exactly one instance would
-  run the tick, while chains are per process and in memory — every other instance would have
-  accumulated records attested by nothing. Sealing is now volume-driven.
-- Sealing advanced `sequence` and `previousHash` before writing the entry, so a failed write left the
-  chain past a position no row occupies and every later entry would link to a nonexistent hash. The
-  chain would have reported itself permanently broken after one transient database error.
-
-Both were found by reading the code again, not by a test failing. That suggests more remain.
-
-**Specifically unexamined:** behaviour under concurrent folds from many requests (the mutex is
-believed correct but has not been stress-tested), and what happens when two processes are assigned the
-same `serverId` — the chain id is `serverId + bootMillis`, and `serverId` derives from a MAC address,
-so containers on one host that share an interface and start in the same millisecond would collide.
+**Specifically unexamined:** concurrent folds under load (the mutex is believed correct, never
+stress-tested), and `chainId` collisions — it is `serverId + bootMillis`, and `serverId` derives from
+a MAC address, so containers sharing a host interface and starting in the same millisecond collide.
 
 ## 4. The audit log now stores the sensitive values it exists to audit
 
@@ -110,17 +78,24 @@ conditions were stored, and is worth revisiting.
 It also interacts with erasure (#6): shredding a subject's records does not shred a condition in a
 data access row that happens to contain their identifier.
 
-## 4b. `ModelInfo.baseTable()` bypasses the log, and is used today
+## 4b. Bypassing the audit log — mostly closed, one surface left
 
-**Found by review.** I had worried about `Table.wraps`; the reviewer confirmed nothing unwraps it, and
-pointed at the real surface instead. `ModelInfo.baseTable()` and `DatabaseTableRegistration.invoke()`
-are both public and sit *below* the `log` decorator, so anything holding a `ModelInfo` can read or
-mutate an audited model with no record. It is not hypothetical: `media/.../processing.kt:128` calls
-`info.baseTable().updateOneById(...)` today.
+**Found by review, now largely fixed.** `ModelInfo.baseTable()` sat below the `log` decorator, so
+anything holding a `ModelInfo` could read or mutate an audited model with no record — and
+`media/.../processing.kt:128` was doing exactly that.
 
-This is not fixable by the decorator — it is a question of whether `baseTable()` should be public at
-all, or whether the audit module should refuse to start when an audited model's `ModelInfo` is
-reachable without decoration. Undecided.
+`baseTable()` now goes through the decorator: it means "without permissions", which is what callers
+actually want, not "without a record". The genuine bypass moved to `dangerouslyDirectTable()`, which
+requires opting in to `@UnauditedDatabaseAccess` (a `RequiresOptIn` **error**). The point is not to
+forbid it — migrations legitimately need it — but to make every bypass greppable:
+`grep -rn UnauditedDatabaseAccess` now answers "where is an audited model touched without a record",
+which was previously unanswerable. The media call site is audited as a side effect.
+
+**What remains open:** `DatabaseTableRegistration.invoke()` — i.e. calling `myTable()` on a registered
+table — returns the undecorated table and is the *documented normal way* to use a table. It carries no
+annotation and cannot reasonably carry one, since it is the primary API for every table in every app.
+So the hardening covers `ModelInfo`, which is where audited models are conventionally reached, and not
+the registration surface underneath it.
 
 ## 5. An audited model that no endpoint returns cannot be read at all
 
@@ -209,12 +184,9 @@ Not defects, but they will surprise someone:
 
 1. Decide #1 — whether fail-closed on privileged reads is acceptable, because it gates whether this
    can be turned on at all.
-2. Fix #1b, or stop calling the total-log tamper-evidence. As built it attests to itself and not to
-   the records, so the property most people would assume it has, it does not have.
-3. Build anchoring (#2) and key the hash, which together are what make #1b and truncation
-   detectable by anyone outside the database.
-4. Decide #4b — whether `baseTable()` should be reachable at all once a model is audited.
-5. Revisit 11.4 in light of #4.
+2. Make sure nobody describes the in-process chain (#2) as tamper-evidence. The real total-log is a
+   separate system and that is where the guarantee lives.
+3. Revisit 11.4 in light of #4.
 
 #3 in the original list — "get this reviewed by someone who did not write it" — has now happened, and
 found a silent bypass plus four data gaps that my own reading missed. The three defects I had already

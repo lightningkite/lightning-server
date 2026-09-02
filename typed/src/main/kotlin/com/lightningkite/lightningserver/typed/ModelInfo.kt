@@ -28,8 +28,26 @@ public interface ModelInfo<SUBJECT : HasId<*>?, T : HasId<ID>, ID : Comparable<I
 
     public fun registerChangeListener(action: suspend context(ServerRuntime) (CollectionChanges<T>) -> Unit)
 
+    /**
+     * The table without permissions, but **with** auditing.
+     *
+     * This is what "I need the raw table" almost always means: skip the caller's read/write masks,
+     * not skip the record of what was touched. Goes through the same `log` decorator as [table], so
+     * an audited model read this way is still recorded.
+     */
     context(server: ServerRuntime)
     public fun baseTable(): Table<T>
+
+    /**
+     * The table with nothing applied at all — no permissions, no signals, and **no auditing**.
+     *
+     * Requires opting in to [UnauditedDatabaseAccess], so that every bypass in a codebase can be
+     * found by grepping for it. See that annotation for when this is legitimate.
+     */
+    @UnauditedDatabaseAccess
+    context(server: ServerRuntime)
+    public fun dangerouslyDirectTable(): Table<T>
+
     context(server: ServerRuntime)
     public fun table(): Table<T>
 
@@ -64,8 +82,12 @@ public inline fun <reified USER : HasId<*>?, reified T : HasId<ID>, reified ID :
     // registerTable defines the table, registers it, and creates its (once-per-deploy) prepare task.
     override val registration: DatabaseTableRegistration<T> = this@modelInfo.registerTable(tableName, serializer)
 
+    @UnauditedDatabaseAccess
     context(server: ServerRuntime)
-    override fun baseTable(): Table<T> = registration()
+    override fun dangerouslyDirectTable(): Table<T> = registration()
+
+    context(server: ServerRuntime)
+    override fun baseTable(): Table<T> = log(null, registration())
 
     override val tableName: String get() = tableName
 
@@ -77,8 +99,12 @@ public inline fun <reified USER : HasId<*>?, reified T : HasId<ID>, reified ID :
     context(server: ServerRuntime)
     override suspend fun permissions(auth: AuthAccess<USER>): ModelPermissions<T> = permissions(auth)
 
+    // Built on the undecorated table on purpose: table() and table(auth) apply `log` themselves, and
+    // going through baseTable() here would decorate twice and record every query in duplicate.
+    @OptIn(UnauditedDatabaseAccess::class)
     context(server: ServerRuntime)
-    fun collectionWithSignals() = signals(baseTable().withServerRuntimeChangeListeners(changeListeners))
+    fun collectionWithSignals() =
+        signals(dangerouslyDirectTable().withServerRuntimeChangeListeners(changeListeners))
 
     context(server: ServerRuntime)
     override suspend fun table(auth: AuthAccess<USER>): Table<T> = collectionWithSignals()
@@ -115,8 +141,12 @@ public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> Runtime<Databa
     override val registration: DatabaseTableRegistration<T> =
         with(builder) { this@explicitModelInfo.registerTable(tableName, serializer) }
 
+    @UnauditedDatabaseAccess
     context(server: ServerRuntime)
-    override fun baseTable(): Table<T> = registration()
+    override fun dangerouslyDirectTable(): Table<T> = registration()
+
+    context(server: ServerRuntime)
+    override fun baseTable(): Table<T> = log(null, registration())
 
     override val tableName: String
         get() = tableName
@@ -129,8 +159,12 @@ public fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> Runtime<Databa
     context(server: ServerRuntime)
     override suspend fun permissions(auth: AuthAccess<USER>): ModelPermissions<T> = permissions(auth)
 
+    // Undecorated on purpose: table() and table(auth) apply `log` themselves, so routing this through
+    // baseTable() would decorate twice and record every query in duplicate.
+    @OptIn(UnauditedDatabaseAccess::class)
     context(server: ServerRuntime)
-    fun collectionWithSignals() = signals(baseTable().withServerRuntimeChangeListeners(changeListeners))
+    fun collectionWithSignals() =
+        signals(dangerouslyDirectTable().withServerRuntimeChangeListeners(changeListeners))
 
     context(server: ServerRuntime)
     override suspend fun table(auth: AuthAccess<USER>): Table<T> = collectionWithSignals()
@@ -151,3 +185,26 @@ public suspend fun <USER : HasId<*>, T : HasId<ID>, ID : Comparable<ID>> ModelIn
 context(_: ServerRuntime)
 public suspend fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ModelInfo<USER, T, ID>.table(auth: Authentication<USER & Any>?): Table<T> =
     table(AuthAccess(auth))
+
+/**
+ * Marks a way of reaching a table that skips the [ModelInfo] `log` decorator, and therefore skips
+ * auditing.
+ *
+ * Opting in is deliberately an error to ignore rather than a warning. The point is not to forbid the
+ * bypass — there are legitimate uses, such as a migration that must not multiply the audit log by the
+ * size of the table — but to make every one of them **greppable**. `grep -rn UnauditedDatabaseAccess`
+ * should return the complete list of places in a codebase where an audited model is touched without a
+ * record, which is exactly the question an auditor asks and the one that was previously unanswerable.
+ *
+ * If you are reaching for this because auditing is inconvenient, use [ModelInfo.baseTable] instead: it
+ * skips permissions, which is usually what "I need the raw table" actually means, while still being
+ * recorded.
+ */
+@RequiresOptIn(
+    "This reaches the table without the audit decorator, so nothing records what it reads or writes. " +
+        "Prefer baseTable(), which skips permissions but is still audited. If you genuinely need to " +
+        "bypass the audit log, opt in explicitly so the bypass is greppable.",
+    RequiresOptIn.Level.ERROR,
+)
+@Target(AnnotationTarget.FUNCTION, AnnotationTarget.PROPERTY)
+public annotation class UnauditedDatabaseAccess

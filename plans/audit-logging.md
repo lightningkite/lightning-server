@@ -714,11 +714,17 @@ Anchoring — periodically emitting a chain head as an ordinary HTTP request so 
 commitment to records it could not see — likewise belongs with the total-log, since it is meaningless
 without a chain to commit to.
 
-#### 5.7.1 Design (first cut — NOT reviewed by the author of this plan)
+#### 5.7.1 Design (a placeholder for something that lives elsewhere)
 
-> Everything in this subsection was designed while implementing it, not decided beforehand. It is
-> security-critical and the trade-offs below were chosen, not specified. **Treat it as a proposal
-> until reviewed.**
+> **Scope, corrected.** The real total-log is a separate system that lives **outside Lightning
+> Server**, and the integrity story belongs to it. What is implemented here is a modest in-process
+> chain: useful as a local consistency check and as somewhere for audit writes to fold into, but it is
+> not the thing that makes the log tamper-evident and should not be described or relied on as such.
+>
+> That reframing settles most of what would otherwise be alarming below. An in-process chain with an
+> unkeyed hash and no external anchor cannot resist an operator who can write its table, and it does
+> not need to — the external log is what an auditor trusts. Everything here was designed while
+> implementing rather than specified, so treat the specifics as provisional.
 
 **The chain commits to hashes, in batches, not to records one by one.** The disclosure log writes one
 row per record disclosed, so a single query can produce ten thousand rows; a chain entry per row would
@@ -757,13 +763,12 @@ agree on the next `sequence`, which is a distributed lock on the hot path of eve
 What that gives up is total ordering *between* instances: the log proves no entry within a chain was
 altered or removed, and proves nothing about the interleaving of two chains.
 
-**What tamper-evidence this actually provides.** Altering or deleting any sealed entry breaks the
-link to its successor, which verification detects. Truncating a chain at its end does not — the
-remaining prefix is internally consistent. That is precisely the hole anchoring closes: a chain head
-committed through the HTTP path the reverse proxy captures is a claim about the chain's length that
-the operator cannot later retract. **Without an external anchor the chain detects modification but not
-truncation**, and that limitation is the reason [section 10](#10-out-of-scope-external-capture-layer)
-treats the proxy capture as a requirement rather than an enhancement.
+**What this actually provides.** Altering or deleting a sealed entry breaks the link to its
+successor, which verification detects — against accident and against a caller that is not trying to
+cover its tracks. It does not detect truncation at the end of a chain, it does not detect deletion of
+the *records* an entry covers (entries store a fold, not membership), and its hash is unkeyed, so
+anyone who can write the table can recompute the whole chain. None of that is worth fixing in
+process: those are the properties the external total-log exists to supply.
 
 **What it does not provide, at all.** Fabrication at write time. A record that was never written
 cannot be detected as missing, and a false record written through the normal path chains correctly.
@@ -1226,11 +1231,10 @@ Sequenced so each step is independently shippable and testable, and so prerequis
    rather than a later refinement. Extends the existing write auditing at the database layer to
    record every condition and sort applied to an audited model.
 8. **Total-log: hash chaining and anchoring** ([section 5.7](#57-integrity-not-in-the-database-log))
-   — **chain DONE, anchoring NOT DONE.** The chain, its sealing schedule and verification are built
-   to the design in 5.7.1, which was written during implementation and is flagged there as needing
-   review. Anchoring — emitting a chain head through the path the proxy captures — is **not built**,
-   and without it the chain detects modification but not truncation, so the tamper-evidence is
-   materially weaker than 5.7 implies.
+   — **out of scope here.** The real total-log is a separate system outside Lightning Server. What
+   ships in this repository is an in-process chain (5.7.1) that audit writes fold into: a local
+   consistency check and an integration point, not the tamper-evidence. Anchoring is not built and is
+   not this repository's job.
 9. **Auth event log** ([section 7](#7-layer-4-the-authentication-event-log)) — the largest greenfield
    piece, since nothing exists to extend. **Groundwork done; the event log itself is not.** Both
    cheap unblockers have shipped: `sessionInfo` now takes a `signals` parameter

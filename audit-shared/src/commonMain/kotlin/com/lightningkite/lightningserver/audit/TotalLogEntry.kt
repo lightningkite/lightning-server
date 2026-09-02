@@ -11,29 +11,23 @@ import kotlin.uuid.Uuid
 /**
  * One sealed link in an audit chain: proof that everything committed to it is unaltered since.
  *
- * Separate from the queryable logs on purpose. Their job is investigation, this one's is proving
- * nothing was edited, and keeping the two apart leaves the highest-volume table free of chain columns
- * it would never read. See `plans/audit-logging.md` 5.7 and 5.7.1.
+ * Separate from the queryable logs on purpose: keeping the two apart leaves the highest-volume table
+ * free of chain columns it would never read. See `plans/audit-logging.md` 5.7 and 5.7.1.
  *
- * ## What a chain proves, and what it does not
- * Altering or removing a sealed entry breaks the link to its successor, which [verifyChain] detects
- * — **against an adversary who cannot recompute the chain.** [hash] is an unkeyed SHA-256 with no
- * secret, so anyone who can write this table can recompute every entry and the result verifies
- * clean. Real tamper-evidence needs either a key held outside the database operator's reach or an
- * external anchor; neither exists yet.
+ * ## This is a local check, not the tamper-evidence
+ * The real total-log is a **separate system outside Lightning Server**, and the integrity guarantees
+ * an auditor relies on belong to it. This chain is a local consistency check and the point where
+ * audit writes hand off to that system. Do not describe it as tamper-evidence.
  *
- * Two further limits, both currently open:
- * - **Truncating a chain at its end is undetectable** — the surviving prefix is internally
- *   consistent, and nothing inside the system knows how long the chain should have been.
- * - **[contentHash] is not verifiable against the records.** An entry commits to a fold of record
- *   hashes but stores no record ids and no ordering key, and the records carry no chain position, so
- *   nobody can recompute the fold. Deleting an audit record is therefore undetectable: today the
- *   chain attests to its own integrity, not to the log's. Fixing it means storing membership — an id
- *   list or an id range per entry.
+ * Concretely, it detects an entry that was altered or removed, which catches accident and corruption.
+ * It does not detect truncation at the end of a chain; it does not detect deletion of the *records*
+ * an entry covers, since [contentHash] is a fold with no membership recorded; and [hash] is an
+ * unkeyed SHA-256, so anyone who can write this table can recompute the whole chain and it will
+ * verify clean. Those are properties only something outside the process can supply, which is exactly
+ * why the total-log lives outside it.
  *
- * And nothing here addresses fabrication at write time: a false record written through the normal
- * path chains perfectly well. The chain proves the log has not been edited since it was written, not
- * that it was true when written.
+ * Nothing here addresses fabrication at write time either: a false record written through the normal
+ * path chains perfectly well.
  *
  * @property chainId The process that owns this chain — its server id and boot time. One chain per
  *   process, because a chain shared between instances would need them to agree on [sequence], which

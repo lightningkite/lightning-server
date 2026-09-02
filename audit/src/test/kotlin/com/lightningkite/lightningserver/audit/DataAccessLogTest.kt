@@ -11,7 +11,10 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.set
+import com.lightningkite.lightningserver.typed.explicitModelInfo
 import com.lightningkite.lightningserver.typed.registerTable
+import com.lightningkite.services.database.ModelPermissions
+import kotlinx.serialization.builtins.serializer
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.count
@@ -45,6 +48,16 @@ class DataAccessLogTest {
 
         /** Not audited itself, but contains an audited model — the shape that used to slip through. */
         val wrappers = database.registerTable("Wrapper", PatientWrapper.serializer())
+
+        /** A full ModelInfo, so the two raw-table accessors can be told apart. */
+        val patientInfo = database.explicitModelInfo(
+            auth = noAuth,
+            serializer = Patient.serializer(),
+            idSerializer = Uuid.serializer(),
+            tableName = "PatientInfo",
+            log = { audit.dataAccessLogged(it) },
+            permissions = { ModelPermissions() },
+        )
 
         /**
          * The audit registry assigns ids by scanning endpoint serializers, never tables, so an
@@ -206,6 +219,31 @@ class DataAccessLogTest {
         table.insert(listOf(PlainThing(Uuid.random(), "x")))
         table.find(Condition.Always).toList()
         table.count(Condition.Always)
+
+        assertEquals(emptyList(), logged())
+    }
+
+    /**
+     * `baseTable()` means "without permissions", not "without a record". It was the real bypass — one
+     * production call site was updating a model through it with nothing logged — so it now goes
+     * through the same decorator as `table()`.
+     */
+    @Test
+    fun `baseTable is audited`() = onServer {
+        TestServer.patientInfo.baseTable().count(Condition.Always)
+
+        assertEquals(DataAccessOperation.Count, logged().single().operation)
+    }
+
+    /**
+     * The genuine bypass still exists, because migrations and similar work legitimately need it. What
+     * changed is that it is named, and reaching it requires opting in, so every bypass in a codebase
+     * is greppable.
+     */
+    @OptIn(com.lightningkite.lightningserver.typed.UnauditedDatabaseAccess::class)
+    @Test
+    fun `dangerouslyDirectTable is not audited`() = onServer {
+        TestServer.patientInfo.dangerouslyDirectTable().count(Condition.Always)
 
         assertEquals(emptyList(), logged())
     }
