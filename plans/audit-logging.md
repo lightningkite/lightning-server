@@ -714,6 +714,50 @@ Anchoring — periodically emitting a chain head as an ordinary HTTP request so 
 commitment to records it could not see — likewise belongs with the total-log, since it is meaningless
 without a chain to commit to.
 
+#### 5.7.1 Design (first cut — NOT reviewed by the author of this plan)
+
+> Everything in this subsection was designed while implementing it, not decided beforehand. It is
+> security-critical and the trade-offs below were chosen, not specified. **Treat it as a proposal
+> until reviewed.**
+
+**The chain commits to hashes, in batches, not to records one by one.** The disclosure log writes one
+row per record disclosed, so a single query can produce ten thousand rows; a chain entry per row would
+double the largest table in the system and serialise every write behind a chain head. Instead each
+audit write folds its record's hash into a running value, and a chain entry is sealed periodically,
+committing to everything folded in since the previous entry.
+
+```kotlin
+@Serializable
+public data class TotalLogEntry(
+    override val _id: Uuid,       // v7: ordered, and carries its own seal time
+    @Index val chainId: String,   // which chain — see below
+    val sequence: Long,           // strictly increasing within a chain, from 0
+    val previousHash: String,     // the previous entry's `hash`; "" at sequence 0
+    val contentHash: String,      // fold of every record hash sealed into this entry
+    val count: Long,              // how many records that fold covers
+    val hash: String,             // SHA-256 over chainId, sequence, previousHash, contentHash, count
+) : HasId<Uuid>
+```
+
+**One chain per process, not one per deployment.** A single global chain would need every instance to
+agree on the next `sequence`, which is a distributed lock on the hot path of every audited write. So
+`chainId` is the server instance plus its boot time, and each process owns its chain exclusively.
+What that gives up is total ordering *between* instances: the log proves no entry within a chain was
+altered or removed, and proves nothing about the interleaving of two chains.
+
+**What tamper-evidence this actually provides.** Altering or deleting any sealed entry breaks the
+link to its successor, which verification detects. Truncating a chain at its end does not — the
+remaining prefix is internally consistent. That is precisely the hole anchoring closes: a chain head
+committed through the HTTP path the reverse proxy captures is a claim about the chain's length that
+the operator cannot later retract. **Without an external anchor the chain detects modification but not
+truncation**, and that limitation is the reason [section 10](#10-out-of-scope-external-capture-layer)
+treats the proxy capture as a requirement rather than an enhancement.
+
+**What it does not provide, at all.** Fabrication at write time. A record that was never written
+cannot be detected as missing, and a false record written through the normal path chains correctly.
+The chain proves the log has not been edited *since it was written*; it says nothing about whether it
+was truthful when written.
+
 ### 5.8 The request record — what `requestId` points at
 
 Every disclosure references a `requestId` and repeats nothing else, so a table holding what that id
