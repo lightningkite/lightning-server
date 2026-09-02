@@ -38,23 +38,28 @@ bigger claim, and it deserves an explicit decision rather than inheriting one.
 **Options if that is unacceptable:** scope the decorator to user-facing tables only (weakens the
 guarantee the layer exists for), or make failure policy configurable per model.
 
-## 2. There is no integrity mechanism in this system at all
+## 2. Integrity rests on the server behaving, and always did
 
-Stated plainly so nobody assumes otherwise: **nothing here makes the audit log tamper-evident.** The
-tables are ordinary rows in an ordinary database. Anyone who can write them can edit or delete
-records, and no artefact in this repository would reveal it.
+Not a regression, and not a gap introduced by removing the hash chain — a statement of what this
+system has always been. **The only integrity mechanism is whether the server does what it says it
+does.** Code running in the server can lie about what the server did, and nothing in the server can
+prevent that.
 
-That is deliberate. Tamper-evidence belongs to the emergency total-log, a separate system outside
-Lightning Server, reached for only if these logs prove insufficient or bypassable. An in-process chain
-was built here and then removed: with an unkeyed hash and no external anchor it could not resist
-anyone able to write its own table, so it could never have provided the property it was named for —
-while adding a second write to the path of every audited read, including privileged internal ones,
-where a hash failure could halt a schedule tick or a startup task.
+What a chain *could* have defended, built properly, is narrower: an adversary who can write the audit
+tables but cannot deploy code — a DBA, a leaked database credential, someone editing rows after the
+fact. An HMAC keyed from a secret store that principal cannot read would make silent edits detectable.
+Ours was an unkeyed hash living in the same database it protected, so it was recomputable by exactly
+that adversary; it defended nobody while putting a second write on the path of every audited read.
 
-The practical consequence: **the integrity of this log rests entirely on deployment controls** — who
-can write the audit tables, whether the store is append-only at the infrastructure level, and whether
-anything ships records off-box. None of that is enforced by code here, and #4 makes it matter more,
-since these tables now hold the sensitive values they audit.
+So this is a deliberate scope decision, not an oversight: **that narrower guarantee is bought with
+deployment controls, not code.** Restrict who can write the audit tables; make the store append-only
+at the infrastructure level where that is available; keep the audit principal distinct from the
+application's. None of it is enforced here, and #4 raises the stakes, since these tables now hold the
+sensitive values they audit.
+
+If those controls prove insufficient, the emergency total-log outside the server is the answer — and a
+better one than a chain, provided it is *externally driven* and treats silence as an alarm. See
+`audit-logging.md` section 10.
 
 ## 4. The audit log now stores the sensitive values it exists to audit
 
@@ -177,8 +182,8 @@ Not defects, but they will surprise someone:
 1. Decide #1 — whether fail-closed on privileged reads is acceptable, because it gates whether this
    can be turned on at all.
 2. Treat #2 as a deployment requirement, not a code one: decide who can write the audit tables and
-   whether the store is append-only at the infrastructure level. Nothing in this repository enforces
-   it.
+   whether the store is append-only at the infrastructure level. That is where the narrower
+   tamper-resistance is bought, and nothing in this repository enforces it.
 3. Revisit 11.4 in light of #2 and #4 — its "no special mechanism needed" resolution rested partly on
    a hash chain that no longer exists here.
 
