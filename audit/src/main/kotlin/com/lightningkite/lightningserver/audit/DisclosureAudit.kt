@@ -10,6 +10,11 @@ import com.lightningkite.lightningserver.typed.ApiWebSocketHandler
 import com.lightningkite.lightningserver.typed.DatabaseTableRegistration
 import com.lightningkite.lightningserver.typed.registerTable
 import com.lightningkite.services.database.Database
+import com.lightningkite.services.database.insertOne
+import com.lightningkite.lightningserver.definition.ScheduledTask
+import com.lightningkite.lightningserver.runtime.now
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 import kotlinx.serialization.descriptors.SerialDescriptor
 
 /**
@@ -48,7 +53,14 @@ import kotlinx.serialization.descriptors.SerialDescriptor
  * @property registry What every model id and every bit permanently mean. Needed to read the log:
  *   a [DisclosureRecord]'s bits are meaningless without it.
  */
-public class DisclosureAudit(database: Runtime<Database>) : ServerBuilder() {
+public class DisclosureAudit(
+    database: Runtime<Database>,
+    /**
+     * How often the tamper-evidence chain is sealed. Also the window in which a crash leaves recent
+     * records unattested — shorter is safer and costs one row per interval. See 5.7.1.
+     */
+    private val sealInterval: Duration = 1.minutes,
+) : ServerBuilder() {
     public val requests: DatabaseTableRegistration<RequestRecord> =
         database.registerTable("AuditRequest", RequestRecord.serializer())
 
@@ -62,6 +74,23 @@ public class DisclosureAudit(database: Runtime<Database>) : ServerBuilder() {
      */
     public val dataAccess: DatabaseTableRegistration<DataAccessRecord> =
         database.registerTable("AuditDataAccess", DataAccessRecord.serializer())
+
+    /**
+     * The tamper-evidence chain. Sealed periodically rather than per record; see
+     * `plans/audit-logging.md` 5.7.1 and [AuditChain].
+     */
+    public val totalLog: DatabaseTableRegistration<TotalLogEntry> =
+        database.registerTable("AuditTotalLog", TotalLogEntry.serializer())
+
+    /**
+     * This process's chain head.
+     *
+     * One per process — see [TotalLogEntry.chainId]. Created lazily against the engine's identity so
+     * that two runtimes built from the same definition do not share a head.
+     */
+    public val chain: Runtime<AuditChain> = Runtime.Cached(Runtime {
+        AuditChain(chainId = "${'$'}{serverId}-${'$'}{clock.now().toEpochMilliseconds()}")
+    })
 
     private val registrations: DatabaseTableRegistration<AuditModelRegistration> =
         database.registerTable("AuditModelRegistration", AuditModelRegistration.serializer())
@@ -89,9 +118,22 @@ public class DisclosureAudit(database: Runtime<Database>) : ServerBuilder() {
     public val registry: RuntimeDeferred<AuditRegistry> =
         RuntimeDeferred.Cached(RuntimeDeferred { loadAuditRegistry(registrations(), fieldRegistrations()) })
 
+    /**
+     * Turns everything folded since the last seal into a chain entry.
+     *
+     * On a schedule rather than per record because folding is in-memory and cheap while sealing is a
+     * write; see [AuditChain]. The interval is the window in which a crash leaves recent records
+     * unattested — present in the queryable log, covered by no entry.
+     */
+    public val sealChain: ScheduledTask = path.path("seal-audit-chain") bind ScheduledTask(
+        frequency = sealInterval,
+    ) {
+        chain().seal(now().toEpochMilliseconds())?.let { totalLog().insertOne(it) }
+    }
+
     init {
         install(RequestRecordInterceptor(requests))
-        install(DisclosureLogInterceptor(registry, disclosures))
+        install(DisclosureLogInterceptor(registry, disclosures, chain))
     }
 }
 

@@ -27,6 +27,7 @@ import kotlin.uuid.Uuid
 public class DisclosureLogInterceptor(
     registry: RuntimeDeferred<AuditRegistry>,
     private val table: Runtime<Table<DisclosureRecord>>,
+    private val chain: Runtime<AuditChain>,
 ) : TypedOutputInterceptor {
     override val name: String = "DisclosureLog"
 
@@ -45,19 +46,23 @@ public class DisclosureLogInterceptor(
         )
         if (disclosures.isEmpty()) return
 
-        table().insert(
-            disclosures.map {
-                DisclosureRecord(
-                    // v7 so the row carries its own insert time; DisclosureRecord.at reads it back.
-                    // Not generateRequestId(): that names execution ids, and this is a row id.
-                    _id = Uuid.generateV7NonMonotonicAt(runtime.clock.now()),
-                    requestId = runtime.initiator.requestRecordId,
-                    modelId = it.modelId,
-                    fields0 = it.bits.fields0,
-                    fields1 = it.bits.fields1,
-                    recordId = it.recordId,
-                )
-            }
-        )
+        val rows = disclosures.map {
+            DisclosureRecord(
+                // v7 so the row carries its own insert time; DisclosureRecord.at reads it back.
+                // Not generateRequestId(): that names execution ids, and this is a row id.
+                _id = Uuid.generateV7NonMonotonicAt(runtime.clock.now()),
+                requestId = runtime.initiator.requestRecordId,
+                modelId = it.modelId,
+                fields0 = it.bits.fields0,
+                fields1 = it.bits.fields1,
+                recordId = it.recordId,
+            )
+        }
+        table().insert(rows)
+        // Folded after the write, deliberately. A record attested but not stored would be a chain
+        // that vouches for something an auditor cannot read; the reverse — stored but not yet
+        // attested — is the window 5.7.1 documents and accepts.
+        val chain = chain()
+        rows.forEach { chain.fold(auditHash(it.chainInput())) }
     }
 }
