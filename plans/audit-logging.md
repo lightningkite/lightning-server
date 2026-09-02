@@ -710,14 +710,32 @@ Hash chaining and tamper-evidence belong to the **emergency total-log**, a separ
 Lightning Server. It exists for the case where these logs are later found insufficient or bypassable;
 it is not a component of this design and nothing in this repository implements it.
 
-An earlier revision of this plan specified an in-process chain, and one was built and then removed. It
-is worth recording why, because the reasoning generalises: an in-process chain with an unkeyed hash
-and no external anchor cannot resist anyone who can write its table, so it could never have been the
-tamper-evidence it was named for. What it did instead was add a second write to the path of every
-audited read — including privileged internal ones — which meant a hash failure could halt a schedule
-tick or a startup task. It bought a property it could not actually provide, at a real availability
-cost. The guarantee belongs outside the process, where it can be held by something the operator does
-not control.
+#### Where the boundary actually is
+
+The system's integrity has always rested on one thing: **whether the server does what it says it
+does.** That was true before any of this was written and no amount of in-process machinery changes it.
+Code running in the server can always lie about what the server did.
+
+But the boundary is not quite "inside the server, therefore nothing" — it is *who controls the
+server*, and there are two different adversaries hiding in that:
+
+| Adversary | In-process chain | External capture |
+|---|---|---|
+| Can write the audit tables, cannot deploy code (a DBA, a leaked DB credential, an operator editing rows after the fact) | **Helps, if built properly** — an HMAC keyed from a secret store the DB principal cannot read makes silent edits detectable | Helps |
+| Can run code on the server (deploy access, RCE, a malicious change) | **Useless** — they hold the key and the code, and can recompute anything | Helps, but see below |
+
+So an in-process chain is not inherently worthless; it defends the first row. What made *ours*
+worthless was building it with an unkeyed hash, in the same database it was protecting. That version
+could be recomputed by exactly the adversary it was supposed to catch, while adding a second write to
+the path of every audited read — including privileged internal ones, where a hash failure could halt a
+schedule tick or a startup task. It bought a property it could not provide, at a real availability
+cost.
+
+The decision is therefore not "integrity is impossible in-process" but **"we are not paying for the
+narrower guarantee here."** Deployment controls are expected to cover the first row: restrict who can
+write the audit tables, and make the store append-only at the infrastructure level where it is
+available. If that turns out to be insufficient, the emergency total-log ([section 10](#10-out-of-scope-external-capture-layer))
+is the answer, and it is a better one than a chain would have been.
 
 ### 5.8 The request record — what `requestId` points at
 
@@ -1196,7 +1214,27 @@ Sequenced so each step is independently shippable and testable, and so prerequis
 
 Not covered here, but it constrains the above. The requirement is a capture that is **provably
 outside application control**, so that the operator cannot be accused of tampering. That forces it
-out of process — into the reverse proxy — and the code-side implications are:
+out of process — into the reverse proxy — and the code-side implications are below.
+
+Three properties do the actual work, and it is worth naming them separately because only the first is
+obvious:
+
+1. **It is outside the trust domain.** Whoever compromises the server does not thereby control the
+   capture. This is the whole point.
+2. **It is externally driven, not pushed.** A capture the server *reports to* inherits the server's
+   compromise: a compromised server simply stops reporting. A capture that taps or pulls does not ask
+   the server's permission. If the total-log is ever built as a push, it loses most of its value.
+3. **Silence must be alarming.** Following from (2): the external side has to detect *absence* of
+   expected traffic, not merely verify what it received. Otherwise the cheapest attack on an
+   unforgeable log is to stop feeding it.
+
+Being simpler and not our code helps for a fourth, softer reason: our bugs do not become its bugs.
+Three defects shipped in the in-process chain during a single session's work, and that code was far
+smaller than the system it was protecting.
+
+The residual gap that none of this closes is **fabrication at write time**. If the server lies, an
+unforgeable capture faithfully records the lie. No external mechanism can distinguish a truthful
+server from a convincing one; that is a property of the application, not of the log.
 
 - Envoy's `tap` filter is the correct primitive (nginx `mirror` re-issues requests to a second
   upstream, duplicating side effects and capturing no responses).
