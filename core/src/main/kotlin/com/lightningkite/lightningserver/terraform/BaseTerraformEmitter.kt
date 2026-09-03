@@ -127,7 +127,7 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
      * @param context Optional name for the terraform file (without .tf.json extension)
      * @param action Builder lambda to construct Terraform JSON objects
      */
-    public fun emitExtra(
+    override fun emitExtra(
         context: String,
         content: String,
     ) {
