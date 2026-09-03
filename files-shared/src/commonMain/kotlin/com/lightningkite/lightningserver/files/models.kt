@@ -10,6 +10,11 @@ import kotlin.uuid.Uuid
 /**
  * Record for tracking a prepared upload and guarding against reuse.
  * Stored in the database to enable cleanup and single-use semantics.
+ *
+ * **Do not expose this table through a REST or model endpoint.** Between preparation and verification
+ * [file] names a file in the upload jail, which has not been scanned. Serializing one hands a client a
+ * signed URL that [com.lightningkite.services.files.ExternalServerFileSerializer] will accept straight
+ * back as a usable `ServerFile`, bypassing scanning entirely.
  */
 @GenerateDataClassPaths
 @Serializable
