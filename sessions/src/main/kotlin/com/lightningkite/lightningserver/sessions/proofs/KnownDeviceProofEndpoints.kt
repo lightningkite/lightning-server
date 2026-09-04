@@ -10,7 +10,6 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.sessions.*
-import com.lightningkite.lightningserver.sessions.proofs.extensions.constrainAttemptRate
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.typed.sdk.*
@@ -168,6 +167,7 @@ public class KnownDeviceProofEndpoints(
                 val id = input.substringBefore('/').let {
                     try { Uuid.parse(it) }
                     catch (e: IllegalArgumentException) {
+                        reportProofRejected(info, ProofFailureReason.MalformedRequest, request = request)
                         throw BadRequestException(
                             message = "Invalid known device identifier. ${e.message}",
                             data = it,
@@ -176,15 +176,28 @@ public class KnownDeviceProofEndpoints(
                     }
                 }
                 val secret = input.substringAfter('/')
-                cache().constrainAttemptRate(
-                    cacheKey = "known-devices-count-${id}"
+                cache().constrainProofAttemptRate(
+                    cacheKey = "known-devices-count-${id}",
+                    method = info,
+                    request = request,
                 ) {
                     val active = modelInfo.table().get(id)
-                        ?: throw BadRequestException("No such known device")
+                        ?: run {
+                            // The device id names no record, so there is no account behind it to name.
+                            reportProofRejected(info, ProofFailureReason.NoSuchSubject, request = request)
+                            throw BadRequestException("No such known device")
+                        }
 
                     // Good: Uses constant-time checkAgainstHash to prevent timing attacks
-                    if (!secret.checkAgainstHash(active.hash))
+                    if (!secret.checkAgainstHash(active.hash)) {
+                        reportProofRejected(
+                            info,
+                            ProofFailureReason.SecretMismatch,
+                            principal = active.subjectId,
+                            request = request,
+                        )
                         throw BadRequestException("User ID and code do not match")
+                    }
 
                     // Lazy migration: if using old slow PBKDF2 hash, upgrade to fast SHA-256 hash
                     val shouldMigrate = active.hash.isSlowHash()
@@ -196,6 +209,7 @@ public class KnownDeviceProofEndpoints(
                         }
                     })
 
+                    reportProofAccepted(info, principal = active.subjectId, request = request)
                     proofSigner.await().makeProof(
                         property = "${active.subjectType}/_id",
                         value = active.subjectId,

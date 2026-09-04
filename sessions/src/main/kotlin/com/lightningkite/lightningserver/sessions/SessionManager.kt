@@ -92,6 +92,19 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     public val principal: PrincipalType<SUBJECT, ID>,
     database: Runtime<Database>,
     public val tokenFormat: Runtime<TokenFormat> = Runtime { PrivateTinyTokenFormat() },
+    /**
+     * Decorates the session table, so a deployment can observe session creation, update and
+     * termination without reaching into this class.
+     *
+     * The write paths here are deliberately sealed — `newSession` is not open,
+     * `terminateSessionById` is private — so before this existed there was no seam at all for the
+     * auth event log (`plans/audit-logging.md` 7.2) to attach to. Applied ahead of permissions, so a
+     * decorator sees privileged and unprivileged access alike.
+     *
+     * For write-only observation, `sessionInfo.registerChangeListener` is already sufficient and
+     * needs nothing from here; this is the wider seam, which also sees reads.
+     */
+    private val sessionSignals: context(ServerRuntime) (Table<Session<SUBJECT, ID>>) -> Table<Session<SUBJECT, ID>> = { it },
 ) : ServerBuilder(), Authentication.Reader<SUBJECT> {
     public object Scopes {
         public val self: RequiredScope = RequiredScope("auth:self")
@@ -168,6 +181,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             serializer = Session.serializer(principal.subjectSerializer, principal.idSerializer),
             idSerializer = Uuid.serializer(),
             tableName = principal.name + "Session",
+            signals = { sessionSignals(it) },
             permissions = {
                 val auth = this.authOrNull
                 val canUse: Condition<Session<SUBJECT, ID>> = when {
@@ -186,7 +200,13 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                         )
                     ),
                     update = isRoot,
-                    delete = isRoot,
+                    // Sessions are terminated, never erased. The row is the only record that a
+                    // session ever existed, and two comments in this file already promise it is
+                    // "kept for audit trail" — but delete was exposed over REST, so a super-user
+                    // could erase the evidence and nothing recorded that they had. Termination
+                    // (Session.terminated) remains available and is what callers want; it goes
+                    // through table(), which does not consult these permissions.
+                    delete = Condition.Never,
                 )
             }
         )
@@ -351,41 +371,111 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
      * @return The validated Session, or null if token is malformed
      * @throws UnauthorizedException if token is well-formed but invalid (wrong secret, expired, etc.)
      */
+    /**
+     * The single point every authentication rejection passes through.
+     *
+     * Exists so the reason is a value rather than a sentence: the auth event log
+     * (`plans/audit-logging.md` section 7) has to record *why* an attempt failed, and a debug string
+     * printed to stdout is not something that can be counted or alerted on. Reporting stays gated on
+     * the debug setting exactly as before; the enum is what makes this seam worth hooking later.
+     */
     context(server: ServerRuntime)
-    private suspend fun RefreshToken.session(request: Request<*>?): Session<SUBJECT, ID>? {
+    private suspend fun authFailed(
+        reason: AuthFailureReason,
+        principal: String? = null,
+        sessionId: String? = null,
+        request: Request<*>? = null,
+    ) {
+        if (generalSettings().debug) println("Auth failed: $reason" + (sessionId?.let { " ($it)" } ?: ""))
+        // A rejection an attacker can produce on demand is an amplification vector, not an audit
+        // trail: one forged token per request writes one audit row per request, unauthenticated,
+        // into the same database as the fail-closed disclosure and data access logs. Each reason
+        // declares which side of the credential check it falls on, rather than this being a list
+        // here that the next reason gets left out of. See AuthFailureReason.reachableWithoutCredentials.
+        if (reason.reachableWithoutCredentials) return
+        // Reporters must not throw (see AuthEventReporter): this path is already rejecting a login,
+        // and a second failure here would obscure the first.
+        server.server.authEventReporters.forEach {
+            it.report(
+                type = "AuthenticationFailed",
+                // Indexed on the record precisely so "when did this account start failing logins"
+                // is answerable. Null only where the attempt failed before any subject resolved.
+                principal = principal,
+                sessionId = sessionId,
+                // Only what was actually observed; a placeholder would read as a real origin.
+                sourceIp = request?.sourceIp,
+                userAgent = request?.headers?.get(HttpHeader.UserAgent)?.root,
+                detail = reason.name,
+            )
+        }
+    }
+
+    context(server: ServerRuntime)
+    /**
+     * [request] is non-null because both call sites are request handlers; the type says so rather
+     * than leaving a branch that cannot be reached. It was nullable, which made the placeholder
+     * fallback below unreachable *and* untestable — a mutation reintroducing a literal `"test"` ip
+     * could not be killed by any test, because no caller can supply the null that would select it.
+     */
+    private suspend fun RefreshToken.session(request: Request<*>): Session<SUBJECT, ID>? {
         if (!valid) {
-            if (generalSettings().debug) println("Auth failed because !valid")
+            authFailed(AuthFailureReason.TokenMalformed, request = request)
             return null
         }
         if (type != principal.name) {
-            if (generalSettings().debug) println("Auth failed because type != handler.name")
+            authFailed(AuthFailureReason.TokenTypeMismatch, request = request)
             return null
         }
 
         val session = sessionInfo.table().get(_id) ?: run {
-            if (generalSettings().debug) println("No such session")
+            authFailed(AuthFailureReason.NoSuchSession, sessionId = _id.toString(), request = request)
             throw UnauthorizedException("No such session")
         }
         val subject = principal.fetch(session.subjectId)
         if(!permitAuthentication(subject)){
-            if (generalSettings().debug) println("Permit Authentication failed")
+            authFailed(
+                AuthFailureReason.AuthenticationNotPermitted,
+                principal = session.subjectId.toString(),
+                sessionId = session._id.toString(),
+                request = request,
+            )
             throw ForbiddenException()
         }
         // SECURITY: Constant-time hash comparison to prevent timing attacks
         if (!plainTextSecret.checkAgainstHash(session.secretHash)) {
-            if (generalSettings().debug) println("Auth failed because hash verification failed for session ${session._id}")
+            authFailed(
+                AuthFailureReason.SecretMismatch,
+                principal = session.subjectId.toString(),
+                sessionId = session._id.toString(),
+                request = request,
+            )
             throw UnauthorizedException("Incorrect hash for session")
         }
         if ((session.expires ?: Instant.DISTANT_FUTURE) < now()) {
-            if (generalSettings().debug) println("Auth failed because (session.expires ?: Instant.DISTANT_FUTURE) < now()")
+            authFailed(
+                AuthFailureReason.SessionExpired,
+                principal = session.subjectId.toString(),
+                sessionId = session._id.toString(),
+                request = request,
+            )
             throw UnauthorizedException("Session has expired (hard).")
         }
         if ((session.stale ?: Instant.DISTANT_FUTURE) < now()) {
-            if (generalSettings().debug) println("Auth failed because (session.stale ?: Instant.FUTURE) < now()")
+            authFailed(
+                AuthFailureReason.SessionStale,
+                principal = session.subjectId.toString(),
+                sessionId = session._id.toString(),
+                request = request,
+            )
             throw UnauthorizedException("Session has expired (stale).")
         }
         if (session.terminated != null) {
-            if (generalSettings().debug) println("Auth failed because session.terminated != null")
+            authFailed(
+                AuthFailureReason.SessionTerminated,
+                principal = session.subjectId.toString(),
+                sessionId = session._id.toString(),
+                request = request,
+            )
             throw UnauthorizedException("Session has been terminated.")
         }
 
@@ -395,8 +485,12 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         // Update session metadata on each use for audit trail and sliding expiration
         sessionInfo.table().updateOneById(_id, modification(spath) {
             it.lastUsed assign now()
-            it.userAgents addAll setOf(request?.headers?.get(HttpHeader.UserAgent)?.root ?: "")
-            it.ips addAll setOf(request?.sourceIp ?: "test")
+            // Record only what was actually observed. These sets are the closest thing the system
+            // has to an authentication audit trail, and a placeholder in them is indistinguishable
+            // from a real observation: a literal "test" ip read as a genuine origin, and an empty
+            // user agent as a genuine one. Absent is absent.
+            it.userAgents addAll setOfNotNull(request.headers[HttpHeader.UserAgent]?.root)
+            it.ips addAll setOf(request.sourceIp)
 
             // Reset staleness window on each use (sliding expiration)
             sessionStaleAfter(subject)?.let { length ->

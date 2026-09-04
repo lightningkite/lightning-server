@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
+import com.lightningkite.lightningserver.BadRequestException
+import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
@@ -78,9 +80,33 @@ public abstract class PinBasedProofEndpoints(
             errorCases = emptyList(),
             successCode = HttpStatus.OK,
             implementation = { input: FinishProof ->
+                // What the attempt is against. A PIN proves ownership of an address, not of an account —
+                // these endpoints never resolve a subject, that happens later at login — so the address is
+                // the truthful answer to "who was this about", and it is the only one a failure has.
+                val target = pin.pendingTarget(input.key)
+                val value = try {
+                    pin.assert(input.key, input.password)
+                } catch (e: NotFoundException) {
+                    reportProofRejected(
+                        info,
+                        ProofFailureReason.SecretExpired,
+                        principal = target,
+                        request = request,
+                    )
+                    throw e
+                } catch (e: BadRequestException) {
+                    reportProofRejected(
+                        info,
+                        ProofFailureReason.SecretMismatch,
+                        principal = target,
+                        request = request,
+                    )
+                    throw e
+                }
+                reportProofAccepted(info, principal = value, request = request)
                 proofSigner.await().makeProof(
                     property = property,
-                    value = pin.assert(input.key, input.password),
+                    value = value,
                 )
             }
         )

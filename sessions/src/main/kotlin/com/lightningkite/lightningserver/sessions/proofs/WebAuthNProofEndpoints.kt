@@ -390,16 +390,28 @@ public class WebAuthNProofEndpoints(
 
                 val cacheKey = challengeCacheKey(challengeId)
                 val fromCache = cache().getAndRemove<AuthenticationCache>(cacheKey)
-                    ?: throw BadRequestException("No Challenge available")
+                    ?: run {
+                        // The challenge is single-use and time-limited, so an unknown id is one that
+                        // expired, was already spent, or was never issued. No subject is known yet.
+                        reportProofRejected(info, ProofFailureReason.SecretExpired, request = request)
+                        throw BadRequestException("No Challenge available")
+                    }
                 cache().remove(cacheKey)
 
-                if (fromCache.challenge != WebAuthN.base64Decoder.decode(clientData.challenge).decodeToString())
+                if (fromCache.challenge != WebAuthN.base64Decoder.decode(clientData.challenge).decodeToString()) {
+                    reportProofRejected(info, ProofFailureReason.SecretMismatch, request = request)
                     throw BadRequestException("No Challenge available")
+                }
 
                 val publicKeyCredential: WebAuthNCredential = modelInfo.table()
                     .find(condition { it._id.eq(credentials.id) and active })
                     .firstOrNull()
-                    ?: throw ForbiddenException("Invalid Credential ID")
+                    ?: run {
+                        // The credential id is what identifies the account here, so an unknown one
+                        // resolves no subject.
+                        reportProofRejected(info, ProofFailureReason.NoSuchSubject, request = request)
+                        throw ForbiddenException("Invalid Credential ID")
+                    }
 
                 val authRequest = AuthenticationRequest(
                     WebAuthN.base64Decoder.decode(credentials.id),
@@ -442,6 +454,12 @@ public class WebAuthNProofEndpoints(
                     )
                 } catch (e: VerificationException) {
                     e.printStackTrace()
+                    reportProofRejected(
+                        info,
+                        ProofFailureReason.SecretMismatch,
+                        principal = publicKeyCredential.subjectId,
+                        request = request,
+                    )
                     throw BadRequestException("Failed to verify Authenticator")
                 }
 
@@ -458,6 +476,7 @@ public class WebAuthNProofEndpoints(
                     }
                 )
 
+                reportProofAccepted(info, principal = publicKeyCredential.subjectId, request = request)
                 proofSigner.await().makeProof(
                     info = if (authData.authenticatorData?.isFlagUV == true) info.copy(strength = 20) else info,
                     property = "${fromCache.subjectType}/_id",

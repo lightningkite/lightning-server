@@ -32,6 +32,16 @@ public suspend fun Cache.claimOnce(cacheKey: String, ttl: Duration): Boolean =
     setIfNotExists(cacheKey, now(), ttl)
 
 /**
+ * The rejection [constrainAttemptRate] raises when a key has run out of attempts.
+ *
+ * A subclass rather than a plain [BadRequestException] so that a caller can tell "the limiter turned
+ * this away" apart from "the credential was wrong", which look identical to the client on purpose but
+ * are different security events. The status, detail and message are unchanged, so what the caller
+ * receives is exactly what it was.
+ */
+public class TooManyAttemptsException(message: String) : BadRequestException(message = message)
+
+/**
  *  Tracks the number of action attempts against a given [cacheKey] and applies rate limiting with
  *  **exponential backoff** so that repeated abuse of the same key is punished progressively harder.
  *
@@ -91,7 +101,7 @@ public suspend inline fun <R> Cache.constrainAttemptRate(
         // still treated as a repeat offender (defeats slow "popcorn" brute forcing).
         this.add(levelKey, 1, maxBlocked * 4)
         this.add(cacheKey, 1, blockDuration)
-        throw BadRequestException("Too many attempts; please wait ${blockDuration.inWholeMinutes} minutes.")
+        throw TooManyAttemptsException("Too many attempts; please wait ${blockDuration.inWholeMinutes} minutes.")
     }
 
     return try {

@@ -156,17 +156,27 @@ public class TimeBasedOTPProofEndpoints(
                 val gracePeriod = now().minus(5.seconds)
                 val subject = input.type
                 val handler = serverRuntime.server.principalTypes[subject]
-                    ?: throw IllegalArgumentException("No subject $subject recognized")
+                    ?: run {
+                        reportProofRejected(info, ProofFailureReason.MalformedRequest, request = request)
+                        throw IllegalArgumentException("No subject $subject recognized")
+                    }
                 // Normalize BEFORE building the rate-limit key: the key must be derived from the canonical
                 // identifier so that case/whitespace variants of the same account share one bucket. Keying on
                 // the raw value would let an attacker dodge the limiter (and its exponential backoff) simply
                 // by varying case or whitespace.
                 val normalizedValue = handler.normalizePropertyValue(input.property, input.value)
-                cache().constrainAttemptRate(
-                    cacheKey = "totp-count-${input.property}-${normalizedValue}"
+                cache().constrainProofAttemptRate(
+                    cacheKey = "totp-count-${input.property}-${normalizedValue}",
+                    method = info,
+                    request = request,
                 ) {
                     val subjectId = handler.fetchUserIdString(input.property, normalizedValue)
-                        ?: throw BadRequestException("User ID and code do not match")
+                        ?: run {
+                            // No account resolved, so no principal to name. Recorded anyway: a run of these
+                            // against different values is what enumeration looks like.
+                            reportProofRejected(info, ProofFailureReason.NoSuchSubject, request = request)
+                            throw BadRequestException("User ID and code do not match")
+                        }
 
                     val active = modelInfo.table().find(condition {
                         it.subjectId.eq(subjectId) and it.subjectType.eq(subject) and active
@@ -185,7 +195,15 @@ public class TimeBasedOTPProofEndpoints(
                         matching = secret
                         break
                     }
-                    val matched = matching ?: throw BadRequestException("User ID and code do not match")
+                    val matched = matching ?: run {
+                        reportProofRejected(
+                            info,
+                            ProofFailureReason.SecretMismatch,
+                            principal = subjectId,
+                            request = request,
+                        )
+                        throw BadRequestException("User ID and code do not match")
+                    }
 
                     // Enforce single-use (RFC 6238 §5.2): a code is valid for exactly one time-step, so the same
                     // code must not mint two proofs. Key on the secret + the time-step that validated; reuse the
@@ -199,14 +217,23 @@ public class TimeBasedOTPProofEndpoints(
                     // A reused code is reported plainly (unlike a wrong code, which stays opaque): revealing reuse
                     // is harmless here — it only confirms a code the caller already supplied was once valid — and
                     // a clear "wait for the next code" is far better UX than a misleading "does not match".
-                    if (!claimed) throw BadRequestException(
-                        "That code was already used. Please wait for your authenticator to show a new code."
-                    )
+                    if (!claimed) {
+                        reportProofRejected(
+                            info,
+                            ProofFailureReason.SecretAlreadyUsed,
+                            principal = subjectId,
+                            request = request,
+                        )
+                        throw BadRequestException(
+                            "That code was already used. Please wait for your authenticator to show a new code."
+                        )
+                    }
 
                     modelInfo.table().updateOneById(matched._id, modification {
                         it.lastUsedAt assign now
                     })
 
+                    reportProofAccepted(info, principal = subjectId, request = request)
                     proofSigner.await().makeProof(
                         property = input.property,
                         value = normalizedValue,

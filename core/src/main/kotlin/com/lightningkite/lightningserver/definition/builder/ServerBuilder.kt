@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.runtime.AuthEventReporter
 import com.lightningkite.lightningserver.runtime.ExecutionInterceptor
 import com.lightningkite.lightningserver.serialization.*
 import com.lightningkite.lightningserver.typedoutput.TypedOutputInterceptor
@@ -99,6 +100,8 @@ public abstract class ServerBuilder : Extendable {
 
     private val typedOutputInterceptors: ListRegistry<TypedOutputInterceptor> = ListRegistry()
 
+    private val authEventReporters: ListRegistry<AuthEventReporter> = ListRegistry()
+
     private var exceptionHandler: ExceptionHttpHandler = DefaultExceptionHttpHandler
 
     private val preDeployTasks: MapRegistry<PathSpec0, PreDeployTask> = MapRegistry()
@@ -117,6 +120,10 @@ public abstract class ServerBuilder : Extendable {
     @JvmName("installExecutionInterceptor")
     public fun <T : ExecutionInterceptor> install(interceptor: T): T =
         interceptor.also { executionInterceptors.register(it) }
+
+    @JvmName("installAuthEventReporter")
+    public fun <T : AuthEventReporter> install(reporter: T): T =
+        reporter.also { authEventReporters.register(it) }
 
     @JvmName("installHttpConnectionInterceptor")
     public fun <T : HttpConnectionInterceptor> install(interceptor: T): T =
@@ -341,6 +348,7 @@ public abstract class ServerBuilder : Extendable {
             externalSerializersModule = externalSerialization,
             annotationValidators = annotationValidators,
             executionInterceptors = executionInterceptors.toSealedList(),
+            authEventReporters = authEventReporters.toSealedList(),
             httpConnectionInterceptors = httpConnectionInterceptors.toSealedList(),
             httpLogicalInterceptors = httpLogicalInterceptors.toSealedList(),
             webSocketConnectionInterceptors = webSocketConnectionInterceptors.toSealedList(),

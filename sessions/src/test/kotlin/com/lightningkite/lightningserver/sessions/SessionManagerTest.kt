@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.data.get
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.plainText
@@ -22,6 +23,11 @@ import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
+import com.lightningkite.services.database.get
+import com.lightningkite.services.database.Table
+import com.lightningkite.services.database.Condition
+import com.lightningkite.lightningserver.typed.AuthAccess
+import com.lightningkite.services.database.postCreate
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -59,10 +65,12 @@ class SessionManagerTest {
         database: Runtime<Database>,
         private val expirationDuration: Duration? = 30.days,
         private val staleDuration: Duration? = 7.days,
+        sessionSignals: context(ServerRuntime) (Table<Session<SessionTestUser, Uuid>>) -> Table<Session<SessionTestUser, Uuid>> = { it },
     ) : SessionManager<SessionTestUser, Uuid>(
         principal = SessionTestUser,
         database = database,
-        tokenFormat = Runtime { PrivateTinyTokenFormat() }
+        tokenFormat = Runtime { PrivateTinyTokenFormat() },
+        sessionSignals = sessionSignals,
     ) {
         context(server: ServerRuntime)
         override suspend fun sessionExpiration(subject: SessionTestUser): Instant? =
@@ -183,6 +191,159 @@ class SessionManagerTest {
 
                 assertNotNull(accessToken)
                 assertTrue(accessToken.isNotEmpty())
+            }
+        }
+    }
+
+    /**
+     * The session's `ips` and `userAgents` sets are the closest thing this system has to an
+     * authentication audit trail, so an unobserved value must be absent from them rather than
+     * present as a placeholder — an empty-string user agent reads as a real observation to anyone
+     * querying it, exactly as the literal "test" ip did on the request-less path.
+     */
+    @Test
+    fun `an unobserved user agent is not recorded as a placeholder`() = runBlocking {
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(database = database)
+        }.let { server ->
+            server.test({}) {
+                val (session, refreshToken) = server.sessions.newSession(userId)
+                // The harness supplies a source ip but no User-Agent header.
+                server.sessions.tokenSimple.test(null, refreshToken.string)
+
+                val stored = with(serverRuntime) { server.sessions.sessionInfo.table().get(session._id) }
+                assertNotNull(stored)
+                assertEquals(
+                    emptySet(),
+                    stored.userAgents,
+                    "an absent user agent was recorded as a value",
+                )
+                // The ip was genuinely observed, so it is genuinely recorded.
+                assertEquals(setOf("localhost"), stored.ips)
+            }
+        }
+    }
+
+    /**
+     * The other half of the same audit-trail promise: what *is* observed must be the request's own
+     * value, not something the code supplies. The test above drives the session through the typed
+     * harness, which fixes the ip and sends no User-Agent, so it can only show that an absent value
+     * stays absent. Here a real request presents its refresh token as a bearer credential — the path
+     * a client that has not yet exchanged for an access token actually takes — carrying an ip and a
+     * user agent that appear nowhere else, so a recorded constant could not pass for either.
+     */
+    @Test
+    fun `a session use records the ip and user agent the request carried`() = runBlocking {
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(database = database)
+        }.let { server ->
+            server.test({}) {
+                val (session, refreshToken) = server.sessions.newSession(userId)
+
+                val request = HttpRequest<PathSpec>(
+                    path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
+                    queryParameters = QueryParameters.EMPTY,
+                    headers = HttpHeaders {
+                        add(HttpHeader.Authorization, "Bearer ${refreshToken.string}")
+                        add(HttpHeader.UserAgent, "ExampleClient/9.9 (audit-trail probe)")
+                    },
+                    domain = "example.com",
+                    protocol = "https",
+                    sourceIp = "203.0.113.7",
+                )
+                // Resolving the request's authentication is what drives the session-use update. If the
+                // token were not accepted no update would happen at all, and the assertions below would
+                // be reading an untouched session rather than a recorded one.
+                val resolved = with(serverRuntime) { request[Authentication.CacheKey] }
+                assertNotNull(resolved, "the refresh token was not accepted, so no session use was recorded")
+
+                val stored = with(serverRuntime) { server.sessions.sessionInfo.table().get(session._id) }
+                assertNotNull(stored)
+                assertEquals(setOf("203.0.113.7"), stored.ips, "the recorded ip is not the one the request came from")
+                assertEquals(
+                    setOf("ExampleClient/9.9 (audit-trail probe)"),
+                    stored.userAgents,
+                    "the recorded user agent is not the one the request sent",
+                )
+            }
+        }
+    }
+
+    /**
+     * The auth event log needs to observe session creation and termination, and the write paths that
+     * do both are sealed — `newSession` is not open, `terminateSessionById` is private. The signals
+     * seam is what makes them observable from outside without unsealing anything.
+     */
+    @Test
+    fun `the signals seam sees session writes`() = runBlocking {
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
+
+        val created = mutableListOf<Uuid>()
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(
+                database = database,
+                sessionSignals = { table -> table.postCreate { created += it._id } },
+            )
+        }.let { server ->
+            server.test({}) {
+                val (session, _) = server.sessions.newSession(userId)
+                assertEquals(listOf(session._id), created, "the seam did not observe session creation")
+            }
+        }
+    }
+
+    /**
+     * A session row is the only record that a session ever existed, and this file twice promises it
+     * is "kept for audit trail" — but delete was granted to super-users and exposed over REST, so
+     * the evidence could be erased with nothing recording that it had been. Termination is the
+     * supported operation and is unaffected: it goes through table(), which does not consult these
+     * permissions.
+     */
+    @Test
+    fun `session rows cannot be deleted, even by a super user`() = runBlocking {
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(database = database)
+
+            init {
+                // Make the test subject a super user, so `isRoot` resolves to Always. Without this
+                // every branch collapses to Never for an unprivileged caller and the assertion below
+                // would hold no matter what delete was granted.
+                AuthRequirement.isSuperUser = SessionTestUser.require()
+            }
+        }.let { server ->
+            server.test({}) {
+                val (session, _) = server.sessions.newSession(userId)
+                val auth = with(server.sessions) { session.toAuth() }
+                val permissions = with(serverRuntime) {
+                    server.sessions.sessionInfo.permissions(AuthAccess(auth))
+                }
+                assertTrue(
+                    permissions.delete == Condition.Never,
+                    "a super user can delete session rows, erasing the only record the session existed",
+                )
             }
         }
     }

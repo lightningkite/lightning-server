@@ -10,7 +10,7 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.serverRuntime
-import com.lightningkite.lightningserver.sessions.proofs.extensions.constrainAttemptRate
+import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.typed.sdk.*
@@ -27,6 +27,7 @@ import kotlinx.serialization.builtins.serializer
 import java.security.SecureRandom
 import kotlin.time.Clock
 import kotlin.time.Duration
+import kotlin.time.Instant
 import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
 
@@ -38,6 +39,16 @@ public data class BackupCodeSecret(
     val code: String,
     val subjectId: String,
     val subjectType: String,
+    val createdAt: Instant,
+    /**
+     * When this code was redeemed, or null while it is still usable.
+     *
+     * Redeeming a code used to delete its row, which left no trace that the code had ever existed,
+     * let alone been used — the one event on this table an auditor is certain to ask about. The row
+     * is now retained and marked instead, and it is this field, not the row's absence, that makes a
+     * code single-use.
+     */
+    val usedAt: Instant? = null,
 ) : HasId<Uuid>
 
 @OptIn(InternalSerializationApi::class)
@@ -82,8 +93,13 @@ public class BackupCodeEndpoints(
             errorCases = listOf(),
             examples = listOf(),
             implementation = { _: Unit ->
+                // Revokes the codes that are still live. Redeemed rows stay: they are a record of an
+                // authentication that happened, not a secret that needs withdrawing.
                 modelInfo.table().deleteManyIgnoringOld(
-                    condition { it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) }
+                    condition {
+                        it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) and
+                                it.usedAt.eq(null)
+                    }
                 )
 
                 val r = SecureRandom()
@@ -102,6 +118,7 @@ public class BackupCodeEndpoints(
                         code = it.lowercase(),
                         subjectId = auth.rawId,
                         subjectType = auth.principalName,
+                        createdAt = now(),
                     )
                 })
 
@@ -120,8 +137,12 @@ public class BackupCodeEndpoints(
             examples = listOf(),
             implementation = { _: Unit ->
 
+                // As above: clearing withdraws live codes, it does not erase redemption history.
                 modelInfo.table().deleteManyIgnoringOld(
-                    condition { it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) }
+                    condition {
+                        it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) and
+                                it.usedAt.eq(null)
+                    }
                 )
 
                 Unit
@@ -139,7 +160,10 @@ public class BackupCodeEndpoints(
             examples = listOf(),
             implementation = { _: Unit ->
                 modelInfo.table().findOne(
-                    condition { it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) }
+                    condition {
+                        it.subjectId.eq(auth.rawId) and it.subjectType.eq(auth.principalName) and
+                                it.usedAt.eq(null)
+                    }
                 ) != null
             }
         )
@@ -174,31 +198,66 @@ public class BackupCodeEndpoints(
                 val subject = input.type
 
                 val handler = serverRuntime.server.principalTypes.values.find { it.name == subject }
-                    ?: throw IllegalArgumentException("No subject $subject recognized")
+                    ?: run {
+                        reportProofRejected(info, ProofFailureReason.MalformedRequest, request = request)
+                        throw IllegalArgumentException("No subject $subject recognized")
+                    }
 
                 // Normalize BEFORE building the rate-limit key: the key must be derived from the canonical
                 // identifier so that case/whitespace variants of the same account share one bucket. Keying on
                 // the raw value would let an attacker dodge the limiter (and its exponential backoff) simply
                 // by varying case or whitespace.
                 val normalizedValue = handler.normalizePropertyValue(input.property, input.value)
-                cache().constrainAttemptRate(
-                    cacheKey = "backup-code-count-${input.property}-${normalizedValue}"
+                cache().constrainProofAttemptRate(
+                    cacheKey = "backup-code-count-${input.property}-${normalizedValue}",
+                    method = info,
+                    request = request,
                 ) {
                     val subjectId = handler.fetchUserIdString(input.property, input.value)
-                        ?: throw BadRequestException("Invalid Backup Code")
+                        ?: run {
+                            // No account resolved, so no principal to name. Recorded anyway: a run of these
+                            // against different values is what enumeration looks like.
+                            reportProofRejected(info, ProofFailureReason.NoSuchSubject, request = request)
+                            throw BadRequestException("Invalid Backup Code")
+                        }
 
                     val secrets = modelInfo.table().find(condition {
                         it.subjectId.eq(subjectId) and
-                                it.subjectType.eq(subject)
+                                it.subjectType.eq(subject) and
+                                it.usedAt.eq(null)
                     })
                         .toList()
 
                     val normalizedCode = input.password.filter { it.isLetter() }.lowercase()
                     val match = secrets.find { normalizedCode == it.code }
-                        ?: throw BadRequestException("Invalid Backup Code")
+                        ?: run {
+                            reportProofRejected(
+                                info,
+                                ProofFailureReason.SecretMismatch,
+                                principal = subjectId,
+                                request = request,
+                            )
+                            throw BadRequestException("Invalid Backup Code")
+                        }
 
-                    modelInfo.table().deleteOneById(match._id)
+                    // Claim the code by marking it, conditional on it still being unused, so that two
+                    // concurrent redemptions of the same code cannot both succeed. Losing this race is
+                    // indistinguishable from presenting an already-spent code, and answers the same.
+                    val claimed = modelInfo.table().updateOne(
+                        condition { it._id.eq(match._id) and it.usedAt.eq(null) },
+                        modification { it.usedAt assign now() },
+                    )
+                    if (claimed.old == null) {
+                        reportProofRejected(
+                            info,
+                            ProofFailureReason.SecretAlreadyUsed,
+                            principal = subjectId,
+                            request = request,
+                        )
+                        throw BadRequestException("Invalid Backup Code")
+                    }
 
+                    reportProofAccepted(info, principal = subjectId, request = request)
                     proofSigner.await().makeProof(
                         info = info.copy(strength = 10),
                         property = input.property,
@@ -216,7 +275,8 @@ public class BackupCodeEndpoints(
         modelInfo.table().findOne(
             condition {
                 it.subjectId.eq(principal.idString(subject._id)) and
-                        it.subjectType.eq(principal.name)
+                        it.subjectType.eq(principal.name) and
+                        it.usedAt.eq(null)
             }
         ) != null
 }
