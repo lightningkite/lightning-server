@@ -49,8 +49,10 @@ class BulkInterceptorScopeTest {
     }
 
     /** Records what it saw, then delegates. Shared by both interceptor kinds below. */
+    context(runtime: ServerRuntime)
     private fun record(into: MutableList<Seen>, request: HttpRequest<*>) {
-        into.add(Seen("/" + request.path.pathSegments.toString(), request.requestId, request.parentRequestId))
+        val initiator = runtime.initiator
+        into.add(Seen("/" + request.path.pathSegments.toString(), initiator.executionId, initiator.causedBy))
     }
 
     private inner class LogicalRecorder : HttpLogicalInterceptor {
@@ -125,9 +127,9 @@ class BulkInterceptorScopeTest {
                     domain = "example.com",
                     protocol = "https",
                     sourceIp = "local",
-                    requestId = outerRequestId,
                     body = TypedData.text(body, MediaType.Application.Json),
-                )
+                ),
+                outerRequestId,
             )
         }
         block()
@@ -165,12 +167,12 @@ class BulkInterceptorScopeTest {
     }
 
     /**
-     * The guard exists because a sub-request that kept the outer ID, or carried no parent at all,
-     * would be either indistinguishable from the request that carried it or unattributable to it —
-     * and both corrupt the audit trail silently rather than failing.
+     * The guard exists because a sub-request dispatched from outside an HTTP execution has nothing to
+     * be a sub-request *of*: it would be unattributable to the request that carried it, which corrupts
+     * the audit trail silently rather than failing.
      */
     @Test
-    fun `handleSubRequest rejects a request that was not derived as a sub-request`() =
+    fun `handleSubRequest rejects a dispatch from outside an http execution`() =
         TestServer.test(settings = {}) {
             val notASubRequest = HttpRequest<PathSpec>(
                 path = RawHttpEndpoint(asString = "/alpha", method = HttpMethod.GET),
@@ -179,14 +181,13 @@ class BulkInterceptorScopeTest {
                 domain = "example.com",
                 protocol = "https",
                 sourceIp = "local",
-                requestId = Uuid.random(),
             )
             val failure = assertFailsWith<IllegalArgumentException> {
                 runBlocking { serverRuntime.handleSubRequest(notASubRequest) }
             }
             assertTrue(
-                failure.message.orEmpty().contains("subRequest"),
-                "the message should name the correct way to build one; was: ${failure.message}",
+                failure.message.orEmpty().contains("HTTP execution"),
+                "the message should say why there is nothing to parent to; was: ${failure.message}",
             )
         }
 

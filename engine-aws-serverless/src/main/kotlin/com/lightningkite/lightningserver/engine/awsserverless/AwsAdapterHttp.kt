@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.engine.awsserverless
 
+import com.lightningkite.lightningserver.pathing.PathSpec
+import kotlin.uuid.Uuid
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
@@ -28,20 +30,20 @@ internal class AwsAdapterHttp(val root: AwsAdapter) {
             ?: emptyList()
 
         val request = HttpRequest(
-            path = RawHttpEndpoint(event.path.removePrefix("/" + event.requestContext.stage), method),
+            path = RawHttpEndpoint<PathSpec>(event.path.removePrefix("/" + event.requestContext.stage), method),
             queryParameters = QueryParameters(queryParams),
             headers = headers,
             body = body,
             domain = event.requestContext.domainName,
             protocol = "https",
             sourceIp = event.requestContext.identity.sourceIp,
-            requestId = generateRequestId(),
             upstreamRequestId = headers[HttpHeader.XRequestId]?.root,
             // API Gateway's ID is not a UUID, so it is kept as the join key to the gateway's own
             // access logs rather than adopted as ours.
             engineRequestId = event.requestContext.requestId,
         )
-        val result = root.handle(request)
+        // API Gateway's ID is not a UUID, so we always mint our own execution id.
+        val result = root.handle(request, Uuid.random())
         return result.toAws()
     }
 }

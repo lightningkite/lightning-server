@@ -1,11 +1,15 @@
 package com.lightningkite.lightningserver.runtime.test
 
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.runtime.Initiator
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
+import com.lightningkite.lightningserver.runtime.forExecution
+import com.lightningkite.lightningserver.runtime.phase
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.SettingContext
@@ -107,15 +111,21 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
      *
      * @param handler The WebSocket handler being tested
      * @param request The connection request
+     * @param initiator The socket's connect initiator, from which each phase derives its own
      * @param currentState The current connection state (mutable for inspection)
      * @param name Display name for debug output (default: "Client")
      */
+    @OptIn(InternalLightningServerApi::class)
     public inner class TestWebSocket<PATH : PathSpec, STORAGE>(
         private val handler: WebSocketHandler<PATH, STORAGE>,
         public val request: WebSocketConnectRequest<PATH>,
+        public val initiator: Initiator.WebSocket,
         public var currentState: STORAGE,
         public val name: String = "Client",
     ) {
+        private fun runtimeFor(phase: Initiator.WebSocket.Phase): ServerRuntime =
+            this@TestRunner.forExecution(initiator.phase(phase))
+
         public var onMessageSent: (frame: WebSocketFrame) -> Unit = {}
         public suspend fun close() {
             /*logger.debug*/run { "$name --> <close>" }.let(::println)
@@ -126,7 +136,7 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
         public suspend fun send(frame: WebSocketFrame) {
             /*logger.debug*/run { "$name --> '$frame'" }.let(::println)
             val connection = this@TestWebSocket.server
-            with(this@TestRunner) { handler.messageFromClient(connection, frame) }
+            with(runtimeFor(Initiator.WebSocket.Phase.ClientMessage)) { handler.messageFromClient(connection, frame) }
             connection.flush()
         }
 
@@ -135,7 +145,9 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
         public inner class ServerSide() : WebSocketConnection<PATH, STORAGE> {
             private val changeQueue = ArrayList<(STORAGE) -> STORAGE>()
             private val sub: suspend (WebSocketSubscriptionMessage<*, *>) -> Unit = {
-                with(this@TestRunner) { handler.messageFromSubscription(this@ServerSide, it) }
+                with(runtimeFor(Initiator.WebSocket.Phase.SubscriptionMessage)) {
+                    handler.messageFromSubscription(this@ServerSide, it)
+                }
                 flush()
             }
 
@@ -184,7 +196,7 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
 
             override suspend fun close(reason: WebSocketClose) {
                 /*logger.debug*/run { "$name <-- <close>" }.let(::println)
-                with(this@TestRunner) { handler.disconnect(this@ServerSide, reason) }
+                with(runtimeFor(Initiator.WebSocket.Phase.Disconnect)) { handler.disconnect(this@ServerSide, reason) }
             }
 
             internal fun clean() {

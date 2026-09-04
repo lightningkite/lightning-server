@@ -4,7 +4,6 @@ import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import kotlin.uuid.Uuid
 
 /**
  * Base class for HTTP requests in Lightning Server.
@@ -13,6 +12,11 @@ import kotlin.uuid.Uuid
  * and includes a built-in cache for computed values via the [Caching] interface.
  *
  * This is typically implemented by the framework and passed to endpoint handlers.
+ *
+ * What is *not* here is any identifier of ours: correlation lives on
+ * [com.lightningkite.lightningserver.runtime.ServerRuntime.initiator], because a task or a schedule
+ * tick has no request to hang it on. The two identifiers that remain below are wire-level facts
+ * about the caller and the gateway, not identifiers the server minted.
  *
  * @param PATH The path specification type for this request
  */
@@ -34,20 +38,6 @@ public abstract class Request<out PATH : PathSpec> : HasContextualPath<PATH>, Ca
 
     /** The source IP address of the client making the request. */
     public abstract val sourceIp: String
-
-    /**
-     * Server-controlled identifier correlating this request across every log the server writes.
-     *
-     * Never derived from an untrusted caller — see
-     * [com.lightningkite.lightningserver.http.requestIdentity] for how engines resolve it.
-     */
-    public abstract val requestId: Uuid
-
-    /**
-     * The [requestId] of the request that dispatched this one, for sub-requests of a multiplexed
-     * request, or null for a request that arrived directly from a client.
-     */
-    public abstract val parentRequestId: Uuid?
 
     /**
      * An identifier the caller supplied that was not trusted, kept for diagnostics only.

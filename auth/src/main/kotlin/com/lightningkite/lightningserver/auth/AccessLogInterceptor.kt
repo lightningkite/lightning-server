@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpLogicalInterceptor
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.runtime.Initiator
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.websockets.DelegatingWebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketClose
@@ -67,7 +68,7 @@ public class AccessLogInterceptor : HttpLogicalInterceptor, WebSocketLogicalInte
             val elapsedMs = started.elapsedNow().inWholeMilliseconds
             runtime.logger.info {
                 "${request.path} accessed by $principal (${request.sourceIp}) " +
-                    "-> $outcome in ${elapsedMs}ms ${request.idSuffix()}"
+                    "-> $outcome in ${elapsedMs}ms ${idSuffix()}"
             }
         }
     }
@@ -80,7 +81,7 @@ public class AccessLogInterceptor : HttpLogicalInterceptor, WebSocketLogicalInte
                     val principal = request.principalName()
                     serverRuntime.logger.info {
                         "ws ${request.path} opened by $principal (${request.sourceIp}) " +
-                            request.idSuffix(idLabel = "conn")
+                            idSuffix(idLabel = "conn")
                     }
                 }
                 return wrapped.willConnect(request)
@@ -93,7 +94,7 @@ public class AccessLogInterceptor : HttpLogicalInterceptor, WebSocketLogicalInte
                     val principal = request.principalName()
                     serverRuntime.logger.info {
                         "ws ${request.path} closed by $principal (${request.sourceIp}) " +
-                            "-> $reason ${request.idSuffix(idLabel = "conn")}"
+                            "-> $reason ${idSuffix(idLabel = "conn")}"
                     }
                 }
                 wrapped.disconnect(connection, reason)
@@ -119,6 +120,22 @@ private suspend fun com.lightningkite.lightningserver.data.Request<*>.principalN
 /**
  * Renders the correlation IDs, including the parent for a sub-request or virtual socket, so a line
  * can be tied back to the request that carried it.
+ *
+ * A socket is named by its socket id rather than by the phase's execution id: a reader following a
+ * socket wants the one identifier that is the same at open and at close. For the same reason the
+ * socket's parent is read from the causal root rather than from `causedBy`, which on any phase after
+ * connect points at that socket's own connect and would render as "X of X".
  */
-private fun com.lightningkite.lightningserver.data.Request<*>.idSuffix(idLabel: String = "req"): String =
-    parentRequestId?.let { "[$idLabel $requestId of $it]" } ?: "[$idLabel $requestId]"
+context(runtime: ServerRuntime)
+private fun idSuffix(idLabel: String = "req"): String {
+    val initiator = runtime.initiator
+    return when (initiator) {
+        is Initiator.WebSocket -> initiator.socketId.let { socket ->
+            initiator.rootExecutionId.takeIf { it != socket }?.let { "[$idLabel $socket of $it]" }
+                ?: "[$idLabel $socket]"
+        }
+
+        else -> initiator.causedBy?.let { "[$idLabel ${initiator.executionId} of $it]" }
+            ?: "[$idLabel ${initiator.executionId}]"
+    }
+}

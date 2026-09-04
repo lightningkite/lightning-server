@@ -105,7 +105,6 @@ class AnnotationValidatorsTests {
                             domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                             protocol = generalSettings().publicUrl.substringBefore("://"),
                             sourceIp = "localhost",
-                            requestId = generateRequestId(),
                             body = TypedData.text(
                                 serverRuntime.externalSerialization.json.encodeToString(
                                     endpoint.inputType,

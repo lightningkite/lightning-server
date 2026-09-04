@@ -18,6 +18,11 @@ public data class MultiplexWebSocketHandlerConnectionInfo(
     val storage: AnonType,
     val topics: Set<String> = setOf(),
     val request: WebSocketConnectRequest<*>,
+    /**
+     * The virtual socket's connect initiator, kept here for the same reason the request is: a later
+     * phase may run in a different process, and the socket's identity has to survive the trip.
+     */
+    val initiator: Initiator.WebSocket,
 )
 
 /**
@@ -36,6 +41,7 @@ private fun MultiplexWebSocketHandlerState.updateChannel(
     return copy(map = map + (channel to change(existing)))
 }
 
+@OptIn(InternalLightningServerApi::class)
 public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, MultiplexWebSocketHandlerState> {
     override val storageSerializer: KSerializer<MultiplexWebSocketHandlerState> get() = serializer()
 
@@ -191,11 +197,14 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                         queryParameters = QueryParameters(connection.request.queryParameters + (message.queryParams?.entries?.flatMap { it.value.map { v -> it.key to v } }
                             ?: listOf())),
                     )
-                    val storage = otherHandler.willConnectWithMetrics(match.path.pathSpec, serverRuntime, r)
+                    val subInitiator = serverRuntime.socketInitiator.subConnection(r.path)
+                    val storage =
+                        otherHandler.willConnectWithMetrics(match.path.pathSpec, serverRuntime, subInitiator, r)
                     connection.updateStateImmediately {
                         it.copy(
                             map = it.map + (channel to MultiplexWebSocketHandlerConnectionInfo(
                                 request = r,
+                                initiator = subInitiator,
                                 storage = AnonType(
                                     serverRuntime.internalSerialization.kotlinBytesFormat,
                                     storage,
@@ -208,6 +217,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                         otherHandler.didConnectWithMetrics(
                             match.pathSpec,
                             serverRuntime,
+                            subInitiator.phase(Initiator.WebSocket.Phase.Connected),
                             it
                         )
                     }
@@ -234,6 +244,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                         otherHandler.disconnectWithMetrics(
                             match.pathSpec,
                             serverRuntime,
+                            info.initiator.phase(Initiator.WebSocket.Phase.Disconnect),
                             it,
                             WebSocketClose.NORMAL
                         )
@@ -263,7 +274,15 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                         serverRuntime,
                         otherHandler,
                         channel
-                    ) { otherHandler.messageFromClientWithMetrics(match.pathSpec, serverRuntime, it, textFrame) }
+                    ) {
+                        otherHandler.messageFromClientWithMetrics(
+                            match.pathSpec,
+                            serverRuntime,
+                            info.initiator.phase(Initiator.WebSocket.Phase.ClientMessage),
+                            it,
+                            textFrame,
+                        )
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -285,6 +304,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                     otherHandler.disconnectWithMetrics(
                         match.pathSpec,
                         serverRuntime,
+                        info.initiator.phase(Initiator.WebSocket.Phase.Disconnect),
                         it,
                         ((e as? HttpStatusException)?.status ?: HttpStatus.InternalServerError).bestWebSocketCloseCode
                     )
@@ -306,7 +326,13 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                 val otherHandler = serverRuntime.server.compiledWebSocketLogicalInterceptors
                     .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
                 connection.withWrapped(serverRuntime, otherHandler, channel) {
-                    otherHandler.messageFromSubscriptionWithMetrics(match.pathSpec, serverRuntime, it, topic)
+                    otherHandler.messageFromSubscriptionWithMetrics(
+                        match.pathSpec,
+                        serverRuntime,
+                        info.initiator.phase(Initiator.WebSocket.Phase.SubscriptionMessage),
+                        it,
+                        topic,
+                    )
                 }
             }
         }
@@ -323,7 +349,13 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
             val otherHandler = serverRuntime.server.compiledWebSocketLogicalInterceptors
                 .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
             connection.withWrapped(serverRuntime, otherHandler, channel) {
-                otherHandler.disconnectWithMetrics(match.pathSpec, serverRuntime, it, reason)
+                otherHandler.disconnectWithMetrics(
+                    match.pathSpec,
+                    serverRuntime,
+                    info.initiator.phase(Initiator.WebSocket.Phase.Disconnect),
+                    it,
+                    reason,
+                )
             }
         }
     }

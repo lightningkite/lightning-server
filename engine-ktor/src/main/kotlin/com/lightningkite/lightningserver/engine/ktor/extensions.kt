@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
+import kotlin.uuid.Uuid
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
 import io.ktor.http.*
@@ -34,16 +35,15 @@ internal fun Headers.adapt(): HttpHeaders = HttpHeaders(flattenEntries())
  * Falls back to the origin remote address if the header is not present.
  */
 context(server: ServerRuntimeBase)
-internal suspend fun ApplicationCall.adapt(maxBody: Long): HttpRequest<PathSpec> {
+internal suspend fun ApplicationCall.adapt(maxBody: Long): Pair<HttpRequest<PathSpec>, Uuid> {
     val adaptedHeaders = request.headers.adapt()
     val identity = adaptedHeaders.requestIdentity(ktorRunConfig().requestIdHeader) {
         server.logger.warn { "Request ID header for proxy '${ktorRunConfig().requestIdHeader}' was missing from the request." }
     }
-    return HttpRequest(
+    val adapted = HttpRequest(
         path = RawHttpEndpoint(request.path().decodeURLPart(), HttpMethod(request.httpMethod.value)),
         queryParameters = QueryParameters(request.queryParameters.flattenEntries()),
         headers = adaptedHeaders,
-        requestId = identity.requestId,
         upstreamRequestId = identity.upstreamRequestId,
         domain = request.origin.serverHost,
         protocol = request.origin.scheme,
@@ -65,6 +65,7 @@ internal suspend fun ApplicationCall.adapt(maxBody: Long): HttpRequest<PathSpec>
             )
         },
     )
+    return adapted to identity.requestId
 }
 
 // TODO: Implement MultiPart support - the code below is a partial implementation that needs completion

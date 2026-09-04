@@ -21,7 +21,7 @@ import kotlinx.serialization.KSerializer
  * — a disclosure that could not be recorded must not happen.
  *
  * An implementation must tolerate being called many times per connection: a WebSocket pushes many
- * frames under one [Request.requestId].
+ * frames, and on a local engine they all belong to one socket.
  */
 public interface TypedOutputInterceptor {
     /** The name of this interceptor, used for instrumentation and debugging. */
@@ -31,7 +31,7 @@ public interface TypedOutputInterceptor {
      * Called with a value that is about to be serialized and sent.
      *
      * @param request The request or connection this output belongs to; correlate by
-     *   [Request.requestId].
+     *   [com.lightningkite.lightningserver.runtime.ServerRuntime.initiator].
      * @param serializer The serializer that will encode [value] — walk this rather than reflecting,
      *   so that what is observed is exactly what the client will receive.
      * @param value The value being sent.

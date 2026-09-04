@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.websockets
 
 import com.lightningkite.lightningserver.AnonType
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.http.QueryParameters
@@ -16,6 +17,7 @@ public data class QueryParamWebSocketHandlerData(
     val underlyingData: AnonType,
 )
 
+@OptIn(InternalLightningServerApi::class)
 public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryParamWebSocketHandlerData> {
     override val storageSerializer: KSerializer<QueryParamWebSocketHandlerData> =
         QueryParamWebSocketHandlerData.serializer()
@@ -134,9 +136,6 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
                 domain = request.domain,
                 protocol = request.protocol,
                 sourceIp = request.sourceIp,
-                // Same physical socket, only the path is rewritten, so the identity carries over.
-                requestId = request.requestId,
-                parentRequestId = request.parentRequestId,
                 upstreamRequestId = request.upstreamRequestId,
                 cache = request.cache,
             )
@@ -153,7 +152,13 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
 //                    null /*TODO*/
 //                )
 //            ) {
-            otherHandler.willConnectWithMetrics(match.pathSpec, serverRuntime, request)
+            // Same physical socket, only the path is rewritten, so the identity carries over.
+            otherHandler.willConnectWithMetrics(
+                match.pathSpec,
+                serverRuntime,
+                serverRuntime.socketInitiator.rewritePath(request.path),
+                request,
+            )
 //            }
 
         @Suppress("UNCHECKED_CAST")
@@ -181,11 +186,24 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
         return match.pathSpec to (otherHandler as WebSocketHandler<PathSpec, Any?>)
     }
 
+    /**
+     * This phase, re-pointed at the path the socket was really opened against.
+     *
+     * Rewriting a path is not opening a socket, so the execution and the socket stay the same; only
+     * the location the initiator names would otherwise be the placeholder the client connected to.
+     */
+    context(serverRuntime: ServerRuntime)
+    private fun WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>.innerInitiator(): Initiator.WebSocket {
+        @Suppress("UNCHECKED_CAST")
+        val path = currentState.request.path as RawWebSocketPath<PathSpec>
+        return serverRuntime.socketInitiator.rewritePath(path)
+    }
+
     context(serverRuntime: ServerRuntime)
     override suspend fun didConnect(connection: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>) {
         val (pathSpec, otherHandler) = connection.inner()
         connection.withWrapped(serverRuntime, otherHandler) {
-            otherHandler.didConnectWithMetrics(pathSpec, serverRuntime, it)
+            otherHandler.didConnectWithMetrics(pathSpec, serverRuntime, connection.innerInitiator(), it)
         }
     }
 
@@ -196,7 +214,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
     ) {
         val (pathSpec, otherHandler) = connection.inner()
         connection.withWrapped(serverRuntime, otherHandler) {
-            otherHandler.messageFromClientWithMetrics(pathSpec, serverRuntime, it, frame)
+            otherHandler.messageFromClientWithMetrics(pathSpec, serverRuntime, connection.innerInitiator(), it, frame)
         }
     }
 
@@ -207,7 +225,13 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
     ) {
         val (pathSpec, otherHandler) = connection.inner()
         connection.withWrapped(serverRuntime, otherHandler) {
-            otherHandler.messageFromSubscriptionWithMetrics(pathSpec, serverRuntime, it, topic)
+            otherHandler.messageFromSubscriptionWithMetrics(
+                pathSpec,
+                serverRuntime,
+                connection.innerInitiator(),
+                it,
+                topic,
+            )
         }
     }
 
@@ -218,7 +242,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
     ) {
         val (pathSpec, otherHandler) = connection.inner()
         connection.withWrapped(serverRuntime, otherHandler) {
-            otherHandler.disconnectWithMetrics(pathSpec, serverRuntime, it, reason)
+            otherHandler.disconnectWithMetrics(pathSpec, serverRuntime, connection.innerInitiator(), it, reason)
         }
     }
 }

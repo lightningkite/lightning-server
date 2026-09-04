@@ -31,6 +31,7 @@ class ServerSettingThreadSafetyTest {
         // Create a minimal test runtime context
         val testRuntime = object : com.lightningkite.lightningserver.runtime.ServerRuntime {
             override val server get() = throw NotImplementedError()
+            override val initiator get() = throw NotImplementedError()
             override val settings get() = throw NotImplementedError()
             override val internalSerialization get() = throw NotImplementedError()
             override val externalSerialization get() = throw NotImplementedError()
@@ -98,6 +99,7 @@ class ServerSettingThreadSafetyTest {
     /** Minimal [ServerRuntime] stub whose only usable capability is acting as the settings/transformation context. */
     private fun stubRuntime(): ServerRuntime = object : ServerRuntime {
         override val server get() = throw NotImplementedError()
+        override val initiator get() = throw NotImplementedError()
         override val settings get() = throw NotImplementedError()
         override val internalSerialization get() = throw NotImplementedError()
         override val externalSerialization get() = throw NotImplementedError()

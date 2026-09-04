@@ -37,8 +37,8 @@ import kotlin.uuid.Uuid
 class TypedOutputInterceptorTest {
 
     private data class Seen(
-        val requestId: Uuid,
-        val parentRequestId: Uuid?,
+        val executionId: Uuid,
+        val causedBy: Uuid?,
         val serialName: String,
         val value: Any?,
     )
@@ -62,7 +62,12 @@ class TypedOutputInterceptorTest {
         context(runtime: ServerRuntime)
         override suspend fun <T> outputProduced(request: Request<*>, serializer: KSerializer<T>, value: T) {
             Observed.seen.add(
-                Seen(request.requestId, request.parentRequestId, serializer.descriptor.serialName, value)
+                Seen(
+                    runtime.initiator.executionId,
+                    runtime.initiator.causedBy,
+                    serializer.descriptor.serialName,
+                    value,
+                )
             )
             if (Observed.failOn != null && Observed.failOn == value) {
                 throw IllegalStateException("audit sink unavailable")
@@ -115,7 +120,6 @@ class TypedOutputInterceptorTest {
             domain = "example.com",
             protocol = "https",
             sourceIp = "local",
-            requestId = outerRequestId,
             body = body?.let { TypedData.text(it, MediaType.Application.Json) },
         )
 
@@ -129,12 +133,12 @@ class TypedOutputInterceptorTest {
 
     @Test
     fun `an http response is observed with its serializer and value`() = onServer {
-        serverRuntime.handle(request("/alpha"))
+        serverRuntime.handle(request("/alpha"), outerRequestId)
 
         assertEquals(1, Observed.seen.size, "expected exactly one observation, saw ${Observed.seen}")
         val seen = Observed.seen.single()
         assertEquals("alpha", seen.value)
-        assertEquals(outerRequestId, seen.requestId)
+        assertEquals(outerRequestId, seen.executionId)
         assertTrue(seen.serialName.contains("String"), "expected the output serializer; was ${seen.serialName}")
     }
 
@@ -149,7 +153,8 @@ class TypedOutputInterceptorTest {
                 "/meta/bulk",
                 HttpMethod.POST,
                 """{"a":{"path":"/alpha","method":"GET"},"b":{"path":"/beta","method":"GET"}}""",
-            )
+            ),
+            outerRequestId,
         )
 
         val values = Observed.seen.map { it.value }
@@ -157,8 +162,8 @@ class TypedOutputInterceptorTest {
         assertTrue("beta" in values, "sub-response from /beta was not observed; saw $values")
 
         val subs = Observed.seen.filter { it.value == "alpha" || it.value == "beta" }
-        subs.forEach { assertEquals(outerRequestId, it.parentRequestId, "sub-response lost its parent") }
-        assertEquals(2, subs.map { it.requestId }.toSet().size, "sub-responses must be separately attributable")
+        subs.forEach { assertEquals(outerRequestId, it.causedBy, "sub-response lost its parent") }
+        assertEquals(2, subs.map { it.executionId }.toSet().size, "sub-responses must be separately attributable")
     }
 
     /**
@@ -168,7 +173,7 @@ class TypedOutputInterceptorTest {
     @Test
     fun `a failing interceptor prevents the response`() = onServer {
         Observed.failOn = "alpha"
-        val response = serverRuntime.handle(request("/alpha"))
+        val response = serverRuntime.handle(request("/alpha"), outerRequestId)
 
         assertEquals(HttpStatus.InternalServerError, response.status, "the response was sent anyway")
     }

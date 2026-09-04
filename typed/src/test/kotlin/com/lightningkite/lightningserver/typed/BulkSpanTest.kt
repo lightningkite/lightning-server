@@ -141,7 +141,6 @@ class BulkSpanTest {
                         domain = "example.com",
                         protocol = "https",
                         sourceIp = "local",
-                        requestId = generateRequestId(),
                         body = TypedData.text(
                             """
                             {
@@ -151,7 +150,8 @@ class BulkSpanTest {
                             """.trimIndent(),
                             MediaType.Application.Json,
                         ),
-                    )
+                    ),
+                    generateRequestId(),
                 )
             }
 

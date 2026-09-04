@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.engine.awsserverless
 
+import kotlin.uuid.Uuid
 import com.lightningkite.lightningserver.AnonType
 import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.definition.generalSettings
@@ -43,6 +44,8 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
     data class WebSocketDidConnect(
         val socketId: String,
         val connection: WebSocketConnectRequest<Nothing>,
+        /** `didConnect` is its own Lambda invocation, so the socket's identity has to travel with it. */
+        val initiator: Initiator.WebSocket,
         val storage: AnonType,
     ) : AwsLambdaInput
 
@@ -264,6 +267,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                             h.messageFromSubscriptionWithMetrics(
                                 p.pathSpec,
                                 root,
+                                s.initiator.phase(Initiator.WebSocket.Phase.SubscriptionMessage),
                                 mid,
                                 WebSocketSubscriptionMessage(
                                     fullTopicMatch.value,
@@ -350,6 +354,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                 rootWs.didConnectWithMetrics(
                     rootPath,
                     root,
+                    event.initiator.phase(Initiator.WebSocket.Phase.Connected),
                     mid
                 )
                 return APIGatewayV2HTTPResponse(200)
@@ -396,18 +401,29 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     domain = event.requestContext.domainName,
                     protocol = "https",
                     sourceIp = event.requestContext.identity.sourceIp ?: "0.0.0.0",
-                    // Generated once here, at $connect, and persisted with the connection state, so it
-                    // is stable for the socket's whole lifetime — the correlation scope wanted for a
-                    // connection. The gateway's connection ID is not a UUID and stays in
-                    // [engineSocketId], which is where the join to the gateway's logs comes from.
-                    requestId = generateRequestId(),
                     upstreamRequestId = headers[HttpHeader.XRequestId]?.root,
                     engineSocketId = event.requestContext.connectionId
                 )
+                // Minted once here, at $connect, and persisted with the connection state, so the socket
+                // is one identity across the five separate Lambda invocations its lifetime is made of.
+                // The gateway's connection ID is not a UUID and stays in [engineSocketId], which is where
+                // the join to the gateway's own logs comes from.
+                val socketId = Uuid.random()
+                val connectInitiator = Initiator.WebSocket(
+                    executionId = socketId,
+                    socketId = socketId,
+                    path = lkEvent.path,
+                    phase = Initiator.WebSocket.Phase.Connect,
+                )
                 try {
-                    val storage = rootWs.willConnectWithMetrics(rootPath, root, lkEvent)
+                    val storage = rootWs.willConnectWithMetrics(rootPath, root, connectInitiator, lkEvent)
                     val storageBytes = encoding.encodeToByteArray(rootWs.storageSerializer, storage)
-                    webSocketDynamo.setState(event.requestContext.connectionId, lkEvent, storageBytes)
+                    webSocketDynamo.setState(
+                        event.requestContext.connectionId,
+                        lkEvent,
+                        connectInitiator,
+                        storageBytes,
+                    )
                     try {
                         root.invokeLambda(InvokeRequest.builder().also {
                             it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
@@ -422,6 +438,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                                         WebSocketDidConnect(
                                             event.requestContext.connectionId,
                                             lkEvent as WebSocketConnectRequest<Nothing>,
+                                            connectInitiator,
                                             AnonType(storageBytes)
                                         )
                                     )
@@ -457,6 +474,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         rootWs.disconnectWithMetrics(
                             rootPath,
                             root,
+                            state.initiator.phase(Initiator.WebSocket.Phase.Disconnect),
                             mid,
                             WebSocketClose.NORMAL
                         )
@@ -501,6 +519,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         rootWs.messageFromClientWithMetrics(
                             rootPath,
                             root,
+                            state.initiator.phase(Initiator.WebSocket.Phase.ClientMessage),
                             mid,
                             WebSocketFrame(event.body)
                         )

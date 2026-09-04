@@ -49,9 +49,9 @@ public interface WebSocketConnectionInterceptor : WebSocketInterceptor
  * many independent subscriptions were running over it.
  *
  * An implementation must tolerate wrapping several handlers within one physical connection, and
- * should attribute its work to the connection's own
- * [com.lightningkite.lightningserver.websockets.WebSocketConnectRequest.requestId] rather than
- * assuming one socket per client.
+ * should attribute its work to the socket's own
+ * [com.lightningkite.lightningserver.runtime.Initiator.WebSocket.socketId] rather than assuming one
+ * socket per client.
  *
  * @see WebSocketConnectionInterceptor for the per-physical-connection counterpart.
  */

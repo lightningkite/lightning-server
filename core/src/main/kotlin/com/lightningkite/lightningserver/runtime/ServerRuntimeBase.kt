@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.runtime
 
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -7,6 +8,7 @@ import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.services.telemetry.TelemetryBackend
 import com.lightningkite.services.SharedResources
 import kotlinx.coroutines.*
+import kotlin.uuid.Uuid
 
 /**
  * Base implementation of [ServerRuntime] providing common functionality.
@@ -29,6 +31,14 @@ import kotlinx.coroutines.*
  * @param server The server definition to run
  */
 public abstract class ServerRuntimeBase(override val server: ServerDefinition) : ServerRuntime {
+    /**
+     * The engine itself is not running on anyone's behalf — executions get their own runtime from
+     * [forExecution] at the seam. Work done directly on the engine, such as boot, is attributed to
+     * this one [Initiator.Direct] rather than to nothing at all.
+     */
+    @OptIn(InternalLightningServerApi::class)
+    override val initiator: Initiator = Initiator.Direct(Uuid.random())
+
     /**
      * Settings manager with automatically included system settings.
      *
