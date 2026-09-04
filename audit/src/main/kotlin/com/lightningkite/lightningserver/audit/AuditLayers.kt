@@ -87,3 +87,41 @@ public class AuthEventLog(private val core: AuditCore) : ServerBuilder() {
     }
 }
 
+/**
+ * Layer 5: one row per audited record that changed, and what it changed from.
+ *
+ * The question this answers is "who changed this record, and to what" — tampering rather than
+ * snooping. Nothing else here can: a [DataAccessRecord] carries the `Modification` that was
+ * *submitted*, which is intent, not effect. It does not say which rows a condition matched, and a
+ * modification such as `count assign count + 1` names no resulting value at all.
+ *
+ * A separate layer with its own table rather than more columns on the data access log, because
+ * looking for tampering and looking for query abuse are unrelated investigations with unrelated
+ * volumes; a deployment should be able to install either without paying for the other. Opt-in per
+ * model, like the data access log — see [mutationLogged].
+ *
+ * ## Failure behaviour: fail-open, and necessarily so
+ * The layers that gate disclosure record first and throw. That option does not exist here: the effect
+ * *is* the record, so there is nothing to write until the change is made, and once it is made,
+ * throwing reports failure for something that happened — inviting a retry that applies it twice. A
+ * failed audit write is therefore logged loudly and the mutation stands. Where "no unrecorded write"
+ * matters more than "no double write", install [DataAccessLog] alongside: it fails closed and records
+ * the attempt before it runs.
+ *
+ * @param bulkDetail Whether the `Ignoring*` methods are upgraded so every changed row is recorded.
+ *   Defaults to recording everything; see [BulkMutationDetail] for what the alternative gives up.
+ * @property mutations One row per change to an audited record.
+ */
+public class MutationLog(
+    private val core: AuditCore,
+    internal val bulkDetail: BulkMutationDetail = BulkMutationDetail.RecordEveryRow,
+) : ServerBuilder() {
+    public val mutations: DatabaseTableRegistration<MutationRecord> =
+        core.database.registerTable("AuditMutation", MutationRecord.serializer())
+
+    internal val registry get() = core.registry
+
+    init {
+        core.claim("MutationLog")
+    }
+}
