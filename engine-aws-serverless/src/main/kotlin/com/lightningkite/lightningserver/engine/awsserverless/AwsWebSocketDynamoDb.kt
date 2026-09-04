@@ -11,30 +11,56 @@ import kotlinx.coroutines.reactive.asFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.NothingSerializer
 import software.amazon.awssdk.core.SdkBytes
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.dynamodb.model.*
+import java.io.IOException
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.measureTime
+
+/**
+ * The outcome of reading one socket's stored row.
+ *
+ * [Absent] and [Legacy] are separate types rather than one nullable result because they call for
+ * opposite handling: an absent row means the socket is already gone and there is nothing left to do,
+ * while a legacy row means a live socket is still holding data this deployment cannot use, so the
+ * socket has to be ended before it can be forgotten.  Collapsing the two - as a nullable result
+ * invites - silently leaves such a socket open to fail again on its next frame.
+ */
+internal sealed interface SocketRow {
+    /** The socket has no row: it disconnected and was cleaned up already. */
+    data object Absent : SocketRow
+
+    /**
+     * A row written by an earlier deployment, which this one can neither decode nor attribute.
+     *
+     * Nothing later can repair it.  Both the stored connect request and the initiator are written
+     * once, at `${'$'}connect`, by whatever code was deployed then, so the socket is ended and the
+     * client reconnects to get a row in the current shape.
+     */
+    data class Legacy(val reason: String) : SocketRow
+
+    /** A row this deployment can both decode and attribute. */
+    class Current(
+        val state: ByteArray,
+        val connectRequest: WebSocketConnectRequest<*>,
+        /**
+         * The socket's connect initiator.  Persisted beside the request because each of the five
+         * lifecycle phases is a separate Lambda invocation: without it, nothing after
+         * `${'$'}connect` could say which socket it belongs to.
+         */
+        val initiator: Initiator.WebSocket,
+    ) : SocketRow
+}
 
 internal class AwsWebSocketDynamoDb(
     val client: DynamoDbAsyncClient,
     val baseTableName: String,
     val encoding: KotlinBytesFormat,
 ) {
-    class StateAndConnectRequest(
-        val state: ByteArray,
-        val connectRequest: WebSocketConnectRequest<*>,
-        /**
-         * The socket's connect initiator. Persisted beside the request because each of the five
-         * lifecycle phases is a separate Lambda invocation: without it, nothing after `${'$'}connect`
-         * could say which socket it belongs to.
-         */
-        val initiator: Initiator.WebSocket,
-    )
-
     private val socketExpiration = 8.hours
     private val tableSubs = "$baseTableName-ws-subs"
     private val tableSubsReverse = "$baseTableName-ws-subs-reverse"
@@ -216,25 +242,68 @@ internal class AwsWebSocketDynamoDb(
         }.also { logger.debug { "AwsWebSocketDynamoDb.clean took $it" } }
     }
 
-    suspend fun debugStates(): Map<String, StateAndConnectRequest> {
+    /**
+     * Reads one stored row, reporting anything an earlier deployment wrote as [SocketRow.Legacy]
+     * instead of throwing.
+     *
+     * This is not defensive padding.  The stored connect request is a positional blob, and this branch
+     * removed two properties from [WebSocketConnectRequest], so every blob written before that change
+     * carries element indices past the end of the current descriptor.  A row written before the
+     * `wsInitiator` column existed is the same situation with a different symptom.  Neither is a fault
+     * to report; both are simply data this deployment cannot read.
+     *
+     * Only the two failures a schema change produces are absorbed, and only around the decode itself:
+     * [SerializationException] for a missing field or an out-of-range element index, and [IOException]
+     * for a decode that ran off the end of the blob because the layout shifted under it.  Every other
+     * failure, DynamoDB's included, happens outside this block and still propagates.
+     */
+    private fun decodeRow(socketId: String, item: Map<String, AttributeValue>): SocketRow {
+        val initiator = item[initiatorKey]
+            ?: return legacyRow(socketId, "$initiatorKey is absent, so the socket cannot be attributed")
+        return try {
+            SocketRow.Current(
+                state = item[stateKey]!!.b().asByteArray(),
+                connectRequest = encoding.decodeFromByteArray(
+                    WebSocketConnectRequest.serializer(NothingSerializer()),
+                    item[requestKey]!!.b().asByteArray()
+                ),
+                initiator = encoding.decodeFromByteArray(
+                    Initiator.WebSocket.serializer(),
+                    initiator.b().asByteArray()
+                ),
+            )
+        } catch (e: SerializationException) {
+            legacyRow(
+                socketId,
+                "its stored data does not fit this deployment's schema (${e.message ?: e::class.simpleName})"
+            )
+        } catch (e: IOException) {
+            legacyRow(
+                socketId,
+                "its stored data ran out mid-decode, so its layout is another schema's " +
+                        "(${e.message ?: e::class.simpleName})"
+            )
+        }
+    }
+
+    private fun legacyRow(socketId: String, reason: String): SocketRow.Legacy {
+        logger.warn {
+            "Socket $socketId holds a row from a previous deployment: $reason. " +
+                    "The socket will be ended so the client reconnects."
+        }
+        return SocketRow.Legacy(reason)
+    }
+
+    suspend fun debugStates(): Map<String, SocketRow> {
         ensureTables()
-        val out = HashMap<String, StateAndConnectRequest>()
+        val out = HashMap<String, SocketRow>()
         client.scanPaginator {
             it.tableName(tableStates)
             it.projectionExpression("$socketIdKey, $stateKey, $requestKey, $initiatorKey")
         }.asFlow().collect {
             it.items()?.forEach {
-                out[it[socketIdKey]!!.s()] = StateAndConnectRequest(
-                    it[stateKey]!!.b().asByteArray(),
-                    encoding.decodeFromByteArray(
-                        WebSocketConnectRequest.serializer(NothingSerializer()),
-                        it[requestKey]!!.b().asByteArray()
-                    ),
-                    encoding.decodeFromByteArray(
-                        Initiator.WebSocket.serializer(),
-                        it[initiatorKey]!!.b().asByteArray()
-                    )
-                )
+                val id = it[socketIdKey]!!.s()
+                out[id] = decodeRow(id, it)
             }
         }
         return out
@@ -245,9 +314,9 @@ internal class AwsWebSocketDynamoDb(
     // is guaranteed to lose the swap, or omits a row that was written moments ago by the connect handler.
     // Correctness here is worth the doubled read cost.
 
-    suspend fun state(id: String): StateAndConnectRequest? {
+    suspend fun state(id: String): SocketRow {
         ensureTables()
-        val result: StateAndConnectRequest?
+        val result: SocketRow
         measureTime {
             val response = client.getItem {
                 it.tableName(tableStates)
@@ -258,19 +327,7 @@ internal class AwsWebSocketDynamoDb(
             // item() is an SDK auto-construct map: it returns empty rather than null when the socket
             // has no row, so hasItem() is the only way to detect a missing socket.  Testing item() for
             // null instead silently falls through to reading attributes that aren't there.
-            result = if (!response.hasItem()) null else response.item().let {
-                StateAndConnectRequest(
-                    it[stateKey]!!.b().asByteArray(),
-                    encoding.decodeFromByteArray(
-                        WebSocketConnectRequest.serializer(NothingSerializer()),
-                        it[requestKey]!!.b().asByteArray()
-                    ),
-                    encoding.decodeFromByteArray(
-                        Initiator.WebSocket.serializer(),
-                        it[initiatorKey]!!.b().asByteArray()
-                    ),
-                )
-            }
+            result = if (!response.hasItem()) SocketRow.Absent else decodeRow(id, response.item())
         }.also { logger.debug { "AwsWebSocketDynamoDb.state($id) took $it" } }
         return result
     }
@@ -294,9 +351,15 @@ internal class AwsWebSocketDynamoDb(
         return out
     }
 
-    suspend fun states(ids: Iterable<String>): Map<String, StateAndConnectRequest> {
+    /**
+     * Reads several rows at once.  Every requested id is present in the result, defaulting to
+     * [SocketRow.Absent], so a caller walking its own id list has to handle a missing socket
+     * explicitly instead of inferring it from a key that isn't there.
+     */
+    suspend fun states(ids: Iterable<String>): Map<String, SocketRow> {
         ensureTables()
-        val out = HashMap<String, StateAndConnectRequest>()
+        val out = HashMap<String, SocketRow>()
+        ids.forEach { out[it] = SocketRow.Absent }
         measureTime {
             val getState = KeysAndAttributes.builder()
                 .projectionExpression("$socketIdKey, $stateKey, $requestKey, $initiatorKey")
@@ -306,17 +369,8 @@ internal class AwsWebSocketDynamoDb(
                 it.requestItems(mapOf(tableStates to getState))
             }.asFlow().collect {
                 it.responses()?.get(tableStates)?.forEach {
-                    out[it[socketIdKey]!!.s()] = StateAndConnectRequest(
-                        it[stateKey]!!.b().asByteArray(),
-                        encoding.decodeFromByteArray(
-                            WebSocketConnectRequest.serializer(NothingSerializer()),
-                            it[requestKey]!!.b().asByteArray()
-                        ),
-                        encoding.decodeFromByteArray(
-                            Initiator.WebSocket.serializer(),
-                            it[initiatorKey]!!.b().asByteArray()
-                        )
-                    )
+                    val id = it[socketIdKey]!!.s()
+                    out[id] = decodeRow(id, it)
                 }
             }
         }.also { logger.debug { "AwsWebSocketDynamoDb.states(${ids.joinToString()}) took $it" } }
