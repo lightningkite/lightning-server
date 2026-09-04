@@ -30,3 +30,33 @@ public class DisclosureLog(private val core: AuditCore) : ServerBuilder() {
     }
 }
 
+/**
+ * Layer 3: one row per query against an audited model, including privileged internal reads.
+ *
+ * This is the expensive layer, and the only one that is opt-in per model — see [dataAccessLogged].
+ * That is deliberate rather than an inconsistency: it writes a row per *query* rather than per
+ * disclosure, so on a read-heavy model it is orders of magnitude more voluminous than everything else
+ * here combined. Enable it where the aggregation and oracle channels in `audit-logging.md` 6.1
+ * actually matter, not everywhere by reflex.
+ *
+ * ## Failure behaviour: fail-closed, with the widest blast radius here
+ * A query whose record cannot be written does not run. Because this sits at the database layer it
+ * covers privileged internal reads too — startup tasks, schedule ticks, one service reading another's
+ * model — so an audit outage stops more than request serving. See `audit-logging.md` 6.2 and the risk
+ * register.
+ *
+ * Unlike the other layers this installs no interceptor: it attaches per model through `log`.
+ *
+ * @property dataAccess One row per query against an audited model.
+ */
+public class DataAccessLog(private val core: AuditCore) : ServerBuilder() {
+    public val dataAccess: DatabaseTableRegistration<DataAccessRecord> =
+        core.database.registerTable("AuditDataAccess", DataAccessRecord.serializer())
+
+    internal val registry get() = core.registry
+
+    init {
+        core.claim("DataAccessLog")
+    }
+}
+
