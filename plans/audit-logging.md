@@ -62,6 +62,16 @@ covers endpoints that happen to be built from it.
 the serializer for the outgoing value (`outputType`). Hooking there means a new endpoint is audited
 by construction.
 
+**The two layers are complements, not alternatives**, and each covers the other's blind spot:
+
+| | Sees | Cannot see |
+|---|---|---|
+| Typed layer ([5](#5-layer-2-the-disclosure-log-audited)) | what actually reached a client, field by field | a privileged read that never leaves the server |
+| Database layer ([6](#6-layer-3-the-data-access-log)) | every query and mutation, whoever issued it | whether any of it reached a client |
+
+So disclosure is recorded at the typed layer, and *access* — every condition and sort applied to the
+data — is recorded at the database layer. Neither alone is sufficient.
+
 ### 2.2 Why record disclosed fields rather than masked fields
 
 An earlier version of this design proposed deriving the record from the `Mask` that was applied
@@ -157,10 +167,20 @@ there is no separate untrusted claim, so `upstreamRequestId` stays null.
 out-of-the-box behaviour is to trust nothing. It deliberately mirrors the existing `realIpHeader`
 setting, which solves the same trust problem for source IP.
 
-**AWS serverless needs no such setting.** API Gateway mints `requestContext.requestId` itself, so it
-is authoritative with no configuration, and it matches the ID in the gateway's own access logs. For
-WebSockets the adapter uses `requestContext.connectionId`, which is stable for the socket's whole
-lifetime — exactly the correlation scope wanted for a connection.
+**AWS serverless needs no such setting either, but for a different reason.** An earlier version of
+this plan had the adapter adopt `requestContext.requestId` (and `requestContext.connectionId` for
+WebSockets) as the authoritative id. That was abandoned when request ids became `Uuid`s: API Gateway
+ids are not UUIDs and not even 128 bits, so there is nothing to adopt. The adapter now mints its own
+`Uuid` on both paths.
+
+The join to the gateway's own access log is preserved rather than lost. The gateway's id is kept in
+`RequestRecord.engineRequestId` — trusted, because the engine supplied it rather than the caller, and
+therefore deliberately a separate column from the untrusted `upstreamRequestId`. The join is:
+gateway log `requestId` → `engineRequestId` → our `Uuid`. For WebSockets the connection id already
+lives in `engineSocketId` and is surfaced through the same property, so a socket keeps one identity
+for its whole lifetime without storing the value twice.
+
+See [`execution-context-refactor.md`](execution-context-refactor.md) §2.6.
 
 ### 3.3 Aligning with the proxy and with telemetry
 
@@ -338,96 +358,205 @@ value. The real reasons to emit late are outcome and duration.
 
 The layer that delivers the actual compliance value.
 
+**Status: implemented.** `:audit`, `:audit-shared`, and `TypedOutputInterceptor` in `core`. Turned on
+by including the layers a deployment wants — `path.path("audit") include AuditCore(database)` plus
+each log over that core — and nothing audits until they are. It is an ordinary [ServerBuilder] module like `ModelRestEndpoints`,
+which is what it should be: everything it registers (tables, pre-deploy tasks, interceptors) is what
+a module carries, and mounting it at a path namespaces its pre-deploy tasks instead of scattering
+them at the root.
+
 ### 5.1 Marking
 
 ```kotlin
-/** Records disclosure of this model whenever it leaves through a typed endpoint. */
-@Target(AnnotationTarget.CLASS)
+@SerialInfo
+@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY)
+@Retention(AnnotationRetention.RUNTIME)
 public annotation class Audited
-
-/** Records invocation of this endpoint, including its input, as an auditable operation. */
-@Target(AnnotationTarget.CLASS)
-public annotation class AuditedOperation
 ```
 
-`@Audited` on a model covers data disclosure. `@AuditedOperation` on an endpoint covers actions that
-are not model reads at all — triggering a payment, exporting a report, revoking a session. Both use
-the same interception point, so this costs no additional machinery.
+One annotation, two scopes. **On a class:** every instance that reaches a client produces its own
+[DisclosureRecord]. **On a property:** that field is *itemised* — a bit is reserved for it, and each
+disclosure records whether it carried a value.
 
-The annotation establishes the **floor**. The effective level is resolved at registration and may be
-raised by configuration (metadata only → include IDs → include values) but never lowered, so a
-deployment can tighten auditing without a recompile and cannot loosen it by accident.
+`@SerialInfo` is not decoration. A plain Kotlin annotation is invisible to a `SerialDescriptor`, and
+this whole design walks descriptors rather than reflecting — so that it sees exactly what the
+serializer will emit and behaves the same on every target. It also means the marker only has an
+effect on `@Serializable` classes, which audited models always are.
 
-### 5.2 Interception
+#### 5.1.1 Itemising is opt-in; disclosure is not
 
-In `ApiHttpHandler.handle` (the interface's default implementation), after the endpoint's typed
-`handle` returns and before serialization.
+**Resolved after initially getting this backwards.** The first design itemised every field of an
+audited model automatically, on the reasoning that opt-in would let an engineer add a sensitive field
+and leave it silently unaudited.
 
-**Precompute the audit plan per endpoint at registration**, by walking the `outputType` descriptor to
-determine whether the output graph contains audited models and at what paths. `@Audited` models must
-be found anywhere in the graph — bare, in `List<T>`, in `Partial<T>`, nested inside a wrapper, as map
-values. At runtime the plan is a direct walk of the value with no reflection, keeping the hot path
-cheap.
+That reasoning was wrong on the facts. Because one row is written per record disclosed
+([5.3](#53-record-shape--one-row-per-record-disclosed)), **the disclosure record exists whether or
+not any property is annotated** — it is driven by `@Audited` on the *class*. So "who saw this record,
+under which request, when" stays completely covered regardless. Field bits are refinement on top:
+*which fields were in the payload*. Opt-in makes that refinement coarser by default; it does not make
+a disclosure disappear.
 
-Endpoints whose output graph contains no audited models get a null plan and pay nothing.
+The residual risk is narrow and reviewable: someone adds a regulated element to a model already
+marked `@Audited` and forgets to mark the property, so "which requests disclosed an SSN" misses it.
+That is a code-review concern on a model already flagged sensitive.
 
-### 5.3 Record shape — normalisation is the whole game
+Against that, automatic itemising cost real things:
 
-The naive shape (one row per disclosed record, each carrying IP, principal, timestamp, and bitfield)
-is unaffordable: a 10k-row query produces 10k rows, each redundantly repeating request-constant data.
+- **Bits, permanently.** Indices are never reused ([5.4](#54-the-field-registry--append-only-and-the-sole-record-of-what-a-bit-means)),
+  so a model accumulates dead bits through every rename and removal. Headroom shrinks monotonically
+  over a model's life, and nested paths grow faster than property counts. Reserving indices for
+  `sortOrder` and `createdAt` spends capacity that never comes back.
+- **Signal.** A field-set where forty of forty-five bits are noise makes the interesting query harder
+  to write and harder to trust.
 
-Two reductions, together roughly two orders of magnitude:
+Two consequences worth stating so they are not read as bugs later:
 
-1. **Request-constant data lives once.** IP, principal, timestamp, endpoint, and outcome are
-   properties of the request, recorded once in the layer-1 record and referenced by `requestId`.
-   Disclosure records never repeat them.
-2. **Group by bitfield.** Within one query result nearly every row shares the same disclosed-field
-   set. So the unit is not a record, it is a *(request, table, field-set)* group with an ID list.
+- **A disclosure with no bits set is normal and correct** — "this record was disclosed, and none of
+  the fields we track were in its payload".
+- **`_id` gets no bit.** It is already recorded as `recordId` on every row, so itemising it would
+  spend a bit restating the row's own identity.
+
+An annotated property is found anywhere in the graph, including inside types that are not themselves
+audited: `@Audited val street: String` inside an `Address` becomes `address.street` on the record
+holding it. The walk traverses unannotated properties too — it just allocates nothing for them.
+
+**`@AuditedOperation` was dropped.** It was specified as a class annotation on an endpoint, but
+endpoints in this framework are not classes — they are `ApiHttpHandler(...)` factory calls producing
+a private data class, so there is nothing to annotate. Auditing non-disclosure operations is
+deferred; if it returns it belongs as a parameter on the handler factories, not as an annotation.
+
+**The model must be keyed by `Uuid`.** One disclosure row is written per record disclosed, which
+makes the identifier the most-written column in the system. A `Uuid` is sixteen bytes in every
+backend; a string key is larger and indexed poorly. Marking a class whose `_id` is absent or is not a
+`Uuid` fails at deploy.
+
+### 5.2 Interception: a new typed-output layer
+
+Disclosure cannot be observed from an `HttpInterceptor`: by the time one sees a response it is
+bytes, and no statement about *which fields* a client received is possible any more. So there is a
+third interception system alongside the HTTP and WebSocket ones:
 
 ```kotlin
-@Serializable
-public data class DisclosureRecord(
-    val requestId: String,
-    val tableId: Int,          // from the table registry
-    val fields0: Int,          // bits 0..31   } disclosed-field bitfield;
-    val fields1: Int,          // bits 32..63  } see 5.4 for indices,
-    val fields2: Int,          // bits 64..95  } 5.4.1 for why three Ints
-    val ids: List<String>,     // records disclosed with exactly this field set
-)
+public interface TypedOutputInterceptor {
+    public val name: String get() = this::class.simpleName ?: "anonymous"
+
+    context(runtime: ServerRuntime)
+    public suspend fun <T> outputProduced(request: Request<*>, serializer: KSerializer<T>, value: T)
+}
 ```
 
-A 10k-row query collapses from 10k records to typically one to three.
+Installed on `ServerBuilder` like any other interceptor and exposed as
+`ServerDefinition.typedOutputInterceptors`. Unlike the other two it is a flat list rather than a
+compiled chain: these observe, they do not wrap, so there is nothing to short-circuit and no
+order-dependent post-processing. `emitTypedOutput` returns immediately when nothing is installed, so
+a server that does not audit pays nothing per response.
 
-#### 5.3.1 Why three `Int`s and not `Long`, `ULong`, or `ByteArray`
+**Observation only.** An implementation may not alter the value. It *may* throw, and throwing aborts
+the send — which is how [5.6](#56-failure-behaviour-fail-closed) is enforced.
+
+**Installation is explicit, and that is the right granularity.** Nothing audits until a deployment
+includes the audit layers, and likewise nothing records conditions until it installs the
+table interceptor ([6.1](#61-extend-it-to-reads-every-condition-and-every-sort)). `@Audited` on a
+model does nothing on its own. The circumvention this design guards against is an *endpoint* built
+without auditing, not a deployment that chose not to audit — and once installed, no endpoint can
+escape either interceptor. A per-deployment switch is a decision made once, in the open; a
+per-endpoint one would be made a hundred times, silently.
+
+#### Coverage
+
+Every typed output funnels through exactly two places, which is what makes "no exceptions"
+achievable rather than aspirational:
+
+| Seam | Covers |
+|---|---|
+| `ApiHttpHandler.handle`, between the handler returning and `toTypedData` | every typed HTTP response, and every `/meta/bulk` sub-response, since those re-enter through `handleSubRequest` |
+| `ConnectionWrapper.send`, before `encoder.ws(...)` | every typed WebSocket frame, model update streams and multiplexed sockets included |
+
+**The one inherent exception**: raw `HttpHandler`s and signed file downloads emit bytes with no
+serializer. There is no typed value to inspect, so no field-level disclosure statement is possible
+there at any layer. This is a property of untyped endpoints, not a gap in the mechanism.
+
+The precomputed per-endpoint audit plan described in earlier drafts is not needed for the seam
+itself; it belongs to extraction (not yet built) as an optimisation.
+
+### 5.3 Record shape — one row per record disclosed
+
+**Rejected: grouping by field set.** An earlier draft made the unit a *(request, model, field-set)*
+group carrying a list of ids, collapsing a ten-thousand-row query into one or two rows. It was
+rejected on the grounds that settle it: this is an audit log, and "most of these records were
+disclosed the same way" is not a claim an audit log gets to make. Every disclosure is its own row.
+
+The volume is paid down inside the row instead:
+
+1. **Request-constant data lives once.** IP, principal, endpoint, and outcome are
+   properties of the request, recorded once in the layer-1 record and referenced by `requestId`.
+   Disclosure records never repeat them. The row's own instant is the exception, and it costs
+   nothing: `_id` is a version-7 UUID, so `DisclosureRecord.at` derives the moment of disclosure from
+   the key itself. That is worth having here rather than deferring to the request record, because a
+   socket's `requestId` names the socket rather than the phase that disclosed
+   ([5.8.2](#582-a-sockets-row-is-keyed-by-the-socket-not-by-the-phase-resolved)) — without it, a
+   disclosure on a long-lived connection can only be placed "sometime during this session".
+2. **The field set is two `Int`s, not four.** Itemising is opt-in ([5.1.1](#511-itemising-is-opt-in-disclosure-is-not)),
+   so a model reserves bits for the handful of fields that matter rather than for all of them.
+3. **The identifier is a `Uuid`, not a string.** Sixteen bytes in every backend, and indexable.
+   A list of stringly-typed ids is both larger and, in most engines, stored poorly — which is why
+   [`@Audited` is restricted to models keyed by `Uuid`](#51-marking), enforced at deploy.
+4. **No parent request id.** A sub-request's parentage is recorded once in the request log; carrying
+   it on every disclosure row would be storing the same join key twice.
+
+```kotlin
+@IndexSet(fields = ["modelId", "recordId"], name = "byRecord")
+@Serializable
+public data class DisclosureRecord(
+    override val _id: Uuid,    // v7: `at` derives the disclosure instant from it
+    @Index val requestId: Uuid,
+    val modelId: Int,          // from the registry
+    val fields0: Int,          // bits 0..31   } disclosed-field bitfield; see 5.4 for
+    val fields1: Int,          // bits 32..63  } indices, 5.3.1 for why Int columns
+    val recordId: Uuid,        // the _id of the record disclosed
+) : HasId<Uuid>
+```
+
+The two indexes are the two questions an investigation actually asks: *what did this request
+disclose* (`requestId`) and *who has seen this record* (`modelId, recordId`).
+
+`modelId` is keyed on the descriptor's **serial name**, not on a table name. A disclosure is
+observed with a serializer in hand and nothing else — the table a value came from is not knowable at
+that point, and an audited model need not be a table at all.
+
+#### 5.3.1 Why `Int` columns and not `Long`, `ULong`, or `ByteArray`
 
 **Because `Int` is the only type the framework can query bitwise.** The entire bitwise condition
-surface is `Condition<Int>` (`Condition.kt:254-275`):
+surface is `Condition<Int>`:
 
 | Condition | Semantics |
 |---|---|
 | `IntBitsClear(mask)` | all mask bits clear — `on and mask == 0` |
 | `IntBitsSet(mask)` | all mask bits set — `on and mask == mask` |
-| `IntBitsAnyClear(mask)` | at least one mask bit clear — `on and mask < mask` |
-| `IntBitsAnySet(mask)` | at least one mask bit set — `on and mask > 0` |
+| `IntBitsAnyClear(mask)` | at least one mask bit clear — `on and mask != mask` |
+| `IntBitsAnySet(mask)` | at least one mask bit set — `on and mask != 0` |
 
 There are no `Long`, `ULong`, or `ByteArray` equivalents. A `ULong` or `ByteArray` bitfield would be
 **storable but not queryable** — "which requests disclosed the SSN field?" would require a full scan
 and client-side filtering, which is unusable at audit-table volume.
 
-Layout: bit index `i` lives in column `i / 32` at bit `i % 32`. "Was field `i` disclosed" is
-`IntBitsAnySet(1 shl (i % 32))` on the corresponding column; a query spanning several fields is an
-`Or` of per-column conditions. All expressible in the existing condition set.
+Layout: bit index `i` lives in column `i / 32` at bit `i % 32`. `FieldBits` owns this arithmetic;
+`disclosedAll(indices)` and `disclosedAny(indices)` build one condition per column touched and
+combine them with `And` / `Or`.
 
-96 bits is the working ceiling. Extending later means adding a `fields3` column defaulting to `0`,
-which is automatically correct for historical records — absent means not disclosed.
+**64 bits is the working ceiling, and two columns is deliberate.** Adding a `fields2` column later
+defaults to `0`, which reads correctly for every historical record — absent means not disclosed — so
+the migration out is benign. Buying headroom up front would cost eight bytes on every row of the
+highest-volume table in the system to insure against a problem that is cheap to fix if it arrives.
 
-#### 5.3.2 Blocking prerequisite: the bitwise conditions are broken in every SQL engine
+#### 5.3.2 Blocking prerequisite: the bitwise conditions were broken in every engine
 
-**This must be fixed before the disclosure log is built, because the whole queryability argument in
-5.3.1 rests on it.**
+**Fixed in `service-abstractions`, in two rounds.** Both rounds were live correctness bugs affecting
+anyone using bitwise conditions, independent of audit logging.
 
-`SqlFieldSet.single(value)` returns `(column, maskLiteral)` (`SqlConditionMapping.kt:48`). Two of the
-four mappings use `col.first` (the column) where `col.second` (the mask literal) was intended:
+**Round one — the mask/column confusion.** `SqlFieldSet.single(value)` returns
+`(column, maskLiteral)`. Two of four SQL mappings compared against the column where the mask was
+intended, and MongoDB had all four All↔Any transposed:
 
 | Condition | Intended | Emitted by SQL + Postgres | |
 |---|---|---|---|
@@ -436,45 +565,74 @@ four mappings use `col.first` (the column) where `col.second` (the mask literal)
 | `IntBitsAnyClear` | `col & mask < mask` | `col & mask < col` | ✗ |
 | `IntBitsAnySet` | `col & mask > 0` | `col & mask > 0` | ✓ |
 
-Sites: `SqlConditionMapping.kt:263` and `:271`; `ConditionMapping.kt:265` and `:289` (Postgres
-repeats the same error). Failing case: `field = 0b0011`, `mask = 0b0001`. `IntBitsSet` should be
-true; the emitted `0b0001 = 0b0011` is false.
+The in-memory `invoke()` implementations were correct, so any test running against an in-memory
+table passed while the real database returned different rows. The fix shipped with conformance tests
+that run the full truth table against **each real engine**.
 
-MongoDB (`bson.kt:151-154`) has a different bug — all four are transposed All↔Any:
+**Round two — the sign bit.** Found while testing `FieldBits`, and *not* catchable by round one's
+tests, because those compare each engine against the in-memory reference and the reference itself
+was wrong:
 
-```kotlin
-is Condition.IntBitsAnyClear -> into.sub(key)["\$bitsAllClear"] = mask   // should be $bitsAnyClear
-is Condition.IntBitsAnySet   -> into.sub(key)["\$bitsAllSet"]   = mask   // should be $bitsAnySet
-is Condition.IntBitsClear    -> into.sub(key)["\$bitsAnyClear"] = mask   // should be $bitsAllClear
-is Condition.IntBitsSet      -> into.sub(key)["\$bitsAnySet"]   = mask   // should be $bitsAllSet
-```
+- `IntBitsAnySet` was `on and mask > 0`. Any mask containing bit 31 is a **negative** `Int`, so
+  `on and mask` is negative when the bit is set and the comparison returns false. `disclosedAny` on
+  field index 31, 63, 95, or 127 silently matched nothing.
+- `IntBitsAnyClear` was `on and mask < mask`, wrong the same way.
 
-The in-memory `invoke()` implementations in `Condition.kt` are all correct, so any test running
-against an in-memory table passes while the real database returns different rows. That is almost
-certainly how this survived, and it means the fix must come with **conformance tests that run against
-each real engine**, not in-memory ones. Cassandra's `ConditionNormalizer.kt:101-104` negation table is
-logically correct and needs no change.
+Both are now stated as exact negations — `!= 0` and `!= mask` — in the reference and in the SQL and
+Postgres emission. MongoDB now passes the mask as a **list of bit positions** rather than a number,
+because Mongo rejects a negative numeric bitmask outright.
 
-This is a live correctness bug in `service-abstractions` affecting anyone using bitwise conditions
-today, independent of audit logging, and should be reported and fixed there on its own merits.
+The lesson is recorded in a new `BitwiseConditionSemanticsTest`: a conformance test that compares
+drivers to a reference can only catch a driver that disagrees with the reference, never a reference
+that is wrong. The semantics need their own test, stated against a literal definition.
 
-### 5.4 The field registry — append-only, not versioned
+Cassandra's `ConditionNormalizer` negation table is logically correct and needed no change in either
+round.
+
+> **Version coordination:** the round-two fix lives in `service-abstractions` and is not yet in a
+> release `lightning-server` depends on. Until the version is bumped, field indices 31, 63, 95, and
+> 127 are storable but not queryable at runtime.
+
+#### 5.3.3 Partial queries must carry `_id` (resolved)
+
+One row per record means extraction needs each item's `_id`, and a `Partial<T>` can omit it.
+Resolved in two places, because one alone is not enough:
+
+- **`ModelRestEndpoints.queryPartial` forces `_id` into the requested field set** for audited models,
+  so ordinary use simply works rather than failing.
+- **Extraction fails closed** on an audited instance that arrives without an `_id`. `ModelRestEndpoints`
+  is circumventable — a custom endpoint can call `findPartial` directly — so the guarantee has to live
+  at the seam. The first is convenience on the common path; this is the actual guarantee.
+
+### 5.4 The field registry — append-only, and the sole record of what a bit means
 
 A bitfield keyed to declaration order is fragile: inserting or reordering a property shifts every
 bit, and all historical records silently change meaning. Storing a schema version per record fixes
 correctness but adds a lookup to every read and a version bump to every model change.
 
-**Use an append-only field registry instead.** Each field of each audited model is assigned a
-permanent bit index the first time it is seen; indices are never reused and never shift.
+**Use an append-only registry instead**, held in the database. Each field of each audited model is
+assigned a permanent bit index the first time it is seen; indices are never reused and never shift.
 
 ```kotlin
 @Serializable
+public data class AuditModelRegistration(
+    override val _id: String,   // descriptor serial name
+    val modelId: Int,
+) : HasId<String>
+
+@Serializable
 public data class AuditFieldRegistration(
-    val tableId: Int,
-    val fieldName: String,
+    override val _id: String,   // "$modelId/$fieldPath"
+    val modelId: Int,
+    val fieldPath: String,
     val bitIndex: Int,
-)
+) : HasId<String>
 ```
+
+Assignment runs as a **pre-deploy task**, once per deploy rather than at startup, so instances never
+race to allocate the same index. It is convergent: existing assignments are never altered, so
+re-running it is a no-op. The snapshot is loaded once per process, which is correct because
+assignments only change during a deploy.
 
 Consequences:
 
@@ -482,13 +640,50 @@ Consequences:
 - Adding or reordering fields never invalidates existing records.
 - A per-record schema reference becomes unnecessary, saving bytes in the highest-volume table.
 
-Registration happens at startup from the serializer descriptors. A **removed** field keeps its index
-permanently reserved — the registry is append-only, so a field is retired rather than deleted, and
-records that referenced it remain interpretable.
+**A rename allocates a new bit, and that is the whole story.** An earlier draft proposed an
+`@AuditRetired` marker plus a startup check that failed loudly when a registered field vanished from
+the descriptor. That was rejected, correctly: the registry table *is* the retirement record. A field
+that disappears simply stops being written; its row remains, so records written before the rename
+still resolve to the field they actually disclosed. Nothing that was written in the past changes
+meaning, which is the only property that matters. The cost is that a query for a semantic field
+after a rename must consider both bits — a query-time concern, not a correctness one.
 
-Startup must fail loudly if a registered field name is absent from the current descriptor *and* has
-not been explicitly marked retired, so that a rename is caught rather than silently allocating a new
-bit and orphaning history.
+#### 5.4.1 Nested fields
+
+Bit indices are assigned to **dotted paths**, not property names. The walk descends through
+everything, but only annotates what was asked for:
+
+| Shape | Rule | Example path |
+|---|---|---|
+| Property marked `@Audited` | a path | `ssn` |
+| Property not marked | no path, but still descended into | — |
+| Nested `@Audited` class | **stop** — it produces its own record under its own `modelId` | `doctor` |
+| List/Set | descend into the element with `[]` | `phones[].number` |
+| Map | descend into the value with `{}` | `tags{}.label` |
+| Sealed | descend per subclass | `payment(Card).last4` |
+| Open polymorphic, contextual | nothing beneath — the concrete type is not known statically | `blob` |
+
+Descending regardless of annotation is what lets `@Audited val street: String` inside a plain
+`Address` become `address.street` on the record holding it, without `Address` itself having to be
+audited or `address` itself having to be annotated.
+
+Annotating a container *as well as* its leaves is what distinguishes "no address was disclosed" from
+"an address was disclosed, all of whose fields held defaults" — worth a bit when that distinction
+matters, and skippable when it does not.
+
+Three failures fall out, all deliberate:
+
+- A model that runs out of bits **fails at deploy**. The message names how many of the 64 are already
+  assigned and says that indices are never reused, so renamed and removed fields still hold theirs —
+  which is usually the surprising part. The remedies are to drop `@Audited` from properties that do
+  not need itemising, or to mark a nested *entity* type `@Audited` so it becomes its own record.
+  A **warning fires at 75% of capacity**, because running out at deploy time is the worst moment to
+  discover it and the ceiling is approached gradually rather than all at once.
+- An `@Audited` class with no `Uuid` `_id` **fails at deploy** — a disclosure record that can name no
+  record is close to worthless, and a string key is too wide for this table.
+- An audited model reaching the encoder with no registry entry **fails the request**. Registration
+  scans every endpoint input/output descriptor, which covers everything but a contextual serializer
+  resolving to an unregistered audited type. That case should be loud, not silent.
 
 ### 5.5 Field presence semantics
 
@@ -500,65 +695,213 @@ question, and it is measurable at the typed layer without reaching below it. The
 consequence is that a field whose true value equals its default is indistinguishable from a masked
 one. That is acceptable — in both cases the client learned nothing beyond the default.
 
+### 5.5.1 The layers are independently includable (resolved)
+
+`AuditCore` carries the request log and the bit registry; `DisclosureLog`, `DataAccessLog` and
+`AuthEventLog` and `MutationLog` are separate modules a deployment includes or does not. There is
+deliberately **no all-in-one bundle**, because a helper that installs everything hides which layers a
+deployment is paying for, and the data access and mutation logs are far too voluminous to acquire by
+reflex. Naming each layer at its point of inclusion is also what
+makes the set reviewable.
+
+The reason is volume. The data access log writes a row per *query* rather than per disclosure, so on a
+read-heavy model it dwarfs every other layer combined — and since these tables sit on fail-closed
+write paths, including a layer is also taking on a dependency for availability, not just for storage.
+A deployment that wants disclosure auditing should not be made to pay either cost for a layer it did
+not ask for. This mirrors the split every cloud provider already makes: GCP separates always-on Admin
+Activity logs from Data Access logs that are off by default and billed.
+
 ### 5.6 Failure behaviour: fail-closed
 
 If the audit write fails, the request fails. For audited models the disclosure must not happen unless
-it was recorded.
+it was recorded. This is why the interception point sits *before* serialization: throwing there
+prevents the body from ever being built.
 
-This is consistent with the framework's fail-fast stance, but it has a hard architectural
-consequence: **the audit sink is in the availability path**, so it cannot be a network call. It must
-be a local append-only file with fsync, with a separate shipper draining it. This is the same
-durability design the external capture layer uses.
+**Confirmed to include the database sink.** The queryable log is a database table, so an audit
+database outage is an outage for audited endpoints. That is the intended trade.
 
-Configurable, defaulting to fail-closed whenever any `@Audited` model is registered.
+**Per layer, and not configurable (resolved).** Disclosure and data access fail closed: the thing they
+guard must not happen unrecorded. Authentication events fail open, because the event has already
+happened by the time it is reported and throwing would replace a clean "your login failed" with an
+unrelated error while losing the original reason. The request log's *completion* write cannot fail
+closed at all — the response is already produced.
 
-### 5.7 Integrity
+There is deliberately **no fail-open switch**. The happy-path cost is identical either way, so nothing
+is bought by the option; what it would cost is real. A security control with an off switch gets
+switched off during the first incident and stays off, and it makes "was this deployment fail-open at
+the time?" a question whose answer lives in configuration rather than in the log. The cases where
+fail-open is genuinely right are handled structurally instead: auth events hard-code it, targeted
+bypasses go through `dangerouslyDirectTable()` where they are greppable, and a deployment that wants
+no auditing simply does not include the layer.
 
-Records are hash-chained: each carries the hash of its predecessor, with per-instance sequence
-numbers. This makes both tampering and **truncation** detectable — truncation being the realistic
-attack, since an append-only sink cannot be edited but can be silently stopped.
+### 5.7 Integrity: out of scope here
 
-### 5.8 Anchoring: extending external assurance to channels the proxy cannot see
+Hash chaining and tamper-evidence belong to the **emergency total-log**, a separate system outside
+Lightning Server. It exists for the case where these logs are later found insufficient or bypassable;
+it is not a component of this design and nothing in this repository implements it.
 
-This is the mechanism that makes streaming audited models over WebSockets acceptable, and it
-generalises to any disclosure the external capture layer cannot observe.
+#### Where the boundary actually is
 
-The problem: layer 2 is written by the application, so on its own it carries no defence against the
-application operator rewriting history. That defence is exactly what the external capture layer
-provides — but the proxy cannot see WebSocket frames (see
-[section 10](#10-out-of-scope-external-capture-layer)), so WS disclosures get layer-2 assurance only.
+The system's integrity has always rested on one thing: **whether the server does what it says it
+does.** That was true before any of this was written and no amount of in-process machinery changes it.
+Code running in the server can always lie about what the server did.
 
-The proxy cannot see WS frames, **but it can see HTTP requests.** So:
+But the boundary is not quite "inside the server, therefore nothing" — it is *who controls the
+server*, and there are two different adversaries hiding in that:
 
-> Periodically emit the layer-2 hash-chain head as an ordinary HTTP request through the proxy.
+| Adversary | In-process chain | External capture |
+|---|---|---|
+| Can write the audit tables, cannot deploy code (a DBA, a leaked DB credential, an operator editing rows after the fact) | **Helps, if built properly** — an HMAC keyed from a secret store the DB principal cannot read makes silent edits detectable | Helps |
+| Can run code on the server (deploy access, RCE, a malicious change) | **Useless** — they hold the key and the code, and can recompute anything | Helps, but see below |
 
-The proxy captures that request into the un-tamperable store like any other. The chain head is a
-cryptographic commitment to every layer-2 record written before it — including the WebSocket ones the
-proxy never saw. Once a head is anchored, the application cannot retroactively alter or delete any
-record preceding it without producing a chain that fails to reproduce an already-captured head.
+That first row is narrower than it looks, and the "if built properly" is carrying most of the weight.
+The key has to be readable by the server, since the server computes the chain — so it lives wherever
+the application's runtime secrets live, and the defence exists only where some principal holds
+database write *without* that secret. That separation is a deployment property the framework can
+neither create nor verify. It collapses entirely against code execution, against anyone who can read
+the app's environment, and against a vault compromise that yields both credentials.
 
-Assurance this does and does not provide:
+Even where it holds it is **partial**: an HMAC chain catches an edited row and a deletion from the
+middle, but not truncation — delete everything after time T and the surviving prefix verifies clean,
+because nothing in process knows how long the chain should have been. The DBA who edits one row to
+cover a specific access is caught; the one who drops the tail is not.
 
-- **Does** prevent retroactive tampering, deletion, and truncation of WS audit records — the same
-  guarantee the external layer gives for HTTP, bounded by the anchor interval.
-- **Does not** prevent fabrication at write time: an already-compromised application can write a
-  false record and anchor it honestly. Layer 1's direct capture is stronger in that specific respect,
-  which is why it remains the backstop for HTTP.
+The version actually reachable in process is worse than the narrow case anyway: an unkeyed hash,
+stored in the database it protects, recomputable by exactly the adversary it is meant to catch — while
+adding a second write to the path of every audited read, including privileged internal ones, where a
+hash failure could halt a schedule tick or a startup task.
 
-Anchor interval is a tradeoff between request overhead and the size of the retroactively-editable
-window; the window is bounded by the interval, so a short interval on a low-volume channel is cheap.
-The interval belongs in configuration.
+**So the conclusion is not "integrity is impossible in-process" but that the in-process version is a
+bad trade.** For the same adversary, the better answer is prevention rather than detection: restrict
+who can write the audit tables, and make the store append-only at the infrastructure level where that
+is available. That stops the tampering instead of detecting a subset of it afterwards, costs nothing
+on the audited path, and adds no subsystem to get wrong. Where prevention is not achievable, the
+answer is the emergency total-log ([section 10](#10-out-of-scope-external-capture-layer)), outside the
+server, not a chain inside it.
 
-Because the anchor is just an HTTP request, this needs no proxy support beyond what layer 1 already
-does, and no WebSocket frame parsing anywhere.
+### 5.8 The request record — what `requestId` points at
+
+Every disclosure references a `requestId` and repeats nothing else, so a table holding what that id
+*means* is not optional; without it the reference dangles.
+
+`AccessLogInterceptor` cannot be that table. It writes log lines, and it is deliberately fail-open —
+"the access log must never be the reason a request fails" — which is the opposite of what a
+fail-closed log needs from its referent. The audit package carries its own:
+
+```kotlin
+@Serializable
+public data class RequestRecord(
+    override val _id: Uuid,            // the execution id itself: no extra column, join on the PK
+    val parentRequestId: Uuid? = null,
+    val rootExecutionId: Uuid,         // the head of this row's causal chain
+    // no `at` column — see below
+    val principal: String? = null,
+    val sourceIp: String,
+    val endpoint: String,              // the route pattern, not the literal target
+    val method: String,
+    val outcome: String? = null,       // null while the request is still in flight
+    val durationMs: Long? = null,
+    val engineRequestId: String? = null, // the gateway's own id, for joining back to its logs
+    val upstreamRequestId: String? = null,
+) : HasId<Uuid>
+```
+
+A duplicate `_id` **fails the request**. A repeated trusted request id means a misconfigured proxy is
+about to merge two principals' activity under one identifier, which is exactly what
+[3.2](#32-sourcing-and-the-trust-rule)'s trust rule exists to prevent, so it must be loud.
+
+**The timestamp is in the id, not a column.** Every execution id is a version-7 UUID minted at the
+instant the execution began (see `execution-context-refactor.md` §2.6), so `_id` embeds its own mint
+time and `RequestRecord.at` is a derived property that recovers it. This is why the id is v7 at all:
+it orders the append-mostly log by insertion time (range queries over the PK instead of an indexed
+copy) and keeps the row's "when" permanently consistent with its id. The price is whole-millisecond
+precision only. Ids that were *adopted* from a trusted proxy (which may be any version) carry no
+timestamp and degrade to the epoch rather than misreporting — honest about "unknown."
+
+#### 5.8.1 Write ordering (resolved)
+
+Disclosures are written *during* a request, but outcome and duration are only known at the end, so
+the ordering has to be chosen rather than assumed.
+
+**Resolved: write the record at request start, update it at completion.** Two writes per request.
+The referent always exists before anything references it, and the same shape works for a WebSocket,
+where the record is written at connect and updated at close. Requests in flight are visible for free.
+
+Rejected: buffering disclosures and writing everything at the end. It is tempting for HTTP, where the
+response is not sent until the end anyway — but it is wrong for WebSockets, whose frames are
+delivered as they are sent and whose connections can live for hours, leaving delivered data
+unrecorded in memory. A per-protocol split was not worth two code paths.
+
+Disclosures within one request batch into a single `insert`, so the per-request cost is two writes
+plus one.
+
+#### 5.8.2 A socket's row is keyed by the socket, not by the phase (resolved)
+
+Since the [execution-context refactor](execution-context-refactor.md), each of a WebSocket's five
+lifecycle phases is a separate execution with its own `executionId` — on a serverless engine they are
+literally separate invocations. The record for a socket is nonetheless keyed by `Initiator.WebSocket.socketId`.
+
+It has to be, for [5.8.1](#581-write-ordering-resolved) to work at all: the row is written at connect
+and updated at close, and those are two different executions. A row keyed by either one's
+`executionId` could not be found by the other, and every socket record would sit at `outcome = null`
+forever.
+
+**What that gives up.** `messageFromClient` and `messageFromSubscription` are executions that can
+disclose. With socket-keyed rows their disclosures point at the socket, so the audit answer for a
+long-lived connection is "sometime during this session" rather than "in response to this message".
+
+**Why it is not a regression.** Before the refactor a socket's correlation id was deliberately
+constant for the socket's whole lifetime, so disclosures on a socket already attributed to the
+session rather than to a frame. Socket-keying reproduces that exactly.
+
+**Resolved: keep socket-keyed rows, and carry the execution id on the records instead.**
+
+The question was whether per-phase attribution justified a `RequestRecord` row per phase execution —
+for a chatty socket, a row per client message, against a fail-closed write path. It does not, because
+the precision that was actually wanted can be had without those rows. Both record types written
+during a socket's life now carry `executionId` alongside `requestId`:
+[`DataAccessRecord`](#62-record-shape-and-installation-resolved) from the outset, and any record that
+needs it can follow. `requestId` still names the socket, so the join to the request record is
+unchanged and one row per socket remains; `executionId` names the phase, so "which message caused
+this" is answerable by reading the record rather than by multiplying request records.
+
+`DisclosureRecord` does **not** yet carry it, and that is the remaining gap: a disclosure on a
+long-lived socket can still only be placed within the session, though its own v7 `_id` now timestamps
+it to the millisecond, which in practice identifies the message. Adding the column is 16 bytes on the
+highest-volume table in the system and should be weighed against that.
 
 ### 5.9 Sinks
 
 The audit stream is a typed event stream with pluggable sinks, not a single log. Auditors need to
 *query*; an encrypted object store is unqueryable by design. Expect at minimum a queryable sink
-(Postgres or a SIEM) for investigation alongside the tamper-evident sink as system of record.
+(Postgres or a SIEM) for investigation alongside the tamper-evident total-log as system of record.
+
+**Shipped:** the database sink, written by `DisclosureLogInterceptor` straight into the
+`DisclosureRecord` table. It catches nothing, so an extraction that cannot resolve a model, a record
+with no `_id`, or a sink that will not take the write all abort the send before the value is
+serialized.
+
+### 5.10 How extraction works
+
+`DisclosureExtractor` walks the outgoing value with its own serializer, as a custom `Encoder`. Using
+the serializer rather than reflection means what is observed is exactly what the client will receive,
+and that a model cannot slip through a shape the walk does not understand.
+
+Three things are worth knowing about it:
+
+- **Field presence is judged on the value, not on the format.** A default is a default whether or not
+  the encoder in use would have elided it, which keeps [5.5](#55-field-presence-semantics) true
+  regardless of content negotiation.
+- **Paths are resolved once per (model, position, descriptor) and cached.** A list of ten thousand
+  records enters the same descriptor at the same path ten thousand times; without the cache every
+  field of every record would rebuild its path string and hash it against the registry.
+- **`Partial` is unwrapped explicitly.** `PartialSerializer` builds a descriptor named for `Partial`
+  that carries none of the model's class annotations, so `@Audited` is invisible on it. The extractor
+  reads `PartialSerializer.source` instead. Without that, a partial query would have disclosed an
+  audited model with no record at all — the exact hole this design exists to close.
 
 ---
+
 
 ## 6. Layer 3: the data access log
 
@@ -568,11 +911,119 @@ never reach a user.
 
 One architectural advantage worth exploiting: `Modification<T>` is a first-class serializable value
 in this stack. Logging `(condition, modification, affected ids)` is far more compact than before/after
-images and strictly more informative about intent. Reads at this layer, where enabled, should record
-the `Condition<T>` for the same reason.
+images and strictly more informative about intent.
 
-Operations that are neither model reads nor model writes are covered by `@AuditedOperation`
-([section 5.1](#51-marking)) and, as a backstop, by the action log.
+### 6.1 Extend it to reads: every condition and every sort
+
+**This is what closes the aggregation hole, and it is a prerequisite rather than a refinement.**
+
+`groupCount` and `groupAggregate` return `Map<String, _>` **whose keys are field values**.
+`groupCount(condition = Always, groupBy = ssn)` returns the distinct SSNs — not an inference channel
+but a bulk read, and one that produces no disclosure record at all, because there is no record to
+attach it to. `count` and `aggregate` are oracles in the ordinary way: `count(ssn eq "X")` answers
+1 or 0.
+
+Restricting aggregation does not close this. **`find` is the same oracle** — `find(ssn eq "X")`
+returning nothing discloses nothing under the field-presence rule ([5.5](#55-field-presence-semantics))
+and tells an attacker the same bit. A sort is an oracle too: ordering plus `skip` walks values
+without ever matching one.
+
+**Resolved: record the `Condition<T>` and the sort for every query against an audited model**, at the
+database layer, alongside the mutation recording that already lives there. Aggregation then stops
+being a special case — `groupCount` passes its condition and its group-by path through the same
+choke point as everything else, and a binary search appears as thousands of recorded queries whose
+conditions walk a value: detectable and attributable.
+
+The database layer is the right level for this specifically because it is *not* the typed layer. It
+sees every query whoever issued it, including the privileged internal reads the typed layer never
+observes — see the table in [2.1](#21-why-the-typed-layer-and-not-the-database-layer-for-disclosure).
+
+**Known gap, accepted:** recording a condition records that a bulk read happened, not what came back.
+For `groupCount` by a sensitive field the log says "someone enumerated this field", without the
+values or any record ids — because by construction there are none to name. A deployment that cannot
+accept that should deny the grouping through permissions rather than expect the framework to forbid
+it.
+
+Two things that effort has to settle:
+
+- ~~**`requestId` must be reachable from the database layer**~~ — **no longer a prerequisite, and the
+  proposed signature change is unnecessary.** Since the execution-context refactor a `ServerRuntime`
+  carries `initiator.executionId`, and every seam below already runs in one. Nothing needs to travel
+  with the table.
+- **The insertion point already exists and is unused.** `ModelInfo` declares a `log` decorator slot
+  (`typed/.../ModelInfo.kt:103`):
+
+  ```kotlin
+  log: context(ServerRuntime) AuthAccess<USER>?.(Table<T>) -> Table<T> = { it },
+  ```
+
+  It defaults to identity, nothing in either repository passes it, and it is applied in **both**
+  `table(auth)` and `table()` — so a decorator installed here sees the privileged internal reads that
+  [2.1](#21-why-the-typed-layer-and-not-the-database-layer-for-disclosure) requires this layer to
+  cover, as well as user-facing ones. It sits below permissions, which is where a recorder of
+  *attempted* access belongs.
+
+  Consequence for sizing: this is a `Table` decorator in `lightning-server`, wrapping the read and
+  write methods and recording `(condition, sort, modification)`. **No `service-abstractions` change
+  is required** — `Table` is the interface, and the decorator lives on this side of it. What is still
+  unspecified is the record shape.
+- **Scope and failure mode.** Recording every query on every model would be a firehose; this should
+  be scoped to audited models, and should be fail-closed there for the same reason disclosure is.
+
+Operations that are neither model reads nor model writes rely on the action log for now, since
+`@AuditedOperation` was dropped ([section 5.1](#51-marking)).
+
+### 6.2 Record shape and installation (resolved)
+
+```kotlin
+@Serializable
+public data class DataAccessRecord(
+    override val _id: Uuid,               // v7: `at` derives the query's instant from the key
+    @Index val requestId: Uuid,           // joins to RequestRecord, socket-keyed like a disclosure
+    @Index val executionId: Uuid,         // the precise execution, which requestId blurs for sockets
+    @Index val modelId: Int,              // same registry as DisclosureRecord
+    val operation: DataAccessOperation,
+    val condition: String,                // serialized Condition<T>
+    val sort: String? = null,             // serialized List<SortPart<T>>, where the operation takes one
+    val modification: String? = null,     // serialized Modification<T>, for writes
+    val groupBy: String? = null,          // the field path an aggregation grouped on
+) : HasId<Uuid>
+```
+
+**Why the query is stored as text.** `Condition<T>` and `Modification<T>` are serializable, but only
+against the model's own serializer, and this table holds rows for every audited model at once. A
+generic record type would mean a table per model. The condition is serialized with the model's
+serializer at write time and stored as JSON, which stays readable and greppable and gives up only
+the ability to query *inside* a recorded condition — an investigation reads these rows, it does not
+join on their contents.
+
+**Both ids are recorded.** `requestId` matches [5.8](#58-the-request-record--what-requestid-points-at)
+so a query joins to the same request record as a disclosure — which for a socket names the socket.
+`executionId` is the phase that actually issued the query. Carrying both costs 16 bytes and recovers
+the per-phase precision [5.8.2](#582-a-sockets-row-is-keyed-by-the-socket-not-by-the-phase-resolved)
+gives up, without a `RequestRecord` row per phase.
+
+**Installation is the `log` slot, and scope is the registry.** The decorator is passed as
+`ModelInfo`'s `log` parameter (see 6.1), and no-ops for any model the audit registry does not know —
+so passing it uniformly is safe, and only audited models generate rows. This keeps the "which models
+are audited" decision in exactly one place, the `@Audited` annotation, rather than splitting it
+between the annotation and a list of decorated tables.
+
+**An audited model needs an endpoint before it can be logged here — a real limitation.** Model ids
+are assigned by scanning **endpoint serializers**, never tables (scanning tables made disclosure
+coverage look complete when it was not). The decorator keys off the
+`@Audited` annotation and then resolves the id, which *throws* when there is none. So an audited model
+that no endpoint's serializer can reach has no id, and its reads fail rather than going unrecorded —
+correct as a fail-closed rule, but it means a model that is only ever read internally cannot be
+data-access-logged until something makes it reachable. Resolving this properly means either a second
+registration space for table-only models or an explicit opt-in list on the module; **not decided**.
+
+**Fail-closed, with the same reasoning as 5.6.** A read of an audited model whose query cannot be
+recorded does not happen. That makes an outage of the audit database an outage for reads of audited
+models, which is a strictly larger blast radius than the disclosure log's — that one only fails
+requests that actually disclose, while this one fails privileged internal reads too, including ones
+made during startup or a schedule tick. **This is the single riskiest thing in this plan** and is
+called out again in the deployment notes.
 
 ---
 
@@ -650,8 +1101,8 @@ logging"). Why each apparent seam fails:
 
 ### 7.3 Design
 
-Auth events are their own record type, sharing the request ID, hash chain (5.7), anchoring (5.8), and
-sinks (5.9) with the disclosure log — but not its shape, since they are not model disclosures.
+Auth events are their own record type, sharing the request ID and sinks (5.9) with the disclosure
+log — but not its shape, since they are not model disclosures.
 
 Minimum event set, each carrying request ID, timestamp, source IP, user agent, outcome, and both
 acting and target principal where they differ:
@@ -667,6 +1118,27 @@ Two ordering notes for implementation. **Failure reasons already exist** as the 
 `SessionManager.kt:357-388` — that is a direct map to the failure-reason enum, not new analysis.
 And **`sessionInfo` gaining a `signals` parameter is the cheapest first step**, since it makes
 session creation, update, and termination observable without touching sealed methods.
+
+#### 7.3.1 The seam, and one deliberate asymmetry
+
+`AuthEventReporter` lives in `core` rather than in `sessions` or `audit`, because those two do not
+depend on each other and should not have to: `sessions` raises events, an audit module installs a
+reporter that records them, and a deployment with no reporter installed pays a null check. Events are
+passed as strings so `core` does not own the taxonomy.
+
+**Reporters must not throw, and that is a real weakening.** The disclosure and data access logs gate
+*disclosure* — the guarded thing must not happen unless it was recorded, so they fail closed. An
+authentication event has already happened by the time it is reported, and is usually reported from a
+path that is itself rejecting something; throwing there would replace a clean "your login failed"
+with an unrelated server error and lose the original reason. So `AuthEventLogReporter` logs and
+swallows write failures. The consequence, stated plainly: **an attacker who can make the audit
+database unavailable can make authentication events go unrecorded while authentication keeps
+working.** That is the opposite of the guarantee the other two layers give, and it is a choice, not
+an oversight.
+
+**Coverage so far is partial.** The seam exists and rejected authentications report through it. The
+remaining events in the list above — issuance, refresh, termination, per-method proof results,
+masquerade — are not yet raised; the reporter will record them as soon as the call sites do.
 
 The three adverse findings in 7.1 should be fixed alongside: session rows want `delete =
 Condition.Never` with soft-termination only, backup-code use wants a soft-disable with a timestamp
@@ -726,35 +1198,85 @@ Sequenced so each step is independently shippable and testable, and so prerequis
    `Request` base class, `requestIdentity` resolution with the trust rule, `requestIdHeader` on the
    Ktor/Netty/JDK settings, API Gateway's own IDs on AWS, and `subRequest`/`subConnection` for
    derived requests. Covered by `core/src/test/.../http/RequestIdentityTest.kt`.
-2. **Multiplex dispatch fix** ([section 4.1](#41-metabulk-bypasses-the-entire-interceptor-chain)) —
-   correctness bug in security controls beyond logging. Includes `InterceptorScope`.
-3. **WebSocket permission staleness** ([section 8](#8-websocket-permission-staleness)) — live
-   permissions bug.
-4. **Access log completeness** ([sections 4.2–4.3](#42-websockets-are-not-access-logged-at-all)) —
-   websocket coverage, post-hoc emission with outcome.
-5. **Fix the bitwise conditions in `service-abstractions`**
-   ([section 5.3.2](#532-blocking-prerequisite-the-bitwise-conditions-are-broken-in-every-sql-engine))
+2. ~~**Multiplex dispatch fix**~~ ([section 4.1](#41-metabulk-bypasses-the-entire-interceptor-chain))
+   — **DONE.** Correctness bug in security controls beyond logging. Shipped as a split of the
+   interceptor types rather than the rejected `InterceptorScope` enum.
+3. ~~**WebSocket permission staleness**~~ ([section 8](#8-websocket-permission-staleness)) —
+   **DONE.**
+4. ~~**Access log completeness**~~ ([sections 4.2–4.3](#42-websockets-are-not-access-logged-at-all))
+   — **DONE.** WebSocket coverage, post-hoc emission with outcome.
+5. ~~**Fix the bitwise conditions in `service-abstractions`**~~ — **DONE, twice.**
+   ([section 5.3.2](#532-blocking-prerequisite-the-bitwise-conditions-were-broken-in-every-engine))
    — blocks the disclosure log's queryability, and is a live bug worth fixing on its own merits.
    Must ship with per-engine conformance tests, not in-memory ones.
-6. **Disclosure log** ([section 5](#5-layer-2-the-disclosure-log-audited)) — the largest piece.
-   Field registry and record shape first, then interception, then hash chaining, then sinks.
-7. **Anchoring** ([section 5.8](#58-anchoring-extending-external-assurance-to-channels-the-proxy-cannot-see))
-   — small once the chain exists, and it is what lets audited models stream over WebSockets.
-8. **Data access log alignment** ([section 6](#6-layer-3-the-data-access-log)) — extend existing
-   write auditing to record conditions, share the record format.
+6. ~~**Disclosure log**~~ ([section 5](#5-layer-2-the-disclosure-log-audited)) — **DONE.** Typed-output
+   interception, the marker, the record shape and bit registry, the recording `Encoder`, the
+   [`RequestRecord`](#58-the-request-record--what-requestid-points-at) table with its two-write
+   lifecycle, the fail-closed database sink, and the `_id`-in-partials rule from 5.3.3. Included as
+   `AuditCore`.
+7. ~~**Data access log: conditions and sorts**~~ ([section 6.1](#61-extend-it-to-reads-every-condition-and-every-sort))
+   — **DONE**, to the record shape and installation in 6.2. Two limitations recorded there: an
+   audited model that no endpoint's serializer reaches has no id and its reads fail rather than going
+   unrecorded, and fail-closed here covers privileged internal reads so its blast radius exceeds the
+   disclosure log's. Originally described as an extension of existing write auditing, which
+   **did not exist**: Section 6 opens by asserting "write auditing already
+   exists at `ModelPermissionsTable`". Verified 2026-09: it does not. That class enforces permissions
+   and records nothing; `simpleSignals.kt` provides generic `postCreate`/`postChange`/`postDelete`
+   decorators, but nothing in either repository writes an audit record from the database layer. So
+   this step is a build of the recording layer for reads *and* writes, not an extension of an
+   existing one, and no record shape is specified anywhere yet.
+
+   The `requestId`-reachability blocker below is, however, largely resolved: `ModelInfo.table()` is
+   already `context(ServerRuntime)`, and since the execution-context refactor a `ServerRuntime`
+   carries `initiator.executionId`. The remaining question is placement — `ModelPermissionsTable`
+   lives in service-abstractions and cannot see Lightning Server types, so the recording decorator
+   belongs on this side.
+   — moved ahead of the total-log, because it is what closes the aggregation and oracle channels
+   rather than a later refinement. Extends the existing write auditing at the database layer to
+   record every condition and sort applied to an audited model.
+8. ~~**Total-log: hash chaining and anchoring**~~ ([section 5.7](#57-integrity-out-of-scope-here))
+   — **removed from scope.** The emergency total-log is a separate system outside Lightning Server,
+   reached for only if these logs prove insufficient or bypassable. Nothing here implements it.
 9. **Auth event log** ([section 7](#7-layer-4-the-authentication-event-log)) — the largest greenfield
-   piece, since nothing exists to extend. Start with the two cheap unblocking changes: give
-   `sessionInfo` a `signals` parameter ([7.2](#72-no-usable-extension-point-exists)), and turn the
-   existing debug `println` failure strings into a failure-reason enum
-   ([7.3](#73-design)). The three adverse findings in
-   [7.1](#71-survey-findings) — hard-deletable session rows, self-destroying backup-code evidence,
-   and the fabricated `"test"` IP — are independently worth fixing and can ship ahead of the rest.
+   piece, since nothing exists to extend. **Groundwork done; the event log itself is not.** Both
+   cheap unblockers have shipped: `sessionInfo` now takes a `signals` parameter
+   ([7.2](#72-no-usable-extension-point-exists)), and the debug `println` failure strings are now the
+   `AuthFailureReason` enum behind a single seam ([7.3](#73-design)). All three adverse findings in
+   [7.1](#71-survey-findings) are fixed: session rows are no longer deletable (termination remains),
+   a redeemed backup code is retained and marked rather than deleted, and the fabricated `"test"` IP
+   and empty user agent are no longer recorded. What remains is the event record type, its sinks,
+   and emission at each of the events listed in [7.3](#73-design).
+
+   Correction found while doing that work: 7.2 says the table-decoration approach is unavailable for
+   `sessionInfo`. That is true of `signals` specifically, but `ModelInfo.registerChangeListener` is
+   public, already applied to the session table, and already sufficient to observe creates, updates
+   and deletes. The `signals` seam is still the wider one — it also sees reads.
 
 ## 10. Out of scope: external capture layer
 
 Not covered here, but it constrains the above. The requirement is a capture that is **provably
 outside application control**, so that the operator cannot be accused of tampering. That forces it
-out of process — into the reverse proxy — and the code-side implications are:
+out of process — into the reverse proxy — and the code-side implications are below.
+
+Three properties do the actual work, and it is worth naming them separately because only the first is
+obvious:
+
+1. **It is outside the trust domain.** Whoever compromises the server does not thereby control the
+   capture. This is the whole point.
+2. **It is externally driven, not pushed.** A capture the server *reports to* inherits the server's
+   compromise: a compromised server simply stops reporting. A capture that taps or pulls does not ask
+   the server's permission. If the total-log is ever built as a push, it loses most of its value.
+3. **Silence must be alarming.** Following from (2): the external side has to detect *absence* of
+   expected traffic, not merely verify what it received. Otherwise the cheapest attack on an
+   unforgeable log is to stop feeding it.
+
+Being simpler and not our code helps for a fourth, softer reason: our bugs do not become its bugs.
+Three defects shipped in the in-process chain during a single session's work, and that code was far
+smaller than the system it was protecting.
+
+The residual gap that none of this closes is **fabrication at write time**. If the server lies, an
+unforgeable capture faithfully records the lie. No external mechanism can distinguish a truthful
+server from a convincing one; that is a property of the application, not of the log.
 
 - Envoy's `tap` filter is the correct primitive (nginx `mirror` re-issues requests to a second
   upstream, duplicating side effects and capturing no responses).
@@ -764,10 +1286,9 @@ out of process — into the reverse proxy — and the code-side implications are
 
   **Resolved: build neither.** High-sensitivity deployments today already do not stream audited
   models, and the goal is to lift that restriction rather than entrench it. The
-  [anchoring mechanism](#58-anchoring-extending-external-assurance-to-channels-the-proxy-cannot-see)
-  achieves that without any WS parsing: WS disclosures are recorded by layer 2 and made
-  tamper-evident by committing the chain head through the HTTP path the proxy already captures.
-  The residual gap versus direct capture is fabrication-at-write-time, documented in 5.8.
+  emergency total-log, if it is ever needed, achieves that without any WS parsing: WS disclosures are
+  recorded by layer 2, and making them tamper-evident is that separate system's job rather than this
+  one's. The residual gap versus direct capture is fabrication-at-write-time.
 - If the proxy stamps `x-request-id` and forwards the same value, the external capture and the
   in-process logs join for free (see [3.3](#33-aligning-with-the-proxy-and-with-telemetry)).
 
@@ -805,6 +1326,26 @@ This must be decided per model *before* its sinks receive their first record, be
 how records are encrypted at rest. It cannot be retrofitted to existing records — that is the whole
 point of crypto-shredding.
 
+> **The shape above is the intended design, not code. Crypto-shredding does not exist here.**
+> It is recorded so that it does not have to be re-derived, and deliberately left undeclared, because
+> declaring it now would be worse than leaving it out.
+>
+> **Why it is not declared yet.** Nothing would read `subjectKeys`. Its only runtime effect would be a
+> pre-deploy task failing the deploy unless the map was populated, charging every deployment a
+> declaration in exchange for nothing — and an unread declaration is a checkbox rather than a
+> decision. Worse, it would pin three guesses into public API for a feature that does not exist: the
+> extractor above returns a `String` where crypto-shredding wants a key id, a record about two people
+> has two subjects, and no such map can express that a key's type matches its model. Declaring it
+> now makes it likelier that the eventual real API gets bent to fit it.
+>
+> **What that costs, honestly.** A deploy guard would be the one thing forcing an erasure decision at
+> deploy time,
+> and that decision genuinely cannot be retrofitted — records written before a key exists stay
+> unshreddable forever. A deployment that will need erasure still needs to decide early; it just has
+> no mechanical prompt now. The right time to design this API is when the wrapping and shredding are
+> being built, against real requirements — including what the mutation log's `old`/`new` columns
+> imply, since those put record contents in a second place that erasure has to reach.
+
 ### 11.3 Auth events — resolved, see section 7
 
 The working assumption was that `SessionManager` already handled much of this and the work would be
@@ -821,17 +1362,33 @@ evidence, and a fabricated `"test"` IP placeholder.
 ### 11.4 Auditing reads of the audit log — no special mechanism needed (resolved)
 
 Earlier drafts called for a separate credential path. That was overcomplicated. Reading the audit log
-is just an `@AuditedOperation` endpoint, and its records land in the same stream as everything else.
-The hash chain (5.7) and the append-only sink mean a reader cannot erase the evidence of their own
-read, which is the property that actually matters. Self-reference is not a problem here: the log only
-ever appends, so recording a read of the log simply produces one more record.
+is an ordinary endpoint, and its records land in the same stream as everything else. Self-reference is
+not a problem: the log only ever appends, so recording a read of the log simply produces one more
+record.
+
+**Weaker than it sounds, on two counts.** The argument would be much stronger with a hash chain
+making it impossible for a reader to erase the evidence of their own read; chaining is
+[out of scope](#57-integrity-out-of-scope-here), so what remains is an append-only *convention*, not an
+enforced property — anyone with write access to the audit tables can delete their own row. And
+[6.2](#62-record-shape-and-installation-resolved) now stores serialized query conditions, so the audit
+log holds the sensitive values it audits and is worth protecting more carefully than "an ordinary
+endpoint" implies. The resolution still stands for framework *design* — no special credential path is
+needed — but the deployment-side controls it assumes are doing more work than this section credits.
 
 Separation of duties between reading the log and administering it remains worth having, but it is an
 IAM/deployment concern, not a framework design concern.
 
-### 11.5 Bitfield width — three `Int`s (resolved)
+### 11.5 Bitfield width — two `Int`s (resolved)
 
-96 bits across three `Int` columns. See [5.3.1](#531-why-three-ints-and-not-long-ulong-or-bytearray)
-for the reasoning — `Int` is the only bitwise-queryable type in the framework — and
-[5.3.2](#532-blocking-prerequisite-the-bitwise-conditions-are-broken-in-every-sql-engine) for the
-engine bugs that must be fixed first.
+64 bits across two `Int` columns. See
+[5.3.1](#531-why-int-columns-and-not-long-ulong-or-bytearray) for the reasoning — `Int` is the only
+bitwise-queryable type in the framework — and
+[5.3.2](#532-blocking-prerequisite-the-bitwise-conditions-were-broken-in-every-engine) for the two
+rounds of engine bugs that had to be fixed first.
+
+Went 96 → 128 → 64 during implementation. It was widened when every field was itemised automatically,
+because nested paths ([5.4.1](#541-nested-fields)) grow faster than property counts and dead indices
+accumulate forever. Making itemising opt-in
+([5.1.1](#511-itemising-is-opt-in-disclosure-is-not)) removed the pressure entirely: a model reserves
+bits for the few fields that matter to an audit, so two columns is ample and saves eight bytes on
+every row.
