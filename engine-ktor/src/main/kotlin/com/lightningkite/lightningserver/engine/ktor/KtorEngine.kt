@@ -328,7 +328,7 @@ public class KtorEngine(
                         }
                         closingMid = mid
 
-                        socketHandler.didConnectWithMetrics(match.pathSpec, mid)
+                        socketHandler.didConnectWithMetrics(match.pathSpec, this@KtorEngine, mid)
 
                         for (incoming in this.incoming) {
                             val m = when (incoming) {
@@ -338,16 +338,22 @@ public class KtorEngine(
                                 is Frame.Ping -> continue
                                 is Frame.Pong -> continue
                             }
-                            socketHandler.messageFromClientWithMetrics(match.pathSpec, mid, m)
+                            socketHandler.messageFromClientWithMetrics(match.pathSpec, this@KtorEngine, mid, m)
                         }
 
                         closingMid.let { mid ->
-                            socketHandler.disconnectWithMetrics(match.pathSpec, mid, WebSocketClose.NORMAL)
+                            socketHandler.disconnectWithMetrics(
+                                match.pathSpec,
+                                this@KtorEngine,
+                                mid,
+                                WebSocketClose.NORMAL
+                            )
                         }
                     } catch (e: Throwable) {
                         closingMid?.let { mid ->
                             socketHandler.disconnectWithMetrics(
                                 match.pathSpec,
+                                this@KtorEngine,
                                 mid,
                                 ((e as? HttpStatusException)?.status
                                     ?: HttpStatus.InternalServerError).bestWebSocketCloseCode

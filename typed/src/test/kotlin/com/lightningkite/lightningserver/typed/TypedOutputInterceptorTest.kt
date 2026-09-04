@@ -26,6 +26,7 @@ import java.util.Collections
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.uuid.Uuid
 
 /**
  * The disclosure log's entire premise is that no typed value reaches a client unobserved. These
@@ -36,8 +37,8 @@ import kotlin.test.assertTrue
 class TypedOutputInterceptorTest {
 
     private data class Seen(
-        val requestId: String,
-        val parentRequestId: String?,
+        val requestId: Uuid,
+        val parentRequestId: Uuid?,
         val serialName: String,
         val value: Any?,
     )
@@ -104,6 +105,8 @@ class TypedOutputInterceptorTest {
         )
     }
 
+    private val outerRequestId = Uuid.parse("00000000-0000-4000-8000-000000000001")
+
     private fun request(path: String, method: HttpMethod = HttpMethod.GET, body: String? = null) =
         HttpRequest<PathSpec>(
             path = RawHttpEndpoint(asString = path, method = method),
@@ -112,7 +115,7 @@ class TypedOutputInterceptorTest {
             domain = "example.com",
             protocol = "https",
             sourceIp = "local",
-            requestId = "outer-request",
+            requestId = outerRequestId,
             body = body?.let { TypedData.text(it, MediaType.Application.Json) },
         )
 
@@ -131,7 +134,7 @@ class TypedOutputInterceptorTest {
         assertEquals(1, Observed.seen.size, "expected exactly one observation, saw ${Observed.seen}")
         val seen = Observed.seen.single()
         assertEquals("alpha", seen.value)
-        assertEquals("outer-request", seen.requestId)
+        assertEquals(outerRequestId, seen.requestId)
         assertTrue(seen.serialName.contains("String"), "expected the output serializer; was ${seen.serialName}")
     }
 
@@ -154,7 +157,7 @@ class TypedOutputInterceptorTest {
         assertTrue("beta" in values, "sub-response from /beta was not observed; saw $values")
 
         val subs = Observed.seen.filter { it.value == "alpha" || it.value == "beta" }
-        subs.forEach { assertEquals("outer-request", it.parentRequestId, "sub-response lost its parent") }
+        subs.forEach { assertEquals(outerRequestId, it.parentRequestId, "sub-response lost its parent") }
         assertEquals(2, subs.map { it.requestId }.toSet().size, "sub-responses must be separately attributable")
     }
 
@@ -178,7 +181,7 @@ class TypedOutputInterceptorTest {
         }) {
             Observed.reset()
             val socket = TestServer.updates.webSocket.test()
-            val json = socket.server.externalSerialization.json
+            val json = contextOf<ServerRuntime>().externalSerialization.json
             val always: Condition<Sample> = Condition.Always
             socket.send(WebSocketFrame.Text(json.encodeToString(Condition.serializer(Sample.serializer()), always)))
 

@@ -78,7 +78,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
         val handler: WebSocketHandler<P, T>,
         val socketId: String,
         val stateAnonType: AnonType,
-    ) : WebSocketConnection<P, T>, ServerRuntime by root {
+    ) : WebSocketConnection<P, T> {
         override var currentState: T = stateAnonType.value(encoding, handler.storageSerializer)
 
         /**
@@ -153,11 +153,11 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
         }
 
         override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-            webSocketDynamo.subscribe(path.toString(), topic.path(), socketId)
+            webSocketDynamo.subscribe(path.toString(), with(root) { topic.path() }, socketId)
         }
 
         override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-            webSocketDynamo.unsubscribe(topic.path(), socketId)
+            webSocketDynamo.unsubscribe(with(root) { topic.path() }, socketId)
         }
 
         override suspend fun send(frame: WebSocketFrame) {
@@ -263,6 +263,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         ) { mid ->
                             h.messageFromSubscriptionWithMetrics(
                                 p.pathSpec,
+                                root,
                                 mid,
                                 WebSocketSubscriptionMessage(
                                     fullTopicMatch.value,
@@ -348,6 +349,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
             ) { mid ->
                 rootWs.didConnectWithMetrics(
                     rootPath,
+                    root,
                     mid
                 )
                 return APIGatewayV2HTTPResponse(200)
@@ -394,9 +396,11 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     domain = event.requestContext.domainName,
                     protocol = "https",
                     sourceIp = event.requestContext.identity.sourceIp ?: "0.0.0.0",
-                    // The gateway's connection ID is stable for the socket's whole lifetime, which is
-                    // exactly the correlation scope wanted for a connection.
-                    requestId = event.requestContext.connectionId,
+                    // Generated once here, at $connect, and persisted with the connection state, so it
+                    // is stable for the socket's whole lifetime — the correlation scope wanted for a
+                    // connection. The gateway's connection ID is not a UUID and stays in
+                    // [engineSocketId], which is where the join to the gateway's logs comes from.
+                    requestId = generateRequestId(),
                     upstreamRequestId = headers[HttpHeader.XRequestId]?.root,
                     engineSocketId = event.requestContext.connectionId
                 )
@@ -452,6 +456,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     ) { mid ->
                         rootWs.disconnectWithMetrics(
                             rootPath,
+                            root,
                             mid,
                             WebSocketClose.NORMAL
                         )
@@ -495,6 +500,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         }
                         rootWs.messageFromClientWithMetrics(
                             rootPath,
+                            root,
                             mid,
                             WebSocketFrame(event.body)
                         )

@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.location
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlin.uuid.Uuid
 
 
 /**
@@ -90,8 +91,8 @@ public data class WebSocketConnectRequest<PATH : PathSpec>(
      * this connection correlates back to it, since a long-lived socket is one logical session rather
      * than one request.
      */
-    override val requestId: String,
-    override val parentRequestId: String? = null,
+    override val requestId: Uuid,
+    override val parentRequestId: Uuid? = null,
     override val upstreamRequestId: String? = null,
     override val cache: SerializableCache = SerializableCache(),
     /**
@@ -101,6 +102,9 @@ public data class WebSocketConnectRequest<PATH : PathSpec>(
      */
     val engineSocketId: String? = null,
 ) : Request<PATH>() {
+    /** The gateway's identifier for a socket is the socket itself, so there is nothing else to hold. */
+    override val engineRequestId: String? get() = engineSocketId
+
     /**
      * Derives a logical sub-connection of this one, as multiplexing carries several logical sockets
      * over a single physical connection.
@@ -131,8 +135,8 @@ public data class WebSocketConnectRequest<PATH : PathSpec>(
 /**
  * Represents an active WebSocket connection with stateful lifecycle management.
  *
- * This interface extends [ServerRuntime] to provide access to server services and adds
- * WebSocket-specific functionality for managing connection state, subscriptions, and messaging.
+ * This is the socket alone: connection state, subscriptions, and messaging. The server it runs on is
+ * a separate concern, supplied to every [WebSocketHandler] method as a [ServerRuntime] context.
  *
  * **State Management:**
  * Each connection maintains a STORAGE object that can be updated in two ways:
@@ -149,7 +153,7 @@ public data class WebSocketConnectRequest<PATH : PathSpec>(
  * @param PATH The PathSpec type for this WebSocket endpoint
  * @param STORAGE The type of state object maintained for this connection
  */
-public interface WebSocketConnection<PATH : PathSpec, STORAGE> : ServerRuntime {
+public interface WebSocketConnection<PATH : PathSpec, STORAGE> {
     /** The original connection request */
     public val request: WebSocketConnectRequest<PATH>
 
@@ -210,8 +214,8 @@ public interface WebSocketConnection<PATH : PathSpec, STORAGE> : ServerRuntime {
  * 3. No way to query current subscriptions for a connection. Adding a `val subscriptions: Set<WebSocketSubscriptionRequest<*, *>>`
  *    would be useful for debugging and state inspection.
  *
- * 4. WebSocketConnection extends ServerRuntime which means every connection has its own runtime context.
- *    Document how this relates to the parent server runtime and if there are any scoping implications.
+ * 4. No way to identify a connection from the connection itself; callers reach for
+ *    `request.requestId`. Consider exposing the socket's identity directly.
  *
  * 5. The subscribe/unsubscribe operations don't return success/failure. If a topic doesn't exist or
  *    subscription fails, how does the caller know? Consider returning Boolean or throwing exceptions.

@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.typed
 
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.GeneralServerSettings
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -86,7 +87,7 @@ class WebSocketPermissionStalenessTest {
         ) {
             runBlocking {
                 val socket = fixture.ws.webSocket.test()
-                val json = socket.server.externalSerialization.json
+                val json = contextOf<ServerRuntime>().externalSerialization.json
                 val watchEverything = WebSocketFrame.Text(
                     json.encodeToString(Condition.serializer(Sample.serializer()), Condition.Always)
                 )

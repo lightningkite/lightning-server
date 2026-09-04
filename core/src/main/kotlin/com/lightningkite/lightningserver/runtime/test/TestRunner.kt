@@ -125,18 +125,17 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
 
         public suspend fun send(frame: WebSocketFrame) {
             /*logger.debug*/run { "$name --> '$frame'" }.let(::println)
-            with(server) {
-                handler.messageFromClient(frame)
-                flush()
-            }
+            val connection = this@TestWebSocket.server
+            with(this@TestRunner) { handler.messageFromClient(connection, frame) }
+            connection.flush()
         }
 
         public val server: ServerSide = ServerSide()
 
-        public inner class ServerSide() : WebSocketConnection<PATH, STORAGE>, ServerRuntime by this@TestRunner {
+        public inner class ServerSide() : WebSocketConnection<PATH, STORAGE> {
             private val changeQueue = ArrayList<(STORAGE) -> STORAGE>()
             private val sub: suspend (WebSocketSubscriptionMessage<*, *>) -> Unit = {
-                handler.messageFromSubscription(it)
+                with(this@TestRunner) { handler.messageFromSubscription(this@ServerSide, it) }
                 flush()
             }
 
@@ -185,7 +184,7 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
 
             override suspend fun close(reason: WebSocketClose) {
                 /*logger.debug*/run { "$name <-- <close>" }.let(::println)
-                handler.disconnect(reason)
+                with(this@TestRunner) { handler.disconnect(this@ServerSide, reason) }
             }
 
             internal fun clean() {

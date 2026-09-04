@@ -230,18 +230,20 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.wi
  * Wraps a WebSocket didConnect handler invocation with telemetry metrics.
  *
  * @param location The path specification for this WebSocket endpoint
+ * @param serverRuntime The runtime this phase runs on
  * @param connection The established WebSocket connection
  */
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.didConnectWithMetrics(
     location: PATH,
+    serverRuntime: ServerRuntime,
     connection: WebSocketConnection<PATH, STORAGE>,
 ) {
-    return with(connection) {
+    return with(serverRuntime) {
         instrument("didConnect", TelemetryAttributes {
             put(wsRoute, location.toString())
-            put(TelemetryKeys.Net.peerIp, request.sourceIp)
+            put(TelemetryKeys.Net.peerIp, connection.request.sourceIp)
         }) {
-            didConnect()
+            didConnect(connection)
         }
     }
 }
@@ -252,18 +254,20 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
  * Records the frame type (text/binary) and size in telemetry.
  *
  * @param location The path specification for this WebSocket endpoint
+ * @param serverRuntime The runtime this phase runs on
  * @param connection The WebSocket connection
  * @param frame The frame received from the client
  */
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.messageFromClientWithMetrics(
     location: PATH,
+    serverRuntime: ServerRuntime,
     connection: WebSocketConnection<PATH, STORAGE>,
     frame: WebSocketFrame,
 ) {
-    return with(connection) {
+    return with(serverRuntime) {
         instrument("messageFromClient", TelemetryAttributes {
             put(wsRoute, location.toString())
-            put(TelemetryKeys.Net.peerIp, request.sourceIp)
+            put(TelemetryKeys.Net.peerIp, connection.request.sourceIp)
             put(
                 wsFrameType, when (frame) {
                     is WebSocketFrame.Text -> "text"
@@ -277,7 +281,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
                 }
             )
         }) {
-            messageFromClient(frame)
+            messageFromClient(connection, frame)
         }
     }
 }
@@ -286,21 +290,23 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
  * Wraps a WebSocket messageFromSubscription handler invocation with telemetry metrics.
  *
  * @param location The path specification for this WebSocket endpoint
+ * @param serverRuntime The runtime this phase runs on
  * @param connection The WebSocket connection
  * @param topic The subscription message received
  */
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.messageFromSubscriptionWithMetrics(
     location: PATH,
+    serverRuntime: ServerRuntime,
     connection: WebSocketConnection<PATH, STORAGE>,
     topic: WebSocketSubscriptionMessage<*, *>,
 ) {
-    return with(connection) {
+    return with(serverRuntime) {
         instrument("messageFromSubscription", TelemetryAttributes {
             put(wsRoute, location.toString())
-            put(TelemetryKeys.Net.peerIp, request.sourceIp)
+            put(TelemetryKeys.Net.peerIp, connection.request.sourceIp)
             put(wsSubscriptionTopic, topic.topic.location.toString())
         }) {
-            messageFromSubscription(topic)
+            messageFromSubscription(connection, topic)
         }
     }
 }
@@ -309,22 +315,24 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
  * Wraps a WebSocket disconnect handler invocation with telemetry metrics.
  *
  * @param location The path specification for this WebSocket endpoint
+ * @param serverRuntime The runtime this phase runs on
  * @param connection The WebSocket connection being closed
  * @param reason The close reason and code
  */
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.disconnectWithMetrics(
     location: PATH,
+    serverRuntime: ServerRuntime,
     connection: WebSocketConnection<PATH, STORAGE>,
     reason: WebSocketClose,
 ) {
-    return with(connection) {
+    return with(serverRuntime) {
         instrument("disconnect", TelemetryAttributes {
             put(wsRoute, location.toString())
-            put(TelemetryKeys.Net.peerIp, request.sourceIp)
+            put(TelemetryKeys.Net.peerIp, connection.request.sourceIp)
             put(wsDisconnectCode, reason.code.toLong())
             put(wsDisconnectReason, reason.name)
         }) {
-            disconnect(reason)
+            disconnect(connection, reason)
         }
     }
 }

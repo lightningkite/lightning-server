@@ -40,21 +40,22 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
     override val storageSerializer: KSerializer<MultiplexWebSocketHandlerState> get() = serializer()
 
     private inner class WrappedConnection<T>(
+        val runtime: ServerRuntime,
         val wrapped: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>,
         val channel: String,
         val handler: WebSocketHandler<PathSpec, T>,
-    ) : WebSocketConnection<PathSpec, T>, ServerRuntime by wrapped {
+    ) : WebSocketConnection<PathSpec, T> {
         @Suppress("UNCHECKED_CAST")
         override val request: WebSocketConnectRequest<PathSpec> get() = wrapped.currentState.map.getValue(channel).request as WebSocketConnectRequest<PathSpec>
         override var currentState: T = wrapped.currentState.map.getValue(channel).storage.value(
-            wrapped.internalSerialization.kotlinBytesFormat,
+            runtime.internalSerialization.kotlinBytesFormat,
             handler.storageSerializer
         )
             private set
 
         override suspend fun close(reason: WebSocketClose) = wrapped.close(reason)
         override suspend fun send(frame: WebSocketFrame) = wrapped.send(
-            externalSerialization.json.encodeToString(
+            runtime.externalSerialization.json.encodeToString(
                 MultiplexMessage(
                     channel = channel,
                     data = frame.text
@@ -67,20 +68,21 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                 val info = wrapped.repullState().map[channel]
                     ?: throw IllegalStateException("Multiplex channel $channel was closed while it was being handled.")
                 info.storage.value(
-                    this.internalSerialization.kotlinBytesFormat,
+                    runtime.internalSerialization.kotlinBytesFormat,
                     handler.storageSerializer
                 )
             }
 
         override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-            if (topic.path() !in wrapped.currentState) wrapped.subscribe(topic)
+            val asString = with(runtime) { topic.path() }
+            if (asString !in wrapped.currentState) wrapped.subscribe(topic)
             wrapped.updateStateImmediately { data ->
-                data.updateChannel(channel) { it.copy(topics = it.topics + topic.path()) }
+                data.updateChannel(channel) { it.copy(topics = it.topics + asString) }
             }
         }
 
         override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-            val asString = topic.path()
+            val asString = with(runtime) { topic.path() }
             val newstate = wrapped.updateStateImmediately { data ->
                 data.updateChannel(channel) { it.copy(topics = it.topics - asString) }
             }
@@ -92,12 +94,12 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
             wrapped.queueStateUpdate { data ->
                 data.updateChannel(channel) { info ->
                     val underlying = info.storage.value(
-                        this.internalSerialization.kotlinBytesFormat,
+                        runtime.internalSerialization.kotlinBytesFormat,
                         handler.storageSerializer
                     )
                     info.copy(
                         storage = AnonType(
-                            this.internalSerialization.kotlinBytesFormat,
+                            runtime.internalSerialization.kotlinBytesFormat,
                             modification(underlying),
                             handler.storageSerializer
                         )
@@ -110,12 +112,12 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
             wrapped.updateStateImmediately { data ->
                 data.updateChannel(channel) { info ->
                     val underlying = info.storage.value(
-                        this.internalSerialization.kotlinBytesFormat,
+                        runtime.internalSerialization.kotlinBytesFormat,
                         handler.storageSerializer
                     )
                     info.copy(
                         storage = AnonType(
-                            this.internalSerialization.kotlinBytesFormat,
+                            runtime.internalSerialization.kotlinBytesFormat,
                             modification(underlying).also {
                                 currentState = it
                             },
@@ -138,11 +140,12 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
     }
 
     private suspend inline fun <T> WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>.withWrapped(
+        runtime: ServerRuntime,
         handler: WebSocketHandler<PathSpec, T>,
         channel: String,
         action: suspend (WrappedConnection<T>) -> Unit,
     ): WebSocketConnection<PathSpec, T> {
-        val wrapped = WrappedConnection(this, channel, handler)
+        val wrapped = WrappedConnection(runtime, this, channel, handler)
         action(wrapped)
         wrapped.finalize()
         return wrapped
@@ -154,11 +157,13 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
             map = mapOf(),
         )
 
-    context(connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>)
-    override suspend fun didConnect(): Unit = Unit
+    context(serverRuntime: ServerRuntime)
+    override suspend fun didConnect(connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>): Unit =
+        Unit
 
-    context(connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>)
+    context(serverRuntime: ServerRuntime)
     override suspend fun messageFromClient(
+        connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>,
         frame: WebSocketFrame,
     ) {
         if ((frame as? WebSocketFrame.Text)?.content?.isBlank() == true) {
@@ -166,48 +171,49 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
             return
         }
         val message =
-            connection.externalSerialization.json.decodeFromString<MultiplexMessage>((frame as WebSocketFrame.Text).content)
+            serverRuntime.externalSerialization.json.decodeFromString<MultiplexMessage>((frame as WebSocketFrame.Text).content)
         val channel = message.channel
         try {
             when {
                 message.start -> {
-                    val match = connection.server.endpoints.match(
-                        connection.externalSerialization.stringArrayFormat,
+                    val match = serverRuntime.server.endpoints.match(
+                        serverRuntime.externalSerialization.stringArrayFormat,
                         message.path!!
                     ) { it.webSocket } ?: throw NotFoundException()
                     // A virtual socket is a logical connection in its own right, so it must go through the webSocket
                     // interceptor chain. Taking the raw handler let every multiplexed socket bypass access logging and
                     // rate limiting, exactly as bulk sub-requests once bypassed the HTTP chain.
                     @Suppress("UNCHECKED_CAST")
-                    val otherHandler = connection.server.compiledWebSocketLogicalInterceptors
+                    val otherHandler = serverRuntime.server.compiledWebSocketLogicalInterceptors
                         .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
                     val r = connection.request.subConnection<PathSpec>(
                         path = RawWebSocketPath<PathSpec>(PathSegments.parse(message.path!!), match),
                         queryParameters = QueryParameters(connection.request.queryParameters + (message.queryParams?.entries?.flatMap { it.value.map { v -> it.key to v } }
                             ?: listOf())),
                     )
-                    val storage = otherHandler.willConnectWithMetrics(match.path.pathSpec, connection, r)
+                    val storage = otherHandler.willConnectWithMetrics(match.path.pathSpec, serverRuntime, r)
                     connection.updateStateImmediately {
                         it.copy(
                             map = it.map + (channel to MultiplexWebSocketHandlerConnectionInfo(
                                 request = r,
                                 storage = AnonType(
-                                    connection.internalSerialization.kotlinBytesFormat,
+                                    serverRuntime.internalSerialization.kotlinBytesFormat,
                                     storage,
                                     otherHandler.storageSerializer
                                 ),
                             ))
                         )
                     }
-                    connection.withWrapped(otherHandler, channel) {
+                    connection.withWrapped(serverRuntime, otherHandler, channel) {
                         otherHandler.didConnectWithMetrics(
                             match.pathSpec,
+                            serverRuntime,
                             it
                         )
                     }
                     connection.send(
                         WebSocketFrame(
-                            connection.externalSerialization.json.encodeToString(
+                            serverRuntime.externalSerialization.json.encodeToString(
                                 MultiplexMessage(
                                     channel = channel,
                                     start = true
@@ -220,13 +226,14 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                 message.end -> {
                     val info = connection.currentState.map[message.channel]
                         ?: throw NotFoundException("No open multiplex channel ${message.channel} to end.")
-                    val match = with(connection) { info.request.path.match }
+                    val match = info.request.path.match
                     @Suppress("UNCHECKED_CAST")
-                    val otherHandler = connection.server.compiledWebSocketLogicalInterceptors
+                    val otherHandler = serverRuntime.server.compiledWebSocketLogicalInterceptors
                         .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
-                    connection.withWrapped(otherHandler, channel) {
+                    connection.withWrapped(serverRuntime, otherHandler, channel) {
                         otherHandler.disconnectWithMetrics(
                             match.pathSpec,
+                            serverRuntime,
                             it,
                             WebSocketClose.NORMAL
                         )
@@ -234,7 +241,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                     connection.updateStateImmediately { it.copy(map = it.map - channel) }
                     connection.send(
                         WebSocketFrame(
-                            connection.externalSerialization.json.encodeToString(
+                            serverRuntime.externalSerialization.json.encodeToString(
                                 MultiplexMessage(
                                     channel = channel,
                                     end = true
@@ -247,20 +254,21 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                 message.data != null -> {
                     val info = connection.currentState.map[message.channel]
                         ?: throw NotFoundException("No open multiplex channel ${message.channel} to deliver data to.")
-                    val match = with(connection) { info.request.path.match }
+                    val match = info.request.path.match
                     @Suppress("UNCHECKED_CAST")
-                    val otherHandler = connection.server.compiledWebSocketLogicalInterceptors
+                    val otherHandler = serverRuntime.server.compiledWebSocketLogicalInterceptors
                         .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
                     val textFrame = WebSocketFrame.Text(message.data!!)
                     connection.withWrapped(
+                        serverRuntime,
                         otherHandler,
                         channel
-                    ) { otherHandler.messageFromClientWithMetrics(match.pathSpec, it, textFrame) }
+                    ) { otherHandler.messageFromClientWithMetrics(match.pathSpec, serverRuntime, it, textFrame) }
                 }
             }
         } catch (e: Exception) {
             connection.send(
-                connection.externalSerialization.json.encodeToString(
+                serverRuntime.externalSerialization.json.encodeToString(
                     MultiplexMessage(
                         channel,
                         end = true,
@@ -269,13 +277,14 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                 )
             )
             connection.currentState.map[channel]?.let { info ->
-                val match = with(connection) { info.request.path.match }
+                val match = info.request.path.match
                 @Suppress("UNCHECKED_CAST")
-                val otherHandler = connection.server.compiledWebSocketLogicalInterceptors
+                val otherHandler = serverRuntime.server.compiledWebSocketLogicalInterceptors
                     .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
-                connection.withWrapped(otherHandler, channel) {
+                connection.withWrapped(serverRuntime, otherHandler, channel) {
                     otherHandler.disconnectWithMetrics(
                         match.pathSpec,
+                        serverRuntime,
                         it,
                         ((e as? HttpStatusException)?.status ?: HttpStatus.InternalServerError).bestWebSocketCloseCode
                     )
@@ -285,34 +294,37 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
         }
     }
 
-    context(connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>)
+    context(serverRuntime: ServerRuntime)
     override suspend fun messageFromSubscription(
+        connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>,
         topic: WebSocketSubscriptionMessage<*, *>,
-    ): Unit = with(connection) {
-        for ((channel, info) in currentState.map) {
+    ) {
+        for ((channel, info) in connection.currentState.map) {
             if (info.topics.contains(topic.path())) {
-                val match = with(connection) { info.request.path.match }
+                val match = info.request.path.match
                 @Suppress("UNCHECKED_CAST")
-                val otherHandler = connection.server.compiledWebSocketLogicalInterceptors
+                val otherHandler = serverRuntime.server.compiledWebSocketLogicalInterceptors
                     .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
-                connection.withWrapped(otherHandler, channel) {
-                    otherHandler.messageFromSubscriptionWithMetrics(match.pathSpec, it, topic)
+                connection.withWrapped(serverRuntime, otherHandler, channel) {
+                    otherHandler.messageFromSubscriptionWithMetrics(match.pathSpec, serverRuntime, it, topic)
                 }
             }
         }
     }
 
-    context(connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>)
-    override suspend fun disconnect(reason: WebSocketClose): Unit =
-        with(connection) {
-            currentState.map.entries.forEach { (channel, info) ->
-                val match = with(connection) { info.request.path.match }
-                @Suppress("UNCHECKED_CAST")
-                val otherHandler = connection.server.compiledWebSocketLogicalInterceptors
-                    .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
-                connection.withWrapped(otherHandler, channel) {
-                    otherHandler.disconnectWithMetrics(match.pathSpec, it, reason)
-                }
+    context(serverRuntime: ServerRuntime)
+    override suspend fun disconnect(
+        connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>,
+        reason: WebSocketClose,
+    ) {
+        connection.currentState.map.entries.forEach { (channel, info) ->
+            val match = info.request.path.match
+            @Suppress("UNCHECKED_CAST")
+            val otherHandler = serverRuntime.server.compiledWebSocketLogicalInterceptors
+                .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
+            connection.withWrapped(serverRuntime, otherHandler, channel) {
+                otherHandler.disconnectWithMetrics(match.pathSpec, serverRuntime, it, reason)
             }
         }
+    }
 }

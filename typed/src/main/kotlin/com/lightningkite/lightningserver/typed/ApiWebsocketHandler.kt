@@ -27,7 +27,13 @@ public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
     override val storageSerializer: KSerializer<ApiWebSocketStorage<STORAGE>>
         get() = ApiWebSocketStorage.serializer(innerStorageSerializer)
 
-    public interface Connection<PATH : PathSpec, STORAGE, USER : HasId<*>?, INPUT, OUTPUT> : ServerRuntime {
+    /**
+     * The typed view of one socket: its request, its decoded state, and typed sending.
+     *
+     * The socket alone, like [WebSocketConnection] underneath it. The server it runs on arrives
+     * separately, as the [ServerRuntime] context of every `*Typed` method below.
+     */
+    public interface Connection<PATH : PathSpec, STORAGE, USER : HasId<*>?, INPUT, OUTPUT> {
         public val request: WebSocketConnectRequest<PATH>
         public val currentState: STORAGE
         public suspend fun auth(): Authentication<USER & Any>?
@@ -40,20 +46,28 @@ public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
         public suspend fun close(reason: WebSocketClose)
     }
 
+    /*
+     * The typed phases mirror the raw ones: the server is the context and the socket is an argument,
+     * because they have different lifetimes. On a serverless engine each phase is a separate
+     * invocation with its own runtime, while the connection persists across all of them.
+     */
     public context(serverRuntime: ServerRuntime)
     suspend fun willConnectTyped(access: WebSocketConnectRequestAccess<PATH, USER>): STORAGE
 
-    public context(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>)
-    suspend fun didConnectTyped()
+    public context(serverRuntime: ServerRuntime)
+    suspend fun didConnectTyped(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>)
 
-    public context(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>)
-    suspend fun messageFromClientTyped(frame: INPUT)
+    public context(serverRuntime: ServerRuntime)
+    suspend fun messageFromClientTyped(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>, frame: INPUT)
 
-    public context(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>)
-    suspend fun messageFromSubscriptionTyped(topic: WebSocketSubscriptionMessage<*, *>)
+    public context(serverRuntime: ServerRuntime)
+    suspend fun messageFromSubscriptionTyped(
+        connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>,
+        topic: WebSocketSubscriptionMessage<*, *>,
+    )
 
-    public context(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>)
-    suspend fun disconnectTyped(reason: WebSocketClose)
+    public context(serverRuntime: ServerRuntime)
+    suspend fun disconnectTyped(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>, reason: WebSocketClose)
 
 
     override context(serverRuntime: ServerRuntime)
@@ -68,55 +82,55 @@ public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
         }
     }
 
-    override context(connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>)
-    suspend fun didConnect() {
-        with(ConnectionWrapper<PATH, STORAGE, USER, INPUT, OUTPUT>(connection, outputType, auth)) { didConnectTyped() }
+    override context(serverRuntime: ServerRuntime)
+    suspend fun didConnect(connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>) {
+        didConnectTyped(connection.typed())
     }
 
-    override context(connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>)
-    suspend fun messageFromClient(frame: WebSocketFrame) {
+    override context(serverRuntime: ServerRuntime)
+    suspend fun messageFromClient(
+        connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>,
+        frame: WebSocketFrame,
+    ) {
         val parsed = try {
             connection.currentState.mediaType.decoder!!(frame, inputType)
         } catch (e: SerializationException) {
             throw BadRequestException(e.message ?: "Could not parse", cause = e)
         }
-        with(
-            ConnectionWrapper<PATH, STORAGE, USER, INPUT, OUTPUT>(
-                connection,
-                outputType,
-                auth
-            )
-        ) { messageFromClientTyped(parsed) }
+        messageFromClientTyped(connection.typed(), parsed)
     }
 
-    override context(connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>)
-    suspend fun messageFromSubscription(topic: WebSocketSubscriptionMessage<*, *>) {
-        with(
-            ConnectionWrapper<PATH, STORAGE, USER, INPUT, OUTPUT>(
-                connection,
-                outputType,
-                auth
-            )
-        ) { messageFromSubscriptionTyped(topic) }
+    override context(serverRuntime: ServerRuntime)
+    suspend fun messageFromSubscription(
+        connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>,
+        topic: WebSocketSubscriptionMessage<*, *>,
+    ) {
+        messageFromSubscriptionTyped(connection.typed(), topic)
     }
 
-    override context(connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>)
-    suspend fun disconnect(reason: WebSocketClose) {
-        with(ConnectionWrapper<PATH, STORAGE, USER, INPUT, OUTPUT>(connection, outputType, auth)) {
-            disconnectTyped(
-                reason
-            )
-        }
+    override context(serverRuntime: ServerRuntime)
+    suspend fun disconnect(
+        connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>,
+        reason: WebSocketClose,
+    ) {
+        disconnectTyped(connection.typed(), reason)
     }
+
+    /** Presents the raw connection as the typed one this handler's own methods are written against. */
+    private context(serverRuntime: ServerRuntime)
+    fun WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>.typed(): Connection<PATH, STORAGE, USER, INPUT, OUTPUT> =
+        ConnectionWrapper<PATH, STORAGE, USER, INPUT, OUTPUT>(serverRuntime, this, outputType, auth)
 }
 
 
 private class ConnectionWrapper<PATH : PathSpec, STORAGE, USER : HasId<*>?, INPUT, OUTPUT>(
+    /** Needed for the wrapper's own work — resolving auth and encoding output — not exposed to the socket. */
+    private val runtime: ServerRuntime,
     val wraps: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>,
     val outputSerializer: KSerializer<OUTPUT>,
     val authRequirement: AuthRequirement<USER>,
-) : ApiWebSocketHandler.Connection<PATH, STORAGE, USER, INPUT, OUTPUT>, ServerRuntime by wraps {
-    override suspend fun auth(): Authentication<USER & Any>? = wraps.request.auth(authRequirement)
+) : ApiWebSocketHandler.Connection<PATH, STORAGE, USER, INPUT, OUTPUT> {
+    override suspend fun auth(): Authentication<USER & Any>? = with(runtime) { wraps.request.auth(authRequirement) }
     override val request: WebSocketConnectRequest<PATH> get() = wraps.request
     override val currentState: STORAGE get() = wraps.currentState.storage
     override suspend fun repullState(): STORAGE = wraps.repullState().storage
@@ -130,7 +144,7 @@ private class ConnectionWrapper<PATH : PathSpec, STORAGE, USER : HasId<*>?, INPU
     override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) = wraps.unsubscribe(topic)
     // The single chokepoint for every typed WebSocket output, model update streams included. See
     // TypedOutputInterceptor for why observation happens before encoding.
-    override suspend fun send(frame: OUTPUT) {
+    override suspend fun send(frame: OUTPUT): Unit = with(runtime) {
         emitTypedOutput(wraps.request, outputSerializer, frame)
         wraps.send(wraps.currentState.mediaType.encoder!!.ws(wraps.currentState.mediaType, outputSerializer, frame))
     }

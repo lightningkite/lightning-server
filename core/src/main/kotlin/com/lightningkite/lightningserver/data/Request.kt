@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import kotlin.uuid.Uuid
 
 /**
  * Base class for HTTP requests in Lightning Server.
@@ -40,19 +41,27 @@ public abstract class Request<out PATH : PathSpec> : HasContextualPath<PATH>, Ca
      * Never derived from an untrusted caller — see
      * [com.lightningkite.lightningserver.http.requestIdentity] for how engines resolve it.
      */
-    public abstract val requestId: String
+    public abstract val requestId: Uuid
 
     /**
      * The [requestId] of the request that dispatched this one, for sub-requests of a multiplexed
      * request, or null for a request that arrived directly from a client.
      */
-    public abstract val parentRequestId: String?
+    public abstract val parentRequestId: Uuid?
 
     /**
      * An identifier the caller supplied that was not trusted, kept for diagnostics only.
      * Never used for correlation.
      */
     public abstract val upstreamRequestId: String?
+
+    /**
+     * The identifier the gateway or proxy in front of the server minted for this request, or null
+     * when the engine has none. Trusted — it comes from our own infrastructure rather than the
+     * caller — and kept only so a record can be joined back to that gateway's own access log, which
+     * is why it is a `String`: it is the gateway's identifier, in whatever shape the gateway uses.
+     */
+    public abstract val engineRequestId: String?
 
     context(serverRuntime: ServerRuntime)
     override val pathInContext: ResolvedPath<PATH>

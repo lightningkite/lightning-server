@@ -24,6 +24,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.fail
+import kotlin.uuid.Uuid
 
 /**
  * The access log previously emitted before the handler ran, so a line carried no status, no duration,
@@ -69,6 +70,8 @@ class AccessLogInterceptorTest {
 
     private fun accessLines(lines: List<String>) = lines.filter { it.contains("accessed by") || it.startsWith("ws ") }
 
+    private val requestIdUnderTest = Uuid.parse("11111111-2222-3333-4444-555555555555")
+
     private fun get(path: String) = HttpRequest<PathSpec>(
         path = RawHttpEndpoint(asString = path, method = HttpMethod.GET),
         queryParameters = QueryParameters.EMPTY,
@@ -76,7 +79,7 @@ class AccessLogInterceptorTest {
         domain = "example.com",
         protocol = "https",
         sourceIp = "10.0.0.1",
-        requestId = "req-under-test",
+        requestId = requestIdUnderTest,
     )
 
     @Test
@@ -88,7 +91,7 @@ class AccessLogInterceptorTest {
         val line = accessLines(lines).singleOrNull() ?: fail("expected one access line; got $lines")
         assertTrue(line.contains("-> 200"), "line should carry the status; was: $line")
         assertTrue(Regex("in \\d+ms").containsMatchIn(line), "line should carry the duration; was: $line")
-        assertTrue(line.contains("req-under-test"), "line should carry the request id; was: $line")
+        assertTrue(line.contains(requestIdUnderTest.toString()), "line should carry the request id; was: $line")
         assertTrue(line.contains("10.0.0.1"), "line should carry the source ip; was: $line")
     }
 

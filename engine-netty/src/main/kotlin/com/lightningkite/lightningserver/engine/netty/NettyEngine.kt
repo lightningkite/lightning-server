@@ -333,7 +333,7 @@ public class NettyEngine(
                         val pathspec = ctx.channel().attr(PATHSPEC_KEY).get() ?: return
                         scope.launch(ctx.executor().asCoroutineDispatcher()) {
                             try {
-                                handler.messageFromClientWithMetrics(pathspec, mid, m)
+                                handler.messageFromClientWithMetrics(pathspec, this@NettyEngine, mid, m)
                             } catch (e: Exception) {
                                 mid.close(
                                     ((e as? HttpStatusException)?.status
@@ -357,7 +357,7 @@ public class NettyEngine(
                         val pathspec = ctx.channel().attr(PATHSPEC_KEY).get() ?: return
                         scope.launch(ctx.executor().asCoroutineDispatcher()) {
                             try {
-                                handler.messageFromClientWithMetrics(pathspec, mid, m)
+                                handler.messageFromClientWithMetrics(pathspec, this@NettyEngine, mid, m)
                             } catch (e: Exception) {
                                 mid.close(
                                     ((e as? HttpStatusException)?.status
@@ -381,7 +381,7 @@ public class NettyEngine(
                         if (mid != null && handler != null && pathspec != null) {
                             scope.launch(ctx.executor().asCoroutineDispatcher()) {
                                 try {
-                                    handler.disconnectWithMetrics(pathspec, mid, WebSocketClose.NORMAL)
+                                    handler.disconnectWithMetrics(pathspec, this@NettyEngine, mid, WebSocketClose.NORMAL)
                                 } catch (e: Exception) {
                                     mid.close(
                                         ((e as? HttpStatusException)?.status
@@ -569,7 +569,7 @@ public class NettyEngine(
                 handshaker.handshake(ctx.channel(), req).addListener {
                     scope.launch {
                         try {
-                            socketHandler.didConnectWithMetrics(match.pathSpec, mid)
+                            socketHandler.didConnectWithMetrics(match.pathSpec, this@NettyEngine, mid)
                         } catch (_: Throwable) {
                         }
                     }
@@ -597,11 +597,9 @@ public class NettyEngine(
                 val handler = ctx.channel().attr(HANDLER_KEY).get()
                 if (mid != null && handler != null) {
                     try {
-                        context(mid) {
-                            scope.launch {
-                                logger.error { "Disconnected because channel is inactive " }
-                                handler.disconnect(WebSocketClose.GOING_AWAY)
-                            }
+                        scope.launch {
+                            logger.error { "Disconnected because channel is inactive " }
+                            with(this@NettyEngine) { handler.disconnect(mid, WebSocketClose.GOING_AWAY) }
                         }
                     } catch (_: Throwable) {
                     }
