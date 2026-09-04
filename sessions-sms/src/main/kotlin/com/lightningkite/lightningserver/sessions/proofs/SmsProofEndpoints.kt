@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
+import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.signer
@@ -121,8 +122,18 @@ public class SmsProofEndpoints(
      * Security: The proof is signed and time-limited to prevent tampering or replay.
      */
     context(_: ServerRuntime)
-    public suspend fun send(destination: String, content: (Proof) -> String) {
-        sms().send(destination.toPhoneNumber(), content(issueProof(destination)))
+    public suspend fun send(destination: String, content: (Proof) -> String): Unit =
+        send(destination, request = null, content = content)
+
+    /**
+     * As [send], naming the request that asked for the link to be sent.
+     *
+     * Pass the request wherever the caller has one. The proof is a bearer credential, so the audit
+     * record of its issuance is only as useful as the origin it names.
+     */
+    context(_: ServerRuntime)
+    public suspend fun send(destination: String, request: Request<*>?, content: (Proof) -> String) {
+        sms().send(destination.toPhoneNumber(), content(issueProof(destination, request)))
     }
 }
 

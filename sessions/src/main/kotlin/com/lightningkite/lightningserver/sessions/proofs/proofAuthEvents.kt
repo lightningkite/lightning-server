@@ -98,7 +98,7 @@ public suspend fun reportProofRejected(
  * Raised where the acceptance happens — at the end of a `prove` handler, after the secret has been
  * checked — and deliberately not where proofs are *minted*. `Signer.makeProof` also mints a proof to
  * be mailed to someone (a magic link), which is not a credential having been presented and must not
- * be recorded as one. See the module notes on that split.
+ * be recorded as one. That path raises [reportProofIssued] instead.
  *
  * @param principal The account that authenticated. For a method that proves ownership of an address
  *   rather than of an account (an emailed or texted PIN), this is that address: those endpoints
@@ -111,6 +111,41 @@ public suspend fun reportProofAccepted(
     principal: String? = null,
     request: Request<*>? = null,
 ): Unit = reportProofEvent("ProofAccepted", method, principal, request, null)
+
+/**
+ * Records that a proof was minted to be sent to someone, with nothing presented by anyone.
+ *
+ * This is the magic-link case: the server decides to trust an address and mails it a signed proof.
+ * The result is a bearer credential — whoever reads that message can authenticate as the address —
+ * so the issuance is the act an investigation starts from. Without this the whole flow was invisible:
+ * a link issued to an address an attacker controls produces a perfectly ordinary [ProofAccepted]
+ * later, and nothing records that the credential was handed out in the first place.
+ *
+ * Deliberately not [reportProofAccepted]. Recording issuance as an acceptance would put a login in
+ * the log that never happened, and would make "how many times did this account authenticate" wrong.
+ *
+ * ## Origin is the point, so pass the request
+ * Issuance is normally caused by an inbound request — a frontend calling "email this person a link"
+ * — and that request is what an investigation actually wants: the IP and user agent of whoever asked
+ * for the credential to be sent. Pass it. The event also carries the execution's request id, so the
+ * request log is a second route to the same origin even where a caller does not.
+ *
+ * Where issuance genuinely has no request behind it — a scheduled re-invite, say — the origin stays
+ * null rather than becoming a placeholder, as everywhere else here.
+ *
+ * @param method The proof method the credential was minted for; its `via` and `property` land on the
+ *   record.
+ * @param principal The address the proof was issued for. As with an emailed PIN, these endpoints
+ *   never resolve a subject — that happens later, at login — so the address is the truthful answer
+ *   to who this was about.
+ * @param request The request that caused the issuance, where there was one.
+ */
+context(server: ServerRuntime)
+public suspend fun reportProofIssued(
+    method: ProofMethodInfo,
+    principal: String? = null,
+    request: Request<*>? = null,
+): Unit = reportProofEvent("ProofIssued", method, principal, request, null)
 
 context(server: ServerRuntime)
 private suspend fun reportProofEvent(

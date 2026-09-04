@@ -1111,6 +1111,8 @@ acting and target principal where they differ:
 - token issuance, refresh, and refresh failure
 - session termination, including the acting principal when terminated by an administrator
 - proof submission per method, success and failure
+- proof *issuance* where nothing was presented — a mailed magic link is a bearer credential, and
+  whoever receives it can authenticate as the address, so the issuance is its own event
 - masquerade assumed and released, with actor and target
 - scope or permission change
 

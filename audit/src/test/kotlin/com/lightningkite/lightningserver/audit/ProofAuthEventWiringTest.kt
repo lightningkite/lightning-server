@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.audit
 
+import com.lightningkite.lightningserver.auth.noAuth
+import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.idString
@@ -51,7 +53,7 @@ import kotlin.uuid.Uuid
  * Proof *issuance* and proof *acceptance* are different events. `Signer.makeProof` is reached both by
  * a `prove` handler that has just checked a secret and by `PinBasedProofEndpoints.issueProof`, which
  * mints a proof to be mailed to somebody (a magic link) with nothing presented at all. Only the first
- * is an acceptance; `a mailed magic link is not recorded as an accepted proof` pins that down.
+ * is an acceptance; `a mailed magic link is recorded as issued, not as accepted` pins that down.
  */
 class ProofAuthEventWiringTest {
 
@@ -99,6 +101,27 @@ class ProofAuthEventWiringTest {
         /** Reaches the magic-link mint, which is `protected` on the base class. */
         context(_: ServerRuntime)
         suspend fun mintMagicLink(destination: String): Proof = issueProof(destination)
+
+        /**
+         * Stands in for an application's own "email me a login link" route.
+         *
+         * The framework ships no such endpoint — magic links are always the application calling
+         * `send(destination) { ... }` from a route of its own — so the realistic case has to be
+         * modelled here. It passes `request`, which is the whole point: that is where the IP and
+         * user agent of whoever asked for the link come from.
+         */
+        val sendLink: ApiHttpHandler<PathSpec0, HasId<*>?, String, Boolean> =
+            path.path("send-link").post bind ApiHttpHandler(
+                auth = noAuth,
+                summary = "Send a magic link",
+                description = "Mints a proof to be mailed to the address, presenting nothing.",
+                errorCases = emptyList(),
+                successCode = HttpStatus.OK,
+                implementation = { destination: String ->
+                    issueProof(destination, request)
+                    true
+                },
+            )
     }
 
     object TestServer : ServerBuilder() {
@@ -441,16 +464,74 @@ class ProofAuthEventWiringTest {
     /**
      * The issuance/acceptance split, asserted rather than assumed. `issueProof` mints a proof to be
      * mailed to an address — a magic link — with no credential presented by anyone. Recording that as
-     * `ProofAccepted` would put a login in the log that never happened.
+     * `ProofAccepted` would put a login in the log that never happened, and would make "how many
+     * times did this account authenticate" wrong.
+     *
+     * It *is* recorded, as [AuthEventType.ProofIssued]. The link is a bearer credential from the
+     * moment it exists, so an attacker who can cause one to be issued to an address they control
+     * needs no credential at all — and the resulting login looks entirely ordinary. The issuance is
+     * the only point at which that shows up.
      */
     @Test
-    fun `a mailed magic link is not recorded as an accepted proof`() = onServer {
+    fun `a mailed magic link is recorded as issued, not as accepted`() = onServer {
         TestServer.pin.mintMagicLink("victim@example.com")
 
-        assertTrue(
-            events().isEmpty(),
-            "minting a proof to mail to someone was recorded as a presented credential being accepted",
+        val event = events().single()
+        assertEquals(
+            AuthEventType.ProofIssued,
+            event.type,
+            "minting a proof to mail to someone must not read as a presented credential being accepted",
         )
+        assertEquals("victim@example.com", event.principal)
+        assertEquals("testpin", event.method)
+    }
+
+    /**
+     * The trace this event exists for, end to end: a frontend asks for a link to be mailed, and the
+     * log can name who asked.
+     *
+     * A magic link is a bearer credential, so "someone caused a link to be sent to an address they
+     * control" is the attack, and it is invisible at login time — the resulting authentication looks
+     * entirely ordinary. The issuance is the only point where the requester's origin is knowable, so
+     * an issuance event with no origin would record that something happened while losing the one
+     * fact worth having.
+     */
+    @Test
+    fun `an issuance names the origin of the request that asked for it`() = onServer {
+        serverRuntime.handle(post("/pin/send-link", "\"victim@example.com\""), testId(20))
+
+        val event = events().single()
+        assertEquals(AuthEventType.ProofIssued, event.type)
+        assertEquals("victim@example.com", event.principal)
+        assertEquals("203.0.113.7", event.sourceIp, "the log must name who asked for the link")
+        assertEquals("probe/1.0", event.userAgent)
+    }
+
+    /** And the same origin is reachable through the request log, independently of the event's own columns. */
+    @Test
+    fun `an issuance joins the request record of the call that asked for it`() = onServer {
+        serverRuntime.handle(post("/pin/send-link", "\"victim@example.com\""), testId(21))
+
+        val event = events().single()
+        assertEquals(testId(21), event.requestId)
+        val requests = TestServer.audit.requests().find(Condition.Always).toList()
+        val row = requests.singleOrNull { it._id == testId(21) }
+        assertEquals("203.0.113.7", row?.sourceIp, "the issuance points at no request record")
+    }
+
+    /**
+     * Where issuance genuinely has no request behind it — a scheduled re-invite, say — the origin
+     * stays absent rather than becoming a placeholder. A fabricated IP reads as a real observation
+     * to whoever queries the log.
+     */
+    @Test
+    fun `an issuance with no request records no origin rather than a fake one`() = onServer {
+        TestServer.pin.mintMagicLink("victim@example.com")
+
+        val event = events().single()
+        assertEquals(AuthEventType.ProofIssued, event.type)
+        assertNull(event.sourceIp, "a request-less issuance must not be given a fabricated origin")
+        assertNull(event.userAgent, "a request-less issuance must not be given a fabricated user agent")
     }
 
     // ---- WebAuthN ----------------------------------------------------------------------------

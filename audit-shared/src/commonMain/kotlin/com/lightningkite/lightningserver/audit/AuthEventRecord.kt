@@ -35,6 +35,16 @@ public enum class AuthEventType {
 
     /** A proof was rejected. */
     ProofRejected,
+
+    /**
+     * A proof was minted and sent to someone with no credential presented by anyone — a magic link.
+     *
+     * Separate from [ProofAccepted] because nothing was proven: the server decided to trust an
+     * address and mailed a bearer credential to it. Whoever reads that message can authenticate as
+     * the address, so issuance is itself the act worth tracking — an attacker who can cause a link
+     * to be issued to an address they control needs no credential at all.
+     */
+    ProofIssued,
 }
 
 /**

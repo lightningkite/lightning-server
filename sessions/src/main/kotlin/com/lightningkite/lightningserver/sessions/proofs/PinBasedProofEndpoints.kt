@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
+import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.auth.PrincipalType
@@ -65,11 +66,20 @@ public abstract class PinBasedProofEndpoints(
         )
 
     context(_: ServerRuntime)
-    protected suspend fun issueProof(destination: String): Proof {
-        return proofSigner.await().makeProof(
+    protected suspend fun issueProof(destination: String, request: Request<*>? = null): Proof {
+        val proof = proofSigner.await().makeProof(
             property = property,
             value = destination,
         )
+        // Recorded here rather than at the call sites that mail it: every path that mints an
+        // unpresented proof goes through this function, so instrumenting it is what makes the record
+        // complete. The proof is a bearer credential the moment it exists, so the mint is the event.
+        //
+        // `request` is the request that asked for the link to be sent, where the caller has one —
+        // which is the normal case, since a frontend triggers this. It carries the IP and user agent
+        // of whoever asked, which is what an investigation into a misused link starts from.
+        reportProofIssued(info, principal = destination, request = request)
+        return proof
     }
 
     override val prove: ApiHttpHandler<PathSpec0, HasId<*>?, FinishProof, Proof> =
