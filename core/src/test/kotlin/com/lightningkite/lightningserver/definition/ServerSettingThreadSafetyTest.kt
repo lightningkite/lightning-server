@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.definition
 
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.Engine
+import com.lightningkite.lightningserver.runtime.ExecutionCause
 import com.lightningkite.lightningserver.settings.ServerSettings
 import kotlinx.coroutines.*
 import kotlinx.serialization.builtins.serializer
@@ -29,9 +30,8 @@ class ServerSettingThreadSafetyTest {
         val cached = Runtime.Cached(runtime)
 
         // Create a minimal test runtime context
-        val testRuntime = object : com.lightningkite.lightningserver.runtime.ServerRuntime {
+        val testRuntime = object : com.lightningkite.lightningserver.runtime.Engine {
             override val server get() = throw NotImplementedError()
-            override val initiator get() = throw NotImplementedError()
             override val settings get() = throw NotImplementedError()
             override val internalSerialization get() = throw NotImplementedError()
             override val externalSerialization get() = throw NotImplementedError()
@@ -39,8 +39,10 @@ class ServerSettingThreadSafetyTest {
             override val serverVersion get() = ""
             override val projectName get() = ""
             override val sharedResources get() = throw NotImplementedError()
-            override suspend fun <T> com.lightningkite.lightningserver.definition.Task<T>.invoke(input: T) =
-                throw NotImplementedError()
+            override suspend fun <T> com.lightningkite.lightningserver.definition.Task<T>.invoke(
+                input: T,
+                cause: com.lightningkite.lightningserver.runtime.ExecutionCause?,
+            ) = throw NotImplementedError()
 
             override suspend fun <PATH : com.lightningkite.lightningserver.pathing.PathSpec, T> sendWebSocketSubscriptionMessage(
                 event: com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage<PATH, T>,
@@ -96,10 +98,9 @@ class ServerSettingThreadSafetyTest {
         }
     }
 
-    /** Minimal [ServerRuntime] stub whose only usable capability is acting as the settings/transformation context. */
-    private fun stubRuntime(): ServerRuntime = object : ServerRuntime {
+    /** Minimal [Engine] stub whose only usable capability is acting as the settings/transformation context. */
+    private fun stubRuntime(): Engine = object : Engine {
         override val server get() = throw NotImplementedError()
-        override val initiator get() = throw NotImplementedError()
         override val settings get() = throw NotImplementedError()
         override val internalSerialization get() = throw NotImplementedError()
         override val externalSerialization get() = throw NotImplementedError()
@@ -107,7 +108,7 @@ class ServerSettingThreadSafetyTest {
         override val serverVersion get() = ""
         override val projectName get() = ""
         override val sharedResources get() = throw NotImplementedError()
-        override suspend fun <T> Task<T>.invoke(input: T) = throw NotImplementedError()
+        override suspend fun <T> Task<T>.invoke(input: T, cause: ExecutionCause?) = throw NotImplementedError()
         override suspend fun <PATH : com.lightningkite.lightningserver.pathing.PathSpec, T> sendWebSocketSubscriptionMessage(
             event: com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage<PATH, T>,
         ) = throw NotImplementedError()

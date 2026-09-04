@@ -3,7 +3,7 @@ package com.lightningkite.lightningserver.typed.sdk
 import com.lightningkite.lightningserver.auth.naturalLanguage
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.plus
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.typed.LiveVersion
 import com.lightningkite.lightningserver.typed.sdk.SDK.processToModules
 import com.lightningkite.lightningserver.typed.sdk.SDK.sdk
@@ -114,7 +114,7 @@ public class FetcherSdk(
      *
      * @param archive The archive where generated files will be written
      */
-    context(server: ServerRuntime)
+    context(server: Engine)
     override fun write(archive: Archive) {
         val processed = server.server.sdk(rootInfo).processToModules().ensureUniqueNames()
 
@@ -169,7 +169,7 @@ public class FetcherSdk(
             .joinTo(this, "\n", prefix = "\n", postfix = "\n") { "import $it" }
     }
 
-    context(_: ServerRuntime)
+    context(_: Engine)
     private fun Appendable.writeInterface(module: SDK.Module) {
         fun SDK.Module.writeInterface(depth: Int) {
 
@@ -227,7 +227,7 @@ public class FetcherSdk(
         module.writeInterface(0)
     }
 
-    context(server: ServerRuntime)
+    context(server: Engine)
     private fun Appendable.writeLive(module: SDK.Module) {
         fun PathSpec.toCodeString() = segments.joinToString("/", prefix = "\"", postfix = "\"") {
             when (it) {

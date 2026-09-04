@@ -4,7 +4,7 @@ import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.runtime.Initiator
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.forExecution
 import com.lightningkite.lightningserver.runtime.phase
 import com.lightningkite.lightningserver.websockets.*
@@ -29,7 +29,7 @@ public abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
     private val handler: WebSocketHandler<PATH, STORAGE>,
     private val scope: CoroutineScope,
     /** Needed to deliver a subscription message, which is a fresh execution rather than part of one. */
-    private val server: ServerRuntime,
+    private val server: Engine,
     private val pubSub: (request: WebSocketSubscriptionRequest<*, Any?>) -> PubSubChannel<Any?>,
 ) : WebSocketConnection<PATH, STORAGE> {
 

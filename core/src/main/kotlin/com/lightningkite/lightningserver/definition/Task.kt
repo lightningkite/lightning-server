@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.definition
 
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.invoke
 import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import kotlinx.serialization.KSerializer
 import kotlin.time.Duration
@@ -81,7 +82,7 @@ public fun <INPUT> Task(
  * @param input The input data for the task
  */
 context(server: ServerRuntime)
-public suspend fun <INPUT> Task<INPUT>.launch(input: INPUT): Unit = with(server) { invoke(input) }
+public suspend fun <INPUT> Task<INPUT>.launch(input: INPUT): Unit = invoke(input)
 
 /*
  * TODO: API Recommendations for Task.kt

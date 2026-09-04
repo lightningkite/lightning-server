@@ -1,47 +1,31 @@
 package com.lightningkite.lightningserver.runtime
 
-import com.lightningkite.lightningserver.definition.*
-import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.settings.ServerSettings
-import com.lightningkite.lightningserver.websockets.DirectWebSocketSender
+import com.lightningkite.lightningserver.InternalLightningServerApi
+import com.lightningkite.lightningserver.definition.Task
+import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.pathing.PathSpec1
+import com.lightningkite.lightningserver.pathing.PathSpec2
+import com.lightningkite.lightningserver.pathing.PathSpec3
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
-import com.lightningkite.services.Namespaced
-import com.lightningkite.services.SettingContext
-import kotlinx.serialization.modules.SerializersModule
-import kotlin.time.Clock
+import com.lightningkite.lightningserver.websockets.WebSocketTopic
 
 /**
- * Core interface representing a running Lightning Server instance.
+ * An [Engine], running one execution on behalf of an [initiator].
  *
- * ServerRuntime provides the execution context for a server, including:
- * - Access to the server definition (routes, handlers, settings)
- * - Serialization configuration for external (API) and internal (storage) use
- * - Settings management and access
- * - WebSocket subscription messaging
- * - Task execution
- * - Telemetry and clock access
- * - Reading settings
+ * An "execution" is one run of anything the server can run: an HTTP request, one WebSocket lifecycle
+ * phase, a task, a schedule tick, a startup task, or a pre-deploy task. Everything an execution needs
+ * beyond its attribution — settings, serialization, telemetry, task dispatch — is process-wide, so a
+ * runtime is an engine plus one extra property.
  *
- * Implementations of this interface are responsible for:
- * - Managing the server lifecycle
- * - Routing HTTP requests to appropriate handlers
- * - Executing scheduled and startup tasks
- * - Handling WebSocket connections and subscriptions
+ * ## Why this is a type rather than a convention
+ * Declaring `context(server: ServerRuntime)` says the work being done is attributable, and declaring
+ * `context(engine: Engine)` says it is not. That makes "who initiated this?" a question the compiler
+ * answers: work that must be audited cannot accidentally be written somewhere no initiator exists.
  *
+ * Runtimes are minted by the framework at the seam every engine funnels through
+ * ([com.lightningkite.lightningserver.runtime.forExecution]), never by user code.
  */
-public interface ServerRuntime : SettingContext, Namespaced {
-    /** Fixed namespace used when naming spans in the metrics backend. */
-    override val name: String get() = "lightningserver"
-
-    /** This runtime is the SettingContext for all its services. */
-    override val context: SettingContext get() = this
-
-    /**
-     * The server definition containing all routes, handlers, settings, and tasks.
-     */
-    public val server: ServerDefinition
-
+public interface ServerRuntime : Engine {
     /**
      * What started the execution this runtime is serving.
      *
@@ -52,122 +36,92 @@ public interface ServerRuntime : SettingContext, Namespaced {
      * `ApiHttpHandler` and `ApiWebSocketHandler`. Reaching that by parameter would mean adding one to
      * `HttpHandler.handle`, and so to every endpoint handler in the framework and in user code. The
      * runtime context is the only carrier already threaded to all three.
-     *
-     * A runtime obtained outside any execution — the engine itself, during boot — carries
-     * [Initiator.Direct].
      */
     public val initiator: Initiator
-
-    /**
-     * Whether the different parts of the webSocket handler (willConnect, didConnect, messageFromClient,
-     * messageFromSubscription, disconnect) all occur in the same process.  If they do, you can use RAM to store
-     * information between those events.
-     */
-    public val webSocketHandlersRunOnSameMachine: Boolean get() = true
-
-    /**
-     * The public URL at which this server is accessible.
-     *
-     * Defaults to the value from general settings.
-     */
-    override val publicUrl: String
-        get() = generalSettings().publicUrl
-
-    /**
-     * Serialization configuration for external API communication (HTTP bodies, etc.).
-     */
-    public val externalSerialization: Serialization
-
-    /**
-     * Serialization configuration for internal use (database storage, caching, etc.).
-     */
-    public val internalSerialization: Serialization
-
-    /**
-     * Clock used for time-based operations.
-     *
-     * Defaults to system clock but can be overridden for testing.
-     */
-    override val clock: Clock get() = Clock.System
-
-    /**
-     * Settings manager for accessing configured server settings.
-     */
-    public val settings: ServerSettings
-
-    /**
-     * Sends a WebSocket subscription message to all connections subscribed to the topic.
-     *
-     * The message will be delivered to all WebSocket connections that have subscribed
-     * to the topic with matching path parameters.
-     *
-     * @param event The subscription message to send, including topic, path args, and value
-     */
-    public suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>)
-
-    /**
-     * Optional direct WebSocket sender for engines that support it (e.g., AWS).
-     *
-     * When available, allows bypassing the pub/sub mechanism for direct message sending
-     * to specific sockets. Used by [com.lightningkite.lightningserver.websockets.CoroutineWebSocketHandler]
-     * to optimize message delivery.
-     *
-     * @return DirectWebSocketSender implementation if supported, null otherwise
-     */
-    public val directWebSocketSender: DirectWebSocketSender? get() = null
-
-    /**
-     * Invokes a task for asynchronous execution.
-     *
-     * The exact execution mechanism (background thread, coroutine, queue, etc.)
-     * depends on the runtime implementation.
-     *
-     * @param input The input parameter for the task
-     */
-    public suspend fun <T> Task<T>.invoke(input: T)
-
-    /**
-     * Serializers module used for internal serialization.
-     */
-    override val internalSerializersModule: SerializersModule get() = internalSerialization.serializersModule
-
-    /**
-     * Unique identifier for this server instance.
-     *
-     * For single-machine engines, typically derived from network interface MAC address.
-     * For serverless deployments, may be a Lambda function ID or similar.
-     */
-    public val serverId: String
-
-    /**
-     * Version identifier for the running server.
-     *
-     * May be "Unknown" if version information is not available.
-     */
-    public val serverVersion: String
 }
 
-/*
- * TODO: API Recommendations for ServerRuntime.kt
+/**
+ * Sends a message to all WebSocket connections subscribed to this topic (no path parameters).
  *
- * 1. The openTelemetry property returns null by default with a TODO comment. This should either be
- *    implemented or the TODO removed if telemetry is truly optional. Document the expected behavior.
- *
- * 2. No lifecycle methods for server startup/shutdown. Consider adding:
- *    - suspend fun start()
- *    - suspend fun stop()
- *    - val isRunning: Boolean
- *
- * 3. The Task.invoke() method doesn't provide any feedback about task execution status or errors.
- *    Consider returning a result or providing a callback mechanism for task completion/failure.
- *
- * 4. sendWebSocketSubscriptionMessage doesn't document what happens if no connections are subscribed.
- *    Does it silently succeed? Document this behavior.
- *
- * 5. No way to query the server state (number of active connections, running tasks, etc.).
- *    Consider adding health/metrics accessors for observability.
- *
- * 6. The serverId and serverVersion have no validation. Consider validating that these are set
- *    properly during initialization or providing defaults.
+ * @param value The message to send
  */
+context(serverRuntime: ServerRuntime)
+public suspend fun <T> WebSocketTopic<PathSpec0, T>.send(value: T): Unit =
+    serverRuntime.sendWebSocketSubscriptionMessage(
+        WebSocketSubscriptionMessage(this, listOf(), value)
+    )
 
+/**
+ * Sends a message to all WebSocket connections subscribed to this topic with one path parameter.
+ *
+ * @param path1 The first path parameter value
+ * @param value The message to send
+ */
+context(serverRuntime: ServerRuntime)
+public suspend fun <A, T> WebSocketTopic<PathSpec1<A>, T>.send(
+    path1: A,
+    value: T,
+): Unit = serverRuntime.sendWebSocketSubscriptionMessage(
+    WebSocketSubscriptionMessage(this, listOf(path1), value)
+)
+
+/**
+ * Sends a message to all WebSocket connections subscribed to this topic with two path parameters.
+ *
+ * @param path1 The first path parameter value
+ * @param path2 The second path parameter value
+ * @param value The message to send
+ */
+context(serverRuntime: ServerRuntime)
+public suspend fun <A, B, T> WebSocketTopic<PathSpec2<A, B>, T>.send(
+    path1: A,
+    path2: B,
+    value: T,
+): Unit = serverRuntime.sendWebSocketSubscriptionMessage(
+    WebSocketSubscriptionMessage(this, listOf(path1, path2), value)
+)
+
+/**
+ * Sends a message to all WebSocket connections subscribed to this topic with three path parameters.
+ *
+ * @param path1 The first path parameter value
+ * @param path2 The second path parameter value
+ * @param path3 The third path parameter value
+ * @param value The message to send
+ */
+context(serverRuntime: ServerRuntime)
+public suspend fun <A, B, C, T> WebSocketTopic<PathSpec3<A, B, C>, T>.send(
+    path1: A,
+    path2: B,
+    path3: C,
+    value: T,
+): Unit = serverRuntime.sendWebSocketSubscriptionMessage(
+    WebSocketSubscriptionMessage(this, listOf(path1, path2, path3), value)
+)
+
+/**
+ * Queues a task for asynchronous execution, parented to the execution launching it.
+ *
+ * The task will be executed in the background. The exact execution mechanism depends
+ * on the engine implementation (e.g., GlobalScope.launch for single-machine engines).
+ *
+ * This takes a [ServerRuntime] rather than an [Engine] so that a launched task always has something
+ * to be caused by: parentage across a queue is the one thing the serializable initiator exists for,
+ * and a task launched from nowhere could not be joined back to the work that wanted it.
+ *
+ * @param input The input parameter for the task
+ */
+@OptIn(InternalLightningServerApi::class)
+context(serverRuntime: ServerRuntime)
+public suspend operator fun <T> Task<T>.invoke(input: T): Unit =
+    with(serverRuntime) {
+        this@invoke.invoke(input, serverRuntime.initiator.cause)
+    }
+
+/**
+ * Provides access to the ServerRuntime instance from a context receiver.
+ *
+ * This allows nested functions to access the runtime without explicit parameter passing.
+ */
+context(runner: ServerRuntime)
+public val serverRuntime: ServerRuntime get() = runner

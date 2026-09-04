@@ -7,7 +7,8 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.Initiator
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
+import com.lightningkite.lightningserver.runtime.EngineBase
+import com.lightningkite.lightningserver.runtime.ExecutionCause
 import com.lightningkite.lightningserver.runtime.forExecution
 import com.lightningkite.lightningserver.runtime.phase
 import com.lightningkite.lightningserver.settings.ServerSettings
@@ -17,6 +18,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Clock
+import kotlin.uuid.Uuid
 
 /**
  * Test runtime for Lightning Server applications.
@@ -54,7 +56,14 @@ import kotlin.time.Clock
 public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.test() instead.") constructor(
     public val serverBuilder: SERVER,
     private val clockGet: () -> Clock = { Clock.System },  // TODO: always use mock clock, build in advancement features
-) : ServerRuntimeBase(serverBuilder.build()) {
+) : EngineBase(serverBuilder.build()), ServerRuntime {
+
+    /**
+     * A test has no server-side execution behind it, so it is the one place besides manual
+     * invocation that mints [Initiator.Direct] — see its documentation for why that hole exists.
+     */
+    @OptIn(InternalLightningServerApi::class)
+    override val initiator: Initiator = Initiator.Direct(Uuid.random())
 
     public companion object {
         internal val logger = KotlinLogging.logger("com.lightningkite.lightningserver.TestRunner")
@@ -84,9 +93,10 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
      * Executes tasks inline (synchronously) for testing.
      *
      * Unlike production runtimes, tasks don't run in the background but complete
-     * immediately, making tests deterministic.
+     * immediately, making tests deterministic. That also means the task body runs inside the
+     * launching execution rather than as one of its own, so there is nothing for [cause] to parent.
      */
-    override suspend fun <T> Task<T>.invoke(input: T) {
+    override suspend fun <T> Task<T>.invoke(input: T, cause: ExecutionCause?) {
         this.executeInline(input)
     }
 

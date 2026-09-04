@@ -4,6 +4,8 @@ import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.runtime.ExecutionInterceptor
+import com.lightningkite.lightningserver.runtime.compileAndInstrument
 import com.lightningkite.lightningserver.serialization.*
 import com.lightningkite.lightningserver.typedoutput.TypedOutputInterceptor
 import com.lightningkite.lightningserver.websockets.*
@@ -37,6 +39,7 @@ public data class ServerDefinition(
         public val annotationValidators: Runtime<AnnotationValidators>,
 
         public val endpoints: PathSpecMap<ServerPathEndpoints>,
+        public val executionInterceptors: List<ExecutionInterceptor>,
         public val httpConnectionInterceptors: List<HttpConnectionInterceptor>,
         public val httpLogicalInterceptors: List<HttpLogicalInterceptor>,
         public val webSocketConnectionInterceptors: List<WebSocketConnectionInterceptor>,
@@ -67,6 +70,11 @@ public data class ServerDefinition(
     public val annotationValidators: Runtime<AnnotationValidators> get() = flattened.annotationValidators
 
     public val endpoints: PathSpecMap<ServerPathEndpoints> get() = flattened.endpoints
+
+    /** Interceptors wrapping every execution the server runs, of every kind. See [ExecutionInterceptor]. */
+    public val executionInterceptors: List<ExecutionInterceptor> get() = flattened.executionInterceptors
+    public val compiledExecutionInterceptors: ExecutionInterceptor by lazy { executionInterceptors.compileAndInstrument() }
+
     /** Interceptors wrapping the whole physical request. See [HttpConnectionInterceptor]. */
     public val httpConnectionInterceptors: List<HttpConnectionInterceptor> get() = flattened.httpConnectionInterceptors
     public val compiledHttpConnectionInterceptors: HttpInterceptor by lazy { httpConnectionInterceptors.compileAndInstrument() }
@@ -126,6 +134,7 @@ public data class ServerDefinition(
         internalSerializersModule = Runtime.Cached(internalSerializersModule),
         externalSerializersModule = Runtime.Cached(externalSerializersModule),
         annotationValidators = Runtime.Cached(annotationValidators),
+        executionInterceptors = executionInterceptors.toSealedList(),
         httpConnectionInterceptors = httpConnectionInterceptors.toSealedList(),
         httpLogicalInterceptors = httpLogicalInterceptors.toSealedList(),
         webSocketConnectionInterceptors = webSocketConnectionInterceptors.toSealedList(),
@@ -190,6 +199,7 @@ public data class ServerDefinition(
             internalSerializersModule = { flattenedModuleItems.fold(thisLayer.internalSerializersModule()) { acc, module -> acc + module.internalSerializersModule() } },
             externalSerializersModule = { flattenedModuleItems.fold(thisLayer.externalSerializersModule()) { acc, module -> acc + module.externalSerializersModule() } },
             annotationValidators = { flattenedModuleItems.fold(thisLayer.annotationValidators()) { acc, module -> acc + module.annotationValidators() } },
+            executionInterceptors = flattenList { it.executionInterceptors },
             httpConnectionInterceptors = flattenList { it.httpConnectionInterceptors },
             httpLogicalInterceptors = flattenList { it.httpLogicalInterceptors },
             webSocketConnectionInterceptors = flattenList { it.webSocketConnectionInterceptors },

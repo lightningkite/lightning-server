@@ -266,3 +266,30 @@ public fun Initiator.WebSocket.subConnection(path: RawWebSocketPath<PathSpec>): 
  */
 @InternalLightningServerApi
 public fun Initiator.WebSocket.rewritePath(path: RawWebSocketPath<PathSpec>): Initiator.WebSocket = copy(path = path)
+
+/**
+ * The parentage a launched execution inherits from the one that launched it.
+ *
+ * Just the two ids, because this is what has to survive a queue: an engine serializes it into the
+ * task's payload, and the task run on the other side builds its own [Initiator] from it. The
+ * launched execution's own id is minted where it runs, as every other initiator's is.
+ */
+@Serializable
+public data class ExecutionCause @InternalLightningServerApi constructor(
+    val causedBy: Uuid,
+    val rootExecutionId: Uuid,
+    /**
+     * The launcher's [Initiator.attributedTo], so the launched execution attributes to whoever the
+     * launcher did rather than to whatever sits at the head of the causal chain.
+     *
+     * This is the field that has to survive the queue for an indirect change to remain traceable to
+     * a person: a task has no request-log row of its own, so without this its only handle is
+     * [rootExecutionId], which names the outermost execution — and that one can be anonymous while
+     * an inner one holds the credentials.
+     */
+    val attributedTo: Uuid,
+)
+
+/** This execution, as the parentage of anything it launches. */
+@InternalLightningServerApi
+public val Initiator.cause: ExecutionCause get() = ExecutionCause(executionId, rootExecutionId, attributedTo)

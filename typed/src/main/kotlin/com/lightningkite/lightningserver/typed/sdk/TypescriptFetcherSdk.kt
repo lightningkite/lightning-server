@@ -3,7 +3,7 @@ package com.lightningkite.lightningserver.typed.sdk
 import com.lightningkite.lightningserver.auth.naturalLanguage
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.plus
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.typed.sdk.SDK.processToModules
 import com.lightningkite.lightningserver.typed.sdk.SDK.sdk
 import com.lightningkite.services.data.ExperimentalLightningServer
@@ -142,7 +142,7 @@ public class TypescriptFetcherSdk(
      *
      * @param archive The archive where generated files will be written
      */
-    context(server: ServerRuntime)
+    context(server: Engine)
     override fun write(archive: Archive): Unit = when (fileStructure) {
         is Structure.SingleFile -> {
             val processed = server.server.sdk(rootInfo).processToModules().ensureUniqueNames()
@@ -200,7 +200,7 @@ public class TypescriptFetcherSdk(
 
 
     @OptIn(ExperimentalSerializationApi::class)
-    context(server: ServerRuntime)
+    context(server: Engine)
     private fun Appendable.writeTypeDefinitions(types: List<KSerializer<*>> = server.models()) {
         val stringSerialNames = HashSet<String>()
         // TypeScript merges declarations with the same exported name, so nested Kotlin types
@@ -391,7 +391,7 @@ public class TypescriptFetcherSdk(
      *
      * @param root The root module to generate an interface for
      */
-    context(server: ServerRuntime)
+    context(server: Engine)
     private fun Appendable.writeInterface(root: SDK.Module) {
         fun Appendable.appendInterface(module: SDK.Module, depth: Int) {
             if (depth == 0) appendLine("export interface ${module.info.interfaceName} {")
@@ -442,7 +442,7 @@ public class TypescriptFetcherSdk(
         appendInterface(root, 0)
     }
 
-    context(server: ServerRuntime)
+    context(server: Engine)
     private fun Appendable.writeLive(root: SDK.Module) {
         fun PathSpec.ts() = segments.joinToString("/", prefix = "`/", postfix = "`") {
             when (it) {
@@ -521,7 +521,7 @@ public class TypescriptFetcherSdk(
 
 
     @OptIn(ExperimentalSerializationApi::class)
-    private fun ServerRuntime.models() = usedTypes()
+    private fun Engine.models() = usedTypes()
         .filter { it.descriptor.simpleSerialName !in skipFromLsPackage }
         .sortedBy { it.descriptor.simpleSerialName }
         .distinctBy { it.tsType().substringBefore("<") } // Distinct by generics
@@ -537,13 +537,13 @@ public class TypescriptFetcherSdk(
         }
 
 
-    context(runtime: ServerRuntime)
+    context(runtime: Engine)
     private fun KSerializer<*>.tsTopLevelTypeName(): String = tsType()
         .substringBefore('<')
         .substringBefore('.')
 
     @OptIn(ExperimentalSerializationApi::class)
-    context(runtime: ServerRuntime)
+    context(runtime: Engine)
     private fun KSerializer<*>.tsType(): String = nullElement()?.let { it.tsType() + " | null | undefined" } ?: when {
         this.isUnit() -> "void"
         else -> buildString {

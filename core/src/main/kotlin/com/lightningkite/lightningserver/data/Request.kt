@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.data
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 
 /**
@@ -53,7 +54,7 @@ public abstract class Request<out PATH : PathSpec> : HasContextualPath<PATH>, Ca
      */
     public abstract val engineRequestId: String?
 
-    context(serverRuntime: ServerRuntime)
+    context(engine: Engine)
     override val pathInContext: ResolvedPath<PATH>
         get() = path.pathInContext
 }

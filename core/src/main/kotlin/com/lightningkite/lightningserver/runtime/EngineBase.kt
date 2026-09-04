@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.runtime
 
-import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -8,10 +7,9 @@ import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.services.telemetry.TelemetryBackend
 import com.lightningkite.services.SharedResources
 import kotlinx.coroutines.*
-import kotlin.uuid.Uuid
 
 /**
- * Base implementation of [ServerRuntime] providing common functionality.
+ * Base implementation of [Engine] providing common functionality.
  *
  * This abstract class handles:
  * - Settings initialization and management (including automatic addition of system settings)
@@ -21,24 +19,16 @@ import kotlin.uuid.Uuid
  * - Startup task execution with dependency resolution
  *
  * Subclasses should implement:
- * - [ServerRuntime.sendWebSocketSubscriptionMessage]
- * - [ServerRuntime.Task.invoke]
- * - [ServerRuntime.serverId]
- * - [ServerRuntime.serverVersion]
+ * - [Engine.sendWebSocketSubscriptionMessage]
+ * - [Engine.Task.invoke]
+ * - [Engine.serverId]
+ * - [Engine.serverVersion]
  * - HTTP request handling (typically via an engine)
  * - Scheduled task execution
  *
  * @param server The server definition to run
  */
-public abstract class ServerRuntimeBase(override val server: ServerDefinition) : ServerRuntime {
-    /**
-     * The engine itself is not running on anyone's behalf — executions get their own runtime from
-     * [forExecution] at the seam. Work done directly on the engine, such as boot, is attributed to
-     * this one [Initiator.Direct] rather than to nothing at all.
-     */
-    @OptIn(InternalLightningServerApi::class)
-    override val initiator: Initiator = Initiator.Direct(Uuid.random())
-
+public abstract class EngineBase(override val server: ServerDefinition) : Engine {
     /**
      * Settings manager with automatically included system settings.
      *
@@ -145,7 +135,7 @@ public abstract class ServerRuntimeBase(override val server: ServerDefinition) :
 }
 
 /*
- * TODO: API Recommendations for ServerRuntimeBase.kt
+ * TODO: API Recommendations for EngineBase.kt
  *
  * 2. The runStartupTasks() method launches all tasks concurrently but doesn't limit concurrency.
  *    For servers with many startup tasks, this could create resource contention.

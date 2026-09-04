@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.files
 
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.services.files.*
 import kotlinx.serialization.ExperimentalSerializationApi
 
@@ -9,11 +9,11 @@ import kotlinx.serialization.ExperimentalSerializationApi
  *
  * Gotchas:
  * - fileObject conversion relies on a contextual ExternalServerFileSerializer being registered in the
- *   current ServerRuntime.externalSerialization serializers module. If it's missing or a different
+ *   current Engine.externalSerialization serializers module. If it's missing or a different
  *   serializer is registered, a ClassCastException/IllegalStateException will occur.
  */
 @Deprecated("Replace with 'externalFile'", ReplaceWith("externalFile", "com.lightningkite.lightningserver.files.externalFile"))
-context(runtime: ServerRuntime)
+context(runtime: Engine)
 public val ServerFile.fileObject: ExternalFile get() = externalFile
 
 /**
@@ -21,11 +21,11 @@ public val ServerFile.fileObject: ExternalFile get() = externalFile
  *
  * Gotchas:
  * - fileObject conversion relies on a contextual ExternalServerFileSerializer being registered in the
- *   current ServerRuntime.externalSerialization serializers module. If it's missing or a different
+ *   current Engine.externalSerialization serializers module. If it's missing or a different
  *   serializer is registered, a ClassCastException/IllegalStateException will occur.
  */
 @OptIn(ExperimentalSerializationApi::class)
-context(runtime: ServerRuntime)
+context(runtime: Engine)
 public val ServerFile.externalFile: ExternalFile
     get() {
         val ext =
