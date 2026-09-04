@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.runtime
 
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.http.PathSegments
+import com.lightningkite.lightningserver.http.generateRequestId
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.pathing.RawWebSocketPath
@@ -197,6 +198,7 @@ public sealed interface Initiator {
     @Serializable
     @SerialName("direct")
     public data class Direct @InternalLightningServerApi constructor(
+        // TODO: Require textual explanation?
         override val executionId: Uuid,
         override val causedBy: Uuid? = null,
         override val rootExecutionId: Uuid = executionId,
@@ -214,8 +216,9 @@ public sealed interface Initiator {
  * to it through [Initiator.causedBy] and to the whole batch through [Initiator.rootExecutionId].
  */
 @InternalLightningServerApi
+context(engine: Engine)
 public fun Initiator.Http.subRequest(endpoint: RawHttpEndpoint<PathSpec>): Initiator.Http = Initiator.Http(
-    executionId = Uuid.random(),
+    executionId = generateRequestId(),
     causedBy = executionId,
     rootExecutionId = rootExecutionId,
     endpoint = endpoint,
@@ -228,8 +231,9 @@ public fun Initiator.Http.subRequest(endpoint: RawHttpEndpoint<PathSpec>): Initi
  * that every phase of a socket names the connect that opened it.
  */
 @InternalLightningServerApi
+context(engine: Engine)
 public fun Initiator.WebSocket.phase(phase: Initiator.WebSocket.Phase): Initiator.WebSocket = copy(
-    executionId = Uuid.random(),
+    executionId = generateRequestId(),
     causedBy = executionId,
     rootExecutionId = rootExecutionId,
     phase = phase,
@@ -242,11 +246,12 @@ public fun Initiator.WebSocket.phase(phase: Initiator.WebSocket.Phase): Initiato
  * subscriptions; the physical connection carrying it stays reachable through [Initiator.causedBy].
  */
 @InternalLightningServerApi
+context(engine: Engine)
 public fun Initiator.WebSocket.subConnection(path: RawWebSocketPath<PathSpec>): Initiator.WebSocket {
     // One id for both, exactly as every engine mints a real connect. Minting two left a sub-socket's
     // own request-log row — which is keyed by socketId — unreachable from its execution id, so
     // nothing descending from it could find the row that names the person who opened it.
-    val id = Uuid.random()
+    val id = generateRequestId()
     return Initiator.WebSocket(
         executionId = id,
         causedBy = executionId,

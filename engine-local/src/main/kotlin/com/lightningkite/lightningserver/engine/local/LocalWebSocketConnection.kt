@@ -55,7 +55,7 @@ public abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
         subscriptions.remove(topic)?.cancel()
         subscriptions[topic] = scope.launch {
             pubSub(topic).collect { value ->
-                with(server.forExecution(connectInitiator.phase(Initiator.WebSocket.Phase.SubscriptionMessage))) {
+                with(server.forExecution(with(server) { connectInitiator.phase(Initiator.WebSocket.Phase.SubscriptionMessage) })) {
                     handler.messageFromSubscription(
                         this@LocalWebSocketConnection,
                         WebSocketSubscriptionMessage(topic.topic, topic.pathInContext.rawPathArguments, value),

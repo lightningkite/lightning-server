@@ -41,7 +41,7 @@ public suspend fun <STORAGE> WebSocketHandler<PathSpec0, STORAGE>.test(
     domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
     protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
-    socketId: Uuid = Uuid.random(),
+    socketId: Uuid = generateRequestId(),
 ): TestRunner<*>.TestWebSocket<PathSpec0, STORAGE> {
     val intercepted = test.server.interceptIncomingSocket(this@test)
     val request = WebSocketConnectRequest(
@@ -75,7 +75,7 @@ public suspend fun <STORAGE, A> WebSocketHandler<PathSpec1<A>, STORAGE>.test(
     domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
     protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
-    socketId: Uuid = Uuid.random(),
+    socketId: Uuid = generateRequestId(),
 ): TestRunner<*>.TestWebSocket<PathSpec1<A>, STORAGE> {
     val intercepted = test.server.interceptIncomingSocket(this@test)
     val request = WebSocketConnectRequest(
@@ -110,7 +110,7 @@ public suspend fun <STORAGE, A, B> WebSocketHandler<PathSpec2<A, B>, STORAGE>.te
     domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
     protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
-    socketId: Uuid = Uuid.random(),
+    socketId: Uuid = generateRequestId(),
 ): TestRunner<*>.TestWebSocket<PathSpec2<A, B>, STORAGE> {
     val intercepted = test.server.interceptIncomingSocket(this@test)
     val request = WebSocketConnectRequest(
@@ -146,7 +146,7 @@ public suspend fun <STORAGE, A, B, C> WebSocketHandler<PathSpec3<A, B, C>, STORA
     domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
     protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
-    socketId: Uuid = Uuid.random(),
+    socketId: Uuid = generateRequestId(),
 ): TestRunner<*>.TestWebSocket<PathSpec3<A, B, C>, STORAGE> {
     val intercepted = test.server.interceptIncomingSocket(this@test)
     val request = WebSocketConnectRequest(

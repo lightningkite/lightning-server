@@ -298,8 +298,10 @@ private fun HttpExchange.requestToLightningServer(
         }
     } else null
 
-    val identity = headers.requestIdentity(requestIdHeader) {
-        engine.logger.warn { "Request ID header for proxy '$requestIdHeader' was missing from the request." }
+    val identity = with(engine) {
+        headers.requestIdentity(requestIdHeader) {
+            engine.logger.warn { "Request ID header for proxy '$requestIdHeader' was missing from the request." }
+        }
     }
 
     val adapted = HttpRequest(
