@@ -370,7 +370,16 @@ class SessionManagerTest {
     }
 
     @Test
-    fun `tokenSimple rejects not active user`() = runBlocking {
+    /**
+     * `permitAuthentication` returning false is what refuses this, not an [AuthRequirement].
+     *
+     * `tokenSimple` is `noAuth` — it has to be, since exchanging a refresh token is how a caller
+     * becomes authenticated in the first place — so nothing about the endpoint's requirement can
+     * reject anyone. The assertion below pins that, so a future change that moved the rejection into
+     * a requirement would fail here rather than quietly keep the test green under a different
+     * mechanism than its name describes.
+     */
+    fun `tokenSimple rejects a user permitAuthentication turned away`() = runBlocking {
         SessionTestUser.users.clear()
         val userId = Uuid.random()
         val user = SessionTestUser(userId, "test@example.com")
@@ -385,7 +394,14 @@ class SessionManagerTest {
                 val (_, refreshToken) = server.sessions.newSession(userId)
 
                 SessionTestUser.users[userId] = user.copy(active = false)
-                assertFailsWith<ForbiddenException>("Inactive User's refresh token should be rejected") {
+                // Nothing here can be an authorization failure: the endpoint demands no authentication.
+                assertEquals(
+                    noAuth,
+                    server.sessions.tokenSimple.auth,
+                    "tokenSimple gained an auth requirement, so the rejection below no longer proves " +
+                        "what this test claims — it could now be the requirement rather than permitAuthentication",
+                )
+                assertFailsWith<ForbiddenException>("an inactive user's refresh token must be refused") {
                     server.sessions.tokenSimple.test(null, refreshToken.string)
                 }
             }
