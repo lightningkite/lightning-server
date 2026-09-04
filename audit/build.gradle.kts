@@ -21,6 +21,11 @@ dependencies {
 
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
+
+    // Test-only. The auth event log's whole point is that something else raises the events, so
+    // proving the seam is actually reached needs the module that raises them. `sessions` does not
+    // depend on `audit`, so this stays one-directional.
+    testImplementation(project(":sessions"))
 }
 
 kotlin {

@@ -60,3 +60,30 @@ public class DataAccessLog(private val core: AuditCore) : ServerBuilder() {
     }
 }
 
+/**
+ * Layer 4: authentication events — the history a mutable session row cannot provide.
+ *
+ * A `Session` row records that a session *exists*, not that a login *happened*. Everything the survey
+ * in `audit-logging.md` 7.1 found was last-write-wins state, an ephemeral counter deleted on the next
+ * success, or a debug `println`.
+ *
+ * ## Failure behaviour: fail-open, deliberately and uniquely
+ * Unlike the layers above, this one logs and swallows a write failure. Those gate *disclosure*, so the
+ * guarded thing must not happen unrecorded. An authentication event has already happened by the time
+ * it is reported, and is usually reported from a path that is itself rejecting something — throwing
+ * would replace a clean "your login failed" with an unrelated server error and lose the original
+ * reason. The cost, stated plainly: an attacker who can make the audit database unavailable can make
+ * authentication events go unrecorded while authentication keeps working. See 7.3.1.
+ *
+ * @property authEvents One row per authentication event.
+ */
+public class AuthEventLog(private val core: AuditCore) : ServerBuilder() {
+    public val authEvents: DatabaseTableRegistration<AuthEventRecord> =
+        core.database.registerTable("AuditAuthEvent", AuthEventRecord.serializer())
+
+    init {
+        core.claim("AuthEventLog")
+        install(AuthEventLogReporter(authEvents))
+    }
+}
+
