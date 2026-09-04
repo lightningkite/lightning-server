@@ -150,6 +150,7 @@ multiplatform module (KMP; used by client SDKs) and a JVM module.
 | `core` / `core-shared` | Base HTTP types, routing, settings, serialization |
 | `typed` / `typed-shared` | Typed `ApiHttpHandler`, OpenAPI spec, SDK generation |
 | `auth` / `auth-shared` | `PrincipalType`, `AuthRequirement`, token handling |
+| `audit` / `audit-shared` | `@Audited` disclosure logging: which fields of which records left the server |
 | `sessions*` | Pre-built session flows: email magic link, SMS PIN, OAuth, OpenID |
 | `files` / `files-shared` | File upload/download with S3, Azure, and local backends |
 | `media` / `media-shared` | Image processing |

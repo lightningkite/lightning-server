@@ -4,7 +4,9 @@ import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.runtime.ExecutionInterceptor
 import com.lightningkite.lightningserver.serialization.*
+import com.lightningkite.lightningserver.typedoutput.TypedOutputInterceptor
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.Setting
 import com.lightningkite.services.SettingContext
@@ -84,6 +86,8 @@ public abstract class ServerBuilder : Extendable {
     private val settings: ListRegistry<ServerSetting<*, *>> = ListRegistry()
     private val settingOverrides: MapRegistry<ServerSetting<*, *>, Runtime<*>> = MapRegistry()
 
+    private val executionInterceptors: ListRegistry<ExecutionInterceptor> = ListRegistry()
+
     private val httpConnectionInterceptors: ListRegistry<HttpConnectionInterceptor> = ListRegistry()
     private val httpLogicalInterceptors: ListRegistry<HttpLogicalInterceptor> = ListRegistry()
     private val httpHandlers: PathSpecRegistry<MapRegistry<HttpMethod, HttpHandler<*>>> = PathSpecRegistry()
@@ -92,6 +96,9 @@ public abstract class ServerBuilder : Extendable {
     private val webSocketLogicalInterceptors: ListRegistry<WebSocketLogicalInterceptor> = ListRegistry()
     private val webSocketHandlers: PathSpecRegistry<WebSocketHandler<*, *>> = PathSpecRegistry()
     private val webSocketTopics: PathSpecRegistry<WebSocketTopic<*, *>> = PathSpecRegistry()
+
+    private val typedOutputInterceptors: ListRegistry<TypedOutputInterceptor> = ListRegistry()
+
 
     private var exceptionHandler: ExceptionHttpHandler = DefaultExceptionHttpHandler
 
@@ -107,6 +114,10 @@ public abstract class ServerBuilder : Extendable {
 
     private val imports: ListRegistry<Locationed<PathSpec0, ServerDefinition>> = ListRegistry()
     private val modules: ListRegistry<Locationed<PathSpec0, ServerBuilder>> = ListRegistry()
+
+    @JvmName("installExecutionInterceptor")
+    public fun <T : ExecutionInterceptor> install(interceptor: T): T =
+        interceptor.also { executionInterceptors.register(it) }
 
     @JvmName("installHttpConnectionInterceptor")
     public fun <T : HttpConnectionInterceptor> install(interceptor: T): T =
@@ -137,6 +148,10 @@ public abstract class ServerBuilder : Extendable {
             httpLogicalInterceptors.register(it)
             webSocketLogicalInterceptors.register(it)
         }
+
+    @JvmName("installTypedOutputInterceptor")
+    public fun <T : TypedOutputInterceptor> install(interceptor: T): T =
+        interceptor.also { typedOutputInterceptors.register(it) }
 
     public infix fun <PATH : PathSpec, HANDLER : HttpHandler<PATH>> HttpEndpoint<PATH>.bind(handler: HANDLER): HANDLER {
         httpHandlers.getOrRegister(this.path, ::MapRegistry).register(this.method, handler)
@@ -326,10 +341,12 @@ public abstract class ServerBuilder : Extendable {
             internalSerializersModule = internalSerialization,
             externalSerializersModule = externalSerialization,
             annotationValidators = annotationValidators,
+            executionInterceptors = executionInterceptors.toSealedList(),
             httpConnectionInterceptors = httpConnectionInterceptors.toSealedList(),
             httpLogicalInterceptors = httpLogicalInterceptors.toSealedList(),
             webSocketConnectionInterceptors = webSocketConnectionInterceptors.toSealedList(),
             webSocketLogicalInterceptors = webSocketLogicalInterceptors.toSealedList(),
+            typedOutputInterceptors = typedOutputInterceptors.toSealedList(),
             endpoints = buildSealedPathSpecMap {
                 for (path in httpHandlers.keys + webSocketHandlers.keys) {
                     put(

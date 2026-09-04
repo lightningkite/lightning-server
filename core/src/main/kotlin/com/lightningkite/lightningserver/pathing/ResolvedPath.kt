@@ -4,7 +4,7 @@ package com.lightningkite.lightningserver.pathing
 
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.PathSegments
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.services.data.StringArrayFormat
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.StringFormat
@@ -92,21 +92,21 @@ public data class ResolvedPath<out PATH : PathSpec> internal constructor(
     public fun toString(stringArrayFormat: StringArrayFormat): String = path(stringArrayFormat)
 }
 
-context(serverRuntime: ServerRuntime)
+context(engine: Engine)
 public fun ResolvedPath<*>.pathSegments(): PathSegments =
-    pathSegments(serverRuntime.externalSerialization.stringArrayFormat)
+    pathSegments(engine.externalSerialization.stringArrayFormat)
 
-context(serverRuntime: ServerRuntime)
-public fun ResolvedPath<*>.path(): String = path(serverRuntime.externalSerialization.stringArrayFormat)
+context(engine: Engine)
+public fun ResolvedPath<*>.path(): String = path(engine.externalSerialization.stringArrayFormat)
 
-context(serverRuntime: ServerRuntime)
+context(engine: Engine)
 public fun ResolvedPath<*>.fullUrl(): String = generalSettings().publicUrl + path()
 
-context(serverRuntime: ServerRuntime)
+context(engine: Engine)
 public fun ResolvedPath<*>.wsFullUrl(): String = generalSettings().wsUrl + path()
 
 /**
- * Interface for objects that can provide a [ResolvedPath] when given a [ServerRuntime] context.
+ * Interface for objects that can provide a [ResolvedPath] when given an [Engine] context.
  *
  * This is used for lazy path resolution where the path cannot be determined until runtime context is available.
  * Common use cases include paths that depend on server settings or need to look up endpoints.
@@ -114,7 +114,7 @@ public fun ResolvedPath<*>.wsFullUrl(): String = generalSettings().wsUrl + path(
  * @param PATH The PathSpec type
  */
 public interface HasContextualPath<out PATH : PathSpec> {
-    context(server: ServerRuntime)
+    context(server: Engine)
     public val pathInContext: ResolvedPath<PATH>
 }
 
@@ -168,17 +168,17 @@ public fun HasResolvedPath<*>.pathSegments(stringArrayFormat: StringArrayFormat)
 
 public fun HasResolvedPath<*>.path(stringArrayFormat: StringArrayFormat): String = path.path(stringArrayFormat)
 
-context(serverRuntime: ServerRuntime)
+context(engine: Engine)
 public fun HasResolvedPath<*>.pathSegments(): PathSegments =
-    path.pathSegments(serverRuntime.externalSerialization.stringArrayFormat)
+    path.pathSegments(engine.externalSerialization.stringArrayFormat)
 
-context(serverRuntime: ServerRuntime)
-public fun HasResolvedPath<*>.path(): String = path.path(serverRuntime.externalSerialization.stringArrayFormat)
+context(engine: Engine)
+public fun HasResolvedPath<*>.path(): String = path.path(engine.externalSerialization.stringArrayFormat)
 
-context(serverRuntime: ServerRuntime)
+context(engine: Engine)
 public fun HasResolvedPath<*>.fullUrl(): String = generalSettings().publicUrl + path()
 
-context(serverRuntime: ServerRuntime)
+context(engine: Engine)
 public fun HasResolvedPath<*>.wsFullUrl(): String = generalSettings().wsUrl + path()
 
 @get:JvmName("arg1_1")
@@ -221,43 +221,43 @@ public val <A, B, C> HasResolvedPath<PathSpec3<A, B, C>>.arg2: B get() = path.ar
 public val <A, B, C> HasResolvedPath<PathSpec3<A, B, C>>.arg3: C get() = path.arg3
 
 
-context(serverRuntime: ServerRuntime)
+context(engine: Engine)
 public val HasContextualPath<*>.trailingSegments: PathSegments? get() = pathInContext.trailingSegments
 
 @get:JvmName("arg1_1")
-context(serverRuntime: ServerRuntime)
+context(engine: Engine)
 public val <A> HasContextualPath<PathSpec1<A>>.arg1: A get() = pathInContext.arg1
 
 @get:JvmName("arg1_2")
-context(serverRuntime: ServerRuntime)
+context(engine: Engine)
 public val <A, B> HasContextualPath<PathSpec2<A, B>>.arg1: A get() = pathInContext.arg1
 
 @get:JvmName("arg2_2")
-context(serverRuntime: ServerRuntime)
+context(engine: Engine)
 public val <A, B> HasContextualPath<PathSpec2<A, B>>.arg2: B get() = pathInContext.arg2
 
 @get:JvmName("arg1_3")
-context(serverRuntime: ServerRuntime)
+context(engine: Engine)
 public val <A, B, C> HasContextualPath<PathSpec3<A, B, C>>.arg1: A get() = pathInContext.arg1
 
 @get:JvmName("arg2_3")
-context(serverRuntime: ServerRuntime)
+context(engine: Engine)
 public val <A, B, C> HasContextualPath<PathSpec3<A, B, C>>.arg2: B get() = pathInContext.arg2
 
 @get:JvmName("arg3_3")
-context(serverRuntime: ServerRuntime)
+context(engine: Engine)
 public val <A, B, C> HasContextualPath<PathSpec3<A, B, C>>.arg3: C get() = pathInContext.arg3
 
-context(serverRuntime: ServerRuntime)
+context(engine: Engine)
 public fun HasContextualPath<*>.pathSegments(): PathSegments =
-    pathInContext.pathSegments(serverRuntime.externalSerialization.stringArrayFormat)
+    pathInContext.pathSegments(engine.externalSerialization.stringArrayFormat)
 
-context(serverRuntime: ServerRuntime)
+context(engine: Engine)
 public fun HasContextualPath<*>.path(): String =
-    pathInContext.path(serverRuntime.externalSerialization.stringArrayFormat)
+    pathInContext.path(engine.externalSerialization.stringArrayFormat)
 
-context(serverRuntime: ServerRuntime)
+context(engine: Engine)
 public fun HasContextualPath<*>.fullUrl(): String = generalSettings().publicUrl + path()
 
-context(serverRuntime: ServerRuntime)
+context(engine: Engine)
 public fun HasContextualPath<*>.wsFullUrl(): String = generalSettings().wsUrl + path()

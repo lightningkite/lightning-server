@@ -5,7 +5,7 @@ import com.lightningkite.lightningserver.LightningServerDsl
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.engine
 import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.services.data.*
 import com.lightningkite.services.serializers.KotlinBytesFormat
@@ -202,7 +202,7 @@ public class JsonMediaTypeCoder(
 @OptIn(ExperimentalSerializationApi::class)
 @Suppress("DSL_MARKER_APPLIED_TO_WRONG_TARGET")
 @LightningServerDsl
-public fun ServerBuilder.registerBasicMediaTypeCoders(serializersModule: Runtime<SerializersModule> = Runtime { serverRuntime.externalSerialization.serializersModule }) {
+public fun ServerBuilder.registerBasicMediaTypeCoders(serializersModule: Runtime<SerializersModule> = Runtime { engine.externalSerialization.serializersModule }) {
     register(JsonMediaTypeCoder {
         Json {
             this.serializersModule = serializersModule()

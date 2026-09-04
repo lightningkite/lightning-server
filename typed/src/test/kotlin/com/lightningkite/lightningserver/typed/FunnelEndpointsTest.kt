@@ -1,10 +1,12 @@
 // by Claude
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.lightningserver.auth.AuthRequirement
+import com.lightningkite.lightningserver.ForbiddenException
+import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.GeneralServerSettings
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.services.data.HealthStatus
@@ -13,20 +15,58 @@ import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.*
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.serializer
 import kotlin.test.*
 import kotlin.time.Duration.Companion.minutes
+import kotlin.uuid.Uuid
 
 /**
  * Tests for FunnelEndpoints - user funnel tracking and analytics.
  */
 class FunnelEndpointsTest {
 
+    /** The admin these tests call [FunnelEndpoints.summaries] and [FunnelEndpoints.summarizeNow] as. */
+    @Serializable
+    data class AdminUser(override val _id: Uuid = Uuid.random()) : HasId<Uuid> {
+        companion object : PrincipalType<AdminUser, Uuid> {
+            override val idSerializer: KSerializer<Uuid> = Uuid.serializer()
+            override val subjectSerializer: KSerializer<AdminUser> = serializer()
+
+            context(server: ServerRuntime)
+            override suspend fun fetch(id: Uuid): AdminUser = AdminUser(id)
+        }
+    }
+
     object TestServer : ServerBuilder() {
         val database = setting("database", Database.Settings())
+
+        init {
+            register(AdminUser)
+            // IsAdmin is only a name until a server says what it means: left unconfigured it falls
+            // back to IsSuperUser, which has no default and so rejects everyone. Defining it here is
+            // what makes the reporting endpoints reachable at all - without it the only way these
+            // tests could pass would be by never having their auth checked.
+            AuthRequirement.isAdmin = AdminUser.require()
+        }
 
         // Use AuthRequirement.IsAdmin which has the correct type for FunnelEndpoints
         val funnel = path.path("funnel") include FunnelEndpoints(database, read = AuthRequirement.IsAdmin)
     }
+
+    /**
+     * An [AdminUser] authentication, in the static type the endpoints declare.
+     *
+     * [FunnelEndpoints] types its callers as `HasId<*>?` and [Authentication] is invariant, so a
+     * concrete `Authentication<AdminUser>` cannot be handed to `.test()` without widening. Nothing
+     * about the authentication changes; only its static type. Whether it satisfies
+     * [AuthRequirement.IsAdmin] is still decided by the endpoint.
+     */
+    @Suppress("UNCHECKED_CAST")
+    context(server: ServerRuntime)
+    private fun adminAuth(): Authentication<HasId<*>> =
+        AdminUser.testAuth(AdminUser()) as Authentication<HasId<*>>
 
     @Test
     fun start_creates_funnel_instance() = runBlocking {
@@ -155,6 +195,24 @@ class FunnelEndpointsTest {
         }
     }
 
+    /**
+     * The counterpart to the reporting tests below: the requirement is real, so a caller who cannot
+     * satisfy it is refused. Without this, dropping `read` from those endpoints entirely would leave
+     * every other test in this file green.
+     */
+    @Test
+    fun summarize_rejects_unauthenticated_callers() = runBlocking {
+        TestServer.test(settings = {
+            generalSettings set GeneralServerSettings()
+            database set Database.Settings()
+        }) {
+            assertFailsWith<ForbiddenException> {
+                TestServer.funnel.summarizeNow.test(null, LocalDate(2024, 5, 1))
+            }
+            Unit
+        }
+    }
+
     @Test
     fun summarize_creates_summary_from_instances() = runBlocking {
         TestServer.test(settings = {
@@ -228,7 +286,7 @@ class FunnelEndpointsTest {
             )
 
             // Run summarize for that date
-            TestServer.funnel.summarizeNow.test(null, targetDate)
+            TestServer.funnel.summarizeNow.test(adminAuth(), targetDate)
 
             // Verify summary was created
             val summaries =
@@ -297,7 +355,7 @@ class FunnelEndpointsTest {
             TestServer.funnel.summaryInfo.table().insertOne(summaryOtherDate)
 
             // Get summaries for target date
-            val result = TestServer.funnel.summaries.test(targetDate, null, Unit)
+            val result = TestServer.funnel.summaries.test(targetDate, adminAuth(), Unit)
 
             assertEquals(2, result.size)
             assertTrue(result.any { it.funnel == "funnel-a" })
@@ -351,7 +409,7 @@ class FunnelEndpointsTest {
                 )
             )
 
-            TestServer.funnel.summarizeNow.test(null, targetDate)
+            TestServer.funnel.summarizeNow.test(adminAuth(), targetDate)
 
             val summaries =
                 TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList()
@@ -410,7 +468,7 @@ class FunnelEndpointsTest {
                 )
             }
 
-            TestServer.funnel.summarizeNow.test(null, targetDate)
+            TestServer.funnel.summarizeNow.test(adminAuth(), targetDate)
 
             val summaries =
                 TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList()
@@ -469,7 +527,7 @@ class FunnelEndpointsTest {
                 )
             }
 
-            TestServer.funnel.summarizeNow.test(null, targetDate)
+            TestServer.funnel.summarizeNow.test(adminAuth(), targetDate)
 
             val summaries =
                 TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList()
@@ -522,7 +580,7 @@ class FunnelEndpointsTest {
             }
 
             // Run summarize - should replace the existing summary
-            TestServer.funnel.summarizeNow.test(null, targetDate)
+            TestServer.funnel.summarizeNow.test(adminAuth(), targetDate)
 
             val summaries =
                 TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList()

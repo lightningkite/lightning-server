@@ -1,5 +1,8 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
+import com.lightningkite.lightningserver.data.Request
+import com.lightningkite.lightningserver.BadRequestException
+import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
@@ -63,11 +66,20 @@ public abstract class PinBasedProofEndpoints(
         )
 
     context(_: ServerRuntime)
-    protected suspend fun issueProof(destination: String): Proof {
-        return proofSigner.await().makeProof(
+    protected suspend fun issueProof(destination: String, request: Request<*>? = null): Proof {
+        val proof = proofSigner.await().makeProof(
             property = property,
             value = destination,
         )
+        // Recorded here rather than at the call sites that mail it: every path that mints an
+        // unpresented proof goes through this function, so instrumenting it is what makes the record
+        // complete. The proof is a bearer credential the moment it exists, so the mint is the event.
+        //
+        // `request` is the request that asked for the link to be sent, where the caller has one —
+        // which is the normal case, since a frontend triggers this. It carries the IP and user agent
+        // of whoever asked, which is what an investigation into a misused link starts from.
+        reportProofIssued(info, principal = destination, request = request)
+        return proof
     }
 
     override val prove: ApiHttpHandler<PathSpec0, HasId<*>?, FinishProof, Proof> =
@@ -78,9 +90,33 @@ public abstract class PinBasedProofEndpoints(
             errorCases = emptyList(),
             successCode = HttpStatus.OK,
             implementation = { input: FinishProof ->
+                // What the attempt is against. A PIN proves ownership of an address, not of an account —
+                // these endpoints never resolve a subject, that happens later at login — so the address is
+                // the truthful answer to "who was this about", and it is the only one a failure has.
+                val target = pin.pendingTarget(input.key)
+                val value = try {
+                    pin.assert(input.key, input.password)
+                } catch (e: NotFoundException) {
+                    reportProofRejected(
+                        info,
+                        ProofFailureReason.SecretExpired,
+                        principal = target,
+                        request = request,
+                    )
+                    throw e
+                } catch (e: BadRequestException) {
+                    reportProofRejected(
+                        info,
+                        ProofFailureReason.SecretMismatch,
+                        principal = target,
+                        request = request,
+                    )
+                    throw e
+                }
+                reportProofAccepted(info, principal = value, request = request)
                 proofSigner.await().makeProof(
                     property = property,
-                    value = pin.assert(input.key, input.password),
+                    value = value,
                 )
             }
         )

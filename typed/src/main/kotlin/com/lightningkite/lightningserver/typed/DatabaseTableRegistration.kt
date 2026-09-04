@@ -2,7 +2,7 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.definition.*
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.services.data.toSealedMap
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.DatabaseTableDefinition
@@ -16,7 +16,7 @@ import kotlinx.serialization.serializer
  * [tableDefinition], and the [preDeployTask] that reconciles it (creates the collection/indexes)
  * once per deploy.
  *
- * The registration is itself a [Runtime]<[Table]> — invoke it inside a [ServerRuntime] to get the
+ * The registration is itself a [Runtime]<[Table]> — invoke it inside an [Engine] to get the
  * live table (`myTable()`). All registrations are enumerable at runtime through
  * [ServerDefinition.allRegisteredTables], keyed by table name.
  */
@@ -25,7 +25,7 @@ public data class DatabaseTableRegistration<T : Any>(
     val tableDefinition: DatabaseTableDefinition<T>,
     val preDeployTask: PreDeployTask,
 ) : Runtime<Table<T>> {
-    context(server: ServerRuntime)
+    context(server: Engine)
     override fun invoke(): Table<T> = database().table(tableDefinition)
 }
 

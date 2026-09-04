@@ -27,10 +27,13 @@ class AuthExamplesEndpointsTest {
         }
     }
 
-    // whoAmI requires auth: AuthRequirement<User> (non-optional), so .test() only accepts a real
-    // Authentication<User> - there is no way to even construct an unauthenticated call to it
-    // through the typed test helper. That's the point: the requirement is enforced by the type
-    // system, not just checked at runtime.
+    // whoAmI types its caller as a non-nullable User, so an unauthenticated call to it cannot be
+    // written: `.test(null, Unit)` does not compile. That is a property of this endpoint's signature
+    // and does not generalise — every endpoint beside it types callers as `HasId<*>?`, where a null
+    // call compiles fine and is refused at runtime by the AuthRequirement instead.
+    //
+    // Deliberately left as a comment rather than dressed up as a test: "this does not compile" is not
+    // something a test can assert, so a test claiming to prove it would be proving something else.
 
     @Test
     fun greetIsGenericForAnonymousCallers() = runBlocking {
@@ -52,8 +55,17 @@ class AuthExamplesEndpointsTest {
         }
     }
 
+    /**
+     * The rejection here comes from the **handler body**, not from the endpoint's [AuthRequirement].
+     *
+     * `adminOnly` requires only `UserAuth.require()` — any logged-in caller satisfies it — and then
+     * reads `isSuperUser` itself and throws. So this and its sibling below cover a role check, which
+     * is a normal and legitimate thing to demonstrate; they are named for that rather than for
+     * authorization, because a reader copying from the demo module should be able to tell which of
+     * the two mechanisms they are looking at.
+     */
     @Test
-    fun adminOnlyRejectsNonAdminsWith403() = runBlocking {
+    fun adminOnlyRejectsALoggedInNonAdminFromItsHandlerBody() = runBlocking {
         TestHelper.testServer {
             val user = Server.userInfo.table().insertOne(User(email = "regular@example.com"))!!
             val auth = Authentication(Server.UserAuth, id = user._id, sessionId = null)
@@ -65,8 +77,9 @@ class AuthExamplesEndpointsTest {
         }
     }
 
+    /** As above: the caller clears the requirement either way, and the body's role check admits them. */
     @Test
-    fun adminOnlyAllowsSuperUsers() = runBlocking {
+    fun adminOnlyAdmitsALoggedInSuperUserFromItsHandlerBody() = runBlocking {
         TestHelper.testServer {
             val admin = Server.userInfo.table().insertOne(User(email = "admin@example.com", isSuperUser = true))!!
             val auth = Authentication(Server.UserAuth, id = admin._id, sessionId = null)

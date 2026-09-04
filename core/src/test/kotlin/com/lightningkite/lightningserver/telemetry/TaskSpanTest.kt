@@ -49,7 +49,7 @@ class TaskSpanTest {
         ) {
             cleanup.executeWithMetrics(cleanup.location)
             reindex.executeWithMetrics(reindex.location)
-            sendEmail.executeWithMetrics(sendEmail.location, Unit)
+            sendEmail.executeWithMetrics(sendEmail.location, Unit, cause = null)
             migrate.executeWithMetrics(migrate.location)
             warmup.executeWithMetrics(warmup.location)
 

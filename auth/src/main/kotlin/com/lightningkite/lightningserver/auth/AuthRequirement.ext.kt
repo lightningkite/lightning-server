@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.ForbiddenException
 import com.lightningkite.lightningserver.auth.AuthRequirement.Options
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.set
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.HasId
 import kotlin.time.Duration
@@ -107,7 +108,7 @@ public var AuthRequirement.Companion.isDeveloper: AuthRequirement<HasId<*>>
     }
 
 
-context(_: ServerRuntime)
+context(_: Engine)
 public fun AuthRequirement<*>.naturalLanguage(markdown: Boolean = false): String = when (this) {
     is AuthRequirement.Options -> options.joinToString(if (markdown) " *or* " else " or ") { it.naturalLanguage(markdown) }
     is AuthRequirement.AuthSetting -> setting()?.let { "$this (${it.naturalLanguage(markdown)})" } ?: this.toString()

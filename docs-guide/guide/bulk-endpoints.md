@@ -177,21 +177,19 @@ fun bulkTest() = BulkServer.testBlocking(settings = {}) {
     // Drive /meta/bulk through the full HTTP pipeline so the framework can resolve
     // sub-request paths via the registered route table.  ApiHttpHandler.test() would
     // bypass routing and cannot match sub-request paths, so we use serverRuntime.handle().
-    val response = serverRuntime.handle(
-        HttpRequest<PathSpec>(
-            path = RawHttpEndpoint(asString = "/meta/bulk", method = HttpMethod.POST),
-            queryParameters = QueryParameters.EMPTY,
-            headers = HttpHeaders.EMPTY,
-            domain = "example.com",
-            protocol = "https",
-            sourceIp = "local",
-            requestId = generateRequestId(),
-            body = TypedData.text(
-                """{"ping":{"path":"/ping","method":"GET"},"gone":{"path":"/missing","method":"GET"}}""",
-                MediaType.Application.Json,
-            ),
-        )
+    val request = HttpRequest<PathSpec>(
+        path = RawHttpEndpoint(asString = "/meta/bulk", method = HttpMethod.POST),
+        queryParameters = QueryParameters.EMPTY,
+        headers = HttpHeaders.EMPTY,
+        domain = "example.com",
+        protocol = "https",
+        sourceIp = "local",
+        body = TypedData.text(
+            """{"ping":{"path":"/ping","method":"GET"},"gone":{"path":"/missing","method":"GET"}}""",
+            MediaType.Application.Json,
+        ),
     )
+    val response = serverRuntime.handle(request, generateRequestId())
 
     // The outer bulk endpoint always returns HTTP 200; per-sub-request errors appear in the body.
     check(response.status.code == 200)

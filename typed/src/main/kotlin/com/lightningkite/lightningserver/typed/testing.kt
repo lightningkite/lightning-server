@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.auth.Authentication
+import com.lightningkite.lightningserver.auth.assert
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
@@ -98,6 +99,24 @@ import com.lightningkite.services.database.HasId
 //        with(it.server) { didConnect() }
 //    }
 //}
+/**
+ * Checks [presented] against this endpoint's own [auth] requirement, the way a real request does.
+ *
+ * These helpers used to hand the handler an [Access] built directly from whatever authentication the
+ * test supplied, which meant the endpoint's requirement was never consulted. Any test asserting "this
+ * caller is refused" therefore passed whether or not the endpoint required anything at all — it would
+ * have passed against an endpoint with no requirement, which is the opposite of what it read as.
+ *
+ * The real path does this inside [access]; going through the same check here is what makes an
+ * authorization test in a typed harness mean something. A rejected caller now gets the
+ * [com.lightningkite.lightningserver.ForbiddenException] the endpoint would really have produced.
+ */
+context(test: TestRunner<*>)
+private suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT>
+    ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.assertAuth(
+    presented: Authentication<*>?,
+): Authentication<USER & Any>? = with(test) { auth.assert(presented) }
+
 context(test: TestRunner<*>)
 public suspend fun <USER : HasId<*>, INPUT, OUTPUT> ApiHttpHandler<PathSpec0, USER, INPUT, OUTPUT>.test(
     auth: Authentication<USER>,
@@ -112,13 +131,12 @@ public suspend fun <USER : HasId<*>, INPUT, OUTPUT> ApiHttpHandler<PathSpec0, US
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
                 sourceIp = "localhost",
-                requestId = generateRequestId(),
                 body = TypedData.text(
                     test.externalSerialization.json.encodeToString(inputType, input),
                     MediaType.Application.Json
                 ),
             ),
-            auth,
+            assertAuth(auth),
         ),
         input
     )
@@ -139,13 +157,12 @@ public suspend fun <USER : HasId<*>, INPUT, OUTPUT, A> ApiHttpHandler<PathSpec1<
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
                 sourceIp = "localhost",
-                requestId = generateRequestId(),
                 body = TypedData.text(
                     test.externalSerialization.json.encodeToString(inputType, input),
                     MediaType.Application.Json
                 ),
             ),
-            auth,
+            assertAuth(auth),
         ),
         input
     )
@@ -167,13 +184,12 @@ public suspend fun <USER : HasId<*>, INPUT, OUTPUT, A, B> ApiHttpHandler<PathSpe
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
                 sourceIp = "localhost",
-                requestId = generateRequestId(),
                 body = TypedData.text(
                     test.externalSerialization.json.encodeToString(inputType, input),
                     MediaType.Application.Json
                 ),
             ),
-            auth,
+            assertAuth(auth),
         ),
         input
     )
@@ -196,13 +212,12 @@ public suspend fun <USER : HasId<*>, INPUT, OUTPUT, A, B, C> ApiHttpHandler<Path
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
                 sourceIp = "localhost",
-                requestId = generateRequestId(),
                 body = TypedData.text(
                     test.externalSerialization.json.encodeToString(inputType, input),
                     MediaType.Application.Json
                 ),
             ),
-            auth,
+            assertAuth(auth),
         ),
         input
     )
@@ -222,13 +237,12 @@ context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT>
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
                 sourceIp = "localhost",
-                requestId = generateRequestId(),
                 body = TypedData.text(
                     test.externalSerialization.json.encodeToString(inputType, input),
                     MediaType.Application.Json
                 ),
             ),
-            auth,
+            assertAuth(auth),
         ),
         input
     )
@@ -249,13 +263,12 @@ context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT,
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
                 sourceIp = "localhost",
-                requestId = generateRequestId(),
                 body = TypedData.text(
                     test.externalSerialization.json.encodeToString(inputType, input),
                     MediaType.Application.Json
                 ),
             ),
-            auth,
+            assertAuth(auth),
         ),
         input
     )
@@ -277,13 +290,12 @@ context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT,
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
                 sourceIp = "localhost",
-                requestId = generateRequestId(),
                 body = TypedData.text(
                     test.externalSerialization.json.encodeToString(inputType, input),
                     MediaType.Application.Json
                 ),
             ),
-            auth,
+            assertAuth(auth),
         ),
         input
     )
@@ -306,13 +318,12 @@ context(test: TestRunner<*>) public suspend fun <USER : HasId<*>, INPUT, OUTPUT,
                 domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
                 protocol = generalSettings().publicUrl.substringBefore("://"),
                 sourceIp = "localhost",
-                requestId = generateRequestId(),
                 body = TypedData.text(
                     test.externalSerialization.json.encodeToString(inputType, input),
                     MediaType.Application.Json
                 ),
             ),
-            auth,
+            assertAuth(auth),
         ),
         input
     )

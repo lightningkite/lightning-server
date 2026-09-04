@@ -62,8 +62,13 @@ class TestAwsAdapter(server: ServerDefinition) : AwsAdapter(server) {
 
     val webSocketChannels = HashMap<String, Channel<String>>()
     fun webSocketChannel(id: String): Channel<String> = webSocketChannels.getOrPut(id) { Channel() }
+
+    /** Connection ids the engine asked API Gateway to close, so a test can assert a socket was really ended. */
+    val closedConnections: MutableList<String> = Collections.synchronizedList(ArrayList<String>())
+
     override suspend fun apiGatewayWsDeleteConnection(request: DeleteConnectionRequest): DeleteConnectionResponse {
         println("delete ${request.connectionId()}")
+        closedConnections.add(request.connectionId())
         request.connectionId().let { webSocketChannels.remove(it)?.close() }
         return DeleteConnectionResponse.builder().apply {
             sdkHttpResponse(

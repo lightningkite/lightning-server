@@ -4,8 +4,8 @@ import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.QueryParameters
-import com.lightningkite.lightningserver.http.generateRequestId
 import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.location
 import kotlinx.serialization.KSerializer
@@ -43,7 +43,7 @@ public data class WebSocketSubscriptionRequest<PATH : PathSpec, T>(
     val topic: WebSocketTopic<PATH, T>,
     val rawPathArguments: List<Any?>,
 ) : HasContextualPath<PATH> {
-    context(server: ServerRuntime)
+    context(server: Engine)
     override val pathInContext: ResolvedPath<PATH> get() = ResolvedPath(topic.location, rawPathArguments)
 }
 
@@ -64,7 +64,7 @@ public data class WebSocketSubscriptionMessage<PATH : PathSpec, T>(
     val rawPathArguments: List<Any?>,
     val value: T,
 ) : HasContextualPath<PATH> {
-    context(server: ServerRuntime)
+    context(server: Engine)
     override val pathInContext: ResolvedPath<PATH> get() = ResolvedPath(topic.location, rawPathArguments)
 }
 
@@ -85,13 +85,6 @@ public data class WebSocketConnectRequest<PATH : PathSpec>(
     override val domain: String = "",
     override val protocol: String = "",
     override val sourceIp: String = "",
-    /**
-     * Identifies this connection for the lifetime of the socket. Every message and every push on
-     * this connection correlates back to it, since a long-lived socket is one logical session rather
-     * than one request.
-     */
-    override val requestId: String,
-    override val parentRequestId: String? = null,
     override val upstreamRequestId: String? = null,
     override val cache: SerializableCache = SerializableCache(),
     /**
@@ -101,14 +94,17 @@ public data class WebSocketConnectRequest<PATH : PathSpec>(
      */
     val engineSocketId: String? = null,
 ) : Request<PATH>() {
+    /** The gateway's identifier for a socket is the socket itself, so there is nothing else to hold. */
+    override val engineRequestId: String? get() = engineSocketId
+
     /**
      * Derives a logical sub-connection of this one, as multiplexing carries several logical sockets
      * over a single physical connection.
      *
-     * The sub-connection gets its own [requestId] with [parentRequestId] pointing back here, so each
-     * logical socket is independently attributable while remaining joinable to the physical
-     * connection carrying it. Use this only for a genuinely distinct logical connection — a shim that
-     * merely rewrites the path of the same socket should keep the existing [requestId].
+     * Use this only for a genuinely distinct logical socket, with
+     * [com.lightningkite.lightningserver.runtime.subConnection] deriving the initiator that gives it
+     * its own socket identity. A shim that merely rewrites the path of the same socket is not opening
+     * one, and should use [com.lightningkite.lightningserver.runtime.rewritePath] instead.
      */
     public fun <PATH2 : PathSpec> subConnection(
         path: RawWebSocketPath<PATH2>,
@@ -120,8 +116,6 @@ public data class WebSocketConnectRequest<PATH : PathSpec>(
         domain = domain,
         protocol = protocol,
         sourceIp = sourceIp,
-        requestId = generateRequestId(),
-        parentRequestId = requestId,
         upstreamRequestId = upstreamRequestId,
         cache = cache,
         engineSocketId = engineSocketId,
@@ -131,8 +125,8 @@ public data class WebSocketConnectRequest<PATH : PathSpec>(
 /**
  * Represents an active WebSocket connection with stateful lifecycle management.
  *
- * This interface extends [ServerRuntime] to provide access to server services and adds
- * WebSocket-specific functionality for managing connection state, subscriptions, and messaging.
+ * This is the socket alone: connection state, subscriptions, and messaging. The server it runs on is
+ * a separate concern, supplied to every [WebSocketHandler] method as a [ServerRuntime] context.
  *
  * **State Management:**
  * Each connection maintains a STORAGE object that can be updated in two ways:
@@ -149,7 +143,7 @@ public data class WebSocketConnectRequest<PATH : PathSpec>(
  * @param PATH The PathSpec type for this WebSocket endpoint
  * @param STORAGE The type of state object maintained for this connection
  */
-public interface WebSocketConnection<PATH : PathSpec, STORAGE> : ServerRuntime {
+public interface WebSocketConnection<PATH : PathSpec, STORAGE> {
     /** The original connection request */
     public val request: WebSocketConnectRequest<PATH>
 
@@ -210,16 +204,13 @@ public interface WebSocketConnection<PATH : PathSpec, STORAGE> : ServerRuntime {
  * 3. No way to query current subscriptions for a connection. Adding a `val subscriptions: Set<WebSocketSubscriptionRequest<*, *>>`
  *    would be useful for debugging and state inspection.
  *
- * 4. WebSocketConnection extends ServerRuntime which means every connection has its own runtime context.
- *    Document how this relates to the parent server runtime and if there are any scoping implications.
- *
- * 5. The subscribe/unsubscribe operations don't return success/failure. If a topic doesn't exist or
+ * 4. The subscribe/unsubscribe operations don't return success/failure. If a topic doesn't exist or
  *    subscription fails, how does the caller know? Consider returning Boolean or throwing exceptions.
  *
- * 6. No ping/pong support exposed in the API. WebSocket implementations typically need this for
+ * 5. No ping/pong support exposed in the API. WebSocket implementations typically need this for
  *    connection keepalive. Consider adding automatic ping or exposing manual ping control.
  *
- * 7. The currentState property could be stale if queueStateUpdate is used. Document the
+ * 6. The currentState property could be stale if queueStateUpdate is used. Document the
  *    consistency model (eventual consistency? last-write-wins?).
  */
 

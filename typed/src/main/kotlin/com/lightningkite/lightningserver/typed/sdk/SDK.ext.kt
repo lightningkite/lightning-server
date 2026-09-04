@@ -4,7 +4,7 @@ import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.definition.mapItems
 import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.pathing.buildPathSpecMap
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.ApiWebSocketHandler
 import com.lightningkite.services.database.nullElement
@@ -72,7 +72,7 @@ public class TypingGenerationException internal constructor(
     cause
 )
 
-public fun ServerRuntime.usedTypes(): Collection<KSerializer<*>> {
+public fun Engine.usedTypes(): Collection<KSerializer<*>> {
     val seen = HashMap<SerialDescriptor, KSerializer<*>>()
 
     fun registerRecursive(serializer: KSerializer<*>) {

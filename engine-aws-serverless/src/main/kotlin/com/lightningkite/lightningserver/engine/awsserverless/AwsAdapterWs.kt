@@ -43,6 +43,15 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
     data class WebSocketDidConnect(
         val socketId: String,
         val connection: WebSocketConnectRequest<Nothing>,
+        /**
+         * `didConnect` is its own Lambda invocation, so the socket's identity has to travel with it.
+         *
+         * Null only for a payload fired by a deployment that predates this field.  It needs the explicit
+         * default as well as the nullable type: kotlinx.serialization treats a field without a default
+         * as required regardless of nullability, so without it the whole payload fails to decode and
+         * `didConnect` is lost in the outer failure handler with no response and no trace.
+         */
+        val initiator: Initiator.WebSocket? = null,
         val storage: AnonType,
     ) : AwsLambdaInput
 
@@ -78,7 +87,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
         val handler: WebSocketHandler<P, T>,
         val socketId: String,
         val stateAnonType: AnonType,
-    ) : WebSocketConnection<P, T>, ServerRuntime by root {
+    ) : WebSocketConnection<P, T> {
         override var currentState: T = stateAnonType.value(encoding, handler.storageSerializer)
 
         /**
@@ -153,11 +162,11 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
         }
 
         override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-            webSocketDynamo.subscribe(path.toString(), topic.path(), socketId)
+            webSocketDynamo.subscribe(path.toString(), with(root) { topic.path() }, socketId)
         }
 
         override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-            webSocketDynamo.unsubscribe(topic.path(), socketId)
+            webSocketDynamo.unsubscribe(with(root) { topic.path() }, socketId)
         }
 
         override suspend fun send(frame: WebSocketFrame) {
@@ -251,7 +260,19 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                 // TODO: could retrieve more states at once?
                 val states = webSocketDynamo.states(ids)
                 for (socketId in ids) {
-                    val s = states[socketId] ?: continue
+                    // Handled per socket, so one previous-schema row cannot cost the rest of the batch
+                    // its push.  Reading these rows as a group used to throw on the first legacy one and
+                    // abandon the whole page, healthy sockets included.
+                    val s = when (val row = states.getValue(socketId)) {
+                        SocketRow.Absent -> continue
+                        is SocketRow.Legacy -> {
+                            webSocketClose(socketId, WebSocketClose.GOING_AWAY)
+                            webSocketDynamo.clean(socketId)
+                            continue
+                        }
+
+                        is SocketRow.Current -> row
+                    }
                     try {
                         @Suppress("UNCHECKED_CAST")
                         withMid<PathSpec, Any?, Unit>(
@@ -263,6 +284,8 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         ) { mid ->
                             h.messageFromSubscriptionWithMetrics(
                                 p.pathSpec,
+                                root,
+                                with(root) { s.initiator.phase(Initiator.WebSocket.Phase.SubscriptionMessage) },
                                 mid,
                                 WebSocketSubscriptionMessage(
                                     fullTopicMatch.value,
@@ -337,6 +360,19 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
     }
 
     suspend fun handleWebSocketDidConnect(event: WebSocketDidConnect): APIGatewayV2HTTPResponse {
+        // The `${'$'}connect` that fired this payload ran under a deployment with no initiator, which
+        // means it also wrote a row this deployment cannot use.  The socket is unattributable for life,
+        // so end it here rather than merely skipping didConnect - skipping only defers the same close to
+        // the socket's first frame, with a broken connection in between.
+        val initiator = event.initiator ?: run {
+            root.logger.warn {
+                "Socket ${event.socketId} was connected by a previous deployment (its didConnect carries " +
+                        "no initiator). Ending it so the client reconnects."
+            }
+            webSocketClose(event.socketId, WebSocketClose.GOING_AWAY)
+            webSocketDynamo.clean(event.socketId)
+            return APIGatewayV2HTTPResponse(204)
+        }
         try {
             @Suppress("UNCHECKED_CAST")
             withMid(
@@ -348,6 +384,8 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
             ) { mid ->
                 rootWs.didConnectWithMetrics(
                     rootPath,
+                    root,
+                    with(root) { initiator.phase(Initiator.WebSocket.Phase.Connected) },
                     mid
                 )
                 return APIGatewayV2HTTPResponse(200)
@@ -394,16 +432,29 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     domain = event.requestContext.domainName,
                     protocol = "https",
                     sourceIp = event.requestContext.identity.sourceIp ?: "0.0.0.0",
-                    // The gateway's connection ID is stable for the socket's whole lifetime, which is
-                    // exactly the correlation scope wanted for a connection.
-                    requestId = event.requestContext.connectionId,
                     upstreamRequestId = headers[HttpHeader.XRequestId]?.root,
                     engineSocketId = event.requestContext.connectionId
                 )
+                // Minted once here, at $connect, and persisted with the connection state, so the socket
+                // is one identity across the five separate Lambda invocations its lifetime is made of.
+                // The gateway's connection ID is not a UUID and stays in [engineSocketId], which is where
+                // the join to the gateway's own logs comes from.
+                val socketId = with(root) { generateRequestId() }
+                val connectInitiator = Initiator.WebSocket(
+                    executionId = socketId,
+                    socketId = socketId,
+                    path = lkEvent.path,
+                    phase = Initiator.WebSocket.Phase.Connect,
+                )
                 try {
-                    val storage = rootWs.willConnectWithMetrics(rootPath, root, lkEvent)
+                    val storage = rootWs.willConnectWithMetrics(rootPath, root, connectInitiator, lkEvent)
                     val storageBytes = encoding.encodeToByteArray(rootWs.storageSerializer, storage)
-                    webSocketDynamo.setState(event.requestContext.connectionId, lkEvent, storageBytes)
+                    webSocketDynamo.setState(
+                        event.requestContext.connectionId,
+                        lkEvent,
+                        connectInitiator,
+                        storageBytes,
+                    )
                     try {
                         root.invokeLambda(InvokeRequest.builder().also {
                             it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
@@ -418,6 +469,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                                         WebSocketDidConnect(
                                             event.requestContext.connectionId,
                                             lkEvent as WebSocketConnectRequest<Nothing>,
+                                            connectInitiator,
                                             AnonType(storageBytes)
                                         )
                                     )
@@ -440,8 +492,20 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
 
             "\$disconnect" -> {
                 try {
-                    val state =
-                        webSocketDynamo.state(event.requestContext.connectionId) ?: return APIGatewayV2HTTPResponse(204)
+                    // A previous-schema row cannot have its disconnect attributed to anything, and
+                    // recording the phase against a fabricated initiator would put it in the audit trail
+                    // under an id that never connected.  The socket is already going away, so there is
+                    // nothing to close - just drop the row.  These returns bypass the trailing `also`,
+                    // hence the explicit clean.
+                    val state = when (val row = webSocketDynamo.state(event.requestContext.connectionId)) {
+                        SocketRow.Absent -> return APIGatewayV2HTTPResponse(204)
+                        is SocketRow.Legacy -> {
+                            webSocketDynamo.clean(event.requestContext.connectionId)
+                            return APIGatewayV2HTTPResponse(204)
+                        }
+
+                        is SocketRow.Current -> row
+                    }
                     @Suppress("UNCHECKED_CAST")
                     withMid(
                         rootPath,
@@ -452,6 +516,8 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     ) { mid ->
                         rootWs.disconnectWithMetrics(
                             rootPath,
+                            root,
+                            with(root) { state.initiator.phase(Initiator.WebSocket.Phase.Disconnect) },
                             mid,
                             WebSocketClose.NORMAL
                         )
@@ -467,8 +533,20 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
             else -> if (body == null || body.isEmpty())
                 APIGatewayV2HTTPResponse(200)
             else {
-                val state =
-                    webSocketDynamo.state(event.requestContext.connectionId) ?: return APIGatewayV2HTTPResponse(204)
+                // A previous-schema row cannot be served or attributed for as long as the socket stays
+                // open, so end it: the client reconnects, `${'$'}connect` writes a current row, and
+                // everything after that is handled normally.  API Gateway's deleteConnection carries no
+                // close code, so the client sees an abrupt close and reconnects on its own.
+                val state = when (val row = webSocketDynamo.state(event.requestContext.connectionId)) {
+                    SocketRow.Absent -> return APIGatewayV2HTTPResponse(204)
+                    is SocketRow.Legacy -> {
+                        webSocketClose(event.requestContext.connectionId, WebSocketClose.GOING_AWAY)
+                        webSocketDynamo.clean(event.requestContext.connectionId)
+                        return APIGatewayV2HTTPResponse(204)
+                    }
+
+                    is SocketRow.Current -> row
+                }
                 try {
                     @Suppress("UNCHECKED_CAST")
                     withMid(
@@ -495,6 +573,8 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         }
                         rootWs.messageFromClientWithMetrics(
                             rootPath,
+                            root,
+                            with(root) { state.initiator.phase(Initiator.WebSocket.Phase.ClientMessage) },
                             mid,
                             WebSocketFrame(event.body)
                         )

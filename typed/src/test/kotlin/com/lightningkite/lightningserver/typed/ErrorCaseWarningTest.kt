@@ -56,15 +56,14 @@ class ErrorCaseWarningTest {
         domain = "example.com",
         protocol = "https",
         sourceIp = "local",
-        requestId = generateRequestId(),
     )
 
     @Test
     fun undeclaredErrorStillSurfacesAs400() = runBlocking {
         TestServer.test({}) {
             // Warning is logged for /boom; both still return 400 (response unchanged by W6).
-            assertEquals(400, serverRuntime.handle(request("/boom")).status.code)
-            assertEquals(400, serverRuntime.handle(request("/declared")).status.code)
+            assertEquals(400, serverRuntime.handle(request("/boom"), generateRequestId()).status.code)
+            assertEquals(400, serverRuntime.handle(request("/declared"), generateRequestId()).status.code)
         }
     }
 }

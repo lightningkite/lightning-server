@@ -6,7 +6,6 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
 import java.util.Collections
 import kotlin.test.Test
@@ -38,30 +37,17 @@ class MultiplexInterceptorTest {
         override val name: String = "LogicalRecorder"
 
         override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> =
-            object : WebSocketHandler<PATH, T> {
-                override val storageSerializer: KSerializer<T> get() = handler.storageSerializer
-
+            object : DelegatingWebSocketHandler<PATH, T>(handler) {
                 context(serverRuntime: ServerRuntime)
                 override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
                     Observed.connects.add("/" + request.path.pathSegments.toString())
-                    return handler.willConnect(request)
+                    return wrapped.willConnect(request)
                 }
 
-                context(connection: WebSocketConnection<PATH, T>)
-                override suspend fun didConnect(): Unit = handler.didConnect()
-
-                context(connection: WebSocketConnection<PATH, T>)
-                override suspend fun messageFromClient(frame: WebSocketFrame): Unit =
-                    handler.messageFromClient(frame)
-
-                context(connection: WebSocketConnection<PATH, T>)
-                override suspend fun messageFromSubscription(topic: WebSocketSubscriptionMessage<*, *>): Unit =
-                    handler.messageFromSubscription(topic)
-
-                context(connection: WebSocketConnection<PATH, T>)
-                override suspend fun disconnect(reason: WebSocketClose) {
+                context(serverRuntime: ServerRuntime)
+                override suspend fun disconnect(connection: WebSocketConnection<PATH, T>, reason: WebSocketClose) {
                     Observed.disconnects.add("/" + connection.request.path.pathSegments.toString())
-                    handler.disconnect(reason)
+                    wrapped.disconnect(connection, reason)
                 }
             }
     }
@@ -71,28 +57,12 @@ class MultiplexInterceptorTest {
         override val name: String = "ConnectionRecorder"
 
         override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> =
-            object : WebSocketHandler<PATH, T> {
-                override val storageSerializer: KSerializer<T> get() = handler.storageSerializer
-
+            object : DelegatingWebSocketHandler<PATH, T>(handler) {
                 context(serverRuntime: ServerRuntime)
                 override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
                     Observed.physicalConnects.add("/" + request.path.pathSegments.toString())
-                    return handler.willConnect(request)
+                    return wrapped.willConnect(request)
                 }
-
-                context(connection: WebSocketConnection<PATH, T>)
-                override suspend fun didConnect(): Unit = handler.didConnect()
-
-                context(connection: WebSocketConnection<PATH, T>)
-                override suspend fun messageFromClient(frame: WebSocketFrame): Unit =
-                    handler.messageFromClient(frame)
-
-                context(connection: WebSocketConnection<PATH, T>)
-                override suspend fun messageFromSubscription(topic: WebSocketSubscriptionMessage<*, *>): Unit =
-                    handler.messageFromSubscription(topic)
-
-                context(connection: WebSocketConnection<PATH, T>)
-                override suspend fun disconnect(reason: WebSocketClose): Unit = handler.disconnect(reason)
             }
     }
 
@@ -119,7 +89,7 @@ class MultiplexInterceptorTest {
         TestServer.test(settings = {}) {
             runBlocking {
                 val mux = TestServer.multiplex.test()
-                val json = mux.server.externalSerialization.json
+                val json = contextOf<ServerRuntime>().externalSerialization.json
 
                 mux.send(
                     WebSocketFrame.Text(
@@ -144,7 +114,7 @@ class MultiplexInterceptorTest {
         TestServer.test(settings = {}) {
             runBlocking {
                 val mux = TestServer.multiplex.test()
-                val json = mux.server.externalSerialization.json
+                val json = contextOf<ServerRuntime>().externalSerialization.json
 
                 mux.send(
                     WebSocketFrame.Text(
@@ -183,7 +153,7 @@ class MultiplexInterceptorTest {
         TestServer.test(settings = {}) {
             runBlocking {
                 val mux = TestServer.multiplex.test()
-                val json = mux.server.externalSerialization.json
+                val json = contextOf<ServerRuntime>().externalSerialization.json
 
                 mux.send(
                     WebSocketFrame.Text(

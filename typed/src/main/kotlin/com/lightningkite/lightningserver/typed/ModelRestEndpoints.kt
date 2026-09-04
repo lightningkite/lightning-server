@@ -101,11 +101,22 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
             examples = emptyList(),
             implementation = { input: QueryPartial<T> ->
                 info.table(this)
-                    .queryPartial(input)
+                    .queryPartial(input.withId())
                     .toList()
             }
         )
 
+
+    /**
+     * The same query with `_id` added to the requested fields.
+     *
+     * A partial that omits `_id` returns data no one can attribute to a record — which defeats
+     * disclosure auditing, where one row is written per record disclosed, and is rarely what a caller
+     * wanted anyway. Adding it is cheaper than rejecting the query, and it is added unconditionally so
+     * that behaviour does not depend on whether a model happens to be audited.
+     */
+    private fun QueryPartial<T>.withId(): QueryPartial<T> =
+        copy(fields = fields + DataClassPathSelf(info.serializer)[info.serializer._id()])
 
     public val detail: ApiHttpHandler<PathSpec1<ID>, USER, Unit, T> =
         detailPath.get bind explicitApiHttpHandler(

@@ -6,7 +6,7 @@ import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.pathing.plus
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.typed.contract.diffApiContract
 import com.lightningkite.lightningserver.typed.sdk.*
@@ -30,7 +30,7 @@ private fun InterfaceInfo.virtualTypeReference(registry: SerializationRegistry):
 public val ServerBuilder.lightningServerKSchemaFromDefaultRuntime: LightningServerKSchema get() = SDK.withDefaultRuntime(this) { lightningServerKSchema }
 
 
-public context(runtime: ServerRuntime)
+public context(runtime: Engine)
 val lightningServerKSchema: LightningServerKSchema
     get() {
         val registry = SerializationRegistry(runtime.externalSerialization.serializersModule).apply {

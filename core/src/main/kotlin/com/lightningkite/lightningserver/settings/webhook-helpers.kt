@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.fullUrl
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.services.webhooksubservice.HttpAdapter
@@ -73,7 +74,7 @@ public operator fun <Input, Output> Runtime<HttpAdapter<Input, Output>>.invoke(h
  * Creates a webhook server module for a particular WebhookAdapterWithResponse.
  */
 public fun <Input, Output> serviceWebhook(
-    forThing: context(ServerRuntime) () -> WebhookAdapterWithResponse<Input, Output>,
+    forThing: context(Engine) () -> WebhookAdapterWithResponse<Input, Output>,
     frequency: Duration = 1.minutes,
     handler: suspend context(ServerRuntime) (Input) -> Output,
 ): WebhookServer<Input, Output> =

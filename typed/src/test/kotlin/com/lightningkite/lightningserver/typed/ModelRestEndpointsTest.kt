@@ -48,6 +48,36 @@ class ModelRestEndpointsTest {
         }
     }
 
+    /**
+     * A partial that omits `_id` returns rows nobody can attribute to a record, which defeats
+     * disclosure auditing — one row is written per record disclosed — and is rarely what the caller
+     * meant. `_id` is added regardless of what was asked for.
+     */
+    @Test
+    fun query_partial_always_includes_the_id() = runBlocking {
+        CrudTestServer.test(settings = {
+            generalSettings set GeneralServerSettings()
+            database set Database.Settings()
+        }) {
+            val item = CrudItem(name = "Partial Test", category = "Books", price = 1.0, quantity = 1)
+            CrudTestServer.rest.insert.test(null, item)
+
+            val nameOnly = DataClassPathSelf(CrudItem.serializer())[CrudItem_name]
+            val results = CrudTestServer.rest.queryPartial.test(null, QueryPartial(fields = setOf(nameOnly)))
+
+            val returned = results.single()
+            assertEquals(
+                item._id,
+                returned.parts.entries.single { it.key.name == "_id" }.value,
+                "_id was not returned even though every partial must carry one",
+            )
+            assertTrue(
+                returned.parts.keys.any { it.name == "name" },
+                "the requested field went missing; was ${returned.parts.keys.map { it.name }}",
+            )
+        }
+    }
+
     @Test
     fun detail_returns_inserted_item() = runBlocking {
         CrudTestServer.test(settings = {

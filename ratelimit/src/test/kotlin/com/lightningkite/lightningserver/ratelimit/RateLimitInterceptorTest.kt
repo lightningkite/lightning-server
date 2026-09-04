@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.ratelimit
 
+import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -43,13 +44,12 @@ class RateLimiterTest {
     ) {
 
         val dummy = HttpRequest(
-            RawHttpEndpoint("", method = HttpMethod.GET),
+            RawHttpEndpoint<PathSpec>("", method = HttpMethod.GET),
             queryParameters = QueryParameters.EMPTY,
             headers = HttpHeaders(),
             domain = "Domain",
             protocol = "Http",
             sourceIp = "localhost",
-            requestId = generateRequestId(),
             body = null,
         )
         var successRequests = 0
@@ -242,13 +242,12 @@ class RateLimiterTest {
                 )
 
                 val dummy = HttpRequest(
-                    RawHttpEndpoint("", method = HttpMethod.GET),
+                    RawHttpEndpoint<PathSpec>("", method = HttpMethod.GET),
                     queryParameters = QueryParameters.EMPTY,
                     headers = HttpHeaders(),
                     domain = "Domain",
                     protocol = "Http",
                     sourceIp = "localhost",
-                    requestId = generateRequestId(),
                     body = null,
                 )
                 var successRequests = 0

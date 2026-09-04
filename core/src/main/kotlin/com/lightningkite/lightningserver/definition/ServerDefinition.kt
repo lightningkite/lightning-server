@@ -4,7 +4,10 @@ import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.runtime.ExecutionInterceptor
+import com.lightningkite.lightningserver.runtime.compileAndInstrument
 import com.lightningkite.lightningserver.serialization.*
+import com.lightningkite.lightningserver.typedoutput.TypedOutputInterceptor
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.*
 import com.lightningkite.services.database.validation.AnnotationValidators
@@ -36,10 +39,12 @@ public data class ServerDefinition(
         public val annotationValidators: Runtime<AnnotationValidators>,
 
         public val endpoints: PathSpecMap<ServerPathEndpoints>,
+        public val executionInterceptors: List<ExecutionInterceptor>,
         public val httpConnectionInterceptors: List<HttpConnectionInterceptor>,
         public val httpLogicalInterceptors: List<HttpLogicalInterceptor>,
         public val webSocketConnectionInterceptors: List<WebSocketConnectionInterceptor>,
         public val webSocketLogicalInterceptors: List<WebSocketLogicalInterceptor>,
+        public val typedOutputInterceptors: List<TypedOutputInterceptor>,
         public val exceptionHandler: ExceptionHttpHandler = DefaultExceptionHttpHandler,
 
         public val startupTasks: Map<PathSpec0, StartupTask>,
@@ -65,6 +70,13 @@ public data class ServerDefinition(
     public val annotationValidators: Runtime<AnnotationValidators> get() = flattened.annotationValidators
 
     public val endpoints: PathSpecMap<ServerPathEndpoints> get() = flattened.endpoints
+
+    /** Interceptors wrapping every execution the server runs, of every kind. See [ExecutionInterceptor]. */
+    public val executionInterceptors: List<ExecutionInterceptor> get() = flattened.executionInterceptors
+
+    /** Everything that wants to hear about authentication events. Empty unless a module installs one. */
+    public val compiledExecutionInterceptors: ExecutionInterceptor by lazy { executionInterceptors.compileAndInstrument() }
+
     /** Interceptors wrapping the whole physical request. See [HttpConnectionInterceptor]. */
     public val httpConnectionInterceptors: List<HttpConnectionInterceptor> get() = flattened.httpConnectionInterceptors
     public val compiledHttpConnectionInterceptors: HttpInterceptor by lazy { httpConnectionInterceptors.compileAndInstrument() }
@@ -92,6 +104,13 @@ public data class ServerDefinition(
         handler: WebSocketHandler<PATH, T>,
     ): WebSocketHandler<PATH, T> = compiledWebSocketConnectionInterceptors
         .intercept(compiledWebSocketLogicalInterceptors.intercept(handler))
+    /**
+     * Observers of every typed value the server sends, applied before serialization. See
+     * [TypedOutputInterceptor]. A flat list rather than a compiled chain: these observe, they do not
+     * wrap.
+     */
+    public val typedOutputInterceptors: List<TypedOutputInterceptor> get() = flattened.typedOutputInterceptors
+
     public val exceptionHandler: ExceptionHttpHandler get() = flattened.exceptionHandler
 
     public val startupTasks: Map<PathSpec0, StartupTask> get() = flattened.startupTasks
@@ -117,10 +136,12 @@ public data class ServerDefinition(
         internalSerializersModule = Runtime.Cached(internalSerializersModule),
         externalSerializersModule = Runtime.Cached(externalSerializersModule),
         annotationValidators = Runtime.Cached(annotationValidators),
+        executionInterceptors = executionInterceptors.toSealedList(),
         httpConnectionInterceptors = httpConnectionInterceptors.toSealedList(),
         httpLogicalInterceptors = httpLogicalInterceptors.toSealedList(),
         webSocketConnectionInterceptors = webSocketConnectionInterceptors.toSealedList(),
         webSocketLogicalInterceptors = webSocketLogicalInterceptors.toSealedList(),
+        typedOutputInterceptors = typedOutputInterceptors.toSealedList(),
         endpoints = endpoints.toSealedPathSpecMap(),
         schedules = schedules.toSealedMap(),
         tasks = tasks.toSealedMap(),
@@ -180,10 +201,12 @@ public data class ServerDefinition(
             internalSerializersModule = { flattenedModuleItems.fold(thisLayer.internalSerializersModule()) { acc, module -> acc + module.internalSerializersModule() } },
             externalSerializersModule = { flattenedModuleItems.fold(thisLayer.externalSerializersModule()) { acc, module -> acc + module.externalSerializersModule() } },
             annotationValidators = { flattenedModuleItems.fold(thisLayer.annotationValidators()) { acc, module -> acc + module.annotationValidators() } },
+            executionInterceptors = flattenList { it.executionInterceptors },
             httpConnectionInterceptors = flattenList { it.httpConnectionInterceptors },
             httpLogicalInterceptors = flattenList { it.httpLogicalInterceptors },
             webSocketConnectionInterceptors = flattenList { it.webSocketConnectionInterceptors },
             webSocketLogicalInterceptors = flattenList { it.webSocketLogicalInterceptors },
+            typedOutputInterceptors = flattenList { it.typedOutputInterceptors },
             endpoints = buildPathSpecMap { // We want to be able to override existing entries here, but we'll have to check for duplicate registration manually.
                 putAll(thisLayer.endpoints)
                 for ((modPath, map) in flattenedModules.mapItems { it.endpoints })

@@ -168,27 +168,48 @@ public class PasswordProofEndpoints(
                 val now = now()
                 val subject = input.type
                 val handler = serverRuntime.server.principalTypes.values.find { it.name == subject }
-                    ?: throw IllegalArgumentException("No subject $subject recognized")
+                    ?: run {
+                        reportProofRejected(info, ProofFailureReason.MalformedRequest, request = request)
+                        throw IllegalArgumentException("No subject $subject recognized")
+                    }
                 // Normalize BEFORE building the rate-limit key: the key must be derived from the canonical
                 // identifier so that case/whitespace variants (e.g. "Bob@x.com" vs "bob@x.com ") of the same
                 // account share one bucket. Keying on the raw value would let an attacker dodge the limiter
                 // (and its exponential backoff) simply by varying case or whitespace.
                 val normalizedValue = handler.normalizePropertyValue(input.property, input.value)
-                cache().constrainAttemptRate("password-${input.property}-${normalizedValue}") {
+                cache().constrainProofAttemptRate(
+                    cacheKey = "password-${input.property}-${normalizedValue}",
+                    method = info,
+                    request = request,
+                ) {
                     val subjectId = handler.fetchUserIdString(input.property, normalizedValue)
-                        ?: throw BadRequestException("User ID and code do not match")
+                        ?: run {
+                            // No account resolved, so no principal to name. Recorded anyway: a run of
+                            // these against different values is what enumeration looks like.
+                            reportProofRejected(info, ProofFailureReason.NoSuchSubject, request = request)
+                            throw BadRequestException("User ID and code do not match")
+                        }
 
                     val active = modelInfo.table().find(condition {
                         it.subjectId.eq(subjectId) and it.subjectType.eq(subject) and active
                     }).toList()
 
                     val matching = active.find { input.password.checkAgainstHash(it.hash) }
-                        ?: throw BadRequestException("User ID and code do not match")
+                        ?: run {
+                            reportProofRejected(
+                                info,
+                                ProofFailureReason.SecretMismatch,
+                                principal = subjectId,
+                                request = request,
+                            )
+                            throw BadRequestException("User ID and code do not match")
+                        }
 
                     modelInfo.table().updateOneById(matching._id, modification {
                         it.lastUsedAt assign now
                     })
 
+                    reportProofAccepted(info, principal = subjectId, request = request)
                     proofSigner.await().makeProof(
                         property = input.property,
                         value = normalizedValue,

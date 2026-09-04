@@ -8,7 +8,8 @@ import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.path
-import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
+import com.lightningkite.lightningserver.runtime.EngineBase
+import com.lightningkite.lightningserver.runtime.ExecutionCause
 import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.settings.*
 import com.lightningkite.lightningserver.websockets.*
@@ -41,7 +42,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 private val awsApiGatewayWsEndpointSetting = ServerSetting("awsApiGatewayWsEndpointSetting", "", String.serializer())
 
-public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(server), RequestStreamHandler, Resource {
+public open class AwsAdapter(server: ServerDefinition) : EngineBase(server), RequestStreamHandler, Resource {
 
     internal val logger: KLogger = KotlinLogging.logger("com.lightningkite.lightningserver.engine.awsserverless")
     internal var preventLambdaTimeoutReuse: Boolean = false
@@ -160,8 +161,8 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
             .build()
     }
 
-    override suspend fun <T> Task<T>.invoke(input: T) {
-        tasks.launchTask(location, this, input)
+    override suspend fun <T> Task<T>.invoke(input: T, cause: ExecutionCause?) {
+        tasks.launchTask(location, this, input, cause)
     }
 
     override val serverId: String

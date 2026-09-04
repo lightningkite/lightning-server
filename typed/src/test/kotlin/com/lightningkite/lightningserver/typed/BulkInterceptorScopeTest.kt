@@ -22,6 +22,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import kotlin.uuid.Uuid
 
 /**
  * `/meta/bulk` used to invoke each sub-request's handler directly, so sub-requests bypassed the
@@ -33,7 +34,9 @@ import kotlin.test.assertTrue
  */
 class BulkInterceptorScopeTest {
 
-    private data class Seen(val path: String, val requestId: String, val parentRequestId: String?)
+    private data class Seen(val path: String, val requestId: Uuid, val parentRequestId: Uuid?)
+
+    private val outerRequestId = Uuid.parse("00000000-0000-4000-8000-000000000001")
 
     private object Observed {
         val logical: MutableList<Seen> = Collections.synchronizedList(mutableListOf())
@@ -46,8 +49,10 @@ class BulkInterceptorScopeTest {
     }
 
     /** Records what it saw, then delegates. Shared by both interceptor kinds below. */
+    context(runtime: ServerRuntime)
     private fun record(into: MutableList<Seen>, request: HttpRequest<*>) {
-        into.add(Seen("/" + request.path.pathSegments.toString(), request.requestId, request.parentRequestId))
+        val initiator = runtime.initiator
+        into.add(Seen("/" + request.path.pathSegments.toString(), initiator.executionId, initiator.causedBy))
     }
 
     private inner class LogicalRecorder : HttpLogicalInterceptor {
@@ -122,9 +127,9 @@ class BulkInterceptorScopeTest {
                     domain = "example.com",
                     protocol = "https",
                     sourceIp = "local",
-                    requestId = "outer-request",
                     body = TypedData.text(body, MediaType.Application.Json),
-                )
+                ),
+                outerRequestId,
             )
         }
         block()
@@ -156,18 +161,18 @@ class BulkInterceptorScopeTest {
     ) {
         val subs = Observed.logical.filter { it.path != "/meta/bulk" }
         assertEquals(2, subs.size, "expected two sub-requests, saw ${Observed.logical.map { it.path }}")
-        subs.forEach { assertEquals("outer-request", it.parentRequestId) }
+        subs.forEach { assertEquals(outerRequestId, it.parentRequestId) }
         assertEquals(2, subs.map { it.requestId }.toSet().size, "sub-requests must have distinct ids")
-        assertTrue(subs.none { it.requestId == "outer-request" }, "a sub-request reused the outer id")
+        assertTrue(subs.none { it.requestId == outerRequestId }, "a sub-request reused the outer id")
     }
 
     /**
-     * The guard exists because a sub-request that kept the outer ID, or carried no parent at all,
-     * would be either indistinguishable from the request that carried it or unattributable to it —
-     * and both corrupt the audit trail silently rather than failing.
+     * The guard exists because a sub-request dispatched from outside an HTTP execution has nothing to
+     * be a sub-request *of*: it would be unattributable to the request that carried it, which corrupts
+     * the audit trail silently rather than failing.
      */
     @Test
-    fun `handleSubRequest rejects a request that was not derived as a sub-request`() =
+    fun `handleSubRequest rejects a dispatch from outside an http execution`() =
         TestServer.test(settings = {}) {
             val notASubRequest = HttpRequest<PathSpec>(
                 path = RawHttpEndpoint(asString = "/alpha", method = HttpMethod.GET),
@@ -176,14 +181,13 @@ class BulkInterceptorScopeTest {
                 domain = "example.com",
                 protocol = "https",
                 sourceIp = "local",
-                requestId = "hand-rolled",
             )
             val failure = assertFailsWith<IllegalArgumentException> {
                 runBlocking { serverRuntime.handleSubRequest(notASubRequest) }
             }
             assertTrue(
-                failure.message.orEmpty().contains("subRequest"),
-                "the message should name the correct way to build one; was: ${failure.message}",
+                failure.message.orEmpty().contains("HTTP execution"),
+                "the message should say why there is nothing to parent to; was: ${failure.message}",
             )
         }
 

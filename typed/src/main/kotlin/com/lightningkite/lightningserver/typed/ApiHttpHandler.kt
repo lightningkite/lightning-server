@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.serialization.*
 import com.lightningkite.lightningserver.typed.sdk.SDK
+import com.lightningkite.lightningserver.typedoutput.emitTypedOutput
 import com.lightningkite.services.database.HasId
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.KSerializer
@@ -125,6 +126,11 @@ public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT
             }
             throw e
         }
+
+        // Every typed output is observed while still structured, before it becomes bytes. Placed after
+        // the handler and before serialization so an observer that fails (an audit that could not be
+        // recorded) prevents the send rather than trailing it.
+        emitTypedOutput(request, outputType, result)
 
         return HttpResponse(
             body = if (result == Unit) null else result.toTypedData(request.headers.accept, outputType),

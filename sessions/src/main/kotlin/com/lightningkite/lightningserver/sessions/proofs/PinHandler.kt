@@ -50,6 +50,16 @@ public open class PinHandler(
         return pin
     }
 
+    /**
+     * The identifier a pending PIN was established for, or null when [key] is unknown or expired.
+     *
+     * Exists so that a failed [assert] can say *what* the attempt was against: the key on its own is a
+     * random UUID, which cannot be counted or alerted on. Reads the same entry [assert] consumes on
+     * success, without disturbing it.
+     */
+    context(server: ServerRuntime)
+    public suspend fun pendingTarget(key: String): String? = cache().get<String>(valueCacheKey(key))
+
     context(server: ServerRuntime)
     public suspend fun assert(key: String, pin: String): String {
         val hashedPin = cache().get<String>(cacheKey(key))

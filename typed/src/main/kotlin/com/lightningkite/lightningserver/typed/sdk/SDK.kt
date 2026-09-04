@@ -5,8 +5,9 @@ import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.pathing.*
-import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
+import com.lightningkite.lightningserver.runtime.Engine
+import com.lightningkite.lightningserver.runtime.EngineBase
+import com.lightningkite.lightningserver.runtime.ExecutionCause
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.ApiWebSocketHandler
 import com.lightningkite.lightningserver.typed.sdk.SDK.sdk
@@ -106,7 +107,7 @@ public object SDK {
      * ## Creating a Custom Format
      *
      * To create a custom SDK format, implement the [Format] interface and override the [write] method.
-     * Your implementation will have access to the [ServerRuntime] context, which provides all the
+     * Your implementation will have access to the [Engine] context, which provides all the
      * information needed to generate client code.
      *
      * ### Step-by-Step Guide
@@ -163,7 +164,7 @@ public object SDK {
      *
      * ```kotlin
      * class SimpleJsonFormat(private val rootInfo: SdkModule.Info) : SDK.Format {
-     *     context(server: ServerRuntime)
+     *     context(server: Engine)
      *     override fun write(archive: Archive) {
      *         // Extract and process API structure
      *         val apiData = server.server.sdk(rootInfo)
@@ -232,7 +233,7 @@ public object SDK {
          * implementations, etc.) and writes them to the archive using the [Archive] API.
          *
          * The implementation should:
-         * 1. Analyze the server's API structure via the [ServerRuntime] context
+         * 1. Analyze the server's API structure via the [Engine] context
          * 2. Generate appropriate client code for the target language/platform
          * 3. Write all files to the archive using `Archive.entry()` and `Archive.sub()`
          *
@@ -241,7 +242,7 @@ public object SDK {
          * LightningServer provides several helper methods to assist with creating your
          * own [SDK.Format] implementations.
          *
-         * All [ServerRuntime] data is provided when `write` is called, but this data can be
+         * All [Engine] data is provided when `write` is called, but this data can be
          * difficult to parse into client code with proper api module structure defined during
          * the server-definition phase.
          *
@@ -257,13 +258,13 @@ public object SDK {
          *                directory, ZIP file, or single output stream depending on the
          *                [Archive] implementation used.
          *
-         * @receiver server The [ServerRuntime] providing access to API definitions,
+         * @receiver server The [Engine] providing access to API definitions,
          *                  type serializers, and server metadata
          *
          * @sample
          * ```kotlin
          * class MyCustomFormat : SDK.Format {
-         *     context(server: ServerRuntime)
+         *     context(server: Engine)
          *     override fun write(archive: Archive) {
          *         val apiData = server.server.sdk()
          *         archive.sink("api-client.txt") {
@@ -273,7 +274,7 @@ public object SDK {
          * }
          * ```
          */
-        context(server: ServerRuntime)
+        context(server: Engine)
         public fun write(archive: Archive)
     }
 
@@ -573,11 +574,11 @@ public object SDK {
      */
     public open class GenerationException(override val message: String) : Exception()
 
-    private class Runtime(server: ServerBuilder) : ServerRuntimeBase(server.build()) {
+    private class Runtime(server: ServerBuilder) : EngineBase(server.build()) {
         override val serverId: String = "SDK Runtime"
         override val serverVersion: String = "0.0.0"
 
-        override suspend fun <T> Task<T>.invoke(input: T): Nothing =
+        override suspend fun <T> Task<T>.invoke(input: T, cause: ExecutionCause?): Nothing =
             throw NotImplementedError("SDK Runner only exists to retrieve serialization information")
 
         override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>): Nothing =
@@ -587,7 +588,7 @@ public object SDK {
     /**
      * Convenience method to generate SDK files using default server settings.
      *
-     * This method creates a temporary [ServerRuntime] from the [ServerBuilder],
+     * This method creates a temporary [Engine] from the [ServerBuilder],
      * initializes all settings with their default values, and then calls the
      * [Format.write] method to generate the SDK.
      *
@@ -605,7 +606,7 @@ public object SDK {
     /**
      * Convenience method to generate SDK files using default server settings.
      *
-     * This method creates a temporary [ServerRuntime] from the [ServerBuilder],
+     * This method creates a temporary [Engine] from the [ServerBuilder],
      * initializes all settings with their default values, and then calls the
      * [Format.write] method to generate the SDK.
      *
@@ -628,7 +629,7 @@ public object SDK {
      * stable in future versions.
      * */
     @OptIn(ExperimentalLightningServer::class)
-    context(server: ServerRuntime)
+    context(server: Engine)
     public fun Format.write(folder: KFile): Unit = write(Archive.folder(folder))
 
     /**
@@ -637,12 +638,12 @@ public object SDK {
      *
      * Like [Format.writeUsingDefaultSettings], this spins up a throwaway [Runtime] and initializes all settings with
      * their defaults via [com.lightningkite.lightningserver.settings.ServerSettings.readyUsingDefaults], so it is safe
-     * to run in CI. The provided [block] is executed with the temporary [ServerRuntime] as context.
+     * to run in CI. The provided [block] is executed with the temporary [Engine] as context.
      *
      * This lives inside [SDK] because it must access the package-private [Runtime] used by the SDK-generation path.
      */
     @OptIn(ExperimentalLightningServer::class)
-    public fun <T> withDefaultRuntime(server: ServerBuilder, block: context(ServerRuntime) () -> T): T {
+    public fun <T> withDefaultRuntime(server: ServerBuilder, block: context(Engine) () -> T): T {
         val runtime = Runtime(server)
         runtime.settings.readyUsingDefaults()
         return context(runtime) { block() }

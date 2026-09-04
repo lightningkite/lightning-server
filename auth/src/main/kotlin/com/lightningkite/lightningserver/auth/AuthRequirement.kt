@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.auth
 import com.lightningkite.lightningserver.DelicateLightningServerApi
 import com.lightningkite.lightningserver.definition.MutableExtensions
 import com.lightningkite.lightningserver.definition.Runtime
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.services.database.HasId
@@ -181,7 +182,7 @@ public interface AuthRequirement<out SUBJECT : HasId<*>?> {
     public abstract class AuthSetting<SUBJECT : HasId<*>?>(
         public val default: AuthRequirement<SUBJECT>? = null,
     ) : AuthRequirement<SUBJECT>, MutableExtensions.Key<AuthRequirement<SUBJECT>> {
-        context(server: ServerRuntime)
+        context(server: Engine)
         public fun setting(): AuthRequirement<SUBJECT>? = server.server.extensions[this]
 
         override val requiredScopes: Runtime<Set<RequiredScope>> = Runtime { setting()?.requiredScopes() ?: default?.requiredScopes() ?: emptySet() }

@@ -10,18 +10,28 @@ import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.serialization.KSerializer
 
+/**
+ * The five phases of a WebSocket's life, as the server sees them.
+ *
+ * The server is the context and the socket is an argument, because they have different lifetimes: on
+ * a serverless engine each phase below is a separate invocation with its own runtime, while the
+ * connection is the one thing that persists across all of them.
+ */
 public interface WebSocketHandler<PATH : PathSpec, STORAGE> {
     public val storageSerializer: KSerializer<STORAGE>
     public context(serverRuntime: ServerRuntime)
     suspend fun willConnect(request: WebSocketConnectRequest<PATH>): STORAGE
-    public context(connection: WebSocketConnection<PATH, STORAGE>)
-    suspend fun didConnect()
-    public context(connection: WebSocketConnection<PATH, STORAGE>)
-    suspend fun messageFromClient(frame: WebSocketFrame)
-    public context(connection: WebSocketConnection<PATH, STORAGE>)
-    suspend fun messageFromSubscription(topic: WebSocketSubscriptionMessage<*, *>)
-    public context(connection: WebSocketConnection<PATH, STORAGE>)
-    suspend fun disconnect(reason: WebSocketClose)
+    public context(serverRuntime: ServerRuntime)
+    suspend fun didConnect(connection: WebSocketConnection<PATH, STORAGE>)
+    public context(serverRuntime: ServerRuntime)
+    suspend fun messageFromClient(connection: WebSocketConnection<PATH, STORAGE>, frame: WebSocketFrame)
+    public context(serverRuntime: ServerRuntime)
+    suspend fun messageFromSubscription(
+        connection: WebSocketConnection<PATH, STORAGE>,
+        topic: WebSocketSubscriptionMessage<*, *>,
+    )
+    public context(serverRuntime: ServerRuntime)
+    suspend fun disconnect(connection: WebSocketConnection<PATH, STORAGE>, reason: WebSocketClose)
 }
 
 /**
@@ -60,60 +70,59 @@ public interface DirectExecutableWebSocketHandler<PATH : PathSpec> {
 
 // BUILDER
 
-@InternalLightningServerApi
-public suspend fun <PATH : PathSpec, STORAGE> WebSocketConnection<PATH, STORAGE>.didConnectNoOp(): Unit = Unit
-
-@InternalLightningServerApi
-public suspend fun <PATH : PathSpec, STORAGE> WebSocketConnection<PATH, STORAGE>.messageFromClientNoOp(frame: WebSocketFrame): Unit =
-    Unit
-
-@InternalLightningServerApi
-public suspend fun <PATH : PathSpec, STORAGE> WebSocketConnection<PATH, STORAGE>.disconnectNoOp(reason: WebSocketClose): Unit =
-    Unit
-
+/**
+ * Builds a handler from one lambda per lifecycle phase.
+ *
+ * The connection is the lambdas' receiver and the [ServerRuntime] their context, which is the
+ * opposite of how [WebSocketHandler] declares them. A socket body spends most of its lines on the
+ * socket — `send`, `currentState`, `subscribe` — so that is what `this` should be, while the runtime
+ * is what the settings and service accessors want and they take it as a context anyway.
+ */
 public inline fun <PATH : PathSpec, reified STORAGE> WebSocketHandler(
     storageSerializer: KSerializer<STORAGE> = serializerOrContextual<STORAGE>(),
     crossinline willConnect: suspend ServerRuntime.(request: WebSocketConnectRequest<PATH>) -> STORAGE,
-    crossinline didConnect: suspend WebSocketConnection<PATH, STORAGE>.() -> Unit = WebSocketConnection<PATH, STORAGE>::didConnectNoOp,
-    crossinline messageFromClient: suspend WebSocketConnection<PATH, STORAGE>.(frame: WebSocketFrame) -> Unit = WebSocketConnection<PATH, STORAGE>::messageFromClientNoOp,
+    crossinline didConnect: suspend context(ServerRuntime) WebSocketConnection<PATH, STORAGE>.() -> Unit = {},
+    crossinline messageFromClient: suspend context(ServerRuntime) WebSocketConnection<PATH, STORAGE>.(frame: WebSocketFrame) -> Unit = {},
     crossinline topicHandlers: TopicHandlersBuilder<PATH, STORAGE>.() -> Unit = {},
-    crossinline disconnect: suspend WebSocketConnection<PATH, STORAGE>.(reason: WebSocketClose) -> Unit = WebSocketConnection<PATH, STORAGE>::disconnectNoOp,
+    crossinline disconnect: suspend context(ServerRuntime) WebSocketConnection<PATH, STORAGE>.(reason: WebSocketClose) -> Unit = {},
 ): WebSocketHandler<PATH, STORAGE> =
     object : WebSocketHandler<PATH, STORAGE> {
         override val storageSerializer: KSerializer<STORAGE> = storageSerializer
         override suspend context(serverRuntime: ServerRuntime)
         fun willConnect(request: WebSocketConnectRequest<PATH>): STORAGE =
-            willConnect(contextOf<ServerRuntime>(), request)
+            willConnect(serverRuntime, request)
 
-        override suspend context(connection: WebSocketConnection<PATH, STORAGE>)
-        fun didConnect() {
-            didConnect(contextOf<WebSocketConnection<PATH, STORAGE>>())
+        override suspend context(serverRuntime: ServerRuntime)
+        fun didConnect(connection: WebSocketConnection<PATH, STORAGE>) {
+            didConnect(serverRuntime, connection)
         }
 
-        override suspend context(connection: WebSocketConnection<PATH, STORAGE>)
-        fun messageFromClient(frame: WebSocketFrame) {
-            messageFromClient(contextOf<WebSocketConnection<PATH, STORAGE>>(), frame)
+        override suspend context(serverRuntime: ServerRuntime)
+        fun messageFromClient(connection: WebSocketConnection<PATH, STORAGE>, frame: WebSocketFrame) {
+            messageFromClient(serverRuntime, connection, frame)
         }
 
         private val subHandler = TopicHandlersBuilder<PATH, STORAGE>().apply(topicHandlers).build()
-        override suspend context(connection: WebSocketConnection<PATH, STORAGE>)
-        fun messageFromSubscription(topic: WebSocketSubscriptionMessage<*, *>) =
-            subHandler(contextOf<WebSocketConnection<PATH, STORAGE>>(), topic)
+        override suspend context(serverRuntime: ServerRuntime)
+        fun messageFromSubscription(
+            connection: WebSocketConnection<PATH, STORAGE>,
+            topic: WebSocketSubscriptionMessage<*, *>,
+        ): Unit = subHandler(serverRuntime, connection, topic)
 
-        override suspend context(connection: WebSocketConnection<PATH, STORAGE>)
-        fun disconnect(reason: WebSocketClose) {
-            disconnect(contextOf<WebSocketConnection<PATH, STORAGE>>(), reason)
+        override suspend context(serverRuntime: ServerRuntime)
+        fun disconnect(connection: WebSocketConnection<PATH, STORAGE>, reason: WebSocketClose) {
+            disconnect(serverRuntime, connection, reason)
         }
     }
 
 public class TopicHandlersBuilder<PATH : PathSpec, STORAGE>() {
-    public var handler: suspend WebSocketConnection<PATH, STORAGE>.(topic: WebSocketSubscriptionMessage<*, *>) -> Unit =
+    public var handler: suspend context(ServerRuntime) WebSocketConnection<PATH, STORAGE>.(topic: WebSocketSubscriptionMessage<*, *>) -> Unit =
         {}
 
     @Suppress("UNCHECKED_CAST", "DSL_MARKER_APPLIED_TO_WRONG_TARGET")
     @LightningServerDsl
     public inline infix fun <TOPICPATH : PathSpec, T> WebSocketTopic<TOPICPATH, T>.bind(
-        crossinline handler: suspend WebSocketConnection<PATH, STORAGE>.(topic: WebSocketSubscriptionMessage<TOPICPATH, T>) -> Unit,
+        crossinline handler: suspend context(ServerRuntime) WebSocketConnection<PATH, STORAGE>.(topic: WebSocketSubscriptionMessage<TOPICPATH, T>) -> Unit,
     ) {
         val topic = this
         this@TopicHandlersBuilder.handler = this@TopicHandlersBuilder.handler.let { current ->
@@ -124,6 +133,6 @@ public class TopicHandlersBuilder<PATH : PathSpec, STORAGE>() {
         }
     }
 
-    public fun build(): suspend WebSocketConnection<PATH, STORAGE>.(topic: WebSocketSubscriptionMessage<*, *>) -> Unit =
+    public fun build(): suspend context(ServerRuntime) WebSocketConnection<PATH, STORAGE>.(topic: WebSocketSubscriptionMessage<*, *>) -> Unit =
         handler
 }

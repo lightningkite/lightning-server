@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.sessions.proofs
 
+import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.encryption.Signer
 import com.lightningkite.lightningserver.encryption.signer
@@ -71,21 +72,15 @@ public class EmailProofEndpoints(
     }
 
     /**
-     * Advanced: Send a custom email with an embedded proof.
-     * Useful for magic link authentication or custom email templates.
+     * As [send], naming the request that asked for the link to be sent.
      *
-     * The content function receives a signed Proof that can be embedded in the email
-     * (e.g., as a magic link parameter). The proof's signature ensures the link can't be forged.
-     *
-     * @param destination Email address to send to
-     * @param content Function that takes a Proof and returns an Email to send
-     * @throws IllegalArgumentException if the returned Email's 'to' field doesn't match destination
-     *
-     * Security: The email address mismatch check prevents accidentally sending proofs to wrong addresses.
+     * Pass the request wherever the caller has one — a frontend's "email me a login link" endpoint
+     * always does. The link is a bearer credential, so the audit record of its issuance is only as
+     * useful as the origin it names, and without this it names none.
      */
     context(_: ServerRuntime)
-    public suspend fun send(destination: String, content: (Proof) -> Email) {
-        email().send(content(issueProof(destination)).also {
+    public suspend fun send(destination: String, request: Request<*>?, content: (Proof) -> Email) {
+        email().send(content(issueProof(destination, request)).also {
             if (it.to.singleOrNull()?.value?.equals(destination) != true) {
                 throw IllegalArgumentException("Email mismatch")
             }

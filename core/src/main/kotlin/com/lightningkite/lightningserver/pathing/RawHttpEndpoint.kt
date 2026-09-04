@@ -4,7 +4,7 @@ import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.RouteNotFoundException
 import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.PathSegments
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.Engine
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 
@@ -14,13 +14,13 @@ public data class RawHttpEndpoint<out PATH : PathSpec>(val pathSegments: PathSeg
     public constructor(asString: String, method: HttpMethod) : this(PathSegments.parse(asString), method)
 
     @Suppress("UNCHECKED_CAST")
-    context(server: ServerRuntime)
+    context(server: Engine)
     override val pathInContext: ResolvedPath<PATH> get() = match.path as ResolvedPath<PATH>
 
     @Transient
     private var matchIfPresent: PathSpecMap.Match<HttpHandler<*>>? = null
 
-    context(server: ServerRuntime)
+    context(server: Engine)
     public val match: PathSpecMap.Match<HttpHandler<*>>
         get() {
             if (this.matchIfPresent == null) {
@@ -47,18 +47,18 @@ public data class RawHttpEndpoint<out PATH : PathSpec>(val pathSegments: PathSeg
     override fun toString(): String = "$method /$pathSegments"
 }
 
-context(server: ServerRuntime)
+context(server: Engine)
 public fun <PATH : PathSpec> RawHttpEndpoint(path: ResolvedPath<PATH>, method: HttpMethod): RawHttpEndpoint<PATH> =
     RawHttpEndpoint(path.pathSegments(server.internalSerialization.stringArrayFormat), method = method)
 
-context(serverRuntime: ServerRuntime)
+context(engine: Engine)
 public fun RawHttpEndpoint(
     spec: PathSpec0,
     method: HttpMethod,
     trailingSegments: PathSegments? = null,
 ): RawHttpEndpoint<PathSpec0> = RawHttpEndpoint(ResolvedPath(spec, trailingSegments), method)
 
-context(serverRuntime: ServerRuntime)
+context(engine: Engine)
 public fun <A> RawHttpEndpoint(
     spec: PathSpec1<A>,
     path1: A,
@@ -67,7 +67,7 @@ public fun <A> RawHttpEndpoint(
 ): RawHttpEndpoint<PathSpec1<A>> =
     RawHttpEndpoint(ResolvedPath(spec, path1, trailingSegments), method)
 
-context(serverRuntime: ServerRuntime)
+context(engine: Engine)
 public fun <A, B> RawHttpEndpoint(
     spec: PathSpec2<A, B>,
     path1: A,
@@ -77,7 +77,7 @@ public fun <A, B> RawHttpEndpoint(
 ): RawHttpEndpoint<PathSpec2<A, B>> =
     RawHttpEndpoint(ResolvedPath(spec, path1, path2, trailingSegments), method)
 
-context(serverRuntime: ServerRuntime)
+context(engine: Engine)
 public fun <A, B, C> RawHttpEndpoint(
     spec: PathSpec3<A, B, C>,
     path1: A,

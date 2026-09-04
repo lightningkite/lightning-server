@@ -101,7 +101,9 @@ public fun interface HttpConnectionInterceptor : HttpInterceptor
  * how much was done inside it.
  *
  * An implementation must tolerate running several times within one physical request, and should
- * attribute its work to [HttpRequest.requestId] rather than assuming one request per connection.
+ * attribute its work to the running execution
+ * ([com.lightningkite.lightningserver.runtime.ServerRuntime.initiator]) rather than assuming one
+ * request per connection.
  */
 public fun interface HttpLogicalInterceptor : HttpInterceptor
 

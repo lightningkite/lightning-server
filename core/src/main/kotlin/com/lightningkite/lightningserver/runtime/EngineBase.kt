@@ -9,7 +9,7 @@ import com.lightningkite.services.SharedResources
 import kotlinx.coroutines.*
 
 /**
- * Base implementation of [ServerRuntime] providing common functionality.
+ * Base implementation of [Engine] providing common functionality.
  *
  * This abstract class handles:
  * - Settings initialization and management (including automatic addition of system settings)
@@ -19,16 +19,16 @@ import kotlinx.coroutines.*
  * - Startup task execution with dependency resolution
  *
  * Subclasses should implement:
- * - [ServerRuntime.sendWebSocketSubscriptionMessage]
- * - [ServerRuntime.Task.invoke]
- * - [ServerRuntime.serverId]
- * - [ServerRuntime.serverVersion]
+ * - [Engine.sendWebSocketSubscriptionMessage]
+ * - [Engine.Task.invoke]
+ * - [Engine.serverId]
+ * - [Engine.serverVersion]
  * - HTTP request handling (typically via an engine)
  * - Scheduled task execution
  *
  * @param server The server definition to run
  */
-public abstract class ServerRuntimeBase(override val server: ServerDefinition) : ServerRuntime {
+public abstract class EngineBase(override val server: ServerDefinition) : Engine {
     /**
      * Settings manager with automatically included system settings.
      *
@@ -135,7 +135,7 @@ public abstract class ServerRuntimeBase(override val server: ServerDefinition) :
 }
 
 /*
- * TODO: API Recommendations for ServerRuntimeBase.kt
+ * TODO: API Recommendations for EngineBase.kt
  *
  * 2. The runStartupTasks() method launches all tasks concurrently but doesn't limit concurrency.
  *    For servers with many startup tasks, this could create resource contention.

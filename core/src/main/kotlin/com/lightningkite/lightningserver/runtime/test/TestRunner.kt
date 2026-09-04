@@ -1,11 +1,16 @@
 package com.lightningkite.lightningserver.runtime.test
 
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.runtime.Initiator
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.ServerRuntimeBase
+import com.lightningkite.lightningserver.runtime.EngineBase
+import com.lightningkite.lightningserver.runtime.ExecutionCause
+import com.lightningkite.lightningserver.runtime.forExecution
+import com.lightningkite.lightningserver.runtime.phase
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.SettingContext
@@ -13,6 +18,8 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Clock
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 /**
  * Test runtime for Lightning Server applications.
@@ -50,7 +57,16 @@ import kotlin.time.Clock
 public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.test() instead.") constructor(
     public val serverBuilder: SERVER,
     private val clockGet: () -> Clock = { Clock.System },  // TODO: always use mock clock, build in advancement features
-) : ServerRuntimeBase(serverBuilder.build()) {
+) : EngineBase(serverBuilder.build()), ServerRuntime {
+
+    /**
+     * A test has no server-side execution behind it, so it is the one place besides manual
+     * invocation that mints [Initiator.Direct] — see its documentation for why that hole exists.
+     */
+    @OptIn(InternalLightningServerApi::class)
+    override val initiator: Initiator = Initiator.Direct(
+        @OptIn(ExperimentalUuidApi::class) Uuid.generateV7NonMonotonicAt(clock.now())
+    )
 
     public companion object {
         internal val logger = KotlinLogging.logger("com.lightningkite.lightningserver.TestRunner")
@@ -80,9 +96,10 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
      * Executes tasks inline (synchronously) for testing.
      *
      * Unlike production runtimes, tasks don't run in the background but complete
-     * immediately, making tests deterministic.
+     * immediately, making tests deterministic. That also means the task body runs inside the
+     * launching execution rather than as one of its own, so there is nothing for [cause] to parent.
      */
-    override suspend fun <T> Task<T>.invoke(input: T) {
+    override suspend fun <T> Task<T>.invoke(input: T, cause: ExecutionCause?) {
         this.executeInline(input)
     }
 
@@ -107,15 +124,21 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
      *
      * @param handler The WebSocket handler being tested
      * @param request The connection request
+     * @param initiator The socket's connect initiator, from which each phase derives its own
      * @param currentState The current connection state (mutable for inspection)
      * @param name Display name for debug output (default: "Client")
      */
+    @OptIn(InternalLightningServerApi::class)
     public inner class TestWebSocket<PATH : PathSpec, STORAGE>(
         private val handler: WebSocketHandler<PATH, STORAGE>,
         public val request: WebSocketConnectRequest<PATH>,
+        public val initiator: Initiator.WebSocket,
         public var currentState: STORAGE,
         public val name: String = "Client",
     ) {
+        private fun runtimeFor(phase: Initiator.WebSocket.Phase): ServerRuntime =
+            this@TestRunner.forExecution(initiator.phase(phase))
+
         public var onMessageSent: (frame: WebSocketFrame) -> Unit = {}
         public suspend fun close() {
             /*logger.debug*/run { "$name --> <close>" }.let(::println)
@@ -125,18 +148,19 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
 
         public suspend fun send(frame: WebSocketFrame) {
             /*logger.debug*/run { "$name --> '$frame'" }.let(::println)
-            with(server) {
-                handler.messageFromClient(frame)
-                flush()
-            }
+            val connection = this@TestWebSocket.server
+            with(runtimeFor(Initiator.WebSocket.Phase.ClientMessage)) { handler.messageFromClient(connection, frame) }
+            connection.flush()
         }
 
         public val server: ServerSide = ServerSide()
 
-        public inner class ServerSide() : WebSocketConnection<PATH, STORAGE>, ServerRuntime by this@TestRunner {
+        public inner class ServerSide() : WebSocketConnection<PATH, STORAGE> {
             private val changeQueue = ArrayList<(STORAGE) -> STORAGE>()
             private val sub: suspend (WebSocketSubscriptionMessage<*, *>) -> Unit = {
-                handler.messageFromSubscription(it)
+                with(runtimeFor(Initiator.WebSocket.Phase.SubscriptionMessage)) {
+                    handler.messageFromSubscription(this@ServerSide, it)
+                }
                 flush()
             }
 
@@ -185,7 +209,7 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
 
             override suspend fun close(reason: WebSocketClose) {
                 /*logger.debug*/run { "$name <-- <close>" }.let(::println)
-                handler.disconnect(reason)
+                with(runtimeFor(Initiator.WebSocket.Phase.Disconnect)) { handler.disconnect(this@ServerSide, reason) }
             }
 
             internal fun clean() {

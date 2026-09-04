@@ -3,7 +3,7 @@ package com.lightningkite.lightningserver.settings
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.logger
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.services.otel.applyToLogback
 import kotlin.contracts.*
 
@@ -208,11 +208,11 @@ public class ServerSettings private constructor(
      * **Important**: After this function succeeds, settings can be accessed via [get] but
      * can no longer be modified via [set], [setStatic], or [include].
      *
-     * @receiver A [ServerRuntime] context required for logging and setting transformation
+     * @receiver An [Engine] context required for logging and setting transformation
      * @throws IllegalStateException if any required settings are missing
      * @throws Error if any settings fail to transform (includes detailed logging of all failures)
      */
-    context(server: ServerRuntime)
+    context(server: Engine)
     public fun ready() {
         val missing = settings.minus(serializable.keys + goal.keys + overrides.keys)
         if (missing.isNotEmpty()) throw IllegalStateException("Settings ${missing.joinToString { it.name }} are missing.")
@@ -255,12 +255,12 @@ public class ServerSettings private constructor(
      *
      * @param key The setting to retrieve
      * @return The transformed result value for this setting
-     * @receiver A [ServerRuntime] context required for the setting's transformation
+     * @receiver An [Engine] context required for the setting's transformation
      * @throws IllegalStateException if settings are not ready yet (call [ready] first)
      * @throws CircularOverrideException if a circular dependency is detected during resolution
      */
     @Suppress("UNCHECKED_CAST")
-    context(_: ServerRuntime)
+    context(_: Engine)
     public fun <SERIALIZABLE, RESULT> get(key: ServerSetting<SERIALIZABLE, RESULT>): RESULT {
         if (!ready) throw IllegalStateException("Settings not ready yet.")
 
@@ -344,10 +344,10 @@ public class ServerSettings private constructor(
      * Useful for pre-warming all settings or debugging the complete configuration state.
      *
      * @return A map of all settings to their transformed result values
-     * @receiver A [ServerRuntime] context required for transformation
+     * @receiver An [Engine] context required for transformation
      * @throws IllegalStateException if settings are not ready yet
      */
-    context(_: ServerRuntime)
+    context(_: Engine)
     public fun allGoals(): Map<ServerSetting<*, *>, Any?> = settings.associateWith { get(it) }
 
     private fun copy(

@@ -6,14 +6,15 @@ import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpLogicalInterceptor
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.runtime.Initiator
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.websockets.DelegatingWebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketConnection
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketLogicalInterceptor
 import kotlinx.coroutines.CancellationException
-import kotlinx.serialization.KSerializer
 import kotlin.time.TimeSource
 
 /**
@@ -67,49 +68,36 @@ public class AccessLogInterceptor : HttpLogicalInterceptor, WebSocketLogicalInte
             val elapsedMs = started.elapsedNow().inWholeMilliseconds
             runtime.logger.info {
                 "${request.path} accessed by $principal (${request.sourceIp}) " +
-                    "-> $outcome in ${elapsedMs}ms ${request.idSuffix()}"
+                    "-> $outcome in ${elapsedMs}ms ${idSuffix()}"
             }
         }
     }
 
     override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> =
-        object : WebSocketHandler<PATH, T> {
-            override val storageSerializer: KSerializer<T> get() = handler.storageSerializer
-
+        object : DelegatingWebSocketHandler<PATH, T>(handler) {
             context(serverRuntime: ServerRuntime)
             override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
                 if (serverRuntime.logger.isInfoEnabled()) {
                     val principal = request.principalName()
                     serverRuntime.logger.info {
                         "ws ${request.path} opened by $principal (${request.sourceIp}) " +
-                            request.idSuffix(idLabel = "conn")
+                            idSuffix(idLabel = "conn")
                     }
                 }
-                return handler.willConnect(request)
+                return wrapped.willConnect(request)
             }
 
-            context(connection: WebSocketConnection<PATH, T>)
-            override suspend fun didConnect(): Unit = handler.didConnect()
-
-            context(connection: WebSocketConnection<PATH, T>)
-            override suspend fun messageFromClient(frame: com.lightningkite.lightningserver.websockets.WebSocketFrame): Unit =
-                handler.messageFromClient(frame)
-
-            context(connection: WebSocketConnection<PATH, T>)
-            override suspend fun messageFromSubscription(topic: com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage<*, *>): Unit =
-                handler.messageFromSubscription(topic)
-
-            context(connection: WebSocketConnection<PATH, T>)
-            override suspend fun disconnect(reason: WebSocketClose) {
-                if (connection.logger.isInfoEnabled()) {
+            context(serverRuntime: ServerRuntime)
+            override suspend fun disconnect(connection: WebSocketConnection<PATH, T>, reason: WebSocketClose) {
+                if (serverRuntime.logger.isInfoEnabled()) {
                     val request = connection.request
-                    val principal = with(connection as ServerRuntime) { request.principalName() }
-                    connection.logger.info {
+                    val principal = request.principalName()
+                    serverRuntime.logger.info {
                         "ws ${request.path} closed by $principal (${request.sourceIp}) " +
-                            "-> $reason ${request.idSuffix(idLabel = "conn")}"
+                            "-> $reason ${idSuffix(idLabel = "conn")}"
                     }
                 }
-                handler.disconnect(reason)
+                wrapped.disconnect(connection, reason)
             }
         }
 }
@@ -132,6 +120,19 @@ private suspend fun com.lightningkite.lightningserver.data.Request<*>.principalN
 /**
  * Renders the correlation IDs, including the parent for a sub-request or virtual socket, so a line
  * can be tied back to the request that carried it.
+ *
+ * One rule for every kind of execution. The line names the logical request or connection it belongs
+ * to — for a socket that is the socket rather than the phase, the identifier that stays the same from
+ * open to close — and names `causedBy` as its parent, suppressed when it *is* the id already shown.
+ * That suppression is the whole of the socket special case: every phase after connect is caused by
+ * its own connect, which would otherwise render as "X of X".
+ *
+ * `causedBy` and not `rootExecutionId`, so that "of" means the same thing on every line. The two
+ * differ as soon as anything nests, and a reader cannot tell a parent from a causal root by looking.
  */
-private fun com.lightningkite.lightningserver.data.Request<*>.idSuffix(idLabel: String = "req"): String =
-    parentRequestId?.let { "[$idLabel $requestId of $it]" } ?: "[$idLabel $requestId]"
+context(runtime: ServerRuntime)
+private fun idSuffix(idLabel: String = "req"): String {
+    val initiator = runtime.initiator
+    val id = initiator.logicalId ?: initiator.executionId
+    return initiator.causedBy?.takeIf { it != id }?.let { "[$idLabel $id of $it]" } ?: "[$idLabel $id]"
+}

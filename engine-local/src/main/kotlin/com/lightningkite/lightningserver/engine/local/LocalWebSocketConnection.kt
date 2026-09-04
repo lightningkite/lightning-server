@@ -3,7 +3,10 @@ package com.lightningkite.lightningserver.engine.local
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.path
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.Initiator
+import com.lightningkite.lightningserver.runtime.Engine
+import com.lightningkite.lightningserver.runtime.forExecution
+import com.lightningkite.lightningserver.runtime.phase
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.pubsub.PubSubChannel
 import kotlinx.coroutines.CoroutineScope
@@ -21,11 +24,14 @@ import kotlinx.coroutines.yield
 public abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
     startingState: STORAGE,
     override val request: WebSocketConnectRequest<PATH>,
+    /** The socket's connect initiator, so a delivery can name the socket it is being delivered to. */
+    public val connectInitiator: Initiator.WebSocket,
     private val handler: WebSocketHandler<PATH, STORAGE>,
     private val scope: CoroutineScope,
-    server: ServerRuntime,
+    /** Needed to deliver a subscription message, which is a fresh execution rather than part of one. */
+    private val server: Engine,
     private val pubSub: (request: WebSocketSubscriptionRequest<*, Any?>) -> PubSubChannel<Any?>,
-) : WebSocketConnection<PATH, STORAGE>, ServerRuntime by server {
+) : WebSocketConnection<PATH, STORAGE> {
 
     override var currentState: STORAGE = startingState
     override suspend fun repullState(): STORAGE = currentState
@@ -49,9 +55,12 @@ public abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
         subscriptions.remove(topic)?.cancel()
         subscriptions[topic] = scope.launch {
             pubSub(topic).collect { value ->
-                handler.messageFromSubscription(
-                    WebSocketSubscriptionMessage(topic.topic, topic.pathInContext.rawPathArguments, value),
-                )
+                with(server.forExecution(with(server) { connectInitiator.phase(Initiator.WebSocket.Phase.SubscriptionMessage) })) {
+                    handler.messageFromSubscription(
+                        this@LocalWebSocketConnection,
+                        WebSocketSubscriptionMessage(topic.topic, topic.pathInContext.rawPathArguments, value),
+                    )
+                }
             }
             yield()
         }

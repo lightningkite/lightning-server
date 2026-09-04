@@ -102,12 +102,25 @@ public class OauthProofEndpoints(
         cache = cache,
     ) { response: OauthResponse, _: Uuid ->
         val profile = provider.getProfile(response, credentials())
-        val email = profile.email ?: throw BadRequestException("No email was found for this profile.")
+        if (profile.email == null) {
+            // The provider authenticated someone, and returned nothing this server can identify them
+            // by. Not a subject that failed to resolve — there was never anything to resolve.
+            reportProofRejected(info, ProofFailureReason.MalformedRequest)
+            throw BadRequestException("No email was found for this profile.")
+        }
+        val proof = makeProof(profile)
+        // The proof's own value rather than the profile's email: `makeProof` is overridable, and what
+        // was accepted is whatever it put its signature on.
+        //
+        // No request is passed, and so no origin is recorded: `OauthCallbackEndpoint.onAccess` does
+        // not carry one, and widening that seam would change a public signature every caller
+        // implements. The origin is still reachable by joining the event's `requestId`.
+        reportProofAccepted(info, principal = proof.value)
         // Open-redirect note: the final destination is produced entirely by the app-supplied
         // `continueUiAuthUrl` from a server-generated, signed Proof. No user- or attacker-controllable
         // value (query param or `state`) feeds into it, so the redirect target is app-controlled and
         // does not require redirect-URI whitelisting here.
-        HttpResponse.redirectToGet(continueUiAuthUrl(makeProof(profile)))
+        HttpResponse.redirectToGet(continueUiAuthUrl(proof))
     }
 
     public val openEndpoint: HttpHandler<*> = path.path("open").get bind HttpHandler {

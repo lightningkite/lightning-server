@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.typed
 
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.GeneralServerSettings
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -41,7 +42,7 @@ class ModelRestUpdatesWebSocketTest {
             database set Database.Settings()
         }) {
             val socket = TestServer.ws.webSocket.test()
-            val json = socket.server.externalSerialization.json
+            val json = contextOf<ServerRuntime>().externalSerialization.json
 
             // Send a condition from client: Always
             val cond: Condition<Sample> = Condition.Always
@@ -94,7 +95,7 @@ class ModelRestUpdatesWebSocketTest {
             database set Database.Settings()
         }) {
             val socket = TestServer.ws.webSocket.test()
-            val json = socket.server.externalSerialization.json
+            val json = contextOf<ServerRuntime>().externalSerialization.json
 
             var count = 0
             socket.onMessageSent = { count++ }
@@ -148,7 +149,7 @@ class ModelRestUpdatesWebSocketTest {
             )
 
             val socket = KeyedServer.ws.webSocket.test()
-            val json = socket.server.externalSerialization.json
+            val json = contextOf<ServerRuntime>().externalSerialization.json
 
             // An Equal condition on the key is what lets the server shard onto the hash topic.
             val narrowed: Condition<Sample> = condition { it.name eq "shared" }
@@ -184,7 +185,7 @@ class ModelRestUpdatesWebSocketTest {
             database set Database.Settings()
         }) {
             val socket = TestServer.ws.webSocket.test()
-            val json = socket.server.externalSerialization.json
+            val json = contextOf<ServerRuntime>().externalSerialization.json
 
             val always: Condition<Sample> = Condition.Always
             socket.send(WebSocketFrame.Text(json.encodeToString(Condition.serializer(Sample.serializer()), always)))
@@ -211,7 +212,7 @@ class ModelRestUpdatesWebSocketTest {
             database set Database.Settings()
         }) {
             val socket = TestServer.ws.webSocket.test()
-            val json = socket.server.externalSerialization.json
+            val json = contextOf<ServerRuntime>().externalSerialization.json
 
             val always: Condition<Sample> = Condition.Always
             val frameText = json.encodeToString(Condition.serializer(Sample.serializer()), always)
