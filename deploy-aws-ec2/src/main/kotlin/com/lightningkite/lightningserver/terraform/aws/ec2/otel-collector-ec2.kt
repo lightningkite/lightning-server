@@ -100,7 +100,7 @@ public fun TerraformNeed<TelemetryBackend.Settings>.otelGrafanaCloud(
         resourceId = "grafana_cloud_api_key",
         parameterName = parameterName,
         valueExpression = expression("var.grafana_cloud_api_key"),
-        description = "Grafana Cloud OTLP token for ${emitter.displayName} Alloy collector",
+        description = "Grafana Cloud OTLP token for ${emitter.deploymentTag} Alloy collector",
     )
 
     // Install + configure Alloy on every instance (cloud-init for single, AMI bake for scaling).
@@ -161,7 +161,7 @@ chmod 600 /run/alloy/key
         // localhost so it is never exposed.
         val unit = """
 [Unit]
-Description=Grafana Alloy (OpenTelemetry collector for ${emitter.displayName})
+Description=Grafana Alloy (OpenTelemetry collector for ${emitter.deploymentTag})
 Wants=network-online.target
 After=network-online.target
 
