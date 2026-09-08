@@ -89,7 +89,7 @@ public class UploadEarlyEndpoint(
     private val uploadSigner: Runtime<Signer> = secretBasis.signerBlocking("upload-files")
 
     /** Mints and checks the tokens this endpoint hands to clients. */
-    public val tokens: Runtime<UploadTokens> = Runtime.Cached { UploadTokens(uploadSigner(), serverRuntime.clock) }
+    public val tokens: Runtime<UploadTokens> = Runtime.Cached { UploadTokens(uploadSigner(), engine.clock) }
 
     /**
      * Contextual serializer used for ServerFile values.

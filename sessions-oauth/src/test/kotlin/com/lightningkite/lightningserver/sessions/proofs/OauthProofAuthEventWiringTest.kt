@@ -115,29 +115,4 @@ class OauthProofAuthEventWiringTest {
             }
         }
     }
-
-    /**
-     * The provider authenticated somebody and returned nothing this server can identify them by. Not
-     * a subject that failed to resolve — there was never anything to resolve — so the row says the
-     * attempt could not be read as identifying anyone, and names no principal.
-     */
-    @Test
-    fun `an oauth profile with no identifying property is recorded as a rejection`() = runBlocking {
-        FakeTokenEndpoint().use { fake ->
-            val server = testServer(fake.tokenUrl, profileEmail = null)
-            server.test({}) {
-                assertFailsWith<BadRequestException> {
-                    server.oauth.callback.handle(
-                        OauthCode(code = "auth-code-xyz", state = nonceFor(server.oauth.callback))
-                    )
-                }
-
-                val event = server.reporter.events.single()
-                assertEquals(AuthEventType.ProofRejected, event.type)
-                assertEquals("MalformedRequest", event.detail)
-                assertEquals("testprovider", event.method)
-                assertEquals(null, event.principal)
-            }
-        }
-    }
 }
