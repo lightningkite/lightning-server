@@ -30,7 +30,7 @@ orgCrac = "0.1.3"
 proguard = "7.9.1"
 scrimage = "4.5.1"
 serializationLibs = "1.11.0"
-serviceAbstractions = "1.3.0-prerelease-112-b929e589"
+serviceAbstractions = "1.3.0-prerelease-113-79195cb8"
 shadow = "8.1.1"
 vanniktechMavenPublish = "0.36.0"
 webauthn4jCore = "0.31.3.RELEASE"
@@ -136,6 +136,7 @@ services-sms-inbound = { module = "com.lightningkite.services:sms-inbound", vers
 services-sms-inbound-twilio = { module = "com.lightningkite.services:sms-inbound-twilio", version = { ref = "serviceAbstractions" } }
 services-sms-test = { module = "com.lightningkite.services:sms-test", version = { ref = "serviceAbstractions" } }
 services-sms-twilio = { module = "com.lightningkite.services:sms-twilio", version = { ref = "serviceAbstractions" } }
+services-currency = { module = "com.lightningkite.services:currency", version = { ref = "serviceAbstractions" } }
 services-test = { module = "com.lightningkite.services:test", version = { ref = "serviceAbstractions" } }
 services-voiceagent = { module = "com.lightningkite.services:voiceagent", version = { ref = "serviceAbstractions" } }
 services-voiceagent-openai = { module = "com.lightningkite.services:voiceagent-openai", version = { ref = "serviceAbstractions" } }
