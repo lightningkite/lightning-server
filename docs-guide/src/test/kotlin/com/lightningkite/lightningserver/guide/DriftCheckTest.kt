@@ -33,7 +33,9 @@ class DriftCheckTest {
     // Gradle runs tests with the project dir as the working directory.
     private val moduleRoot = File(System.getProperty("user.dir"))
     private val guideDir = moduleRoot.resolve("guide")
-    private val samplesRoot = moduleRoot.resolve("src/samples/kotlin")
+    // The migration moved these from src/samples/kotlin (Gradle's extra sourceSet)to
+    // src/main/kotlin, where the Toolchain's maven-like layout scans for main sources.
+    private val samplesRoot = moduleRoot.resolve("src/main/kotlin")
 
     @Test
     fun `guide code blocks match sample source regions`() {
