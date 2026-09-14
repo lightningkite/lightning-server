@@ -204,6 +204,7 @@ public class OauthProviderInfo(
                     email = if (response2.verified_email) response2.email else null,
                     image = response2.picture?.takeUnless { it.isEmpty() },
                     name = response2.name?.takeUnless { it.isEmpty() },
+                    providerName =google.identifierName
                 )
             }
         )
@@ -240,7 +241,11 @@ public class OauthProviderInfo(
                 // Email may be null on 2nd+ logins
                 val email = if (emailVerified) claimsJson.get("email")?.jsonPrimitive?.content else null
 
-                ExternalProfile(id = sub, email = email)
+                ExternalProfile(
+                    id = sub,
+                    email = email,
+                    providerName = apple.identifierName
+                )
             }
         )
 
@@ -259,6 +264,7 @@ public class OauthProviderInfo(
                     id = response2.sub,
                     email = response2.email,
                     image = response2.picture,
+                    providerName = microsoft.identifierName
                 )
             }
         )
@@ -293,7 +299,8 @@ public class OauthProviderInfo(
                     email = email,
                     username = user.login,
                     image = user.avatar_url,
-                    name = user.name
+                    name = user.name,
+                    providerName = github.identifierName
                 )
             }
         )

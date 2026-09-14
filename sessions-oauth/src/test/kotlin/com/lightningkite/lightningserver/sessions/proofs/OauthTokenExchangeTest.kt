@@ -92,7 +92,7 @@ class OauthTokenExchangeTest {
             tokenUrl = tokenUrl,
             scopeForProfile = "email",
             mode = OauthResponseMode.query,
-            getProfile = { _, _ -> ExternalProfile(email = "user@example.com") },
+            getProfile = { _, _ -> ExternalProfile(email = "user@example.com", providerName = "TestProvider") },
         )
         val callback: OauthCallbackEndpoint<Uuid> = path.path("cb") include OauthCallbackEndpoint(
             stateSerializer = serializerOrContextual<Uuid>(),

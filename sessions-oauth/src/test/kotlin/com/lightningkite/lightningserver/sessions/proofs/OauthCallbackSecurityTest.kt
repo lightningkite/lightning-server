@@ -35,7 +35,7 @@ class OauthCallbackSecurityTest {
             scopeForProfile = "email",
             mode = OauthResponseMode.query,
             supportsPkce = supportsPkce,
-            getProfile = { _, _ -> ExternalProfile(email = "user@example.com") },
+            getProfile = { _, _ -> ExternalProfile(email = "user@example.com", providerName = "TestProvider") },
         )
         val callback: OauthCallbackEndpoint<Uuid> = path.path("cb") include OauthCallbackEndpoint(
             stateSerializer = serializerOrContextual<Uuid>(),
@@ -130,5 +130,10 @@ class OauthCallbackSecurityTest {
             assertTrue(v.length in 43..128, "verifier length ${v.length} out of range")
             assertTrue(v.all { it.isLetterOrDigit() || it in "-._~" }, "verifier has non-unreserved chars: $v")
         }
+    }
+
+    @Test
+    fun testHandleNoEmailAddress() {
+
     }
 }

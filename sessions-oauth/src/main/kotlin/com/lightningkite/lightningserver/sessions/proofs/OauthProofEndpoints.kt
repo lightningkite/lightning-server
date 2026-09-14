@@ -15,11 +15,22 @@ import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.lightningserver.sessions.proofs.oauth.*
 import com.lightningkite.lightningserver.sessions.proofs.oauth.OauthCallbackEndpoint
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
+import com.lightningkite.lightningserver.typed.ModelInfo
+import com.lightningkite.lightningserver.typed.modelInfo
+import com.lightningkite.lightningserver.typed.registerTable
 import com.lightningkite.lightningserver.typed.sdk.SdkModule
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
 import com.lightningkite.lightningserver.typed.sdk.sdkSettings
 import com.lightningkite.services.cache.Cache
+import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
+import com.lightningkite.services.database.ModelPermissions
+import com.lightningkite.services.database.and
+import com.lightningkite.services.database.condition
+import com.lightningkite.services.database.eq
+import com.lightningkite.services.database.eqNn
+import com.lightningkite.services.database.findOne
+import com.lightningkite.services.database.insertOne
 import io.ktor.http.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
@@ -68,6 +79,7 @@ import kotlin.uuid.Uuid
 public class OauthProofEndpoints(
     private val provider: OauthProviderInfo,
     private val cache: Runtime<Cache>,
+    private val database: Runtime<Database>,
     override val proofSigner: RuntimeDeferred<Signer> = secretBasis.signer("proof"),
     override val proofExpiration: Duration = 1.hours,
     private val credentials: Runtime<OauthProviderCredentials>,
@@ -89,6 +101,9 @@ public class OauthProofEndpoints(
         // sdkSettings.clientInterface = ProofClientEndpoints.OAuth::class.info()
     }
 
+
+    private val externalAuthProfileTable = database.registerTable<ExternalProfile>("ExternalProfile")
+
     override val info: ProofMethodInfo = ProofMethodInfo(
         via = provider.identifierName,
         property = "email",
@@ -101,7 +116,33 @@ public class OauthProofEndpoints(
         credentials = credentials,
         cache = cache,
     ) { response: OauthResponse, _: Uuid ->
-        val profile = provider.getProfile(response, credentials())
+        val fromProviderProfile = provider.getProfile(response, credentials())
+
+        val profileQuery = condition { (it.providerName eq provider.identifierName) and (it.id eq fromProviderProfile.id) }
+        val existing = externalAuthProfileTable().findOne(profileQuery)
+        if (fromProviderProfile.email?.takeIf {it.isNotBlank() } == null && existing?.email == null) {
+            throw BadRequestException("No email was found from provider or database.")
+        }
+
+        val profile = if (existing == null) {
+            externalAuthProfileTable().insertOne(fromProviderProfile)
+        } else {
+            val mergedProfile = existing.copy(
+                name = fromProviderProfile.name ?: existing.name,
+                image = fromProviderProfile.image ?: existing.image,
+                username = fromProviderProfile.username ?: existing.username,
+                email = fromProviderProfile.email?.takeIf {it.isNotBlank() } ?: existing.email
+            )
+
+            // Kotlin's data class equality checks all properties automatically
+            if (mergedProfile != existing) {
+                externalAuthProfileTable().replaceOne(profileQuery, mergedProfile).new
+                    ?: throw Exception("Profile can't be null")
+            } else existing
+        }
+
+
+
         // Open-redirect note: the final destination is produced entirely by the app-supplied
         // `continueUiAuthUrl` from a server-generated, signed Proof. No user- or attacker-controllable
         // value (query param or `state`) feeds into it, so the redirect target is app-controlled and
