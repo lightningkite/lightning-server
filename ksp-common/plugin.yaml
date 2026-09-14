@@ -1,0 +1,14 @@
+tasks:
+  kspCommon:
+    action: !kspcommon.runKspOverCommon
+      commonSrcDir: ${module.rootDir}/src
+      classpath: ${module.compileClasspath}
+      outputDir: ${taskOutputDir}
+
+generated:
+  sources:
+    - language: kotlin
+      # No `fragment:` clause, so the output lands in the COMMON fragment -- which is what
+      # makes the generated @get:JvmName (an @OptionalExpectation annotation off-JVM) legal.
+      # This is the equivalent of Gradle's srcDir("build/generated/ksp/common/commonMain/kotlin").
+      directory: ${tasks.kspCommon.action.outputDir}

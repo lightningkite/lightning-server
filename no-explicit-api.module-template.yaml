@@ -1,0 +1,7 @@
+# Applied by the three modules that deliberately do NOT enforce explicit API:
+# demo, docs-guide and load-test. Their Gradle build files omit explicitApi(),
+# and that is intent, not oversight.
+# Applied after the base template, so this flag wins.
+settings:
+  kotlin:
+    freeCompilerArgs: [ -Xexplicit-api=disable ]

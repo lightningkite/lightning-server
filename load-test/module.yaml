@@ -1,0 +1,27 @@
+# Not published (Gradle applied no lkLibrary/vanniktech publish block here), and Gradle
+# omitted explicitApi() deliberately -- see no-explicit-api.module-template.yaml.
+apply: [ //jvm.module-template.yaml, //no-explicit-api.module-template.yaml ]
+
+# Never published. The Toolchain requires every module's mavenLocal declaration to agree
+# on publishability or it aborts the whole repo run; `publish: true` is harmless here because
+# this module has no `settings.publishing.enabled` and so never actually publishes.
+repositories:
+  - id: mavenLocal
+    url: mavenLocal
+    publish: true
+
+product: jvm/lib
+
+description: Framework-native load testing for Lightning Server.
+
+settings:
+  kotlin:
+    serialization: enabled
+
+dependencies:
+  - //typed: exported
+  - org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.11.0
+
+settings@jvm:
+  kotlin:
+    freeCompilerArgs: [ -module-name, "com.lightningkite.lightningserver:load-test" ]

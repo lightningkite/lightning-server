@@ -1,0 +1,25 @@
+apply: [ //jvm.module-template.yaml, //publishing.module-template.yaml ]
+
+product: jvm/lib
+
+description: A set of tools and endpoints for user authentication using OAuth.
+
+settings:
+  kotlin:
+    serialization: enabled
+
+dependencies:
+  - //sessions: exported
+  - //sessions-oauth-shared: exported
+
+test-dependencies:
+  - org.jetbrains.kotlin:kotlin-test:2.4.10
+  - org.jetbrains.kotlin:kotlin-test-junit:2.4.10
+
+settings@jvm:
+  kotlin:
+    freeCompilerArgs: [ -module-name, "com.lightningkite.lightningserver:sessions-oauth" ]
+
+test-settings@jvm:
+  kotlin:
+    freeCompilerArgs: [ -module-name, sessions-oauth_test ]

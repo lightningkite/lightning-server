@@ -1,0 +1,29 @@
+# Extracted from engine-local's `java-test-fixtures` source set, which the Kotlin
+# Toolchain has no equivalent for. engine-ktor, engine-netty and engine-jdk-server
+# each depend on this test-scoped so they can run the identical HTTP conformance
+# assertions against their own engine (see EngineHttpConformanceSuite).
+#
+# no-explicit-api is applied deliberately: Gradle's explicitApi() in engine-local
+# covered the main source set only, never testFixtures.
+apply: [ //jvm.module-template.yaml, //no-explicit-api.module-template.yaml, //publishing.module-template.yaml ]
+
+product: jvm/lib
+
+description: A cross-engine HTTP conformance suite shared by the Lightning Server engine modules.
+
+settings:
+  kotlin:
+    serialization: enabled
+
+dependencies:
+  - //core: exported
+  - org.jetbrains.kotlin:kotlin-test:2.4.10: exported
+  - org.jetbrains.kotlin:kotlin-test-junit:2.4.10: exported
+
+settings@jvm:
+  kotlin:
+    freeCompilerArgs: [ -module-name, "com.lightningkite.lightningserver:engine-conformance" ]
+
+test-settings@jvm:
+  kotlin:
+    freeCompilerArgs: [ -module-name, engine-conformance_test ]

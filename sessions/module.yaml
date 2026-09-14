@@ -1,0 +1,49 @@
+apply: [ //jvm.module-template.yaml, //publishing.module-template.yaml ]
+
+product: jvm/lib
+
+description: A set of tools and endpoints for managing user sessions.
+
+settings:
+  kotlin:
+    serialization: enabled
+    ksp:
+      processors:
+        - com.lightningkite.services:database-processor:1.3.0-prerelease-113-79195cb8
+      processorOptions:
+        generateFields: "true"
+
+dependencies:
+  - //core: exported
+  - //auth: exported
+  - //typed: exported
+  - //sessions-shared: exported
+  - com.lightningkite.services:database:1.3.0-prerelease-113-79195cb8: exported
+  - com.lightningkite.services:cache:1.3.0-prerelease-113-79195cb8: exported
+  - org.jetbrains.kotlin:kotlin-reflect:2.4.10: exported
+  - dev.turingcomplete:kotlin-onetimepassword:2.4.1
+  - org.bouncycastle:bcprov-jdk18on:1.84
+  - org.bouncycastle:bcpkix-jdk18on:1.84
+  - com.webauthn4j:webauthn4j-core:0.31.3.RELEASE
+
+test-dependencies:
+  - org.jetbrains.kotlin:kotlin-test:2.4.10
+  - org.jetbrains.kotlin:kotlin-test-junit:2.4.10
+
+# The test source set declares its own models, and Gradle ran the processor over test
+# sources separately (kspTest) rather than reusing the main ksp configuration's output.
+test-settings:
+  kotlin:
+    ksp:
+      processors:
+        - com.lightningkite.services:database-processor:1.3.0-prerelease-113-79195cb8
+      processorOptions:
+        generateFields: "true"
+
+settings@jvm:
+  kotlin:
+    freeCompilerArgs: [ -module-name, "com.lightningkite.lightningserver:sessions" ]
+
+test-settings@jvm:
+  kotlin:
+    freeCompilerArgs: [ -module-name, sessions_test ]

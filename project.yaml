@@ -1,0 +1,41 @@
+modules:
+  - auth
+  - auth-shared
+  - core
+  - core-shared
+  - deploy-aws-ec2
+  - docs-guide
+  - engine-aws-serverless
+  - engine-conformance
+  - engine-jdk-server
+  - engine-ktor
+  - engine-local
+  - engine-netty
+  - files
+  - files-shared
+  - ksp-common
+  - load-test
+  - media
+  - media-shared
+  - notifications
+  - notifications-shared
+  - ratelimit
+  - secret-source-aws
+  - sessions
+  - sessions-email
+  - sessions-oauth
+  - sessions-oauth-shared
+  - sessions-shared
+  - sessions-sms
+  - typed
+  - typed-shared
+
+plugins:
+  - //ksp-common
+
+# Omitted, and why:
+#
+# demo is a jvm/app-shaped module with ~50 dependencies (most on service artifacts this
+# repo doesn't otherwise consume) and custom Gradle tasks (serve, sdk, deploy, lambda,
+# GraalVM native image) that need more than module.yaml can express in the time budgeted
+# for this pass. Re-add once someone works through its custom tasks individually.

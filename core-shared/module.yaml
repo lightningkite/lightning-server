@@ -1,0 +1,58 @@
+apply: [ //kmp.module-template.yaml, //publishing.module-template.yaml ]
+
+product:
+  type: kmp/lib
+  platforms: [ jvm, android, js, iosX64, iosArm64, iosSimulatorArm64, macosArm64 ]
+
+description: A set of models that can be shared between the client and the server projects.
+
+settings:
+  kotlin:
+    serialization: enabled
+
+dependencies:
+  - org.jetbrains.kotlinx:kotlinx-datetime:0.7.1: exported
+  - com.lightningkite.services:database-shared:1.3.0-prerelease-113-79195cb8: exported
+
+test-dependencies:
+  - org.jetbrains.kotlin:kotlin-test:2.4.10
+  - org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0
+
+# Gradle names the Kotlin module "<group>:<artifact>", which determines the
+# META-INF/*.kotlin_module entry on JVM and the module name baked into JS and Klib output.
+# The Toolchain defaults to the module directory name, so it is restated per platform here.
+# This value is per-module and cannot be shared through a template.
+settings@jvm:
+  kotlin:
+    freeCompilerArgs: [ -module-name, "com.lightningkite.lightningserver:core-shared" ]
+
+settings@js:
+  kotlin:
+    freeCompilerArgs: [ -Xir-module-name=com.lightningkite.lightningserver:core-shared ]
+
+settings@ios:
+  kotlin:
+    freeCompilerArgs: [ -module-name, "com.lightningkite.lightningserver:core-shared", -Xexport-kdoc ]
+
+# settings@<platform> applies to test compilations too, so the module name above would other-
+# wise be given to the test output as well. On Apple targets that is fatal: main and test klibs
+# end up with the same `unique_name` and the KLIB resolver refuses to load both. These restore
+# the Toolchain's default test module name; test output is never published.
+test-settings@jvm:
+  kotlin:
+    freeCompilerArgs: [ -module-name, core-shared_test ]
+
+test-settings@js:
+  kotlin:
+    freeCompilerArgs: [ -Xir-module-name=core-shared_test ]
+
+test-settings@ios:
+  kotlin:
+    freeCompilerArgs: [ -module-name, core-shared_test ]
+
+# The Toolchain does not add kotlin-dom-api-compat the way the Kotlin Gradle plugin does, so
+# without this every org.w3c.dom type is unresolvable on JS. Declared per module rather than in
+# the shared template: a `dependencies@js` block in a template was observed reaching the
+# iosArm64 and macosArm64 resolutions too, which this modifier is meant to exclude.
+dependencies@js:
+  - org.jetbrains.kotlin:kotlin-dom-api-compat:2.4.10

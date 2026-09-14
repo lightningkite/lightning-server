@@ -1,0 +1,30 @@
+apply: [ //jvm.module-template.yaml, //publishing.module-template.yaml ]
+
+product: jvm/lib
+
+description: The abstract engine implementation to use in dedicated deployments.
+
+settings:
+  kotlin:
+    serialization: enabled
+
+dependencies:
+  - //core: exported
+  - com.lightningkite.services:database:1.3.0-prerelease-113-79195cb8: exported
+  - com.lightningkite.services:cache:1.3.0-prerelease-113-79195cb8: exported
+  - com.lightningkite.services:pubsub:1.3.0-prerelease-113-79195cb8: exported
+  - org.jetbrains.kotlin:kotlin-reflect:2.4.10: exported
+
+test-dependencies:
+  - org.jetbrains.kotlin:kotlin-test:2.4.10
+  - org.jetbrains.kotlin:kotlin-test-junit:2.4.10
+
+# Gradle names the Kotlin module "<group>:<artifact>", which determines the
+# META-INF/*.kotlin_module entry. The Toolchain defaults to the module directory name.
+settings@jvm:
+  kotlin:
+    freeCompilerArgs: [ -module-name, "com.lightningkite.lightningserver:engine-local" ]
+
+test-settings@jvm:
+  kotlin:
+    freeCompilerArgs: [ -module-name, engine-local_test ]

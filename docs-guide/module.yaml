@@ -1,0 +1,52 @@
+# Not published, and Gradle omitted explicitApi() deliberately -- see
+# no-explicit-api.module-template.yaml.
+#
+# Gradle wired src/samples/kotlin in as an extra main sourceSet.kotlin.srcDir; the
+# Toolchain's maven-like layout only scans src/main/kotlin, so that directory was
+# mechanically git-mv'd to src/main/kotlin (see project.yaml history). The DriftCheckTest
+# in src/test/kotlin still reads guide/*.md at runtime, unaffected by this move.
+apply: [ //jvm.module-template.yaml, //no-explicit-api.module-template.yaml ]
+
+# Never published. The Toolchain requires every module's mavenLocal declaration to agree
+# on publishability, or it aborts the whole repo run; `publish: true` here is harmless because
+# this module has no `settings.publishing.enabled` and so never actually publishes.
+repositories:
+  - id: mavenLocal
+    url: mavenLocal
+    publish: true
+
+product: jvm/lib
+
+description: Compiled-samples documentation for Lightning Server, drift-checked against guide/*.md.
+
+settings:
+  kotlin:
+    serialization: enabled
+    ksp:
+      processors:
+        - com.lightningkite.services:database-processor:1.3.0-prerelease-113-79195cb8
+      processorOptions:
+        generateFields: "true"
+
+dependencies:
+  - //core
+  - //typed
+  - //auth
+  - //engine-local
+  - com.lightningkite.services:database-jsonfile:1.3.0-prerelease-113-79195cb8
+  - com.lightningkite.services:database:1.3.0-prerelease-113-79195cb8
+  - com.lightningkite.services:cache:1.3.0-prerelease-113-79195cb8
+  # Promoted to a main dependency (not test-only) so @Test is available on the sample
+  # sources in src/main/kotlin, letting guide examples show complete annotated test classes.
+  - org.jetbrains.kotlin:kotlin-test-junit:2.4.10
+
+test-dependencies:
+  - org.jetbrains.kotlin:kotlin-test-junit:2.4.10
+
+settings@jvm:
+  kotlin:
+    freeCompilerArgs: [ -module-name, "com.lightningkite.lightningserver:docs-guide" ]
+
+test-settings@jvm:
+  kotlin:
+    freeCompilerArgs: [ -module-name, docs-guide_test ]

@@ -1,0 +1,33 @@
+# Shared configuration for every JVM-only module in this repo.
+# `maven-like` keeps the existing src/main/kotlin + src/test/kotlin layout, so no
+# JVM-only module needs its sources moved.
+layout: maven-like
+
+settings:
+  kotlin:
+    optIns:
+      - kotlin.time.ExperimentalTime
+      - kotlin.uuid.ExperimentalUuidApi
+    # Restores Gradle's explicitApi(). Toolchain 0.12.1 has no settings.kotlin.explicitApi,
+    # so the raw flag is used. It would otherwise apply to test sources too, which
+    # explicitApi() never did -- hence the test-settings counter-flag below.
+    freeCompilerArgs: [ -Xexplicit-api=strict ]
+  jvm:
+    # Matches the bytecode Gradle produced (class file major 61). Without it the
+    # Toolchain compiles against its own JDK 25 and emits bytecode no JDK 17/21
+    # consumer can read.
+    release: 17
+  # Gradle's kotlin-jvm modules pull in kotlin-test-junit (JUnit 4) for their tests.
+  # The Toolchain defaults to JUnit 5, under which those tests are silently not run.
+  junit: junit-4
+
+# test-settings appends to settings rather than replacing it, so the mode is turned
+# back off for test sources by a later -Xexplicit-api flag.
+test-settings:
+  kotlin:
+    freeCompilerArgs: [ -Xexplicit-api=disable ]
+
+# Gradle's root build.gradle.kts adds this to `allprojects`. Service Abstractions
+# prereleases are published here, not to Maven Central.
+repositories:
+  - url: https://lightningkite-maven.s3.us-west-2.amazonaws.com

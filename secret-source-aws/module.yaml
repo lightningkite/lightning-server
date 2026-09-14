@@ -1,0 +1,29 @@
+apply: [ //jvm.module-template.yaml, //publishing.module-template.yaml ]
+
+product: jvm/lib
+
+description: An AWS Secrets implementation of SecretSource
+
+settings:
+  kotlin:
+    serialization: enabled
+
+# NOTE: Gradle excluded software.amazon.awssdk:netty-nio-client and :apache-client from
+# this dependency. The Kotlin Toolchain has no exclude mechanism, so both remain on the
+# classpath and the AWS SDK cannot pick a sync HTTP implementation on its own. See the
+# migration report: AwsSecretSource.kt:54 needs an explicit .httpClient(...).
+dependencies:
+  - //core: exported
+  - software.amazon.awssdk:secretsmanager:2.42.34: exported
+
+test-dependencies:
+  - org.jetbrains.kotlin:kotlin-test:2.4.10
+  - org.jetbrains.kotlin:kotlin-test-junit:2.4.10
+
+settings@jvm:
+  kotlin:
+    freeCompilerArgs: [ -module-name, "com.lightningkite.lightningserver:secret-source-aws" ]
+
+test-settings@jvm:
+  kotlin:
+    freeCompilerArgs: [ -module-name, secret-source-aws_test ]
