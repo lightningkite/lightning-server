@@ -21,8 +21,8 @@ import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
-import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.runtime.EngineBase
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ExecutionCause
 import com.lightningkite.lightningserver.runtime.Initiator
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -31,7 +31,6 @@ import com.lightningkite.lightningserver.runtime.handle
 import com.lightningkite.lightningserver.runtime.invoke
 import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
-import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.MetaEndpoints
 import com.lightningkite.lightningserver.typed.registerTable
@@ -375,7 +374,7 @@ private object BulkTestServer : ServerBuilder() {
 private class BulkProbeEngine : EngineBase(BulkTestServer.build()), ServerRuntime {
     override val serverId: String = "bulk-probe"
     override val serverVersion: String = "test"
-    override val initiator: Initiator = Initiator.Direct(Uuid.random())
+    override val execution: Initiator = Initiator.Direct(Uuid.random())
 
     override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(
         event: WebSocketSubscriptionMessage<PATH, T>,
@@ -399,11 +398,11 @@ private class BulkProbeEngine : EngineBase(BulkTestServer.build()), ServerRuntim
 
     private val queue = ArrayDeque<Queued>()
 
-    override suspend fun <T> Task<T>.invoke(input: T, cause: ExecutionCause?) {
+    override suspend fun <T> dispatchTask(task: Task<T>, input: T, from: Execution) {
         queue.addLast(
             Queued(
                 location = location.toString(),
-                cause = cause,
+                cause = from,
                 input = internalSerialization.json.encodeToString(serializer, input),
             )
         )

@@ -24,36 +24,36 @@ class InitiatorTest {
 
     @Test
     fun `every subtype survives a round trip`() {
-        Initiator.Http(
-            executionId = execution,
+        Execution.Http(
+            id = execution,
             causedBy = root,
-            rootExecutionId = root,
+            rootExecution = root,
             endpoint = RawHttpEndpoint<PathSpec>(asString = "/users/abc", method = HttpMethod.GET),
         ).roundTripTest()
-        Initiator.WebSocket(
-            executionId = execution,
-            rootExecutionId = execution,
+        Execution.WebSocket(
+            id = execution,
+            rootExecution = execution,
             socketId = socket,
             path = RawWebSocketPath<PathSpec>("/updates"),
-            phase = Initiator.WebSocket.Phase.ClientMessage,
+            phase = Execution.WebSocket.Phase.ClientMessage,
         ).roundTripTest()
-        Initiator.Task(
-            executionId = execution,
+        Execution.Task(
+            id = execution,
             causedBy = root,
-            rootExecutionId = root,
+            rootExecution = root,
             attributedTo = root,
             location = location,
         ).roundTripTest()
-        Initiator.Schedule(executionId = execution, attributedTo = execution, location = location).roundTripTest()
-        Initiator.Startup(executionId = execution, location = location).roundTripTest()
-        Initiator.PreDeploy(executionId = execution, location = location).roundTripTest()
-        Initiator.Direct(executionId = execution).roundTripTest()
+        Execution.Schedule(id = execution, attributedTo = execution, location = location).roundTripTest()
+        Execution.Startup(id = execution, location = location).roundTripTest()
+        Execution.PreDeploy(id = execution, location = location).roundTripTest()
+        Execution.Direct(id = execution).roundTripTest()
     }
 
     /** Polymorphic dispatch is what makes the persisted form readable back as the right subtype. */
     @Test
     fun `a subtype survives a round trip through the sealed interface`() {
-        val initiator: Initiator = Initiator.Task(executionId = execution, attributedTo = execution, location = location)
+        val initiator: Execution = Execution.Task(id = execution, attributedTo = execution, location = location)
         initiator.roundTripTest()
     }
 }

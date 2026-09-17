@@ -15,7 +15,7 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
  * This is typically implemented by the framework and passed to endpoint handlers.
  *
  * What is *not* here is any identifier of ours: correlation lives on
- * [com.lightningkite.lightningserver.runtime.ServerRuntime.initiator], because a task or a schedule
+ * [com.lightningkite.lightningserver.runtime.ServerRuntime.execution], because a task or a schedule
  * tick has no request to hang it on. The two identifiers that remain below are wire-level facts
  * about the caller and the gateway, not identifiers the server minted.
  *

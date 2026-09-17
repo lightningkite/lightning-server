@@ -64,7 +64,7 @@ public fun <T : Any> MutationLog.mutationLogged(table: Table<T>): Table<T> {
             "inconsistently."
     )
     val serialName = descriptor.auditSerialName
-    val initiator = runtime.initiator
+    val initiator = runtime.execution
     val json = runtime.internalSerialization.json
     return MutationLogTable(
         wraps = table,

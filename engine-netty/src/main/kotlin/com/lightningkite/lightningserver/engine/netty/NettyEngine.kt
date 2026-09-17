@@ -12,8 +12,8 @@ import com.lightningkite.lightningserver.engine.local.WsOversizePolicy
 import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.engine.local.LocalWebSocketConnection
-import com.lightningkite.lightningserver.runtime.Initiator
-import com.lightningkite.lightningserver.runtime.forExecution
+import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.runtime.execute
 import com.lightningkite.lightningserver.runtime.phase
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
@@ -122,7 +122,7 @@ public class NettyEngine(
     private lateinit var HANDSHAKER_KEY: AttributeKey<WebSocketServerHandshaker>
     private lateinit var MID_KEY: AttributeKey<WebSocketConnection<PathSpec, Any?>>
     private lateinit var PATHSPEC_KEY: AttributeKey<PathSpec>
-    private lateinit var INITIATOR_KEY: AttributeKey<Initiator.WebSocket>
+    private lateinit var INITIATOR_KEY: AttributeKey<Execution.WebSocket>
     private lateinit var HANDLER_KEY: AttributeKey<WebSocketHandler<PathSpec, Any?>>
     private lateinit var DIRECT_CHANNEL_KEY: AttributeKey<SendChannel<LkWebSocketFrame>>
 
@@ -338,7 +338,7 @@ public class NettyEngine(
                 handler.disconnectWithMetrics(
                     pathspec,
                     this@NettyEngine,
-                    socketInitiator.phase(Initiator.WebSocket.Phase.Disconnect),
+                    socketInitiator.phase(Execution.WebSocket.Phase.Disconnect),
                     mid,
                     reason,
                 )
@@ -417,7 +417,7 @@ public class NettyEngine(
                                 handler.messageFromClientWithMetrics(
                                     pathspec,
                                     this@NettyEngine,
-                                    socketInitiator.phase(Initiator.WebSocket.Phase.ClientMessage),
+                                    socketInitiator.phase(Execution.WebSocket.Phase.ClientMessage),
                                     mid,
                                     m,
                                 )
@@ -445,7 +445,7 @@ public class NettyEngine(
                                 handler.messageFromClientWithMetrics(
                                     pathspec,
                                     this@NettyEngine,
-                                    socketInitiator.phase(Initiator.WebSocket.Phase.ClientMessage),
+                                    socketInitiator.phase(Execution.WebSocket.Phase.ClientMessage),
                                     mid,
                                     m,
                                 )
@@ -563,7 +563,7 @@ public class NettyEngine(
                             // A directly-run socket is not phase-structured — the whole session runs
                             // in this one coroutine — so it is one execution, named by the socket it is.
                             directHandler.handleDirect(
-                                serverRuntime = this@NettyEngine.forExecution(wsInitiator),
+                                serverRuntime = this@NettyEngine.execute(wsInitiator),
                                 request = wsRequest,
                                 incoming = incomingChannel,
                                 send = { frame ->
@@ -651,7 +651,7 @@ public class NettyEngine(
                             socketHandler.didConnectWithMetrics(
                                 match.pathSpec,
                                 this@NettyEngine,
-                                wsInitiator.phase(Initiator.WebSocket.Phase.Connected),
+                                wsInitiator.phase(Execution.WebSocket.Phase.Connected),
                                 mid,
                             )
                         } catch (_: Throwable) {
@@ -739,7 +739,7 @@ public class NettyEngine(
         private fun FullHttpRequest.toLightningWebSocketConnectRequest(
             ctx: ChannelHandlerContext,
             cfg: NettyRuntimeSettings,
-        ): Pair<WebSocketConnectRequest<PathSpec>, Initiator.WebSocket> {
+        ): Pair<WebSocketConnectRequest<PathSpec>, Execution.WebSocket> {
             val parts = QueryStringDecoder(this.uri())
             val headers = (this.headers() as NettyHttpHeaders).toLightningHeaders()
             val hostHeader = this.headers()[HOST] ?: ""
@@ -767,11 +767,11 @@ public class NettyEngine(
             )
             // The socket's identity is minted once, at connect, and every phase derives its own
             // execution from it, so a socket stays one thing across five separate executions.
-            return adapted to Initiator.WebSocket(
-                executionId = identity.requestId,
+            return adapted to Execution.WebSocket(
+                id = identity.requestId,
                 socketId = identity.requestId,
                 path = adapted.path,
-                phase = Initiator.WebSocket.Phase.Connect,
+                phase = Execution.WebSocket.Phase.Connect,
             )
         }
 

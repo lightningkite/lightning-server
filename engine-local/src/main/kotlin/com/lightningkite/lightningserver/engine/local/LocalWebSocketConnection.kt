@@ -2,10 +2,9 @@ package com.lightningkite.lightningserver.engine.local
 
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.path
-import com.lightningkite.lightningserver.runtime.Initiator
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.Engine
-import com.lightningkite.lightningserver.runtime.forExecution
+import com.lightningkite.lightningserver.runtime.execute
 import com.lightningkite.lightningserver.runtime.phase
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.pubsub.PubSubChannel
@@ -25,7 +24,7 @@ public abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
     startingState: STORAGE,
     override val request: WebSocketConnectRequest<PATH>,
     /** The socket's connect initiator, so a delivery can name the socket it is being delivered to. */
-    public val connectInitiator: Initiator.WebSocket,
+    public val connectInitiator: Execution.WebSocket,
     private val handler: WebSocketHandler<PATH, STORAGE>,
     private val scope: CoroutineScope,
     /** Needed to deliver a subscription message, which is a fresh execution rather than part of one. */
@@ -55,7 +54,7 @@ public abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
         subscriptions.remove(topic)?.cancel()
         subscriptions[topic] = scope.launch {
             pubSub(topic).collect { value ->
-                with(server.forExecution(with(server) { connectInitiator.phase(Initiator.WebSocket.Phase.SubscriptionMessage) })) {
+                with(server.execute(with(server) { connectInitiator.phase(Execution.WebSocket.Phase.SubscriptionMessage) })) {
                     handler.messageFromSubscription(
                         this@LocalWebSocketConnection,
                         WebSocketSubscriptionMessage(topic.topic, topic.pathInContext.rawPathArguments, value),

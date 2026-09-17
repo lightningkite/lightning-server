@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.handle
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.runtime.test.test
@@ -62,8 +63,10 @@ class ErrorCaseWarningTest {
     fun undeclaredErrorStillSurfacesAs400() = runBlocking {
         TestServer.test({}) {
             // Warning is logged for /boom; both still return 400 (response unchanged by W6).
-            assertEquals(400, serverRuntime.handle(request("/boom"), generateRequestId()).status.code)
-            assertEquals(400, serverRuntime.handle(request("/declared"), generateRequestId()).status.code)
+            contextOf<TestRunner>()
+            assertEquals(400, serverRuntime.handle(request("/boom"), Execution.ID.generate()).status.code)
+            contextOf<TestRunner>()
+            assertEquals(400, serverRuntime.handle(request("/declared"), Execution.ID.generate()).status.code)
         }
     }
 }

@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.http
 
 import com.lightningkite.lightningserver.runtime.subRequest
-import com.lightningkite.lightningserver.runtime.Initiator
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.definition.Task
@@ -10,7 +10,6 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.EngineBase
-import com.lightningkite.lightningserver.runtime.ExecutionCause
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -29,7 +28,7 @@ class RequestIdentityTest {
             event: WebSocketSubscriptionMessage<PATH, T>,
         ): Nothing = throw NotImplementedError()
 
-        override suspend fun <T> Task<T>.invoke(input: T, cause: ExecutionCause?): Nothing =
+        override suspend fun <T> dispatchTask(task: Task<T>, input: T, from: Execution): Nothing =
             throw NotImplementedError()
     }
 
@@ -47,7 +46,7 @@ class RequestIdentityTest {
             event: WebSocketSubscriptionMessage<PATH, T>,
         ): Nothing = throw NotImplementedError()
 
-        override suspend fun <T> Task<T>.invoke(input: T, cause: ExecutionCause?): Nothing =
+        override suspend fun <T> dispatchTask(task: Task<T>, input: T, from: Execution): Nothing =
             throw NotImplementedError()
     }
 
@@ -79,7 +78,7 @@ class RequestIdentityTest {
     fun `a generated request id carries the engine clock's instant, not the wall clock`() {
         val minted = kotlin.time.Instant.fromEpochMilliseconds(1_700_000_000_123)
 
-        val (version, millis) = with(engineAt(minted)) { generateRequestId() }.versionAndMillis()
+        val (version, millis) = with(engineAt(minted)) { Execution.ID.generate() }.versionAndMillis()
 
         assertEquals(7, version, "the audit layer's timestamp decoder returns 0 for any non-v7 id")
         assertEquals(
@@ -226,8 +225,8 @@ class RequestIdentityTest {
     private val outerId = Uuid.parse("00000000-0000-4000-8000-0000000000d4")
 
     @OptIn(InternalLightningServerApi::class)
-    private fun outer() = Initiator.Http(
-        executionId = outerId,
+    private fun outer() = Execution.Http(
+        id = outerId,
         endpoint = RawHttpEndpoint(asString = "/outer", method = HttpMethod.POST),
     )
 
@@ -237,9 +236,9 @@ class RequestIdentityTest {
     fun `subRequest gets its own id parented to the outer request`() {
         val sub = with(engine) { outer().subRequest(endpoint("/inner")) }
 
-        assertNotEquals(outerId, sub.executionId)
+        assertNotEquals(outerId, sub.id)
         assertEquals(outerId, sub.causedBy)
-        assertEquals(outerId, sub.rootExecutionId)
+        assertEquals(outerId, sub.rootExecution)
     }
 
     @Test
@@ -248,7 +247,7 @@ class RequestIdentityTest {
         val a = with(engine) { outer.subRequest(endpoint("/a")) }
         val b = with(engine) { outer.subRequest(endpoint("/b")) }
 
-        assertNotEquals(a.executionId, b.executionId)
+        assertNotEquals(a.id, b.id)
         assertEquals(outerId, a.causedBy)
         assertEquals(outerId, b.causedBy)
     }
@@ -257,7 +256,7 @@ class RequestIdentityTest {
     fun `nesting keeps the root while the parent follows the nesting`() {
         val inner = with(engine) { outer().subRequest(endpoint("/a")).subRequest(endpoint("/b")) }
 
-        assertEquals(outerId, inner.rootExecutionId)
+        assertEquals(outerId, inner.rootExecution)
         assertNotEquals(outerId, inner.causedBy)
     }
 }

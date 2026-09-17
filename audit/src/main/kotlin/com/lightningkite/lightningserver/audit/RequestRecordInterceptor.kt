@@ -64,7 +64,7 @@ public class RequestRecordInterceptor(
         try {
             return cont(request).also { outcome = it.status.code.toString() }
         } finally {
-            complete(runtime.initiator.requestRecordId, outcome, started.elapsedNow().inWholeMilliseconds)
+            complete(runtime.execution.requestRecordId, outcome, started.elapsedNow().inWholeMilliseconds)
         }
     }
 
@@ -83,16 +83,16 @@ public class RequestRecordInterceptor(
                 } finally {
                     // A socket's duration is its whole lifetime, which no monotonic mark taken here
                     // could measure, so it is left to be derived from `at` and the close time.
-                    complete(serverRuntime.initiator.requestRecordId, reason.toString(), durationMs = null)
+                    complete(serverRuntime.execution.requestRecordId, reason.toString(), durationMs = null)
                 }
             }
         }
 
     context(runtime: ServerRuntime)
     private suspend fun Request<*>.opening(endpoint: String, method: String) = RequestRecord(
-        _id = runtime.initiator.requestRecordId,
-        parentRequestId = runtime.initiator.causedBy,
-        rootExecutionId = runtime.initiator.rootExecutionId,
+        _id = runtime.execution.requestRecordId,
+        parentRequestId = runtime.execution.causedBy,
+        rootExecutionId = runtime.execution.rootExecutionId,
         principal = principalOrNull(),
         sourceIp = sourceIp,
         endpoint = endpoint,

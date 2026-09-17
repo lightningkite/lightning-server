@@ -10,7 +10,7 @@ import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.Initiator
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.forExecution
+import com.lightningkite.lightningserver.runtime.execute
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
@@ -121,7 +121,7 @@ class MutationLogTest {
     ) = runBlocking {
         TestServer.test(settings = { database set Database.Settings(); cache set Cache.Settings() }) {
             runPreDeployTasks(serverRuntime)
-            val runtime = if (initiator == null) serverRuntime else serverRuntime.forExecution(initiator)
+            val runtime = if (initiator == null) serverRuntime else serverRuntime.execute(initiator)
             block(runtime, runtime)
         }
     }

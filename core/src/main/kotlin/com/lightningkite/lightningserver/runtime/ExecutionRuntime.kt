@@ -2,20 +2,14 @@ package com.lightningkite.lightningserver.runtime
 
 import com.lightningkite.lightningserver.InternalLightningServerApi
 
-/**
- * This engine, running one execution attributed to [initiator].
- *
- * Everything a runtime offers — settings, serialization, telemetry, task dispatch — is process-wide
- * and shared; only the attribution differs per execution, so this delegates the whole of it and adds
- * one property. Minted at the single seam every engine funnels through ([handle] and the
- * `*WithMetrics` helpers), never by user code, so that "who initiated this?" is answerable from the
- * runtime alone rather than reconstructed from whatever happens to be in scope.
- */
 @InternalLightningServerApi
-public fun Engine.forExecution(initiator: Initiator): ServerRuntime = ExecutionRuntime(this, initiator)
+public fun Engine.executionRuntime(scope: Execution): ServerRuntime = ExecutionRuntime(this, scope)
+
+@InternalLightningServerApi
+public inline fun <T> Engine.execute(scope: Execution, action: ServerRuntime.() -> T): T = executionRuntime(scope).action()
 
 private class ExecutionRuntime(
     engine: Engine,
-    override val initiator: Initiator,
+    override val execution: Execution,
 ) : ServerRuntime, Engine by engine
 

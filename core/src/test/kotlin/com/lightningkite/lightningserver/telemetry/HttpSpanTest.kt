@@ -8,13 +8,13 @@ import com.lightningkite.lightningserver.definition.telemetrySettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.plainText
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.handle
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.services.telemetry.TelemetryBackend
 import io.opentelemetry.api.trace.SpanId
-import io.opentelemetry.sdk.trace.data.SpanData
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -54,8 +54,9 @@ class HttpSpanTest {
             }
         ) {
             runBlocking {
+                contextOf<TestRunner>()
                 serverRuntime.handle(
-                    HttpRequest<PathSpec>(
+                    HttpRequest(
                         path = RawHttpEndpoint(asString = "/users/abc", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
                         headers = HttpHeaders { add(HttpHeader.Origin, "https://example.com") },
@@ -63,7 +64,7 @@ class HttpSpanTest {
                         protocol = "https",
                         sourceIp = "local",
                     ),
-                    generateRequestId(),
+                    Execution.ID.generate(),
                 )
             }
 
@@ -117,8 +118,9 @@ class HttpSpanTest {
             }
         ) {
             runBlocking {
+                contextOf<TestRunner>()
                 serverRuntime.handle(
-                    HttpRequest<PathSpec>(
+                    HttpRequest(
                         path = RawHttpEndpoint(asString = "/does/not/exist", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
                         headers = HttpHeaders.EMPTY,
@@ -126,7 +128,7 @@ class HttpSpanTest {
                         protocol = "https",
                         sourceIp = "local",
                     ),
-                    generateRequestId(),
+                    Execution.ID.generate(),
                 )
             }
 

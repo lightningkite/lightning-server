@@ -2,7 +2,7 @@
 
 package com.lightningkite.lightningserver.engine.awsserverless
 
-import com.lightningkite.lightningserver.runtime.Initiator
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.services.serializers.KotlinBytesFormat
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -52,7 +52,7 @@ internal sealed interface SocketRow {
          * lifecycle phases is a separate Lambda invocation: without it, nothing after
          * `${'$'}connect` could say which socket it belongs to.
          */
-        val initiator: Initiator.WebSocket,
+        val initiator: Execution.WebSocket,
     ) : SocketRow
 }
 
@@ -268,7 +268,7 @@ internal class AwsWebSocketDynamoDb(
                     item[requestKey]!!.b().asByteArray()
                 ),
                 initiator = encoding.decodeFromByteArray(
-                    Initiator.WebSocket.serializer(),
+                    Execution.WebSocket.serializer(),
                     initiator.b().asByteArray()
                 ),
             )
@@ -380,7 +380,7 @@ internal class AwsWebSocketDynamoDb(
     suspend fun setState(
         socketId: String,
         request: WebSocketConnectRequest<*>,
-        initiator: Initiator.WebSocket,
+        initiator: Execution.WebSocket,
         toState: ByteArray,
     ) {
         ensureTables()
@@ -402,7 +402,7 @@ internal class AwsWebSocketDynamoDb(
                         ),
                         initiatorKey to AttributeValue.fromB(
                             SdkBytes.fromByteArray(
-                                encoding.encodeToByteArray(Initiator.WebSocket.serializer(), initiator)
+                                encoding.encodeToByteArray(Execution.WebSocket.serializer(), initiator)
                             )
                         ),
                         expireKey to AttributeValue.fromN(

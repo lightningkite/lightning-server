@@ -7,7 +7,6 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
-import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
@@ -19,14 +18,14 @@ import kotlin.test.assertNotEquals
 import kotlin.uuid.Uuid
 
 /** Every initiator a task run under [QueueingEngine] saw, in the order the tasks ran. */
-private val recorded = mutableListOf<Initiator>()
+private val recorded = mutableListOf<Execution>()
 
 private object TestServer : ServerBuilder() {
     val second: Task<Unit> = path.path("second") bind Task(Unit.serializer()) {
-        recorded += serverRuntime.initiator
+        recorded += serverRuntime.execution
     }
     val first: Task<Unit> = path.path("first") bind Task(Unit.serializer()) {
-        recorded += serverRuntime.initiator
+        recorded += serverRuntime.execution
         second(Unit)
     }
 }
@@ -55,8 +54,8 @@ private class QueueingEngine : EngineBase(TestServer.build()) {
 
     private val queue = ArrayDeque<String>()
 
-    override suspend fun <T> Task<T>.invoke(input: T, cause: ExecutionCause?) {
-        queue.addLast(Json.encodeToString(Queued.serializer(), Queued(location.toString(), cause)))
+    override suspend fun <T> dispatchTask(task: Task<T>, input: T, from: Execution) {
+        queue.addLast(Json.encodeToString(Queued.serializer(), Queued(location.toString(), from)))
     }
 
     /** Runs everything queued, reading each payload back the way a fresh process would. */
@@ -85,9 +84,9 @@ class TaskParentageTest {
 
         val requestId = Uuid.random()
         runBlocking {
-            val request = engine.forExecution(
-                Initiator.Http(
-                    executionId = requestId,
+            val request = engine.execute(
+                Execution.Http(
+                    id = requestId,
                     endpoint = RawHttpEndpoint<PathSpec>(asString = "/thing", method = HttpMethod.GET),
                 )
             )
@@ -98,16 +97,16 @@ class TaskParentageTest {
 
         assertEquals(2, recorded.size, "Expected both tasks to run. Got: $recorded")
 
-        val first = recorded[0] as Initiator.Task
+        val first = recorded[0] as Execution.Task
         assertEquals(requestId, first.causedBy, "The task should name the request that launched it.")
-        assertEquals(requestId, first.rootExecutionId)
-        assertNotEquals(requestId, first.executionId, "A task is its own execution, not the request's.")
+        assertEquals(requestId, first.rootExecution)
+        assertNotEquals(requestId, first.id, "A task is its own execution, not the request's.")
 
-        val second = recorded[1] as Initiator.Task
-        assertEquals(first.executionId, second.causedBy, "A task launched from a task names that task.")
+        val second = recorded[1] as Execution.Task
+        assertEquals(first.id, second.causedBy, "A task launched from a task names that task.")
         assertEquals(
             requestId,
-            second.rootExecutionId,
+            second.rootExecution,
             "The root must survive every hop, or \"everything caused by request X\" needs a recursive walk.",
         )
     }
@@ -119,12 +118,12 @@ class TaskParentageTest {
         with(engine) { settings.readyUsingDefaults() }
 
         runBlocking {
-            with(engine) { TestServer.second.invoke(Unit, cause = null) }
+            with(engine) { dispatchTask(, Unit, from = null) }
             engine.drain()
         }
 
-        val only = recorded.single() as Initiator.Task
+        val only = recorded.single() as Execution.Task
         assertEquals(null, only.causedBy)
-        assertEquals(only.executionId, only.rootExecutionId)
+        assertEquals(only.id, only.rootExecution)
     }
 }

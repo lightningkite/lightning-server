@@ -6,7 +6,6 @@ import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpLogicalInterceptor
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.runtime.Initiator
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.websockets.DelegatingWebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketClose
@@ -132,7 +131,7 @@ private suspend fun com.lightningkite.lightningserver.data.Request<*>.principalN
  */
 context(runtime: ServerRuntime)
 private fun idSuffix(idLabel: String = "req"): String {
-    val initiator = runtime.initiator
-    val id = initiator.logicalId ?: initiator.executionId
+    val initiator = runtime.execution
+    val id = initiator.logicalId ?: initiator.id
     return initiator.causedBy?.takeIf { it != id }?.let { "[$idLabel $id of $it]" } ?: "[$idLabel $id]"
 }

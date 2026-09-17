@@ -18,6 +18,7 @@ import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
+import com.lightningkite.lightningserver.runtime.Execution
 import org.slf4j.LoggerFactory
 import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.typed.test
@@ -144,8 +145,9 @@ class SessionManagerTest {
                 logbackLogger.addAppender(appender)
                 try {
                     runBlocking {
+                        contextOf<TestRunner>()
                         serverRuntime.handle(
-                            HttpRequest<PathSpec>(
+                            HttpRequest(
                                 path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
                                 queryParameters = QueryParameters.EMPTY,
                                 headers = HttpHeaders { add(HttpHeader.Authorization, "Bearer $accessToken") },
@@ -153,7 +155,7 @@ class SessionManagerTest {
                                 protocol = "https",
                                 sourceIp = "local",
                             ),
-                            generateRequestId(),
+                            Execution.ID.generate(),
                         )
                     }
                 } finally {

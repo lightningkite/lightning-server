@@ -9,7 +9,7 @@ import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.runtime.EngineBase
-import com.lightningkite.lightningserver.runtime.ExecutionCause
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.settings.*
 import com.lightningkite.lightningserver.websockets.*
@@ -161,8 +161,8 @@ public open class AwsAdapter(server: ServerDefinition) : EngineBase(server), Req
             .build()
     }
 
-    override suspend fun <T> Task<T>.invoke(input: T, cause: ExecutionCause?) {
-        tasks.launchTask(location, this, input, cause)
+    override suspend fun <T> dispatchTask(task: Task<T>, input: T, from: Execution) {
+        tasks.launchTask(location, this, input, from)
     }
 
     override val serverId: String

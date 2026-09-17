@@ -35,12 +35,12 @@ import kotlin.uuid.Uuid
 class ExecutionInterceptorTest {
 
     private class Recorder : ExecutionInterceptor {
-        val seen = ArrayList<Initiator>()
+        val seen = ArrayList<Execution>()
         override suspend fun <T> intercept(
             runtime: ServerRuntime,
             cont: suspend context(ServerRuntime) () -> T,
         ): T {
-            seen.add(runtime.initiator)
+            seen.add(runtime.execution)
             return with(runtime) { cont() }
         }
     }
@@ -89,11 +89,11 @@ class ExecutionInterceptorTest {
                 server.socket.willConnectWithMetrics(
                     location = server.socket.location,
                     engine = engine,
-                    initiator = Initiator.WebSocket(
-                        executionId = Uuid.random(),
+                    initiator = Execution.WebSocket(
+                        id = Uuid.random(),
                         socketId = Uuid.random(),
                         path = RawWebSocketPath("socket"),
-                        phase = Initiator.WebSocket.Phase.Connect,
+                        phase = Execution.WebSocket.Phase.Connect,
                     ),
                     request = WebSocketConnectRequest(RawWebSocketPath("socket")),
                 )

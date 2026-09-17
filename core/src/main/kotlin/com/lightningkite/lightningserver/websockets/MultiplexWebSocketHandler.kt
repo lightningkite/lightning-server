@@ -4,7 +4,7 @@ import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.*
-import com.lightningkite.lightningserver.runtime.Initiator
+import com.lightningkite.lightningserver.runtime.Execution
 import kotlinx.serialization.*
 
 @Serializable
@@ -23,7 +23,7 @@ public data class MultiplexWebSocketHandlerConnectionInfo(
      * The virtual socket's connect initiator, kept here for the same reason the request is: a later
      * phase may run in a different process, and the socket's identity has to survive the trip.
      */
-    val initiator: Initiator.WebSocket,
+    val initiator: Execution.WebSocket,
 )
 
 /**
@@ -198,9 +198,9 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                         queryParameters = QueryParameters(connection.request.queryParameters + (message.queryParams?.entries?.flatMap { it.value.map { v -> it.key to v } }
                             ?: listOf())),
                     )
-                    val subInitiator = (serverRuntime.initiator as? Initiator.WebSocket
+                    val subInitiator = (serverRuntime.execution as? Execution.WebSocket
                         ?: throw IllegalStateException(
-                            "Expected to be running a WebSocket phase, but this execution was initiated by ${serverRuntime.initiator}."
+                            "Expected to be running a WebSocket phase, but this execution was initiated by ${serverRuntime.execution}."
                         )).subConnection(r.path)
                     val storage =
                         otherHandler.willConnectWithMetrics(match.path.pathSpec, serverRuntime, subInitiator, r)
@@ -221,7 +221,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                         otherHandler.didConnectWithMetrics(
                             match.pathSpec,
                             serverRuntime,
-                            subInitiator.phase(Initiator.WebSocket.Phase.Connected),
+                            subInitiator.phase(Execution.WebSocket.Phase.Connected),
                             it
                         )
                     }
@@ -248,7 +248,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                         otherHandler.disconnectWithMetrics(
                             match.pathSpec,
                             serverRuntime,
-                            info.initiator.phase(Initiator.WebSocket.Phase.Disconnect),
+                            info.initiator.phase(Execution.WebSocket.Phase.Disconnect),
                             it,
                             WebSocketClose.NORMAL
                         )
@@ -282,7 +282,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                         otherHandler.messageFromClientWithMetrics(
                             match.pathSpec,
                             serverRuntime,
-                            info.initiator.phase(Initiator.WebSocket.Phase.ClientMessage),
+                            info.initiator.phase(Execution.WebSocket.Phase.ClientMessage),
                             it,
                             textFrame,
                         )
@@ -308,7 +308,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                     otherHandler.disconnectWithMetrics(
                         match.pathSpec,
                         serverRuntime,
-                        info.initiator.phase(Initiator.WebSocket.Phase.Disconnect),
+                        info.initiator.phase(Execution.WebSocket.Phase.Disconnect),
                         it,
                         ((e as? HttpStatusException)?.status ?: HttpStatus.InternalServerError).bestWebSocketCloseCode
                     )
@@ -333,7 +333,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                     otherHandler.messageFromSubscriptionWithMetrics(
                         match.pathSpec,
                         serverRuntime,
-                        info.initiator.phase(Initiator.WebSocket.Phase.SubscriptionMessage),
+                        info.initiator.phase(Execution.WebSocket.Phase.SubscriptionMessage),
                         it,
                         topic,
                     )
@@ -356,7 +356,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                 otherHandler.disconnectWithMetrics(
                     match.pathSpec,
                     serverRuntime,
-                    info.initiator.phase(Initiator.WebSocket.Phase.Disconnect),
+                    info.initiator.phase(Execution.WebSocket.Phase.Disconnect),
                     it,
                     reason,
                 )

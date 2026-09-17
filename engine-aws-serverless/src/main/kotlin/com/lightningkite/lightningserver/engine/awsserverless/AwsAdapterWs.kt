@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.*
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.serializers.KotlinBytesFormat
 import kotlinx.serialization.KSerializer
@@ -51,7 +52,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
          * as required regardless of nullability, so without it the whole payload fails to decode and
          * `didConnect` is lost in the outer failure handler with no response and no trace.
          */
-        val initiator: Initiator.WebSocket? = null,
+        val initiator: Execution.WebSocket? = null,
         val storage: AnonType,
     ) : AwsLambdaInput
 
@@ -285,7 +286,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                             h.messageFromSubscriptionWithMetrics(
                                 p.pathSpec,
                                 root,
-                                with(root) { s.initiator.phase(Initiator.WebSocket.Phase.SubscriptionMessage) },
+                                with(root) { s.initiator.phase(Execution.WebSocket.Phase.SubscriptionMessage) },
                                 mid,
                                 WebSocketSubscriptionMessage(
                                     fullTopicMatch.value,
@@ -385,7 +386,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                 rootWs.didConnectWithMetrics(
                     rootPath,
                     root,
-                    with(root) { initiator.phase(Initiator.WebSocket.Phase.Connected) },
+                    with(root) { initiator.phase(Execution.WebSocket.Phase.Connected) },
                     mid
                 )
                 return APIGatewayV2HTTPResponse(200)
@@ -439,12 +440,12 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                 // is one identity across the five separate Lambda invocations its lifetime is made of.
                 // The gateway's connection ID is not a UUID and stays in [engineSocketId], which is where
                 // the join to the gateway's own logs comes from.
-                val socketId = with(root) { generateRequestId() }
-                val connectInitiator = Initiator.WebSocket(
-                    executionId = socketId,
+                val socketId = with(root) { Execution.ID.generate() }
+                val connectInitiator = Execution.WebSocket(
+                    id = socketId,
                     socketId = socketId,
                     path = lkEvent.path,
-                    phase = Initiator.WebSocket.Phase.Connect,
+                    phase = Execution.WebSocket.Phase.Connect,
                 )
                 try {
                     val storage = rootWs.willConnectWithMetrics(rootPath, root, connectInitiator, lkEvent)
@@ -517,7 +518,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         rootWs.disconnectWithMetrics(
                             rootPath,
                             root,
-                            with(root) { state.initiator.phase(Initiator.WebSocket.Phase.Disconnect) },
+                            with(root) { state.initiator.phase(Execution.WebSocket.Phase.Disconnect) },
                             mid,
                             WebSocketClose.NORMAL
                         )
@@ -574,7 +575,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         rootWs.messageFromClientWithMetrics(
                             rootPath,
                             root,
-                            with(root) { state.initiator.phase(Initiator.WebSocket.Phase.ClientMessage) },
+                            with(root) { state.initiator.phase(Execution.WebSocket.Phase.ClientMessage) },
                             mid,
                             WebSocketFrame(event.body)
                         )

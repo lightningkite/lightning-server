@@ -5,11 +5,10 @@ import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.runtime.Initiator
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.EngineBase
-import com.lightningkite.lightningserver.runtime.ExecutionCause
-import com.lightningkite.lightningserver.runtime.forExecution
+import com.lightningkite.lightningserver.runtime.execute
 import com.lightningkite.lightningserver.runtime.phase
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.*
@@ -61,10 +60,10 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
 
     /**
      * A test has no server-side execution behind it, so it is the one place besides manual
-     * invocation that mints [Initiator.Direct] — see its documentation for why that hole exists.
+     * invocation that mints [Execution.Direct] — see its documentation for why that hole exists.
      */
     @OptIn(InternalLightningServerApi::class)
-    override val initiator: Initiator = Initiator.Direct(
+    override val execution: Execution = Execution.Direct(
         @OptIn(ExperimentalUuidApi::class) Uuid.generateV7NonMonotonicAt(clock.now())
     )
 
@@ -97,9 +96,9 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
      *
      * Unlike production runtimes, tasks don't run in the background but complete
      * immediately, making tests deterministic. That also means the task body runs inside the
-     * launching execution rather than as one of its own, so there is nothing for [cause] to parent.
+     * launching execution rather than as one of its own, so there is nothing for [from] to parent.
      */
-    override suspend fun <T> Task<T>.invoke(input: T, cause: ExecutionCause?) {
+    override suspend fun <T> dispatchTask(task: Task<T>, input: T, from: Execution) {
         this.executeInline(input)
     }
 
@@ -132,12 +131,12 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
     public inner class TestWebSocket<PATH : PathSpec, STORAGE>(
         private val handler: WebSocketHandler<PATH, STORAGE>,
         public val request: WebSocketConnectRequest<PATH>,
-        public val initiator: Initiator.WebSocket,
+        public val initiator: Execution.WebSocket,
         public var currentState: STORAGE,
         public val name: String = "Client",
     ) {
-        private fun runtimeFor(phase: Initiator.WebSocket.Phase): ServerRuntime =
-            this@TestRunner.forExecution(initiator.phase(phase))
+        private fun runtimeFor(phase: Execution.WebSocket.Phase): ServerRuntime =
+            this@TestRunner.execute(initiator.phase(phase))
 
         public var onMessageSent: (frame: WebSocketFrame) -> Unit = {}
         public suspend fun close() {
@@ -149,7 +148,7 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
         public suspend fun send(frame: WebSocketFrame) {
             /*logger.debug*/run { "$name --> '$frame'" }.let(::println)
             val connection = this@TestWebSocket.server
-            with(runtimeFor(Initiator.WebSocket.Phase.ClientMessage)) { handler.messageFromClient(connection, frame) }
+            with(runtimeFor(Execution.WebSocket.Phase.ClientMessage)) { handler.messageFromClient(connection, frame) }
             connection.flush()
         }
 
@@ -158,7 +157,7 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
         public inner class ServerSide() : WebSocketConnection<PATH, STORAGE> {
             private val changeQueue = ArrayList<(STORAGE) -> STORAGE>()
             private val sub: suspend (WebSocketSubscriptionMessage<*, *>) -> Unit = {
-                with(runtimeFor(Initiator.WebSocket.Phase.SubscriptionMessage)) {
+                with(runtimeFor(Execution.WebSocket.Phase.SubscriptionMessage)) {
                     handler.messageFromSubscription(this@ServerSide, it)
                 }
                 flush()
@@ -209,7 +208,7 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
 
             override suspend fun close(reason: WebSocketClose) {
                 /*logger.debug*/run { "$name <-- <close>" }.let(::println)
-                with(runtimeFor(Initiator.WebSocket.Phase.Disconnect)) { handler.disconnect(this@ServerSide, reason) }
+                with(runtimeFor(Execution.WebSocket.Phase.Disconnect)) { handler.disconnect(this@ServerSide, reason) }
             }
 
             internal fun clean() {

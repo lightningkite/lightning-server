@@ -62,7 +62,7 @@ public fun <T : Any> DataAccessLog.dataAccessLogged(table: Table<T>): Table<T> {
             "inconsistently."
     )
     val serialName = descriptor.auditSerialName
-    val initiator = runtime.initiator
+    val initiator = runtime.execution
     return DataAccessLogTable(
         wraps = table,
         modelId = { registry.await().modelId(serialName) },

@@ -17,7 +17,7 @@ This package contains the core runtime system for Lightning Server applications.
   `context(ServerRuntime)` rather than `context(Engine)` is how a declaration says its work is attributable. Also holds
   the runtime-scoped extensions: WebSocket topic messaging and task launching.
 
-- **[Initiator.kt](Initiator.kt)** - What started one execution, and what caused it to start. Serializable, so
+- **[Initiator.kt](Execution.kt)** - What started one execution, and what caused it to start. Serializable, so
   parentage survives a task queue.
 
 - **[ExecutionRuntime.kt](ExecutionRuntime.kt)** - Mints a [ServerRuntime] from an engine plus an initiator.

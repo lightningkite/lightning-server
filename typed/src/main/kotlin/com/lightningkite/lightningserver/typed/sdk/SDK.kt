@@ -7,10 +7,9 @@ import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.EngineBase
-import com.lightningkite.lightningserver.runtime.ExecutionCause
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.ApiWebSocketHandler
-import com.lightningkite.lightningserver.typed.sdk.SDK.sdk
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.services.data.*
 import com.lightningkite.services.kfile.KFile
@@ -578,7 +577,7 @@ public object SDK {
         override val serverId: String = "SDK Runtime"
         override val serverVersion: String = "0.0.0"
 
-        override suspend fun <T> Task<T>.invoke(input: T, cause: ExecutionCause?): Nothing =
+        override suspend fun <T> dispatchTask(task: Task<T>, input: T, from: Execution): Nothing =
             throw NotImplementedError("SDK Runner only exists to retrieve serialization information")
 
         override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>): Nothing =

@@ -177,15 +177,15 @@ public abstract class LocalEngine(server: ServerDefinition) : EngineBase(server)
      * The task is launched in the engine's coroutine scope and errors are caught and reported.
      *
      * @param input The input value for the task
-     * @param cause The execution launching it, carried straight through: a single-process engine
+     * @param from The execution launching it, carried straight through: a single-process engine
      *   hands the task to a coroutine rather than a queue, but the parentage recorded is the same.
      */
-    override suspend fun <T> Task<T>.invoke(input: T, cause: ExecutionCause?) {
+    override suspend fun <T> dispatchTask(task: Task<T>, input: T, from: Execution) {
         scope.launch {
             try {
-                logger.debug { "Handling task: $location" }
-                executeWithMetrics(location, input, cause)
-            } catch (e: Exception) {
+                logger.debug { "Handling task: ${task.location}" }
+                task.executeWithMetrics(task.location, input, from)
+            } catch (_: Exception) {
                 /*squish; already reported*/
             }
         }

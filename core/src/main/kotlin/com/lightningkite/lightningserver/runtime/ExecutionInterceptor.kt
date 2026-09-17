@@ -46,7 +46,7 @@ public interface ExecutionInterceptor {
      * @param cont The continuation, invoked as `with(runtime) { cont() }`. Skipping it skips the
      *   execution entirely, so an interceptor that means to let the work happen must call it.
      */
-    public suspend fun <T> intercept(
+    public suspend fun <T> intercept(   // todo: change signature to context parameter
         runtime: ServerRuntime,
         cont: suspend context(ServerRuntime) () -> T,
     ): T

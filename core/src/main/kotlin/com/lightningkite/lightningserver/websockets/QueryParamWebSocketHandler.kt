@@ -7,7 +7,7 @@ import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.*
-import com.lightningkite.lightningserver.runtime.Initiator
+import com.lightningkite.lightningserver.runtime.Execution
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 
@@ -157,9 +157,9 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
             otherHandler.willConnectWithMetrics(
                 match.pathSpec,
                 serverRuntime,
-                (serverRuntime.initiator as? Initiator.WebSocket
+                (serverRuntime.execution as? Execution.WebSocket
                     ?: throw IllegalStateException(
-                        "Expected to be running a WebSocket phase, but this execution was initiated by ${serverRuntime.initiator}."
+                        "Expected to be running a WebSocket phase, but this execution was initiated by ${serverRuntime.execution}."
                     )).rewritePath(request.path),
                 request,
             )
@@ -197,12 +197,12 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
      * the location the initiator names would otherwise be the placeholder the client connected to.
      */
     context(serverRuntime: ServerRuntime)
-    private fun WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>.innerInitiator(): Initiator.WebSocket {
+    private fun WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>.innerInitiator(): Execution.WebSocket {
         @Suppress("UNCHECKED_CAST")
         val path = currentState.request.path as RawWebSocketPath<PathSpec>
-        return (serverRuntime.initiator as? Initiator.WebSocket
+        return (serverRuntime.execution as? Execution.WebSocket
             ?: throw IllegalStateException(
-                "Expected to be running a WebSocket phase, but this execution was initiated by ${serverRuntime.initiator}."
+                "Expected to be running a WebSocket phase, but this execution was initiated by ${serverRuntime.execution}."
             )).rewritePath(path)
     }
 

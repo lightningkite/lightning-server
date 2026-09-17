@@ -10,7 +10,7 @@ import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
 
 /**
- * An [Engine], running one execution on behalf of an [initiator].
+ * An [Engine], running one execution on behalf of an [execution].
  *
  * An "execution" is one run of anything the server can run: an HTTP request, one WebSocket lifecycle
  * phase, a task, a schedule tick, a startup task, or a pre-deploy task. Everything an execution needs
@@ -23,7 +23,7 @@ import com.lightningkite.lightningserver.websockets.WebSocketTopic
  * answers: work that must be audited cannot accidentally be written somewhere no initiator exists.
  *
  * Runtimes are minted by the framework at the seam every engine funnels through
- * ([com.lightningkite.lightningserver.runtime.forExecution]), never by user code.
+ * ([com.lightningkite.lightningserver.runtime.execute]), never by user code.
  */
 public interface ServerRuntime : Engine {
     /**
@@ -37,7 +37,7 @@ public interface ServerRuntime : Engine {
      * `HttpHandler.handle`, and so to every endpoint handler in the framework and in user code. The
      * runtime context is the only carrier already threaded to all three.
      */
-    public val initiator: Initiator
+    public val execution: Execution
 }
 
 /**
@@ -115,7 +115,7 @@ public suspend fun <A, B, C, T> WebSocketTopic<PathSpec3<A, B, C>, T>.send(
 context(serverRuntime: ServerRuntime)
 public suspend operator fun <T> Task<T>.invoke(input: T): Unit =
     with(serverRuntime) {
-        this@invoke.invoke(input, serverRuntime.initiator.cause)
+        dispatchTask(, input, serverRuntime.execution.cause)
     }
 
 /**

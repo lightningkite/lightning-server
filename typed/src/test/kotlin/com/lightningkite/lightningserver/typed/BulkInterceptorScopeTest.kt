@@ -51,8 +51,8 @@ class BulkInterceptorScopeTest {
     /** Records what it saw, then delegates. Shared by both interceptor kinds below. */
     context(runtime: ServerRuntime)
     private fun record(into: MutableList<Seen>, request: HttpRequest<*>) {
-        val initiator = runtime.initiator
-        into.add(Seen("/" + request.path.pathSegments.toString(), initiator.executionId, initiator.causedBy))
+        val initiator = runtime.execution
+        into.add(Seen("/" + request.path.pathSegments.toString(), initiator.id, initiator.causedBy))
     }
 
     private inner class LogicalRecorder : HttpLogicalInterceptor {

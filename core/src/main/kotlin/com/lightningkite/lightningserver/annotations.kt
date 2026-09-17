@@ -6,7 +6,7 @@ package com.lightningkite.lightningserver
  */
 @RequiresOptIn(
     "This is essentially internal, and its usage is unstable and may change at any time.",
-    RequiresOptIn.Level.WARNING
+    RequiresOptIn.Level.ERROR
 )
 @Target(
     AnnotationTarget.PROPERTY,

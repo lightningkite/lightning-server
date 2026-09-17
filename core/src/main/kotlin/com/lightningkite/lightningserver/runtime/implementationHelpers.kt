@@ -56,18 +56,13 @@ private val errorType = TelemetryKey.OfString("error.type")
 @OptIn(InternalLightningServerApi::class)
 public suspend fun Engine.handle(
     request: HttpRequest<PathSpec>,
-    executionId: Uuid,
-): HttpResponse = forExecution(
-    Initiator.Http(executionId = executionId, endpoint = request.path)
-).handleInExecution(request)
+    executionId: Execution.ID,
+): HttpResponse = execute(
+    Execution.Http(id = executionId, endpoint = request.path)
+) {
+    handleInExecution(request)
+}
 
-/**
- * Runs [body] as the whole of this execution, through every installed [ExecutionInterceptor].
- *
- * Sits inside the execution's telemetry span and outside the HTTP/WebSocket chains: an execution
- * interceptor wraps the whole of what ran, and what it does belongs to that execution's trace.
- */
-@OptIn(InternalLightningServerApi::class)
 private suspend fun <T> ServerRuntime.inExecution(body: suspend context(ServerRuntime) () -> T): T =
     server.compiledExecutionInterceptors.intercept(this, body)
 
@@ -121,12 +116,12 @@ private suspend fun ServerRuntime.handleInExecution(request: HttpRequest<PathSpe
  */
 @OptIn(InternalLightningServerApi::class)
 public suspend fun ServerRuntime.handleSubRequest(request: HttpRequest<PathSpec>): HttpResponse {
-    val outer = initiator
-    require(outer is Initiator.Http) {
+    val outer = execution
+    require(outer is Execution.Http) {
         "Sub-requests may only be dispatched from inside an HTTP execution, so that they can be " +
             "parented to the request that carried them; ${request.path} was dispatched from $outer."
     }
-    val runtime = forExecution(with(this) { outer.subRequest(request.path) })
+    val runtime = execute(outer.subRequest(request.path))
     return with(runtime) {
         instrumentHttpRequest(request) {
             val outcome = runtime.inExecution { runtime.dispatchLogicalRequest(request) }
@@ -252,10 +247,10 @@ private suspend fun ServerRuntime.dispatchLogicalRequest(request: HttpRequest<Pa
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.willConnectWithMetrics(
     location: PATH,
     engine: Engine,
-    initiator: Initiator.WebSocket,
+    initiator: Execution.WebSocket,
     request: WebSocketConnectRequest<PATH>,
 ): STORAGE {
-    val runtime = engine.forExecution(initiator)
+    val runtime = engine.execute(initiator)
     return with(runtime) {
         instrument("willConnect", TelemetryAttributes {
             put(wsRoute, location.toString())
@@ -279,10 +274,10 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.wi
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.didConnectWithMetrics(
     location: PATH,
     engine: Engine,
-    initiator: Initiator.WebSocket,
+    initiator: Execution.WebSocket,
     connection: WebSocketConnection<PATH, STORAGE>,
 ) {
-    val runtime = engine.forExecution(initiator)
+    val runtime = engine.execute(initiator)
     return with(runtime) {
         instrument("didConnect", TelemetryAttributes {
             put(wsRoute, location.toString())
@@ -309,11 +304,11 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.messageFromClientWithMetrics(
     location: PATH,
     engine: Engine,
-    initiator: Initiator.WebSocket,
+    initiator: Execution.WebSocket,
     connection: WebSocketConnection<PATH, STORAGE>,
     frame: WebSocketFrame,
 ) {
-    val runtime = engine.forExecution(initiator)
+    val runtime = engine.execute(initiator)
     return with(runtime) {
         instrument("messageFromClient", TelemetryAttributes {
             put(wsRoute, location.toString())
@@ -350,11 +345,11 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.messageFromSubscriptionWithMetrics(
     location: PATH,
     engine: Engine,
-    initiator: Initiator.WebSocket,
+    initiator: Execution.WebSocket,
     connection: WebSocketConnection<PATH, STORAGE>,
     topic: WebSocketSubscriptionMessage<*, *>,
 ) {
-    val runtime = engine.forExecution(initiator)
+    val runtime = engine.execute(initiator)
     return with(runtime) {
         instrument("messageFromSubscription", TelemetryAttributes {
             put(wsRoute, location.toString())
@@ -380,11 +375,11 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.disconnectWithMetrics(
     location: PATH,
     engine: Engine,
-    initiator: Initiator.WebSocket,
+    initiator: Execution.WebSocket,
     connection: WebSocketConnection<PATH, STORAGE>,
     reason: WebSocketClose,
 ) {
-    val runtime = engine.forExecution(initiator)
+    val runtime = engine.execute(initiator)
     return with(runtime) {
         instrument("disconnect", TelemetryAttributes {
             put(wsRoute, location.toString())
@@ -405,29 +400,16 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
  */
 private fun PathSpec0.asPathSegments(): PathSegments = PathSegments.parse(toString())
 
-/**
- * The facts that keep one kind of task-like execution distinguishable from another: how its span is
- * named and labelled, and which [Initiator] it is attributed to. Everything else about running one is
- * identical, and lives in [executeTaskLike].
- */
-@OptIn(InternalLightningServerApi::class)
 private enum class TaskKind(
     val label: String,
     val telemetryType: String,
-    val initiator: (
-        executionId: Uuid,
-        causedBy: Uuid?,
-        rootExecutionId: Uuid,
-        attributedTo: Uuid,
-        location: PathSegments,
-    ) -> Initiator,
 ) {
-    Task("task", "TASK", { id, by, root, who, at -> Initiator.Task(id, by, root, who, at) }),
-    Schedule("schedule", "SCHEDULE", { id, by, root, who, at -> Initiator.Schedule(id, by, root, who, at) }),
+    Task("task", "TASK"),
+    Schedule("schedule", "SCHEDULE"),
     // Startup and pre-deploy have no launcher and no request anywhere in their ancestry, so they
     // derive their own anchor and there is nothing to pass.
-    Startup("startup", "STARTUP", { id, by, root, _, at -> Initiator.Startup(id, by, root, at) }),
-    PreDeploy("predeploy", "PREDEPLOY", { id, by, root, _, at -> Initiator.PreDeploy(id, by, root, at) }),
+    Startup("startup", "STARTUP"),
+    PreDeploy("predeploy", "PREDEPLOY"),
 }
 
 /**
@@ -445,31 +427,15 @@ private enum class TaskKind(
 private suspend fun Engine.executeTaskLike(
     kind: TaskKind,
     location: PathSpec0,
-    cause: ExecutionCause?,
+    execution: Execution,
     body: suspend context(ServerRuntime) () -> Unit,
 ) {
-    val executionId = with(this) { generateRequestId() }
-    val runtime = forExecution(
-        kind.initiator(
-            executionId,
-            cause?.causedBy,
-            // With no launcher this execution heads its own causal chain, so it is its own root.
-            cause?.rootExecutionId ?: executionId,
-            // And attributes to itself, which resolves to no request row — the honest answer for a
-            // schedule tick or a startup task. A launched task inherits its launcher's anchor.
-            cause?.attributedTo ?: executionId,
-            location.asPathSegments(),
-        )
-    )
-    // Span name includes the location so traces distinguish one task from another, the same way
-    // HTTP root spans are named "$method $route". Locations are a fixed, static set, so this is
-    // low-cardinality.
-    return with(runtime) {
+    execute(execution) {
         instrument("${kind.label} $location", TelemetryAttributes {
             put(taskType, kind.telemetryType)
             put(taskRoute, location.toString())
         }) {
-            runtime.inExecution(body)
+            inExecution(body)
         }
     }
 }
@@ -483,8 +449,8 @@ private suspend fun Engine.executeTaskLike(
  *   manual invocation.
  */
 context(engine: Engine)
-public suspend fun <T> Task<T>.executeWithMetrics(location: PathSpec0, input: T, cause: ExecutionCause?): Unit =
-    engine.executeTaskLike(TaskKind.Task, location, cause) { executeInline(input) }
+public suspend fun <T> Task<T>.executeWithMetrics(location: PathSpec0, input: T, from: Execution): Unit =
+    engine.executeTaskLike(TaskKind.Task, location, from) { executeInline(input) }
 
 /**
  * Executes a scheduled task with telemetry metrics.

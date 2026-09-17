@@ -412,10 +412,10 @@ public class MetaEndpoints(
                             entry.key to if (response.status.success) {
                                 BulkResponse(durationMs = durationMs, result = response.body?.text())
                             } else {
-                                BulkResponse(durationMs = durationMs, error = with(serverRuntime) { response.toLSError() })
+                                BulkResponse(durationMs = durationMs, error = response.toLSError())
                             }
                         }
-                    }.awaitAll().associate { it }
+                    }.awaitAll().toMap()
                 }
             }
         )

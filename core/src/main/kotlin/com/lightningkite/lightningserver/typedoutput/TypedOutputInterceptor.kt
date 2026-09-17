@@ -31,7 +31,7 @@ public interface TypedOutputInterceptor {
      * Called with a value that is about to be serialized and sent.
      *
      * @param request The request or connection this output belongs to; correlate by
-     *   [com.lightningkite.lightningserver.runtime.ServerRuntime.initiator].
+     *   [com.lightningkite.lightningserver.runtime.ServerRuntime.execution].
      * @param serializer The serializer that will encode [value] — walk this rather than reflecting,
      *   so that what is observed is exactly what the client will receive.
      * @param value The value being sent.

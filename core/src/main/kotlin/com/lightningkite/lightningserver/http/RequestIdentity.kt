@@ -1,7 +1,8 @@
 package com.lightningkite.lightningserver.http
 
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.runtime.Engine
-import kotlin.uuid.ExperimentalUuidApi
+import com.lightningkite.lightningserver.runtime.Execution
 import kotlin.uuid.Uuid
 
 /**
@@ -14,22 +15,9 @@ import kotlin.uuid.Uuid
  *   about what the caller sent, not an identifier of ours.
  */
 public data class RequestIdentity(
-    val requestId: Uuid,
+    val requestId: Execution.ID,
     val upstreamRequestId: String? = null,
 )
-
-/**
- * Generates a fresh authoritative request identifier.
- *
- * A version-7 UUID, stamped with the instant given by the [Engine]'s selected clock — the same clock
- * [com.lightningkite.lightningserver.runtime.now] reads, so a test's injected clock controls the id's
- * embedded timestamp. Because the id embeds its own mint time, the audit layer can elide a separate
- * `at` column and derive time from the id. Keep every execution-id minting site on this function so
- * that derivation stays sound and ids stay roughly time-ordered for index locality.
- */
-@OptIn(ExperimentalUuidApi::class)
-context(engine: Engine)
-public fun generateRequestId(): Uuid = Uuid.generateV7NonMonotonicAt(engine.clock.now())
 
 /**
  * Determines the [RequestIdentity] for an incoming request.
@@ -50,24 +38,23 @@ public fun generateRequestId(): Uuid = Uuid.generateV7NonMonotonicAt(engine.cloc
  *   proxy, or that proxy does not stamp UUIDs. A fresh ID is generated in that case, so correlation
  *   degrades rather than failing.
  */
+@OptIn(InternalLightningServerApi::class)
 context(engine: Engine)
-public fun HttpHeaders.requestIdentity(
+public inline fun HttpHeaders.requestIdentity(
     trustedRequestIdHeader: String?,
     onTrustedHeaderMissing: () -> Unit = {},
 ): RequestIdentity {
     val claimed = get(HttpHeader.XRequestId)?.root
-    if (trustedRequestIdHeader == null) return RequestIdentity(generateRequestId(), claimed)
+    if (trustedRequestIdHeader == null) return RequestIdentity(Execution.ID.generate(), claimed)
 
-    val trusted = get(trustedRequestIdHeader)?.root?.let {
-        try {
-            Uuid.parse(it)
-        } catch (_: IllegalArgumentException) {
-            null
-        }
-    }
+    val trusted = get(trustedRequestIdHeader)
+        ?.root
+        ?.let(Uuid::parseOrNull)
+        ?.let(Execution::ID)
+
     if (trusted == null) {
         onTrustedHeaderMissing()
-        return RequestIdentity(generateRequestId(), claimed)
+        return RequestIdentity(Execution.ID.generate(), claimed)
     }
     // When the trusted header IS X-Request-ID the claimed value is the trusted one, so there is no
     // separate untrusted claim worth recording.

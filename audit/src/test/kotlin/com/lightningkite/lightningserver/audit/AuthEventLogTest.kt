@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * The auth event log is reached through a reporter installed on the server, because an authentication
@@ -51,7 +50,7 @@ class AuthEventLogTest {
         assertEquals(AuthEventType.AuthenticationFailed, event.type)
         assertEquals("user-1", event.principal)
         assertEquals("SecretMismatch", event.failureReason)
-        assertEquals(runtime.initiator.attributedTo, event.requestId)
+        assertEquals(runtime.execution.attributedTo, event.requestId)
     }
 
     /** Events join to the same request record as the disclosures made under the resulting session. */

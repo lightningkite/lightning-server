@@ -282,7 +282,7 @@ class DataAccessLogTest {
         table.count(Condition.Always)
 
         val row = logged().single()
-        assertEquals(runtime.initiator.executionId, row.executionId)
-        assertEquals(runtime.initiator.attributedTo, row.requestId)
+        assertEquals(runtime.execution.executionId, row.executionId)
+        assertEquals(runtime.execution.attributedTo, row.requestId)
     }
 }

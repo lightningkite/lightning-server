@@ -1,4 +1,4 @@
-# Plan: Execution Context Refactor (`Engine` / `ServerRuntime` / `Initiator`)
+# Plan: Execution Context Refactor (`Engine` / `ServerRuntime` / `Execution`)
 
 Status: **complete.** All stages landed; see the commits named below.
 Target: Lightning Server 5.x
@@ -22,7 +22,7 @@ The fix splits the two concerns that are currently fused:
 | Concept | Scope | Contains |
 |---|---|---|
 | `Engine` | one per server process | everything `ServerRuntime` has today |
-| `ServerRuntime` | one per **execution** | an `Engine` (by delegation) + an `Initiator` |
+| `ServerRuntime` | one per **execution** | an `Engine` (by delegation) + an `Execution` |
 
 "Execution" means one run of anything the server can run: an HTTP request, one WebSocket lifecycle
 phase, a task, a schedule tick, a startup task, or a pre-deploy task.
@@ -56,7 +56,7 @@ request. Do not "fix" `RequestRecord` to store concrete segments.
 ### 2.2 The initiator is serializable
 
 Required, and not merely for log convenience: it is how `causedBy` crosses a queue. When a task is
-launched from a request, the launching `executionId` is serialized into the queued payload, so the
+launched from a request, the launching `id` is serialized into the queued payload, so the
 task knows its parent with no database read. This is the only mechanism that works on serverless.
 
 Consequence to accept deliberately: the initiator **will** be persisted — into task queues and into
@@ -71,10 +71,10 @@ send".
 ### 2.4 WebSocket phases are separate executions
 
 On AWS each of the five WebSocket lifecycle methods is a **separate Lambda invocation**. Treating a
-socket as one execution is therefore factually wrong. Each phase gets its own `executionId`; the
+socket as one execution is therefore factually wrong. Each phase gets its own `id`; the
 socket's identity is a separate `socketId` that is constant across all phases of that socket.
 
-### 2.5 Parentage: `causedBy` plus `rootExecutionId`
+### 2.5 Parentage: `causedBy` plus `root`
 
 Three real sources of parentage, no more:
 
@@ -84,17 +84,17 @@ Three real sources of parentage, no more:
 | multiplexed WebSocket sub-sockets | no |
 | a task launched from a request | **yes** — via the serialized initiator |
 
-`causedBy` must live on `Initiator` rather than only in `RequestRecord`, otherwise launching a task
+`causedBy` must live on `Execution` rather than only in `RequestRecord`, otherwise launching a task
 from a request could not stamp parentage without a database read.
 
-`rootExecutionId` is carried as well (**approved**; it originated as a recommendation rather than a
+`root` is carried as well (**approved**; it originated as a recommendation rather than a
 requirement). With parent pointers alone, "show me everything that happened
 because of request X" is a recursive join — and that query is the entire point of the audit system.
 With a root it is one indexed lookup, for 16 bytes on a row that already holds two UUIDs. This is
 consistent with `audit-logging.md`'s rule that parentage lives in the request log and is not repeated
 per disclosure; it just lets the request log answer in one hop.
 
-Both are **framework-set**. User code never constructs an `Initiator`.
+Both are **framework-set**. User code never constructs an `Execution`.
 
 ### 2.6 Ids are `Uuid`, are version 7, minted at the selected clock — and AWS ids are never adopted
 
@@ -142,7 +142,7 @@ convention.
 
 ## 3. Target shapes
 
-### 3.1 `Initiator`
+### 3.1 `Execution`
 
 ```kotlin
 package com.lightningkite.lightningserver.runtime
@@ -219,7 +219,7 @@ public interface ServerRuntime : Engine {
 ```
 
 Plus an implementation that is `Engine by engine`, and overrides `Task.invoke` to stamp the current
-`executionId` as the launched task's `causedBy` (and propagate `rootExecutionId`).
+`id` as the launched task's `causedBy` (and propagate `root`).
 
 ### 3.3 `WebSocketHandler`
 
@@ -305,10 +305,10 @@ and the typed lifecycle methods take the runtime as a context alongside the conn
 shape Stage 2 gave the raw handler, for the same reason. `ModelRestUpdatesWebsocket` and every other
 typed socket in the repo follow.
 
-### Stage 3 — `Initiator`
+### Stage 3 — `Execution`
 
 - Add the type per 3.1.
-- Move `requestId` / `parentRequestId` **off** `Request` onto `Initiator`. `Request` keeps
+- Move `requestId` / `parentRequestId` **off** `Request` onto `Execution`. `Request` keeps
   `upstreamRequestId` only (a wire-level fact about the caller).
 - AWS persists the initiator alongside the connect request in the DynamoDB socket row so `socketId`
   survives the round trip.
@@ -318,7 +318,7 @@ typed socket in the repo follow.
 - Rename `ServerRuntime` → `Engine`, `ServerRuntimeBase` → `EngineBase`. **Do not touch use sites.**
 - Add the new `ServerRuntime` per 3.2 and mint it at the seam in 2.7.
 - Move genuinely engine-scoped declarations to take `Engine` (2.8).
-- `Task.invoke` stamps `causedBy` / `rootExecutionId`.
+- `Task.invoke` stamps `causedBy` / `root`.
 
 ### Stage 5 — `ExecutionInterceptor`
 

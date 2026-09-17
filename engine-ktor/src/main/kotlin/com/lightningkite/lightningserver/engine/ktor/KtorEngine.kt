@@ -2,7 +2,6 @@
 
 package com.lightningkite.lightningserver.engine.ktor
 
-import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
@@ -17,8 +16,8 @@ import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawWebSocketPath
 import com.lightningkite.lightningserver.InternalLightningServerApi
-import com.lightningkite.lightningserver.runtime.Initiator
-import com.lightningkite.lightningserver.runtime.forExecution
+import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.runtime.execute
 import com.lightningkite.lightningserver.runtime.phase
 import com.lightningkite.lightningserver.runtime.didConnectWithMetrics
 import com.lightningkite.lightningserver.runtime.disconnectWithMetrics
@@ -253,11 +252,11 @@ public class KtorEngine(
 
                 // The socket's identity is minted once, here, and every phase below derives its own
                 // execution from it, so a socket stays one thing across five separate executions.
-                val connectInitiator = Initiator.WebSocket(
-                    executionId = identity.requestId,
+                val connectInitiator = Execution.WebSocket(
+                    id = identity.requestId,
                     socketId = identity.requestId,
                     path = request.path,
-                    phase = Initiator.WebSocket.Phase.Connect,
+                    phase = Execution.WebSocket.Phase.Connect,
                 )
 
                 // Check for direct execution capability - bypasses pub/sub overhead
@@ -299,7 +298,7 @@ public class KtorEngine(
                     // A directly-run socket is not phase-structured — the whole session runs in this
                     // one coroutine — so it is one execution, named by the socket it is.
                     directHandler.handleDirect(
-                        serverRuntime = this@KtorEngine.forExecution(connectInitiator),
+                        serverRuntime = this@KtorEngine.execute(connectInitiator),
                         request = request,
                         incoming = incomingChannel,
                         send = { frame ->
@@ -333,7 +332,7 @@ public class KtorEngine(
                         socketHandler.disconnectWithMetrics(
                             match.pathSpec,
                             this@KtorEngine,
-                            connectInitiator.phase(Initiator.WebSocket.Phase.Disconnect),
+                            connectInitiator.phase(Execution.WebSocket.Phase.Disconnect),
                             mid,
                             reason,
                         )
@@ -368,7 +367,7 @@ public class KtorEngine(
                         socketHandler.didConnectWithMetrics(
                             match.pathSpec,
                             this@KtorEngine,
-                            connectInitiator.phase(Initiator.WebSocket.Phase.Connected),
+                            connectInitiator.phase(Execution.WebSocket.Phase.Connected),
                             mid,
                         )
 
@@ -383,7 +382,7 @@ public class KtorEngine(
                             socketHandler.messageFromClientWithMetrics(
                                 match.pathSpec,
                                 this@KtorEngine,
-                                connectInitiator.phase(Initiator.WebSocket.Phase.ClientMessage),
+                                connectInitiator.phase(Execution.WebSocket.Phase.ClientMessage),
                                 mid,
                                 m,
                             )

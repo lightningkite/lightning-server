@@ -46,7 +46,7 @@ parameter through your code.
 
 You will also see `context(engine: Engine)` on parts of the API.  An `Engine` is the process-wide
 server — settings, serialization, telemetry, task dispatch — and a `ServerRuntime` is an engine
-running one execution, carrying an `Initiator` that says what started that execution.  Since every
+running one execution, carrying an `Execution` that says what started that execution.  Since every
 `ServerRuntime` is an `Engine`, anything declaring `context(Engine)` is callable from a handler body
 too; the distinction matters when you write your own declarations.  Take a `ServerRuntime` when the
 work is done on someone's behalf, and an `Engine` when it is not — boot, settings resolution, SDK

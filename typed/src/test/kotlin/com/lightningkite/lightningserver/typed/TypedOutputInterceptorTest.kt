@@ -63,8 +63,8 @@ class TypedOutputInterceptorTest {
         override suspend fun <T> outputProduced(request: Request<*>, serializer: KSerializer<T>, value: T) {
             Observed.seen.add(
                 Seen(
-                    runtime.initiator.executionId,
-                    runtime.initiator.causedBy,
+                    runtime.execution.id,
+                    runtime.execution.causedBy,
                     serializer.descriptor.serialName,
                     value,
                 )

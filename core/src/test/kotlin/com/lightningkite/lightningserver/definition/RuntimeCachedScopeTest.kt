@@ -4,10 +4,9 @@ import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.Engine
-import com.lightningkite.lightningserver.runtime.ExecutionCause
 import com.lightningkite.lightningserver.runtime.EngineBase
-import com.lightningkite.lightningserver.runtime.Initiator
-import com.lightningkite.lightningserver.runtime.forExecution
+import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.runtime.execute
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -23,7 +22,7 @@ private class BareEngine : EngineBase(EmptyServer.build()) {
         event: WebSocketSubscriptionMessage<PATH, T>,
     ): Nothing = throw NotImplementedError()
 
-    override suspend fun <T> Task<T>.invoke(input: T, cause: ExecutionCause?): Nothing =
+    override suspend fun <T> dispatchTask(task: Task<T>, input: T, from: Execution): Nothing =
         throw NotImplementedError()
 }
 
@@ -46,7 +45,7 @@ class RuntimeCachedScopeTest {
         val engine: Engine = BareEngine()
 
         with(engine) { cached() }
-        repeat(5) { with(engine.forExecution(Initiator.Direct(Uuid.random()))) { cached() } }
+        repeat(5) { with(engine.execute(Execution.Direct(Uuid.random()))) { cached() } }
 
         assertEquals(1, computations, "a process-wide value was recomputed per execution")
     }
@@ -58,7 +57,7 @@ class RuntimeCachedScopeTest {
         val engine: Engine = BareEngine()
 
         val fromEngine = with(engine) { cached() }
-        val fromExecution = with(engine.forExecution(Initiator.Direct(Uuid.random()))) { cached() }
+        val fromExecution = with(engine.execute(Execution.Direct(Uuid.random()))) { cached() }
 
         assertEquals(fromEngine, fromExecution)
         assertEquals(1, computations)

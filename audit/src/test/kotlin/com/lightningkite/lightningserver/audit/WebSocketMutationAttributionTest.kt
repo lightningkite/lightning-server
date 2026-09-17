@@ -20,16 +20,16 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.RawWebSocketPath
 import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.runtime.EngineBase
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ExecutionCause
 import com.lightningkite.lightningserver.runtime.Initiator
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.executeWithMetrics
-import com.lightningkite.lightningserver.runtime.forExecution
+import com.lightningkite.lightningserver.runtime.execute
 import com.lightningkite.lightningserver.runtime.invoke
 import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.runtime.phase
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
-import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.registerTable
 import com.lightningkite.lightningserver.websockets.MultiplexWebSocketHandler
@@ -492,7 +492,7 @@ private object TestServer : ServerBuilder() {
 private class ProbeEngine : EngineBase(TestServer.build()), ServerRuntime {
     override val serverId: String = "probe"
     override val serverVersion: String = "test"
-    override val initiator: Initiator = Initiator.Direct(Uuid.random())
+    override val execution: Initiator = Initiator.Direct(Uuid.random())
 
     override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(
         event: WebSocketSubscriptionMessage<PATH, T>,
@@ -516,11 +516,11 @@ private class ProbeEngine : EngineBase(TestServer.build()), ServerRuntime {
 
     private val queue = ArrayDeque<Queued>()
 
-    override suspend fun <T> Task<T>.invoke(input: T, cause: ExecutionCause?) {
+    override suspend fun <T> dispatchTask(task: Task<T>, input: T, from: Execution) {
         queue.addLast(
             Queued(
                 location = location.toString(),
-                cause = cause,
+                cause = from,
                 input = internalSerialization.json.encodeToString(serializer, input),
             )
         )
@@ -573,7 +573,7 @@ private class ProbeEngine : EngineBase(TestServer.build()), ServerRuntime {
         }
 
         suspend fun send(text: String) {
-            with(forExecution(initiator.phase(Initiator.WebSocket.Phase.ClientMessage))) {
+            with(execute(initiator.phase(Initiator.WebSocket.Phase.ClientMessage))) {
                 handler.messageFromClient(connection, WebSocketFrame.Text(text))
             }
         }
@@ -598,9 +598,9 @@ private class ProbeEngine : EngineBase(TestServer.build()), ServerRuntime {
             path = request.path,
             phase = Initiator.WebSocket.Phase.Connect,
         )
-        val storage = with(forExecution(initiator)) { intercepted.willConnect(request) }
+        val storage = with(execute(initiator)) { intercepted.willConnect(request) }
         return ProbeSocket(intercepted, request, initiator, storage).also {
-            with(forExecution(initiator.phase(Initiator.WebSocket.Phase.Connected))) {
+            with(execute(initiator.phase(Initiator.WebSocket.Phase.Connected))) {
                 intercepted.didConnect(it.connection)
             }
         }

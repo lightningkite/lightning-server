@@ -29,7 +29,7 @@ import kotlin.time.Clock
  * - Executing scheduled and startup tasks
  * - Handling WebSocket connections and subscriptions
  *
- * An engine is not running on anyone's behalf, and deliberately has no [Initiator]. Code that needs
+ * An engine is not running on anyone's behalf, and deliberately has no [Execution]. Code that needs
  * to know what started the work it is doing takes a [ServerRuntime] instead — one is minted per
  * execution, and is an engine plus that attribution.
  */
@@ -120,12 +120,12 @@ public interface Engine : SettingContext, Namespaced {
      * depends on the runtime implementation.
      *
      * @param input The input parameter for the task
-     * @param cause The execution launching this task, or null when nothing is launching it — boot,
+     * @param from The execution launching this task, or null when nothing is launching it — boot,
      *   or a manual invocation. Engines must carry it into the queued payload: a serverless engine's
      *   launching process is gone by the time the task runs, so parentage that is not serialized is
      *   parentage that does not exist.
      */
-    public suspend fun <T> Task<T>.invoke(input: T, cause: ExecutionCause?)
+    public suspend fun <T> dispatchTask(task: Task<T>, input: T, from: Execution)
 
     /**
      * Serializers module used for internal serialization.

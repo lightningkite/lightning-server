@@ -13,10 +13,9 @@ import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.QueryParameters
-import com.lightningkite.lightningserver.http.generateRequestId
-import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.runtime.Engine
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.handle
 import com.lightningkite.lightningserver.runtime.now
@@ -1062,8 +1061,9 @@ class BackupCodeEndpointsTest {
 
                 for (endpoint in listOf("reset-codes", "clear-codes")) {
                     val response = runBlocking {
+                        contextOf<TestRunner>()
                         serverRuntime.handle(
-                            HttpRequest<PathSpec>(
+                            HttpRequest(
                                 path = RawHttpEndpoint(asString = "/auth/backup/$endpoint", method = HttpMethod.POST),
                                 queryParameters = QueryParameters.EMPTY,
                                 headers = HttpHeaders(),
@@ -1071,7 +1071,7 @@ class BackupCodeEndpointsTest {
                                 protocol = "https",
                                 sourceIp = "203.0.113.7",
                             ),
-                            generateRequestId(),
+                            Execution.ID.generate(),
                         )
                     }
                     // Forbidden rather than Unauthorized is what AuthRequirement.assert raises for a
