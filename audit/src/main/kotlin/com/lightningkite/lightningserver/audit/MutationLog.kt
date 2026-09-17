@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.audit
 
-import com.lightningkite.lightningserver.runtime.Initiator
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.Table
 import com.lightningkite.services.database.insertOne

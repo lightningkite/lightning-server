@@ -3,16 +3,17 @@ package com.lightningkite.lightningserver.auth
 import com.lightningkite.lightningserver.data.get
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.HttpLogicalInterceptor
+import com.lightningkite.lightningserver.http.HttpInterceptor
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.logicalId
 import com.lightningkite.lightningserver.websockets.DelegatingWebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketConnection
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
-import com.lightningkite.lightningserver.websockets.WebSocketLogicalInterceptor
+import com.lightningkite.lightningserver.websockets.WebSocketInterceptor
 import kotlinx.coroutines.CancellationException
 import kotlin.time.TimeSource
 
@@ -35,10 +36,10 @@ import kotlin.time.TimeSource
  * masquerading as target" — or `anonymous` when the request carries no credentials.
  *
  * ## What gets a line
- * This is a [HttpLogicalInterceptor], so a multiplexed request such as `/meta/bulk` produces a
- * line per sub-request rather than one line for the batch, each carrying its own request ID and the
- * ID of the request that carried it. WebSocket connections are logged at open and close, including
- * the virtual sockets inside a multiplexed connection.
+ * A multiplexed request such as `/meta/bulk` produces a line per sub-request rather than one line for
+ * the batch, each carrying its own request ID and the ID of the request that carried it. WebSocket
+ * connections are logged at open and close, including the virtual sockets inside a multiplexed
+ * connection.
  *
  * ## Failures
  * HTTP lines are emitted after the handler returns, so they carry the outcome — including when the
@@ -46,7 +47,7 @@ import kotlin.time.TimeSource
  * cached per request, so naming the principal costs nothing when a handler resolves auth anyway, and
  * a resolution failure (e.g. a malformed token) is swallowed here so logging never breaks a request.
  */
-public class AccessLogInterceptor : HttpLogicalInterceptor, WebSocketLogicalInterceptor {
+public class AccessLogInterceptor : HttpInterceptor, WebSocketInterceptor {
     override val name: String = "AccessLog"
 
     context(runtime: ServerRuntime)
@@ -132,6 +133,6 @@ private suspend fun com.lightningkite.lightningserver.data.Request<*>.principalN
 context(runtime: ServerRuntime)
 private fun idSuffix(idLabel: String = "req"): String {
     val initiator = runtime.execution
-    val id = initiator.logicalId ?: initiator.id
+    val id = initiator.logicalId
     return initiator.causedBy?.takeIf { it != id }?.let { "[$idLabel $id of $it]" } ?: "[$idLabel $id]"
 }

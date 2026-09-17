@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.handle
+import com.lightningkite.lightningserver.runtime.isRoot
 import com.lightningkite.lightningserver.runtime.handleSubRequest
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.runtime.test.test
@@ -27,10 +28,9 @@ import kotlin.uuid.Uuid
 /**
  * `/meta/bulk` used to invoke each sub-request's handler directly, so sub-requests bypassed the
  * entire interceptor chain — access logging, auditing and rate limiting among them. N logical
- * requests executed while the pipeline saw one. These tests pin the fixed behaviour: a
- * [HttpLogicalInterceptor] observes every sub-request, a [HttpConnectionInterceptor] still observes
- * only the physical request, and each sub-request is independently attributable via its own
- * request ID.
+ * requests executed while the pipeline saw one. These tests pin the fixed behaviour: every
+ * [HttpInterceptor] observes every sub-request, one that guards on [isRoot] still observes only the
+ * physical request, and each sub-request is independently attributable via its own request ID.
  */
 class BulkInterceptorScopeTest {
 
@@ -55,7 +55,8 @@ class BulkInterceptorScopeTest {
         into.add(Seen("/" + request.path.pathSegments.toString(), initiator.id, initiator.causedBy))
     }
 
-    private inner class LogicalRecorder : HttpLogicalInterceptor {
+    /** Takes the default scope: every logical request, sub-requests included. */
+    private inner class LogicalRecorder : HttpInterceptor {
         override val name: String = "LogicalRecorder"
 
         context(runtime: ServerRuntime)
@@ -68,7 +69,8 @@ class BulkInterceptorScopeTest {
         }
     }
 
-    private inner class ConnectionRecorder : HttpConnectionInterceptor {
+    /** Narrows itself to the physical request the way CORS, gzip and security headers do. */
+    private inner class ConnectionRecorder : HttpInterceptor {
         override val name: String = "ConnectionRecorder"
 
         context(runtime: ServerRuntime)
@@ -76,6 +78,7 @@ class BulkInterceptorScopeTest {
             request: HttpRequest<*>,
             cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
         ): HttpResponse {
+            if (!runtime.execution.isRoot()) return cont(request)
             record(Observed.connection, request)
             return cont(request)
         }
@@ -145,13 +148,13 @@ class BulkInterceptorScopeTest {
     }
 
     @Test
-    fun `connection scope interceptor observes only the physical request`() = bulk(
+    fun `an isRoot-guarded interceptor observes only the physical request`() = bulk(
         """{"a":{"path":"/alpha","method":"GET"},"b":{"path":"/beta","method":"GET"}}"""
     ) {
         assertEquals(
             listOf("/meta/bulk"),
             Observed.connection.map { it.path },
-            "connection-scoped interceptors must not re-run per sub-request",
+            "an interceptor that guards on isRoot must not re-run per sub-request",
         )
     }
 

@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.http
 
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.isRoot
 
 /**
  * HTTP interceptor that adds baseline security headers to every response.
@@ -25,7 +26,7 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
  */
 public class SecurityHeadersInterceptor(
     private val hstsMaxAgeSeconds: Long = DEFAULT_HSTS_MAX_AGE_SECONDS,
-) : HttpConnectionInterceptor {
+) : HttpInterceptor {
     override val name: String = "SecurityHeaders"
 
     public companion object {
@@ -44,6 +45,10 @@ public class SecurityHeadersInterceptor(
         request: HttpRequest<*>,
         cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
     ): HttpResponse {
+        // These describe the physical response the browser receives. A sub-request's headers are data
+        // inside the carrying response's body, where a browser never reads them as headers at all.
+        if (!runtime.execution.isRoot()) return cont(request)
+
         val response = cont(request)
         val secure = request.protocol.equals("https", ignoreCase = true)
 

@@ -8,7 +8,7 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.pathing.*
-import com.lightningkite.lightningserver.runtime.Initiator
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.execute
 import com.lightningkite.lightningserver.runtime.serverRuntime

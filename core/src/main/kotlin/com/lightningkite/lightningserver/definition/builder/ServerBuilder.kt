@@ -88,12 +88,10 @@ public abstract class ServerBuilder : Extendable {
 
     private val executionInterceptors: ListRegistry<ExecutionInterceptor> = ListRegistry()
 
-    private val httpConnectionInterceptors: ListRegistry<HttpConnectionInterceptor> = ListRegistry()
-    private val httpLogicalInterceptors: ListRegistry<HttpLogicalInterceptor> = ListRegistry()
+    private val httpInterceptors: ListRegistry<HttpInterceptor> = ListRegistry()
     private val httpHandlers: PathSpecRegistry<MapRegistry<HttpMethod, HttpHandler<*>>> = PathSpecRegistry()
 
-    private val webSocketConnectionInterceptors: ListRegistry<WebSocketConnectionInterceptor> = ListRegistry()
-    private val webSocketLogicalInterceptors: ListRegistry<WebSocketLogicalInterceptor> = ListRegistry()
+    private val webSocketInterceptors: ListRegistry<WebSocketInterceptor> = ListRegistry()
     private val webSocketHandlers: PathSpecRegistry<WebSocketHandler<*, *>> = PathSpecRegistry()
     private val webSocketTopics: PathSpecRegistry<WebSocketTopic<*, *>> = PathSpecRegistry()
 
@@ -119,34 +117,19 @@ public abstract class ServerBuilder : Extendable {
     public fun <T : ExecutionInterceptor> install(interceptor: T): T =
         interceptor.also { executionInterceptors.register(it) }
 
-    @JvmName("installHttpConnectionInterceptor")
-    public fun <T : HttpConnectionInterceptor> install(interceptor: T): T =
-        interceptor.also { httpConnectionInterceptors.register(it) }
+    @JvmName("installHttpInterceptor")
+    public fun <T : HttpInterceptor> install(interceptor: T): T =
+        interceptor.also { httpInterceptors.register(it) }
 
-    @JvmName("installHttpLogicalInterceptor")
-    public fun <T : HttpLogicalInterceptor> install(interceptor: T): T =
-        interceptor.also { httpLogicalInterceptors.register(it) }
+    @JvmName("installWebSocketInterceptor")
+    public fun <T : WebSocketInterceptor> install(interceptor: T): T =
+        interceptor.also { webSocketInterceptors.register(it) }
 
-    @JvmName("installWebSocketConnectionInterceptor")
-    public fun <T : WebSocketConnectionInterceptor> install(interceptor: T): T =
-        interceptor.also { webSocketConnectionInterceptors.register(it) }
-
-    @JvmName("installWebSocketLogicalInterceptor")
-    public fun <T : WebSocketLogicalInterceptor> install(interceptor: T): T =
-        interceptor.also { webSocketLogicalInterceptors.register(it) }
-
-    @JvmName("installHttpAndWebSocketConnectionInterceptor")
-    public fun <T> install(interceptor: T): T where T : HttpConnectionInterceptor, T : WebSocketConnectionInterceptor =
+    @JvmName("installHttpAndWebSocketInterceptor")
+    public fun <T> install(interceptor: T): T where T : HttpInterceptor, T : WebSocketInterceptor =
         interceptor.also {
-            httpConnectionInterceptors.register(it)
-            webSocketConnectionInterceptors.register(it)
-        }
-
-    @JvmName("installHttpAndWebSocketLogicalInterceptor")
-    public fun <T> install(interceptor: T): T where T : HttpLogicalInterceptor, T : WebSocketLogicalInterceptor =
-        interceptor.also {
-            httpLogicalInterceptors.register(it)
-            webSocketLogicalInterceptors.register(it)
+            httpInterceptors.register(it)
+            webSocketInterceptors.register(it)
         }
 
     @JvmName("installTypedOutputInterceptor")
@@ -342,10 +325,8 @@ public abstract class ServerBuilder : Extendable {
             externalSerializersModule = externalSerialization,
             annotationValidators = annotationValidators,
             executionInterceptors = executionInterceptors.toSealedList(),
-            httpConnectionInterceptors = httpConnectionInterceptors.toSealedList(),
-            httpLogicalInterceptors = httpLogicalInterceptors.toSealedList(),
-            webSocketConnectionInterceptors = webSocketConnectionInterceptors.toSealedList(),
-            webSocketLogicalInterceptors = webSocketLogicalInterceptors.toSealedList(),
+            httpInterceptors = httpInterceptors.toSealedList(),
+            webSocketInterceptors = webSocketInterceptors.toSealedList(),
             typedOutputInterceptors = typedOutputInterceptors.toSealedList(),
             endpoints = buildSealedPathSpecMap {
                 for (path in httpHandlers.keys + webSocketHandlers.keys) {

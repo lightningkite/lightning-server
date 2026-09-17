@@ -4,18 +4,18 @@ import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.data.get
 import com.lightningkite.lightningserver.definition.Runtime
-import com.lightningkite.lightningserver.http.HttpLogicalInterceptor
+import com.lightningkite.lightningserver.http.HttpInterceptor
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.runtime.Initiator
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.websockets.DelegatingWebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketConnection
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
-import com.lightningkite.lightningserver.websockets.WebSocketLogicalInterceptor
+import com.lightningkite.lightningserver.websockets.WebSocketInterceptor
 import com.lightningkite.services.database.Table
 import com.lightningkite.services.database.modification
 import com.lightningkite.services.database.updateOneByIdIgnoringResult
@@ -49,7 +49,7 @@ private val logger = KotlinLogging.logger("com.lightningkite.lightningserver.aud
  */
 public class RequestRecordInterceptor(
     private val table: Runtime<Table<RequestRecord>>,
-) : HttpLogicalInterceptor, WebSocketLogicalInterceptor {
+) : HttpInterceptor, WebSocketInterceptor {
     override val name: String = "RequestRecord"
 
     context(runtime: ServerRuntime)

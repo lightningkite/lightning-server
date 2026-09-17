@@ -72,12 +72,9 @@ private suspend fun ServerRuntime.handleInExecution(request: HttpRequest<PathSpe
 
         val response = try {
             inExecution {
-                this@handleInExecution.server.compiledHttpConnectionInterceptors.intercept(request) { req ->
-                    @Suppress("UNCHECKED_CAST")
-                    val outcome = this@handleInExecution.dispatchLogicalRequest(req as HttpRequest<PathSpec>)
-                    errorType = outcome.errorType
-                    outcome.response
-                }
+                val outcome = this@handleInExecution.dispatchLogicalRequest(request)
+                errorType = outcome.errorType
+                outcome.response
             }
         } catch (e: Exception) {
             // Last-resort safety net. Exceptions thrown by an interceptor itself are now recovered
@@ -101,9 +98,9 @@ private suspend fun ServerRuntime.handleInExecution(request: HttpRequest<PathSpe
  * Handles one logical sub-request dispatched by a multiplexed request such as `/meta/bulk`.
  *
  * A multiplexed endpoint must route its sub-requests through this rather than invoking the matched
- * handler directly, or the sub-requests bypass every [HttpLogicalInterceptor] — access logging,
- * auditing and rate limiting among them — and execute unobserved. [HttpConnectionInterceptor]s are
- * deliberately not re-run: they already ran for the physical request that carried this one.
+ * handler directly, or the sub-requests bypass every [HttpInterceptor] — access logging, auditing and
+ * rate limiting among them — and execute unobserved. The chain tells a sub-request apart from the
+ * request that carried it through [isRoot].
  *
  * The sub-request's initiator is derived here rather than supplied, so it cannot be got wrong: it
  * gets its own execution id, parented to the request that carried it. A sub-request that reused the
@@ -152,7 +149,7 @@ private suspend fun ServerRuntime.dispatchLogicalRequest(request: HttpRequest<Pa
         }
     }
 
-    val response = server.compiledHttpLogicalInterceptors.intercept(request) { req ->
+    val response = server.compiledHttpInterceptors.intercept(request) { req ->
         // Access logging (with the resolved principal) is provided by the opt-in AccessLogInterceptor in
         // the auth module, not hardcoded here — so it can name the principal without core depending on auth.
         // Map handler/route/compression exceptions to responses in-place so the surrounding

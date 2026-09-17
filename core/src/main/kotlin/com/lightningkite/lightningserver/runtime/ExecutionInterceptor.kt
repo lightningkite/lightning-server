@@ -25,7 +25,7 @@ package com.lightningkite.lightningserver.runtime
  *             ): T {
  *                 val start = TimeSource.Monotonic.markNow()
  *                 try { return with(runtime) { cont() } }
- *                 finally { println("${runtime.initiator} took ${start.elapsedNow()}") }
+ *                 finally { println("${runtime.Execution} took ${start.elapsedNow()}") }
  *             }
  *         })
  *     }

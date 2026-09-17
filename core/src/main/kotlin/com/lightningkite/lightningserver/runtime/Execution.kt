@@ -158,12 +158,29 @@ public sealed interface Execution {
     ) : Execution
 }
 
-public fun Execution.isRoot(): Boolean = id == rootExecution
-
+/**
+ * The identity of the logical unit of work this execution belongs to: the socket for a
+ * [Execution.WebSocket], whose five phases are five executions of one connection, and the execution
+ * itself for everything else.
+ */
 public val Execution.logicalId: Execution.ID get() = when (this) {
     is Execution.WebSocket -> socketId
     else -> id
 }
+
+/**
+ * Whether this execution is the outermost one — nothing the server is running carried it.
+ *
+ * True for a request a client sent, a socket a client opened (in any of its phases), a schedule tick,
+ * a startup or pre-deploy task. False for anything dispatched inside something else: a `/meta/bulk`
+ * sub-request, a virtual socket multiplexed inside a real one, a task launched by a request.
+ *
+ * Interceptors use this when their concern belongs to the connection rather than to the work, since
+ * the interceptor chains run for every logical request and socket.
+ */
+// Compares logicalId, not id: a socket's later phases each have their own id parented to the connect,
+// so id == rootExecution would report a physical socket's messageFromClient as non-root.
+public fun Execution.isRoot(): Boolean = logicalId == rootExecution
 
 /**
  * The initiator of a logical request dispatched inside this one, such as a `/meta/bulk` sub-request.

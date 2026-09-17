@@ -191,7 +191,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                     // interceptor chain. Taking the raw handler let every multiplexed socket bypass access logging and
                     // rate limiting, exactly as bulk sub-requests once bypassed the HTTP chain.
                     @Suppress("UNCHECKED_CAST")
-                    val otherHandler = serverRuntime.server.compiledWebSocketLogicalInterceptors
+                    val otherHandler = serverRuntime.server.compiledWebSocketInterceptors
                         .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
                     val r = connection.request.subConnection<PathSpec>(
                         path = RawWebSocketPath<PathSpec>(PathSegments.parse(message.path!!), match),
@@ -242,7 +242,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                         ?: throw NotFoundException("No open multiplex channel ${message.channel} to end.")
                     val match = info.request.path.match
                     @Suppress("UNCHECKED_CAST")
-                    val otherHandler = serverRuntime.server.compiledWebSocketLogicalInterceptors
+                    val otherHandler = serverRuntime.server.compiledWebSocketInterceptors
                         .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
                     connection.withWrapped(serverRuntime, otherHandler, channel) {
                         otherHandler.disconnectWithMetrics(
@@ -271,7 +271,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                         ?: throw NotFoundException("No open multiplex channel ${message.channel} to deliver data to.")
                     val match = info.request.path.match
                     @Suppress("UNCHECKED_CAST")
-                    val otherHandler = serverRuntime.server.compiledWebSocketLogicalInterceptors
+                    val otherHandler = serverRuntime.server.compiledWebSocketInterceptors
                         .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
                     val textFrame = WebSocketFrame.Text(message.data!!)
                     connection.withWrapped(
@@ -302,7 +302,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
             connection.currentState.map[channel]?.let { info ->
                 val match = info.request.path.match
                 @Suppress("UNCHECKED_CAST")
-                val otherHandler = serverRuntime.server.compiledWebSocketLogicalInterceptors
+                val otherHandler = serverRuntime.server.compiledWebSocketInterceptors
                     .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
                 connection.withWrapped(serverRuntime, otherHandler, channel) {
                     otherHandler.disconnectWithMetrics(
@@ -327,7 +327,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
             if (info.topics.contains(topic.path())) {
                 val match = info.request.path.match
                 @Suppress("UNCHECKED_CAST")
-                val otherHandler = serverRuntime.server.compiledWebSocketLogicalInterceptors
+                val otherHandler = serverRuntime.server.compiledWebSocketInterceptors
                     .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
                 connection.withWrapped(serverRuntime, otherHandler, channel) {
                     otherHandler.messageFromSubscriptionWithMetrics(
@@ -350,7 +350,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
         connection.currentState.map.entries.forEach { (channel, info) ->
             val match = info.request.path.match
             @Suppress("UNCHECKED_CAST")
-            val otherHandler = serverRuntime.server.compiledWebSocketLogicalInterceptors
+            val otherHandler = serverRuntime.server.compiledWebSocketInterceptors
                 .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
             connection.withWrapped(serverRuntime, otherHandler, channel) {
                 otherHandler.disconnectWithMetrics(

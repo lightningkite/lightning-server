@@ -1,11 +1,12 @@
 package com.lightningkite.lightningserver.compression
 
 import com.lightningkite.lightningserver.http.HttpHeader
-import com.lightningkite.lightningserver.http.HttpConnectionInterceptor
+import com.lightningkite.lightningserver.http.HttpInterceptor
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.gzip
+import com.lightningkite.lightningserver.runtime.isRoot
 import com.lightningkite.services.data.AbstractSuspendingSink
 import com.lightningkite.services.data.AbstractSuspendingSource
 import com.lightningkite.services.data.Data
@@ -26,14 +27,17 @@ import kotlin.use
 /** Staging array size for moving bytes between a [Buffer] and a [java.io.OutputStream]. */
 private const val COPY_CHUNK: Int = 8 * 1024
 
-// Connection-scoped: compression applies to the physical response body. Re-running it per logical
-// request inside a multiplexed response would double-encode.
-public class GzipInterceptor: HttpConnectionInterceptor {
+public class GzipInterceptor: HttpInterceptor {
     context(runtime: ServerRuntime)
     override suspend fun intercept(
         request: HttpRequest<*>,
         cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse
     ): HttpResponse {
+        // Compression applies to the physical response body. A sub-request's body is embedded in the
+        // carrying response, which is itself compressed on the way out, so encoding here would
+        // double-encode it.
+        if (!runtime.execution.isRoot()) return cont(request)
+
         val result = cont(request)
 
         val acceptedEncodings = request.headers.getMany(HttpHeader.AcceptEncoding)

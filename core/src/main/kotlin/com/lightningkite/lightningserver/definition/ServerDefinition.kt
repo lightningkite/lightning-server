@@ -40,10 +40,8 @@ public data class ServerDefinition(
 
         public val endpoints: PathSpecMap<ServerPathEndpoints>,
         public val executionInterceptors: List<ExecutionInterceptor>,
-        public val httpConnectionInterceptors: List<HttpConnectionInterceptor>,
-        public val httpLogicalInterceptors: List<HttpLogicalInterceptor>,
-        public val webSocketConnectionInterceptors: List<WebSocketConnectionInterceptor>,
-        public val webSocketLogicalInterceptors: List<WebSocketLogicalInterceptor>,
+        public val httpInterceptors: List<HttpInterceptor>,
+        public val webSocketInterceptors: List<WebSocketInterceptor>,
         public val typedOutputInterceptors: List<TypedOutputInterceptor>,
         public val exceptionHandler: ExceptionHttpHandler = DefaultExceptionHttpHandler,
 
@@ -77,33 +75,22 @@ public data class ServerDefinition(
     /** Everything that wants to hear about authentication events. Empty unless a module installs one. */
     public val compiledExecutionInterceptors: ExecutionInterceptor by lazy { executionInterceptors.compileAndInstrument() }
 
-    /** Interceptors wrapping the whole physical request. See [HttpConnectionInterceptor]. */
-    public val httpConnectionInterceptors: List<HttpConnectionInterceptor> get() = flattened.httpConnectionInterceptors
-    public val compiledHttpConnectionInterceptors: HttpInterceptor by lazy { httpConnectionInterceptors.compileAndInstrument() }
+    /** Interceptors wrapping every logical request, sub-requests included. See [HttpInterceptor]. */
+    public val httpInterceptors: List<HttpInterceptor> get() = flattened.httpInterceptors
+    public val compiledHttpInterceptors: HttpInterceptor by lazy { httpInterceptors.compileAndInstrument() }
 
-    /** Interceptors wrapping each logical request, sub-requests included. See [HttpLogicalInterceptor]. */
-    public val httpLogicalInterceptors: List<HttpLogicalInterceptor> get() = flattened.httpLogicalInterceptors
-    public val compiledHttpLogicalInterceptors: HttpInterceptor by lazy { httpLogicalInterceptors.compileAndInstrument() }
-    /** Interceptors wrapping the physical socket. See [WebSocketConnectionInterceptor]. */
-    public val webSocketConnectionInterceptors: List<WebSocketConnectionInterceptor> get() = flattened.webSocketConnectionInterceptors
-    public val compiledWebSocketConnectionInterceptors: WebSocketInterceptor by lazy { webSocketConnectionInterceptors.compileAndInstrument() }
-
-    /** Interceptors wrapping every logical socket, virtual ones included. See [WebSocketLogicalInterceptor]. */
-    public val webSocketLogicalInterceptors: List<WebSocketLogicalInterceptor> get() = flattened.webSocketLogicalInterceptors
-    public val compiledWebSocketLogicalInterceptors: WebSocketInterceptor by lazy { webSocketLogicalInterceptors.compileAndInstrument() }
+    /** Interceptors wrapping every logical socket, virtual ones included. See [WebSocketInterceptor]. */
+    public val webSocketInterceptors: List<WebSocketInterceptor> get() = flattened.webSocketInterceptors
+    public val compiledWebSocketInterceptors: WebSocketInterceptor by lazy { webSocketInterceptors.compileAndInstrument() }
 
     /**
-     * Wraps a handler for a socket a client just opened, applying both chains in the right order:
-     * connection-scoped outside, logical-scoped inside.
-     *
-     * The physical socket is itself a logical socket, so it gets both. A virtual socket multiplexed
-     * inside it gets only [compiledWebSocketLogicalInterceptors] — the connection-scoped decisions were
-     * already made about the one real socket carrying it.
+     * Wraps a handler for a socket a client just opened. The same chain wraps a virtual socket
+     * multiplexed inside it; see [WebSocketInterceptor] for how an interceptor narrows itself to the
+     * physical connection.
      */
     public fun <PATH : PathSpec, T> interceptIncomingSocket(
         handler: WebSocketHandler<PATH, T>,
-    ): WebSocketHandler<PATH, T> = compiledWebSocketConnectionInterceptors
-        .intercept(compiledWebSocketLogicalInterceptors.intercept(handler))
+    ): WebSocketHandler<PATH, T> = compiledWebSocketInterceptors.intercept(handler)
     /**
      * Observers of every typed value the server sends, applied before serialization. See
      * [TypedOutputInterceptor]. A flat list rather than a compiled chain: these observe, they do not
@@ -137,10 +124,8 @@ public data class ServerDefinition(
         externalSerializersModule = Runtime.Cached(externalSerializersModule),
         annotationValidators = Runtime.Cached(annotationValidators),
         executionInterceptors = executionInterceptors.toSealedList(),
-        httpConnectionInterceptors = httpConnectionInterceptors.toSealedList(),
-        httpLogicalInterceptors = httpLogicalInterceptors.toSealedList(),
-        webSocketConnectionInterceptors = webSocketConnectionInterceptors.toSealedList(),
-        webSocketLogicalInterceptors = webSocketLogicalInterceptors.toSealedList(),
+        httpInterceptors = httpInterceptors.toSealedList(),
+        webSocketInterceptors = webSocketInterceptors.toSealedList(),
         typedOutputInterceptors = typedOutputInterceptors.toSealedList(),
         endpoints = endpoints.toSealedPathSpecMap(),
         schedules = schedules.toSealedMap(),
@@ -202,10 +187,8 @@ public data class ServerDefinition(
             externalSerializersModule = { flattenedModuleItems.fold(thisLayer.externalSerializersModule()) { acc, module -> acc + module.externalSerializersModule() } },
             annotationValidators = { flattenedModuleItems.fold(thisLayer.annotationValidators()) { acc, module -> acc + module.annotationValidators() } },
             executionInterceptors = flattenList { it.executionInterceptors },
-            httpConnectionInterceptors = flattenList { it.httpConnectionInterceptors },
-            httpLogicalInterceptors = flattenList { it.httpLogicalInterceptors },
-            webSocketConnectionInterceptors = flattenList { it.webSocketConnectionInterceptors },
-            webSocketLogicalInterceptors = flattenList { it.webSocketLogicalInterceptors },
+            httpInterceptors = flattenList { it.httpInterceptors },
+            webSocketInterceptors = flattenList { it.webSocketInterceptors },
             typedOutputInterceptors = flattenList { it.typedOutputInterceptors },
             endpoints = buildPathSpecMap { // We want to be able to override existing entries here, but we'll have to check for duplicate registration manually.
                 putAll(thisLayer.endpoints)

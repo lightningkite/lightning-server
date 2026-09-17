@@ -5,13 +5,17 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.instrument
 
 /**
- * Shared contract for WebSocket interceptors.
+ * Wraps every logical socket: the one the client opened, and each virtual socket multiplexed inside
+ * it. An implementation must therefore tolerate wrapping several handlers within one physical
+ * connection.
  *
- * Not installable on its own: an interceptor is either a [WebSocketConnectionInterceptor] or a
- * [WebSocketLogicalInterceptor], and which one it is decides whether it sees virtual sockets. This
- * mirrors the [com.lightningkite.lightningserver.http.HttpConnectionInterceptor] /
- * [com.lightningkite.lightningserver.http.HttpLogicalInterceptor] split on the HTTP side, for the
- * same reason: multiplexing means one physical connection can carry many logical ones.
+ * A concern tied to the connection itself — the origin check, transport-level policy — narrows itself
+ * with [com.lightningkite.lightningserver.runtime.isRoot], which answers the same for all five phases
+ * of one socket:
+ *
+ * ```kotlin
+ * if (!serverRuntime.execution.isRoot()) return wrapped.willConnect(request)
+ * ```
  */
 public interface WebSocketInterceptor {
     public val name: String get() = this::class.simpleName ?: "anonymous"
@@ -20,43 +24,12 @@ public interface WebSocketInterceptor {
 
     /**
      * The compiled chain for "nothing installed" — it returns the handler untouched.
-     *
-     * Chain machinery, not something to install; a no-op of either kind would only cost a span.
      */
     public object None : WebSocketInterceptor {
         override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> =
             handler
     }
 }
-
-/**
- * An interceptor that wraps the physical WebSocket connection, once per socket the client opened.
- *
- * Correct for concerns tied to the connection itself — the origin check, transport-level policy —
- * where running again for each virtual socket inside a multiplexed connection would repeat a decision
- * that was already made about the one real socket.
- *
- * @see WebSocketLogicalInterceptor for the per-logical-socket counterpart.
- */
-public interface WebSocketConnectionInterceptor : WebSocketInterceptor
-
-/**
- * An interceptor that wraps every logical socket: the one the client opened, and each virtual socket
- * multiplexed inside it.
- *
- * Correct for concerns that describe what is actually being done — access logging, auditing, rate
- * limiting — where seeing only the physical connection would report a single socket no matter how
- * many independent subscriptions were running over it.
- *
- * An implementation must tolerate wrapping several handlers within one physical connection, and
- * should attribute its work to the socket's own
- * [com.lightningkite.lightningserver.runtime.Execution.WebSocket.socketId] rather than assuming one
- * socket per client.
- *
- * @see WebSocketConnectionInterceptor for the per-physical-connection counterpart.
- */
-public interface WebSocketLogicalInterceptor : WebSocketInterceptor
-
 
 /** One link of a compiled chain, wrapping every phase of [this] in its own instrumentation span. */
 private fun <PATH : PathSpec, T> WebSocketHandler<PATH, T>.instrumented(name: String): WebSocketHandler<PATH, T> {
@@ -108,10 +81,6 @@ private fun composeLinks(outer: WebSocketInterceptor, inner: WebSocketIntercepto
  * The first interceptor in the list is outermost, so it sees a connection first and wraps everything
  * the rest of the chain wrapped. [WebSocketInterceptor.None] entries are dropped rather than wrapped,
  * since a chain link around a pass-through only costs a span.
- *
- * Accepts any list of interceptors so the same machinery serves both the connection-scoped and the
- * logical-socket-scoped chain; which interceptors reach which chain is settled at installation by
- * their type.
  */
 internal fun List<WebSocketInterceptor>.compileAndInstrument(): WebSocketInterceptor {
     val effective = filter { it !== WebSocketInterceptor.None }

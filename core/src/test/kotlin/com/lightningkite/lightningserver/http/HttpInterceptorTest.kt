@@ -23,7 +23,7 @@ class HttpInterceptorTest {
         object : ServerBuilder() {
             init {
                 registerBasicMediaTypeCoders()
-                install(HttpConnectionInterceptor { request, cont -> cont(request) })
+                install(HttpInterceptor { request, cont -> cont(request) })
             }
 
             val endpoint = path.path("test").get bind HttpHandler {
@@ -43,7 +43,7 @@ class HttpInterceptorTest {
     @Test
     fun `HttpInterceptor can modify request before passing through`() {
         // Interceptor that adds a custom header to all requests
-        val headerAddingInterceptor = HttpConnectionInterceptor { request, cont ->
+        val headerAddingInterceptor = HttpInterceptor { request, cont ->
             val modifiedRequest = request.copy(
                 headers = request.headers.copy {
                     add("X-Added-Header", "intercepted")
@@ -76,7 +76,7 @@ class HttpInterceptorTest {
     @Test
     fun `HttpInterceptor can modify response after continuation`() {
         // Interceptor that adds a header to all responses
-        val responseModifyingInterceptor = HttpConnectionInterceptor { request, cont ->
+        val responseModifyingInterceptor = HttpInterceptor { request, cont ->
             val response = cont(request)
             response.copy(
                 headers = response.headers.copy {
@@ -108,7 +108,7 @@ class HttpInterceptorTest {
     @Test
     fun `HttpInterceptor can short-circuit and return early response`() {
         // Interceptor that blocks requests with certain header
-        val blockingInterceptor = HttpConnectionInterceptor { request, cont ->
+        val blockingInterceptor = HttpInterceptor { request, cont ->
             if (request.headers["X-Block"]?.root == "true") {
                 HttpResponse(
                     status = HttpStatus.Forbidden,
@@ -152,7 +152,7 @@ class HttpInterceptorTest {
     fun `Multiple interceptors execute in installation order`() {
         val executionOrder = mutableListOf<String>()
 
-        val firstInterceptor = object : HttpConnectionInterceptor {
+        val firstInterceptor = object : HttpInterceptor {
             override val name = "FirstInterceptor"
 
             context(runtime: ServerRuntime)
@@ -167,7 +167,7 @@ class HttpInterceptorTest {
             }
         }
 
-        val secondInterceptor = object : HttpConnectionInterceptor {
+        val secondInterceptor = object : HttpInterceptor {
             override val name = "SecondInterceptor"
 
             context(runtime: ServerRuntime)
@@ -211,7 +211,7 @@ class HttpInterceptorTest {
 
     @Test
     fun `HttpInterceptor default name returns class name or anonymous`() {
-        val namedInterceptor = object : HttpConnectionInterceptor {
+        val namedInterceptor = object : HttpInterceptor {
             context(runtime: ServerRuntime)
             override suspend fun intercept(
                 request: HttpRequest<*>,
@@ -235,7 +235,7 @@ class HttpInterceptorTest {
     @Test
     fun `compileAndInstrument with single interceptor works`() {
         var called = false
-        val singleInterceptor = HttpConnectionInterceptor { request, cont ->
+        val singleInterceptor = HttpInterceptor { request, cont ->
             called = true
             cont(request)
         }
@@ -262,8 +262,8 @@ class HttpInterceptorTest {
 
     @Test
     fun `HttpInterceptor lambda syntax works correctly`() {
-        // Tests the fun interface syntax: HttpConnectionInterceptor { request, cont -> ... }
-        val lambdaInterceptor = HttpConnectionInterceptor { request, cont ->
+        // Tests the fun interface syntax: HttpInterceptor { request, cont -> ... }
+        val lambdaInterceptor = HttpInterceptor { request, cont ->
             val response = cont(request)
             response.copy(
                 headers = response.headers.copy {

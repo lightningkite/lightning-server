@@ -252,7 +252,7 @@ class ServerDefinitionTest {
 
     @Test
     fun `http interceptors are collected from server`() {
-        val interceptor = HttpConnectionInterceptor { request, cont ->
+        val interceptor = HttpInterceptor { request, cont ->
             cont(request)
         }
 
@@ -268,15 +268,15 @@ class ServerDefinitionTest {
 
         val definition = server.build()
 
-        assertEquals(1, definition.httpConnectionInterceptors.size)
-        assertTrue(definition.httpConnectionInterceptors.contains(interceptor))
+        assertEquals(1, definition.httpInterceptors.size)
+        assertTrue(definition.httpInterceptors.contains(interceptor))
     }
 
     @Test
     fun `multiple interceptors preserve order`() {
-        val interceptor1 = HttpConnectionInterceptor { request, cont -> cont(request) }
-        val interceptor2 = HttpConnectionInterceptor { request, cont -> cont(request) }
-        val interceptor3 = HttpConnectionInterceptor { request, cont -> cont(request) }
+        val interceptor1 = HttpInterceptor { request, cont -> cont(request) }
+        val interceptor2 = HttpInterceptor { request, cont -> cont(request) }
+        val interceptor3 = HttpInterceptor { request, cont -> cont(request) }
 
         val server = object : ServerBuilder() {
             init {
@@ -292,17 +292,17 @@ class ServerDefinitionTest {
 
         val definition = server.build()
 
-        assertEquals(3, definition.httpConnectionInterceptors.size)
+        assertEquals(3, definition.httpInterceptors.size)
         // Interceptors should be in same order as installation
-        assertEquals(interceptor1, definition.httpConnectionInterceptors[0])
-        assertEquals(interceptor2, definition.httpConnectionInterceptors[1])
-        assertEquals(interceptor3, definition.httpConnectionInterceptors[2])
+        assertEquals(interceptor1, definition.httpInterceptors[0])
+        assertEquals(interceptor2, definition.httpInterceptors[1])
+        assertEquals(interceptor3, definition.httpInterceptors[2])
     }
 
     @Test
     fun `interceptors from modules are combined`() {
-        val parentInterceptor = HttpConnectionInterceptor { request, cont -> cont(request) }
-        val childInterceptor = HttpConnectionInterceptor { request, cont -> cont(request) }
+        val parentInterceptor = HttpInterceptor { request, cont -> cont(request) }
+        val childInterceptor = HttpInterceptor { request, cont -> cont(request) }
 
         val childModule = object : ServerBuilder() {
             init {
@@ -325,9 +325,9 @@ class ServerDefinitionTest {
         val definition = parentServer.build()
 
         // Both interceptors should be present
-        assertEquals(2, definition.httpConnectionInterceptors.size)
-        assertTrue(definition.httpConnectionInterceptors.contains(parentInterceptor))
-        assertTrue(definition.httpConnectionInterceptors.contains(childInterceptor))
+        assertEquals(2, definition.httpInterceptors.size)
+        assertTrue(definition.httpInterceptors.contains(parentInterceptor))
+        assertTrue(definition.httpInterceptors.contains(childInterceptor))
     }
 
     // ==================== Task Registration Tests ====================
@@ -562,7 +562,7 @@ class ServerDefinitionTest {
     // ==================== Compiled Interceptor Tests ====================
 
     @Test
-    fun `compiledHttpConnectionInterceptors is lazily initialized`() {
+    fun `compiledHttpInterceptors is lazily initialized`() {
         val server = object : ServerBuilder() {
             val root = path.get bind HttpHandler<PathSpec0> {
                 HttpResponse(status = HttpStatus.OK)
@@ -572,12 +572,12 @@ class ServerDefinitionTest {
         val definition = server.build()
 
         // Just accessing should work without throwing
-        val compiled = definition.compiledHttpConnectionInterceptors
+        val compiled = definition.compiledHttpInterceptors
         assertNotNull(compiled)
     }
 
     @Test
-    fun `compiled webSocket interceptor chains are lazily initialized`() {
+    fun `compiledWebSocketInterceptors is lazily initialized`() {
         val server = object : ServerBuilder() {
             val root = path.get bind HttpHandler<PathSpec0> {
                 HttpResponse(status = HttpStatus.OK)
@@ -587,8 +587,7 @@ class ServerDefinitionTest {
         val definition = server.build()
 
         // Just accessing should work without throwing
-        assertNotNull(definition.compiledWebSocketConnectionInterceptors)
-        assertNotNull(definition.compiledWebSocketLogicalInterceptors)
+        assertNotNull(definition.compiledWebSocketInterceptors)
     }
 
     // ==================== Server Definition entries Sequence Tests ====================

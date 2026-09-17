@@ -8,7 +8,7 @@ import com.lightningkite.lightningserver.definition.StartupTask
 import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
-import com.lightningkite.lightningserver.http.HttpConnectionInterceptor
+import com.lightningkite.lightningserver.http.HttpInterceptor
 import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.get
@@ -132,7 +132,7 @@ class ExecutionInterceptorTest {
             init {
                 registerBasicMediaTypeCoders()
                 install(Marker("execution", log))
-                install(HttpConnectionInterceptor { request, cont ->
+                install(HttpInterceptor { request, cont ->
                     log.add("http in")
                     try {
                         cont(request)
