@@ -13,7 +13,7 @@ import org.intellij.lang.annotations.Language
  *
  * Architecture:
  * - An **Application Load Balancer** in public subnets terminates TLS using an ACM certificate
- *   (DNS-validated via Route53) and forwards HTTP to the application on [appPort].
+ *   (DNS-validated via Route53) and forwards HTTP to the application on 8080.
  * - The application runs on instances in **private subnets** inside an **Auto Scaling Group**,
  *   reachable only from the ALB. There is no public IP and no SSH key — administrative access is
  *   via SSM Session Manager.
@@ -136,11 +136,11 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
     public open val albAccessLogRetentionDays: Int get() = 90
 
     /**
-     * Whether to attach an AWS WAFv2 web ACL (AWS managed common + known-bad-inputs rule sets) to the ALB.
-     * Off by default — WAF adds hourly + per-request cost and can block legitimate traffic if rules are tuned
+     * Rules to attach to an AWS WAFv2 web ACL attached to the ALB. These MUST be valid 'aws_wafv2_web_acl' 'rule' objects.
+     * If empty, no WAF will be created — WAF adds hourly + per-request cost and can block legitimate traffic if rules are tuned
      * too aggressively, so it's an opt-in.
      */
-    public open val wafEnabled: Boolean get() = false
+    public open val wafRules: List<JsonObject> get() = emptyList()
 
     /**
      * Salt folded into the golden-AMI version. Bump this to force a re-bake even when the install
@@ -270,8 +270,8 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
                 "security_group_id" - expression("aws_security_group.alb.id")
                 "referenced_security_group_id" - expression("aws_security_group.instance.id")
                 "ip_protocol" - "tcp"
-                "from_port" - appPort
-                "to_port" - appPort
+                "from_port" - 8080
+                "to_port" - 8080
             }
 
             // Instance ingress from the ALB only, egress anywhere (for S3/NAT).
@@ -279,8 +279,8 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
                 "security_group_id" - expression("aws_security_group.instance.id")
                 "referenced_security_group_id" - expression("aws_security_group.alb.id")
                 "ip_protocol" - "tcp"
-                "from_port" - appPort
-                "to_port" - appPort
+                "from_port" - 8080
+                "to_port" - 8080
             }
             "resource.aws_vpc_security_group_egress_rule.instance_outbound" {
                 "security_group_id" - expression("aws_security_group.instance.id")
@@ -364,6 +364,15 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
                 "name" - "$projectPrefix-imagebuilder-profile"
                 "role" - expression("aws_iam_role.imagebuilder.name")
             }
+            // Build logs go to our own group so retention and encryption are managed here, instead of
+            // Image Builder auto-creating a never-expiring one. The name must stay under /aws/imagebuilder/:
+            // anything else requires an execution role, and EC2InstanceProfileForImageBuilder only grants
+            // the build instance log writes there.
+            "resource.aws_cloudwatch_log_group.imagebuilder" {
+                "name" - "/aws/imagebuilder/$projectPrefix"
+                "retention_in_days" - logRetentionDays
+                sharedKmsKeyArn?.let { "kms_key_id" - it }
+            }
             "resource.aws_s3_object.image_data" {
                 "bucket" - expression("aws_s3_bucket.deployment.id")
                 "key" - $$"imagebuilder/component-${local.image_data_version}.yaml"
@@ -438,6 +447,9 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
                 "image_tests_configuration" {
                     "image_tests_enabled" - false
                 }
+                "logging_configuration" {
+                    "log_group_name" - expression("aws_cloudwatch_log_group.imagebuilder.name")
+                }
             }
 
             // Data script
@@ -503,33 +515,57 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
             // security updates arrive as a new package name (linux-image-X-generic) pulled in by a
             // dependency change on the metapackage. Without it they are silently held back.
             appendLine("$apt -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold upgrade --with-new-pkgs")
-            appendLine("$apt install -y openjdk-17-jre-headless openssl curl gnupg ca-certificates unzip")
+            appendLine("$apt install -y openjdk-${javaVersion.name}-jre-headless openssl curl gnupg ca-certificates unzip")
             if (additionalPackages.isNotEmpty()) {
                 appendLine("$apt install -y ${additionalPackages.joinToString(" ") { it.shellEscape() }}")
             }
             appendLine("$apt -y autoremove")
+
             // The AWS CLI and the CloudWatch agent binary are installed by AWS-managed components
             // (see imageManagedComponents) that run before this one; we only write the agent config here.
             cloudwatchAgentConfig()
+
             ssm()
+
             // Baked as an enabled unit only; the ASG's instances allocate the file when they boot,
             // keeping it out of the AMI snapshot.
             swap(activateNow = false)
+
             systemD()
+
             // Bake on-box agents (e.g. the OTel collector) into the AMI. They install + `enable`
             // here but do not start; the ASG starts them at boot, where the instance role can fetch
             // any secrets they need from SSM.
             runProvisioningFragments()
+
             // The redeploy script reads the bucket + region from deploy.env written at boot, and
             // validates the new build against the local liveness endpoint before declaring success.
             instanceRedeployScript(
                 """if [ -f /etc/lightning-server/deploy.env ]; then . /etc/lightning-server/deploy.env; fi
 BUCKET="${'$'}DEPLOYMENT_BUCKET"
 REGION="${'$'}AWS_REGION_NAME"""",
-                localHealthUrl = "http://localhost:$appPort$healthCheckPath",
+                localHealthUrl = "http://localhost:8080$healthCheckPath",
             )
-            instanceUpdateScript(localHealthUrl = "http://localhost:$appPort$healthCheckPath")
-            if (instanceFiles.isNotEmpty() || instanceFilesRaw.isNotEmpty()) instanceFiles()
+
+            instanceUpdateScript(localHealthUrl = "http://localhost:8080$healthCheckPath")
+
+            if (instanceFiles.isNotEmpty() || instanceFilesRaw.isNotEmpty())
+                instanceFiles()
+
+            // Custom Image Install scripts
+            if (customInstallScripts.isNotEmpty() || customInstallScriptsRaw.isNotEmpty()) {
+                appendLine("echo \"[INFO] Running Custom Image Install Init Scripts at \$(date)\"")
+                appendLine("# === Custom Image Install Scripts ===")
+                for (script in customInstallScripts) {
+                    appendLine(script.readString().terraformTemplateEscape())
+                    appendLine()
+                }
+                for (script in customInstallScriptsRaw) {
+                    appendLine(script.terraformTemplateEscape())
+                    appendLine()
+                }
+            }
+
             // Enable (but do not start) the service so it auto-starts after the boot-time deploy.
             appendLine("systemctl enable $projectPrefix || true")
             appendLine("systemctl enable amazon-cloudwatch-agent || true")
@@ -613,7 +649,7 @@ $indentedScript
 
             "resource.aws_lb_target_group.app" {
                 "name" - "$projectPrefix-tg"
-                "port" - appPort
+                "port" - 8080
                 "protocol" - "HTTP"
                 "vpc_id" - applicationVpc.id
                 "target_type" - "instance"
@@ -654,45 +690,48 @@ $indentedScript
                     }
                 }
             }
-            if (wafEnabled) emitWaf()
+            if (wafRules.isNotEmpty()) emitWaf()
         }
     }
 
     /** Regional WAFv2 web ACL with AWS-managed rule sets, associated with the ALB. */
     private fun TerraformJsonObject.emitWaf() {
-        fun managedRule(ruleName: String, priority: Int): JsonElement = terraformJsonObject {
-            "name" - ruleName
-            "priority" - priority
-            "override_action" { "none" { } }
-            "statement" {
-                "managed_rule_group_statement" {
-                    "name" - ruleName
-                    "vendor_name" - "AWS"
-                }
-            }
-            "visibility_config" {
-                "cloudwatch_metrics_enabled" - true
-                "metric_name" - "$projectPrefix-$ruleName"
-                "sampled_requests_enabled" - true
-            }
-        }
         "resource.aws_wafv2_web_acl.main" {
             "name" - "$projectPrefix-waf"
             "scope" - "REGIONAL"
+            "description" - "WAF for $deploymentTag ALB"
             "default_action" { "allow" { } }
-            "rule" - listOf<JsonElement>(
-                managedRule("AWSManagedRulesCommonRuleSet", 1),
-                managedRule("AWSManagedRulesKnownBadInputsRuleSet", 2),
-            )
+            "lifecycle" { "ignore_changes" - listOf("rule") }
+            "rule" - wafRules
             "visibility_config" {
                 "cloudwatch_metrics_enabled" - true
                 "metric_name" - "$projectPrefix-waf"
                 "sampled_requests_enabled" - true
             }
+            "tags" {
+                "Service" - deploymentTag
+            }
         }
+
         "resource.aws_wafv2_web_acl_association.main" {
             "resource_arn" - expression("aws_lb.app.arn")
             "web_acl_arn" - expression("aws_wafv2_web_acl.main.arn")
+        }
+
+        "resource.aws_cloudwatch_log_group.alb_waf" {
+            "name" - "aws-waf-logs-${projectPrefix}"
+            "retention_in_days" - 30
+        }
+
+        "resource.aws_wafv2_web_acl_logging_configuration.main" {
+            "resource_arn" - expression("aws_wafv2_web_acl.main.arn")
+            "log_destination_configs" - listOf(expression("aws_cloudwatch_log_group.alb_waf.arn"))
+
+            "redacted_fields" {
+                "single_header" {
+                    "name" - "authorization"
+                }
+            }
         }
     }
 
@@ -906,7 +945,10 @@ systemctl enable $$projectPrefix || true
             "resource.null_resource.redeploy_app" {
                 "triggers" {
                     "jar_hash" - expression("data.external.jar_hash.result.hash")
-                    "settings_hash" - expression("local_sensitive_file.settings_raw.content_sha256")
+                    // Redeploy whenever a new settings.enc was uploaded: settings changes and every re-encryption
+                    // (cipher change, rotated password). Encrypted-at-rest instances decrypt settings.enc on each
+                    // start, so they must not keep a stale copy.
+                    "settings_upload" - expression("null_resource.upload_settings.id")
                 }
                 "depends_on" - listOf(
                     "null_resource.upload_jar",
@@ -969,7 +1011,7 @@ PACKAGES="$*"
 
 mkdir -p "$(dirname "$LOG_FILE")"
 touch "$LOG_FILE"
-chown ubuntu:ubuntu "$LOG_FILE"
+chown lightning-server:lightning-server "$LOG_FILE"
 exec > >(tee -a "$LOG_FILE" | logger -t os-update -s) 2>&1
 
 log "OS update started"
@@ -1174,7 +1216,7 @@ set -euo pipefail
 ASG_NAME="${1:?usage: redeploy-fleet.sh <asg-name> <region> <target-group-arn>}"
 REGION="${2:?region required}"
 TG_ARN="${3:?target group arn required}"
-APP_PORT="$$appPort"
+APP_PORT="8080"
 BATCH="${LS_REDEPLOY_BATCH:-$$redeployBatchSize}"
 SUSPENDED="HealthCheck ReplaceUnhealthy AZRebalance AddToLoadBalancer"
 
@@ -1287,7 +1329,7 @@ log "Rolling redeploy complete."
 # termination leaves the fleet serving rather than stranded.
 set -euo pipefail
 
-APP_PORT="$$appPort"
+APP_PORT="8080"
 SUSPENDED="HealthCheck ReplaceUnhealthy AZRebalance AddToLoadBalancer"
 
 $${fleetScriptHelpers("update-fleet")}
@@ -1571,7 +1613,7 @@ log "      image is rebuilt. Treat this as a stopgap, not the patch of record."
     private fun emitMonitoringResources() {
         emit("monitoring") {
             "resource.aws_cloudwatch_log_group.application" {
-                "name" - "/ec2/$projectPrefix/application"
+                "name" - projectLogName
                 "retention_in_days" - logRetentionDays
                 sharedKmsKeyArn?.let { "kms_key_id" - it }
             }
