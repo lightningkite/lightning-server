@@ -213,7 +213,7 @@ public object WebAuthN {
     public data class ClientData(
         public val challenge: String,
         public val origin: String,
-        public val crossOrigin: Boolean,
+        public val crossOrigin: Boolean? = null,
         public val type: String,
     )
 
