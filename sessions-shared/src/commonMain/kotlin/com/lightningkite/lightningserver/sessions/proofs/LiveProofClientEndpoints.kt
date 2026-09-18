@@ -141,11 +141,11 @@ public object LiveProofClientEndpoints {
         public val fetcher: Fetcher,
         public val subpath: String,
     ) : ProofClientEndpoints.WebAuthN {
-        override suspend fun start(input: Identification): WebAuthN.Authentication.StartResponse =
+        override suspend fun start(input: WebAuthN.Authentication.StartRequest): WebAuthN.Authentication.StartResponse =
             fetcher(
                 url = "$subpath/start",
                 method = HttpMethod.POST,
-                inSerializer = Identification.serializer(),
+                inSerializer = WebAuthN.Authentication.StartRequest.serializer(),
                 body = input,
                 outSerializer = WebAuthN.Authentication.StartResponse.serializer()
             )

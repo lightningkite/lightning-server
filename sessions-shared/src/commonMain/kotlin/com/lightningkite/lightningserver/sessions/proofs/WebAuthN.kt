@@ -23,7 +23,10 @@ import kotlin.time.Instant
  * @property subjectId ID of the user this credential belongs to
  * @property subjectType Type of subject (e.g., "User")
  * @property displayName Human-readable name for this credential (e.g., "YubiKey 5C", "Touch ID")
- * @property residentKey Whether this is a resident key (stored on the authenticator)
+ * @property residentKey Best-effort record of whether this is a discoverable (resident) credential.
+ *   WebAuthn has no signed residency flag, so this cannot be verified. It is taken from the client's
+ *   `credProps` report when available, and otherwise inferred from [backupEligible] or from the
+ *   registration requiring a discoverable credential. Treat it as a hint, not as a security property.
  * @property authenticatorAttachment Type of authenticator ("platform" for built-in, "cross-platform" for external)
  * @property attestationObject Base64 url-encoded attestation object containing public key and metadata
  * @property lastSignCount Counter from last authentication (used to detect cloned authenticators)
@@ -32,6 +35,12 @@ import kotlin.time.Instant
  * @property lastUsedAt Last time this credential was used for authentication
  * @property expiresAt Optional expiration time for the credential
  * @property disabledAt If set, this credential has been disabled
+ * @property backupEligible The authenticator's signed BE flag: whether this credential can be synced to
+ *   other devices (a synced passkey). It must never change, and webauthn4j rejects a login whose BE flag
+ *   differs from this value. A synced passkey is discoverable in practice, but `false` implies nothing
+ *   about residency. Null for credentials registered before this was recorded; filled in on next use.
+ * @property backupState The authenticator's signed BS flag as of the last registration or login: whether
+ *   the credential is currently backed up. Unlike [backupEligible], this may change over time.
  *
  * Security: The sign count should increment on each use. A decrease indicates credential cloning.
  */
@@ -54,6 +63,8 @@ public data class WebAuthNCredential(
     val lastUsedAt: Instant? = null,
     val expiresAt: Instant? = null,
     @Index val disabledAt: Instant? = null,
+    val backupEligible: Boolean? = null,
+    val backupState: Boolean? = null,
 ) : HasId<String>
 
 
@@ -183,10 +194,20 @@ public object WebAuthN {
         public val type: String = "public-key"
     }
 
+    /**
+     * Server-side authenticator requirements for a registration, returned from the app's
+     * `registrationForUser`.
+     *
+     * @property residentKey Whether the new credential must be discoverable (resident). The server decides
+     *   this; the preference the client sends to `register-start` is only a hint passed to
+     *   `registrationForUser`. Use [GeneralPreference.Required] if you intend to rely on usernameless
+     *   login for every credential.
+     */
     @Serializable
     public data class AuthenticatorSelectionOptions(
         public val authenticatorAttachment: AuthenticatorAttachment? = null,
         public val userVerification: GeneralPreference = GeneralPreference.Preferred,
+        public val residentKey: GeneralPreference = GeneralPreference.Preferred,
     )
 
     @Serializable
@@ -213,7 +234,7 @@ public object WebAuthN {
     public data class ClientData(
         public val challenge: String,
         public val origin: String,
-        public val crossOrigin: Boolean,
+        public val crossOrigin: Boolean? = null,
         public val type: String,
     )
 
@@ -432,6 +453,22 @@ public object WebAuthN {
             public val extensions: RequestExtensions = RequestExtensions(),
             public val hints: List<Hints> = emptyList(),
             public val userVerification: GeneralPreference = GeneralPreference.Preferred,
+        )
+
+        /**
+         * Request body for starting a WebAuthn authentication ceremony.
+         *
+         * @property type The principal type name to authenticate as (e.g. "User")
+         * @property proof A valid proof from another method, identifying the subject. Omit it for the
+         *   discoverable (usernameless) flow, where no credential ids are returned. Supply it when the
+         *   subject's authenticator needs its credential ids to find the key. The proof is required
+         *   because those ids, along with their count and transports, are only released to a caller
+         *   who has already shown they hold something tied to the account.
+         */
+        @Serializable
+        public data class StartRequest(
+            public val type: String,
+            public val proof: Proof? = null,
         )
 
         @Serializable

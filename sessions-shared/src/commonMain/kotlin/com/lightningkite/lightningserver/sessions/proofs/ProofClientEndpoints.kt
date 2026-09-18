@@ -170,10 +170,10 @@ public sealed interface ProofClientEndpoints {
 
         /**
          * Start WebAuthn authentication by getting a challenge.
-         * @param input User identification
+         * @param input The principal type, plus an optional proof from another method identifying the subject
          * @return Challenge and options for the WebAuthn authentication ceremony
          */
-        public suspend fun start(input: Identification): WebAuthN.Authentication.StartResponse
+        public suspend fun start(input: WebAuthN.Authentication.StartRequest): WebAuthN.Authentication.StartResponse
 
         /**
          * Complete WebAuthn authentication by verifying the signed challenge.
