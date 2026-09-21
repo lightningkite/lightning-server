@@ -701,7 +701,6 @@ $indentedScript
             "scope" - "REGIONAL"
             "description" - "WAF for $deploymentTag ALB"
             "default_action" { "allow" { } }
-            "lifecycle" { "ignore_changes" - listOf("rule") }
             "rule" - wafRules
             "visibility_config" {
                 "cloudwatch_metrics_enabled" - true
