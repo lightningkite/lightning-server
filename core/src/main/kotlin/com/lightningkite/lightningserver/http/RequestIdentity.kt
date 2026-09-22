@@ -3,6 +3,8 @@ package com.lightningkite.lightningserver.http
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.services.data.Unsafe
+import com.lightningkite.services.data.UuidV7
 import kotlin.uuid.Uuid
 
 /**
@@ -47,9 +49,12 @@ public inline fun HttpHeaders.requestIdentity(
     val claimed = get(HttpHeader.XRequestId)?.root
     if (trustedRequestIdHeader == null) return RequestIdentity(Execution.ID.generate(), claimed)
 
+    @OptIn(Unsafe::class)
+    // SAFETY: The proxy has been set as a trusted source for ids, and should be configured to provide V7 UUIDs.
     val trusted = get(trustedRequestIdHeader)
         ?.root
         ?.let(Uuid::parseOrNull)
+        ?.let(UuidV7::fromRaw)
         ?.let(Execution::ID)
 
     if (trusted == null) {

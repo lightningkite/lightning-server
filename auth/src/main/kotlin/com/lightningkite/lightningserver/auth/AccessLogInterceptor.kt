@@ -64,7 +64,7 @@ public class AccessLogInterceptor : HttpInterceptor, WebSocketInterceptor {
             // In a finally so a handler that threw still produces a line: an access log with silent
             // gaps is worse than one that records the failure. Resolved outside the logging lambda,
             // which is not suspending; by now auth is cached, so this costs nothing.
-            val principal = request.principalName()
+            val principal = request.authString()
             val elapsedMs = started.elapsedNow().inWholeMilliseconds
             runtime.logger.info {
                 "${request.path} accessed by $principal (${request.sourceIp}) " +
@@ -78,7 +78,7 @@ public class AccessLogInterceptor : HttpInterceptor, WebSocketInterceptor {
             context(serverRuntime: ServerRuntime)
             override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
                 if (serverRuntime.logger.isInfoEnabled()) {
-                    val principal = request.principalName()
+                    val principal = request.authString()
                     serverRuntime.logger.info {
                         "ws ${request.path} opened by $principal (${request.sourceIp}) " +
                             idSuffix(idLabel = "conn")
@@ -91,7 +91,7 @@ public class AccessLogInterceptor : HttpInterceptor, WebSocketInterceptor {
             override suspend fun disconnect(connection: WebSocketConnection<PATH, T>, reason: WebSocketClose) {
                 if (serverRuntime.logger.isInfoEnabled()) {
                     val request = connection.request
-                    val principal = request.principalName()
+                    val principal = request.authString()
                     serverRuntime.logger.info {
                         "ws ${request.path} closed by $principal (${request.sourceIp}) " +
                             "-> $reason ${idSuffix(idLabel = "conn")}"
@@ -109,7 +109,7 @@ public class AccessLogInterceptor : HttpInterceptor, WebSocketInterceptor {
  * handler surfaces the real error itself.
  */
 context(runtime: ServerRuntime)
-private suspend fun com.lightningkite.lightningserver.data.Request<*>.principalName(): String = try {
+private suspend fun com.lightningkite.lightningserver.data.Request<*>.authString(): String = try {
     this[Authentication.CacheKey]?.toString() ?: "anonymous"
 } catch (e: CancellationException) {
     throw e // never swallow cancellation — it would break structured concurrency

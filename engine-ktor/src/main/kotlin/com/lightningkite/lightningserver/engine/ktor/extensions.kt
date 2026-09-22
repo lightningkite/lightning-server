@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.runtime.EngineBase
+import com.lightningkite.lightningserver.runtime.Execution
 import kotlin.uuid.Uuid
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
@@ -35,7 +36,7 @@ internal fun Headers.adapt(): HttpHeaders = HttpHeaders(flattenEntries())
  * Falls back to the origin remote address if the header is not present.
  */
 context(server: EngineBase)
-internal suspend fun ApplicationCall.adapt(maxBody: Long): Pair<HttpRequest<PathSpec>, Uuid> {
+internal suspend fun ApplicationCall.adapt(maxBody: Long): Pair<HttpRequest<PathSpec>, Execution.ID> {
     val adaptedHeaders = request.headers.adapt()
     val identity = adaptedHeaders.requestIdentity(ktorRunConfig().requestIdHeader) {
         server.logger.warn { "Request ID header for proxy '${ktorRunConfig().requestIdHeader}' was missing from the request." }
@@ -47,9 +48,10 @@ internal suspend fun ApplicationCall.adapt(maxBody: Long): Pair<HttpRequest<Path
         upstreamRequestId = identity.upstreamRequestId,
         domain = request.origin.serverHost,
         protocol = request.origin.scheme,
-        sourceIp = ktorRunConfig().realIpHeader?.let {
-            request.header(it)
-                ?: run { server.logger.warn { "Real IP address header for proxy '$it' was missing from the request." }; null }
+        sourceIp = ktorRunConfig().realIpHeader?.let { realIp ->
+            request.header(realIp).also {
+                if (it == null) server.logger.warn { "Real IP address header for proxy '$it' was missing from the request." }
+            }
         } ?: request.origin.remoteAddress,
         body = run {
             // TODO: Add MultiPart support
@@ -57,7 +59,7 @@ internal suspend fun ApplicationCall.adapt(maxBody: Long): Pair<HttpRequest<Path
             // it yields the event loop instead of blocking it (the original receiveStream()+runBlocking path could
             // deadlock the event loop on slow/segmented bodies). maxBody is enforced during the suspending read.
             val declaredLength = request.contentLength()
-            TypedData.suspending(
+            TypedData.suspendingSource(
                 // declaredLength lets the source reject a body that ends before its declared Content-Length (A1).
                 source = KtorChannelSuspendingSource(receiveChannel(), maxBody, declaredLength),
                 mediaType = request.contentType().adapt(),

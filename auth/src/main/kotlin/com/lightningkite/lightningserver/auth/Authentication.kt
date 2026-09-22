@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.data.*
+import com.lightningkite.lightningserver.definition.MutableExtensions
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.HasId
@@ -236,71 +237,79 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
         override val serializer: KSerializer<Authentication<*>?> =
             serializer(NothingSerializer()).nullable as KSerializer<Authentication<*>?>
 
+//        private object ExecutionCacheKey : MutableExtensions.SetOnceKey<Authentication<*>>
+
         context(server: ServerRuntime)
         override suspend fun calculate(input: Request<*>): Authentication<*>? {
-            for (reader in server.server.authReaders.sortedByDescending { it.priority }) {
-                val auth = reader.read(input) ?: continue
+            val auth = run {
+                for (reader in server.server.authReaders.sortedByDescending { it.priority }) {
+                    val auth = reader.read(input) ?: continue
 
-                input.headers[HttpHeader.XMasquerade]?.let { header ->
-                    val masquerade = header.root
+                    input.headers[HttpHeader.XMasquerade]?.let { header ->
+                        val masquerade = header.root
 
-                    val validEncodings = mapOf(
-                        "str-array" to server.externalSerialization.stringArrayFormat,
-                        "json" to server.externalSerialization.json
-                    )
-
-                    if (!masquerade.contains('/')) throw BadRequestException(
-                        """Invalid masquerade value. Expected to be in the form: <principal-name>/<subject-id> (; encoding=[${
-                            validEncodings.keys.withIndex().joinToString(" | ") { (idx, enc) -> 
-                                if (idx == 0) "${enc}(default)"
-                                else enc
-                            }
-                        }])"""
-                    )
-
-                    val principalName = masquerade.substringBefore('/')
-                    val principal = server.server.principalTypes[principalName] as? PrincipalType<HasId<*>, *>
-                        ?: throw BadRequestException("Principal type $principalName is unrecognized for masquerade")
-
-                    val encoding = header.parameters["encoding"]
-                        ?.let {
-                            validEncodings[it] ?: throw BadRequestException("Invalid encoding type. Supported types are ${validEncodings.keys}")
-                        }
-                        ?: validEncodings.values.first()
-
-                    val idString = masquerade.substringAfter('/')
-                    val id = try {
-                        encoding.decodeFromString(principal.idSerializer, idString)
-                    } catch (e: SerializationException) {
-                        throw BadRequestException(
-                            message = "Invalid masquerade id: ${e.message}",
-                            data = idString,
-                            cause = e
+                        val validEncodings = mapOf(
+                            "str-array" to server.externalSerialization.stringArrayFormat,
+                            "json" to server.externalSerialization.json
                         )
+
+                        if (!masquerade.contains('/')) throw BadRequestException(
+                            """Invalid masquerade value. Expected to be in the form: <principal-name>/<subject-id> (; encoding=[${
+                                validEncodings.keys.withIndex().joinToString(" | ") { (idx, enc) ->
+                                    if (idx == 0) "${enc}(default)"
+                                    else enc
+                                }
+                            }])"""
+                        )
+
+                        val principalName = masquerade.substringBefore('/')
+                        val principal = server.server.principalTypes[principalName] as? PrincipalType<HasId<*>, *>
+                            ?: throw BadRequestException("Principal type $principalName is unrecognized for masquerade")
+
+                        val encoding = header.parameters["encoding"]
+                            ?.let {
+                                validEncodings[it] ?: throw BadRequestException("Invalid encoding type. Supported types are ${validEncodings.keys}")
+                            }
+                            ?: validEncodings.values.first()
+
+                        val idString = masquerade.substringAfter('/')
+                        val id = try {
+                            encoding.decodeFromString(principal.idSerializer, idString)
+                        } catch (e: SerializationException) {
+                            throw BadRequestException(
+                                message = "Invalid masquerade id: ${e.message}",
+                                data = idString,
+                                cause = e
+                            )
+                        }
+
+                        val mask = Authentication(
+                            principalType = principal,
+                            id = id,
+                            rawId = idString,
+                            sessionId = null,
+                            issuedAt = server.clock.now(),
+                            expiration = auth.expiration,
+                            scopes = auth.scopes,
+                            fromMasquerade = auth,
+                            cache = auth.cache,
+                        )
+
+                        if (principal.permitMasquerade(auth, mask)) return@run mask
+                        else {
+                            server.logger.warn { "$auth denied masquerade as $masquerade" }
+                            throw ForbiddenException("You are not allowed to masquerade as $masquerade")
+                        }
                     }
 
-                    val mask = Authentication(
-                        principalType = principal,
-                        id = id,
-                        rawId = idString,
-                        sessionId = null,
-                        issuedAt = server.clock.now(),
-                        expiration = auth.expiration,
-                        scopes = auth.scopes,
-                        fromMasquerade = auth,
-                        cache = auth.cache,
-                    )
-
-                    if (principal.permitMasquerade(auth, mask)) return mask
-                    else {
-                        server.logger.warn { "$auth denied masquerade as $masquerade" }
-                        throw ForbiddenException("You are not allowed to masquerade as $masquerade")
-                    }
+                    return@run auth
                 }
-
-                return auth
+                return@run null
             }
-            return null
+
+//            if (auth != null) server.execution.extensions[ExecutionCacheKey] = auth
+
+            return auth
         }
     }
 

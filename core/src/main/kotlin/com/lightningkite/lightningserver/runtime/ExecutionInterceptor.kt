@@ -46,8 +46,8 @@ public interface ExecutionInterceptor {
      * @param cont The continuation, invoked as `with(runtime) { cont() }`. Skipping it skips the
      *   execution entirely, so an interceptor that means to let the work happen must call it.
      */
-    public suspend fun <T> intercept(   // todo: change signature to context parameter
-        runtime: ServerRuntime,
+    context(runtime: ServerRuntime)
+    public suspend fun <T> intercept(
         cont: suspend context(ServerRuntime) () -> T,
     ): T
 
@@ -58,10 +58,10 @@ public interface ExecutionInterceptor {
      * span. [compileAndInstrument] drops these rather than wrapping them.
      */
     public object NoOp : ExecutionInterceptor {
+        context(runtime: ServerRuntime)
         override suspend fun <T> intercept(
-            runtime: ServerRuntime,
             cont: suspend context(ServerRuntime) () -> T,
-        ): T = with(runtime) { cont() }
+        ): T = cont()
     }
 }
 
@@ -76,15 +76,15 @@ public interface ExecutionInterceptor {
 private suspend fun <T> ExecutionInterceptor.interceptInstrumented(
     runtime: ServerRuntime,
     cont: suspend context(ServerRuntime) () -> T,
-): T = with(runtime) { instrument(name) { intercept(runtime, cont) } }
+): T = with(runtime) { instrument(name) { intercept(cont) } }
 
 /** One link of a compiled chain, wrapping [interceptor] in its own instrumentation span. */
 private fun instrumentedLink(interceptor: ExecutionInterceptor): ExecutionInterceptor =
     object : ExecutionInterceptor {
         override val name: String get() = interceptor.name
 
+        context(runtime: ServerRuntime)
         override suspend fun <T> intercept(
-            runtime: ServerRuntime,
             cont: suspend context(ServerRuntime) () -> T,
         ): T = interceptor.interceptInstrumented(runtime, cont)
     }
@@ -94,10 +94,10 @@ private fun composeLinks(outer: ExecutionInterceptor, inner: ExecutionIntercepto
     object : ExecutionInterceptor {
         override val name: String get() = "${outer.name} -> ${inner.name}"
 
+        context(runtime: ServerRuntime)
         override suspend fun <T> intercept(
-            runtime: ServerRuntime,
             cont: suspend context(ServerRuntime) () -> T,
-        ): T = outer.intercept(runtime) { inner.interceptInstrumented(serverRuntime, cont) }
+        ): T = outer.intercept { inner.interceptInstrumented(serverRuntime, cont) }
     }
 
 /**

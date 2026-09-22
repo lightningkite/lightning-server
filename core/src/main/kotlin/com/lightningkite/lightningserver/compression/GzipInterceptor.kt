@@ -234,3 +234,16 @@ private class NonClosingOutputStream(val delegate: OutputStream): OutputStream()
     override fun flush(): Unit = delegate.flush()
     override fun close(): Unit = delegate.flush()
 }
+
+/*
+ * TODO: API Recommendations
+ *
+ * 1. The compression thresholds (256 bytes, 1024 bytes) are magic numbers. Define these as named
+ *    constants with documentation explaining the thresholds.
+ *
+ * 2. The compression denylist (images, videos, fonts, archives) is hardcoded. Consider making
+ *    this configurable via settings for applications with different compression needs.
+ *
+ * 3. Compression for Data.Sink and Data.Source always returns `true` for compressed flag even if
+ *    GZIP might fail or produce larger output. Consider checking actual compression ratio.
+ */

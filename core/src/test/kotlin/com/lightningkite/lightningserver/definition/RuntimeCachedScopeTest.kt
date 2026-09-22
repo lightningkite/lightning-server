@@ -6,11 +6,10 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.EngineBase
 import com.lightningkite.lightningserver.runtime.Execution
-import com.lightningkite.lightningserver.runtime.execute
+import com.lightningkite.lightningserver.runtime.createRuntime
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.uuid.Uuid
 
 private object EmptyServer : ServerBuilder()
 
@@ -45,7 +44,7 @@ class RuntimeCachedScopeTest {
         val engine: Engine = BareEngine()
 
         with(engine) { cached() }
-        repeat(5) { with(engine.execute(Execution.Direct(Uuid.random()))) { cached() } }
+        repeat(5) { with(engine.createRuntime(Execution.Direct(with(engine) { Execution.ID.generate() }))) { cached() } }
 
         assertEquals(1, computations, "a process-wide value was recomputed per execution")
     }
@@ -57,7 +56,7 @@ class RuntimeCachedScopeTest {
         val engine: Engine = BareEngine()
 
         val fromEngine = with(engine) { cached() }
-        val fromExecution = with(engine.execute(Execution.Direct(Uuid.random()))) { cached() }
+        val fromExecution = with(engine.createRuntime(Execution.Direct(with(engine) { Execution.ID.generate() }))) { cached() }
 
         assertEquals(fromEngine, fromExecution)
         assertEquals(1, computations)

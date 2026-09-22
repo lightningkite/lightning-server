@@ -25,7 +25,6 @@ import kotlinx.serialization.builtins.serializer
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.hours
-import kotlin.uuid.Uuid
 
 /**
  * An [ExecutionInterceptor] is the only chain that claims to see *everything the server runs*, so
@@ -36,24 +35,24 @@ class ExecutionInterceptorTest {
 
     private class Recorder : ExecutionInterceptor {
         val seen = ArrayList<Execution>()
+        context(runtime: ServerRuntime)
         override suspend fun <T> intercept(
-            runtime: ServerRuntime,
             cont: suspend context(ServerRuntime) () -> T,
         ): T {
             seen.add(runtime.execution)
-            return with(runtime) { cont() }
+            return cont()
         }
     }
 
     /** Records when it starts and finishes, so nesting order is visible in one flat list. */
     private class Marker(override val name: String, val log: MutableList<String>) : ExecutionInterceptor {
+        context(runtime: ServerRuntime)
         override suspend fun <T> intercept(
-            runtime: ServerRuntime,
             cont: suspend context(ServerRuntime) () -> T,
         ): T {
             log.add("$name in")
             try {
-                return with(runtime) { cont() }
+                return cont()
             } finally {
                 log.add("$name out")
             }
@@ -80,7 +79,7 @@ class ExecutionInterceptorTest {
         server.test(settings = { generalSettings set GeneralServerSettings() }) {
             runBlocking {
                 server.endpoint.test()
-                server.task.executeWithMetrics(server.task.location, Unit, cause = null)
+                server.task.executeWithMetrics(server.task.location, Unit, serverRuntime.execution)
                 server.schedule.executeWithMetrics(server.schedule.location)
                 server.startup.executeWithMetrics(server.startup.location)
                 server.preDeploy.executeWithMetrics(server.preDeploy.location)
@@ -90,8 +89,8 @@ class ExecutionInterceptorTest {
                     location = server.socket.location,
                     engine = engine,
                     initiator = Execution.WebSocket(
-                        id = Uuid.random(),
-                        socketId = Uuid.random(),
+                        id = Execution.ID.generate(),
+                        socketId = Execution.ID.generate(),
                         path = RawWebSocketPath("socket"),
                         phase = Execution.WebSocket.Phase.Connect,
                     ),

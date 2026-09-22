@@ -407,7 +407,7 @@ public class MetaEndpoints(
                             // HttpInterceptor (access logging, auditing, rate limiting)
                             // instead of executing unobserved. handleSubRequest maps exceptions to
                             // responses itself, so nothing escapes here.
-                            val response = serverRuntime.handleSubRequest(properRequest)
+                            val response = serverRuntime.handle(properRequest)
                             val durationMs = start.elapsedNow().inWholeMilliseconds
                             entry.key to if (response.status.success) {
                                 BulkResponse(durationMs = durationMs, result = response.body?.text())

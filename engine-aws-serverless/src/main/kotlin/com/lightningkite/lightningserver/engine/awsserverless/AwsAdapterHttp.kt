@@ -5,7 +5,7 @@ import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.runtime.Execution
-import com.lightningkite.lightningserver.runtime.handle
+import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.services.data.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -43,7 +43,7 @@ internal class AwsAdapterHttp(val root: AwsAdapter) {
             engineRequestId = event.requestContext.requestId,
         )
         // API Gateway's ID is not a UUID, so we always mint our own execution id.
-        val result = with(root) { root.handle(request, Execution.ID.generate()) }
+        val result = with(root) { root.handleRoot(request, Execution.ID.generate()) }
         return result.toAws()
     }
 }

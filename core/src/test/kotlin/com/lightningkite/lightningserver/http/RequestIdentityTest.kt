@@ -1,6 +1,7 @@
+@file:OptIn(InternalLightningServerApi::class, com.lightningkite.services.data.Unsafe::class)
+
 package com.lightningkite.lightningserver.http
 
-import com.lightningkite.lightningserver.runtime.subRequest
 import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.HttpMethod
@@ -8,15 +9,64 @@ import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
+import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.EngineBase
+import com.lightningkite.lightningserver.runtime.createRuntime
+import com.lightningkite.lightningserver.runtime.handle
+import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
+import com.lightningkite.services.data.UuidV7
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
+
+private val outerId = Execution.ID(UuidV7.fromRaw(Uuid.parse("00000000-0000-4000-8000-0000000000d4")))
+
+private fun outer() = Execution.Http(
+    id = outerId,
+    endpoint = RawHttpEndpoint(asString = "/outer", method = HttpMethod.POST),
+)
+
+private fun subTestRequest(path: String): HttpRequest<PathSpec> = HttpRequest(
+    path = RawHttpEndpoint(asString = path, method = HttpMethod.GET),
+    queryParameters = QueryParameters.EMPTY,
+    headers = HttpHeaders.EMPTY,
+    domain = "example.com",
+    protocol = "https",
+    sourceIp = "local",
+)
+
+private val subRecorded = mutableListOf<Execution.Http>()
+
+/**
+ * A sub-request's parentage is no longer derived by a standalone `subRequest` helper; it's derived
+ * inline by [com.lightningkite.lightningserver.runtime.handle] (the same seam `/meta/bulk`
+ * dispatches through), so [RequestIdentityTest]'s sub-request tests exercise it end to end: each
+ * endpoint records its own [Execution.Http], and `nested` dispatches a further sub-request from
+ * inside its own execution to prove the parent follows the nesting rather than always naming the
+ * outermost caller.
+ */
+private object SubServer : ServerBuilder() {
+    val a = path.path("a").get bind HttpHandler {
+        subRecorded += serverRuntime.execution as Execution.Http
+        HttpResponse.plainText("ok")
+    }
+    val b = path.path("b").get bind HttpHandler {
+        subRecorded += serverRuntime.execution as Execution.Http
+        HttpResponse.plainText("ok")
+    }
+    val nested = path.path("nested").get bind HttpHandler {
+        subRecorded += serverRuntime.execution as Execution.Http
+        serverRuntime.handle(subTestRequest("b"))
+        HttpResponse.plainText("ok")
+    }
+}
 
 class RequestIdentityTest {
 
@@ -62,6 +112,9 @@ class RequestIdentityTest {
     private fun Uuid.versionAndMillis(): Pair<Int, Long> =
         toLongs { msb, _ -> ((msb shr 12) and 0xF).toInt() to (msb ushr 16) }
 
+    /** Unwraps back to the raw [Uuid] these tests compare against — reading [Execution.ID] is free, per its docs. */
+    private val Execution.ID.uuid: Uuid get() = raw.raw
+
     /**
      * `generateRequestId`'s documentation promises that "a test's injected clock controls the id's
      * embedded timestamp", and the audit layer takes that promise seriously enough to have no `at`
@@ -78,7 +131,7 @@ class RequestIdentityTest {
     fun `a generated request id carries the engine clock's instant, not the wall clock`() {
         val minted = kotlin.time.Instant.fromEpochMilliseconds(1_700_000_000_123)
 
-        val (version, millis) = with(engineAt(minted)) { Execution.ID.generate() }.versionAndMillis()
+        val (version, millis) = with(engineAt(minted)) { Execution.ID.generate() }.uuid.versionAndMillis()
 
         assertEquals(7, version, "the audit layer's timestamp decoder returns 0 for any non-v7 id")
         assertEquals(
@@ -96,7 +149,7 @@ class RequestIdentityTest {
 
         val identity = with(engineAt(minted)) { headers().requestIdentity(trustedRequestIdHeader = null) }
 
-        assertEquals(minted.toEpochMilliseconds(), identity.requestId.versionAndMillis().second)
+        assertEquals(minted.toEpochMilliseconds(), identity.requestId.uuid.versionAndMillis().second)
     }
 
     private fun headers(vararg pairs: Pair<String, String>) = HttpHeaders(pairs.toList())
@@ -104,7 +157,7 @@ class RequestIdentityTest {
     @Test
     fun `generates a fresh id when no trusted header is configured`() {
         val identity = with(engine) { headers().requestIdentity(trustedRequestIdHeader = null) }
-        assertNotEquals(Uuid.NIL, identity.requestId)
+        assertNotEquals(Uuid.NIL, identity.requestId.uuid)
         assertNull(identity.upstreamRequestId)
     }
 
@@ -127,7 +180,7 @@ class RequestIdentityTest {
                 .requestIdentity(trustedRequestIdHeader = null)
         }
 
-        assertNotEquals(claimed, identity.requestId)
+        assertNotEquals(claimed, identity.requestId.uuid)
         assertEquals(claimed.toString(), identity.upstreamRequestId)
     }
 
@@ -139,7 +192,7 @@ class RequestIdentityTest {
                 .requestIdentity(trustedRequestIdHeader = "X-Proxy-Request-Id")
         }
 
-        assertNotEquals(claimed, identity.requestId)
+        assertNotEquals(claimed, identity.requestId.uuid)
         assertEquals(claimed.toString(), identity.upstreamRequestId)
     }
 
@@ -151,7 +204,7 @@ class RequestIdentityTest {
                 .requestIdentity(trustedRequestIdHeader = "X-Proxy-Request-Id")
         }
 
-        assertEquals(proxyId, identity.requestId)
+        assertEquals(proxyId, identity.requestId.uuid)
     }
 
     @Test
@@ -164,7 +217,7 @@ class RequestIdentityTest {
             ).requestIdentity(trustedRequestIdHeader = "X-Proxy-Request-Id")
         }
 
-        assertEquals(proxyId, identity.requestId)
+        assertEquals(proxyId, identity.requestId.uuid)
         assertEquals("attacker-chosen", identity.upstreamRequestId)
     }
 
@@ -177,7 +230,7 @@ class RequestIdentityTest {
                 .requestIdentity(trustedRequestIdHeader = HttpHeader.XRequestId)
         }
 
-        assertEquals(proxyId, identity.requestId)
+        assertEquals(proxyId, identity.requestId.uuid)
         assertNull(identity.upstreamRequestId)
     }
 
@@ -189,7 +242,7 @@ class RequestIdentityTest {
                 .requestIdentity(trustedRequestIdHeader = "X-Request-ID")
         }
 
-        assertEquals(proxyId, identity.requestId)
+        assertEquals(proxyId, identity.requestId.uuid)
         assertNull(identity.upstreamRequestId)
     }
 
@@ -219,23 +272,19 @@ class RequestIdentityTest {
         }
 
         assertTrue(warned)
-        assertNotEquals(Uuid.NIL, identity.requestId)
+        assertNotEquals(Uuid.NIL, identity.requestId.uuid)
     }
 
-    private val outerId = Uuid.parse("00000000-0000-4000-8000-0000000000d4")
-
-    @OptIn(InternalLightningServerApi::class)
-    private fun outer() = Execution.Http(
-        id = outerId,
-        endpoint = RawHttpEndpoint(asString = "/outer", method = HttpMethod.POST),
-    )
-
-    private fun endpoint(path: String) = RawHttpEndpoint<PathSpec>(asString = path, method = HttpMethod.GET)
-
     @Test
-    fun `subRequest gets its own id parented to the outer request`() {
-        val sub = with(engine) { outer().subRequest(endpoint("/inner")) }
+    fun `a sub-request gets its own id parented to the outer request`() {
+        subRecorded.clear()
+        SubServer.test(settings = {}) {
+            runBlocking {
+                with(serverRuntime.createRuntime(outer())) { serverRuntime.handle(subTestRequest("a")) }
+            }
+        }
 
+        val sub = subRecorded.single()
         assertNotEquals(outerId, sub.id)
         assertEquals(outerId, sub.causedBy)
         assertEquals(outerId, sub.rootExecution)
@@ -243,10 +292,17 @@ class RequestIdentityTest {
 
     @Test
     fun `sibling sub-requests get distinct ids and share a parent`() {
-        val outer = outer()
-        val a = with(engine) { outer.subRequest(endpoint("/a")) }
-        val b = with(engine) { outer.subRequest(endpoint("/b")) }
+        subRecorded.clear()
+        SubServer.test(settings = {}) {
+            runBlocking {
+                with(serverRuntime.createRuntime(outer())) {
+                    serverRuntime.handle(subTestRequest("a"))
+                    serverRuntime.handle(subTestRequest("b"))
+                }
+            }
+        }
 
+        val (a, b) = subRecorded
         assertNotEquals(a.id, b.id)
         assertEquals(outerId, a.causedBy)
         assertEquals(outerId, b.causedBy)
@@ -254,8 +310,16 @@ class RequestIdentityTest {
 
     @Test
     fun `nesting keeps the root while the parent follows the nesting`() {
-        val inner = with(engine) { outer().subRequest(endpoint("/a")).subRequest(endpoint("/b")) }
+        subRecorded.clear()
+        SubServer.test(settings = {}) {
+            runBlocking {
+                with(serverRuntime.createRuntime(outer())) { serverRuntime.handle(subTestRequest("nested")) }
+            }
+        }
 
+        val (nested, inner) = subRecorded
+        assertEquals(outerId, nested.causedBy)
+        assertEquals(nested.id, inner.causedBy)
         assertEquals(outerId, inner.rootExecution)
         assertNotEquals(outerId, inner.causedBy)
     }

@@ -364,7 +364,7 @@ public class NettyEngine(
                             try {
                                 try {
                                     // Request timeout is enforced centrally in ServerRuntime.handle (per-handler HttpHandler.timeout).
-                                    val result: HttpResponse = this@NettyEngine.handle(request, executionId)
+                                    val result: HttpResponse = this@NettyEngine.handleRoot(request, executionId)
                                     val nettyRes = result.toNettyResponse(msg.protocolVersion())
                                     val keepAlive = HttpUtil.isKeepAlive(msg)
                                     if (keepAlive) {

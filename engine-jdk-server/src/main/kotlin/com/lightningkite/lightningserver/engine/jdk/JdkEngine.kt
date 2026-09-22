@@ -2,7 +2,6 @@ package com.lightningkite.lightningserver.engine.jdk
 
 import kotlin.uuid.Uuid
 import com.lightningkite.lightningserver.HttpMethod
-import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.engine.local.BodyTooLargeException
@@ -13,7 +12,7 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
-import com.lightningkite.lightningserver.runtime.handle
+import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.services.data.*
 import com.sun.net.httpserver.HttpExchange
@@ -137,7 +136,7 @@ public class JdkEngine(
                     exchange.requestToLightningServer(cfg.realIpHeader, cfg.requestIdHeader, this@JdkEngine, maxBody)
                 // Request timeout is enforced centrally in ServerRuntime.handle (per-handler HttpHandler.timeout).
                 runBlocking {
-                    val result: HttpResponse = this@JdkEngine.handle(request, executionId)
+                    val result: HttpResponse = this@JdkEngine.handleRoot(request, executionId)
                     exchange.write(result)
                 }
             } catch (e: BodyTooLargeException) {

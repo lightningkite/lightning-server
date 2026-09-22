@@ -8,7 +8,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.EngineBase
-import com.lightningkite.lightningserver.runtime.execute
+import com.lightningkite.lightningserver.runtime.createRuntime
 import com.lightningkite.lightningserver.runtime.phase
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.*
@@ -17,8 +17,6 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Clock
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
 /**
  * Test runtime for Lightning Server applications.
@@ -63,9 +61,7 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
      * invocation that mints [Execution.Direct] — see its documentation for why that hole exists.
      */
     @OptIn(InternalLightningServerApi::class)
-    override val execution: Execution = Execution.Direct(
-        @OptIn(ExperimentalUuidApi::class) Uuid.generateV7NonMonotonicAt(clock.now())
-    )
+    override val execution: Execution = Execution.Direct(Execution.ID.generate())
 
     public companion object {
         internal val logger = KotlinLogging.logger("com.lightningkite.lightningserver.TestRunner")
@@ -99,7 +95,7 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
      * launching execution rather than as one of its own, so there is nothing for [from] to parent.
      */
     override suspend fun <T> dispatchTask(task: Task<T>, input: T, from: Execution) {
-        this.executeInline(input)
+        task.executeInline(input)
     }
 
     /**
@@ -136,7 +132,7 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
         public val name: String = "Client",
     ) {
         private fun runtimeFor(phase: Execution.WebSocket.Phase): ServerRuntime =
-            this@TestRunner.execute(initiator.phase(phase))
+            this@TestRunner.createRuntime(initiator.phase(phase))
 
         public var onMessageSent: (frame: WebSocketFrame) -> Unit = {}
         public suspend fun close() {

@@ -54,7 +54,6 @@ class HttpSpanTest {
             }
         ) {
             runBlocking {
-                contextOf<TestRunner>()
                 serverRuntime.handle(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/users/abc", method = HttpMethod.GET),
@@ -118,7 +117,6 @@ class HttpSpanTest {
             }
         ) {
             runBlocking {
-                contextOf<TestRunner>()
                 serverRuntime.handle(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/does/not/exist", method = HttpMethod.GET),

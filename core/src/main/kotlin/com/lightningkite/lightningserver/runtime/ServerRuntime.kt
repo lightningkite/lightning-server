@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.runtime
 
-import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.PathSpec1
@@ -103,7 +102,7 @@ public suspend fun <A, B, C, T> WebSocketTopic<PathSpec3<A, B, C>, T>.send(
  * Queues a task for asynchronous execution, parented to the execution launching it.
  *
  * The task will be executed in the background. The exact execution mechanism depends
- * on the engine implementation (e.g., GlobalScope.launch for single-machine engines).
+ * on the engine implementation.
  *
  * This takes a [ServerRuntime] rather than an [Engine] so that a launched task always has something
  * to be caused by: parentage across a queue is the one thing the serializable initiator exists for,
@@ -111,12 +110,9 @@ public suspend fun <A, B, C, T> WebSocketTopic<PathSpec3<A, B, C>, T>.send(
  *
  * @param input The input parameter for the task
  */
-@OptIn(InternalLightningServerApi::class)
-context(serverRuntime: ServerRuntime)
+context(runtime: ServerRuntime)
 public suspend operator fun <T> Task<T>.invoke(input: T): Unit =
-    with(serverRuntime) {
-        dispatchTask(, input, serverRuntime.execution.cause)
-    }
+    runtime.dispatchTask(this, input, runtime.execution)
 
 /**
  * Provides access to the ServerRuntime instance from a context receiver.

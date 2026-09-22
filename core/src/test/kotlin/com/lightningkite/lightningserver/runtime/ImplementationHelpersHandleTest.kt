@@ -132,7 +132,6 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                contextOf<TestRunner>()
                 val resp = serverRuntime.handle(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
@@ -156,7 +155,6 @@ class ImplementationHelpersHandleTest {
     @Test
     fun test_blocking_runs_suspend_body_without_run_blocking() {
         TestServer.testBlocking(settings = {}) {
-            contextOf<TestRunner>()
             val resp = serverRuntime.handle(
                 HttpRequest(
                     path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
@@ -189,7 +187,6 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                contextOf<TestRunner>()
                 val resp = serverRuntime.handle(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.HEAD),
@@ -224,7 +221,6 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                contextOf<TestRunner>()
                 val resp = serverRuntime.handle(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.OPTIONS),
@@ -265,7 +261,6 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                contextOf<TestRunner>()
                 val resp = serverRuntime.handle(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/slash", method = HttpMethod.GET),
@@ -303,7 +298,6 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                contextOf<TestRunner>()
                 val resp = serverRuntime.handle(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/slash/", method = HttpMethod.GET),
@@ -338,7 +332,6 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                contextOf<TestRunner>()
                 val resp = serverRuntime.handle(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/", method = HttpMethod.GET),
@@ -373,7 +366,6 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                contextOf<TestRunner>()
                 val resp = serverRuntime.handle(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "", method = HttpMethod.GET),
@@ -415,7 +407,6 @@ class ImplementationHelpersHandleTest {
         // regardless of which engine runs it.
         TestServer.test(settings = {}) {
             runBlocking {
-                contextOf<TestRunner>()
                 val resp = serverRuntime.handle(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/slow", method = HttpMethod.GET),
@@ -440,7 +431,6 @@ class ImplementationHelpersHandleTest {
         // 404) is invisible to client JS.
         TestServer.test(settings = {}) {
             runBlocking {
-                contextOf<TestRunner>()
                 val resp = serverRuntime.handle(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/boom", method = HttpMethod.GET),
@@ -492,7 +482,6 @@ class ImplementationHelpersHandleTest {
         // see a normal response back from their continuation and still post-process it.
         InterceptorFailureTestServer.test(settings = {}) {
             runBlocking {
-                contextOf<TestRunner>()
                 val resp = serverRuntime.handle(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/anything", method = HttpMethod.GET),
@@ -519,7 +508,6 @@ class ImplementationHelpersHandleTest {
         // This test server installs SecurityHeadersInterceptor: an https response must carry nosniff and HSTS.
         TestServer.test(settings = {}) {
             runBlocking {
-                contextOf<TestRunner>()
                 val resp = serverRuntime.handle(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
@@ -546,7 +534,6 @@ class ImplementationHelpersHandleTest {
         // HSTS must never be sent over plain http (per the HSTS spec), but nosniff still applies.
         TestServer.test(settings = {}) {
             runBlocking {
-                contextOf<TestRunner>()
                 val resp = serverRuntime.handle(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
@@ -573,7 +560,6 @@ class ImplementationHelpersHandleTest {
         // them too.
         TestServer.test(settings = {}) {
             runBlocking {
-                contextOf<TestRunner>()
                 val resp = serverRuntime.handle(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/boom", method = HttpMethod.GET),
@@ -600,7 +586,6 @@ class ImplementationHelpersHandleTest {
     fun fast_handler_completes_within_its_timeout() {
         TestServer.test(settings = {}) {
             runBlocking {
-                contextOf<TestRunner>()
                 val resp = serverRuntime.handle(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/fast", method = HttpMethod.GET),
@@ -634,7 +619,6 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                contextOf<TestRunner>()
                 val resp = serverRuntime.handle(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
@@ -671,7 +655,6 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                contextOf<TestRunner>()
                 val resp = serverRuntime.handle(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/bigstream", method = HttpMethod.GET),
@@ -701,7 +684,6 @@ class ImplementationHelpersHandleTest {
         // The blocking Data.Source path must stream-compress (no full-body buffering) and still produce valid gzip.
         TestServer.test(settings = {}) {
             runBlocking {
-                contextOf<TestRunner>()
                 val resp = serverRuntime.handle(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/bigsource", method = HttpMethod.GET),

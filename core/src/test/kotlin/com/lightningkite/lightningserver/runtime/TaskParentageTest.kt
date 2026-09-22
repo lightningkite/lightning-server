@@ -15,7 +15,6 @@ import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
-import kotlin.uuid.Uuid
 
 /** Every initiator a task run under [QueueingEngine] saw, in the order the tasks ran. */
 private val recorded = mutableListOf<Execution>()
@@ -50,12 +49,12 @@ private class QueueingEngine : EngineBase(TestServer.build()) {
 
     /** The queued form. Tasks here take [Unit], so parentage is the whole of the payload. */
     @Serializable
-    private data class Queued(val location: String, val cause: ExecutionCause?)
+    private data class Queued(val location: String, val from: Execution)
 
     private val queue = ArrayDeque<String>()
 
     override suspend fun <T> dispatchTask(task: Task<T>, input: T, from: Execution) {
-        queue.addLast(Json.encodeToString(Queued.serializer(), Queued(location.toString(), from)))
+        queue.addLast(Json.encodeToString(Queued.serializer(), Queued(task.location.toString(), from)))
     }
 
     /** Runs everything queued, reading each payload back the way a fresh process would. */
@@ -65,7 +64,7 @@ private class QueueingEngine : EngineBase(TestServer.build()) {
             val location = PathSpec0.fromString(queued.location)
             @Suppress("UNCHECKED_CAST")
             val task = server.tasks.getValue(location) as Task<Unit>
-            task.executeWithMetrics(location, Unit, queued.cause)
+            task.executeWithMetrics(location, Unit, queued.from)
         }
     }
 }
@@ -82,9 +81,9 @@ class TaskParentageTest {
         val engine = QueueingEngine()
         with(engine) { settings.readyUsingDefaults() }
 
-        val requestId = Uuid.random()
+        val requestId = with(engine) { Execution.ID.generate() }
         runBlocking {
-            val request = engine.execute(
+            val request = engine.createRuntime(
                 Execution.Http(
                     id = requestId,
                     endpoint = RawHttpEndpoint<PathSpec>(asString = "/thing", method = HttpMethod.GET),
@@ -109,21 +108,5 @@ class TaskParentageTest {
             second.rootExecution,
             "The root must survive every hop, or \"everything caused by request X\" needs a recursive walk.",
         )
-    }
-
-    @Test
-    fun `a task with nothing behind it heads its own chain`() {
-        recorded.clear()
-        val engine = QueueingEngine()
-        with(engine) { settings.readyUsingDefaults() }
-
-        runBlocking {
-            with(engine) { dispatchTask(, Unit, from = null) }
-            engine.drain()
-        }
-
-        val only = recorded.single() as Execution.Task
-        assertEquals(null, only.causedBy)
-        assertEquals(only.id, only.rootExecution)
     }
 }

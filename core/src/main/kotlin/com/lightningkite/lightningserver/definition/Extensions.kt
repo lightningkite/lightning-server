@@ -89,6 +89,12 @@ public class MutableExtensions() : Extensions {
     public interface Key<T : Any> : Extensions.Key<T>
 
     /**
+     * Like a regular [Key], but the value may only be set once. Attempts to overwrite an existing value
+     * will either result in the second set being ignored or an exception being thrown.
+     * */
+    public interface SetOnceKey<T : Any> : Extensions.Key<T>
+
+    /**
      * Retrieves `WRITE` when in the context of [MutableExtensions], but when
      * degraded to [Extensions] retrieves `READ`. The typical use for this
      * is to degrade a type `WRITE` with read-write access to a read-only type `READ`.
@@ -145,6 +151,17 @@ public class MutableExtensions() : Extensions {
         else map[key] = value
     }
 
+    public operator fun <T : Any> set(key: SetOnceKey<T>, value: T) {
+        if (map.containsKey(key)) throw IllegalArgumentException("Attempted to set SetOnceKey $key a second time with new value $value")
+        map[key] = value
+    }
+
+    public fun <T : Any> trySet(key: SetOnceKey<T>, value: T): Boolean {
+        if (map.containsKey(key)) return false
+        map[key] = value
+        return true
+    }
+
     @Suppress("UNCHECKED_CAST")
     override val entries: Set<Extensions.Entry<*>>
         get() = map.entries.mapTo(HashSet()) { Extensions.Entry(it.key as Extensions.Key<Any>, it.value) }
@@ -160,6 +177,8 @@ public class MutableExtensions() : Extensions {
             } else map.putIfAbsent(key, value)
         }
     }
+
+    public fun copy(): MutableExtensions = MutableExtensions().also { it.map.putAll(this.map) }
 }
 
 public class SealedExtensions(extensions: Extensions) : Extensions {

@@ -17,11 +17,11 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawWebSocketPath
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.runtime.Execution
-import com.lightningkite.lightningserver.runtime.execute
 import com.lightningkite.lightningserver.runtime.phase
 import com.lightningkite.lightningserver.runtime.didConnectWithMetrics
 import com.lightningkite.lightningserver.runtime.disconnectWithMetrics
-import com.lightningkite.lightningserver.runtime.handle
+import com.lightningkite.lightningserver.runtime.createRuntime
+import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.lightningserver.runtime.messageFromClientWithMetrics
 import com.lightningkite.lightningserver.runtime.willConnectWithMetrics
 import com.lightningkite.lightningserver.settings.ServerSettings
@@ -148,7 +148,7 @@ public class KtorEngine(
                     val (request, executionId) = call.adapt(maxBody)
                     // Request timeout is enforced centrally in ServerRuntime.handle (per-handler HttpHandler.timeout).
                     val result: HttpResponse = try {
-                        this@KtorEngine.handle(request, executionId)
+                        this@KtorEngine.handleRoot(request, executionId)
                     } catch (_: BodyTooLargeException) {
                         // 2.5: streamed body exceeded the cap mid-read.
                         HttpResponse.plainText("Payload Too Large", HttpStatus.PayloadTooLarge)
@@ -298,7 +298,7 @@ public class KtorEngine(
                     // A directly-run socket is not phase-structured — the whole session runs in this
                     // one coroutine — so it is one execution, named by the socket it is.
                     directHandler.handleDirect(
-                        serverRuntime = this@KtorEngine.execute(connectInitiator),
+                        serverRuntime = this@KtorEngine.createRuntime(connectInitiator),
                         request = request,
                         incoming = incomingChannel,
                         send = { frame ->

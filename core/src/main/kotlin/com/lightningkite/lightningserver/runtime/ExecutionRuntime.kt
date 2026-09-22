@@ -1,12 +1,11 @@
 package com.lightningkite.lightningserver.runtime
 
 import com.lightningkite.lightningserver.InternalLightningServerApi
+import com.lightningkite.services.data.Unsafe
 
 @InternalLightningServerApi
-public fun Engine.executionRuntime(scope: Execution): ServerRuntime = ExecutionRuntime(this, scope)
-
-@InternalLightningServerApi
-public inline fun <T> Engine.execute(scope: Execution, action: ServerRuntime.() -> T): T = executionRuntime(scope).action()
+@Unsafe("This must follows the rules of inheritance for execution scopes, and any code should be intercepted by the server's execution interceptors.")
+public fun Engine.createRuntime(scope: Execution): ServerRuntime = ExecutionRuntime(this, scope)
 
 private class ExecutionRuntime(
     engine: Engine,

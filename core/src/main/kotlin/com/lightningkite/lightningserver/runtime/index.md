@@ -17,7 +17,7 @@ This package contains the core runtime system for Lightning Server applications.
   `context(ServerRuntime)` rather than `context(Engine)` is how a declaration says its work is attributable. Also holds
   the runtime-scoped extensions: WebSocket topic messaging and task launching.
 
-- **[Initiator.kt](Execution.kt)** - What started one execution, and what caused it to start. Serializable, so
+- **[Execution.kt](Execution.kt)** - What started one execution, and what caused it to start. Serializable, so
   parentage survives a task queue.
 
 - **[ExecutionRuntime.kt](ExecutionRuntime.kt)** - Mints a [ServerRuntime] from an engine plus an initiator.
@@ -29,15 +29,23 @@ This package contains the core runtime system for Lightning Server applications.
 - **[Engine.ext.kt](Engine.ext.kt)** - Extension functions for convenient engine operations including
   setting access via `invoke()`, the clock, and location lookups for handlers and tasks.
 
-### Request Handling
+### Running Executions
 
-- **[implementationHelpers.kt](implementationHelpers.kt)** - Core HTTP request handling with automatic features
-  including:
-    - HEAD request translation from GET
-    - Trailing slash redirect logic
-    - GZIP compression negotiation and application
-    - Exception handling and logging
-    - Telemetry integration for all handler types (HTTP, WebSocket, tasks)
+One file per kind of execution, each holding the entry point an engine calls plus that kind's
+telemetry.
+
+- **[HttpExecution.kt](HttpExecution.kt)** - `handle` for a request from a client and `handleSubRequest` for one
+  dispatched inside a multiplexed request, both funnelling into the single logical-request choke point. Covers route
+  resolution, HEAD translation from GET, trailing slash redirects, per-handler timeouts, and exception mapping.
+
+- **[WebSocketExecution.kt](WebSocketExecution.kt)** - The five `*WithMetrics` entry points, one per lifecycle phase,
+  each minting its own execution from the socket's connect initiator.
+
+- **[TaskExecution.kt](TaskExecution.kt)** - `executeWithMetrics` for tasks, schedules, startup and pre-deploy tasks,
+  which differ only in their telemetry labels and what they invoke.
+
+- **[Instrumentation.kt](Instrumentation.kt)** - `instrument` for naming a child span, and `interceptExecution`, which runs a
+  body inside the `ExecutionInterceptor` chain. Shared by all of the above.
 
 ### Utilities
 

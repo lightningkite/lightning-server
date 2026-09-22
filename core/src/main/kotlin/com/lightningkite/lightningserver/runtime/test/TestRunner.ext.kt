@@ -7,13 +7,12 @@ import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.Execution
-import com.lightningkite.lightningserver.runtime.execute
+import com.lightningkite.lightningserver.runtime.createRuntime
 import com.lightningkite.lightningserver.runtime.phase
 import com.lightningkite.lightningserver.runtime.handle
 import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.TypedData
-import kotlin.uuid.Uuid
 
 /**
  * Testing extensions for HTTP handlers and WebSocket handlers.
@@ -41,7 +40,7 @@ public suspend fun <STORAGE> WebSocketHandler<PathSpec0, STORAGE>.test(
     domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
     protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
-    socketId: Uuid = Execution.ID.generate(),
+    socketId: Execution.ID = Execution.ID.generate(),
 ): TestRunner<*>.TestWebSocket<PathSpec0, STORAGE> {
     val intercepted = test.server.interceptIncomingSocket(this@test)
     val request = WebSocketConnectRequest(
@@ -58,9 +57,9 @@ public suspend fun <STORAGE> WebSocketHandler<PathSpec0, STORAGE>.test(
         path = request.path,
         phase = Execution.WebSocket.Phase.Connect,
     )
-    val storage = with(test.execute(initiator)) { intercepted.willConnect(request) }
+    val storage = with(test.createRuntime(initiator)) { intercepted.willConnect(request) }
     return test.TestWebSocket(intercepted, request, initiator, storage).also {
-        with(test.execute(initiator.phase(Execution.WebSocket.Phase.Connected))) {
+        with(test.createRuntime(initiator.phase(Execution.WebSocket.Phase.Connected))) {
             intercepted.didConnect(it.server)
         }
     }
@@ -75,7 +74,7 @@ public suspend fun <STORAGE, A> WebSocketHandler<PathSpec1<A>, STORAGE>.test(
     domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
     protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
-    socketId: Uuid = Execution.ID.generate(),
+    socketId: Execution.ID = Execution.ID.generate(),
 ): TestRunner<*>.TestWebSocket<PathSpec1<A>, STORAGE> {
     val intercepted = test.server.interceptIncomingSocket(this@test)
     val request = WebSocketConnectRequest(
@@ -92,9 +91,9 @@ public suspend fun <STORAGE, A> WebSocketHandler<PathSpec1<A>, STORAGE>.test(
         path = request.path,
         phase = Execution.WebSocket.Phase.Connect,
     )
-    val storage = with(test.execute(initiator)) { intercepted.willConnect(request) }
+    val storage = with(test.createRuntime(initiator)) { intercepted.willConnect(request) }
     return test.TestWebSocket(intercepted, request, initiator, storage).also {
-        with(test.execute(initiator.phase(Execution.WebSocket.Phase.Connected))) {
+        with(test.createRuntime(initiator.phase(Execution.WebSocket.Phase.Connected))) {
             intercepted.didConnect(it.server)
         }
     }
@@ -110,7 +109,7 @@ public suspend fun <STORAGE, A, B> WebSocketHandler<PathSpec2<A, B>, STORAGE>.te
     domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
     protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
-    socketId: Uuid = Execution.ID.generate(),
+    socketId: Execution.ID = Execution.ID.generate(),
 ): TestRunner<*>.TestWebSocket<PathSpec2<A, B>, STORAGE> {
     val intercepted = test.server.interceptIncomingSocket(this@test)
     val request = WebSocketConnectRequest(
@@ -127,9 +126,9 @@ public suspend fun <STORAGE, A, B> WebSocketHandler<PathSpec2<A, B>, STORAGE>.te
         path = request.path,
         phase = Execution.WebSocket.Phase.Connect,
     )
-    val storage = with(test.execute(initiator)) { intercepted.willConnect(request) }
+    val storage = with(test.createRuntime(initiator)) { intercepted.willConnect(request) }
     return test.TestWebSocket(intercepted, request, initiator, storage).also {
-        with(test.execute(initiator.phase(Execution.WebSocket.Phase.Connected))) {
+        with(test.createRuntime(initiator.phase(Execution.WebSocket.Phase.Connected))) {
             intercepted.didConnect(it.server)
         }
     }
@@ -146,7 +145,7 @@ public suspend fun <STORAGE, A, B, C> WebSocketHandler<PathSpec3<A, B, C>, STORA
     domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
     protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
-    socketId: Uuid = Execution.ID.generate(),
+    socketId: Execution.ID = Execution.ID.generate(),
 ): TestRunner<*>.TestWebSocket<PathSpec3<A, B, C>, STORAGE> {
     val intercepted = test.server.interceptIncomingSocket(this@test)
     val request = WebSocketConnectRequest(
@@ -163,9 +162,9 @@ public suspend fun <STORAGE, A, B, C> WebSocketHandler<PathSpec3<A, B, C>, STORA
         path = request.path,
         phase = Execution.WebSocket.Phase.Connect,
     )
-    val storage = with(test.execute(initiator)) { intercepted.willConnect(request) }
-    return test.TestWebSocket(this, request, initiator, storage).also {
-        with(test.execute(initiator.phase(Execution.WebSocket.Phase.Connected))) {
+    val storage = with(test.createRuntime(initiator)) { intercepted.willConnect(request) }
+    return test.TestWebSocket(intercepted, request, initiator, storage).also {
+        with(test.createRuntime(initiator.phase(Execution.WebSocket.Phase.Connected))) {
             intercepted.didConnect(it.server)
         }
     }
@@ -179,7 +178,7 @@ public suspend fun HttpHandler<PathSpec0>.test(
     domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
     protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
-    requestId: Uuid = Execution.ID.generate(),
+    requestId: Execution.ID = Execution.ID.generate(),
     body: TypedData? = null,
 ): HttpResponse {
     val request: HttpRequest<PathSpec> = HttpRequest(
@@ -203,7 +202,7 @@ public suspend fun <A> HttpHandler<PathSpec1<A>>.test(
     domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
     protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
-    requestId: Uuid = Execution.ID.generate(),
+    requestId: Execution.ID = Execution.ID.generate(),
     body: TypedData? = null,
 ): HttpResponse {
     val request: HttpRequest<PathSpec> = HttpRequest(
@@ -228,7 +227,7 @@ public suspend fun <A, B> HttpHandler<PathSpec2<A, B>>.test(
     domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
     protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
-    requestId: Uuid = Execution.ID.generate(),
+    requestId: Execution.ID = Execution.ID.generate(),
     body: TypedData? = null,
 ): HttpResponse {
     val request: HttpRequest<PathSpec> = HttpRequest(
@@ -254,7 +253,7 @@ public suspend fun <A, B, C> HttpHandler<PathSpec3<A, B, C>>.test(
     domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
     protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "local",
-    requestId: Uuid = Execution.ID.generate(),
+    requestId: Execution.ID = Execution.ID.generate(),
     body: TypedData? = null,
 ): HttpResponse {
     val request: HttpRequest<PathSpec> = HttpRequest(

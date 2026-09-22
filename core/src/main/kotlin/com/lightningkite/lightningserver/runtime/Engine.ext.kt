@@ -180,3 +180,10 @@ val ServerDefinition.location: PathSpec0 get() = runner.server.location(this) ?:
 public context(runner: Engine)
 val ServerBuilder.location: PathSpec0 get() = runner.server.location(this) ?: throw UnregisteredException(this)
 
+/*
+ * TODO: API Recommendations
+ *
+ * 1. UnregisteredException provides minimal context - just "Item $item is unregistered".
+ *    Consider adding which server it was looked up in, or suggestions for common mistakes.
+ */
+

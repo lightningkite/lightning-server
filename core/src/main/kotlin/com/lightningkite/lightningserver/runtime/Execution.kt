@@ -1,6 +1,8 @@
 package com.lightningkite.lightningserver.runtime
 
 import com.lightningkite.lightningserver.InternalLightningServerApi
+import com.lightningkite.lightningserver.definition.Extendable
+import com.lightningkite.lightningserver.definition.MutableExtensions
 import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
@@ -62,7 +64,6 @@ public sealed interface Execution {
         override val causedBy: ID? get() = null
     }
 
-
     /**
      * One HTTP request, whether it arrived from a client or was dispatched inside a multiplexed one
      * such as `/meta/bulk`.
@@ -78,6 +79,7 @@ public sealed interface Execution {
         override val causedBy: ID? = null,
         override val rootExecution: ID = id,
         val endpoint: RawHttpEndpoint<PathSpec>,
+//        override val extensions: MutableExtensions = MutableExtensions()
     ) : Execution, Requested
 
     /**
@@ -89,7 +91,7 @@ public sealed interface Execution {
      * of one socket, and is the identity to attribute a socket's whole session to.
      */
     @Serializable
-    @SerialName("ws")
+    @SerialName("websocket")
     public data class WebSocket @InternalLightningServerApi constructor(
         override val id: ID,
         override val causedBy: ID? = null,
@@ -98,6 +100,7 @@ public sealed interface Execution {
         val socketId: ID,
         val path: RawWebSocketPath<PathSpec>,
         val phase: Phase,
+//        override val extensions: MutableExtensions = MutableExtensions()
     ) : Execution, Requested {
         public enum class Phase { Connect, Connected, ClientMessage, SubscriptionMessage, Disconnect }
     }
@@ -115,6 +118,7 @@ public sealed interface Execution {
         override val causedBy: ID,
         override val rootExecution: ID,
         val location: PathSegments,
+//        override val extensions: MutableExtensions = MutableExtensions()
     ) : Execution
 
     /** One tick of a scheduled task. */
@@ -123,6 +127,7 @@ public sealed interface Execution {
     public data class Schedule @InternalLightningServerApi constructor(
         override val id: ID,
         val location: PathSegments,
+//        override val extensions: MutableExtensions = MutableExtensions()
     ) : Execution, ServerManaged
 
     /** One run of a startup task. */
@@ -131,6 +136,7 @@ public sealed interface Execution {
     public data class Startup @InternalLightningServerApi constructor(
         override val id: ID,
         val location: PathSegments,
+//        override val extensions: MutableExtensions = MutableExtensions()
     ) : Execution, ServerManaged
 
     /** One run of a pre-deploy task. */
@@ -139,6 +145,7 @@ public sealed interface Execution {
     public data class PreDeploy @InternalLightningServerApi constructor(
         override val id: ID,
         val location: PathSegments,
+//        override val extensions: MutableExtensions = MutableExtensions()
     ) : Execution, ServerManaged
 
     /**
@@ -155,6 +162,7 @@ public sealed interface Execution {
         override val id: ID,
         override val causedBy: ID? = null,
         override val rootExecution: ID = id,
+//        override val extensions: MutableExtensions = MutableExtensions()
     ) : Execution
 }
 
@@ -181,22 +189,6 @@ public val Execution.logicalId: Execution.ID get() = when (this) {
 // Compares logicalId, not id: a socket's later phases each have their own id parented to the connect,
 // so id == rootExecution would report a physical socket's messageFromClient as non-root.
 public fun Execution.isRoot(): Boolean = logicalId == rootExecution
-
-/**
- * The initiator of a logical request dispatched inside this one, such as a `/meta/bulk` sub-request.
- *
- * A sub-request is a separate execution — it is independently attributable, and independently
- * audited — so it gets its own id rather than reusing the carrying request's, while staying joinable
- * to it through [Execution.causedBy] and to the whole batch through [Execution.rootExecution].
- */
-@InternalLightningServerApi
-context(engine: Engine)
-public fun Execution.Http.subRequest(endpoint: RawHttpEndpoint<PathSpec>): Execution.Http = Execution.Http(
-    id = Execution.ID.generate(),
-    causedBy = id,
-    rootExecution = rootExecution,
-    endpoint = endpoint,
-)
 
 /**
  * The initiator of a later phase of the same socket.
