@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.telemetrySettings
 import com.lightningkite.lightningserver.runtime.executeWithMetrics
+import com.lightningkite.lightningserver.runtime.executeInlineWithMetrics
 import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.runtime.test.testBlocking
@@ -50,7 +51,7 @@ class TaskSpanTest {
         ) {
             cleanup.executeWithMetrics(cleanup.location)
             reindex.executeWithMetrics(reindex.location)
-            sendEmail.executeWithMetrics(sendEmail.location, Unit, serverRuntime.execution)
+            sendEmail.executeInlineWithMetrics(sendEmail.location, Unit, serverRuntime.execution)
             migrate.executeWithMetrics(migrate.location)
             warmup.executeWithMetrics(warmup.location)
 

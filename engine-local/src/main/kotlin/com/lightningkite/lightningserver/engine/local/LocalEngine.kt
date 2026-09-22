@@ -184,7 +184,7 @@ public abstract class LocalEngine(server: ServerDefinition) : EngineBase(server)
         scope.launch {
             try {
                 logger.debug { "Handling task: ${task.location}" }
-                task.executeWithMetrics(task.location, input, from)
+                task.executeInlineWithMetrics(task.location, input, from)
             } catch (_: Exception) {
                 /*squish; already reported*/
             }

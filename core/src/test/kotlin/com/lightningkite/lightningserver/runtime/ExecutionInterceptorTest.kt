@@ -79,7 +79,7 @@ class ExecutionInterceptorTest {
         server.test(settings = { generalSettings set GeneralServerSettings() }) {
             runBlocking {
                 server.endpoint.test()
-                server.task.executeWithMetrics(server.task.location, Unit, serverRuntime.execution)
+                server.task.executeInlineWithMetrics(server.task.location, Unit, serverRuntime.execution)
                 server.schedule.executeWithMetrics(server.schedule.location)
                 server.startup.executeWithMetrics(server.startup.location)
                 server.preDeploy.executeWithMetrics(server.preDeploy.location)

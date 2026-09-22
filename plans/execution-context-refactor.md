@@ -124,12 +124,12 @@ Nothing is lost for WebSockets: `connectionId` already lives in `engineSocketId`
 ### 2.7 One seam for minting, interception, and instrumentation
 
 `core/.../runtime/implementationHelpers.kt` is already the single place every engine funnels through:
-`handle()`, the five `*WithMetrics` WebSocket helpers, and four near-identical `executeWithMetrics`
+`handle()`, the five `*WithMetrics` WebSocket helpers, and four near-identical `executeInlineWithMetrics`
 overloads for Task / ScheduledTask / StartupTask / PreDeployTask.
 
 That is the same seam that must mint the `ServerRuntime`, the same seam `ExecutionInterceptor` hooks,
 and the same seam telemetry already uses. Minting, intercepting and instrumenting all happen there,
-once. The four `executeWithMetrics` copies collapse into one generic helper.
+once. The four `executeInlineWithMetrics` copies collapse into one generic helper.
 
 ### 2.8 `Engine` vs `ServerRuntime` at declaration sites
 
@@ -323,7 +323,7 @@ typed socket in the repo follow.
 ### Stage 5 — `ExecutionInterceptor`
 
 - Add per 3.4, install on `ServerBuilder`, apply at the seam.
-- Collapse the four `executeWithMetrics` overloads into one.
+- Collapse the four `executeInlineWithMetrics` overloads into one.
 - ~~Existing telemetry becomes a built-in interceptor.~~ **Not done, and it should not be.**
   An interceptor sees only `(runtime, cont)`, but the spans need attributes the initiator
   deliberately does not carry (§2.3), post-hoc enrichment a bare generic `T` cannot reach, and

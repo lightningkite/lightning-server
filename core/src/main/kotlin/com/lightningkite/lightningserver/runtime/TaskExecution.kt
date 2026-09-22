@@ -70,7 +70,7 @@ private suspend fun Engine.executeTaskLike(
  *   manual invocation.
  */
 context(engine: Engine)
-public suspend fun <T> Task<T>.executeWithMetrics(location: PathSpec0, input: T, from: Execution): Unit =
+public suspend fun <T> Task<T>.executeInlineWithMetrics(location: PathSpec0, input: T, from: Execution): Unit =
     engine.executeTaskLike(
         TaskKind.Task,
         location,

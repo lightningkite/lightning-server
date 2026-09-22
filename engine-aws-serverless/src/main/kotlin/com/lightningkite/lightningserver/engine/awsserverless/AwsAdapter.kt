@@ -162,7 +162,7 @@ public open class AwsAdapter(server: ServerDefinition) : EngineBase(server), Req
     }
 
     override suspend fun <T> dispatchTask(task: Task<T>, input: T, from: Execution) {
-        tasks.launchTask(location, this, input, from)
+        tasks.launchTask(task.location, task, input, from)
     }
 
     override val serverId: String

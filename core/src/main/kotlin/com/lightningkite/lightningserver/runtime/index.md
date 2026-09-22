@@ -41,7 +41,7 @@ telemetry.
 - **[WebSocketExecution.kt](WebSocketExecution.kt)** - The five `*WithMetrics` entry points, one per lifecycle phase,
   each minting its own execution from the socket's connect initiator.
 
-- **[TaskExecution.kt](TaskExecution.kt)** - `executeWithMetrics` for tasks, schedules, startup and pre-deploy tasks,
+- **[TaskExecution.kt](TaskExecution.kt)** - `executeInlineWithMetrics` for tasks, schedules, startup and pre-deploy tasks,
   which differ only in their telemetry labels and what they invoke.
 
 - **[Instrumentation.kt](Instrumentation.kt)** - `instrument` for naming a child span, and `interceptExecution`, which runs a

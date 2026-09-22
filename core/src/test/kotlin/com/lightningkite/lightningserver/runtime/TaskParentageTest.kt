@@ -64,7 +64,7 @@ private class QueueingEngine : EngineBase(TestServer.build()) {
             val location = PathSpec0.fromString(queued.location)
             @Suppress("UNCHECKED_CAST")
             val task = server.tasks.getValue(location) as Task<Unit>
-            task.executeWithMetrics(location, Unit, queued.from)
+            task.executeInlineWithMetrics(location, Unit, queued.from)
         }
     }
 }

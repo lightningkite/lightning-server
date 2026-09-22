@@ -25,7 +25,7 @@ import com.lightningkite.lightningserver.runtime.EngineBase
 import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ExecutionCause
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.executeWithMetrics
+import com.lightningkite.lightningserver.runtime.executeInlineWithMetrics
 import com.lightningkite.lightningserver.runtime.handle
 import com.lightningkite.lightningserver.runtime.invoke
 import com.lightningkite.lightningserver.runtime.location
@@ -413,7 +413,7 @@ private class BulkProbeEngine : EngineBase(BulkTestServer.build()), ServerRuntim
             val location = PathSpec0.fromString(queued.location)
             @Suppress("UNCHECKED_CAST")
             val task = server.tasks.getValue(location) as Task<Any?>
-            task.executeWithMetrics(
+            task.executeInlineWithMetrics(
                 location,
                 internalSerialization.json.decodeFromString(task.serializer, queued.input),
                 queued.cause,

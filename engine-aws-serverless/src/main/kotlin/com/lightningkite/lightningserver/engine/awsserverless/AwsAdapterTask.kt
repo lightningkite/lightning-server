@@ -3,8 +3,8 @@ package com.lightningkite.lightningserver.engine.awsserverless
 import com.lightningkite.lightningserver.AnonType
 import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.pathing.PathSpec0
-import com.lightningkite.lightningserver.runtime.ExecutionCause
-import com.lightningkite.lightningserver.runtime.executeWithMetrics
+import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.runtime.executeInlineWithMetrics
 import com.lightningkite.services.serializers.KotlinBytesFormat
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.Serializable
@@ -26,10 +26,10 @@ internal class AwsAdapterTask(val root: AwsAdapter) {
     data class TaskInvoke(
         val taskName: String,
         val input: AnonType,
-        val cause: ExecutionCause? = null,
+        val cause: Execution,
     ) : AwsLambdaInput
 
-    suspend fun <T> launchTask(location: PathSpec0, task: Task<T>, input: T, cause: ExecutionCause?) {
+    suspend fun <T> launchTask(location: PathSpec0, task: Task<T>, input: T, cause: Execution) {
         try {
             root.invokeLambda(InvokeRequest.builder().also {
                 it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
@@ -60,7 +60,7 @@ internal class AwsAdapterTask(val root: AwsAdapter) {
                 @Suppress("UNCHECKED_CAST")
                 task as Task<Any?>
                 with(root) {
-                    task.executeWithMetrics(
+                    task.executeInlineWithMetrics(
                         p,
                         event.input.value(root.internalSerialization.kotlinBytesFormat, task.serializer),
                         event.cause,
