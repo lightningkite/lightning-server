@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.Engine
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.location
 import kotlinx.serialization.KSerializer
@@ -146,6 +147,9 @@ public data class WebSocketConnectRequest<PATH : PathSpec>(
 public interface WebSocketConnection<PATH : PathSpec, STORAGE> {
     /** The original connection request */
     public val request: WebSocketConnectRequest<PATH>
+
+    /** The identity of this logical socket, constant across every phase of its lifetime. */
+    public val socketId: Execution.ID
 
     /** The current state for this connection */
     public val currentState: STORAGE

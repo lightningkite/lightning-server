@@ -17,7 +17,6 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawWebSocketPath
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.runtime.Execution
-import com.lightningkite.lightningserver.runtime.phase
 import com.lightningkite.lightningserver.runtime.didConnectWithMetrics
 import com.lightningkite.lightningserver.runtime.disconnectWithMetrics
 import com.lightningkite.lightningserver.runtime.execute
@@ -318,7 +317,7 @@ public class KtorEngine(
                     socketHandler as WebSocketHandler<PathSpec, Any?>
 
                     val startingState =
-                        socketHandler.willConnectWithMetrics(match.pathSpec, this@KtorEngine, connectInitiator, request)
+                        socketHandler.willConnectWithMetrics(match.pathSpec, connectInitiator, request)
                     var closingMid: WebSocketConnection<PathSpec, Any?>? = null
 
                     // Disconnect is the socket's cleanup phase, so it has to outlive the cancellation
@@ -330,12 +329,7 @@ public class KtorEngine(
                         mid: WebSocketConnection<PathSpec, Any?>,
                         reason: WebSocketClose,
                     ): Unit = withContext(NonCancellable) {
-                        socketHandler.disconnectWithMetrics(
-                            match.pathSpec,
-                            connectInitiator.phase(Execution.WebSocket.Phase.Disconnect),
-                            mid,
-                            reason,
-                        )
+                        socketHandler.disconnectWithMetrics(match.pathSpec, mid, reason)
                     }
 
                     try {
@@ -364,12 +358,7 @@ public class KtorEngine(
                         }
                         closingMid = mid
 
-                        socketHandler.didConnectWithMetrics(
-                            match.pathSpec,
-                            this@KtorEngine,
-                            connectInitiator.phase(Execution.WebSocket.Phase.Connected),
-                            mid,
-                        )
+                        socketHandler.didConnectWithMetrics(match.pathSpec, mid)
 
                         for (incoming in this.incoming) {
                             val m = when (incoming) {
@@ -379,13 +368,7 @@ public class KtorEngine(
                                 is Frame.Ping -> continue
                                 is Frame.Pong -> continue
                             }
-                            socketHandler.messageFromClientWithMetrics(
-                                match.pathSpec,
-                                this@KtorEngine,
-                                connectInitiator.phase(Execution.WebSocket.Phase.ClientMessage),
-                                mid,
-                                m,
-                            )
+                            socketHandler.messageFromClientWithMetrics(match.pathSpec, mid, m)
                         }
 
                         closingMid.let { mid -> emitDisconnect(mid, WebSocketClose.NORMAL) }

@@ -9,7 +9,6 @@ import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.EngineBase
 import com.lightningkite.lightningserver.runtime.executeWithoutTelemetry
-import com.lightningkite.lightningserver.runtime.phase
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.SettingContext
@@ -131,8 +130,19 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
         public var currentState: STORAGE,
         public val name: String = "Client",
     ) {
+        // No parent execution: a later phase in production is triggered by the network/engine layer
+        // with nothing of the server's already running, and this mirrors that rather than nesting
+        // inside whatever the test happens to be doing when it calls send()/close().
         private suspend fun <T> withPhase(phase: Execution.WebSocket.Phase, action: suspend ServerRuntime.() -> T): T =
-            this@TestRunner.executeWithoutTelemetry(initiator.phase(phase), action)
+            this@TestRunner.executeWithoutTelemetry(
+                Execution.WebSocket(
+                    id = Execution.ID.generate(),
+                    socketId = initiator.socketId,
+                    path = initiator.path,
+                    phase = phase,
+                ),
+                action,
+            )
 
         public var onMessageSent: (frame: WebSocketFrame) -> Unit = {}
         public suspend fun close() {
@@ -151,6 +161,8 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
         public val server: ServerSide = ServerSide()
 
         public inner class ServerSide() : WebSocketConnection<PATH, STORAGE> {
+            override val socketId: Execution.ID get() = initiator.socketId
+
             private val changeQueue = ArrayList<(STORAGE) -> STORAGE>()
             private val sub: suspend (WebSocketSubscriptionMessage<*, *>) -> Unit = {
                 withPhase(Execution.WebSocket.Phase.SubscriptionMessage) {

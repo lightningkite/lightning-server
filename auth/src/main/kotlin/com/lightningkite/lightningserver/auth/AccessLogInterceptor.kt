@@ -118,17 +118,8 @@ private suspend fun com.lightningkite.lightningserver.data.Request<*>.authString
 }
 
 /**
- * Renders the correlation IDs, including the parent for a sub-request or virtual socket, so a line
- * can be tied back to the request that carried it.
- *
- * One rule for every kind of execution. The line names the logical request or connection it belongs
- * to — for a socket that is the socket rather than the phase, the identifier that stays the same from
- * open to close — and names `causedBy` as its parent, suppressed when it *is* the id already shown.
- * That suppression is the whole of the socket special case: every phase after connect is caused by
- * its own connect, which would otherwise render as "X of X".
- *
- * `causedBy` and not `rootExecutionId`, so that "of" means the same thing on every line. The two
- * differ as soon as anything nests, and a reader cannot tell a parent from a causal root by looking.
+ * Renders the line's correlation id, plus `of <parent>` when this execution was genuinely dispatched
+ * from within another one (a sub-request, a virtual socket) — omitted when there is no parent.
  */
 context(runtime: ServerRuntime)
 private fun idSuffix(idLabel: String = "req"): String {

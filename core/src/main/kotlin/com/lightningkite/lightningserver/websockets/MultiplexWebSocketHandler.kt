@@ -57,6 +57,10 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
             val channel: String,
             val handler: WebSocketHandler<PathSpec, T>,
         ) : WebSocketConnection<PathSpec, T> {
+            // The virtual socket's own identity, not the physical connection's — each multiplexed
+            // channel is a logical socket in its own right.
+            override val socketId: Execution.ID get() = wrapped.currentState.map.getValue(channel).initiator.socketId
+
             @Suppress("UNCHECKED_CAST")
             override val request: WebSocketConnectRequest<PathSpec> get() = wrapped.currentState.map.getValue(channel).request as WebSocketConnectRequest<PathSpec>
             override var currentState: T = wrapped.currentState.map.getValue(channel).storage.value(
@@ -202,7 +206,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                             "Expected to be running a WebSocket phase, but this execution was initiated by ${serverRuntime.execution}."
                         )).subConnection(r.path)
                     val storage =
-                        otherHandler.willConnectWithMetrics(match.path.pathSpec, serverRuntime, subInitiator, r)
+                        otherHandler.willConnectWithMetrics(match.path.pathSpec, subInitiator, r)
                     connection.updateStateImmediately {
                         it.copy(
                             map = it.map + (channel to MultiplexWebSocketHandlerConnectionInfo(
@@ -217,12 +221,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                         )
                     }
                     connection.withWrapped(otherHandler, channel) {
-                        otherHandler.didConnectWithMetrics(
-                            match.pathSpec,
-                            serverRuntime,
-                            subInitiator.phase(Execution.WebSocket.Phase.Connected),
-                            it
-                        )
+                        otherHandler.didConnectWithMetrics(match.pathSpec, it)
                     }
                     connection.send(
                         WebSocketFrame(
@@ -244,13 +243,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                     val otherHandler = serverRuntime.server.compiledWebSocketInterceptors
                         .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
                     connection.withWrapped(otherHandler, channel) {
-                        otherHandler.disconnectWithMetrics(
-                            match.pathSpec,
-                            serverRuntime,
-                            info.initiator.phase(Execution.WebSocket.Phase.Disconnect),
-                            it,
-                            WebSocketClose.NORMAL
-                        )
+                        otherHandler.disconnectWithMetrics(match.pathSpec, it, WebSocketClose.NORMAL)
                     }
                     connection.updateStateImmediately { it.copy(map = it.map - channel) }
                     connection.send(
@@ -273,17 +266,8 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                     val otherHandler = serverRuntime.server.compiledWebSocketInterceptors
                         .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
                     val textFrame = WebSocketFrame.Text(message.data!!)
-                    connection.withWrapped(
-                        otherHandler,
-                        channel
-                    ) {
-                        otherHandler.messageFromClientWithMetrics(
-                            match.pathSpec,
-                            serverRuntime,
-                            info.initiator.phase(Execution.WebSocket.Phase.ClientMessage),
-                            it,
-                            textFrame,
-                        )
+                    connection.withWrapped(otherHandler, channel) {
+                        otherHandler.messageFromClientWithMetrics(match.pathSpec, it, textFrame)
                     }
                 }
             }
@@ -305,8 +289,6 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                 connection.withWrapped(otherHandler, channel) {
                     otherHandler.disconnectWithMetrics(
                         match.pathSpec,
-                        serverRuntime,
-                        info.initiator.phase(Execution.WebSocket.Phase.Disconnect),
                         it,
                         ((e as? HttpStatusException)?.status ?: HttpStatus.InternalServerError).bestWebSocketCloseCode
                     )
@@ -328,13 +310,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                 val otherHandler = serverRuntime.server.compiledWebSocketInterceptors
                     .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
                 connection.withWrapped(otherHandler, channel) {
-                    otherHandler.messageFromSubscriptionWithMetrics(
-                        match.pathSpec,
-                        serverRuntime,
-                        info.initiator.phase(Execution.WebSocket.Phase.SubscriptionMessage),
-                        it,
-                        topic,
-                    )
+                    otherHandler.messageFromSubscriptionWithMetrics(match.pathSpec, it, topic)
                 }
             }
         }
@@ -351,13 +327,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
             val otherHandler = serverRuntime.server.compiledWebSocketInterceptors
                 .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
             connection.withWrapped(otherHandler, channel) {
-                otherHandler.disconnectWithMetrics(
-                    match.pathSpec,
-                    serverRuntime,
-                    info.initiator.phase(Execution.WebSocket.Phase.Disconnect),
-                    it,
-                    reason,
-                )
+                otherHandler.disconnectWithMetrics(match.pathSpec, it, reason)
             }
         }
     }

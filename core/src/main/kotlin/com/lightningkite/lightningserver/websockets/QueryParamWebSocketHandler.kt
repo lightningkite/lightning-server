@@ -32,6 +32,9 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
             val wrapped: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>,
             val handler: WebSocketHandler<PathSpec, T>,
         ) : WebSocketConnection<PathSpec, T> {
+            // Same physical socket, only the path is rewritten, so the identity carries over.
+            override val socketId: Execution.ID get() = wrapped.socketId
+
             @Suppress("UNCHECKED_CAST")
             override val request: WebSocketConnectRequest<PathSpec>
                 get() = wrapped.currentState.request as WebSocketConnectRequest<PathSpec>
@@ -155,7 +158,6 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
             // Same physical socket, only the path is rewritten, so the identity carries over.
             otherHandler.willConnectWithMetrics(
                 match.pathSpec,
-                serverRuntime,
                 (serverRuntime.execution as? Execution.WebSocket
                     ?: throw IllegalStateException(
                         "Expected to be running a WebSocket phase, but this execution was initiated by ${serverRuntime.execution}."
@@ -189,27 +191,11 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
         return match.pathSpec to (otherHandler as WebSocketHandler<PathSpec, Any?>)
     }
 
-    /**
-     * This phase, re-pointed at the path the socket was really opened against.
-     *
-     * Rewriting a path is not opening a socket, so the execution and the socket stay the same; only
-     * the location the initiator names would otherwise be the placeholder the client connected to.
-     */
-    context(serverRuntime: ServerRuntime)
-    private fun WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>.innerInitiator(): Execution.WebSocket {
-        @Suppress("UNCHECKED_CAST")
-        val path = currentState.request.path as RawWebSocketPath<PathSpec>
-        return (serverRuntime.execution as? Execution.WebSocket
-            ?: throw IllegalStateException(
-                "Expected to be running a WebSocket phase, but this execution was initiated by ${serverRuntime.execution}."
-            )).rewritePath(path)
-    }
-
     context(serverRuntime: ServerRuntime)
     override suspend fun didConnect(connection: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>) {
         val (pathSpec, otherHandler) = connection.inner()
         connection.withWrapped(otherHandler) {
-            otherHandler.didConnectWithMetrics(pathSpec, serverRuntime, connection.innerInitiator(), it)
+            otherHandler.didConnectWithMetrics(pathSpec, it)
         }
     }
 
@@ -220,7 +206,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
     ) {
         val (pathSpec, otherHandler) = connection.inner()
         connection.withWrapped(otherHandler) {
-            otherHandler.messageFromClientWithMetrics(pathSpec, serverRuntime, connection.innerInitiator(), it, frame)
+            otherHandler.messageFromClientWithMetrics(pathSpec, it, frame)
         }
     }
 
@@ -231,13 +217,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
     ) {
         val (pathSpec, otherHandler) = connection.inner()
         connection.withWrapped(otherHandler) {
-            otherHandler.messageFromSubscriptionWithMetrics(
-                pathSpec,
-                serverRuntime,
-                connection.innerInitiator(),
-                it,
-                topic,
-            )
+            otherHandler.messageFromSubscriptionWithMetrics(pathSpec, it, topic)
         }
     }
 
@@ -248,7 +228,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
     ) {
         val (pathSpec, otherHandler) = connection.inner()
         connection.withWrapped(otherHandler) {
-            otherHandler.disconnectWithMetrics(pathSpec, serverRuntime, connection.innerInitiator(), it, reason)
+            otherHandler.disconnectWithMetrics(pathSpec, it, reason)
         }
     }
 }

@@ -87,7 +87,6 @@ class ExecutionInterceptorTest {
                 // exercised the way an engine does it.
                 server.socket.willConnectWithMetrics(
                     location = server.socket.location,
-                    engine = engine,
                     initiator = Execution.WebSocket(
                         id = Execution.ID.generate(),
                         socketId = Execution.ID.generate(),

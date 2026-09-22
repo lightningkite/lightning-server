@@ -8,7 +8,6 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.executeWithoutTelemetry
-import com.lightningkite.lightningserver.runtime.phase
 import com.lightningkite.lightningserver.runtime.handle
 import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.websockets.*
@@ -59,7 +58,14 @@ public suspend fun <STORAGE> WebSocketHandler<PathSpec0, STORAGE>.test(
     )
     val storage = test.executeWithoutTelemetry(initiator) { intercepted.willConnect(request) }
     return test.TestWebSocket(intercepted, request, initiator, storage).also {
-        test.executeWithoutTelemetry(initiator.phase(Execution.WebSocket.Phase.Connected)) {
+        test.executeWithoutTelemetry(
+        Execution.WebSocket(
+            id = Execution.ID.generate(),
+            socketId = initiator.socketId,
+            path = initiator.path,
+            phase = Execution.WebSocket.Phase.Connected,
+        )
+    ) {
             intercepted.didConnect(it.server)
         }
     }
@@ -93,7 +99,14 @@ public suspend fun <STORAGE, A> WebSocketHandler<PathSpec1<A>, STORAGE>.test(
     )
     val storage = test.executeWithoutTelemetry(initiator) { intercepted.willConnect(request) }
     return test.TestWebSocket(intercepted, request, initiator, storage).also {
-        test.executeWithoutTelemetry(initiator.phase(Execution.WebSocket.Phase.Connected)) {
+        test.executeWithoutTelemetry(
+        Execution.WebSocket(
+            id = Execution.ID.generate(),
+            socketId = initiator.socketId,
+            path = initiator.path,
+            phase = Execution.WebSocket.Phase.Connected,
+        )
+    ) {
             intercepted.didConnect(it.server)
         }
     }
@@ -128,7 +141,14 @@ public suspend fun <STORAGE, A, B> WebSocketHandler<PathSpec2<A, B>, STORAGE>.te
     )
     val storage = test.executeWithoutTelemetry(initiator) { intercepted.willConnect(request) }
     return test.TestWebSocket(intercepted, request, initiator, storage).also {
-        test.executeWithoutTelemetry(initiator.phase(Execution.WebSocket.Phase.Connected)) {
+        test.executeWithoutTelemetry(
+        Execution.WebSocket(
+            id = Execution.ID.generate(),
+            socketId = initiator.socketId,
+            path = initiator.path,
+            phase = Execution.WebSocket.Phase.Connected,
+        )
+    ) {
             intercepted.didConnect(it.server)
         }
     }
@@ -164,7 +184,14 @@ public suspend fun <STORAGE, A, B, C> WebSocketHandler<PathSpec3<A, B, C>, STORA
     )
     val storage = test.executeWithoutTelemetry(initiator) { intercepted.willConnect(request) }
     return test.TestWebSocket(intercepted, request, initiator, storage).also {
-        test.executeWithoutTelemetry(initiator.phase(Execution.WebSocket.Phase.Connected)) {
+        test.executeWithoutTelemetry(
+        Execution.WebSocket(
+            id = Execution.ID.generate(),
+            socketId = initiator.socketId,
+            path = initiator.path,
+            phase = Execution.WebSocket.Phase.Connected,
+        )
+    ) {
             intercepted.didConnect(it.server)
         }
     }

@@ -193,31 +193,18 @@ public val Execution.logicalId: Execution.ID get() = when (this) {
 /**
  * Whether this execution is the outermost one — nothing the server is running carried it.
  *
- * True for a request a client sent, a socket a client opened (in any of its phases), a schedule tick,
- * a startup or pre-deploy task. False for anything dispatched inside something else: a `/meta/bulk`
- * sub-request, a virtual socket multiplexed inside a real one, a task launched by a request.
+ * True for a request a client sent, a socket a client opened (in any of its phases, so long as that
+ * phase was not itself dispatched from within another running execution), a schedule tick, a startup
+ * or pre-deploy task. False for anything dispatched inside something else: a `/meta/bulk` sub-request,
+ * a virtual socket multiplexed inside a real one, a task launched by a request.
+ *
+ * Equivalent to `rootExecution == id`, since a [causedBy] of `null` is exactly the case where nothing
+ * caused this execution to inherit another's root. [causedBy] is the more direct read.
  *
  * Interceptors use this when their concern belongs to the connection rather than to the work, since
  * the interceptor chains run for every logical request and socket.
  */
-// Compares logicalId, not id: a socket's later phases each have their own id parented to the connect,
-// so id == rootExecution would report a physical socket's messageFromClient as non-root.
-public fun Execution.isRoot(): Boolean = logicalId == rootExecution
-
-/**
- * The initiator of a later phase of the same socket.
- *
- * Derive from the socket's connect initiator — the one an engine persists with the connection — so
- * that every phase of a socket names the connect that opened it.
- */
-@InternalLightningServerApi
-context(engine: Engine)
-public fun Execution.WebSocket.phase(phase: Execution.WebSocket.Phase): Execution.WebSocket = copy(
-    id = Execution.ID.generate(),
-    causedBy = id,
-    rootExecution = rootExecution,
-    phase = phase,
-)
+public fun Execution.isRoot(): Boolean = causedBy == null
 
 /**
  * The initiator of a logical sub-socket multiplexed inside this physical connection.

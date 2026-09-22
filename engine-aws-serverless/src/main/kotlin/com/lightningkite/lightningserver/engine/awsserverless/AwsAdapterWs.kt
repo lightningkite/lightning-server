@@ -68,7 +68,8 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
         path: P,
         request: WebSocketConnectRequest<P>,
         handler: WebSocketHandler<P, T>,
-        socketId: String,
+        connectionId: String,
+        socketId: Execution.ID,
         stateString: AnonType,
         action: (WsMid<P, T>) -> R,
     ): R {
@@ -76,6 +77,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
             request = request,
             path = path,
             handler = handler,
+            connectionId = connectionId,
             socketId = socketId,
             stateAnonType = stateString
         )
@@ -88,7 +90,9 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
         override val request: WebSocketConnectRequest<P>,
         val path: P,
         val handler: WebSocketHandler<P, T>,
-        val socketId: String,
+        /** The AWS API Gateway connection id — a wire-level detail, distinct from [socketId]. */
+        val connectionId: String,
+        override val socketId: Execution.ID,
         val stateAnonType: AnonType,
     ) : WebSocketConnection<P, T> {
         override var currentState: T = stateAnonType.value(encoding, handler.storageSerializer)
@@ -113,8 +117,8 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
 
         /** Reads the socket's stored state, failing with [WebSocketStateGoneException] if the socket is no longer tracked. */
         private suspend fun fetchStateBytes(): ByteArray =
-            (webSocketDynamo.statesAlone(listOf(socketId))[socketId]
-                ?: throw WebSocketStateGoneException(socketId))
+            (webSocketDynamo.statesAlone(listOf(connectionId))[connectionId]
+                ?: throw WebSocketStateGoneException(connectionId))
                 .also { committedStateBytes = it }
 
         val queue = ArrayList<(T) -> T>()
@@ -131,20 +135,20 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                 attempts++
                 if (attempts > maxAttempts) {
                     root.logger.error {
-                        "Failed to commit WebSocket state for $socketId after $maxAttempts attempts. " +
+                        "Failed to commit WebSocket state for $connectionId after $maxAttempts attempts. " +
                                 "This indicates either extreme contention or a serialization issue. Queue size: ${queue.size}"
                     }
                     throw IllegalStateException(
-                        "Failed to commit WebSocket state for $socketId after $maxAttempts attempts"
+                        "Failed to commit WebSocket state for $connectionId after $maxAttempts attempts"
                     )
                 }
 
                 val newState = queue.fold(currentState) { item, apply -> apply(item) }
                 val newStateBytes = encoding.encodeToByteArray(handler.storageSerializer, newState)
 
-                if (webSocketDynamo.updateState(socketId, committedStateBytes, newStateBytes)) {
+                if (webSocketDynamo.updateState(connectionId, committedStateBytes, newStateBytes)) {
                     if (attempts > 1) {
-                        root.logger.debug { "WebSocket state committed for $socketId after $attempts attempts" }
+                        root.logger.debug { "WebSocket state committed for $connectionId after $attempts attempts" }
                     }
                     committedStateBytes = newStateBytes
                     queue.clear()
@@ -154,7 +158,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
 
                 // Another invocation (a didConnect, a publish, or another client message) beat us to it.
                 // Re-read the winning state and re-apply our queued modifications on top of it.
-                root.logger.debug { "WebSocket state update retry $attempts for $socketId" }
+                root.logger.debug { "WebSocket state update retry $attempts for $connectionId" }
                 currentState = encoding.decodeFromByteArray(handler.storageSerializer, fetchStateBytes())
             }
         }
@@ -165,24 +169,24 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
         }
 
         override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-            webSocketDynamo.subscribe(path.toString(), with(root) { topic.path() }, socketId)
+            webSocketDynamo.subscribe(path.toString(), with(root) { topic.path() }, connectionId)
         }
 
         override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-            webSocketDynamo.unsubscribe(with(root) { topic.path() }, socketId)
+            webSocketDynamo.unsubscribe(with(root) { topic.path() }, connectionId)
         }
 
         override suspend fun send(frame: WebSocketFrame) {
             try {
                 val result = root.apiGatewayWsPostToConnection(PostToConnectionRequest.builder().also {
-                    it.connectionId(socketId)
+                    it.connectionId(connectionId)
                     it.data(SdkBytes.fromUtf8String(frame.text))
                 }.build())
                 val r = result.sdkHttpResponse()
                 if (!r.isSuccessful) {
-                    root.logger.warn { "Socket $socketId had a send failure." }
+                    root.logger.warn { "Socket $connectionId had a send failure." }
                     throw Exception(
-                        "Failed to send socket message to $socketId ${r.statusCode()} - ${
+                        "Failed to send socket message to $connectionId ${r.statusCode()} - ${
                             try {
                                 r.statusText().get()
                             } catch (e: Exception) {
@@ -192,14 +196,14 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     )
                 }
             } catch (e: GoneException) {
-                root.logger.warn { "Socket $socketId is gone, but a send was attempted." }
-                webSocketDynamo.clean(socketId)
+                root.logger.warn { "Socket $connectionId is gone, but a send was attempted." }
+                webSocketDynamo.clean(connectionId)
             }
         }
 
         override suspend fun close(reason: WebSocketClose) {
-            root.logger.info { "Closing socket $socketId with reason $reason as requested." }
-            webSocketClose(socketId, reason)
+            root.logger.info { "Closing socket $connectionId with reason $reason as requested." }
+            webSocketClose(connectionId, reason)
         }
 
     }
@@ -283,19 +287,20 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                             s.connectRequest as WebSocketConnectRequest<PathSpec>,
                             h,
                             socketId,
+                            s.initiator.socketId,
                             AnonType(s.state)
                         ) { mid ->
-                            h.messageFromSubscriptionWithMetrics(
-                                p.pathSpec,
-                                root,
-                                with(root) { s.initiator.phase(Execution.WebSocket.Phase.SubscriptionMessage) },
-                                mid,
-                                WebSocketSubscriptionMessage(
-                                    fullTopicMatch.value,
-                                    fullTopicMatch.path.rawPathArguments,
-                                    fullValue
+                            with(root) {
+                                h.messageFromSubscriptionWithMetrics(
+                                    p.pathSpec,
+                                    mid,
+                                    WebSocketSubscriptionMessage(
+                                        fullTopicMatch.value,
+                                        fullTopicMatch.path.rawPathArguments,
+                                        fullValue
+                                    )
                                 )
-                            )
+                            }
                         }
                     } catch (e: WebSocketStateGoneException) {
                         root.logger.debug { "Socket $socketId disconnected while delivering topic '${event.topic}'; skipping." }
@@ -383,14 +388,10 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                 event.connection as WebSocketConnectRequest<PathSpec0>,
                 rootWs,
                 event.socketId,
+                initiator.socketId,
                 event.storage
             ) { mid ->
-                rootWs.didConnectWithMetrics(
-                    rootPath,
-                    root,
-                    with(root) { initiator.phase(Execution.WebSocket.Phase.Connected) },
-                    mid
-                )
+                with(root) { rootWs.didConnectWithMetrics(rootPath, mid) }
                 return APIGatewayV2HTTPResponse(200)
             }
         } catch (e: WebSocketStateGoneException) {
@@ -450,7 +451,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     phase = Execution.WebSocket.Phase.Connect,
                 )
                 try {
-                    val storage = rootWs.willConnectWithMetrics(rootPath, root, connectInitiator, lkEvent)
+                    val storage = with(root) { rootWs.willConnectWithMetrics(rootPath, connectInitiator, lkEvent) }
                     val storageBytes = encoding.encodeToByteArray(rootWs.storageSerializer, storage)
                     webSocketDynamo.setState(
                         event.requestContext.connectionId,
@@ -515,15 +516,10 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         state.connectRequest as WebSocketConnectRequest<PathSpec0>,
                         rootWs,
                         event.requestContext.connectionId,
+                        state.initiator.socketId,
                         AnonType(state.state)
                     ) { mid ->
-                        rootWs.disconnectWithMetrics(
-                            rootPath,
-                            root,
-                            with(root) { state.initiator.phase(Execution.WebSocket.Phase.Disconnect) },
-                            mid,
-                            WebSocketClose.NORMAL
-                        )
+                        with(root) { rootWs.disconnectWithMetrics(rootPath, mid, WebSocketClose.NORMAL) }
                     }
                     APIGatewayV2HTTPResponse(200)
                 } catch (e: Exception) {
@@ -557,6 +553,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         state.connectRequest as WebSocketConnectRequest<PathSpec0>,
                         rootWs,
                         event.requestContext.connectionId,
+                        state.initiator.socketId,
                         AnonType(state.state),
                     ) { mid ->
                         try {
@@ -574,13 +571,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         } catch (e: Exception) {
                             root.logger.error(e) { "Failed to run debug webSocket processing" }
                         }
-                        rootWs.messageFromClientWithMetrics(
-                            rootPath,
-                            root,
-                            with(root) { state.initiator.phase(Execution.WebSocket.Phase.ClientMessage) },
-                            mid,
-                            WebSocketFrame(event.body)
-                        )
+                        with(root) { rootWs.messageFromClientWithMetrics(rootPath, mid, WebSocketFrame(event.body)) }
                         APIGatewayV2HTTPResponse(200)
                     }
                 } catch (e: WebSocketStateGoneException) {
