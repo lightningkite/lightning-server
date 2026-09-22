@@ -53,14 +53,13 @@ public interface DirectExecutableWebSocketHandler<PATH : PathSpec> {
      * Local engines should call this instead of the standard lifecycle when available.
      * The implementation should run the entire WebSocket session in this coroutine.
      *
-     * @param serverRuntime The server runtime context
      * @param request The initial connection request
      * @param incoming Receive channel of frames from the client (closes when client disconnects)
      * @param send Function to send frames to the client
      * @param close Function to close the connection with a reason
      */
+    context(server: ServerRuntime)
     public suspend fun handleDirect(
-        serverRuntime: ServerRuntime,
         request: WebSocketConnectRequest<PATH>,
         incoming: ReceiveChannel<WebSocketFrame>,
         send: suspend (WebSocketFrame) -> Unit,

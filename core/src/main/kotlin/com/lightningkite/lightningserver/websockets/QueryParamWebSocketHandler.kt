@@ -23,83 +23,82 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
     override val storageSerializer: KSerializer<QueryParamWebSocketHandlerData> =
         QueryParamWebSocketHandlerData.serializer()
 
-    private class ConnectionWrapped<T>(
-        val runtime: ServerRuntime,
-        val wrapped: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>,
-        val handler: WebSocketHandler<PathSpec, T>,
-    ) : WebSocketConnection<PathSpec, T> {
-        @Suppress("UNCHECKED_CAST")
-        override val request: WebSocketConnectRequest<PathSpec>
-            get() = wrapped.currentState.request as WebSocketConnectRequest<PathSpec>
-        override var currentState: T = wrapped.currentState.underlyingData.value(
-            runtime.internalSerialization.kotlinBytesFormat,
-            handler.storageSerializer
-        )
-            private set
-
-        override suspend fun close(reason: WebSocketClose) = wrapped.close(reason)
-        override suspend fun send(frame: WebSocketFrame) = wrapped.send(frame)
-        override suspend fun repullState(): T =
-            wrapped.repullState().underlyingData.value(
+    context(runtime: ServerRuntime)
+    private suspend fun <T> WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>.withWrapped(
+        handler: WebSocketHandler<PathSpec, T>,
+        action: suspend (WebSocketConnection<PathSpec, T>) -> Unit,
+    ): WebSocketConnection<PathSpec, T> {
+        class ConnectionWrapped(
+            val wrapped: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>,
+            val handler: WebSocketHandler<PathSpec, T>,
+        ) : WebSocketConnection<PathSpec, T> {
+            @Suppress("UNCHECKED_CAST")
+            override val request: WebSocketConnectRequest<PathSpec>
+                get() = wrapped.currentState.request as WebSocketConnectRequest<PathSpec>
+            override var currentState: T = wrapped.currentState.underlyingData.value(
                 runtime.internalSerialization.kotlinBytesFormat,
                 handler.storageSerializer
             )
+                private set
 
-        override suspend fun queueStateUpdate(modification: (T) -> T) {
-            wrapped.queueStateUpdate { data ->
-                val underlying =
-                    data.underlyingData.value(
-                        runtime.internalSerialization.kotlinBytesFormat,
-                        handler.storageSerializer
-                    )
-                data.copy(
-                    underlyingData = AnonType(
-                        runtime.internalSerialization.kotlinBytesFormat,
-                        modification(underlying),
-                        handler.storageSerializer
-                    )
+            override suspend fun close(reason: WebSocketClose) = wrapped.close(reason)
+            override suspend fun send(frame: WebSocketFrame) = wrapped.send(frame)
+            override suspend fun repullState(): T =
+                wrapped.repullState().underlyingData.value(
+                    runtime.internalSerialization.kotlinBytesFormat,
+                    handler.storageSerializer
                 )
-            }
-        }
 
-        override suspend fun updateStateImmediately(modification: (T) -> T): T {
-            wrapped.updateStateImmediately { data ->
-                val underlying =
-                    data.underlyingData.value(
-                        runtime.internalSerialization.kotlinBytesFormat,
-                        handler.storageSerializer
+            override suspend fun queueStateUpdate(modification: (T) -> T) {
+                wrapped.queueStateUpdate { data ->
+                    val underlying =
+                        data.underlyingData.value(
+                            runtime.internalSerialization.kotlinBytesFormat,
+                            handler.storageSerializer
+                        )
+                    data.copy(
+                        underlyingData = AnonType(
+                            runtime.internalSerialization.kotlinBytesFormat,
+                            modification(underlying),
+                            handler.storageSerializer
+                        )
                     )
-                data.copy(
-                    underlyingData = AnonType(
-                        runtime.internalSerialization.kotlinBytesFormat,
-                        modification(underlying).also { currentState = it },
-                        handler.storageSerializer
-                    )
-                )
+                }
             }
-            return currentState
-        }
 
-        override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) =
-            wrapped.subscribe(topic)
-
-        override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) = wrapped.unsubscribe(topic)
-
-        suspend fun finalize() {
-            if (request.cache.updated) {
+            override suspend fun updateStateImmediately(modification: (T) -> T): T {
                 wrapped.updateStateImmediately { data ->
-                    data.copy(request = request)
+                    val underlying =
+                        data.underlyingData.value(
+                            runtime.internalSerialization.kotlinBytesFormat,
+                            handler.storageSerializer
+                        )
+                    data.copy(
+                        underlyingData = AnonType(
+                            runtime.internalSerialization.kotlinBytesFormat,
+                            modification(underlying).also { currentState = it },
+                            handler.storageSerializer
+                        )
+                    )
+                }
+                return currentState
+            }
+
+            override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) =
+                wrapped.subscribe(topic)
+
+            override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) = wrapped.unsubscribe(topic)
+
+            suspend fun finalize() {
+                if (request.cache.updated) {
+                    wrapped.updateStateImmediately { data ->
+                        data.copy(request = request)
+                    }
                 }
             }
         }
-    }
 
-    private suspend inline fun <T> WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>.withWrapped(
-        runtime: ServerRuntime,
-        handler: WebSocketHandler<PathSpec, T>,
-        action: suspend (ConnectionWrapped<T>) -> Unit,
-    ): WebSocketConnection<PathSpec, T> {
-        val wrapped = ConnectionWrapped(runtime, this, handler)
+        val wrapped = ConnectionWrapped(this, handler)
         action(wrapped)
         wrapped.finalize()
         return wrapped
@@ -209,7 +208,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
     context(serverRuntime: ServerRuntime)
     override suspend fun didConnect(connection: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>) {
         val (pathSpec, otherHandler) = connection.inner()
-        connection.withWrapped(serverRuntime, otherHandler) {
+        connection.withWrapped(otherHandler) {
             otherHandler.didConnectWithMetrics(pathSpec, serverRuntime, connection.innerInitiator(), it)
         }
     }
@@ -220,7 +219,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
         frame: WebSocketFrame,
     ) {
         val (pathSpec, otherHandler) = connection.inner()
-        connection.withWrapped(serverRuntime, otherHandler) {
+        connection.withWrapped(otherHandler) {
             otherHandler.messageFromClientWithMetrics(pathSpec, serverRuntime, connection.innerInitiator(), it, frame)
         }
     }
@@ -231,7 +230,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
         topic: WebSocketSubscriptionMessage<*, *>,
     ) {
         val (pathSpec, otherHandler) = connection.inner()
-        connection.withWrapped(serverRuntime, otherHandler) {
+        connection.withWrapped(otherHandler) {
             otherHandler.messageFromSubscriptionWithMetrics(
                 pathSpec,
                 serverRuntime,
@@ -248,7 +247,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
         reason: WebSocketClose,
     ) {
         val (pathSpec, otherHandler) = connection.inner()
-        connection.withWrapped(serverRuntime, otherHandler) {
+        connection.withWrapped(otherHandler) {
             otherHandler.disconnectWithMetrics(pathSpec, serverRuntime, connection.innerInitiator(), it, reason)
         }
     }

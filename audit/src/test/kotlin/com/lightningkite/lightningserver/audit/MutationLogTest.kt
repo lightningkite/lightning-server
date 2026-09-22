@@ -101,12 +101,13 @@ class MutationLogTest {
         )
     }
 
-    private suspend fun runPreDeployTasks(runtime: ServerRuntime) {
+    context(runtime: ServerRuntime)
+    private suspend fun runPreDeployTasks() {
         val done = HashSet<PreDeployTask>()
         suspend fun run(task: PreDeployTask) {
             if (!done.add(task)) return
             task.dependencies().forEach { run(it) }
-            with(runtime) { task.execute() }
+            task.execute()
         }
         runtime.server.preDeployTasks.values.forEach { run(it) }
     }
@@ -120,7 +121,7 @@ class MutationLogTest {
         block: suspend context(ServerRuntime) (ServerRuntime) -> Unit,
     ) = runBlocking {
         TestServer.test(settings = { database set Database.Settings(); cache set Cache.Settings() }) {
-            runPreDeployTasks(serverRuntime)
+            runPreDeployTasks()
             val runtime = if (initiator == null) serverRuntime else serverRuntime.execute(initiator)
             block(runtime, runtime)
         }
@@ -128,7 +129,7 @@ class MutationLogTest {
 
     private fun onSummaryServer(block: suspend context(ServerRuntime) (ServerRuntime) -> Unit) = runBlocking {
         SummaryServer.test(settings = { database set Database.Settings(); cache set Cache.Settings() }) {
-            runPreDeployTasks(serverRuntime)
+            runPreDeployTasks()
             block(serverRuntime, serverRuntime)
         }
     }

@@ -80,7 +80,13 @@ public sealed interface Execution {
         override val rootExecution: ID = id,
         val endpoint: RawHttpEndpoint<PathSpec>,
 //        override val extensions: MutableExtensions = MutableExtensions()
-    ) : Execution, Requested
+    ) : Execution, Requested {
+        @InternalLightningServerApi public constructor(
+            id: ID,
+            parent: Execution?,
+            endpoint: RawHttpEndpoint<PathSpec>
+        ) : this(id, causedBy = parent?.id, rootExecution = parent?.rootExecution ?: id, endpoint)
+    }
 
     /**
      * One phase of one WebSocket's life.
@@ -102,6 +108,14 @@ public sealed interface Execution {
         val phase: Phase,
 //        override val extensions: MutableExtensions = MutableExtensions()
     ) : Execution, Requested {
+        @InternalLightningServerApi public constructor(
+            id: ID,
+            parent: Execution?,
+            socketId: ID,
+            path: RawWebSocketPath<PathSpec>,
+            phase: Phase
+        ) : this(id, causedBy = parent?.id, rootExecution = parent?.rootExecution ?: id, socketId, path, phase)
+
         public enum class Phase { Connect, Connected, ClientMessage, SubscriptionMessage, Disconnect }
     }
 

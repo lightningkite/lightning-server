@@ -73,10 +73,10 @@ public interface ExecutionInterceptor {
  * whatever that kind of execution returns, so there is no response to fabricate here. Failures
  * propagate to the kind-specific handling at the seam.
  */
+context(runtime: ServerRuntime)
 private suspend fun <T> ExecutionInterceptor.interceptInstrumented(
-    runtime: ServerRuntime,
     cont: suspend context(ServerRuntime) () -> T,
-): T = with(runtime) { instrument(name) { intercept(cont) } }
+): T = instrument(name) { intercept(cont) }
 
 /** One link of a compiled chain, wrapping [interceptor] in its own instrumentation span. */
 private fun instrumentedLink(interceptor: ExecutionInterceptor): ExecutionInterceptor =
@@ -86,7 +86,7 @@ private fun instrumentedLink(interceptor: ExecutionInterceptor): ExecutionInterc
         context(runtime: ServerRuntime)
         override suspend fun <T> intercept(
             cont: suspend context(ServerRuntime) () -> T,
-        ): T = interceptor.interceptInstrumented(runtime, cont)
+        ): T = interceptor.interceptInstrumented(cont)
     }
 
 /** Nests [inner] inside [outer], so [outer] runs first and can post-process what [inner] returns. */
@@ -97,7 +97,7 @@ private fun composeLinks(outer: ExecutionInterceptor, inner: ExecutionIntercepto
         context(runtime: ServerRuntime)
         override suspend fun <T> intercept(
             cont: suspend context(ServerRuntime) () -> T,
-        ): T = outer.intercept { inner.interceptInstrumented(serverRuntime, cont) }
+        ): T = outer.intercept { inner.interceptInstrumented(cont) }
     }
 
 /**

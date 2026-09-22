@@ -141,8 +141,8 @@ public abstract class CoroutineWebSocketHandler : ServerBuilder() {
             // --- DirectExecutableWebSocketHandler implementation ---
             // Used by local engines (Ktor, Netty) to bypass pub/sub overhead
 
+            context(server: ServerRuntime)
             override suspend fun handleDirect(
-                serverRuntime: ServerRuntime,
                 request: WebSocketConnectRequest<PathSpec0>,
                 incoming: ReceiveChannel<WebSocketFrame>,
                 send: suspend (WebSocketFrame) -> Unit,
@@ -150,16 +150,14 @@ public abstract class CoroutineWebSocketHandler : ServerBuilder() {
             ) {
                 logger.info { "handleDirect: starting direct execution (bypassing pub/sub)" }
                 try {
-                    with(serverRuntime) {
-                        handle(
-                            request = request,
-                            waitForFullConnect = { /* Already connected in direct mode */ },
-                            incoming = flow {
-                                incoming.consumeEach { emit(it) }
-                            },
-                            send = send
-                        )
-                    }
+                    handle(
+                        request = request,
+                        waitForFullConnect = { /* Already connected in direct mode */ },
+                        incoming = flow {
+                            incoming.consumeEach { emit(it) }
+                        },
+                        send = send
+                    )
                     logger.info { "handleDirect: handler completed normally" }
                     close(WebSocketClose.NORMAL)
                 } catch (e: CancellationException) {

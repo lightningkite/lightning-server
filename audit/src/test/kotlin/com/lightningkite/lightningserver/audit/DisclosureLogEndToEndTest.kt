@@ -87,7 +87,7 @@ class DisclosureLogEndToEndTest {
 
     private fun onServer(block: suspend context(ServerRuntime) Reader.() -> Unit) = runBlocking {
         TestServer.test(settings = { database set Database.Settings(); cache set Cache.Settings() }) {
-            runPreDeployTasks(serverRuntime)
+            runPreDeployTasks()
             block(serverRuntime, Reader())
         }
     }
@@ -97,12 +97,13 @@ class DisclosureLogEndToEndTest {
      * indices. Done here rather than through the runner so the ordering the real deploy pipeline
      * guarantees is reproduced explicitly.
      */
-    private suspend fun runPreDeployTasks(runtime: ServerRuntime) {
+    context(runtime: ServerRuntime)
+    private suspend fun runPreDeployTasks() {
         val done = HashSet<PreDeployTask>()
         suspend fun run(task: PreDeployTask) {
             if (!done.add(task)) return
             task.dependencies().forEach { run(it) }
-            with(runtime) { task.execute() }
+            task.execute()
         }
         runtime.server.preDeployTasks.values.forEach { run(it) }
     }
@@ -135,7 +136,7 @@ class DisclosureLogEndToEndTest {
             settings = { database set Database.Settings(); cache set Cache.Settings() },
             clock = { object : Clock { override fun now(): Instant = fixed } },
         ) {
-            runPreDeployTasks(serverRuntime)
+            runPreDeployTasks()
             with(serverRuntime) {
                 val response = handle(request("/patient"), testId(20))
                 assertEquals(HttpStatus.OK, response.status)

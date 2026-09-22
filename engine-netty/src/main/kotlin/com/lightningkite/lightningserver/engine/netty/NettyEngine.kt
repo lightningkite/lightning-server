@@ -563,7 +563,6 @@ public class NettyEngine(
                             // in this one coroutine — so it is one execution, named by the socket it is.
                             this@NettyEngine.execute("handleDirect", wsInitiator) {
                                 directHandler.handleDirect(
-                                    serverRuntime = this,
                                     request = wsRequest,
                                     incoming = incomingChannel,
                                     send = { frame ->

@@ -118,38 +118,35 @@ public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
 
     /** Presents the raw connection as the typed one this handler's own methods are written against. */
     private context(serverRuntime: ServerRuntime)
-    fun WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>.typed(): Connection<PATH, STORAGE, USER, INPUT, OUTPUT> =
-        ConnectionWrapper<PATH, STORAGE, USER, INPUT, OUTPUT>(serverRuntime, this, outputType, auth)
-}
+    fun WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>.typed(): Connection<PATH, STORAGE, USER, INPUT, OUTPUT> {
+        class ConnectionWrapper(
+            val wraps: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>,
+            val outputSerializer: KSerializer<OUTPUT>,
+            val authRequirement: AuthRequirement<USER>,
+        ) : ApiWebSocketHandler.Connection<PATH, STORAGE, USER, INPUT, OUTPUT> {
+            override suspend fun auth(): Authentication<USER & Any>? = wraps.request.auth(authRequirement)
+            override val request: WebSocketConnectRequest<PATH> get() = wraps.request
+            override val currentState: STORAGE get() = wraps.currentState.storage
+            override suspend fun repullState(): STORAGE = wraps.repullState().storage
+            override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE) =
+                wraps.queueStateUpdate { it.copy(storage = modification(it.storage)) }
 
+            override suspend fun updateStateImmediately(modification: (STORAGE) -> STORAGE): STORAGE =
+                wraps.updateStateImmediately { it.copy(storage = modification(it.storage)) }.storage
 
-private class ConnectionWrapper<PATH : PathSpec, STORAGE, USER : HasId<*>?, INPUT, OUTPUT>(
-    /** Needed for the wrapper's own work — resolving auth and encoding output — not exposed to the socket. */
-    private val runtime: ServerRuntime,
-    val wraps: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>,
-    val outputSerializer: KSerializer<OUTPUT>,
-    val authRequirement: AuthRequirement<USER>,
-) : ApiWebSocketHandler.Connection<PATH, STORAGE, USER, INPUT, OUTPUT> {
-    override suspend fun auth(): Authentication<USER & Any>? = with(runtime) { wraps.request.auth(authRequirement) }
-    override val request: WebSocketConnectRequest<PATH> get() = wraps.request
-    override val currentState: STORAGE get() = wraps.currentState.storage
-    override suspend fun repullState(): STORAGE = wraps.repullState().storage
-    override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE) =
-        wraps.queueStateUpdate { it.copy(storage = modification(it.storage)) }
+            override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) = wraps.subscribe(topic)
+            override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) = wraps.unsubscribe(topic)
+            // The single chokepoint for every typed WebSocket output, model update streams included. See
+            // TypedOutputInterceptor for why observation happens before encoding.
+            override suspend fun send(frame: OUTPUT) {
+                emitTypedOutput(wraps.request, outputSerializer, frame)
+                wraps.send(wraps.currentState.mediaType.encoder!!.ws(wraps.currentState.mediaType, outputSerializer, frame))
+            }
 
-    override suspend fun updateStateImmediately(modification: (STORAGE) -> STORAGE): STORAGE =
-        wraps.updateStateImmediately { it.copy(storage = modification(it.storage)) }.storage
-
-    override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) = wraps.subscribe(topic)
-    override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) = wraps.unsubscribe(topic)
-    // The single chokepoint for every typed WebSocket output, model update streams included. See
-    // TypedOutputInterceptor for why observation happens before encoding.
-    override suspend fun send(frame: OUTPUT): Unit = with(runtime) {
-        emitTypedOutput(wraps.request, outputSerializer, frame)
-        wraps.send(wraps.currentState.mediaType.encoder!!.ws(wraps.currentState.mediaType, outputSerializer, frame))
+            override suspend fun close(reason: WebSocketClose) = wraps.close(reason)
+        }
+        return ConnectionWrapper(this, outputType, auth)
     }
-
-    override suspend fun close(reason: WebSocketClose) = wraps.close(reason)
 }
 
 

@@ -143,19 +143,28 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
  * @param reason The close reason and code
  */
 @OptIn(InternalLightningServerApi::class)
+context(engine: Engine)
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.disconnectWithMetrics(
     location: PATH,
-    engine: Engine,
-    initiator: Execution.WebSocket,
     connection: WebSocketConnection<PATH, STORAGE>,
     reason: WebSocketClose,
 ) {
-    engine.execute("disconnect", initiator, TelemetryAttributes {
-        put(wsRoute, location.toString())
-        put(TelemetryKeys.Net.peerIp, connection.request.sourceIp)
-        put(wsDisconnectCode, reason.code.toLong())
-        put(wsDisconnectReason, reason.name)
-    }) {
+    engine.execute(
+        "disconnect",
+        Execution.WebSocket(
+            id = Execution.ID.generate(),
+            parent = (engine as? ServerRuntime)?.execution,
+            socketId = connection.socketId,
+            path = connection.request.path,
+            phase = Execution.WebSocket.Phase.Disconnect
+        ),
+        TelemetryAttributes {
+            put(wsRoute, location.toString())
+            put(TelemetryKeys.Net.peerIp, connection.request.sourceIp)
+            put(wsDisconnectCode, reason.code.toLong())
+            put(wsDisconnectReason, reason.name)
+        }
+    ) {
         disconnect(connection, reason)
     }
 }

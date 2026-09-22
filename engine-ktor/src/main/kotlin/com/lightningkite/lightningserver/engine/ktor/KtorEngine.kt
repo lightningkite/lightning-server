@@ -299,7 +299,6 @@ public class KtorEngine(
                     // one coroutine — so it is one execution, named by the socket it is.
                     this@KtorEngine.execute("handleDirect", connectInitiator) {
                         directHandler.handleDirect(
-                            serverRuntime = this,
                             request = request,
                             incoming = incomingChannel,
                             send = { frame ->
@@ -333,7 +332,6 @@ public class KtorEngine(
                     ): Unit = withContext(NonCancellable) {
                         socketHandler.disconnectWithMetrics(
                             match.pathSpec,
-                            this@KtorEngine,
                             connectInitiator.phase(Execution.WebSocket.Phase.Disconnect),
                             mid,
                             reason,

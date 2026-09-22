@@ -71,12 +71,13 @@ class AuditLayerRuntimeIndependenceTest {
     )
 
     /** Assignment of bit indices happens in pre-deploy, so a disclosure cannot be read without it. */
-    private suspend fun runPreDeployTasks(runtime: ServerRuntime) {
+    context(runtime: ServerRuntime)
+    private suspend fun runPreDeployTasks() {
         val done = HashSet<PreDeployTask>()
         suspend fun run(task: PreDeployTask) {
             if (!done.add(task)) return
             task.dependencies().forEach { run(it) }
-            with(runtime) { task.execute() }
+            task.execute()
         }
         runtime.server.preDeployTasks.values.forEach { run(it) }
     }
@@ -89,7 +90,7 @@ class AuditLayerRuntimeIndependenceTest {
         )
 
         TestServer.test(settings = { database set Database.Settings(); cache set Cache.Settings() }) {
-            runPreDeployTasks(serverRuntime)
+            runPreDeployTasks()
             with(serverRuntime) {
                 val response = handle(request(), requestId)
                 assertEquals(HttpStatus.OK, response.status)
