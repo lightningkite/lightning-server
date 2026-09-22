@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.engine.jdk
 
-import kotlin.uuid.Uuid
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.ServerSetting
@@ -12,6 +11,7 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.services.data.*
@@ -272,7 +272,7 @@ private fun HttpExchange.requestToLightningServer(
     requestIdHeader: String?,
     engine: JdkEngine,
     maxBody: Long,
-): Pair<HttpRequest<PathSpec>, Uuid> {
+): Pair<HttpRequest<PathSpec>, Execution.ID> {
     val method = this.requestMethod
     val uri = this.requestURI
     val queryParams = QueryParameters.parse(uri.rawQuery ?: "")

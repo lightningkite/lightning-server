@@ -8,7 +8,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.EngineBase
-import com.lightningkite.lightningserver.runtime.createRuntime
+import com.lightningkite.lightningserver.runtime.executeWithoutTelemetry
 import com.lightningkite.lightningserver.runtime.phase
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.*
@@ -131,8 +131,8 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
         public var currentState: STORAGE,
         public val name: String = "Client",
     ) {
-        private fun runtimeFor(phase: Execution.WebSocket.Phase): ServerRuntime =
-            this@TestRunner.createRuntime(initiator.phase(phase))
+        private suspend fun <T> withPhase(phase: Execution.WebSocket.Phase, action: suspend ServerRuntime.() -> T): T =
+            this@TestRunner.executeWithoutTelemetry(initiator.phase(phase), action)
 
         public var onMessageSent: (frame: WebSocketFrame) -> Unit = {}
         public suspend fun close() {
@@ -144,7 +144,7 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
         public suspend fun send(frame: WebSocketFrame) {
             /*logger.debug*/run { "$name --> '$frame'" }.let(::println)
             val connection = this@TestWebSocket.server
-            with(runtimeFor(Execution.WebSocket.Phase.ClientMessage)) { handler.messageFromClient(connection, frame) }
+            withPhase(Execution.WebSocket.Phase.ClientMessage) { handler.messageFromClient(connection, frame) }
             connection.flush()
         }
 
@@ -153,7 +153,7 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
         public inner class ServerSide() : WebSocketConnection<PATH, STORAGE> {
             private val changeQueue = ArrayList<(STORAGE) -> STORAGE>()
             private val sub: suspend (WebSocketSubscriptionMessage<*, *>) -> Unit = {
-                with(runtimeFor(Execution.WebSocket.Phase.SubscriptionMessage)) {
+                withPhase(Execution.WebSocket.Phase.SubscriptionMessage) {
                     handler.messageFromSubscription(this@ServerSide, it)
                 }
                 flush()
@@ -204,7 +204,7 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
 
             override suspend fun close(reason: WebSocketClose) {
                 /*logger.debug*/run { "$name <-- <close>" }.let(::println)
-                with(runtimeFor(Execution.WebSocket.Phase.Disconnect)) { handler.disconnect(this@ServerSide, reason) }
+                withPhase(Execution.WebSocket.Phase.Disconnect) { handler.disconnect(this@ServerSide, reason) }
             }
 
             internal fun clean() {

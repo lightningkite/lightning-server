@@ -2,7 +2,6 @@
 
 package com.lightningkite.lightningserver.engine.netty
 
-import kotlin.uuid.Uuid
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.NotFoundException
@@ -562,24 +561,26 @@ public class NettyEngine(
                         try {
                             // A directly-run socket is not phase-structured — the whole session runs
                             // in this one coroutine — so it is one execution, named by the socket it is.
-                            directHandler.handleDirect(
-                                serverRuntime = this@NettyEngine.execute(wsInitiator),
-                                request = wsRequest,
-                                incoming = incomingChannel,
-                                send = { frame ->
-                                    when (frame) {
-                                        is LkWebSocketFrame.Binary -> ctx.writeAndFlush(
-                                            BinaryWebSocketFrame(Unpooled.wrappedBuffer(frame.content))
-                                        )
+                            this@NettyEngine.execute("handleDirect", wsInitiator) {
+                                directHandler.handleDirect(
+                                    serverRuntime = this,
+                                    request = wsRequest,
+                                    incoming = incomingChannel,
+                                    send = { frame ->
+                                        when (frame) {
+                                            is LkWebSocketFrame.Binary -> ctx.writeAndFlush(
+                                                BinaryWebSocketFrame(Unpooled.wrappedBuffer(frame.content))
+                                            )
 
-                                        is LkWebSocketFrame.Text -> ctx.writeAndFlush(TextWebSocketFrame(frame.content))
+                                            is LkWebSocketFrame.Text -> ctx.writeAndFlush(TextWebSocketFrame(frame.content))
+                                        }
+                                    },
+                                    close = { reason ->
+                                        ctx.writeAndFlush(CloseWebSocketFrame(reason.code.toInt(), reason.name))
+                                            .addListener(ChannelFutureListener.CLOSE)
                                     }
-                                },
-                                close = { reason ->
-                                    ctx.writeAndFlush(CloseWebSocketFrame(reason.code.toInt(), reason.name))
-                                        .addListener(ChannelFutureListener.CLOSE)
-                                }
-                            )
+                                )
+                            }
                         } catch (e: Throwable) {
                             logger.error(e) { "Direct WebSocket handler failed" }
                             ctx.close()
@@ -694,7 +695,7 @@ public class NettyEngine(
         private fun FullHttpRequest.toLightningHttpRequest(
             ctx: ChannelHandlerContext,
             cfg: NettyRuntimeSettings,
-        ): Pair<HttpRequest<PathSpec>, Uuid> {
+        ): Pair<HttpRequest<PathSpec>, Execution.ID> {
 
             val parts = QueryStringDecoder(this.uri())
             val headers = (this.headers() as NettyHttpHeaders).toLightningHeaders()

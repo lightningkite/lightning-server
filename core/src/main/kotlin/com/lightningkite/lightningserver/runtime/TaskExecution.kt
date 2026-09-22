@@ -53,13 +53,11 @@ private suspend fun Engine.executeTaskLike(
     execution: Execution,
     body: suspend context(ServerRuntime) () -> Unit,
 ) {
-    execute(execution) {
-        instrument("${kind.label} $location", TelemetryAttributes {
-            put(taskType, kind.telemetryType)
-            put(taskRoute, location.toString())
-        }) {
-            interceptExecution(body)
-        }
+    execute("${kind.label} $location", execution, TelemetryAttributes {
+        put(taskType, kind.telemetryType)
+        put(taskRoute, location.toString())
+    }) {
+        body()
     }
 }
 

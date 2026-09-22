@@ -35,7 +35,7 @@ private class BareEngine : EngineBase(EmptyServer.build()) {
  * and the only symptom is the work being redone. `ApiHttpHandler` resolves the annotation validators
  * through exactly this path on every typed request.
  */
-@OptIn(InternalLightningServerApi::class)
+@OptIn(InternalLightningServerApi::class, com.lightningkite.services.data.Unsafe::class)
 class RuntimeCachedScopeTest {
     @Test
     fun `cached resolves once across many executions`() {

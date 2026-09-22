@@ -20,7 +20,7 @@ import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.phase
 import com.lightningkite.lightningserver.runtime.didConnectWithMetrics
 import com.lightningkite.lightningserver.runtime.disconnectWithMetrics
-import com.lightningkite.lightningserver.runtime.createRuntime
+import com.lightningkite.lightningserver.runtime.execute
 import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.lightningserver.runtime.messageFromClientWithMetrics
 import com.lightningkite.lightningserver.runtime.willConnectWithMetrics
@@ -297,20 +297,22 @@ public class KtorEngine(
                     // Run handler directly - no pub/sub, no task indirection
                     // A directly-run socket is not phase-structured — the whole session runs in this
                     // one coroutine — so it is one execution, named by the socket it is.
-                    directHandler.handleDirect(
-                        serverRuntime = this@KtorEngine.createRuntime(connectInitiator),
-                        request = request,
-                        incoming = incomingChannel,
-                        send = { frame ->
-                            when (frame) {
-                                is WebSocketFrame.Binary -> send(Frame.Binary(true, frame.content))
-                                is WebSocketFrame.Text -> send(Frame.Text(frame.content))
+                    this@KtorEngine.execute("handleDirect", connectInitiator) {
+                        directHandler.handleDirect(
+                            serverRuntime = this,
+                            request = request,
+                            incoming = incomingChannel,
+                            send = { frame ->
+                                when (frame) {
+                                    is WebSocketFrame.Binary -> send(Frame.Binary(true, frame.content))
+                                    is WebSocketFrame.Text -> send(Frame.Text(frame.content))
+                                }
+                            },
+                            close = { reason ->
+                                close(CloseReason(reason.code, reason.name))
                             }
-                        },
-                        close = { reason ->
-                            close(CloseReason(reason.code, reason.name))
-                        }
-                    )
+                        )
+                    }
                 } else {
                     // Standard pub/sub-based implementation (for non-direct handlers or when forced)
                     @Suppress("UNCHECKED_CAST")

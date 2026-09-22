@@ -12,7 +12,7 @@ import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.EngineBase
-import com.lightningkite.lightningserver.runtime.createRuntime
+import com.lightningkite.lightningserver.runtime.executeWithoutTelemetry
 import com.lightningkite.lightningserver.runtime.handle
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.runtime.test.test
@@ -280,7 +280,7 @@ class RequestIdentityTest {
         subRecorded.clear()
         SubServer.test(settings = {}) {
             runBlocking {
-                with(serverRuntime.createRuntime(outer())) { serverRuntime.handle(subTestRequest("a")) }
+                serverRuntime.executeWithoutTelemetry(outer()) { serverRuntime.handle(subTestRequest("a")) }
             }
         }
 
@@ -295,7 +295,7 @@ class RequestIdentityTest {
         subRecorded.clear()
         SubServer.test(settings = {}) {
             runBlocking {
-                with(serverRuntime.createRuntime(outer())) {
+                serverRuntime.executeWithoutTelemetry(outer()) {
                     serverRuntime.handle(subTestRequest("a"))
                     serverRuntime.handle(subTestRequest("b"))
                 }
@@ -313,7 +313,7 @@ class RequestIdentityTest {
         subRecorded.clear()
         SubServer.test(settings = {}) {
             runBlocking {
-                with(serverRuntime.createRuntime(outer())) { serverRuntime.handle(subTestRequest("nested")) }
+                serverRuntime.executeWithoutTelemetry(outer()) { serverRuntime.handle(subTestRequest("nested")) }
             }
         }
 

@@ -32,13 +32,11 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.wi
     initiator: Execution.WebSocket,
     request: WebSocketConnectRequest<PATH>,
 ): STORAGE {
-    return engine.execute(initiator) {
-        instrument("willConnect", TelemetryAttributes {
-            put(wsRoute, location.toString())
-            put(TelemetryKeys.Net.peerIp, request.sourceIp)
-        }) {
-            interceptExecution { willConnect(request) }
-        }
+    return engine.execute("willConnect", initiator, TelemetryAttributes {
+        put(wsRoute, location.toString())
+        put(TelemetryKeys.Net.peerIp, request.sourceIp)
+    }) {
+        willConnect(request)
     }
 }
 
@@ -58,13 +56,11 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
     initiator: Execution.WebSocket,
     connection: WebSocketConnection<PATH, STORAGE>,
 ) {
-    val runtime = engine.execute(initiator) {
-        instrument("didConnect", TelemetryAttributes {
-            put(wsRoute, location.toString())
-            put(TelemetryKeys.Net.peerIp, connection.request.sourceIp)
-        }) {
-            interceptExecution { didConnect(connection) }
-        }
+    engine.execute("didConnect", initiator, TelemetryAttributes {
+        put(wsRoute, location.toString())
+        put(TelemetryKeys.Net.peerIp, connection.request.sourceIp)
+    }) {
+        didConnect(connection)
     }
 }
 
@@ -88,25 +84,23 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
     connection: WebSocketConnection<PATH, STORAGE>,
     frame: WebSocketFrame,
 ) {
-    engine.execute(initiator) {
-        instrument("messageFromClient", TelemetryAttributes {
-            put(wsRoute, location.toString())
-            put(TelemetryKeys.Net.peerIp, connection.request.sourceIp)
-            put(
-                wsFrameType, when (frame) {
-                    is WebSocketFrame.Text -> "text"
-                    is WebSocketFrame.Binary -> "binary"
-                }
-            )
-            put(
-                wsFrameSize, when (frame) {
-                    is WebSocketFrame.Text -> frame.content.length.toLong()
-                    is WebSocketFrame.Binary -> frame.content.size.toLong()
-                }
-            )
-        }) {
-            interceptExecution { messageFromClient(connection, frame) }
-        }
+    engine.execute("messageFromClient", initiator, TelemetryAttributes {
+        put(wsRoute, location.toString())
+        put(TelemetryKeys.Net.peerIp, connection.request.sourceIp)
+        put(
+            wsFrameType, when (frame) {
+                is WebSocketFrame.Text -> "text"
+                is WebSocketFrame.Binary -> "binary"
+            }
+        )
+        put(
+            wsFrameSize, when (frame) {
+                is WebSocketFrame.Text -> frame.content.length.toLong()
+                is WebSocketFrame.Binary -> frame.content.size.toLong()
+            }
+        )
+    }) {
+        messageFromClient(connection, frame)
     }
 }
 
@@ -128,14 +122,13 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
     connection: WebSocketConnection<PATH, STORAGE>,
     topic: WebSocketSubscriptionMessage<*, *>,
 ) {
-    engine.execute(initiator) {
-        instrument("messageFromSubscription", TelemetryAttributes {
-            put(wsRoute, location.toString())
-            put(TelemetryKeys.Net.peerIp, connection.request.sourceIp)
-            put(wsSubscriptionTopic, topic.topic.location.toString())
-        }) {
-            interceptExecution { messageFromSubscription(connection, topic) }
-        }
+    val topicLocation = with(engine) { topic.topic.location }
+    engine.execute("messageFromSubscription", initiator, TelemetryAttributes {
+        put(wsRoute, location.toString())
+        put(TelemetryKeys.Net.peerIp, connection.request.sourceIp)
+        put(wsSubscriptionTopic, topicLocation.toString())
+    }) {
+        messageFromSubscription(connection, topic)
     }
 }
 
@@ -157,15 +150,13 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
     connection: WebSocketConnection<PATH, STORAGE>,
     reason: WebSocketClose,
 ) {
-    engine.execute(initiator) {
-        instrument("disconnect", TelemetryAttributes {
-            put(wsRoute, location.toString())
-            put(TelemetryKeys.Net.peerIp, connection.request.sourceIp)
-            put(wsDisconnectCode, reason.code.toLong())
-            put(wsDisconnectReason, reason.name)
-        }) {
-            interceptExecution { disconnect(connection, reason) }
-        }
+    engine.execute("disconnect", initiator, TelemetryAttributes {
+        put(wsRoute, location.toString())
+        put(TelemetryKeys.Net.peerIp, connection.request.sourceIp)
+        put(wsDisconnectCode, reason.code.toLong())
+        put(wsDisconnectReason, reason.name)
+    }) {
+        disconnect(connection, reason)
     }
 }
 

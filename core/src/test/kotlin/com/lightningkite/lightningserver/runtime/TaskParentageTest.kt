@@ -83,13 +83,14 @@ class TaskParentageTest {
 
         val requestId = with(engine) { Execution.ID.generate() }
         runBlocking {
-            val request = engine.createRuntime(
+            engine.executeWithoutTelemetry(
                 Execution.Http(
                     id = requestId,
                     endpoint = RawHttpEndpoint<PathSpec>(asString = "/thing", method = HttpMethod.GET),
                 )
-            )
-            with(request) { TestServer.first(Unit) }
+            ) {
+                TestServer.first(Unit)
+            }
             // `first` queues `second` while it runs, so one drain covers both hops.
             engine.drain()
         }

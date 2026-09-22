@@ -7,7 +7,7 @@ import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.Execution
-import com.lightningkite.lightningserver.runtime.createRuntime
+import com.lightningkite.lightningserver.runtime.executeWithoutTelemetry
 import com.lightningkite.lightningserver.runtime.phase
 import com.lightningkite.lightningserver.runtime.handle
 import com.lightningkite.lightningserver.runtime.location
@@ -57,9 +57,9 @@ public suspend fun <STORAGE> WebSocketHandler<PathSpec0, STORAGE>.test(
         path = request.path,
         phase = Execution.WebSocket.Phase.Connect,
     )
-    val storage = with(test.createRuntime(initiator)) { intercepted.willConnect(request) }
+    val storage = test.executeWithoutTelemetry(initiator) { intercepted.willConnect(request) }
     return test.TestWebSocket(intercepted, request, initiator, storage).also {
-        with(test.createRuntime(initiator.phase(Execution.WebSocket.Phase.Connected))) {
+        test.executeWithoutTelemetry(initiator.phase(Execution.WebSocket.Phase.Connected)) {
             intercepted.didConnect(it.server)
         }
     }
@@ -91,9 +91,9 @@ public suspend fun <STORAGE, A> WebSocketHandler<PathSpec1<A>, STORAGE>.test(
         path = request.path,
         phase = Execution.WebSocket.Phase.Connect,
     )
-    val storage = with(test.createRuntime(initiator)) { intercepted.willConnect(request) }
+    val storage = test.executeWithoutTelemetry(initiator) { intercepted.willConnect(request) }
     return test.TestWebSocket(intercepted, request, initiator, storage).also {
-        with(test.createRuntime(initiator.phase(Execution.WebSocket.Phase.Connected))) {
+        test.executeWithoutTelemetry(initiator.phase(Execution.WebSocket.Phase.Connected)) {
             intercepted.didConnect(it.server)
         }
     }
@@ -126,9 +126,9 @@ public suspend fun <STORAGE, A, B> WebSocketHandler<PathSpec2<A, B>, STORAGE>.te
         path = request.path,
         phase = Execution.WebSocket.Phase.Connect,
     )
-    val storage = with(test.createRuntime(initiator)) { intercepted.willConnect(request) }
+    val storage = test.executeWithoutTelemetry(initiator) { intercepted.willConnect(request) }
     return test.TestWebSocket(intercepted, request, initiator, storage).also {
-        with(test.createRuntime(initiator.phase(Execution.WebSocket.Phase.Connected))) {
+        test.executeWithoutTelemetry(initiator.phase(Execution.WebSocket.Phase.Connected)) {
             intercepted.didConnect(it.server)
         }
     }
@@ -162,9 +162,9 @@ public suspend fun <STORAGE, A, B, C> WebSocketHandler<PathSpec3<A, B, C>, STORA
         path = request.path,
         phase = Execution.WebSocket.Phase.Connect,
     )
-    val storage = with(test.createRuntime(initiator)) { intercepted.willConnect(request) }
+    val storage = test.executeWithoutTelemetry(initiator) { intercepted.willConnect(request) }
     return test.TestWebSocket(intercepted, request, initiator, storage).also {
-        with(test.createRuntime(initiator.phase(Execution.WebSocket.Phase.Connected))) {
+        test.executeWithoutTelemetry(initiator.phase(Execution.WebSocket.Phase.Connected)) {
             intercepted.didConnect(it.server)
         }
     }
