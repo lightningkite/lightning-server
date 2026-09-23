@@ -158,6 +158,7 @@ public interface WebSocketConnection<PATH : PathSpec, STORAGE> {
      * Reloads the state from persistent storage.
      * Useful if the state might have been modified externally.
      */
+    context(server: ServerRuntime)
     public suspend fun repullState(): STORAGE
 
     /**
@@ -165,6 +166,7 @@ public interface WebSocketConnection<PATH : PathSpec, STORAGE> {
      *
      * Use this for high-frequency updates where immediate consistency isn't required.
      */
+    context(server: ServerRuntime)
     public suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE)
 
     /**
@@ -173,26 +175,31 @@ public interface WebSocketConnection<PATH : PathSpec, STORAGE> {
      * This operation is atomic - the modification function is applied to the current
      * state and the result becomes the new state.
      */
+    context(server: ServerRuntime)
     public suspend fun updateStateImmediately(modification: (STORAGE) -> STORAGE): STORAGE
 
     /**
      * Subscribes this connection to a topic to receive future messages.
      */
+    context(server: ServerRuntime)
     public suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>)
 
     /**
      * Unsubscribes this connection from a topic.
      */
+    context(server: ServerRuntime)
     public suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>)
 
     /**
      * Sends a frame to the connected client.
      */
+    context(server: ServerRuntime)
     public suspend fun send(frame: WebSocketFrame)
 
     /**
      * Closes the WebSocket connection with a reason code.
      */
+    context(server: ServerRuntime)
     public suspend fun close(reason: WebSocketClose)
 }
 

@@ -111,6 +111,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
          */
         private var committedStateBytes: ByteArray = stateAnonType.serializedBytes()
 
+        context(server: ServerRuntime)
         override suspend fun repullState(): T = fetchStateBytes()
             .let { encoding.decodeFromByteArray(handler.storageSerializer, it) }
             .also { currentState = it }
@@ -122,6 +123,8 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                 .also { committedStateBytes = it }
 
         val queue = ArrayList<(T) -> T>()
+
+        context(server: ServerRuntime)
         override suspend fun queueStateUpdate(modification: (T) -> T) {
             queue.add(modification)
         }
@@ -163,19 +166,23 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
             }
         }
 
+        context(server: ServerRuntime)
         override suspend fun updateStateImmediately(modification: (T) -> T): T {
             queue.add(modification)
             return commit()
         }
 
+        context(server: ServerRuntime)
         override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) {
             webSocketDynamo.subscribe(path.toString(), with(root) { topic.path() }, connectionId)
         }
 
+        context(server: ServerRuntime)
         override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) {
             webSocketDynamo.unsubscribe(with(root) { topic.path() }, connectionId)
         }
 
+        context(server: ServerRuntime)
         override suspend fun send(frame: WebSocketFrame) {
             try {
                 val result = root.apiGatewayWsPostToConnection(PostToConnectionRequest.builder().also {
@@ -201,6 +208,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
             }
         }
 
+        context(server: ServerRuntime)
         override suspend fun close(reason: WebSocketClose) {
             root.logger.info { "Closing socket $connectionId with reason $reason as requested." }
             webSocketClose(connectionId, reason)
@@ -519,7 +527,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         state.initiator.socketId,
                         AnonType(state.state)
                     ) { mid ->
-                        with(root) { rootWs.disconnectWithMetrics(rootPath, mid, WebSocketClose.NORMAL) }
+                        with(root) { rootWs.disconnectAndClose(rootPath, mid, WebSocketClose.NORMAL) }
                     }
                     APIGatewayV2HTTPResponse(200)
                 } catch (e: Exception) {
@@ -560,13 +568,21 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                             if (with(root) { generalSettings() }.debug && state.connectRequest.queryParameters["debug"]
                                     ?.toBoolean() == true
                             ) {
-                                mid.send(
-                                    WebSocketFrame(
-                                        "!!! DEBUG AWS INFO !!! - ${
-                                            mid.currentState
-                                        }"
-                                    )
-                                )
+                                // A diagnostic send, not part of the real message dispatch, so it mints
+                                // its own tiny execution rather than piggybacking on one.
+                                with(root) {
+                                    root.execute(
+                                        "debug",
+                                        Execution.WebSocket(
+                                            id = Execution.ID.generate(),
+                                            socketId = mid.socketId,
+                                            path = mid.request.path,
+                                            phase = Execution.WebSocket.Phase.ClientMessage,
+                                        ),
+                                    ) {
+                                        mid.send(WebSocketFrame("!!! DEBUG AWS INFO !!! - ${mid.currentState}"))
+                                    }
+                                }
                             }
                         } catch (e: Exception) {
                             root.logger.error(e) { "Failed to run debug webSocket processing" }

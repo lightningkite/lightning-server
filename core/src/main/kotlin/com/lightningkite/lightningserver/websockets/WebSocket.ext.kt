@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.websockets
 
 import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 
 public fun <T> WebSocketTopic<PathSpec0, T>.request(): WebSocketSubscriptionRequest<PathSpec0, T> =
     WebSocketSubscriptionRequest(topic = this, rawPathArguments = emptyList())
@@ -21,22 +22,22 @@ public fun <T, A, B, C> WebSocketTopic<PathSpec3<A, B, C>, T>.request(
 ): WebSocketSubscriptionRequest<PathSpec3<A, B, C>, T> =
     WebSocketSubscriptionRequest(topic = this, rawPathArguments = listOf(path1, path2, path3))
 
-context(connection: WebSocketConnection<PATH, STORAGE>)
+context(connection: WebSocketConnection<PATH, STORAGE>, server: ServerRuntime)
 public suspend fun <PATH : PathSpec, STORAGE, T> subscribe(topic: WebSocketTopic<PathSpec0, T>): Unit =
     connection.subscribe(topic.request())
 
-context(connection: WebSocketConnection<PATH, STORAGE>)
+context(connection: WebSocketConnection<PATH, STORAGE>, server: ServerRuntime)
 public suspend fun <PATH : PathSpec, STORAGE, T, A> subscribe(topic: WebSocketTopic<PathSpec1<A>, T>, path1: A): Unit =
     connection.subscribe(topic.request(path1))
 
-context(connection: WebSocketConnection<PATH, STORAGE>)
+context(connection: WebSocketConnection<PATH, STORAGE>, server: ServerRuntime)
 public suspend fun <PATH : PathSpec, STORAGE, T, A, B> subscribe(
     topic: WebSocketTopic<PathSpec2<A, B>, T>,
     path1: A,
     path2: B,
 ): Unit = connection.subscribe(topic.request(path1, path2))
 
-context(connection: WebSocketConnection<PATH, STORAGE>)
+context(connection: WebSocketConnection<PATH, STORAGE>, server: ServerRuntime)
 public suspend fun <PATH : PathSpec, STORAGE, T, A, B, C> subscribe(
     topic: WebSocketTopic<PathSpec3<A, B, C>, T>,
     path1: A,
@@ -44,15 +45,18 @@ public suspend fun <PATH : PathSpec, STORAGE, T, A, B, C> subscribe(
     path3: C,
 ): Unit = connection.subscribe(topic.request(path1, path2, path3))
 
-context(connection: WebSocketConnection<PATH, STORAGE>)
+context(connection: WebSocketConnection<PATH, STORAGE>, server: ServerRuntime)
 public suspend fun <PATH : PathSpec, STORAGE, T> unsubscribe(topic: WebSocketTopic<PathSpec0, T>): Unit =
     connection.unsubscribe(topic.request())
 
-context(connection: WebSocketConnection<PATH, STORAGE>)
+context(connection: WebSocketConnection<PATH, STORAGE>, server: ServerRuntime)
 public suspend fun <PATH : PathSpec, STORAGE, T, A> unsubscribe(
     topic: WebSocketTopic<PathSpec1<A>, T>,
     path1: A,
 ): Unit = connection.unsubscribe(topic.request(path1))
 
+context(server: ServerRuntime)
 public suspend fun WebSocketConnection<*, *>.send(content: String): Unit = send(WebSocketFrame(content))
+
+context(server: ServerRuntime)
 public suspend fun WebSocketConnection<*, *>.send(content: ByteArray): Unit = send(WebSocketFrame(content))

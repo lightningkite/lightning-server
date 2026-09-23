@@ -330,9 +330,10 @@ public class NettyEngine(
         val pathspec = channel.attr(PATHSPEC_KEY).get() ?: return
         cleanupScope.launch {
             try {
-                handler.disconnectWithMetrics(pathspec, mid, reason)
+                // Guarantees mid gets closed even if the handler's own disconnect() throws.
+                handler.disconnectAndClose(pathspec, mid, reason)
             } catch (e: Exception) {
-                mid.close(e.webSocketCloseReason)
+                logger.error(e) { "disconnect handling failed" }
             }
         }
     }
@@ -404,7 +405,9 @@ public class NettyEngine(
                             try {
                                 handler.messageFromClientWithMetrics(pathspec, mid, m)
                             } catch (e: Exception) {
-                                mid.close(e.webSocketCloseReason)
+                                // Route through the normal disconnect lifecycle rather than a bare
+                                // close, so the handler's own cleanup still runs.
+                                emitDisconnect(ctx.channel(), e.webSocketCloseReason)
                             }
                         }
                     }
@@ -425,7 +428,9 @@ public class NettyEngine(
                             try {
                                 handler.messageFromClientWithMetrics(pathspec, mid, m)
                             } catch (e: Exception) {
-                                mid.close(e.webSocketCloseReason)
+                                // Route through the normal disconnect lifecycle rather than a bare
+                                // close, so the handler's own cleanup still runs.
+                                emitDisconnect(ctx.channel(), e.webSocketCloseReason)
                             }
                         }
                     }
@@ -590,6 +595,7 @@ public class NettyEngine(
                     server = this@NettyEngine,
                     pubSub = { this@NettyEngine.pubSubChannel(it) }
                 ) {
+                    context(server: ServerRuntime)
                     override suspend fun send(frame: LkWebSocketFrame) {
                         when (frame) {
                             is LkWebSocketFrame.Binary -> ctx.writeAndFlush(
@@ -604,6 +610,7 @@ public class NettyEngine(
                         }
                     }
 
+                    context(server: ServerRuntime)
                     override suspend fun close(reason: WebSocketClose) {
                         val hs = ctx.channel().attr(HANDSHAKER_KEY).get()
                         if (hs != null) {

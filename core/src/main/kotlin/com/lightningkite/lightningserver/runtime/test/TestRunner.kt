@@ -176,12 +176,15 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
             override val request: WebSocketConnectRequest<PATH>
                 get() = this@TestWebSocket.request
 
+            context(server: ServerRuntime)
             override suspend fun repullState(): STORAGE = currentState
 
+            context(server: ServerRuntime)
             override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE) {
                 changeQueue.add(modification)
             }
 
+            context(server: ServerRuntime)
             override suspend fun updateStateImmediately(modification: (STORAGE) -> STORAGE): STORAGE {
                 while (changeQueue.isNotEmpty()) {
                     this@TestWebSocket.currentState = changeQueue.removeFirst()(currentState)
@@ -197,23 +200,27 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
             }
 
             private val topics = HashSet<WebSocketSubscriptionRequest<*, *>>()
+            context(server: ServerRuntime)
             override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) {
                 if (topics.add(topic)) {
                     subscriptions.getOrPut(topic) { ArrayList() }.add(sub)
                 }
             }
 
+            context(server: ServerRuntime)
             override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) {
                 if (topics.remove(topic)) {
                     subscriptions.getOrPut(topic) { ArrayList() }.remove(sub)
                 }
             }
 
+            context(server: ServerRuntime)
             override suspend fun send(frame: WebSocketFrame) {
                 /*logger.debug*/run { "$name <-- '$frame'" }.let(::println)
                 onMessageSent(frame)
             }
 
+            context(server: ServerRuntime)
             override suspend fun close(reason: WebSocketClose) {
                 /*logger.debug*/run { "$name <-- <close>" }.let(::println)
                 withPhase(Execution.WebSocket.Phase.Disconnect) { handler.disconnect(this@ServerSide, reason) }

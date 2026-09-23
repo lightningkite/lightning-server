@@ -19,19 +19,24 @@ import kotlinx.serialization.KSerializer
  */
 public interface WebSocketHandler<PATH : PathSpec, STORAGE> {
     public val storageSerializer: KSerializer<STORAGE>
-    public context(serverRuntime: ServerRuntime)
-    suspend fun willConnect(request: WebSocketConnectRequest<PATH>): STORAGE
-    public context(serverRuntime: ServerRuntime)
-    suspend fun didConnect(connection: WebSocketConnection<PATH, STORAGE>)
-    public context(serverRuntime: ServerRuntime)
-    suspend fun messageFromClient(connection: WebSocketConnection<PATH, STORAGE>, frame: WebSocketFrame)
-    public context(serverRuntime: ServerRuntime)
-    suspend fun messageFromSubscription(
+
+    context(serverRuntime: ServerRuntime)
+    public suspend fun willConnect(request: WebSocketConnectRequest<PATH>): STORAGE
+
+    context(serverRuntime: ServerRuntime)
+    public suspend fun didConnect(connection: WebSocketConnection<PATH, STORAGE>)
+
+    context(serverRuntime: ServerRuntime)
+    public suspend fun messageFromClient(connection: WebSocketConnection<PATH, STORAGE>, frame: WebSocketFrame)
+
+    context(serverRuntime: ServerRuntime)
+    public suspend fun messageFromSubscription(
         connection: WebSocketConnection<PATH, STORAGE>,
         topic: WebSocketSubscriptionMessage<*, *>,
     )
-    public context(serverRuntime: ServerRuntime)
-    suspend fun disconnect(connection: WebSocketConnection<PATH, STORAGE>, reason: WebSocketClose)
+
+    context(serverRuntime: ServerRuntime)
+    public suspend fun disconnect(connection: WebSocketConnection<PATH, STORAGE>, reason: WebSocketClose)
 }
 
 /**
@@ -87,36 +92,37 @@ public inline fun <PATH : PathSpec, reified STORAGE> WebSocketHandler(
 ): WebSocketHandler<PATH, STORAGE> =
     object : WebSocketHandler<PATH, STORAGE> {
         override val storageSerializer: KSerializer<STORAGE> = storageSerializer
-        override suspend context(serverRuntime: ServerRuntime)
-        fun willConnect(request: WebSocketConnectRequest<PATH>): STORAGE =
+
+        context(serverRuntime: ServerRuntime)
+        override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): STORAGE =
             willConnect(serverRuntime, request)
 
-        override suspend context(serverRuntime: ServerRuntime)
-        fun didConnect(connection: WebSocketConnection<PATH, STORAGE>) {
+        context(serverRuntime: ServerRuntime)
+        override suspend fun didConnect(connection: WebSocketConnection<PATH, STORAGE>) {
             didConnect(serverRuntime, connection)
         }
 
-        override suspend context(serverRuntime: ServerRuntime)
-        fun messageFromClient(connection: WebSocketConnection<PATH, STORAGE>, frame: WebSocketFrame) {
+        context(serverRuntime: ServerRuntime)
+        override suspend fun messageFromClient(connection: WebSocketConnection<PATH, STORAGE>, frame: WebSocketFrame) {
             messageFromClient(serverRuntime, connection, frame)
         }
 
         private val subHandler = TopicHandlersBuilder<PATH, STORAGE>().apply(topicHandlers).build()
-        override suspend context(serverRuntime: ServerRuntime)
-        fun messageFromSubscription(
+
+        context(serverRuntime: ServerRuntime)
+        override suspend fun messageFromSubscription(
             connection: WebSocketConnection<PATH, STORAGE>,
             topic: WebSocketSubscriptionMessage<*, *>,
         ): Unit = subHandler(serverRuntime, connection, topic)
 
-        override suspend context(serverRuntime: ServerRuntime)
-        fun disconnect(connection: WebSocketConnection<PATH, STORAGE>, reason: WebSocketClose) {
+        context(serverRuntime: ServerRuntime)
+        override suspend fun disconnect(connection: WebSocketConnection<PATH, STORAGE>, reason: WebSocketClose) {
             disconnect(serverRuntime, connection, reason)
         }
     }
 
 public class TopicHandlersBuilder<PATH : PathSpec, STORAGE>() {
-    public var handler: suspend context(ServerRuntime) WebSocketConnection<PATH, STORAGE>.(topic: WebSocketSubscriptionMessage<*, *>) -> Unit =
-        {}
+    public var handler: suspend context(ServerRuntime) WebSocketConnection<PATH, STORAGE>.(topic: WebSocketSubscriptionMessage<*, *>) -> Unit = {}
 
     @Suppress("UNCHECKED_CAST", "DSL_MARKER_APPLIED_TO_WRONG_TARGET")
     @LightningServerDsl

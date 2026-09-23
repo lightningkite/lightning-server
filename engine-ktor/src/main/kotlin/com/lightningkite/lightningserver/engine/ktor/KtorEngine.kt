@@ -18,11 +18,12 @@ import com.lightningkite.lightningserver.pathing.RawWebSocketPath
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.didConnectWithMetrics
-import com.lightningkite.lightningserver.runtime.disconnectWithMetrics
+import com.lightningkite.lightningserver.runtime.disconnectAndClose
 import com.lightningkite.lightningserver.runtime.execute
 import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.lightningserver.runtime.messageFromClientWithMetrics
 import com.lightningkite.lightningserver.runtime.willConnectWithMetrics
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.Data
@@ -37,6 +38,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.util.*
+import io.ktor.utils.io.CancellationException
 import io.ktor.utils.io.asSink
 import io.ktor.websocket.*
 import kotlinx.coroutines.*
@@ -185,6 +187,7 @@ public class KtorEngine(
                                 val channel = this
                                 withContext(Dispatchers.IO) { channel.asSink().buffered().use { body.emit(it) } }
                             }
+
                             is Data.Source -> call.respondBytesWriter(contentType = type, status = code) {
                                 // Blocking streaming source: copy it to the channel on the IO pool (no full buffering).
                                 val channel = this
@@ -192,6 +195,7 @@ public class KtorEngine(
                                     channel.asSink().buffered().use { sink -> body.source.use { sink.transferFrom(it) } }
                                 }
                             }
+
                             is Data.SuspendingSource, is Data.SuspendingSink -> call.respondBytesWriter(contentType = type, status = code) {
                                 // Fully cooperative: stream the body into the ByteWriteChannel via a SuspendingSink so
                                 // response writes suspend for backpressure instead of blocking the event loop.
@@ -316,49 +320,35 @@ public class KtorEngine(
                     @Suppress("UNCHECKED_CAST")
                     socketHandler as WebSocketHandler<PathSpec, Any?>
 
-                    val startingState =
-                        socketHandler.willConnectWithMetrics(match.pathSpec, connectInitiator, request)
-                    var closingMid: WebSocketConnection<PathSpec, Any?>? = null
+                    val startingState = socketHandler.willConnectWithMetrics(match.pathSpec, connectInitiator, request)
 
-                    // Disconnect is the socket's cleanup phase, so it has to outlive the cancellation
-                    // that ends the socket. Shutting the server down cancels this coroutine, and a
-                    // suspending call in a cancelled coroutine fails before it runs anything, which
-                    // skipped the handler's cleanup and its span together and left the socket's last
-                    // phase with no trace at all.
-                    suspend fun emitDisconnect(
-                        mid: WebSocketConnection<PathSpec, Any?>,
-                        reason: WebSocketClose,
-                    ): Unit = withContext(NonCancellable) {
-                        socketHandler.disconnectWithMetrics(match.pathSpec, mid, reason)
+                    val connection = object : LocalWebSocketConnection<PathSpec, Any?>(
+                        startingState = startingState,
+                        request = request,
+                        connectInitiator = connectInitiator,
+                        handler = socketHandler,
+                        scope = this@webSocket,
+                        pubSub = { pubSubChannel(it) }
+                    ) {
+                        context(server: ServerRuntime)
+                        override suspend fun send(frame: WebSocketFrame) {
+                            this@webSocket.send(
+                                when (frame) {
+                                    is WebSocketFrame.Binary -> Frame.Binary(true, frame.content)
+                                    is WebSocketFrame.Text -> Frame.Text(frame.content)
+                                }
+                            )
+                        }
+
+                        context(server: ServerRuntime)
+                        override suspend fun close(reason: WebSocketClose) {
+                            this@webSocket.close(CloseReason(reason.code, reason.name))
+                        }
                     }
 
+                    var exception: Throwable? = null
                     try {
-
-                        val mid = object : LocalWebSocketConnection<PathSpec, Any?>(
-                            startingState = startingState,
-                            request = request,
-                            connectInitiator = connectInitiator,
-                            handler = socketHandler,
-                            scope = this@webSocket,
-                            server = this@KtorEngine,
-                            pubSub = { pubSubChannel(it) }
-                        ) {
-                            override suspend fun send(frame: WebSocketFrame) {
-                                this@webSocket.send(
-                                    when (frame) {
-                                        is WebSocketFrame.Binary -> Frame.Binary(true, frame.content)
-                                        is WebSocketFrame.Text -> Frame.Text(frame.content)
-                                    }
-                                )
-                            }
-
-                            override suspend fun close(reason: WebSocketClose) {
-                                this@webSocket.close(CloseReason(reason.code, reason.name))
-                            }
-                        }
-                        closingMid = mid
-
-                        socketHandler.didConnectWithMetrics(match.pathSpec, mid)
+                        socketHandler.didConnectWithMetrics(match.pathSpec, connection)
 
                         for (incoming in this.incoming) {
                             val m = when (incoming) {
@@ -368,18 +358,20 @@ public class KtorEngine(
                                 is Frame.Ping -> continue
                                 is Frame.Pong -> continue
                             }
-                            socketHandler.messageFromClientWithMetrics(match.pathSpec, mid, m)
+                            socketHandler.messageFromClientWithMetrics(match.pathSpec, connection, m)
                         }
-
-                        closingMid.let { mid -> emitDisconnect(mid, WebSocketClose.NORMAL) }
                     } catch (e: Throwable) {
-                        closingMid?.let { mid -> emitDisconnect(mid, e.webSocketCloseReason) }
-                        // Cleanup above must run for a cancelled socket too — that is what
-                        // emitDisconnect's NonCancellable is for — but the cancellation itself has to
-                        // keep travelling. Swallowing it would report this coroutine as having
-                        // completed normally and leave whoever cancelled us waiting on a child that
-                        // never acknowledges the request.
-                        if (e is CancellationException) throw e
+                        exception = e
+
+                        currentCoroutineContext().ensureActive()
+                    } finally {
+                        withContext(NonCancellable) {
+                            socketHandler.disconnectAndClose(
+                                match.pathSpec,
+                                connection,
+                                reason = exception?.webSocketCloseReason ?: WebSocketClose.NORMAL
+                            )
+                        }
                     }
                 }
             }

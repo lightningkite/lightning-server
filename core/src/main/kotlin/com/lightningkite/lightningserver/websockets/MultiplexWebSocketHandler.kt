@@ -69,7 +69,10 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
             )
                 private set
 
+            context(server: ServerRuntime)
             override suspend fun close(reason: WebSocketClose) = wrapped.close(reason)
+
+            context(server: ServerRuntime)
             override suspend fun send(frame: WebSocketFrame) = wrapped.send(
                 runtime.externalSerialization.json.encodeToString(
                     MultiplexMessage(
@@ -79,6 +82,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                 )
             )
 
+            context(server: ServerRuntime)
             override suspend fun repullState(): T =
                 run {
                     val info = wrapped.repullState().map[channel]
@@ -89,6 +93,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                     )
                 }
 
+            context(server: ServerRuntime)
             override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) {
                 val asString = with(runtime) { topic.path() }
                 if (asString !in wrapped.currentState) wrapped.subscribe(topic)
@@ -97,6 +102,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                 }
             }
 
+            context(server: ServerRuntime)
             override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) {
                 val asString = with(runtime) { topic.path() }
                 val newstate = wrapped.updateStateImmediately { data ->
@@ -106,6 +112,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                 if (asString !in newstate) wrapped.unsubscribe(topic)
             }
 
+            context(server: ServerRuntime)
             override suspend fun queueStateUpdate(modification: (T) -> T) {
                 wrapped.queueStateUpdate { data ->
                     data.updateChannel(channel) { info ->
@@ -124,6 +131,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                 }
             }
 
+            context(server: ServerRuntime)
             override suspend fun updateStateImmediately(modification: (T) -> T): T {
                 wrapped.updateStateImmediately { data ->
                     data.updateChannel(channel) { info ->
@@ -243,7 +251,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                     val otherHandler = serverRuntime.server.compiledWebSocketInterceptors
                         .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
                     connection.withWrapped(otherHandler, channel) {
-                        otherHandler.disconnectWithMetrics(match.pathSpec, it, WebSocketClose.NORMAL)
+                        otherHandler.disconnectAndClose(match.pathSpec, it, WebSocketClose.NORMAL)
                     }
                     connection.updateStateImmediately { it.copy(map = it.map - channel) }
                     connection.send(
@@ -287,7 +295,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                 val otherHandler = serverRuntime.server.compiledWebSocketInterceptors
                     .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
                 connection.withWrapped(otherHandler, channel) {
-                    otherHandler.disconnectWithMetrics(
+                    otherHandler.disconnectAndClose(
                         match.pathSpec,
                         it,
                         ((e as? HttpStatusException)?.status ?: HttpStatus.InternalServerError).bestWebSocketCloseCode
@@ -327,7 +335,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
             val otherHandler = serverRuntime.server.compiledWebSocketInterceptors
                 .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
             connection.withWrapped(otherHandler, channel) {
-                otherHandler.disconnectWithMetrics(match.pathSpec, it, reason)
+                otherHandler.disconnectAndClose(match.pathSpec, it, reason)
             }
         }
     }

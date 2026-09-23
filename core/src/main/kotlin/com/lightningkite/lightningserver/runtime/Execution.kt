@@ -133,7 +133,13 @@ public sealed interface Execution {
         override val rootExecution: ID,
         val location: PathSegments,
 //        override val extensions: MutableExtensions = MutableExtensions()
-    ) : Execution
+    ) : Execution {
+        @InternalLightningServerApi public constructor(
+            id: ID,
+            parent: Execution,
+            location: PathSegments
+        ) : this(id, causedBy = parent.id, rootExecution = parent.rootExecution, location)
+    }
 
     /** One tick of a scheduled task. */
     @Serializable

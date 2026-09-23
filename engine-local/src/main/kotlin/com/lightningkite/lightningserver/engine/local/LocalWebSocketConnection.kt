@@ -29,19 +29,22 @@ public abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
     public val connectInitiator: Execution.WebSocket,
     private val handler: WebSocketHandler<PATH, STORAGE>,
     private val scope: CoroutineScope,
-    /** Needed to deliver a subscription message, which is a fresh execution rather than part of one. */
-    private val server: Engine,
     private val pubSub: (request: WebSocketSubscriptionRequest<*, Any?>) -> PubSubChannel<Any?>,
 ) : WebSocketConnection<PATH, STORAGE> {
 
     override val socketId: Execution.ID get() = connectInitiator.socketId
 
     override var currentState: STORAGE = startingState
+
+    context(server: ServerRuntime)
     override suspend fun repullState(): STORAGE = currentState
+
+    context(server: ServerRuntime)
     override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE) {
         currentState = modification(currentState)
     }
 
+    context(server: ServerRuntime)
     override suspend fun updateStateImmediately(modification: (STORAGE) -> STORAGE): STORAGE {
         currentState = modification(currentState)
         return currentState
@@ -52,6 +55,7 @@ public abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
     /** The topic subscriptions this connection currently holds. */
     public val activeSubscriptions: Set<WebSocketSubscriptionRequest<*, *>> get() = subscriptions.keys.toSet()
 
+    context(server: ServerRuntime)
     override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) {
         @Suppress("UNCHECKED_CAST")
         topic as WebSocketSubscriptionRequest<*, Any?>
@@ -78,6 +82,7 @@ public abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
         }
     }
 
+    context(server: ServerRuntime)
     override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) {
         subscriptions.remove(topic)?.cancel()
     }

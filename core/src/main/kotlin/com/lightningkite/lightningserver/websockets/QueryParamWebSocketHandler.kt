@@ -44,14 +44,20 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
             )
                 private set
 
+            context(server: ServerRuntime)
             override suspend fun close(reason: WebSocketClose) = wrapped.close(reason)
+
+            context(server: ServerRuntime)
             override suspend fun send(frame: WebSocketFrame) = wrapped.send(frame)
+
+            context(server: ServerRuntime)
             override suspend fun repullState(): T =
                 wrapped.repullState().underlyingData.value(
                     runtime.internalSerialization.kotlinBytesFormat,
                     handler.storageSerializer
                 )
 
+            context(server: ServerRuntime)
             override suspend fun queueStateUpdate(modification: (T) -> T) {
                 wrapped.queueStateUpdate { data ->
                     val underlying =
@@ -69,6 +75,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
                 }
             }
 
+            context(server: ServerRuntime)
             override suspend fun updateStateImmediately(modification: (T) -> T): T {
                 wrapped.updateStateImmediately { data ->
                     val underlying =
@@ -87,9 +94,11 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
                 return currentState
             }
 
+            context(server: ServerRuntime)
             override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) =
                 wrapped.subscribe(topic)
 
+            context(server: ServerRuntime)
             override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) = wrapped.unsubscribe(topic)
 
             suspend fun finalize() {
@@ -228,7 +237,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
     ) {
         val (pathSpec, otherHandler) = connection.inner()
         connection.withWrapped(otherHandler) {
-            otherHandler.disconnectWithMetrics(pathSpec, it, reason)
+            otherHandler.disconnectAndClose(pathSpec, it, reason)
         }
     }
 }

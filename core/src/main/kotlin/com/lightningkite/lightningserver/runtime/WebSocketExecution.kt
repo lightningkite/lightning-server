@@ -6,6 +6,8 @@ import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryKey
 import com.lightningkite.services.telemetry.TelemetryKeys
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 
 // Pre-allocated TelemetryKey instances (backend caches by equality).
 private val wsRoute = TelemetryKey.OfString("ws.route")
@@ -15,16 +17,9 @@ private val wsSubscriptionTopic = TelemetryKey.OfString("ws.subscription.topic")
 private val wsDisconnectCode = TelemetryKey.OfLong("ws.disconnect.code")
 private val wsDisconnectReason = TelemetryKey.OfString("ws.disconnect.reason")
 
-/**
- * Mints the phase-specific [Execution.WebSocket] for one call against this connection.
- *
- * The parent is whatever [ServerRuntime] happens to be running when this phase is dispatched, or
- * null — a later phase is normally triggered by the network/engine layer with nothing already
- * running, so this is usually null rather than chained to Connect.
- */
 @OptIn(InternalLightningServerApi::class)
 context(engine: Engine)
-private fun <PATH : PathSpec, STORAGE> WebSocketConnection<PATH, STORAGE>.phaseExecution(
+private fun <PATH : PathSpec, STORAGE> WebSocketConnection<PATH, STORAGE>.phase(
     phase: Execution.WebSocket.Phase,
 ): Execution.WebSocket = Execution.WebSocket(
     id = Execution.ID.generate(),
@@ -74,7 +69,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
 ) {
     engine.execute(
         "didConnect",
-        connection.phaseExecution(Execution.WebSocket.Phase.Connected),
+        connection.phase(Execution.WebSocket.Phase.Connected),
         TelemetryAttributes {
             put(wsRoute, location.toString())
             put(TelemetryKeys.Net.peerIp, connection.request.sourceIp)
@@ -102,7 +97,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
 ) {
     engine.execute(
         "messageFromClient",
-        connection.phaseExecution(Execution.WebSocket.Phase.ClientMessage),
+        connection.phase(Execution.WebSocket.Phase.ClientMessage),
         TelemetryAttributes {
             put(wsRoute, location.toString())
             put(TelemetryKeys.Net.peerIp, connection.request.sourceIp)
@@ -140,7 +135,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
 ) {
     engine.execute(
         "messageFromSubscription",
-        connection.phaseExecution(Execution.WebSocket.Phase.SubscriptionMessage),
+        connection.phase(Execution.WebSocket.Phase.SubscriptionMessage),
         TelemetryAttributes {
             put(wsRoute, location.toString())
             put(TelemetryKeys.Net.peerIp, connection.request.sourceIp)
@@ -152,7 +147,8 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
 }
 
 /**
- * Wraps a WebSocket disconnect handler invocation with telemetry metrics.
+ * Wraps a WebSocket disconnect handler invocation with telemetry metrics, ensuring that [WebSocketConnection.close]
+ * is called afterward.
  *
  * @param location The path specification for this WebSocket endpoint
  * @param connection The WebSocket connection being closed
@@ -160,14 +156,14 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
  */
 @OptIn(InternalLightningServerApi::class)
 context(engine: Engine)
-public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.disconnectWithMetrics(
+public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.disconnectAndClose(
     location: PATH,
     connection: WebSocketConnection<PATH, STORAGE>,
     reason: WebSocketClose,
 ) {
     engine.execute(
         "disconnect",
-        connection.phaseExecution(Execution.WebSocket.Phase.Disconnect),
+        connection.phase(Execution.WebSocket.Phase.Disconnect),
         TelemetryAttributes {
             put(wsRoute, location.toString())
             put(TelemetryKeys.Net.peerIp, connection.request.sourceIp)
@@ -175,6 +171,10 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
             put(wsDisconnectReason, reason.name)
         }
     ) {
-        disconnect(connection, reason)
+        try {
+            disconnect(connection, reason)
+        } finally {
+            connection.close(reason)
+        }
     }
 }
