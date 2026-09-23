@@ -155,7 +155,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
 //                    null /*TODO*/
 //                )
 //            ) {
-            otherHandler.willConnectWithMetrics(match.pathSpec, request)
+            otherHandler.willConnectWithMetrics(request)
 //            }
 
         @Suppress("UNCHECKED_CAST")
@@ -174,20 +174,19 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
      * rather than the path because every AWS socket arrives at "/".
      */
     context(serverRuntime: ServerRuntime)
-    private fun WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>.inner(): Pair<PathSpec, WebSocketHandler<PathSpec, Any?>> {
+    private fun WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>.inner(): WebSocketHandler<PathSpec, Any?> {
         val innerRequest = currentState.request
-        val match = innerRequest.path.match
-        val otherHandler = match.value
+        val otherHandler = innerRequest.path.match.value
             ?: throw NotFoundException("No web socket handler found for '${innerRequest.path}'")
         @Suppress("UNCHECKED_CAST")
-        return match.pathSpec to (otherHandler as WebSocketHandler<PathSpec, Any?>)
+        return otherHandler as WebSocketHandler<PathSpec, Any?>
     }
 
     context(serverRuntime: ServerRuntime)
     override suspend fun didConnect(connection: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>) {
-        val (pathSpec, otherHandler) = connection.inner()
+        val otherHandler = connection.inner()
         connection.withWrapped(otherHandler) {
-            otherHandler.didConnectWithMetrics(pathSpec, it)
+            otherHandler.didConnectWithMetrics(it)
         }
     }
 
@@ -196,9 +195,9 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
         connection: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>,
         frame: WebSocketFrame,
     ) {
-        val (pathSpec, otherHandler) = connection.inner()
+        val otherHandler = connection.inner()
         connection.withWrapped(otherHandler) {
-            otherHandler.messageFromClientWithMetrics(pathSpec, it, frame)
+            otherHandler.messageFromClientWithMetrics(it, frame)
         }
     }
 
@@ -207,9 +206,9 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
         connection: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>,
         topic: WebSocketSubscriptionMessage<*, *>,
     ) {
-        val (pathSpec, otherHandler) = connection.inner()
+        val otherHandler = connection.inner()
         connection.withWrapped(otherHandler) {
-            otherHandler.messageFromSubscriptionWithMetrics(pathSpec, it, topic)
+            otherHandler.messageFromSubscriptionWithMetrics(it, topic)
         }
     }
 
@@ -218,9 +217,9 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
         connection: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>,
         reason: WebSocketClose,
     ) {
-        val (pathSpec, otherHandler) = connection.inner()
+        val otherHandler = connection.inner()
         connection.withWrapped(otherHandler) {
-            otherHandler.disconnectAndClose(pathSpec, it, reason)
+            otherHandler.disconnectAndClose(it, reason)
         }
     }
 }

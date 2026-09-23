@@ -224,7 +224,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                         ),
                     )
 
-                    val storage = channelHandler.willConnectWithMetrics(match.path.pathSpec, request)
+                    val storage = channelHandler.willConnectWithMetrics(request)
                     connection.updateStateImmediately {
                         it.copy(
                             map = it.map + (message.channel to MultiplexWebSocketHandlerConnectionInfo(
@@ -239,7 +239,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                     }
 
                     connection.withVirtualConnection(channelHandler, message.channel) {
-                        channelHandler.didConnectWithMetrics(match.pathSpec, it)
+                        channelHandler.didConnectWithMetrics(it)
                     }
                     connection.send(
                         WebSocketFrame(
@@ -260,7 +260,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                     val channelHandler = info.getChannelHandler(message.channel)
 
                     connection.withVirtualConnection(channelHandler, message.channel) {
-                        channelHandler.disconnectAndClose(info.request.pathSpec, it, WebSocketClose.NORMAL)
+                        channelHandler.disconnectAndClose(it, WebSocketClose.NORMAL)
                     }
                 }
 
@@ -272,7 +272,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
 
                     connection.withVirtualConnection(channelHandler, message.channel) {
                         channelHandler.messageFromClientWithMetrics(
-                            info.request.pathSpec, it, WebSocketFrame.Text(
+                            it, WebSocketFrame.Text(
                                 message.data ?: throw BadRequestException("No data provided")
                             )
                         )
@@ -284,7 +284,6 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                 val channelHandler = info.getChannelHandler(message.channel)
                 connection.withVirtualConnection(channelHandler, message.channel) {
                     channelHandler.disconnectAndClose(
-                        info.request.pathSpec,
                         it,
                         WebSocketClose.exceptional(e)
                     )
@@ -306,7 +305,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                 val otherHandler = serverRuntime.server.compiledWebSocketInterceptors
                     .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
                 connection.withVirtualConnection(otherHandler, channel) {
-                    otherHandler.messageFromSubscriptionWithMetrics(match.pathSpec, it, topic)
+                    otherHandler.messageFromSubscriptionWithMetrics(it, topic)
                 }
             }
         }
@@ -324,7 +323,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
             val otherHandler = serverRuntime.server.compiledWebSocketInterceptors
                 .intercept(match.value as WebSocketHandler<PathSpec, Any?>)
             connection.withVirtualConnection(otherHandler, channel) {
-                otherHandler.disconnectAndClose(match.pathSpec, it, reason)
+                otherHandler.disconnectAndClose(it, reason)
             }
         }
     }

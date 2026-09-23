@@ -127,7 +127,7 @@ class AwsAdapterWsLegacyStateRowTest {
                 requestContext = base.requestContext.copy(routeKey = "\$connect")
             )
         )
-        assertEquals(200, response.statusCode, "Connect should have succeeded")
+        assertEquals(200, response.statusCode, "Connect should have succeeded: ${response.body}")
         awaitPendingInvocations()
         return channel
     }

@@ -57,20 +57,28 @@ public class RawWebSocketPath<out PATH : PathSpec>(public val pathSegments: Path
     context(server: Engine)
     override val pathInContext: ResolvedPath<PATH> get() = match.path as ResolvedPath<PATH>
 
+    private var searched: Boolean = false
     private var matchIfPresent: PathSpecMap.Match<WebSocketHandler<*, *>>? = null
 
     context(server: Engine)
-    public val match: PathSpecMap.Match<WebSocketHandler<*, *>>
+    public val matchOrNull: PathSpecMap.Match<WebSocketHandler<*, *>>?
         get() {
-            if (this.matchIfPresent == null) {
-                this.matchIfPresent = server.server.endpoints.match(
-                    server.externalSerialization.stringArrayFormat,
-                    pathSegments
-                ) { it.webSocket }
-            }
-            return this.matchIfPresent
-                ?: throw NullPointerException("No match for path: $pathSegments. Registered paths are ${server.server.endpoints.keys}")
+            if (searched) return this.matchIfPresent
+            searched = true
+
+            val result = server.server.endpoints.match(
+                server.externalSerialization.stringArrayFormat,
+                pathSegments
+            ) { it.webSocket }
+
+            this.matchIfPresent = result
+
+            return result
         }
+
+    context(server: Engine)
+    public val match: PathSpecMap.Match<WebSocketHandler<*, *>>
+        get() = matchOrNull ?: throw NullPointerException("No match for path: $pathSegments. Registered paths are ${server.server.endpoints.keys}")
 
     public constructor(
         pathSegments: PathSegments,

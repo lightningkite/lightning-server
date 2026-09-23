@@ -253,7 +253,6 @@ public class KtorEngine(
                     }
 
                     directHandler.handleDirectWithMetrics(
-                        location = match.pathSpec,
                         request = request,
                         incoming = incomingChannel,
                         send = { frame ->
@@ -271,7 +270,7 @@ public class KtorEngine(
                     @Suppress("UNCHECKED_CAST")
                     socketHandler as WebSocketHandler<PathSpec, Any?>
 
-                    val storage = socketHandler.willConnectWithMetrics(match.pathSpec, request)
+                    val storage = socketHandler.willConnectWithMetrics(request)
 
                     val connection = object : LocalWebSocketConnection<PathSpec, Any?>(
                         startingState = storage,
@@ -298,7 +297,7 @@ public class KtorEngine(
 
                     var exception: Throwable? = null
                     try {
-                        socketHandler.didConnectWithMetrics(match.pathSpec, connection)
+                        socketHandler.didConnectWithMetrics(connection)
 
                         for (incoming in this.incoming) {
                             val m = when (incoming) {
@@ -308,7 +307,7 @@ public class KtorEngine(
                                 is Frame.Ping -> continue
                                 is Frame.Pong -> continue
                             }
-                            socketHandler.messageFromClientWithMetrics(match.pathSpec, connection, m)
+                            socketHandler.messageFromClientWithMetrics(connection, m)
                         }
                     } catch (e: Throwable) {
                         exception = e
@@ -317,7 +316,6 @@ public class KtorEngine(
                     } finally {
                         withContext(NonCancellable) {
                             socketHandler.disconnectAndClose(
-                                match.pathSpec,
                                 connection,
                                 reason = exception?.let(WebSocketClose::exceptional) ?: WebSocketClose.NORMAL
                             )

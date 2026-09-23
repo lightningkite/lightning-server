@@ -90,7 +90,6 @@ class ExecutionInterceptorTest {
                 // The test runner drives sockets without the metrics helpers, so the socket seam is
                 // exercised the way an engine does it.
                 server.socket.willConnectWithMetrics(
-                    location = server.socket.location,
                     request = WebSocketConnectRequest(
                         RawWebSocketPath("socket"),
                         socketId = Execution.ID.generate(),

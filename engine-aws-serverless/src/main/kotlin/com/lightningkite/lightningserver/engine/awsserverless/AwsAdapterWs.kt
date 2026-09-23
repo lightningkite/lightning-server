@@ -286,7 +286,6 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         ) { mid ->
                             with(root) {
                                 h.messageFromSubscriptionWithMetrics(
-                                    p.pathSpec,
                                     mid,
                                     WebSocketSubscriptionMessage(
                                         fullTopicMatch.value,
@@ -387,7 +386,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                 event.socketId,
                 event.storage
             ) { mid ->
-                with(root) { rootWs.didConnectWithMetrics(rootPath, mid) }
+                with(root) { rootWs.didConnectWithMetrics(mid) }
                 return APIGatewayV2HTTPResponse(200)
             }
         } catch (e: WebSocketStateGoneException) {
@@ -441,7 +440,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     socketId = with(root) { Execution.ID.generate() },
                 )
                 try {
-                    val storage = with(root) { rootWs.willConnectWithMetrics(rootPath, lkEvent) }
+                    val storage = with(root) { rootWs.willConnectWithMetrics(lkEvent) }
                     val storageBytes = encoding.encodeToByteArray(rootWs.storageSerializer, storage)
                     webSocketDynamo.setState(
                         event.requestContext.connectionId,
@@ -505,7 +504,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         event.requestContext.connectionId,
                         AnonType(state.state)
                     ) { mid ->
-                        with(root) { rootWs.disconnectAndClose(rootPath, mid, WebSocketClose.NORMAL) }
+                        with(root) { rootWs.disconnectAndClose(mid, WebSocketClose.NORMAL) }
                     }
                     APIGatewayV2HTTPResponse(200)
                 } catch (e: Exception) {
@@ -564,7 +563,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                         } catch (e: Exception) {
                             root.logger.error(e) { "Failed to run debug webSocket processing" }
                         }
-                        with(root) { rootWs.messageFromClientWithMetrics(rootPath, mid, WebSocketFrame(event.body)) }
+                        with(root) { rootWs.messageFromClientWithMetrics(mid, WebSocketFrame(event.body)) }
                         APIGatewayV2HTTPResponse(200)
                     }
                 } catch (e: WebSocketStateGoneException) {
