@@ -7,6 +7,8 @@ import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.serialization.Serialization
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.*
 
 @Serializable
@@ -59,7 +61,9 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                     )
                 )
             )
-            wrapped.queueStateUpdate { it.copy(map = it.map - channel) }
+            // This matches previous behavior.
+            if (reason.isExceptional) wrapped.queueStateUpdate { it.copy(map = it.map - channel) }
+            else wrapped.updateStateImmediately { it.copy(map = it.map - channel) }
         }
 
         context(server: ServerRuntime)
@@ -198,6 +202,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
         val message = when (frame) {
             is WebSocketFrame.Binary ->
                 serverRuntime.externalSerialization.kotlinBytesFormat.decodeFromByteArray<MultiplexMessage>(frame.content)
+
             is WebSocketFrame.Text ->
                 serverRuntime.externalSerialization.json.decodeFromString<MultiplexMessage>(frame.content)
         }
@@ -280,15 +285,31 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                 }
             }
         } catch (e: Exception) {
-            connection.currentState.map[message.channel]?.let { info ->
+            val info = connection.currentState.map[message.channel]
+            if (info == null) {
+                // no active channel found, just send back an end message to make the client close
+                connection.send(
+                    WebSocketFrame(
+                        serverRuntime.externalSerialization.json.encodeToString(
+                            MultiplexMessage(
+                                channel = message.channel,
+                                end = true,
+                                error = e.message ?: "Unknown Error"
+                            )
+                        )
+                    )
+                )
+            } else {
                 val channelHandler = info.getChannelHandler(message.channel)
-                connection.withVirtualConnection(channelHandler, message.channel) {
+                connection.withVirtualConnection(channelHandler, message.channel) { channelConnection ->
                     channelHandler.disconnectAndClose(
-                        it,
+                        channelConnection,
                         WebSocketClose.exceptional(e)
                     )
                 }
             }
+            // this may have caught a CancellationException, need to check if still active
+            currentCoroutineContext().ensureActive()
         }
     }
 

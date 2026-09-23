@@ -24,6 +24,9 @@ public data class WebSocketClose(
         TRY_AGAIN_LATER(1013);
     }
 
+    /** Whether this close was caused by a thrown exception, as built by [exceptional]. */
+    public val isExceptional: Boolean get() = cause != null
+
     public companion object {
         public val NORMAL: WebSocketClose get() = WebSocketClose(Code.NORMAL, null, null)
         public val GOING_AWAY: WebSocketClose get() = WebSocketClose(Code.GOING_AWAY, null, null)
