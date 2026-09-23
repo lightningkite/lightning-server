@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.engine.local.engineCache
 import com.lightningkite.lightningserver.engine.local.enginePubSub
 import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
 import com.lightningkite.lightningserver.settings.set
+import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketClose.Code
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import kotlinx.serialization.builtins.serializer
@@ -24,7 +25,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** Reasons the socket handler was disconnected with. Top-level because the builder below is an object. */
-private val disconnectReasons = CopyOnWriteArrayList<WebSocketCloseReason.Code>()
+private val disconnectReasons = CopyOnWriteArrayList<WebSocketClose>()
 
 private object DisconnectTestServer : ServerBuilder() {
     val mirror = path.path("mirror") bind WebSocketHandler(
@@ -120,7 +121,7 @@ class SocketDisconnectTest {
         Thread.sleep(1_000)
 
         assertEquals(
-            listOf(WebSocketCloseReason.Code.NORMAL),
+            listOf(WebSocketClose.NORMAL),
             disconnectReasons.toList(),
             "a client-initiated close ran the handler's disconnect more than once",
         )
@@ -135,7 +136,7 @@ class SocketDisconnectTest {
 
         // shutdown() drains the cleanup scope before returning, so the phase has already run by here.
         assertEquals(
-            listOf(WebSocketCloseReason.Code.GOING_AWAY),
+            listOf(WebSocketClose.GOING_AWAY),
             disconnectReasons.toList(),
             "shutdown lost the socket's disconnect phase, or reported it as something other than going away",
         )

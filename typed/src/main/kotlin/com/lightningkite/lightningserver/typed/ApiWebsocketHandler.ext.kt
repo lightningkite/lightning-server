@@ -25,7 +25,7 @@ public inline fun <PATH : PathSpec, reified STORAGE, USER : HasId<*>?, reified I
     crossinline didConnectType: suspend context(ServerRuntime) Connection<PATH, STORAGE, USER, INPUT, OUTPUT>.() -> Unit = {},
     crossinline messageFromClientType: suspend context(ServerRuntime) Connection<PATH, STORAGE, USER, INPUT, OUTPUT>.(frame: INPUT) -> Unit = {},
     crossinline topicHandlersType: ApiTopicHandlersBuilder<PATH, STORAGE, USER, INPUT, OUTPUT>.() -> Unit = {},
-    crossinline disconnectType: suspend context(ServerRuntime) Connection<PATH, STORAGE, USER, INPUT, OUTPUT>.(reason: WebSocketClose.Code) -> Unit = {},
+    crossinline disconnectType: suspend context(ServerRuntime) Connection<PATH, STORAGE, USER, INPUT, OUTPUT>.(reason: WebSocketClose) -> Unit = {},
 ): ApiWebSocketHandler<PATH, STORAGE, USER, INPUT, OUTPUT> = ApiWebSocketHandler(
     summary = summary,
     description = description,
@@ -59,7 +59,7 @@ public inline fun <PATH : PathSpec, reified STORAGE, USER : HasId<*>?, reified I
     crossinline didConnectType: suspend context(ServerRuntime) Connection<PATH, STORAGE, USER, INPUT, OUTPUT>.() -> Unit = {},
     crossinline messageFromClientType: suspend context(ServerRuntime) Connection<PATH, STORAGE, USER, INPUT, OUTPUT>.(frame: INPUT) -> Unit = {},
     crossinline topicHandlersType: ApiTopicHandlersBuilder<PATH, STORAGE, USER, INPUT, OUTPUT>.() -> Unit = {},
-    crossinline disconnectType: suspend context(ServerRuntime) Connection<PATH, STORAGE, USER, INPUT, OUTPUT>.(reason: WebSocketClose.Code) -> Unit = {},
+    crossinline disconnectType: suspend context(ServerRuntime) Connection<PATH, STORAGE, USER, INPUT, OUTPUT>.(reason: WebSocketClose) -> Unit = {},
 ): ApiWebSocketHandler<PATH, STORAGE, USER, INPUT, OUTPUT> =
     object : ApiWebSocketHandler<PATH, STORAGE, USER, INPUT, OUTPUT> {
         override val summary: String = summary
@@ -73,16 +73,16 @@ public inline fun <PATH : PathSpec, reified STORAGE, USER : HasId<*>?, reified I
         //        override val examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = examples
         override val innerStorageSerializer: KSerializer<STORAGE> = serializerOrContextual()
 
-        public context(serverRuntime: ServerRuntime)
-        override suspend fun willConnectTyped(access: WebSocketConnectRequestAccess<PATH, USER>): STORAGE =
+        context(serverRuntime: ServerRuntime)
+        public override suspend fun willConnectTyped(access: WebSocketConnectRequestAccess<PATH, USER>): STORAGE =
             willConnectType(serverRuntime, access)
 
-        public context(serverRuntime: ServerRuntime)
-        override suspend fun didConnectTyped(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>): Unit =
+        context(serverRuntime: ServerRuntime)
+        public override suspend fun didConnectTyped(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>): Unit =
             didConnectType(serverRuntime, connection)
 
-        public context(serverRuntime: ServerRuntime)
-        override suspend fun messageFromClientTyped(
+        context(serverRuntime: ServerRuntime)
+        public override suspend fun messageFromClientTyped(
             connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>,
             frame: INPUT,
         ): Unit = messageFromClientType(serverRuntime, connection, frame)
@@ -90,16 +90,16 @@ public inline fun <PATH : PathSpec, reified STORAGE, USER : HasId<*>?, reified I
         private val subHandler =
             ApiTopicHandlersBuilder<PATH, STORAGE, USER, INPUT, OUTPUT>().apply(topicHandlersType).build()
 
-        public context(serverRuntime: ServerRuntime)
-        override suspend fun messageFromSubscriptionTyped(
+        context(serverRuntime: ServerRuntime)
+        public override suspend fun messageFromSubscriptionTyped(
             connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>,
             topic: WebSocketSubscriptionMessage<*, *>,
         ): Unit = subHandler(serverRuntime, connection, topic)
 
-        public context(serverRuntime: ServerRuntime)
-        override suspend fun disconnectTyped(
+        context(serverRuntime: ServerRuntime)
+        public override suspend fun disconnectTyped(
             connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>,
-            reason: WebSocketClose.Code,
+            reason: WebSocketClose,
         ): Unit = disconnectType(serverRuntime, connection, reason)
     }
 

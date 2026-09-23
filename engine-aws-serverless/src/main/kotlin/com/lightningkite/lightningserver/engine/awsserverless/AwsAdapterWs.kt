@@ -198,12 +198,12 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
         context(server: ServerRuntime)
         override suspend fun close(reason: WebSocketClose) {
             root.logger.info { "Closing socket $connectionId with reason $reason as requested." }
-            WebSocketClose.Code(connectionId, reason)
+            webSocketClose(connectionId, reason)
         }
 
     }
 
-    private suspend fun WebSocketClose.Code(socketId: String, reason: WebSocketClose.Code) {
+    private suspend fun webSocketClose(socketId: String, reason: WebSocketClose) {
         try {
             val result = root.apiGatewayWsDeleteConnection(DeleteConnectionRequest.builder().also {
                 it.connectionId(socketId)
@@ -220,7 +220,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     } - ${(r as? SdkHttpFullResponse)?.content()?.get()?.use { it.reader().readText() }}"
                 )
             }
-        } catch (e: GoneException) {
+        } catch (_: GoneException) {
         }
     }
 
@@ -268,7 +268,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     val s = when (val row = states.getValue(socketId)) {
                         SocketRow.Absent -> continue
                         is SocketRow.Legacy -> {
-                            WebSocketClose.Code(socketId, WebSocketClose.GOING_AWAY)
+                            webSocketClose(socketId, WebSocketClose.GOING_AWAY)
                             webSocketDynamo.clean(socketId)
                             continue
                         }
@@ -301,7 +301,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     } catch (e: Exception) {
                         // Suppress, already reported inside *Tracked
                         root.logger.error(e) { "Closing socket $socketId because subscription message from topic '${p.pathSpec}' failed to process." }
-                        WebSocketClose.Code(socketId, WebSocketClose.Code.INTERNAL_ERROR)
+                        webSocketClose(socketId, WebSocketClose(WebSocketClose.Code.INTERNAL_ERROR, null, e))
                     }
                 }
             } catch (e: Exception) {
@@ -371,7 +371,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
             }
 
             is SocketRow.Legacy -> {
-                WebSocketClose.Code(event.socketId, WebSocketClose.GOING_AWAY)
+                webSocketClose(event.socketId, WebSocketClose.GOING_AWAY)
                 webSocketDynamo.clean(event.socketId)
                 return APIGatewayV2HTTPResponse(204)
             }
@@ -395,7 +395,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
             return APIGatewayV2HTTPResponse(204)
         } catch (e: Exception) {
             root.logger.error(e) { "Closing socket ${event.socketId} because didConnect failed." }
-            WebSocketClose.Code(event.socketId, WebSocketClose.Code.INTERNAL_ERROR)
+            webSocketClose(event.socketId, WebSocketClose(WebSocketClose.Code.INTERNAL_ERROR, null, e))
             return APIGatewayV2HTTPResponse(500, body = e.message ?: "")
         }
     }
@@ -525,7 +525,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                 val state = when (val row = webSocketDynamo.state(event.requestContext.connectionId)) {
                     SocketRow.Absent -> return APIGatewayV2HTTPResponse(204)
                     is SocketRow.Legacy -> {
-                        WebSocketClose.Code(event.requestContext.connectionId, WebSocketClose.GOING_AWAY)
+                        webSocketClose(event.requestContext.connectionId, WebSocketClose.GOING_AWAY)
                         webSocketDynamo.clean(event.requestContext.connectionId)
                         return APIGatewayV2HTTPResponse(204)
                     }
@@ -572,7 +572,7 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     APIGatewayV2HTTPResponse(204)
                 } catch (e: Exception) {
                     root.logger.error(e) { "Closing socket ${event.requestContext.connectionId} because message from client failed to process (route key '${event.requestContext.routeKey}')." }
-                    WebSocketClose.Code(event.requestContext.connectionId, WebSocketClose.Code.INTERNAL_ERROR)
+                    webSocketClose(event.requestContext.connectionId, WebSocketClose(WebSocketClose.Code.INTERNAL_ERROR, null, e))
                     APIGatewayV2HTTPResponse(500, body = e.message ?: "")
                 }
             }

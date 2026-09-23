@@ -43,7 +43,7 @@ public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
         public suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>)
         public suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>)
         public suspend fun send(frame: OUTPUT)
-        public suspend fun close(reason: WebSocketClose.Code)
+        public suspend fun close(reason: WebSocketClose)
     }
 
     /*
@@ -51,27 +51,27 @@ public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
      * because they have different lifetimes. On a serverless engine each phase is a separate
      * invocation with its own runtime, while the connection persists across all of them.
      */
-    public context(serverRuntime: ServerRuntime)
-    suspend fun willConnectTyped(access: WebSocketConnectRequestAccess<PATH, USER>): STORAGE
+    context(serverRuntime: ServerRuntime)
+    public suspend fun willConnectTyped(access: WebSocketConnectRequestAccess<PATH, USER>): STORAGE
 
-    public context(serverRuntime: ServerRuntime)
-    suspend fun didConnectTyped(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>)
+    context(serverRuntime: ServerRuntime)
+    public suspend fun didConnectTyped(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>)
 
-    public context(serverRuntime: ServerRuntime)
-    suspend fun messageFromClientTyped(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>, frame: INPUT)
+    context(serverRuntime: ServerRuntime)
+    public suspend fun messageFromClientTyped(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>, frame: INPUT)
 
-    public context(serverRuntime: ServerRuntime)
-    suspend fun messageFromSubscriptionTyped(
+    context(serverRuntime: ServerRuntime)
+    public suspend fun messageFromSubscriptionTyped(
         connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>,
         topic: WebSocketSubscriptionMessage<*, *>,
     )
 
-    public context(serverRuntime: ServerRuntime)
-    suspend fun disconnectTyped(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>, reason: WebSocketClose.Code)
+    context(serverRuntime: ServerRuntime)
+    public suspend fun disconnectTyped(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>, reason: WebSocketClose)
 
 
-    override context(serverRuntime: ServerRuntime)
-    suspend fun willConnect(request: WebSocketConnectRequest<PATH>): ApiWebSocketStorage<STORAGE> {
+    context(serverRuntime: ServerRuntime)
+    override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): ApiWebSocketStorage<STORAGE> {
         return willConnectTyped(WebSocketConnectRequestAccess(request, request.auth(auth))).let {
             ApiWebSocketStorage(
                 request.headers.accept.firstOrNull()?.takeUnless { it.type == "*" }
@@ -82,13 +82,13 @@ public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
         }
     }
 
-    override context(serverRuntime: ServerRuntime)
-    suspend fun didConnect(connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>) {
+    context(serverRuntime: ServerRuntime)
+    override suspend fun didConnect(connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>) {
         didConnectTyped(connection.typed())
     }
 
-    override context(serverRuntime: ServerRuntime)
-    suspend fun messageFromClient(
+    context(serverRuntime: ServerRuntime)
+    override suspend fun messageFromClient(
         connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>,
         frame: WebSocketFrame,
     ) {
@@ -100,16 +100,16 @@ public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
         messageFromClientTyped(connection.typed(), parsed)
     }
 
-    override context(serverRuntime: ServerRuntime)
-    suspend fun messageFromSubscription(
+    context(serverRuntime: ServerRuntime)
+    override suspend fun messageFromSubscription(
         connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>,
         topic: WebSocketSubscriptionMessage<*, *>,
     ) {
         messageFromSubscriptionTyped(connection.typed(), topic)
     }
 
-    override context(serverRuntime: ServerRuntime)
-    suspend fun disconnect(
+    context(serverRuntime: ServerRuntime)
+    override suspend fun disconnect(
         connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>,
         reason: WebSocketClose,
     ) {
@@ -117,8 +117,8 @@ public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
     }
 
     /** Presents the raw connection as the typed one this handler's own methods are written against. */
-    private context(serverRuntime: ServerRuntime)
-    fun WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>.typed(): Connection<PATH, STORAGE, USER, INPUT, OUTPUT> {
+    context(serverRuntime: ServerRuntime)
+    private fun WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>.typed(): Connection<PATH, STORAGE, USER, INPUT, OUTPUT> {
         class ConnectionWrapper(
             val wraps: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>,
             val outputSerializer: KSerializer<OUTPUT>,
@@ -143,7 +143,7 @@ public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
                 wraps.send(wraps.currentState.mediaType.encoder!!.ws(wraps.currentState.mediaType, outputSerializer, frame))
             }
 
-            override suspend fun close(reason: WebSocketClose.Code) = wraps.close(reason)
+            override suspend fun close(reason: WebSocketClose) = wraps.close(reason)
         }
         return ConnectionWrapper(this, outputType, auth)
     }

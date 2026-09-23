@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.engine.local.engineCache
 import com.lightningkite.lightningserver.engine.local.enginePubSub
 import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
 import com.lightningkite.lightningserver.settings.set
+import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketClose.Code
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.webSocketSettings
@@ -34,7 +35,7 @@ import kotlin.test.assertTrue
  */
 private val liveSockets: MutableSet<String> = ConcurrentHashMap.newKeySet()
 private val didConnects = AtomicInteger(0)
-private val cleanupReasons = CopyOnWriteArrayList<WebSocketCloseReason.Code>()
+private val cleanupReasons = CopyOnWriteArrayList<WebSocketClose>()
 
 /**
  * A disconnect body that takes long enough for "did shutdown wait for it" to be a real question.
@@ -168,7 +169,7 @@ class SocketShutdownCleanupTest {
 
         assertEquals(emptySet<String>(), liveSockets, "shutdown left sockets un-unwound")
         assertEquals(
-            List(count) { WebSocketCloseReason.Code.GOING_AWAY },
+            List(count) { WebSocketClose.GOING_AWAY },
             cleanupReasons.toList(),
             "each open socket should disconnect exactly once, as going away",
         )

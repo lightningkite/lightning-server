@@ -8,7 +8,7 @@ import kotlin.coroutines.cancellation.CancellationException
 public data class WebSocketClose(
     val code: Code,
     val message: String?,
-    val cause: Throwable?
+    val cause: Throwable? = null
 ) {
     public enum class Code(public val code: Short) {
         NORMAL(1000),

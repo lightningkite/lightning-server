@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.engine.local.engineCache
 import com.lightningkite.lightningserver.engine.local.enginePubSub
 import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
 import com.lightningkite.lightningserver.settings.set
+import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketClose.Code
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.webSocketSettings
@@ -45,7 +46,7 @@ class WebSocketClientCloseTest {
     companion object {
         val serverConnected = CompletableDeferred<Unit>()
         val serverDisconnected = CompletableDeferred<Unit>()
-        val reasons = CopyOnWriteArrayList<WebSocketCloseReason.Code>()
+        val reasons = CopyOnWriteArrayList<WebSocketClose>()
     }
 
     @Test
@@ -71,6 +72,6 @@ class WebSocketClientCloseTest {
             serverDisconnected.await()
         }
 
-        assertEquals(listOf(WebSocketCloseReason.Code.NORMAL), reasons.toList())
+        assertEquals(listOf(WebSocketClose.NORMAL), reasons.toList())
     }
 }

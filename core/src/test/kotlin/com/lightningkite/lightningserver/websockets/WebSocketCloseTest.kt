@@ -15,7 +15,7 @@ class WebSocketCloseTest {
     // ========== Enum Value Tests ==========
 
     @Test
-    fun `WebSocketCloseReason.Code codes are correct`() {
+    fun `WebSocketCloseReasonCode codes are correct`() {
         assertEquals(1000.toShort(), WebSocketClose.Code.NORMAL.code)
         assertEquals(1001.toShort(), WebSocketClose.Code.GOING_AWAY.code)
         assertEquals(1002.toShort(), WebSocketClose.Code.PROTOCOL_ERROR.code)
@@ -30,7 +30,7 @@ class WebSocketCloseTest {
     }
 
     @Test
-    fun `WebSocketCloseReason.Code values are all unique`() {
+    fun `WebSocketCloseReasonCode values are all unique`() {
         val codes = WebSocketClose.Code.entries.map { it.code }
         assertEquals(codes.size, codes.distinct().size)
     }
@@ -82,7 +82,7 @@ class WebSocketCloseTest {
      */
     @Test
     fun `cancellation closes as GOING_AWAY, not an error`() {
-        assertEquals(WebSocketClose.GOING_AWAY, CancellationException("shutting down").bestWebSocketCloseCode)
+        assertEquals(WebSocketClose.Code.GOING_AWAY, CancellationException("shutting down").bestWebSocketCloseCode)
     }
 
     @Test
@@ -90,7 +90,7 @@ class WebSocketCloseTest {
         // Coroutine cancellation arrives as subclasses (e.g. JobCancellationException), never as the
         // base type, so an equality check on the class would miss every real case.
         class Nested(message: String) : CancellationException(message)
-        assertEquals(WebSocketClose.GOING_AWAY, Nested("child cancelled").bestWebSocketCloseCode)
+        assertEquals(WebSocketClose.Code.GOING_AWAY, Nested("child cancelled").bestWebSocketCloseCode)
     }
 
     /**

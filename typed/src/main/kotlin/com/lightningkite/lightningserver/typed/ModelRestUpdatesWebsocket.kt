@@ -70,8 +70,7 @@ public class ModelRestUpdatesWebSocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
         )
     }
 
-    private inner class WebSocket :
-        ApiWebSocketHandler<PathSpec0, ModelRestUpdatesWebSocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>> {
+    private inner class WebSocket : ApiWebSocketHandler<PathSpec0, ModelRestUpdatesWebSocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>> {
         override val auth: AuthRequirement<USER> = info.auth
         override val inputType: KSerializer<Condition<T>> = Condition.serializer(info.serializer)
         override val outputType: KSerializer<CollectionUpdates<T, ID>> =
@@ -144,7 +143,7 @@ public class ModelRestUpdatesWebSocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
 
             state.user?.expiration?.let { expiration ->
                 if (expiration <= now) {
-                    connection.close(WebSocketClose.Code.VIOLATED_POLICY)
+                    connection.close(WebSocketClose(WebSocketClose.Code.VIOLATED_POLICY, "Expired"))
                     return
                 }
             }
@@ -154,9 +153,9 @@ public class ModelRestUpdatesWebSocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
                     info.table(connection.auth())
                 } catch (e: CancellationException) {
                     throw e
-                } catch (_: Exception) {
+                } catch (e: Exception) {
                     // Auth no longer resolves — the session was terminated or the credential revoked.
-                    connection.close(WebSocketClose.Code.VIOLATED_POLICY)
+                    connection.close(WebSocketClose(WebSocketClose.Code.VIOLATED_POLICY, "Auth Revoked", e))
                     return
                 }
                 // Resolved outside updateStateImmediately: its modification lambda is not suspending.
@@ -208,7 +207,7 @@ public class ModelRestUpdatesWebSocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
         context(serverRuntime: ServerRuntime)
         override suspend fun disconnectTyped(
             connection: ApiWebSocketHandler.Connection<PathSpec0, ModelRestUpdatesWebSocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>>,
-            reason: WebSocketClose.Code,
+            reason: WebSocketClose,
         ) {
         }
     }

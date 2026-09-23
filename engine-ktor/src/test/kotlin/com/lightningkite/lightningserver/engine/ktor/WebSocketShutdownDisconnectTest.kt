@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.engine.local.engineCache
 import com.lightningkite.lightningserver.engine.local.enginePubSub
 import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
 import com.lightningkite.lightningserver.settings.set
+import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketClose.Code
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.webSocketSettings
@@ -50,7 +51,7 @@ class WebSocketShutdownDisconnectTest {
 
     companion object {
         val serverConnected = CompletableDeferred<Unit>()
-        val disconnectReason = AtomicReference<WebSocketCloseReason.Code?>(null)
+        val disconnectReason = AtomicReference<WebSocketClose?>(null)
         val disconnected = CountDownLatch(1)
     }
 
@@ -93,6 +94,6 @@ class WebSocketShutdownDisconnectTest {
             disconnected.await(5, TimeUnit.SECONDS),
             "disconnect phase never ran for a socket cancelled by shutdown",
         )
-        assertEquals(WebSocketCloseReason.Code.GOING_AWAY, disconnectReason.get())
+        assertEquals(WebSocketClose.GOING_AWAY, disconnectReason.get())
     }
 }

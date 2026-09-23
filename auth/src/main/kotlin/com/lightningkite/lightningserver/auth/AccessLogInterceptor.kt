@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.logicalId
 import com.lightningkite.lightningserver.websockets.DelegatingWebSocketHandler
+import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketClose.Code
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketConnection
@@ -88,7 +89,7 @@ public class AccessLogInterceptor : HttpInterceptor, WebSocketInterceptor {
             }
 
             context(serverRuntime: ServerRuntime)
-            override suspend fun disconnect(connection: WebSocketConnection<PATH, T>, reason: WebSocketCloseReason.Code) {
+            override suspend fun disconnect(connection: WebSocketConnection<PATH, T>, reason: WebSocketClose) {
                 if (serverRuntime.logger.isInfoEnabled()) {
                     val request = connection.request
                     val principal = request.authString()
