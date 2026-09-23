@@ -36,14 +36,32 @@ public interface SecretSource {
      * @throws IllegalStateException if the secret is not found and no fallback is available
      */
     public fun <T> get(need: TerraformNeed<T>): T =
-        getOrNull(need) ?: throw IllegalStateException("Missing secret ${need.name}, no backup methodology established")
+        (getBoxed(need) ?: throw IllegalStateException("Missing secret ${need.name}, no backup methodology established")).value
+
+    /**
+     * Retrieves the stored value for a secret, boxed, or `null` if this source has no entry for it.
+     *
+     * This - not [getOrNull] - is the operation implementations provide, because a need of nullable
+     * type may legitimately be stored *as* null; without the box such a need looks unset forever and
+     * is re-prompted on every deploy.
+     */
+    public fun <T> getBoxed(need: TerraformNeed<T>): Stored<T>?
 
     /**
      * Retrieves the value for a secret, or null if not found.
-     * @return The secret value, or null if not available in this source
+     *
+     * Only meaningful for needs of non-nullable type; for a nullable need use [getBoxed] to tell
+     * "stored as null" from "not stored".
      */
-    public fun <T> getOrNull(need: TerraformNeed<T>): T?
+    public fun <T> getOrNull(need: TerraformNeed<T>): T? = getBoxed(need)?.value
 }
+
+/**
+ * A value that is present in a [SecretSource], boxed so that a stored `null` is distinguishable
+ * from the absence of any stored value.
+ */
+@JvmInline
+public value class Stored<out T>(public val value: T)
 
 /**
  * A [SecretSource] that can interactively prompt the user for missing secrets.
@@ -72,7 +90,8 @@ public interface PopulatableSecretSource : SecretSource, InteractiveSecretSource
      * The prompted value is automatically stored for future use.
      */
     override fun <T> get(need: TerraformNeed<T>): T {
-        return getOrNull(need) ?: prompt(need)
+        val stored = getBoxed(need) ?: return prompt(need)
+        return stored.value
     }
 
     /**
@@ -80,18 +99,7 @@ public interface PopulatableSecretSource : SecretSource, InteractiveSecretSource
      * Displays instructions and handles default values.
      */
     override fun <T> prompt(need: TerraformNeed<T>): T {
-        println("${need.name}: ${need.instructions}")
-        println(
-            "Enter value for '${need.name}'${
-                need.default?.let {
-                    " (leave blank to default to ${
-                        need.serializer.emit(
-                            it
-                        )
-                    })"
-                } ?: ""
-            }: ")
-        val typed = readInput { secret -> if (secret.isBlank()) need.default!! else need.serializer.parse(secret) }
+        val typed = need.readFromTerminal("to be stored in $name")
         set(need, typed)
         return typed
     }
@@ -132,26 +140,16 @@ public fun SecretSource.runGuiEditor(variables: List<TerraformNeed<*>>) {
     val pop = this as? PopulatableSecretSource
     val interactive = this as? InteractiveSecretSource
 
-    while (true) {
-        fun emitAny(serializer: KSerializer<Any?>, value: Any): String {
-            return if (serializer.descriptor.kind is PrimitiveKind)
-                StringArrayFormat(EmptySerializersModule()).encodeToString(serializer, value)
-            else Json.encodeToString(serializer, value)
-        }
+    @Suppress("UNCHECKED_CAST")
+    fun TerraformNeed<*>.currentString(): String? = try {
+        getBoxed(this)?.let { (this as TerraformNeed<Any?>).serializer.emit(it.value) }
+    } catch (_: Exception) {
+        null
+    }
 
+    while (true) {
         val optionLabels = (variables.map { v ->
-            val current = try {
-                this.getOrNull(v)
-            } catch (_: Exception) {
-                null
-            }
-            val currentStr = try {
-                @Suppress("UNCHECKED_CAST")
-                current?.let { emitAny((v as TerraformNeed<Any?>).serializer, it) }
-            } catch (_: Exception) {
-                null
-            }
-            if (currentStr != null) "${v.name} (set)" else v.name
+            if (v.currentString() != null) "${v.name} (set)" else v.name
         } + listOf("Quit")).toTypedArray()
 
         val selection = JOptionPane.showInputDialog(
@@ -170,49 +168,20 @@ public fun SecretSource.runGuiEditor(variables: List<TerraformNeed<*>>) {
         // If we can directly populate, prompt for value; otherwise delegate to interactive prompt.
         if (pop != null) {
             while (true) {
-                val currentVal = try {
-                    this.getOrNull(selectedNeed)
-                } catch (_: Exception) {
-                    null
-                }
-                val currentStr = try {
-                    @Suppress("UNCHECKED_CAST")
-                    (selectedNeed as TerraformNeed<Any?>).serializer.let { s ->
-                        currentVal?.let {
-                            s.emit(it)
-                        }
-                    }
-                } catch (_: Exception) {
-                    null
-                }
+                val currentStr = selectedNeed.currentString()
 
                 val message = buildString {
                     append("${selectedNeed.name}: ${selectedNeed.instructions}\n")
                     if (currentStr != null) append("Current: $currentStr\n")
-                    selectedNeed.default?.let { def ->
-                        try {
-                            @Suppress("UNCHECKED_CAST")
-                            val defStr = emitAny(
-                                (selectedNeed as TerraformNeed<Any?>).serializer,
-                                def
-                            )
-                            append("Leave blank to default to $defStr\n")
-                        } catch (_: Exception) {
-                        }
-                    }
+                    selectedNeed.blankHint().takeIf { it.isNotEmpty() }?.let { append("$it\n") }
                 }
 
                 val input = JOptionPane.showInputDialog(null, message, currentStr ?: "") ?: break
                 try {
                     @Suppress("UNCHECKED_CAST")
-                    val typed = if (input.isBlank()) {
-                        if (selectedNeed.default != null) selectedNeed.default as Any
-                        else throw IllegalArgumentException("A value is required")
-                    } else {
-                        (selectedNeed as TerraformNeed<Any?>).serializer.parse(input) as Any
-                    }
-                    @Suppress("UNCHECKED_CAST")
-                    pop.set(selectedNeed as TerraformNeed<Any>, typed)
+                    val need = selectedNeed as TerraformNeed<Any?>
+                    val typed = if (input.isBlank()) need.blankValue() else need.serializer.parse(input)
+                    pop.set(need, typed)
                     JOptionPane.showMessageDialog(null, "Saved '${selectedNeed.name}' to ${pop.name}.")
                     break
                 } catch (e: IllegalArgumentException) {
@@ -245,22 +214,7 @@ public fun SecretSource.runGuiEditor(variables: List<TerraformNeed<*>>) {
             }
         } else {
             // Not editable; just show the current value
-            val currentVal = try {
-                this.getOrNull(selectedNeed)
-            } catch (_: Exception) {
-                null
-            }
-            val currentStr = try {
-                @Suppress("UNCHECKED_CAST")
-                currentVal?.let {
-                    emitAny(
-                        (selectedNeed as TerraformNeed<Any?>).serializer,
-                        it
-                    )
-                } ?: "<unset>"
-            } catch (_: Exception) {
-                "<unset>"
-            }
+            val currentStr = selectedNeed.currentString() ?: "<unset>"
             JOptionPane.showMessageDialog(null, "${selectedNeed.name} = $currentStr\n(Source: ${this.name})")
         }
     }
@@ -286,7 +240,7 @@ public fun SecretSource.runTerminalEditor(variables: List<TerraformNeed<*>>) {
             "Do you want to read or write this variable?",
             listOf(true, false),
             { if (it) "Read" else "Write" })
-        if (read) println("The current value is '${getOrNull(sel)}'.")
+        if (read) println(getBoxed(sel)?.let { "The current value is '${it.value}'." } ?: "It is not set.")
         else prompt(sel)
     }
 }
@@ -313,57 +267,59 @@ public class ManySecretSources(
 
     override val name: String = "Many"
 
-    override fun <T> getOrNull(need: TerraformNeed<T>): T? {
-        return sources.firstNotNullOfOrNull { it.getOrNull(need) }
+    override fun <T> getBoxed(need: TerraformNeed<T>): Stored<T>? {
+        return sources.firstNotNullOfOrNull { it.getBoxed(need) }
     }
 
     override fun <T> prompt(need: TerraformNeed<T>): T {
         val options = sources.filterIsInstance<PopulatableSecretSource>()
-        println("${need.name}: ${need.instructions}")
-        return when (options.size) {
-            0 -> throw IllegalStateException("Missing secret ${need.name}, no backup methodology established")
-            1 -> {
-                val destination = options.single()
-                println(
-                    "Enter value for '${need.name}' to be stored in ${destination.name}${
-                        need.default?.let {
-                            " (leave blank to default to ${
-                                need.serializer.emit(
-                                    it
-                                )
-                            })"
-                        } ?: ""
-                    }: ")
-                val typed =
-                    readInput { secret -> if (secret.isBlank()) need.default!! else need.serializer.parse(secret) }
-                destination.set(need, typed)
-                typed
-            }
-
-            else -> {
-                println()
-                val destination = readSelection("Where would you like to store '${need.name}'?", options) { it.name }
-                println(
-                    "Enter value for '${need.name}' to be stored in ${destination.name}${
-                        need.default?.let {
-                            " (leave blank to default to ${
-                                need.serializer.emit(
-                                    it
-                                )
-                            })"
-                        } ?: ""
-                    }: ")
-                val typed =
-                    readInput { secret -> if (secret.isBlank()) need.default!! else need.serializer.parse(secret) }
-                destination.set(need, typed)
-                typed
-            }
-        }
+        if (options.isEmpty()) throw IllegalStateException("Missing secret ${need.name}, no backup methodology established")
+        val destination = options.singleOrNull()
+            ?: readSelection("Where would you like to store '${need.name}'?", options) { it.name }
+        val typed = need.readFromTerminal("to be stored in ${destination.name}")
+        destination.set(need, typed)
+        return typed
     }
 
     override fun <T> get(need: TerraformNeed<T>): T {
-        return getOrNull(need) ?: prompt(need)
+        val stored = getBoxed(need) ?: return prompt(need)
+        return stored.value
     }
+}
+
+/**
+ * The value meant by an empty entry for this need.
+ *
+ * For a nullable need, `default == null` *is* the default - [TerraformNeed.default] has no way to
+ * express "no default" for such a need - so blank means null there rather than being an error.
+ *
+ * @throws IllegalArgumentException if the need has no default and null is not a legal value.
+ */
+@Suppress("UNCHECKED_CAST")
+internal fun <T> TerraformNeed<T>.blankValue(): T = when {
+    default != null -> default!!
+    serializer.descriptor.isNullable -> null as T
+    else -> throw IllegalArgumentException("'$name' has no default; please enter a value.")
+}
+
+/** Sentence describing what an empty entry does, or "" when an entry is required. */
+internal fun <T> TerraformNeed<T>.blankHint(): String = when {
+    default != null -> "Leave blank to default to ${serializer.emit(default!!)}."
+    serializer.descriptor.isNullable -> "Leave blank for null."
+    else -> ""
+}
+
+/**
+ * Prints this need's instructions and reads one value for it from the terminal, retrying until the
+ * input parses.
+ *
+ * @param destination Describes where the value is headed, e.g. "to be stored in AWS Secrets".
+ */
+internal fun <T> TerraformNeed<T>.readFromTerminal(destination: String): T {
+    println("$name: $instructions")
+    blankHint().takeIf { it.isNotEmpty() }?.let { println(it) }
+    println("Enter value for '$name' $destination: ")
+    return readInput { typed -> if (typed.isBlank()) blankValue() else serializer.parse(typed) }
 }
 
 /**
@@ -421,8 +377,8 @@ internal fun <T> readInput(process: (String) -> T): T {
  */
 public object EnvironmentSecretSource : SecretSource {
     override val name: String = "environment"
-    override fun <T> getOrNull(need: TerraformNeed<T>): T? =
-        System.getenv("LS_SECRET_${need.name}")?.let { need.serializer.parse(it) }
+    override fun <T> getBoxed(need: TerraformNeed<T>): Stored<T>? =
+        System.getenv("LS_SECRET_${need.name}")?.let { Stored(need.serializer.parse(it)) }
 }
 
 /**
@@ -678,8 +634,8 @@ public class EncryptedFileSecretSource(
         file.writeText(json.encodeToString(format))
     }
 
-    override fun <T> getOrNull(need: TerraformNeed<T>): T? {
-        return getMap()[need.name]?.let { json.decodeFromString(need.serializer, it) }
+    override fun <T> getBoxed(need: TerraformNeed<T>): Stored<T>? {
+        return getMap()[need.name]?.let { Stored(json.decodeFromString(need.serializer, it)) }
     }
 
     override fun <T> set(need: TerraformNeed<T>, value: T) {
@@ -795,8 +751,8 @@ public class DynamicEncryptedFileSecretSource(
         return getWraps().set(need, value)
     }
 
-    override fun <T> getOrNull(need: TerraformNeed<T>): T? {
-        return getWraps().get(need)
+    override fun <T> getBoxed(need: TerraformNeed<T>): Stored<T>? {
+        return getWraps().getBoxed(need)
     }
 
 }

@@ -269,7 +269,9 @@ See also:
 
 - **`SecretSource`**: Interface for secret retrieval
     - `get(need)`: Get required secret or throw
-    - `getOrNull(need)`: Get optional secret
+    - `getBoxed(need)`: Get the secret boxed in `Stored`, or null if unset - the operation
+      implementations provide, and the one to use for needs of nullable type
+    - `getOrNull(need)`: Get optional secret (cannot distinguish "stored as null" from "unset")
 
 - **`PopulatableSecretSource`**: Secret source that can store secrets
     - `set(need, value)`: Store a secret

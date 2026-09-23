@@ -57,7 +57,11 @@ Interfaces and implementations for managing deployment secrets.
 Base interface for retrieving secrets.
 
 - `name`: Display name for this source
-- `getOrNull(need)`: Retrieve a secret, or null if not found
+- `fetch(need)`: Retrieve a secret boxed in `Stored`, or null if this source has no entry for it.
+  Implementations provide this one; the box is what lets a need of nullable type be stored *as*
+  null without looking unset (and so being re-prompted) forever.
+- `getOrNull(need)`: Retrieve a secret, or null if not found - convenience over `fetch`, only
+  meaningful for needs of non-nullable type
 - `get(need)`: Retrieve a secret, throwing if not found
 
 **`InteractiveSecretSource`**

@@ -117,11 +117,13 @@ public open class AwsAdapter(server: ServerDefinition) : ServerRuntimeBase(serve
 
     protected open val region: Region by lazy { Region.of(System.getenv("AWS_REGION")) }
 
-    private val lambdaClient = LambdaAsyncClient.builder()
-        .region(region)
-        .httpClient(get(AwsConnections).asyncClient)
-        .overrideConfiguration(get(AwsConnections).clientOverrideConfiguration)
-        .build()
+    private val lambdaClient by lazy {
+        LambdaAsyncClient.builder()
+            .region(region)
+            .httpClient(get(AwsConnections).asyncClient)
+            .overrideConfiguration(get(AwsConnections).clientOverrideConfiguration)
+            .build()
+    }
 
     public open suspend fun invokeLambda(invokeRequest: InvokeRequest): InvokeResponse {
         return lambdaClient.invoke(invokeRequest).await()

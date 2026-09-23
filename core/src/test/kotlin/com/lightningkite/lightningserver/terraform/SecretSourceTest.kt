@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.terraform
 
 import com.lightningkite.services.terraform.TerraformNeed
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer
 import org.junit.Test
 import java.io.File
@@ -28,6 +29,13 @@ class SecretSourceTest {
         override val instructions: String = "Test secret with default value"
     }
 
+    private val nullableNeed = object : TerraformNeed<String?> {
+        override val name: String = "TEST_NULLABLE"
+        override val serializer: KSerializer<String?> = String.serializer().nullable
+        override val default: String? = null
+        override val instructions: String = "Test secret whose value may legitimately be null"
+    }
+
     /** Helper to create a test PasswordFetcher with a predefined password */
     private fun mockPasswordFetcher(password: String): PasswordFetcher {
         return object : PasswordFetcher() {
@@ -52,15 +60,15 @@ class SecretSourceTest {
     fun `ManySecretSources returns first non-null value`() {
         val source1 = object : SecretSource {
             override val name: String = "Source1"
-            override fun <T> getOrNull(need: TerraformNeed<T>): T? = null
+            override fun <T> getBoxed(need: TerraformNeed<T>): Stored<T>? = null
         }
         @Suppress("UNCHECKED_CAST") val source2 = object : SecretSource {
             override val name: String = "Source2"
-            override fun <T> getOrNull(need: TerraformNeed<T>): T? = "from-source2" as? T
+            override fun <T> getBoxed(need: TerraformNeed<T>): Stored<T>? = Stored("from-source2" as T)
         }
         @Suppress("UNCHECKED_CAST") val source3 = object : SecretSource {
             override val name: String = "Source3"
-            override fun <T> getOrNull(need: TerraformNeed<T>): T? = "from-source3" as? T
+            override fun <T> getBoxed(need: TerraformNeed<T>): Stored<T>? = Stored("from-source3" as T)
         }
 
         val many = ManySecretSources(source1, source2, source3)
@@ -72,11 +80,11 @@ class SecretSourceTest {
     fun `ManySecretSources returns null when all sources return null`() {
         val source1 = object : SecretSource {
             override val name: String = "Source1"
-            override fun <T> getOrNull(need: TerraformNeed<T>): T? = null
+            override fun <T> getBoxed(need: TerraformNeed<T>): Stored<T>? = null
         }
         val source2 = object : SecretSource {
             override val name: String = "Source2"
-            override fun <T> getOrNull(need: TerraformNeed<T>): T? = null
+            override fun <T> getBoxed(need: TerraformNeed<T>): Stored<T>? = null
         }
 
         val many = ManySecretSources(source1, source2)
@@ -88,7 +96,7 @@ class SecretSourceTest {
     fun `SecretSource get() throws when value not found and no default`() {
         val source = object : SecretSource {
             override val name: String = "TestSource"
-            override fun <T> getOrNull(need: TerraformNeed<T>): T? = null
+            override fun <T> getBoxed(need: TerraformNeed<T>): Stored<T>? = null
         }
 
         assertFailsWith<IllegalStateException> {
@@ -192,7 +200,7 @@ class SecretSourceTest {
     fun `ManySecretSources with single source`() {
         @Suppress("UNCHECKED_CAST") val source = object : SecretSource {
             override val name: String = "SingleSource"
-            override fun <T> getOrNull(need: TerraformNeed<T>): T? = "single-value" as? T
+            override fun <T> getBoxed(need: TerraformNeed<T>): Stored<T>? = Stored("single-value" as T)
         }
 
         val many = ManySecretSources(source)
@@ -211,11 +219,11 @@ class SecretSourceTest {
     fun `ManySecretSources sources property is accessible`() {
         val source1 = object : SecretSource {
             override val name: String = "S1"
-            override fun <T> getOrNull(need: TerraformNeed<T>): T? = null
+            override fun <T> getBoxed(need: TerraformNeed<T>): Stored<T>? = null
         }
         val source2 = object : SecretSource {
             override val name: String = "S2"
-            override fun <T> getOrNull(need: TerraformNeed<T>): T? = null
+            override fun <T> getBoxed(need: TerraformNeed<T>): Stored<T>? = null
         }
 
         val many = ManySecretSources(source1, source2)
@@ -230,13 +238,11 @@ class SecretSourceTest {
     fun `SecretSource get() returns default when not found`() {
         val source = object : SecretSource {
             override val name: String = "TestSource"
-            override fun <T> getOrNull(need: TerraformNeed<T>): T? = null
+            override fun <T> getBoxed(need: TerraformNeed<T>): Stored<T>? = null
         }
 
-        // With default, should return null and then default kicks in via need.default
-        // Actually, SecretSource.get() throws if not found. Let's verify behavior.
-        // Looking at the source: get() = getOrNull(need) ?: throw IllegalStateException(...)
-        // So default in TerraformNeed is not used by base SecretSource.get()
+        // A need's default is not a fallback for a plain SecretSource.get(); only the
+        // interactive sources offer it, as the value to accept when the user enters nothing.
         assertFailsWith<IllegalStateException> {
             source.get(testNeedWithDefault)
         }
@@ -255,6 +261,27 @@ class SecretSourceTest {
             // Without setting anything, getOrNull should return null
             val result = source.getOrNull(testNeed)
             assertNull(result, "Should return null for key that hasn't been set")
+        } finally {
+            tempFile.delete()
+        }
+    }
+
+    @Test
+    fun `a nullable secret stored as null stays stored`() {
+        val tempFile = File.createTempFile("test-secrets", ".json.enc")
+        tempFile.delete()
+
+        try {
+            val source = EncryptedFileSecretSource(tempFile, "test-source", mockPasswordFetcher("test-password-123"))
+
+            assertNull(source.getBoxed(nullableNeed), "Should read as absent before it is set")
+            source.set(nullableNeed, null)
+
+            val stored = source.getBoxed(nullableNeed)
+            assertNotNull(stored, "A need stored as null must read back as present")
+            assertNull(stored.value)
+            // get() would otherwise prompt on every call - the bug this box exists to prevent.
+            assertNull(source.get(nullableNeed))
         } finally {
             tempFile.delete()
         }

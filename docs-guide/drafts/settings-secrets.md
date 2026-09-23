@@ -249,6 +249,9 @@ export LS_SECRET_DATABASE_PASSWORD="hunter2"
 ```kotlin
 // Illustrative
 val db = EnvironmentSecretSource.getOrNull(dbPasswordNeed)
+// For a need whose type is nullable, use fetch: `null` means unset, `Stored(null)` means
+// stored as null.  getOrNull() cannot tell those apart.
+val maybe = EnvironmentSecretSource.fetch(nullableNeed)?.value
 ```
 
 ### EncryptedFileSecretSource
