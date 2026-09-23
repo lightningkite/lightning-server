@@ -59,11 +59,10 @@ class LegacyQueryParamWebSocketHandlerData(
 )
 
 /**
- * The legacy shape of [AwsAdapterWs.WebSocketDidConnect]: no `initiator`.
+ * The legacy shape of [AwsAdapterWs.WebSocketDidConnect], which still carried the connect request.
  *
  * The payload travels as JSON, not as a positional blob, and the adapter's `Json` sets
- * `ignoreUnknownKeys`, so the extra `requestId` and `parentRequestId` here are tolerated on arrival.
- * The missing `initiator` is the whole failure.
+ * `ignoreUnknownKeys`, so the extra `connection` is tolerated on arrival.
  */
 @Serializable
 class LegacyWebSocketDidConnect(
@@ -77,7 +76,6 @@ class LegacyWebSocketDidConnect(
 internal const val socketIdColumn = "wsSocketId"
 internal const val stateColumn = "wsState"
 internal const val requestColumn = "wsRequest"
-internal const val initiatorColumn = "wsInitiator"
 private const val expireColumn = "wsExpire"
 
 internal fun TestAwsAdapter.stateTableName(): String = ws.webSocketDynamo.baseTableName + "-ws-state"
@@ -94,11 +92,9 @@ internal fun TestAwsAdapter.legacyConnectRequest(connectionId: String) = LegacyW
  * Replaces [connectionId]'s state row with one written the way the fork point wrote it.
  *
  * Overwrites rather than inserts, so a test can connect normally first - keeping the subscription rows
- * that `didConnect` registered - and then age only the state row.  `wsInitiator` is written only if
- * [initiator] is given, which models the narrower case of a row whose column set is current but whose
- * blob is not.
+ * that `didConnect` registered - and then age only the state row.
  */
-internal fun TestAwsAdapter.putLegacySocketRow(connectionId: String, initiator: AttributeValue? = null) {
+internal fun TestAwsAdapter.putLegacySocketRow(connectionId: String) {
     val encoding = internalSerialization.kotlinBytesFormat
     val request = legacyConnectRequest(connectionId)
     val storage = LegacyQueryParamWebSocketHandlerData(
@@ -133,7 +129,6 @@ internal fun TestAwsAdapter.putLegacySocketRow(connectionId: String, initiator: 
                         expireColumn,
                         AttributeValue.fromN(Clock.System.now().plus(8.hours).epochSeconds.toString())
                     )
-                    initiator?.let { put(initiatorColumn, it) }
                 }
             )
         }.await()

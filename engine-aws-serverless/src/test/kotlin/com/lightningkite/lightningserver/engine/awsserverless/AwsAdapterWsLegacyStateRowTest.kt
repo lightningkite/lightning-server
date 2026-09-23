@@ -26,16 +26,12 @@ import kotlin.test.assertTrue
 
 /**
  * A socket row written by an earlier deployment cannot be served or attributed by this one, and no later
- * phase can repair it: both the stored connect request and the initiator are written once, at
- * `${'$'}connect`, under whatever code was deployed then.  Every phase after `${'$'}connect` therefore
- * has to end such a socket rather than fail on it, or a rolling deploy breaks every socket open across
- * it.
+ * phase can repair it: the stored connect request is written once, at `${'$'}connect`, under whatever code
+ * was deployed then.  Every phase after `${'$'}connect` therefore has to end such a socket rather than
+ * fail on it, or a rolling deploy breaks every socket open across it.
  *
- * Two flavours of aged row are covered, because both are real:
- * - a **genuine legacy row**, written by [putLegacySocketRow] in the fork point's own layout, which the
- *   current serializer cannot decode at all;
- * - a **row whose column set is older** than its blob, produced by removing `wsInitiator` from a row this
- *   deployment wrote.
+ * The rows here are written by [putLegacySocketRow] in the fork point's own layout, which the current
+ * serializer cannot decode at all.
  */
 class AwsAdapterWsLegacyStateRowTest {
 
@@ -76,21 +72,6 @@ class AwsAdapterWsLegacyStateRowTest {
             it.key(mapOf(socketIdColumn to AttributeValue.fromS(connectionId)))
             it.consistentRead(true)
         }.await().takeIf { it.hasItem() }?.item()
-    }
-
-    /** Ages only the column set: the blob stays current, but the initiator column goes away. */
-    private fun TestAwsAdapter.stripInitiator(connectionId: String) {
-        assertTrue(
-            stateRow(connectionId)!!.containsKey(initiatorColumn),
-            "A freshly connected socket must have an initiator, or this fixture is testing nothing"
-        )
-        runBlocking {
-            countingDynamo.updateItem {
-                it.tableName(stateTableName())
-                it.key(mapOf(socketIdColumn to AttributeValue.fromS(connectionId)))
-                it.updateExpression("REMOVE $initiatorColumn")
-            }.await()
-        }
     }
 
     private fun baseMessage(connectionId: String) = APIGatewayV2WebSocketRequest(
@@ -222,43 +203,6 @@ class AwsAdapterWsLegacyStateRowTest {
         assertSocketEnded(adapter, connectionId, channel)
     }
 
-    /**
-     * A row whose blob is from the fork point but which does carry an initiator - the case where only the
-     * stored request is stale.  This is the one that reaches the decode failure itself rather than
-     * short-circuiting on the absent column.
-     */
-    @Test
-    fun clientMessageOnLegacyBlobWithCurrentInitiatorEndsTheSocket() {
-        val adapter = adapter()
-        val connectionId = "legacy-blob-client-message"
-        val channel = adapter.connect(connectionId)
-        adapter.putLegacySocketRow(connectionId, initiator = adapter.stateRow(connectionId)!![initiatorColumn]!!)
-
-        val response = adapter.invoke(clientMessage(connectionId, "Ping!"))
-        adapter.awaitPendingInvocations()
-
-        assertEquals(204, response.statusCode, "A row whose blob no longer decodes is discarded: ${response.body}")
-        assertSocketEnded(adapter, connectionId, channel)
-    }
-
-    @Test
-    fun clientMessageOnRowMissingOnlyTheInitiatorColumnEndsTheSocket() {
-        val adapter = adapter()
-        val connectionId = "no-initiator-client-message"
-        val channel = adapter.connect(connectionId)
-        adapter.stripInitiator(connectionId)
-
-        val response = adapter.invoke(clientMessage(connectionId, "Ping!"))
-        adapter.awaitPendingInvocations()
-
-        assertEquals(
-            204,
-            response.statusCode,
-            "An unattributable socket is discarded, not reported as a server failure: ${response.body}"
-        )
-        assertSocketEnded(adapter, connectionId, channel)
-    }
-
     @Test
     fun disconnectOnLegacyRowIsDiscardedNotFailed() {
         val adapter = adapter()
@@ -283,25 +227,8 @@ class AwsAdapterWsLegacyStateRowTest {
         assertEquals(
             0,
             SampleServer.disconnectHandlerRuns.get(),
-            "The disconnect phase must not be recorded under a fabricated initiator"
+            "The disconnect phase must not be recorded under a fabricated socket id"
         )
-    }
-
-    @Test
-    fun disconnectOnRowMissingOnlyTheInitiatorColumnIsDiscarded() {
-        val adapter = adapter()
-        val connectionId = "no-initiator-disconnect"
-        adapter.connect(connectionId)
-        adapter.stripInitiator(connectionId)
-        SampleServer.disconnectHandlerRuns.set(0)
-
-        val response = adapter.invoke(disconnect(connectionId))
-        adapter.awaitPendingInvocations()
-
-        assertEquals(204, response.statusCode, "Expected the disconnect to be discarded: ${response.body}")
-        assertNull(adapter.stateRow(connectionId), "The row must be cleaned up")
-        assertTrue(connectionId !in adapter.closedConnections, "No close call should be made")
-        assertEquals(0, SampleServer.disconnectHandlerRuns.get(), "The disconnect phase must not be recorded")
     }
 
     @Test
@@ -316,26 +243,13 @@ class AwsAdapterWsLegacyStateRowTest {
         assertSocketEnded(adapter, connectionId, channel)
     }
 
-    @Test
-    fun subscriptionPushToRowMissingOnlyTheInitiatorColumnEndsTheSocket() {
-        val adapter = adapter()
-        val connectionId = "no-initiator-subscription"
-        val channel = adapter.connect(connectionId)
-        adapter.stripInitiator(connectionId)
-
-        adapter.publishToBroadcast()
-
-        assertSocketEnded(adapter, connectionId, channel)
-    }
-
     /**
-     * `didConnect` is a separate Lambda invocation, so its initiator travels in the payload rather than
-     * the row.  A payload fired by the fork point has no `initiator` at all, and the field was required,
-     * so the whole payload used to fail to decode - silently, since the outer handler writes no response
-     * and Lambda records the async invocation as a success.
+     * `didConnect` is a separate Lambda invocation.  A payload fired by the fork point must still decode,
+     * or it is lost silently - the outer handler writes no response and Lambda records the async
+     * invocation as a success - and the row it belongs to is a legacy one, so the socket is ended.
      */
     @Test
-    fun didConnectWithoutInitiatorEndsTheSocket() {
+    fun didConnectFromAPreviousDeploymentEndsTheSocket() {
         val adapter = adapter()
         val connectionId = "legacy-did-connect"
         val channel = adapter.connect(connectionId)
@@ -343,7 +257,7 @@ class AwsAdapterWsLegacyStateRowTest {
 
         val response = decodeResponse(
             adapter.handleRequest(adapter.legacyDidConnectPayload(connectionId)),
-            "a didConnect payload with no initiator"
+            "a didConnect payload from a previous deployment"
         )
         adapter.awaitPendingInvocations()
 
@@ -373,9 +287,11 @@ class AwsAdapterWsLegacyStateRowTest {
         adapter.awaitPendingInvocations()
         assertEquals(1, SampleServer.disconnectHandlerRuns.get(), "The disconnect handler should have run")
         assertNull(adapter.stateRow(connectionId), "Disconnect cleans up the row")
+        // disconnectAndClose always closes the connection after the handler runs; the gateway has already
+        // dropped the socket by `${'$'}disconnect`, so this is a harmless no-op delete.
         assertTrue(
-            connectionId !in adapter.closedConnections,
-            "A healthy socket is never force-closed by the engine"
+            connectionId in adapter.closedConnections,
+            "The disconnect phase must close the connection once the handler has run"
         )
     }
 }

@@ -32,7 +32,7 @@ import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCod
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.registerTable
 import com.lightningkite.lightningserver.websockets.MultiplexWebSocketHandler
-import com.lightningkite.lightningserver.websockets.WebSocketClose
+import com.lightningkite.lightningserver.websockets.WebSocketClose.Code
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketConnection
 import com.lightningkite.lightningserver.websockets.WebSocketFrame
@@ -568,7 +568,7 @@ private class ProbeEngine : EngineBase(TestServer.build()), ServerRuntime {
                 sent += frame
             }
 
-            override suspend fun close(reason: WebSocketClose): Unit = Unit
+            override suspend fun close(reason: WebSocketCloseReason.Code): Unit = Unit
         }
 
         suspend fun send(text: String) {

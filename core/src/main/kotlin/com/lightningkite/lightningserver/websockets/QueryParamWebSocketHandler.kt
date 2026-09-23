@@ -7,7 +7,6 @@ import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.*
-import com.lightningkite.lightningserver.runtime.Execution
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 
@@ -32,9 +31,6 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
             val wrapped: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>,
             val handler: WebSocketHandler<PathSpec, T>,
         ) : WebSocketConnection<PathSpec, T> {
-            // Same physical socket, only the path is rewritten, so the identity carries over.
-            override val socketId: Execution.ID get() = wrapped.socketId
-
             @Suppress("UNCHECKED_CAST")
             override val request: WebSocketConnectRequest<PathSpec>
                 get() = wrapped.currentState.request as WebSocketConnectRequest<PathSpec>
@@ -141,15 +137,10 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
                 } else it
             } + (request.headers["x-path"]?.root?.substringAfter('?')?.let { QueryParameters.parse(it).entries }
                 ?: listOf()))
-            WebSocketConnectRequest<PathSpec>(
+            // Same physical socket, only the path is rewritten, so the socket id carries over.
+            request.withPath(
                 path = RawWebSocketPath<PathSpec>(PathSegments.parse(rawPath), match),
                 queryParameters = fixedQueryParameters,
-                headers = request.headers,
-                domain = request.domain,
-                protocol = request.protocol,
-                sourceIp = request.sourceIp,
-                upstreamRequestId = request.upstreamRequestId,
-                cache = request.cache,
             )
         }
         val otherHandler = match.value
@@ -164,15 +155,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
 //                    null /*TODO*/
 //                )
 //            ) {
-            // Same physical socket, only the path is rewritten, so the identity carries over.
-            otherHandler.willConnectWithMetrics(
-                match.pathSpec,
-                (serverRuntime.execution as? Execution.WebSocket
-                    ?: throw IllegalStateException(
-                        "Expected to be running a WebSocket phase, but this execution was initiated by ${serverRuntime.execution}."
-                    )).rewritePath(request.path),
-                request,
-            )
+            otherHandler.willConnectWithMetrics(match.pathSpec, request)
 //            }
 
         @Suppress("UNCHECKED_CAST")

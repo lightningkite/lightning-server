@@ -25,15 +25,10 @@ import kotlinx.coroutines.yield
 public abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
     startingState: STORAGE,
     override val request: WebSocketConnectRequest<PATH>,
-    /** The socket's connect initiator, so a delivery can name the socket it is being delivered to. */
-    public val connectInitiator: Execution.WebSocket,
     private val handler: WebSocketHandler<PATH, STORAGE>,
     private val scope: CoroutineScope,
     private val pubSub: (request: WebSocketSubscriptionRequest<*, Any?>) -> PubSubChannel<Any?>,
 ) : WebSocketConnection<PATH, STORAGE> {
-
-    override val socketId: Execution.ID get() = connectInitiator.socketId
-
     override var currentState: STORAGE = startingState
 
     context(server: ServerRuntime)
@@ -62,15 +57,14 @@ public abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
         subscriptions.remove(topic)?.cancel()
         subscriptions[topic] = scope.launch {
             pubSub(topic).collect { value ->
-                val phaseExecution = with(server) {
-                    Execution.WebSocket(
-                        id = Execution.ID.generate(),
-                        parent = (server as? ServerRuntime)?.execution,
-                        socketId = socketId,
-                        path = request.path,
-                        phase = Execution.WebSocket.Phase.SubscriptionMessage,
-                    )
-                }
+                // Delivered from the pub/sub collector, not from within whatever called subscribe(), so there
+                // is no parent execution.
+                val phaseExecution = Execution.WebSocket(
+                    id = Execution.ID.generate(),
+                    socketId = socketId,
+                    path = request.path,
+                    phase = Execution.WebSocket.Phase.SubscriptionMessage,
+                )
                 server.executeWithoutTelemetry(phaseExecution) {
                     handler.messageFromSubscription(
                         this@LocalWebSocketConnection,

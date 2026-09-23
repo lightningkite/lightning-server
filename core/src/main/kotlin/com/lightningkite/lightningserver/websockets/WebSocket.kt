@@ -94,20 +94,14 @@ public data class WebSocketConnectRequest<PATH : PathSpec>(
      * Used by CoroutineWebSocketHandler to bypass pub/sub for direct sends.
      */
     val engineSocketId: String? = null,
+    /** The identity of the logical socket this request opens, constant across every phase of its lifetime. */
+    val socketId: Execution.ID,
 ) : Request<PATH>() {
     /** The gateway's identifier for a socket is the socket itself, so there is nothing else to hold. */
     override val engineRequestId: String? get() = engineSocketId
 
-    /**
-     * Derives a logical sub-connection of this one, as multiplexing carries several logical sockets
-     * over a single physical connection.
-     *
-     * Use this only for a genuinely distinct logical socket, with
-     * [com.lightningkite.lightningserver.runtime.subConnection] deriving the initiator that gives it
-     * its own socket identity. A shim that merely rewrites the path of the same socket is not opening
-     * one, and should use [com.lightningkite.lightningserver.runtime.rewritePath] instead.
-     */
-    public fun <PATH2 : PathSpec> subConnection(
+    /** The same socket at a different path, keeping its [socketId]. */
+    public fun <PATH2 : PathSpec> withPath(
         path: RawWebSocketPath<PATH2>,
         queryParameters: QueryParameters = this.queryParameters,
     ): WebSocketConnectRequest<PATH2> = WebSocketConnectRequest(
@@ -120,7 +114,21 @@ public data class WebSocketConnectRequest<PATH : PathSpec>(
         upstreamRequestId = upstreamRequestId,
         cache = cache,
         engineSocketId = engineSocketId,
+        socketId = socketId,
     )
+
+    /**
+     * Derives a logical sub-connection of this one, as multiplexing carries several logical sockets
+     * over a single physical connection.
+     *
+     * Use this only for a genuinely distinct logical socket, which needs its own [socketId]. A shim that
+     * merely re-targets the same socket is not opening one, and should use [withPath] instead.
+     */
+    public fun <PATH2 : PathSpec> subConnection(
+        path: RawWebSocketPath<PATH2>,
+        socketId: Execution.ID,
+        queryParameters: QueryParameters = this.queryParameters,
+    ): WebSocketConnectRequest<PATH2> = withPath(path, queryParameters).copy(socketId = socketId)
 }
 
 /**
@@ -149,7 +157,7 @@ public interface WebSocketConnection<PATH : PathSpec, STORAGE> {
     public val request: WebSocketConnectRequest<PATH>
 
     /** The identity of this logical socket, constant across every phase of its lifetime. */
-    public val socketId: Execution.ID
+    public val socketId: Execution.ID get() = request.socketId
 
     /** The current state for this connection */
     public val currentState: STORAGE
@@ -197,7 +205,10 @@ public interface WebSocketConnection<PATH : PathSpec, STORAGE> {
     public suspend fun send(frame: WebSocketFrame)
 
     /**
-     * Closes the WebSocket connection with a reason code.
+     * Tears down the underlying transport with a reason code, and nothing else.
+     *
+     * This does not run [WebSocketHandler.disconnect]; the disconnect phase calls this itself once the
+     * handler has finished, so an implementation that ran the handler again would recurse.
      */
     context(server: ServerRuntime)
     public suspend fun close(reason: WebSocketClose)

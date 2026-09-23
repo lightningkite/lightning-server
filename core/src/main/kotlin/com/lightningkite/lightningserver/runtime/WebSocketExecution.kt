@@ -6,8 +6,7 @@ import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryKey
 import com.lightningkite.services.telemetry.TelemetryKeys
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.channels.ReceiveChannel
 
 // Pre-allocated TelemetryKey instances (backend caches by equality).
 private val wsRoute = TelemetryKey.OfString("ws.route")
@@ -16,6 +15,59 @@ private val wsFrameSize = TelemetryKey.OfLong("ws.frame.size")
 private val wsSubscriptionTopic = TelemetryKey.OfString("ws.subscription.topic")
 private val wsDisconnectCode = TelemetryKey.OfLong("ws.disconnect.code")
 private val wsDisconnectReason = TelemetryKey.OfString("ws.disconnect.reason")
+
+/**
+ * Runs the Connect phase execution for the socket a [request] opens.
+ *
+ * Its id is [WebSocketConnectRequest.socketId]. A shim that rewrites the path of a socket already being
+ * connected (same id as the running execution) continues that execution's lineage instead of nesting in it.
+ */
+@OptIn(InternalLightningServerApi::class)
+context(engine: Engine)
+private fun <PATH : PathSpec> connectExecution(request: WebSocketConnectRequest<PATH>): Execution.WebSocket {
+    val ambient = (engine as? ServerRuntime)?.execution
+    return if (ambient != null && ambient.id == request.socketId) Execution.WebSocket(
+        id = request.socketId,
+        causedBy = ambient.causedBy,
+        rootExecution = ambient.rootExecution,
+        socketId = request.socketId,
+        path = request.path,
+        phase = Execution.WebSocket.Phase.Connect,
+    ) else Execution.WebSocket(
+        id = request.socketId,
+        parent = ambient,
+        socketId = request.socketId,
+        path = request.path,
+        phase = Execution.WebSocket.Phase.Connect,
+    )
+}
+
+/**
+ * Runs [DirectExecutableWebSocketHandler.handleDirect] as the socket's Connect execution, with telemetry
+ * and interceptors.
+ *
+ * @param location The path specification for this WebSocket endpoint
+ */
+@OptIn(InternalLightningServerApi::class)
+context(engine: Engine)
+public suspend fun <PATH : PathSpec, STORAGE> DirectExecutableWebSocketHandler<PATH, STORAGE>.handleDirectWithMetrics(
+    location: PATH,
+    request: WebSocketConnectRequest<PATH>,
+    incoming: ReceiveChannel<WebSocketFrame>,
+    send: suspend (WebSocketFrame) -> Unit,
+    close: suspend (WebSocketClose) -> Unit,
+) {
+    engine.execute(
+        "handleDirect",
+        connectExecution(request),
+        TelemetryAttributes {
+            put(wsRoute, location.toString())
+            put(TelemetryKeys.Net.peerIp, request.sourceIp)
+        }
+    ) {
+        handleDirect(request, incoming, send, close)
+    }
+}
 
 @OptIn(InternalLightningServerApi::class)
 context(engine: Engine)
@@ -32,11 +84,7 @@ private fun <PATH : PathSpec, STORAGE> WebSocketConnection<PATH, STORAGE>.phase(
 /**
  * Wraps a WebSocket willConnect handler invocation with telemetry metrics.
  *
- * Unlike the other phases, there is no connection yet to derive an identity from, so [initiator] is
- * supplied rather than derived.
- *
  * @param location The path specification for this WebSocket endpoint
- * @param initiator The socket's connect initiator, minted by the engine
  * @param request The WebSocket connection request
  * @return The connection storage state
  */
@@ -44,15 +92,16 @@ private fun <PATH : PathSpec, STORAGE> WebSocketConnection<PATH, STORAGE>.phase(
 context(engine: Engine)
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.willConnectWithMetrics(
     location: PATH,
-    initiator: Execution.WebSocket,
     request: WebSocketConnectRequest<PATH>,
-): STORAGE {
-    return engine.execute("willConnect", initiator, TelemetryAttributes {
+): STORAGE = engine.execute(
+    "willConnect",
+    connectExecution(request),
+    TelemetryAttributes {
         put(wsRoute, location.toString())
         put(TelemetryKeys.Net.peerIp, request.sourceIp)
-    }) {
-        willConnect(request)
     }
+) {
+    willConnect(request)
 }
 
 /**
@@ -167,8 +216,8 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
         TelemetryAttributes {
             put(wsRoute, location.toString())
             put(TelemetryKeys.Net.peerIp, connection.request.sourceIp)
-            put(wsDisconnectCode, reason.code.toLong())
-            put(wsDisconnectReason, reason.name)
+            put(wsDisconnectCode, reason.code.code.toLong())
+            put(wsDisconnectReason, reason.code.name)
         }
     ) {
         try {

@@ -44,6 +44,7 @@ public suspend fun <STORAGE> WebSocketHandler<PathSpec0, STORAGE>.test(
     val intercepted = test.server.interceptIncomingSocket(this@test)
     val request = WebSocketConnectRequest(
         RawWebSocketPath(location, trailingSegments = trailingWildcard),
+        socketId = socketId,
         queryParameters = queryParameters,
         headers = headers,
         domain = domain,
@@ -57,12 +58,12 @@ public suspend fun <STORAGE> WebSocketHandler<PathSpec0, STORAGE>.test(
         phase = Execution.WebSocket.Phase.Connect,
     )
     val storage = test.executeWithoutTelemetry(initiator) { intercepted.willConnect(request) }
-    return test.TestWebSocket(intercepted, request, initiator, storage).also {
+    return test.TestWebSocket(intercepted, request, storage).also {
         test.executeWithoutTelemetry(
         Execution.WebSocket(
             id = Execution.ID.generate(),
-            socketId = initiator.socketId,
-            path = initiator.path,
+            socketId = request.socketId,
+            path = request.path,
             phase = Execution.WebSocket.Phase.Connected,
         )
     ) {
@@ -85,6 +86,7 @@ public suspend fun <STORAGE, A> WebSocketHandler<PathSpec1<A>, STORAGE>.test(
     val intercepted = test.server.interceptIncomingSocket(this@test)
     val request = WebSocketConnectRequest(
         RawWebSocketPath(location, path1, trailingSegments = trailingWildcard),
+        socketId = socketId,
         queryParameters = queryParameters,
         headers = headers,
         domain = domain,
@@ -98,12 +100,12 @@ public suspend fun <STORAGE, A> WebSocketHandler<PathSpec1<A>, STORAGE>.test(
         phase = Execution.WebSocket.Phase.Connect,
     )
     val storage = test.executeWithoutTelemetry(initiator) { intercepted.willConnect(request) }
-    return test.TestWebSocket(intercepted, request, initiator, storage).also {
+    return test.TestWebSocket(intercepted, request, storage).also {
         test.executeWithoutTelemetry(
         Execution.WebSocket(
             id = Execution.ID.generate(),
-            socketId = initiator.socketId,
-            path = initiator.path,
+            socketId = request.socketId,
+            path = request.path,
             phase = Execution.WebSocket.Phase.Connected,
         )
     ) {
@@ -127,6 +129,7 @@ public suspend fun <STORAGE, A, B> WebSocketHandler<PathSpec2<A, B>, STORAGE>.te
     val intercepted = test.server.interceptIncomingSocket(this@test)
     val request = WebSocketConnectRequest(
         RawWebSocketPath(location, path1, path2, trailingSegments = trailingWildcard),
+        socketId = socketId,
         queryParameters = queryParameters,
         headers = headers,
         domain = domain,
@@ -140,12 +143,12 @@ public suspend fun <STORAGE, A, B> WebSocketHandler<PathSpec2<A, B>, STORAGE>.te
         phase = Execution.WebSocket.Phase.Connect,
     )
     val storage = test.executeWithoutTelemetry(initiator) { intercepted.willConnect(request) }
-    return test.TestWebSocket(intercepted, request, initiator, storage).also {
+    return test.TestWebSocket(intercepted, request, storage).also {
         test.executeWithoutTelemetry(
         Execution.WebSocket(
             id = Execution.ID.generate(),
-            socketId = initiator.socketId,
-            path = initiator.path,
+            socketId = request.socketId,
+            path = request.path,
             phase = Execution.WebSocket.Phase.Connected,
         )
     ) {
@@ -170,6 +173,7 @@ public suspend fun <STORAGE, A, B, C> WebSocketHandler<PathSpec3<A, B, C>, STORA
     val intercepted = test.server.interceptIncomingSocket(this@test)
     val request = WebSocketConnectRequest(
         RawWebSocketPath(location, path1, path2, path3),
+        socketId = socketId,
         queryParameters = queryParameters,
         headers = headers,
         domain = domain,
@@ -183,12 +187,12 @@ public suspend fun <STORAGE, A, B, C> WebSocketHandler<PathSpec3<A, B, C>, STORA
         phase = Execution.WebSocket.Phase.Connect,
     )
     val storage = test.executeWithoutTelemetry(initiator) { intercepted.willConnect(request) }
-    return test.TestWebSocket(intercepted, request, initiator, storage).also {
+    return test.TestWebSocket(intercepted, request, storage).also {
         test.executeWithoutTelemetry(
         Execution.WebSocket(
             id = Execution.ID.generate(),
-            socketId = initiator.socketId,
-            path = initiator.path,
+            socketId = request.socketId,
+            path = request.path,
             phase = Execution.WebSocket.Phase.Connected,
         )
     ) {

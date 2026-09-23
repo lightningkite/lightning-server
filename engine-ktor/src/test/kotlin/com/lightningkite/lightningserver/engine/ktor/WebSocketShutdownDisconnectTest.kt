@@ -8,7 +8,7 @@ import com.lightningkite.lightningserver.engine.local.engineCache
 import com.lightningkite.lightningserver.engine.local.enginePubSub
 import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
 import com.lightningkite.lightningserver.settings.set
-import com.lightningkite.lightningserver.websockets.WebSocketClose
+import com.lightningkite.lightningserver.websockets.WebSocketClose.Code
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.webSocketSettings
 import io.ktor.client.plugins.websocket.*
@@ -31,8 +31,8 @@ import kotlin.test.assertTrue
 /**
  * A socket that is still open when the server goes down is torn down by cancellation, not by an
  * error. This pins both halves of that: the handler's `disconnect` still runs (it is wrapped in
- * `NonCancellable`), and the reason it is given is [WebSocketClose.GOING_AWAY] rather than the
- * [WebSocketClose.INTERNAL_ERROR] that deriving the code from a 500 used to produce.
+ * `NonCancellable`), and the reason it is given is [WebSocketCloseReason.Code.GOING_AWAY] rather than the
+ * [WebSocketCloseReason.Code.INTERNAL_ERROR] that deriving the code from a 500 used to produce.
  */
 class WebSocketShutdownDisconnectTest {
 
@@ -50,7 +50,7 @@ class WebSocketShutdownDisconnectTest {
 
     companion object {
         val serverConnected = CompletableDeferred<Unit>()
-        val disconnectReason = AtomicReference<WebSocketClose?>(null)
+        val disconnectReason = AtomicReference<WebSocketCloseReason.Code?>(null)
         val disconnected = CountDownLatch(1)
     }
 
@@ -93,6 +93,6 @@ class WebSocketShutdownDisconnectTest {
             disconnected.await(5, TimeUnit.SECONDS),
             "disconnect phase never ran for a socket cancelled by shutdown",
         )
-        assertEquals(WebSocketClose.GOING_AWAY, disconnectReason.get())
+        assertEquals(WebSocketCloseReason.Code.GOING_AWAY, disconnectReason.get())
     }
 }

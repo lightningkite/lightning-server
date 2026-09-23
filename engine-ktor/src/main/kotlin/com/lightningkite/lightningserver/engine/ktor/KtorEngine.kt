@@ -12,18 +12,15 @@ import com.lightningkite.lightningserver.engine.local.WsOversizePolicy
 import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
 import com.lightningkite.lightningserver.engine.local.LocalWebSocketConnection
 import com.lightningkite.lightningserver.http.*
-import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.RawWebSocketPath
 import com.lightningkite.lightningserver.InternalLightningServerApi
-import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.didConnectWithMetrics
 import com.lightningkite.lightningserver.runtime.disconnectAndClose
-import com.lightningkite.lightningserver.runtime.execute
 import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.lightningserver.runtime.messageFromClientWithMetrics
 import com.lightningkite.lightningserver.runtime.willConnectWithMetrics
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.handleDirectWithMetrics
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.Data
@@ -32,13 +29,10 @@ import io.ktor.http.*
 import io.ktor.http.HttpHeaders
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
-import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
-import io.ktor.util.*
-import io.ktor.utils.io.CancellationException
 import io.ktor.utils.io.asSink
 import io.ktor.websocket.*
 import kotlinx.coroutines.*
@@ -146,7 +140,7 @@ public class KtorEngine(
                         call.respondText("Payload Too Large", status = HttpStatusCode.PayloadTooLarge)
                         return@handle
                     }
-                    val (request, executionId) = call.adapt(maxBody)
+                    val (request, executionId) = call.adaptHttpRequest(maxBody)
                     // Request timeout is enforced centrally in ServerRuntime.handle (per-handler HttpHandler.timeout).
                     val result: HttpResponse = try {
                         this@KtorEngine.handleRoot(request, executionId)
@@ -207,37 +201,7 @@ public class KtorEngine(
                 }
             }
             webSocket("{...}") {
-
-                // TODO: Remove this fugly hack. It's around for backwards compatibility.
-                fun parseQueryParams(): QueryParameters = QueryParameters(
-                    call.request.queryParameters.flattenEntries()
-                        .flatMap {
-                            if (it.first == "path" && it.second.contains('?')) {
-                                listOf(it.first to it.second.substringBefore('?')) +
-                                        QueryParameters.parse(
-                                            it.second.substringAfter('?')
-                                        ).entries
-                            } else
-                                listOf(it)
-                        })
-
-                val queryParams = parseQueryParams()
-                val adaptedHeaders = call.request.headers.adapt()
-                val identity = adaptedHeaders.requestIdentity(runConfig.requestIdHeader) {
-                    logger.warn { "Request ID header for proxy '${runConfig.requestIdHeader}' was missing from the request." }
-                }
-                val request = WebSocketConnectRequest(
-                    path = RawWebSocketPath(queryParams["path"] ?: call.request.path().decodeURLPart()),
-                    queryParameters = queryParams,
-                    headers = adaptedHeaders,
-                    upstreamRequestId = identity.upstreamRequestId,
-                    domain = call.request.origin.serverHost,
-                    protocol = call.request.origin.scheme,
-                    sourceIp = runConfig.realIpHeader?.let {
-                        call.request.header(it)
-                            ?: run { logger.warn { "Real IP address header for proxy '$it' was missing from the request." }; null }
-                    } ?: call.request.origin.remoteAddress,
-                )
+                val request = call.adaptWebSocketConnectRequest()
 
                 val match = server.endpoints.match(
                     externalSerialization.stringArrayFormat,
@@ -253,19 +217,10 @@ public class KtorEngine(
                 }
                 val socketHandler = server.interceptIncomingSocket(match.value)
 
-                // The socket's identity is minted once, here, and every phase below derives its own
-                // execution from it, so a socket stays one thing across five separate executions.
-                val connectInitiator = Execution.WebSocket(
-                    id = identity.requestId,
-                    socketId = identity.requestId,
-                    path = request.path,
-                    phase = Execution.WebSocket.Phase.Connect,
-                )
-
                 // Check for direct execution capability - bypasses pub/sub overhead
-                if (socketHandler is DirectExecutableWebSocketHandler<*> && !forceWebSocketPubSub()) {
+                if (socketHandler is DirectExecutableWebSocketHandler<*, *> && !forceWebSocketPubSub()) {
                     @Suppress("UNCHECKED_CAST")
-                    val directHandler = socketHandler as DirectExecutableWebSocketHandler<PathSpec>
+                    val directHandler = socketHandler as DirectExecutableWebSocketHandler<PathSpec, Any?>
 
                     // 2.10: bounded inbound channel with backpressure instead of Channel.UNLIMITED.
                     val incomingChannel = newWebSocketInboundChannel<WebSocketFrame>(reliability)
@@ -297,35 +252,30 @@ public class KtorEngine(
                         }
                     }
 
-                    // Run handler directly - no pub/sub, no task indirection
-                    // A directly-run socket is not phase-structured — the whole session runs in this
-                    // one coroutine — so it is one execution, named by the socket it is.
-                    this@KtorEngine.execute("handleDirect", connectInitiator) {
-                        directHandler.handleDirect(
-                            request = request,
-                            incoming = incomingChannel,
-                            send = { frame ->
-                                when (frame) {
-                                    is WebSocketFrame.Binary -> send(Frame.Binary(true, frame.content))
-                                    is WebSocketFrame.Text -> send(Frame.Text(frame.content))
-                                }
-                            },
-                            close = { reason ->
-                                close(CloseReason(reason.code, reason.name))
+                    directHandler.handleDirectWithMetrics(
+                        location = match.pathSpec,
+                        request = request,
+                        incoming = incomingChannel,
+                        send = { frame ->
+                            when (frame) {
+                                is WebSocketFrame.Binary -> send(Frame.Binary(true, frame.content))
+                                is WebSocketFrame.Text -> send(Frame.Text(frame.content))
                             }
-                        )
-                    }
+                        },
+                        close = { reason ->
+                            close(reason.adapt())
+                        }
+                    )
                 } else {
                     // Standard pub/sub-based implementation (for non-direct handlers or when forced)
                     @Suppress("UNCHECKED_CAST")
                     socketHandler as WebSocketHandler<PathSpec, Any?>
 
-                    val startingState = socketHandler.willConnectWithMetrics(match.pathSpec, connectInitiator, request)
+                    val storage = socketHandler.willConnectWithMetrics(match.pathSpec, request)
 
                     val connection = object : LocalWebSocketConnection<PathSpec, Any?>(
-                        startingState = startingState,
+                        startingState = storage,
                         request = request,
-                        connectInitiator = connectInitiator,
                         handler = socketHandler,
                         scope = this@webSocket,
                         pubSub = { pubSubChannel(it) }
@@ -342,7 +292,7 @@ public class KtorEngine(
 
                         context(server: ServerRuntime)
                         override suspend fun close(reason: WebSocketClose) {
-                            this@webSocket.close(CloseReason(reason.code, reason.name))
+                            this@webSocket.close(reason.adapt())
                         }
                     }
 
@@ -369,7 +319,7 @@ public class KtorEngine(
                             socketHandler.disconnectAndClose(
                                 match.pathSpec,
                                 connection,
-                                reason = exception?.webSocketCloseReason ?: WebSocketClose.NORMAL
+                                reason = exception?.let(WebSocketClose::exceptional) ?: WebSocketClose.NORMAL
                             )
                         }
                     }

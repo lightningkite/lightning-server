@@ -49,50 +49,50 @@ public val engine: Engine get() = inContext
 /**
  * Gets the location of an HTTP handler, or null if it's not registered.
  */
-public context(runner: Engine)
-val <P : PathSpec> HttpHandler<P>.locationOrNull: HttpEndpoint<P>? get() = runner.server.location(this)
+context(runner: Engine)
+public val <P : PathSpec> HttpHandler<P>.locationOrNull: HttpEndpoint<P>? get() = runner.server.location(this)
 
 /**
  * Gets the location of a WebSocket handler, or null if it's not registered.
  */
-public context(runner: Engine)
-val <P : PathSpec> WebSocketHandler<P, *>.locationOrNull: P? get() = runner.server.location(this)
+context(runner: Engine)
+public val <P : PathSpec> WebSocketHandler<P, *>.locationOrNull: P? get() = runner.server.location(this)
 
 /**
  * Gets the location of a WebSocket topic, or null if it's not registered.
  */
-public context(runner: Engine)
-val <P : PathSpec> WebSocketTopic<P, *>.locationOrNull: P? get() = runner.server.location(this)
+context(runner: Engine)
+public val <P : PathSpec> WebSocketTopic<P, *>.locationOrNull: P? get() = runner.server.location(this)
 
 /**
  * Gets the location of a task, or null if it's not registered.
  */
-public context(runner: Engine)
-val Task<*>.locationOrNull: PathSpec0? get() = runner.server.location(this)
+context(runner: Engine)
+public val Task<*>.locationOrNull: PathSpec0? get() = runner.server.location(this)
 
 /**
  * Gets the location of a startup task, or null if it's not registered.
  */
-public context(runner: Engine)
-val StartupTask.locationOrNull: PathSpec0? get() = runner.server.location(this)
+context(runner: Engine)
+public val StartupTask.locationOrNull: PathSpec0? get() = runner.server.location(this)
 
 /**
  * Gets the location of a scheduled task, or null if it's not registered.
  */
-public context(runner: Engine)
-val ScheduledTask.locationOrNull: PathSpec0? get() = runner.server.location(this)
+context(runner: Engine)
+public val ScheduledTask.locationOrNull: PathSpec0? get() = runner.server.location(this)
 
 /**
  * Gets the location of a server module, or null if it's not registered.
  */
-public context(runner: Engine)
-val ServerDefinition.locationOrNull: PathSpec0? get() = runner.server.location(this)
+context(runner: Engine)
+public val ServerDefinition.locationOrNull: PathSpec0? get() = runner.server.location(this)
 
 /**
  * Gets the location of a server module, or null if it's not registered.
  */
-public context(runner: Engine)
-val ServerBuilder.locationOrNull: PathSpec0? get() = runner.server.location(this)
+context(runner: Engine)
+public val ServerBuilder.locationOrNull: PathSpec0? get() = runner.server.location(this)
 
 /**
  * Exception thrown when attempting to get the location of an unregistered item.
@@ -108,8 +108,8 @@ public class UnregisteredException internal constructor(item: Any) :
  *
  * @throws UnregisteredException if the handler is not registered with the server
  */
-public context(runner: Engine)
-val <P : PathSpec> HttpHandler<P>.location: HttpEndpoint<P>
+context(runner: Engine)
+public val <P : PathSpec> HttpHandler<P>.location: HttpEndpoint<P>
     get() = runner.server.location(this) ?: throw UnregisteredException(this)
 
 /**
@@ -117,8 +117,8 @@ val <P : PathSpec> HttpHandler<P>.location: HttpEndpoint<P>
  *
  * @throws UnregisteredException if the handler is not registered with the server
  */
-public context(runner: Engine)
-val <P : PathSpec> WebSocketHandler<P, *>.location: P
+context(runner: Engine)
+public val <P : PathSpec> WebSocketHandler<P, *>.location: P
     get() = runner.server.location(this) ?: throw UnregisteredException(this)
 
 /**
@@ -126,8 +126,8 @@ val <P : PathSpec> WebSocketHandler<P, *>.location: P
  *
  * @throws UnregisteredException if the topic is not registered with the server
  */
-public context(runner: Engine)
-val <P : PathSpec> WebSocketTopic<P, *>.location: P
+context(runner: Engine)
+public val <P : PathSpec> WebSocketTopic<P, *>.location: P
     get() = runner.server.location(this) ?: throw UnregisteredException(
         this
     )
@@ -137,48 +137,48 @@ val <P : PathSpec> WebSocketTopic<P, *>.location: P
  *
  * @throws UnregisteredException if the task is not registered with the server
  */
-public context(runner: Engine)
-val Task<*>.location: PathSpec0 get() = runner.server.location(this) ?: throw UnregisteredException(this)
+context(runner: Engine)
+public val Task<*>.location: PathSpec0 get() = runner.server.location(this) ?: throw UnregisteredException(this)
 
 /**
  * Gets the location of a startup task.
  *
  * @throws UnregisteredException if the task is not registered with the server
  */
-public context(runner: Engine)
-val StartupTask.location: PathSpec0 get() = runner.server.location(this) ?: throw UnregisteredException(this)
+context(runner: Engine)
+public val StartupTask.location: PathSpec0 get() = runner.server.location(this) ?: throw UnregisteredException(this)
 
 /**
  * Gets the location of a pre-deploy task.
  *
  * @throws UnregisteredException if the task is not registered with the server
  */
-public context(runner: Engine)
-val PreDeployTask.location: PathSpec0 get() = runner.server.location(this) ?: throw UnregisteredException(this)
+context(runner: Engine)
+public val PreDeployTask.location: PathSpec0 get() = runner.server.location(this) ?: throw UnregisteredException(this)
 
 /**
  * Gets the location of a scheduled task.
  *
  * @throws UnregisteredException if the task is not registered with the server
  */
-public context(runner: Engine)
-val ScheduledTask.location: PathSpec0 get() = runner.server.location(this) ?: throw UnregisteredException(this)
+context(runner: Engine)
+public val ScheduledTask.location: PathSpec0 get() = runner.server.location(this) ?: throw UnregisteredException(this)
 
 /**
  * Gets the location of a server module.
  *
  * @throws UnregisteredException if the module is not registered with the server
  */
-public context(runner: Engine)
-val ServerDefinition.location: PathSpec0 get() = runner.server.location(this) ?: throw UnregisteredException(this)
+context(runner: Engine)
+public val ServerDefinition.location: PathSpec0 get() = runner.server.location(this) ?: throw UnregisteredException(this)
 
 /**
  * Gets the location of a server module.
  *
  * @throws UnregisteredException if the module is not registered with the server
  */
-public context(runner: Engine)
-val ServerBuilder.location: PathSpec0 get() = runner.server.location(this) ?: throw UnregisteredException(this)
+context(runner: Engine)
+public val ServerBuilder.location: PathSpec0 get() = runner.server.location(this) ?: throw UnregisteredException(this)
 
 /*
  * TODO: API Recommendations

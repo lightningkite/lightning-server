@@ -235,7 +235,7 @@ public interface WebSocketHandler<PATH : PathSpec, STORAGE> {
     public context(serverRuntime: ServerRuntime)
     suspend fun messageFromSubscription(connection: WebSocketConnection<PATH, STORAGE>, topic: WebSocketSubscriptionMessage<*, *>)
     public context(serverRuntime: ServerRuntime)
-    suspend fun disconnect(connection: WebSocketConnection<PATH, STORAGE>, reason: WebSocketClose)
+    suspend fun disconnect(connection: WebSocketConnection<PATH, STORAGE>, reason: WebSocketCloseReason.Code)
 }
 ```
 

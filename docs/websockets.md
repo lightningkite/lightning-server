@@ -48,7 +48,7 @@ Inside those callbacks you have access to:
 - `send(...)` — send a frame to the client. Overloads accept `String`, `ByteArray`, or a `WebSocketFrame`.
 - `subscribe(topic)` / `unsubscribe(topic)` — join or leave a pub/sub topic.
 - `updateStateImmediately { }` / `queueStateUpdate { }` — atomically update `STORAGE`.
-- `close(reason)` — close with a `WebSocketClose` code (e.g. `WebSocketClose.NORMAL`).
+- `close(reason)` — close with a `Code` code (e.g. `WebSocketCloseReason.Code.NORMAL`).
 
 Inbound frames are `WebSocketFrame` (`WebSocketFrame.Text` or `WebSocketFrame.Binary`). Use `frame.text` for the
 string form.

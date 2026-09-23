@@ -43,7 +43,7 @@ public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
         public suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>)
         public suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>)
         public suspend fun send(frame: OUTPUT)
-        public suspend fun close(reason: WebSocketClose)
+        public suspend fun close(reason: WebSocketClose.Code)
     }
 
     /*
@@ -67,7 +67,7 @@ public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
     )
 
     public context(serverRuntime: ServerRuntime)
-    suspend fun disconnectTyped(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>, reason: WebSocketClose)
+    suspend fun disconnectTyped(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>, reason: WebSocketClose.Code)
 
 
     override context(serverRuntime: ServerRuntime)
@@ -143,7 +143,7 @@ public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
                 wraps.send(wraps.currentState.mediaType.encoder!!.ws(wraps.currentState.mediaType, outputSerializer, frame))
             }
 
-            override suspend fun close(reason: WebSocketClose) = wraps.close(reason)
+            override suspend fun close(reason: WebSocketClose.Code) = wraps.close(reason)
         }
         return ConnectionWrapper(this, outputType, auth)
     }

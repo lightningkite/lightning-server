@@ -59,6 +59,9 @@ public abstract class Request<out PATH : PathSpec> : HasContextualPath<PATH>, Ca
         get() = path.pathInContext
 }
 
+context(_: Engine)
+public val <PATH : PathSpec> Request<PATH>.pathSpec: PATH get() = pathInContext.pathSpec
+
 /**
  * Retrieves or calculates a cached value for this request.
  *

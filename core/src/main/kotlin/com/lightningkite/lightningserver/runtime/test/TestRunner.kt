@@ -118,7 +118,6 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
      *
      * @param handler The WebSocket handler being tested
      * @param request The connection request
-     * @param initiator The socket's connect initiator, from which each phase derives its own
      * @param currentState The current connection state (mutable for inspection)
      * @param name Display name for debug output (default: "Client")
      */
@@ -126,7 +125,6 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
     public inner class TestWebSocket<PATH : PathSpec, STORAGE>(
         private val handler: WebSocketHandler<PATH, STORAGE>,
         public val request: WebSocketConnectRequest<PATH>,
-        public val initiator: Execution.WebSocket,
         public var currentState: STORAGE,
         public val name: String = "Client",
     ) {
@@ -137,8 +135,8 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
             this@TestRunner.executeWithoutTelemetry(
                 Execution.WebSocket(
                     id = Execution.ID.generate(),
-                    socketId = initiator.socketId,
-                    path = initiator.path,
+                    socketId = request.socketId,
+                    path = request.path,
                     phase = phase,
                 ),
                 action,
@@ -147,8 +145,9 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
         public var onMessageSent: (frame: WebSocketFrame) -> Unit = {}
         public suspend fun close() {
             /*logger.debug*/run { "$name --> <close>" }.let(::println)
-            server.close(WebSocketClose.NORMAL)
-            server.clean()
+            val connection = this@TestWebSocket.server
+            withPhase(Execution.WebSocket.Phase.Disconnect) { handler.disconnect(connection, WebSocketClose.NORMAL) }
+            connection.clean()
         }
 
         public suspend fun send(frame: WebSocketFrame) {
@@ -161,8 +160,6 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
         public val server: ServerSide = ServerSide()
 
         public inner class ServerSide() : WebSocketConnection<PATH, STORAGE> {
-            override val socketId: Execution.ID get() = initiator.socketId
-
             private val changeQueue = ArrayList<(STORAGE) -> STORAGE>()
             private val sub: suspend (WebSocketSubscriptionMessage<*, *>) -> Unit = {
                 withPhase(Execution.WebSocket.Phase.SubscriptionMessage) {
@@ -222,8 +219,11 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
 
             context(server: ServerRuntime)
             override suspend fun close(reason: WebSocketClose) {
+                // Transport teardown only. The disconnect phase is run by whoever ends the socket (see
+                // [TestWebSocket.close]); running it from here would re-enter it, since disconnect handlers
+                // close the connection themselves.
                 /*logger.debug*/run { "$name <-- <close>" }.let(::println)
-                withPhase(Execution.WebSocket.Phase.Disconnect) { handler.disconnect(this@ServerSide, reason) }
+                clean()
             }
 
             internal fun clean() {

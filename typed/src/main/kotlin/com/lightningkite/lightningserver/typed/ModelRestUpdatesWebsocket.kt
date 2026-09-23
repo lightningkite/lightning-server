@@ -144,7 +144,7 @@ public class ModelRestUpdatesWebSocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
 
             state.user?.expiration?.let { expiration ->
                 if (expiration <= now) {
-                    connection.close(WebSocketClose.VIOLATED_POLICY)
+                    connection.close(WebSocketClose.Code.VIOLATED_POLICY)
                     return
                 }
             }
@@ -156,7 +156,7 @@ public class ModelRestUpdatesWebSocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
                     throw e
                 } catch (_: Exception) {
                     // Auth no longer resolves — the session was terminated or the credential revoked.
-                    connection.close(WebSocketClose.VIOLATED_POLICY)
+                    connection.close(WebSocketClose.Code.VIOLATED_POLICY)
                     return
                 }
                 // Resolved outside updateStateImmediately: its modification lambda is not suspending.
@@ -208,7 +208,7 @@ public class ModelRestUpdatesWebSocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
         context(serverRuntime: ServerRuntime)
         override suspend fun disconnectTyped(
             connection: ApiWebSocketHandler.Connection<PathSpec0, ModelRestUpdatesWebSocketData<T, ID>, USER, Condition<T>, CollectionUpdates<T, ID>>,
-            reason: WebSocketClose,
+            reason: WebSocketClose.Code,
         ) {
         }
     }

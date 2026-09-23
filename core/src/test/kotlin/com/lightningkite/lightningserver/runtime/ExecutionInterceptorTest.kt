@@ -1,3 +1,5 @@
+@file:OptIn(com.lightningkite.lightningserver.InternalLightningServerApi::class, com.lightningkite.services.data.Unsafe::class)
+
 package com.lightningkite.lightningserver.runtime
 
 import com.lightningkite.lightningserver.InternalLightningServerApi
@@ -25,6 +27,8 @@ import kotlinx.serialization.builtins.serializer
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.hours
+import com.lightningkite.services.data.UuidV7
+import com.lightningkite.lightningserver.runtime.Execution
 
 /**
  * An [ExecutionInterceptor] is the only chain that claims to see *everything the server runs*, so
@@ -87,13 +91,10 @@ class ExecutionInterceptorTest {
                 // exercised the way an engine does it.
                 server.socket.willConnectWithMetrics(
                     location = server.socket.location,
-                    initiator = Execution.WebSocket(
-                        id = Execution.ID.generate(),
+                    request = WebSocketConnectRequest(
+                        RawWebSocketPath("socket"),
                         socketId = Execution.ID.generate(),
-                        path = RawWebSocketPath("socket"),
-                        phase = Execution.WebSocket.Phase.Connect,
                     ),
-                    request = WebSocketConnectRequest(RawWebSocketPath("socket")),
                 )
             }
         }

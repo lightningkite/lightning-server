@@ -8,10 +8,9 @@ import com.lightningkite.lightningserver.http.HttpInterceptor
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.websockets.DelegatingWebSocketHandler
-import com.lightningkite.lightningserver.websockets.WebSocketClose
+import com.lightningkite.lightningserver.websockets.WebSocketClose.Code
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketConnection
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
@@ -77,7 +76,7 @@ public class RequestRecordInterceptor(
             }
 
             context(serverRuntime: ServerRuntime)
-            override suspend fun disconnect(connection: WebSocketConnection<PATH, T>, reason: WebSocketClose) {
+            override suspend fun disconnect(connection: WebSocketConnection<PATH, T>, reason: WebSocketCloseReason.Code) {
                 try {
                     wrapped.disconnect(connection, reason)
                 } finally {

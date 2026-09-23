@@ -2,7 +2,6 @@
 
 package com.lightningkite.lightningserver.engine.awsserverless
 
-import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.services.serializers.KotlinBytesFormat
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -37,9 +36,9 @@ internal sealed interface SocketRow {
     /**
      * A row written by an earlier deployment, which this one can neither decode nor attribute.
      *
-     * Nothing later can repair it.  Both the stored connect request and the initiator are written
-     * once, at `${'$'}connect`, by whatever code was deployed then, so the socket is ended and the
-     * client reconnects to get a row in the current shape.
+     * Nothing later can repair it.  The stored connect request is written once, at `${'$'}connect`, by
+     * whatever code was deployed then, so the socket is ended and the client reconnects to get a row in
+     * the current shape.
      */
     data class Legacy(val reason: String) : SocketRow
 
@@ -47,12 +46,6 @@ internal sealed interface SocketRow {
     class Current(
         val state: ByteArray,
         val connectRequest: WebSocketConnectRequest<*>,
-        /**
-         * The socket's connect initiator.  Persisted beside the request because each of the five
-         * lifecycle phases is a separate Lambda invocation: without it, nothing after
-         * `${'$'}connect` could say which socket it belongs to.
-         */
-        val initiator: Execution.WebSocket,
     ) : SocketRow
 }
 
@@ -78,7 +71,6 @@ internal class AwsWebSocketDynamoDb(
         private const val stateKey = "wsState"
         private const val fromStateKey = "wsFromState"
         private const val requestKey = "wsRequest"
-        private const val initiatorKey = "wsInitiator"
     }
 
     private val initMutex = Mutex()
@@ -248,9 +240,9 @@ internal class AwsWebSocketDynamoDb(
      *
      * This is not defensive padding.  The stored connect request is a positional blob, and this branch
      * removed two properties from [WebSocketConnectRequest], so every blob written before that change
-     * carries element indices past the end of the current descriptor.  A row written before the
-     * `wsInitiator` column existed is the same situation with a different symptom.  Neither is a fault
-     * to report; both are simply data this deployment cannot read.
+     * carries element indices past the end of the current descriptor, and one written before
+     * [WebSocketConnectRequest.socketId] existed lacks a required field.  Neither is a fault to report;
+     * both are simply data this deployment cannot read.
      *
      * Only the two failures a schema change produces are absorbed, and only around the decode itself:
      * [SerializationException] for a missing field or an out-of-range element index, and [IOException]
@@ -258,18 +250,12 @@ internal class AwsWebSocketDynamoDb(
      * failure, DynamoDB's included, happens outside this block and still propagates.
      */
     private fun decodeRow(socketId: String, item: Map<String, AttributeValue>): SocketRow {
-        val initiator = item[initiatorKey]
-            ?: return legacyRow(socketId, "$initiatorKey is absent, so the socket cannot be attributed")
         return try {
             SocketRow.Current(
                 state = item[stateKey]!!.b().asByteArray(),
                 connectRequest = encoding.decodeFromByteArray(
                     WebSocketConnectRequest.serializer(NothingSerializer()),
                     item[requestKey]!!.b().asByteArray()
-                ),
-                initiator = encoding.decodeFromByteArray(
-                    Execution.WebSocket.serializer(),
-                    initiator.b().asByteArray()
                 ),
             )
         } catch (e: SerializationException) {
@@ -299,7 +285,7 @@ internal class AwsWebSocketDynamoDb(
         val out = HashMap<String, SocketRow>()
         client.scanPaginator {
             it.tableName(tableStates)
-            it.projectionExpression("$socketIdKey, $stateKey, $requestKey, $initiatorKey")
+            it.projectionExpression("$socketIdKey, $stateKey, $requestKey")
         }.asFlow().collect {
             it.items()?.forEach {
                 val id = it[socketIdKey]!!.s()
@@ -321,7 +307,7 @@ internal class AwsWebSocketDynamoDb(
             val response = client.getItem {
                 it.tableName(tableStates)
                 it.key(mapOf(socketIdKey to AttributeValue.fromS(id)))
-                it.projectionExpression("$stateKey, $requestKey, $initiatorKey")
+                it.projectionExpression("$stateKey, $requestKey")
                 it.consistentRead(true)
             }.await()
             // item() is an SDK auto-construct map: it returns empty rather than null when the socket
@@ -362,7 +348,7 @@ internal class AwsWebSocketDynamoDb(
         ids.forEach { out[it] = SocketRow.Absent }
         measureTime {
             val getState = KeysAndAttributes.builder()
-                .projectionExpression("$socketIdKey, $stateKey, $requestKey, $initiatorKey")
+                .projectionExpression("$socketIdKey, $stateKey, $requestKey")
                 .consistentRead(true)
                 .keys(ids.map { mapOf(socketIdKey to AttributeValue.fromS(it)) }).build()
             client.batchGetItemPaginator {
@@ -380,7 +366,6 @@ internal class AwsWebSocketDynamoDb(
     suspend fun setState(
         socketId: String,
         request: WebSocketConnectRequest<*>,
-        initiator: Execution.WebSocket,
         toState: ByteArray,
     ) {
         ensureTables()
@@ -398,11 +383,6 @@ internal class AwsWebSocketDynamoDb(
                                     WebSocketConnectRequest.serializer(NothingSerializer()),
                                     request as WebSocketConnectRequest<Nothing>
                                 )
-                            )
-                        ),
-                        initiatorKey to AttributeValue.fromB(
-                            SdkBytes.fromByteArray(
-                                encoding.encodeToByteArray(Execution.WebSocket.serializer(), initiator)
                             )
                         ),
                         expireKey to AttributeValue.fromN(

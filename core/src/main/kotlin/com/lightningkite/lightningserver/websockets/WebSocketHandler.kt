@@ -51,7 +51,7 @@ public interface WebSocketHandler<PATH : PathSpec, STORAGE> {
  * uses pub/sub channels to communicate between the connection and background task.
  * In local engines, this overhead is unnecessary since everything runs in-process.
  */
-public interface DirectExecutableWebSocketHandler<PATH : PathSpec> {
+public interface DirectExecutableWebSocketHandler<PATH : PathSpec, STORAGE> : WebSocketHandler<PATH, STORAGE> {
     /**
      * Handle the WebSocket connection directly without pub/sub.
      *

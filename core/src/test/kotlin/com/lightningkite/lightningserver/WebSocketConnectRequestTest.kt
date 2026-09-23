@@ -1,3 +1,5 @@
+@file:OptIn(com.lightningkite.lightningserver.InternalLightningServerApi::class, com.lightningkite.services.data.Unsafe::class)
+
 package com.lightningkite.lightningserver
 
 import com.lightningkite.lightningserver.data.*
@@ -18,6 +20,8 @@ import kotlinx.serialization.modules.EmptySerializersModule
 import org.junit.Assert.assertEquals
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
+import com.lightningkite.services.data.UuidV7
+import com.lightningkite.lightningserver.runtime.Execution
 
 class WebSocketConnectRequestTest {
     @Test
@@ -32,6 +36,7 @@ class WebSocketConnectRequestTest {
             domain = "localhost",
             protocol = "https",
             sourceIp = "127.0.0.1",
+            socketId = Execution.ID(UuidV7.generate()),
         )
         r.roundTripTest()
         object : ServerBuilder() {}.test(

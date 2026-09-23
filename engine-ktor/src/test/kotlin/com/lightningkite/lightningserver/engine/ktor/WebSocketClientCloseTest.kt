@@ -8,7 +8,7 @@ import com.lightningkite.lightningserver.engine.local.engineCache
 import com.lightningkite.lightningserver.engine.local.enginePubSub
 import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
 import com.lightningkite.lightningserver.settings.set
-import com.lightningkite.lightningserver.websockets.WebSocketClose
+import com.lightningkite.lightningserver.websockets.WebSocketClose.Code
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.webSocketSettings
 import io.ktor.client.plugins.websocket.*
@@ -21,7 +21,7 @@ import kotlin.test.assertEquals
 
 /**
  * The counterpart to [WebSocketShutdownDisconnectTest]: an ordinary client-initiated close must
- * report [WebSocketClose.NORMAL], exactly once.
+ * report [WebSocketCloseReason.Code.NORMAL], exactly once.
  *
  * Ktor's ordinary close leaves the socket loop normally rather than by exception, so it is the half
  * of the disconnect path that the cancellation work did *not* touch — and the half nothing covered.
@@ -45,7 +45,7 @@ class WebSocketClientCloseTest {
     companion object {
         val serverConnected = CompletableDeferred<Unit>()
         val serverDisconnected = CompletableDeferred<Unit>()
-        val reasons = CopyOnWriteArrayList<WebSocketClose>()
+        val reasons = CopyOnWriteArrayList<WebSocketCloseReason.Code>()
     }
 
     @Test
@@ -71,6 +71,6 @@ class WebSocketClientCloseTest {
             serverDisconnected.await()
         }
 
-        assertEquals(listOf(WebSocketClose.NORMAL), reasons.toList())
+        assertEquals(listOf(WebSocketCloseReason.Code.NORMAL), reasons.toList())
     }
 }

@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.pathing
 
 import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.runtime.Engine
+import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.*
@@ -56,10 +57,10 @@ public class RawWebSocketPath<out PATH : PathSpec>(public val pathSegments: Path
     context(server: Engine)
     override val pathInContext: ResolvedPath<PATH> get() = match.path as ResolvedPath<PATH>
 
-    private var matchIfPresent: PathSpecMap.Match<*>? = null
+    private var matchIfPresent: PathSpecMap.Match<WebSocketHandler<*, *>>? = null
 
     context(server: Engine)
-    public val match: PathSpecMap.Match<*>
+    public val match: PathSpecMap.Match<WebSocketHandler<*, *>>
         get() {
             if (this.matchIfPresent == null) {
                 this.matchIfPresent = server.server.endpoints.match(
@@ -73,7 +74,7 @@ public class RawWebSocketPath<out PATH : PathSpec>(public val pathSegments: Path
 
     public constructor(
         pathSegments: PathSegments,
-        match: PathSpecMap.Match<*>,
+        match: PathSpecMap.Match<WebSocketHandler<*, *>>,
     ) : this(pathSegments) {
         this.matchIfPresent = match
     }

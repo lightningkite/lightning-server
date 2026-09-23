@@ -134,7 +134,7 @@ public abstract class CoroutineWebSocketHandler : ServerBuilder() {
     }
 
     public val webSocketHandler: WebSocketHandler<PathSpec0, Storage> =
-        path bind (object : WebSocketHandler<PathSpec0, Storage>, DirectExecutableWebSocketHandler<PathSpec0> {
+        path bind (object : WebSocketHandler<PathSpec0, Storage>, DirectExecutableWebSocketHandler<PathSpec0, Storage> {
 
             override val storageSerializer: KSerializer<Storage> = Storage.serializer()
 
@@ -160,15 +160,16 @@ public abstract class CoroutineWebSocketHandler : ServerBuilder() {
                     )
                     logger.info { "handleDirect: handler completed normally" }
                     close(WebSocketClose.NORMAL)
-                } catch (e: CancellationException) {
+                } catch (_: CancellationException) {
                     logger.info { "handleDirect: cancelled" }
                     close(WebSocketClose.GOING_AWAY)
+                    currentCoroutineContext().ensureActive()
                 } catch (e: HttpStatusException) {
                     logger.warn(e) { "handleDirect: HTTP exception" }
-                    close(e.status.bestWebSocketCloseCode)
+                    close(WebSocketClose.exceptional(e))
                 } catch (e: Exception) {
                     logger.error(e) { "handleDirect: unexpected exception" }
-                    close(WebSocketClose.INTERNAL_ERROR)
+                    close(WebSocketClose.exceptional(e))
                 }
             }
 

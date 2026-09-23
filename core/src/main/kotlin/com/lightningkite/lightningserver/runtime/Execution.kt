@@ -211,36 +211,3 @@ public val Execution.logicalId: Execution.ID get() = when (this) {
  * the interceptor chains run for every logical request and socket.
  */
 public fun Execution.isRoot(): Boolean = causedBy == null
-
-/**
- * The initiator of a logical sub-socket multiplexed inside this physical connection.
- *
- * A new [Execution.WebSocket.socketId], because a virtual socket has its own lifetime and its own
- * subscriptions; the physical connection carrying it stays reachable through [Execution.causedBy].
- */
-@InternalLightningServerApi
-context(engine: Engine)
-public fun Execution.WebSocket.subConnection(path: RawWebSocketPath<PathSpec>): Execution.WebSocket {
-    // One id for both, exactly as every engine mints a real connect. Minting two left a sub-socket's
-    // own request-log row — which is keyed by socketId — unreachable from its execution id, so
-    // nothing descending from it could find the row that names the person who opened it.
-    val id = Execution.ID.generate()
-    return Execution.WebSocket(
-        id = id,
-        causedBy = this@subConnection.id,
-        rootExecution = rootExecution,
-        socketId = id,
-        path = path,
-        phase = Execution.WebSocket.Phase.Connect,
-    )
-}
-
-/**
- * The same socket and the same execution, at a rewritten path.
- *
- * For shims that only re-target where a socket was opened — the path arrives in a query parameter
- * rather than the URL, say. Rewriting is not opening: reusing the identity is what keeps the two
- * indistinguishable in the audit trail, which is correct here and wrong for [subConnection].
- */
-@InternalLightningServerApi
-public fun Execution.WebSocket.rewritePath(path: RawWebSocketPath<PathSpec>): Execution.WebSocket = copy(path = path)

@@ -12,7 +12,6 @@ import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.engine.local.LocalWebSocketConnection
 import com.lightningkite.lightningserver.runtime.Execution
-import com.lightningkite.lightningserver.runtime.execute
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
@@ -309,6 +308,8 @@ public class NettyEngine(
         }
     }
 
+    private fun WebSocketClose.adapt(): CloseWebSocketFrame = CloseWebSocketFrame(code.code.toInt(), message)
+
     /**
      * Raises a pub/sub socket's disconnect phase, at most once per channel.
      *
@@ -407,7 +408,8 @@ public class NettyEngine(
                             } catch (e: Exception) {
                                 // Route through the normal disconnect lifecycle rather than a bare
                                 // close, so the handler's own cleanup still runs.
-                                emitDisconnect(ctx.channel(), e.webSocketCloseReason)
+                                emitDisconnect(ctx.channel(), WebSocketClose.exceptional(e))
+                                currentCoroutineContext().ensureActive()
                             }
                         }
                     }
@@ -430,7 +432,8 @@ public class NettyEngine(
                             } catch (e: Exception) {
                                 // Route through the normal disconnect lifecycle rather than a bare
                                 // close, so the handler's own cleanup still runs.
-                                emitDisconnect(ctx.channel(), e.webSocketCloseReason)
+                                emitDisconnect(ctx.channel(), WebSocketClose.exceptional(e))
+                                currentCoroutineContext().ensureActive()
                             }
                         }
                     }
@@ -473,7 +476,7 @@ public class NettyEngine(
                 val result = directChannel.trySend(frame)
                 if (result.isFailure && !result.isClosed) {
                     ctx.writeAndFlush(
-                        CloseWebSocketFrame(WebSocketClose.TOO_BIG.code.toInt(), "WebSocket inbound buffer overflow")
+                        CloseWebSocketFrame(WebSocketClose.Code.TOO_BIG.code.toInt(), "WebSocket inbound buffer overflow")
                     ).addListener(ChannelFutureListener.CLOSE)
                 }
             } else {
@@ -488,7 +491,7 @@ public class NettyEngine(
         }
 
         private suspend fun handleWebSocketStartup(ctx: ChannelHandlerContext, req: FullHttpRequest) {
-            val (wsRequest, wsInitiator) = try {
+            val wsRequest = try {
                 req.toLightningWebSocketConnectRequest(ctx, cfg)
             } catch (e: Throwable) {
                 logger.error(e) { "" }
@@ -528,9 +531,9 @@ public class NettyEngine(
             ctx.channel().attr(HANDSHAKER_KEY).set(handshaker)
 
             // Check for direct execution capability - bypasses pub/sub overhead
-            if (socketHandler is DirectExecutableWebSocketHandler<*> && !forceWebSocketPubSub()) {
+            if (socketHandler is DirectExecutableWebSocketHandler<*, *> && !forceWebSocketPubSub()) {
                 @Suppress("UNCHECKED_CAST")
-                val directHandler = socketHandler as DirectExecutableWebSocketHandler<PathSpec>
+                val directHandler = socketHandler as DirectExecutableWebSocketHandler<PathSpec, Any?>
 
                 // 2.10: bounded inbound channel with backpressure instead of Channel.UNLIMITED.
                 val incomingChannel = newWebSocketInboundChannel<LkWebSocketFrame>(cfg.reliability)
@@ -540,27 +543,24 @@ public class NettyEngine(
                 handshaker.handshake(ctx.channel(), req).addListener {
                     scope.launch {
                         try {
-                            // A directly-run socket is not phase-structured — the whole session runs
-                            // in this one coroutine — so it is one execution, named by the socket it is.
-                            this@NettyEngine.execute("handleDirect", wsInitiator) {
-                                directHandler.handleDirect(
-                                    request = wsRequest,
-                                    incoming = incomingChannel,
-                                    send = { frame ->
-                                        when (frame) {
-                                            is LkWebSocketFrame.Binary -> ctx.writeAndFlush(
-                                                BinaryWebSocketFrame(Unpooled.wrappedBuffer(frame.content))
-                                            )
+                            directHandler.handleDirectWithMetrics(
+                                location = match.pathSpec,
+                                request = wsRequest,
+                                incoming = incomingChannel,
+                                send = { frame ->
+                                    when (frame) {
+                                        is LkWebSocketFrame.Binary -> ctx.writeAndFlush(
+                                            BinaryWebSocketFrame(Unpooled.wrappedBuffer(frame.content))
+                                        )
 
-                                            is LkWebSocketFrame.Text -> ctx.writeAndFlush(TextWebSocketFrame(frame.content))
-                                        }
-                                    },
-                                    close = { reason ->
-                                        ctx.writeAndFlush(CloseWebSocketFrame(reason.code.toInt(), reason.name))
-                                            .addListener(ChannelFutureListener.CLOSE)
+                                        is LkWebSocketFrame.Text -> ctx.writeAndFlush(TextWebSocketFrame(frame.content))
                                     }
-                                )
-                            }
+                                },
+                                close = { reason ->
+                                    ctx.writeAndFlush(reason.adapt())
+                                        .addListener(ChannelFutureListener.CLOSE)
+                                }
+                            )
                         } catch (e: Throwable) {
                             logger.error(e) { "Direct WebSocket handler failed" }
                             ctx.close()
@@ -573,7 +573,7 @@ public class NettyEngine(
                 socketHandler as WebSocketHandler<PathSpec, Any?>
 
                 val startingState = try {
-                    socketHandler.willConnectWithMetrics(match.pathSpec, wsInitiator, wsRequest)
+                    socketHandler.willConnectWithMetrics(match.pathSpec, wsRequest)
                 } catch (e: HttpStatusException) {
                     logger.error(e) { "" }
                     val res = DefaultFullHttpResponse(req.protocolVersion(), HttpResponseStatus.valueOf(e.status.code))
@@ -589,10 +589,8 @@ public class NettyEngine(
                 val mid = object : LocalWebSocketConnection<PathSpec, Any?>(
                     startingState = startingState,
                     request = wsRequest,
-                    connectInitiator = wsInitiator,
                     handler = socketHandler,
                     scope = CoroutineScope(Dispatchers.IO),
-                    server = this@NettyEngine,
                     pubSub = { this@NettyEngine.pubSubChannel(it) }
                 ) {
                     context(server: ServerRuntime)
@@ -614,7 +612,7 @@ public class NettyEngine(
                     override suspend fun close(reason: WebSocketClose) {
                         val hs = ctx.channel().attr(HANDSHAKER_KEY).get()
                         if (hs != null) {
-                            ctx.writeAndFlush(CloseWebSocketFrame(reason.code.toInt(), reason.name))
+                            ctx.writeAndFlush(reason.adapt())
                                 .addListener(ChannelFutureListener.CLOSE)
                         } else {
                             ctx.close()
@@ -716,7 +714,7 @@ public class NettyEngine(
         private fun FullHttpRequest.toLightningWebSocketConnectRequest(
             ctx: ChannelHandlerContext,
             cfg: NettyRuntimeSettings,
-        ): Pair<WebSocketConnectRequest<PathSpec>, Execution.WebSocket> {
+        ): WebSocketConnectRequest<PathSpec> {
             val parts = QueryStringDecoder(this.uri())
             val headers = (this.headers() as NettyHttpHeaders).toLightningHeaders()
             val hostHeader = this.headers()[HOST] ?: ""
@@ -732,8 +730,9 @@ public class NettyEngine(
                 logger.warn { "Request ID header for proxy '${cfg.requestIdHeader}' was missing from the request." }
             }
 
-            val adapted = WebSocketConnectRequest(
+            return WebSocketConnectRequest(
                 path = RawWebSocketPath<PathSpec>(parts.path()),
+                socketId = identity.requestId,
                 queryParameters = QueryParameters(
                     parts.parameters().flatMap { (key, values) -> values.map { key to it } }),
                 headers = headers,
@@ -741,14 +740,6 @@ public class NettyEngine(
                 protocol = "http",
                 sourceIp = sourceIp,
                 upstreamRequestId = identity.upstreamRequestId,
-            )
-            // The socket's identity is minted once, at connect, and every phase derives its own
-            // execution from it, so a socket stays one thing across five separate executions.
-            return adapted to Execution.WebSocket(
-                id = identity.requestId,
-                socketId = identity.requestId,
-                path = adapted.path,
-                phase = Execution.WebSocket.Phase.Connect,
             )
         }
 

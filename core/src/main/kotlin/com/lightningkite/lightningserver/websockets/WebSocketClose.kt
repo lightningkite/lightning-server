@@ -5,25 +5,38 @@ import com.lightningkite.lightningserver.http.HttpStatus
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlin.coroutines.cancellation.CancellationException
 
-public enum class WebSocketClose(public val code: Short) {
-    NORMAL(1000),
-    GOING_AWAY(1001),
-    PROTOCOL_ERROR(1002),
-    CANNOT_ACCEPT(1003),
-    NOT_CONSISTENT(1007),
-    VIOLATED_POLICY(1008),
-    TOO_BIG(1009),
-    NO_EXTENSION(1010),
-    INTERNAL_ERROR(1011),
-    SERVICE_RESTART(1012),
-    TRY_AGAIN_LATER(1013);
+public data class WebSocketClose(
+    val code: Code,
+    val message: String?,
+    val cause: Throwable?
+) {
+    public enum class Code(public val code: Short) {
+        NORMAL(1000),
+        GOING_AWAY(1001),
+        PROTOCOL_ERROR(1002),
+        CANNOT_ACCEPT(1003),
+        NOT_CONSISTENT(1007),
+        VIOLATED_POLICY(1008),
+        TOO_BIG(1009),
+        NO_EXTENSION(1010),
+        INTERNAL_ERROR(1011),
+        SERVICE_RESTART(1012),
+        TRY_AGAIN_LATER(1013);
+    }
+
+    public companion object {
+        public val NORMAL: WebSocketClose get() = WebSocketClose(Code.NORMAL, null, null)
+        public val GOING_AWAY: WebSocketClose get() = WebSocketClose(Code.GOING_AWAY, null, null)
+        public fun exceptional(exception: Throwable): WebSocketClose =
+            WebSocketClose(exception.bestWebSocketCloseCode, exception.message, exception)
+    }
 }
 
-public val HttpStatus.bestWebSocketCloseCode: WebSocketClose
+public val HttpStatus.bestWebSocketCloseCode: WebSocketClose.Code
     get() = when (code / 100) {
-        1, 2, 3 -> WebSocketClose.NORMAL
-        4 -> WebSocketClose.VIOLATED_POLICY
-        else -> WebSocketClose.INTERNAL_ERROR
+        1, 2, 3 -> WebSocketClose.Code.NORMAL
+        4 -> WebSocketClose.Code.VIOLATED_POLICY
+        else -> WebSocketClose.Code.INTERNAL_ERROR
     }
 
 /**
@@ -38,12 +51,12 @@ public val HttpStatus.bestWebSocketCloseCode: WebSocketClose
  * (1012 `SERVICE_RESTART` is arguably more precise, but it is only in the IANA registry rather than
  * RFC 6455 proper, so client support for it is thinner. 1001 is the interoperable choice.)
  */
-public val Throwable.webSocketCloseReason: WebSocketClose
-    get() = when {
+public val Throwable.bestWebSocketCloseCode: WebSocketClose.Code
+    get() = when (this) {
         // A handler's own withTimeout expiring is a server fault that happens to arrive as a
         // cancellation. Reporting it as "going away" would bury it exactly the way deriving every
         // cancellation from a 500 used to bury shutdowns — the same mistake, pointed the other way.
-        this is TimeoutCancellationException -> WebSocketClose.INTERNAL_ERROR
-        this is CancellationException -> WebSocketClose.GOING_AWAY
+        is TimeoutCancellationException -> WebSocketClose.Code.INTERNAL_ERROR
+        is CancellationException -> WebSocketClose.Code.GOING_AWAY
         else -> ((this as? HttpStatusException)?.status ?: HttpStatus.InternalServerError).bestWebSocketCloseCode
     }
