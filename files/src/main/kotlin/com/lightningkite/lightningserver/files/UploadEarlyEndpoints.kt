@@ -51,6 +51,7 @@ public class UploadEarlyEndpoint(
     public val filePath: String = "uploaded",
     public val expiration: Duration = 1.days,
     public val authOptions: AuthRequirement<*> = noAuth,
+    public val foreignUrlHandling: ForeignUrlHandling = ForeignUrlHandling.ERROR,
 ) : ServerBuilder() {
     init {
         sdkSettings.clientInterface = ClientUploadEarlyEndpoints::class.info()
@@ -108,6 +109,7 @@ public class UploadEarlyEndpoint(
         val table = uploadForNextRequestTable()
         ExternalServerFileSerializer(
             fileSystems = listOf(checkedFiles()),
+            foreignUrlHandling = foreignUrlHandling,
             resolveUpload = { raw ->
                 when (val token = tokens.parseOrNull(raw)) {
                     null -> null
