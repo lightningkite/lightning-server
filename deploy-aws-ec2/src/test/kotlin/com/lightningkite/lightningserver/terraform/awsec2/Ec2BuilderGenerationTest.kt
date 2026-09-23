@@ -20,6 +20,7 @@ import com.lightningkite.services.data.DataSize.Companion.gibibytes
 import com.lightningkite.services.data.EmailAddress
 import com.lightningkite.services.pubsub.PubSub
 import com.lightningkite.services.terraform.AwsVpc
+import com.lightningkite.services.terraform.terraformJsonObject
 import kotlinx.serialization.json.*
 import software.amazon.awssdk.regions.Region
 import java.io.File
@@ -163,7 +164,26 @@ class Ec2BuilderGenerationTest {
             natGateway = AwsVpc.NatGateway.Single,
         )
         override val customerManagedKey = true
-        override val wafEnabled = true
+        override val wafRules: List<JsonObject> = listOf(
+            terraformJsonObject {
+                "name" - "AWSIPReputation"
+                "priority" - 10
+                "override_action" {
+                    "none" {}
+                }
+                "statement" {
+                    "managed_rule_group_statement" {
+                        "vendor_name" - "AWS"
+                        "name" - "AWSManagedRulesAmazonIpReputationList"
+                    }
+                }
+                "visibility_config" {
+                    "cloudwatch_metrics_enabled" - true
+                    "metric_name" - "AWSIPReputation"
+                    "sampled_requests_enabled" - true
+                }
+            }
+        )
         override val hardeningComponents = listOf(stigBuildLinux(StigLevel.Low))
         override val terraformRoot = File(tmpRoot, "cmk")
         override fun TestServer.settings() = fulfillGlobals("redis://cache:6379")
@@ -334,5 +354,192 @@ class Ec2BuilderGenerationTest {
         val maxLife = d.terraformRoot.findResource("aws_autoscaling_group", "app")!!
             .let { it["max_instance_lifetime"]!!.jsonPrimitive.int }
         assertEquals(604800, maxLife)
+    }
+
+    // === Service hardening: layout, sandbox, settings handling ===
+
+    /** A single-instance deployment with the service-hardening knobs exposed; one terraform root per [name]. */
+    inner class ConfiguredSingleDeployment(
+        name: String,
+        override val serviceSandboxing: Boolean = true,
+        override val serviceWritablePaths: List<String> = emptyList(),
+        configFiles: Map<String, String> = emptyMap(),
+    ) : TerraformAwsSingleEc2Builder<TestServer>(TestServer) {
+        override val storageBucket = "test-tf-state"
+        override val region: Region = Region.US_WEST_2
+        override val displayName = "Configured $name"
+        override val domainZone = "example.com"
+        override val domain = "$name.example.com"
+        override val debug = true
+        override val emergencyContact = EmailAddress("ops@example.com")
+        override val instanceType = "t4g.medium"
+        override val instanceArchitecture = CPUArchitecture.Arm
+        override val applicationVpc = AwsVpc.Default
+        override val terraformRoot = File(tmpRoot, "configured-$name")
+        override fun TestServer.settings() = fulfillGlobals(cacheUrl = null)
+
+        init {
+            configFiles.forEach { (fileName, content) -> instanceFilesRaw[fileName to FileType.Config] = content }
+        }
+    }
+
+    inner class ConfiguredScalingDeployment(
+        name: String,
+    ) : TerraformAwsScalingEc2Builder<TestServer>(TestServer) {
+        override val storageBucket = "test-tf-state"
+        override val region: Region = Region.US_WEST_2
+        override val displayName = "Configured Scaling $name"
+        override val domainZone = "example.com"
+        override val domain = "scaling-$name.example.com"
+        override val debug = true
+        override val emergencyContact = EmailAddress("ops@example.com")
+        override val instanceType = "t4g.medium"
+        override val instanceArchitecture = CPUArchitecture.Arm
+        override val applicationVpc = terraformManagedVPC(
+            ipPrefix = "10.0",
+            availabilityZones = listOf("us-west-2a", "us-west-2b"),
+            natGateway = AwsVpc.NatGateway.Single,
+        )
+        override val terraformRoot = File(tmpRoot, "configured-scaling-$name")
+        override fun TestServer.settings() = fulfillGlobals("redis://cache:6379")
+    }
+
+    private val cipherArgs = "-aes-256-cbc -pbkdf2 -iter 10000 -md sha256"
+
+    private fun File.triggersOf(nullResource: String): JsonObject =
+        findResource("null_resource", nullResource)!!["triggers"]!!.jsonObject
+
+    /**
+     * The single instance's `ec2_init.sh` goes through terraform `templatefile()`, so every `${...}` in it
+     * must be a template variable. A leaked Kotlin interpolation (or an unescaped shell `${...}`) would
+     * fail at plan time; this catches it at generation time instead. `$${...}` is the template escape.
+     */
+    private fun assertOnlyTemplateVariables(script: String, allowed: Set<String> = setOf("deployment_bucket")) {
+        val used = Regex("""(?<!\$)\$\{([^}]*)}""").findAll(script).map { it.groupValues[1] }.toSet()
+        assertEquals(emptySet(), used - allowed, "Unexpected template expressions in ec2_init.sh")
+        assertFalse(Regex("""(?<!%)%\{""").containsMatchIn(script), "Unexpected template directive in ec2_init.sh")
+    }
+
+    @Test
+    fun serviceUsesStandardLayoutAndSandbox() {
+        val d = SingleDeployment()
+        d.write()
+        val init = File(d.terraformRoot, "ec2_init.sh").readText()
+        assertOnlyTemplateVariables(init)
+
+        // Unprivileged user, homed in its state directory; code root-owned, config root:<user>.
+        assertContains(init, "useradd --system --user-group --home-dir /var/lib/single-test --no-create-home --shell /usr/sbin/nologin lightning-server")
+        assertContains(init, "install -d -o root -g root -m 0755 /opt/single-test")
+        assertContains(init, "install -d -o root -g lightning-server -m 0750 /etc/single-test")
+        assertContains(init, "install -d -o lightning-server -g lightning-server -m 0700 /var/lib/single-test")
+
+        // The unit: state dir as working directory, settings bind-mounted read-only, sandbox on.
+        for (line in listOf(
+            "User=lightning-server",
+            "WorkingDirectory=/var/lib/single-test",
+            "ExecStart=/opt/single-test/server/bin/server serve",
+            "StateDirectory=single-test",
+            "CacheDirectory=single-test",
+            "LogsDirectory=single-test",
+            "BindReadOnlyPaths=/etc/single-test/settings.enc:/var/lib/single-test/settings.json",
+            "NoNewPrivileges=true",
+            "UMask=0077",
+            "ProtectSystem=strict",
+            "ProtectHome=true",
+            "PrivateTmp=true",
+            "ProtectProc=invisible",
+            "RestrictNamespaces=true",
+        )) assertTrue(Regex("(?m)^" + Regex.escape(line) + "$").containsMatchIn(init), "Missing unit line: $line")
+        assertFalse(init.contains("ReadWritePaths="), "No extra writable paths by default")
+        assertFalse(init.contains("AmbientCapabilities"), "No capabilities for an unprivileged port")
+        assertFalse(init.contains("MemoryDenyWriteExecute"), "Breaks the JVM's JIT")
+        assertFalse(init.contains("ubuntu:ubuntu") || init.contains("User=ubuntu"), "The app must not run as ubuntu")
+
+        // The redeploy keeps the build root-owned and never hands it to the service.
+        assertContains(init, "chown -R root:root \"\$APP_DIR\"")
+        assertFalse(init.contains("chown -R lightning-server:lightning-server \"\$APP_DIR\""))
+        // Predeploy scratch is an unguessable mktemp dir, not a fixed path.
+        assertContains(init, "mktemp -d \"/var/tmp/single-test-predeploy.XXXXXX\"")
+        assertFalse(init.contains("/opt/lightning-server/predeploy"))
+    }
+
+    @Test
+    fun sandboxCanBeDisabledOrExtended() {
+        val off = ConfiguredSingleDeployment("nosandbox", serviceSandboxing = false)
+        off.write()
+        val offInit = File(off.terraformRoot, "ec2_init.sh").readText()
+        assertFalse(offInit.contains("ProtectSystem="), "Sandbox directives must be absent when disabled")
+        // Privilege and settings protections do not depend on the sandbox switch.
+        assertContains(offInit, "NoNewPrivileges=true")
+        assertContains(offInit, "BindReadOnlyPaths=/etc/configured-nosandbox/settings.enc:")
+
+        val extended = ConfiguredSingleDeployment("rwpaths", serviceWritablePaths = listOf("/srv/uploads", "/var/spool/app"))
+        extended.write()
+        assertContains(File(extended.terraformRoot, "ec2_init.sh").readText(), "ReadWritePaths=/srv/uploads /var/spool/app")
+    }
+
+    @Test
+    fun configInstanceFilesReadableOnlyByServiceUser() {
+        val d = ConfiguredSingleDeployment("cfg", configFiles = mapOf("app.conf" to "key=value"))
+        d.write()
+        val init = File(d.terraformRoot, "ec2_init.sh").readText()
+        assertContains(init, "chown root:lightning-server /etc/configured-cfg")
+        assertContains(init, "chmod 750 /etc/configured-cfg")
+        assertContains(init, "chown root:lightning-server '/etc/configured-cfg/app.conf'")
+        assertContains(init, "chmod 640 '/etc/configured-cfg/app.conf'")
+    }
+
+
+    @Test
+    fun settingsAtRestNeverPlaintext() {
+        val single = ConfiguredSingleDeployment("enc")
+        single.write()
+        val init = File(single.terraformRoot, "ec2_init.sh").readText()
+        assertOnlyTemplateVariables(init)
+        // The encrypted file is what gets mounted; systemd fetches the key as root before each start.
+        assertContains(init, "BindReadOnlyPaths=/etc/configured-enc/settings.enc:/var/lib/configured-enc/settings.json")
+        assertContains(init, "ExecStartPre=+/usr/local/bin/configured-enc-settings-key")
+        // '-' is required: systemd loads the file before ExecStartPre too, which is what creates it.
+        assertContains(init, "EnvironmentFile=-/run/configured-enc-secrets/settings.env")
+        // The root key step must not trust the service-writable HOME or working directory.
+        assertContains(init, "export HOME=/root AWS_CONFIG_FILE=/dev/null AWS_SHARED_CREDENTIALS_FILE=/dev/null")
+        // Decryption is only ever a test to /dev/null; plaintext is never written.
+        assertContains(init, "-out /dev/null -pass env:SETTINGS_PASS")
+        assertFalse(init.contains("settings.json.new"), "Plaintext settings must never be written")
+        // Predeploy passes the password through the environment, never argv, and not via sudo (which resets it).
+        assertContains(init, "LIGHTNING_SERVER_SETTINGS_DECRYPTION=\"\$SETTINGS_PASS\" runuser -u lightning-server -- env")
+        assertFalse(init.contains("sudo -u lightning-server env"))
+        // Every re-encryption (e.g. a rotated password) must reach the instance.
+        val singleTriggers = single.terraformRoot.triggersOf("redeploy_app")
+        assertEquals("\${null_resource.upload_settings.id}", singleTriggers["settings_upload"]!!.jsonPrimitive.content)
+        assertNull(singleTriggers["settings_hash"])
+
+        val scaling = ConfiguredScalingDeployment("enc")
+        scaling.write()
+        val component = File(scaling.terraformRoot, "image_data.yaml").readText()
+        assertContains(component, "ExecStartPre=+/usr/local/bin/configured-scaling-enc-settings-key")
+        assertContains(component, "cat > /usr/local/bin/configured-scaling-enc-settings-key")
+        assertFalse(component.contains("settings.json.new"), "Plaintext settings must never be written")
+        val scalingTriggers = scaling.terraformRoot.triggersOf("redeploy_app")
+        assertEquals("\${null_resource.upload_settings.id}", scalingTriggers["settings_upload"]!!.jsonPrimitive.content)
+        assertNull(scalingTriggers["settings_hash"])
+    }
+
+    @Test
+    fun settingsReencryptAndReuploadWhenAnyInputChanges() {
+        val d = SingleDeployment()
+        d.write()
+        val encrypt = d.terraformRoot.triggersOf("encrypt_settings")
+        assertNotNull(encrypt["settings_hash"])
+        assertEquals(cipherArgs, encrypt["cipher"]!!.jsonPrimitive.content)
+        assertEquals("\${sha256(random_password.settings.result)}", encrypt["password_hash"]!!.jsonPrimitive.content)
+        // Upload is chained to the encrypt step, not to the raw settings.
+        val upload = d.terraformRoot.triggersOf("upload_settings")
+        assertEquals("\${null_resource.encrypt_settings.id}", upload["encrypted"]!!.jsonPrimitive.content)
+        assertNull(upload["settings_hash"])
+        // Encryption and on-instance decryption use the same cipher arguments.
+        val terraform = d.terraformRoot.listFiles { f -> f.name.endsWith(".tf.json") }!!.joinToString("\n") { it.readText() }
+        assertContains(terraform, "openssl enc $cipherArgs -in")
+        assertContains(File(d.terraformRoot, "ec2_init.sh").readText(), "openssl enc -d $cipherArgs")
     }
 }

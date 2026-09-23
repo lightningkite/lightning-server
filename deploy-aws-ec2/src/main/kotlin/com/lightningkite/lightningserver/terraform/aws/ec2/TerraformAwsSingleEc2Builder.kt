@@ -2,7 +2,6 @@ package com.lightningkite.lightningserver.terraform.aws.ec2
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.services.Untested
-import com.lightningkite.services.kfile.KFile
 import com.lightningkite.services.terraform.*
 
 
@@ -71,11 +70,6 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
     public open val sshAllowedV6CIDR: List<String> =
         emptyList() // Example: ::/0, would allow everyone in the world to attempt to ssh in
 
-    // === Customization Hooks ===
-
-    /** Additional ec2_init scripts to run after base setup. */
-    public open val ec2InitScriptsRaw: List<String> = emptyList()
-    public open val ec2InitScripts: List<KFile> = emptyList()
 
     /** Direct application only accessible internally; we force using Angie. */
     override val appBindsAllNetworkInterfaces: Boolean get() = false
@@ -99,6 +93,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
 
     /** A generated SSH key pair, available for break-glass debugging access to the instance. */
     private fun emitSshKeyPair() {
+        if (sshAllowedV4CIDR.isEmpty() && sshAllowedV6CIDR.isEmpty()) return
         emit("deployment") {
             "resource.tls_private_key.ec2" {
                 "algorithm" - "RSA"
@@ -123,7 +118,10 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
             "resource.null_resource.redeploy_app" {
                 "triggers" {
                     "jar_hash" - expression("data.external.jar_hash.result.hash")
-                    "settings_hash" - expression("local_sensitive_file.settings_raw.content_sha256")
+                    // Redeploy whenever a new settings.enc was uploaded: settings changes and every re-encryption
+                    // (cipher change, rotated password). Encrypted-at-rest instances decrypt settings.enc on each
+                    // start, so they must not keep a stale copy.
+                    "settings_upload" - expression("null_resource.upload_settings.id")
                 }
 
                 "depends_on" - listOfNotNull(
@@ -230,7 +228,8 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                 emitExtra("ec2_init.sh", generateEC2Init())
                 val replacements = listOf(
                     "deployment_bucket = aws_s3_bucket.deployment.id",
-                    *provisioningFragments.flatMap { it.second.entries.map { "${it.key} = ${it.value}" } }.toTypedArray()
+                    *provisioningFragments.flatMap { it.second.entries.map { "${it.key} = ${it.value}" } }
+                        .toTypedArray()
                 )
                     .joinToString(", ")
                 "ec2_init" - $$"""${templatefile("${path.module}/ec2_init.sh", { $$replacements })}"""
@@ -290,7 +289,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
         emit("monitoring") {
             // CloudWatch Log Group for application logs
             "resource.aws_cloudwatch_log_group.application" {
-                "name" - "/ec2/$projectPrefix/application"
+                "name" - projectLogName
                 "retention_in_days" - logRetentionDays
             }
 
@@ -537,7 +536,7 @@ echo "[INFO] EC2 Init script started at $(date)"
 echo "[INFO] Updating system packages..."
 export DEBIAN_FRONTEND=noninteractive
 apt update -y
-apt install -y openjdk-17-jre-headless openssl curl gnupg ca-certificates unzip
+apt install -y openjdk-${javaVersion.outputString}-jre-headless openssl curl gnupg ca-certificates unzip
 """
             )
 
@@ -570,22 +569,22 @@ apt install -y openjdk-17-jre-headless openssl curl gnupg ca-certificates unzip
             instanceRedeployScript(
                 $$"""BUCKET="${deployment_bucket}"
 REGION="$$applicationRegion"""",
-                localHealthUrl = "http://localhost:$appPort${detectedOnlinePath ?: "/meta/online"}",
+                localHealthUrl = "http://localhost:8080${detectedOnlinePath ?: "/meta/online"}",
             )
 
             if (instanceFiles.isNotEmpty() || instanceFilesRaw.isNotEmpty())
                 instanceFiles()
 
             // Custom ec2_init scripts
-            if (ec2InitScripts.isNotEmpty() || ec2InitScriptsRaw.isNotEmpty()) {
+            if (customInstallScripts.isNotEmpty() || customInstallScriptsRaw.isNotEmpty()) {
                 appendLine("echo \"[INFO] Running Custom EC2 Init Scripts at \$(date)\"")
                 appendLine("# === Custom ec2_init Scripts ===")
-                for (script in ec2InitScripts) {
-                    appendLine(script.readString())
+                for (script in customInstallScripts) {
+                    appendLine(script.readString().terraformTemplateEscape())
                     appendLine()
                 }
-                for (script in ec2InitScriptsRaw) {
-                    appendLine(script)
+                for (script in customInstallScriptsRaw) {
+                    appendLine(script.terraformTemplateEscape())
                     appendLine()
                 }
             }
@@ -717,7 +716,7 @@ map $http_upgrade $connection_upgrade {
 }
 
 upstream app {
-    server 127.0.0.1:$${appPort};
+    server 127.0.0.1:8080;
     keepalive 32;
     keepalive_timeout 45s;
     keepalive_requests 1000;

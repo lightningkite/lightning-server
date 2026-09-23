@@ -77,12 +77,8 @@ public class KnownDeviceProofEndpoints(
                     it.hash.mask("")
                 },
                 update = admin or (mine and active),
-                updateRestrictions = updateRestrictions {
-                    it.subjectType.cannotBeModified()
-                    it.subjectId.cannotBeModified()
-                    it.hash.cannotBeModified()
-                    it.deviceInfo.cannotBeModified()
-                    it.establishedAt.cannotBeModified()
+                updateRestrictions = whitelistRestrictions {
+                    it.disabledAt.canBeModified()
                 },
                 delete = Condition.Never,
             )
