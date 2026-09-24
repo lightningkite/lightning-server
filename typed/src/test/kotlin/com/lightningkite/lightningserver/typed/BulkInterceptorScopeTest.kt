@@ -60,9 +60,9 @@ class BulkInterceptorScopeTest {
         override val name: String = "LogicalRecorder"
 
         context(runtime: ServerRuntime)
-        override suspend fun intercept(
-            request: HttpRequest<*>,
-            cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+        override suspend fun <PATH : PathSpec> intercept(
+            request: HttpRequest<PATH>,
+            cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
         ): HttpResponse {
             record(Observed.logical, request)
             return cont(request)
@@ -74,9 +74,9 @@ class BulkInterceptorScopeTest {
         override val name: String = "ConnectionRecorder"
 
         context(runtime: ServerRuntime)
-        override suspend fun intercept(
-            request: HttpRequest<*>,
-            cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+        override suspend fun <PATH : PathSpec> intercept(
+            request: HttpRequest<PATH>,
+            cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
         ): HttpResponse {
             if (!runtime.execution.isRoot()) return cont(request)
             record(Observed.connection, request)

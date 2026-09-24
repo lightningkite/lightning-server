@@ -90,9 +90,9 @@ public class RateLimitInterceptor(
     override val name: String = "RateLimit"
 
     context(runtime: ServerRuntime)
-    override suspend fun intercept(
-        request: HttpRequest<*>,
-        cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+    override suspend fun <PATH : PathSpec> intercept(
+        request: HttpRequest<PATH>,
+        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
     ): HttpResponse {
         val settings = settings() ?: return cont(request)
 

@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpInterceptor
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
+import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.gzip
 import com.lightningkite.lightningserver.runtime.isRoot
@@ -29,9 +30,9 @@ private const val COPY_CHUNK: Int = 8 * 1024
 
 public class GzipInterceptor: HttpInterceptor {
     context(runtime: ServerRuntime)
-    override suspend fun intercept(
-        request: HttpRequest<*>,
-        cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse
+    override suspend fun <PATH : PathSpec> intercept(
+        request: HttpRequest<PATH>,
+        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse
     ): HttpResponse {
         // Compression applies to the physical response body. A sub-request's body is embedded in the
         // carrying response, which is itself compressed on the way out, so encoding here would

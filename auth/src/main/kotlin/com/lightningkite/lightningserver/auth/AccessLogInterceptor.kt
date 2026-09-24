@@ -52,9 +52,9 @@ public class AccessLogInterceptor : HttpInterceptor, WebSocketInterceptor {
     override val name: String = "AccessLog"
 
     context(runtime: ServerRuntime)
-    override suspend fun intercept(
-        request: HttpRequest<*>,
-        cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+    override suspend fun <PATH : PathSpec> intercept(
+        request: HttpRequest<PATH>,
+        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
     ): HttpResponse {
         if (!runtime.logger.isInfoEnabled()) return cont(request)
         val started = TimeSource.Monotonic.markNow()

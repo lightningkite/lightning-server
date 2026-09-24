@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.ConflictingSettingsException
 import com.lightningkite.lightningserver.settings.ServerSettings
@@ -17,6 +18,15 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.TimeSource
+
+/** A new, distinct interceptor that passes every request straight through. */
+private fun passThrough(): HttpInterceptor = object : HttpInterceptor {
+    context(runtime: ServerRuntime)
+    override suspend fun <PATH : PathSpec> intercept(
+        request: HttpRequest<PATH>,
+        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
+    ): HttpResponse = cont(request)
+}
 
 /**
  * Tests for ServerDefinition class, focusing on the module flattening,
@@ -252,9 +262,7 @@ class ServerDefinitionTest {
 
     @Test
     fun `http interceptors are collected from server`() {
-        val interceptor = HttpInterceptor { request, cont ->
-            cont(request)
-        }
+        val interceptor = passThrough()
 
         val server = object : ServerBuilder() {
             init {
@@ -274,9 +282,9 @@ class ServerDefinitionTest {
 
     @Test
     fun `multiple interceptors preserve order`() {
-        val interceptor1 = HttpInterceptor { request, cont -> cont(request) }
-        val interceptor2 = HttpInterceptor { request, cont -> cont(request) }
-        val interceptor3 = HttpInterceptor { request, cont -> cont(request) }
+        val interceptor1 = passThrough()
+        val interceptor2 = passThrough()
+        val interceptor3 = passThrough()
 
         val server = object : ServerBuilder() {
             init {
@@ -301,8 +309,8 @@ class ServerDefinitionTest {
 
     @Test
     fun `interceptors from modules are combined`() {
-        val parentInterceptor = HttpInterceptor { request, cont -> cont(request) }
-        val childInterceptor = HttpInterceptor { request, cont -> cont(request) }
+        val parentInterceptor = passThrough()
+        val childInterceptor = passThrough()
 
         val childModule = object : ServerBuilder() {
             init {

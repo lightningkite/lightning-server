@@ -1,10 +1,15 @@
 package com.lightningkite.lightningserver.runtime
 
 import com.lightningkite.lightningserver.*
+import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.http.HttpResponse
+import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.PathSegments
+import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.pathing.route
 import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryKey
 import com.lightningkite.services.telemetry.TelemetryKeys
@@ -46,27 +51,33 @@ public suspend fun Engine.handleRoot(
 ): HttpResponse = executeHttpWithMetrics(
     request,
     Execution.Http(id = executionId, endpoint = request.path),
-) { route(it) }
+    ServerRuntime::route
+)
 
 public suspend fun ServerRuntime.handle(
     request: HttpRequest<PathSpec>,
     executionId: Execution.ID = Execution.ID.generate()
-): HttpResponse = executeHttpWithMetrics(request, childHttpExecution(request, executionId)) { route(it) }
+): HttpResponse = executeHttpWithMetrics(
+    request,
+    childHttpExecution(request, executionId),
+    ServerRuntime::route
+)
 
 /**
  * Runs this handler for [request] as a new execution caused by the current one, through the server's HTTP
- * interceptors, exactly as a routed <PATH : _root_ide_package_.com.lightningkite.lightningserver.pathing.PathSpec request would be but without routing.
+ * interceptors, exactly as a routed request would be but without routing.
  */
 context(runtime: ServerRuntime)
 public suspend fun <PATH : PathSpec> HttpHandler<PATH>.handleWithMetrics(
     request: HttpRequest<PATH>,
     executionId: Execution.ID = Execution.ID.generate(),
-): HttpResponse {
-    // The interceptor chain is untyped; it hands the handler back a request for the same endpoint.
-    return runtime.executeHttpWithMetrics(request, runtime.childHttpExecution(request, executionId)) { req ->
+): HttpResponse =
+    runtime.executeHttpWithMetrics(
+        request,
+        runtime.childHttpExecution(request, executionId)
+    ) { req ->
         handleWithTimeout(this@handleWithMetrics, req)
     }
-}
 
 @OptIn(InternalLightningServerApi::class)
 private fun ServerRuntime.childHttpExecution(request: HttpRequest<*>, executionId: Execution.ID): Execution =
@@ -84,11 +95,7 @@ private suspend fun <PATH : PathSpec> Engine.executeHttpWithMetrics(
     dispatch: suspend ServerRuntime.(HttpRequest<PATH>) -> HttpResponse,
 ): HttpResponse {
     val method = request.path.method.toString()
-    val route = try {
-        request.path.match.path.toString()
-    } catch (_: Exception) {
-        "/" + request.path.pathSegments.toString()
-    }
+    val route = request.path.route()
     return execute("$method $route", execution, TelemetryAttributes {
         put(TelemetryKeys.Http.method, method)
         put(TelemetryKeys.Http.route, route)
@@ -97,81 +104,64 @@ private suspend fun <PATH : PathSpec> Engine.executeHttpWithMetrics(
         put(TelemetryKeys.Http.host, request.domain)
         put(TelemetryKeys.Net.peerIp, request.sourceIp)
     }) { trace ->
-        val (response, error) = try {
-            val outcome = serverRuntime.interceptHttp(request, dispatch)
-            outcome.response to outcome.errorType
-        } catch (e: Exception) {
-            logger.error(e) { "Exception in HTTP interceptor chain" }
-            val response = try {
-                instrument("exceptionHandler") { server.exceptionHandler.handle(request, e) }
+        var handledError: String? = null
+        suspend fun handleError(e: Exception, label: String? = e::class.simpleName): HttpResponse {
+            handledError = label
+            return try {
+                instrument("exceptionHandler") { serverRuntime.server.exceptionHandler.handle(request, e) }
             } catch (_: Exception) {
+                handledError = "unhandled_exception"
                 HttpResponse(status = HttpStatus.InternalServerError)
             }
-            response to "unhandled_exception"
         }
+
+        val response = try {
+            serverRuntime.server.compiledHttpInterceptors.intercept(request) { req ->
+                // Access logging (with the resolved principal) is provided by the opt-in AccessLogInterceptor in
+                // the auth module, not hardcoded here — so it can name the principal without core depending on auth.
+                // Map handler/route/compression exceptions to responses in-place so the surrounding
+                // interceptors (CORS, etc.) still post-process error responses.
+                try {
+                    dispatch(req)
+                } catch (_: TimeoutCancellationException) {
+                    // A handler exceeded its HttpHandler.timeout. This is a server-side condition (the server
+                    // couldn't finish in time), so it maps to 503 Service Unavailable — NOT 408, which per
+                    // RFC 7231 means the client was too slow sending its request. Routed through the normal
+                    // exception handler so the error body is formatted consistently. (Other
+                    // CancellationExceptions — e.g. client disconnect — are handled by the generic catch below.)
+                    serverRuntime.logger.warn { "Request to ${req.path} exceeded its handler timeout." }
+                    handleError(
+                        HttpStatusException(
+                            status = HttpStatus.ServiceUnavailable,
+                            detail = "timeout",
+                            message = "The request handler exceeded its timeout.",
+                        ),
+                        label = "timeout",
+                    )
+                } catch (e: Exception) {
+                    serverRuntime.logger.error(e) { "Exception in HTTP" }
+                    handleError(e)
+                }
+            }
+        } catch (e: Exception) {
+            logger.error(e) { "Exception in HTTP interceptor chain" }
+            handleError(e)
+        }
+
         trace.enrich(TelemetryAttributes {
             put(TelemetryKeys.Http.statusCode, response.status.code.toLong())
-            error?.let { put(errorType, it) }
+            handledError?.let { put(errorType, it) }
         })
         response
     }
 }
 
-private class LogicalRequestOutcome(val response: HttpResponse, val errorType: String?)
 
-private suspend fun <PATH : PathSpec> ServerRuntime.interceptHttp(
-    request: HttpRequest<PATH>,
-    dispatch: suspend ServerRuntime.(HttpRequest<PATH>) -> HttpResponse,
-): LogicalRequestOutcome {
-    var errorType: String? = null
-
-    suspend fun handleError(e: Exception, label: String? = e::class.simpleName): HttpResponse {
-        errorType = label
-        return try {
-            instrument("exceptionHandler") { server.exceptionHandler.handle(request, e) }
-        } catch (_: Exception) {
-            errorType = "unhandled_exception"
-            HttpResponse(status = HttpStatus.InternalServerError)
-        }
-    }
-
-    val response = server.compiledHttpInterceptors.intercept(request) { req ->
-        // Access logging (with the resolved principal) is provided by the opt-in AccessLogInterceptor in
-        // the auth module, not hardcoded here — so it can name the principal without core depending on auth.
-        // Map handler/route/compression exceptions to responses in-place so the surrounding
-        // interceptors (CORS, etc.) still post-process error responses.
-        try {
-            @Suppress("UNCHECKED_CAST")
-            dispatch(req)
-        } catch (timeout: TimeoutCancellationException) {
-            // A handler exceeded its HttpHandler.timeout. This is a server-side condition (the server
-            // couldn't finish in time), so it maps to 503 Service Unavailable — NOT 408, which per
-            // RFC 7231 means the client was too slow sending its request. Routed through the normal
-            // exception handler so the error body is formatted consistently. (Other
-            // CancellationExceptions — e.g. client disconnect — are handled by the generic catch below.)
-            this.logger.warn { "Request to ${req.path} exceeded its handler timeout." }
-            handleError(
-                HttpStatusException(
-                    status = HttpStatus.ServiceUnavailable,
-                    detail = "timeout",
-                    message = "The request handler exceeded its timeout.",
-                ),
-                label = "timeout",
-            )
-        } catch (e: Exception) {
-            this.logger.error(e) { "Exception in HTTP" }
-            handleError(e)
-        }
-    }
-    return LogicalRequestOutcome(response, errorType)
-}
-
-private suspend fun ServerRuntime.route(req: HttpRequest<PathSpec>): HttpResponse = try {
+private suspend fun <PATH : PathSpec> ServerRuntime.route(req: HttpRequest<PATH>): HttpResponse = try {
     // Route resolution must live inside this try so that a RouteNotFoundException (e.g. a HEAD
     // request with no HEAD handler, or a missing trailing slash) is caught below and recovered
     // via the HEAD->GET fallback / slash-redirect logic rather than escaping as a bare 404.
-    @Suppress("UNCHECKED_CAST")
-    handleWithTimeout(req.path.match.value as HttpHandler<PathSpec>, req)
+    handleWithTimeout(req.path.resolve().value, req)
 } catch (notFound: RouteNotFoundException) {
     when (req.path.method) {
         HttpMethod.HEAD -> {
@@ -179,7 +169,7 @@ private suspend fun ServerRuntime.route(req: HttpRequest<PathSpec>): HttpRespons
             val getRequest = req.copyWithNewPathType(path = req.path.copy(method = HttpMethod.GET))
 
             @Suppress("UNCHECKED_CAST")
-            val getResult = handleWithTimeout(getRequest.path.match.value as HttpHandler<PathSpec>, getRequest)
+            val getResult = handleWithTimeout(getRequest.path.resolve().value as HttpHandler<PathSpec>, getRequest)
             getResult.copy(
                 body = null,
                 status = if (getResult.status.success) HttpStatus.NoContent else getResult.status,
@@ -187,21 +177,22 @@ private suspend fun ServerRuntime.route(req: HttpRequest<PathSpec>): HttpRespons
         }
 
         else -> {
-            this.logger.debug {
+            logger.debug {
                 "Not found: ${req.path.pathSegments.segments.map { "'$it'" }}, looking for slashes"
             }
             if (req.path.pathSegments.isNotEmpty()) {
                 // Let's see if they just got their ending slash wrong.
-                val altSlashEndpoint = req.path.copy(pathSegments = req.path.pathSegments.segments.let {
-                    if (it.lastOrNull() == "") it.dropLast(1) else it + ""
-                }.let(::PathSegments))
-                try {
-                    altSlashEndpoint.match
+                val altSlashEndpoint = req.path.copy(
+                    pathSegments = req.path.pathSegments.segments
+                        .let { if (it.lastOrNull() == "") it.dropLast(1) else it + "" }
+                        .let(::PathSegments)
+                )
+                if (altSlashEndpoint.tryResolve() != null)
                     HttpResponse.pathMoved(to = "/" + altSlashEndpoint.pathSegments.toString())
-                } catch (_: RouteNotFoundException) {
+                else
                     throw notFound
-                }
-            } else throw notFound
+            }
+            else throw notFound
         }
     }
 }
@@ -218,10 +209,6 @@ private suspend fun <PATH : PathSpec> ServerRuntime.handleWithTimeout(
 
 /*
  * TODO: API Recommendations
- *
- * 1. dispatchLogicalRequest is complex with multiple responsibilities: routing, HEAD/OPTIONS
- *    handling, trailing slash redirects, exception handling. Consider breaking into smaller,
- *    testable functions.
  *
  * 2. The automatic HEAD support silently falls back to GET. This could be surprising and cause
  *    unnecessary computation for expensive GET handlers. Document this behavior clearly or add

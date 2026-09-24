@@ -8,8 +8,12 @@ import com.lightningkite.lightningserver.http.HttpInterceptor
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.pathing.path
+import com.lightningkite.lightningserver.pathing.route
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.logicalId
 import com.lightningkite.lightningserver.websockets.DelegatingWebSocketHandler
+import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketClose.Code
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketConnection
@@ -52,18 +56,18 @@ public class RequestRecordInterceptor(
     override val name: String = "RequestRecord"
 
     context(runtime: ServerRuntime)
-    override suspend fun intercept(
-        request: HttpRequest<*>,
-        cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+    override suspend fun <PATH : PathSpec> intercept(
+        request: HttpRequest<PATH>,
+        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
     ): HttpResponse {
         val started = TimeSource.Monotonic.markNow()
-        table().insert(listOf(request.opening(endpoint = request.route(), method = request.path.method.toString())))
+        table().insert(listOf(request.opening(endpoint = request.path.route(), method = request.path.method.toString())))
 
         var outcome = "failed"
         try {
             return cont(request).also { outcome = it.status.code.toString() }
         } finally {
-            complete(runtime.execution.requestRecordId, outcome, started.elapsedNow().inWholeMilliseconds)
+            complete(runtime.execution.logicalId.raw.raw, outcome, started.elapsedNow().inWholeMilliseconds)
         }
     }
 
@@ -76,7 +80,7 @@ public class RequestRecordInterceptor(
             }
 
             context(serverRuntime: ServerRuntime)
-            override suspend fun disconnect(connection: WebSocketConnection<PATH, T>, reason: WebSocketCloseReason.Code) {
+            override suspend fun disconnect(connection: WebSocketConnection<PATH, T>, reason: WebSocketClose) {
                 try {
                     wrapped.disconnect(connection, reason)
                 } finally {
@@ -90,8 +94,8 @@ public class RequestRecordInterceptor(
     context(runtime: ServerRuntime)
     private suspend fun Request<*>.opening(endpoint: String, method: String) = RequestRecord(
         _id = runtime.execution.requestRecordId,
-        parentRequestId = runtime.execution.causedBy,
-        rootExecutionId = runtime.execution.rootExecutionId,
+        parentRequestId = runtime.execution.causedBy?.raw?.raw,
+        rootExecutionId = runtime.execution.rootExecution.raw.raw,
         principal = principalOrNull(),
         sourceIp = sourceIp,
         endpoint = endpoint,
@@ -115,24 +119,10 @@ public class RequestRecordInterceptor(
     }
 }
 
-/**
- * The matched route pattern, falling back to the literal target when nothing matched.
- *
- * Matching needs the server definition, hence the context; the same resolution telemetry uses.
- */
-context(runtime: ServerRuntime)
-private fun HttpRequest<*>.route(): String = try {
-    path.match.path.pathSpec.toString()
-} catch (_: Exception) {
-    "/" + path.pathSegments.toString()
-}
 
 context(runtime: ServerRuntime)
-private fun WebSocketConnectRequest<*>.route(): String = try {
-    path.match.path.pathSpec.toString()
-} catch (_: Exception) {
-    "/" + path.pathSegments.toString()
-}
+private fun WebSocketConnectRequest<*>.route(): String =
+    path.matchOrNull?.pathSpec?.toString() ?: "/${path.pathSegments}"
 
 /**
  * The resolved subject, or null when the request is anonymous or its credentials could not be
@@ -150,27 +140,3 @@ private suspend fun Request<*>.principalOrNull(): String? = try {
     null
 }
 
-/**
- * The id this execution's request-log row is keyed by: always its [Initiator.logicalId].
- *
- * A row exists for exactly the executions that are part of a logical request or connection, which is
- * what that property means, so there is nothing left to derive here. Fails fast rather than inventing
- * an id — this is only asked inside the http and websocket interceptors below, so a null means one is
- * installed somewhere it should not be. Records that merely *point at* a row use
- * [Initiator.attributedTo], which is defined for every execution; only the writer needs the key.
- *
- * ## The attribution this gives up
- * A socket's message phases are executions in their own right and can disclose. Keying by the socket
- * means their disclosures attribute to the socket, so the audit answer for a long-lived connection is
- * "sometime during this session" rather than "in response to this message". That is exactly what the
- * server did before the initiator existed — a socket's correlation id was deliberately constant for
- * its whole lifetime — so this is non-regressing rather than a new gap.
- *
- * Closing it would mean a row per phase execution, which for a chatty socket is a row per client
- * message. That is an audit-design decision with a real cost, and it belongs with the rest of the
- * audit work in `plans/audit-logging.md` (§5.8), not with the refactor that made it visible.
- */
-internal val Initiator.requestRecordId: Uuid
-    get() = requireNotNull(logicalId) {
-        "A request record was keyed for $this, which is not part of a logical request or connection."
-    }

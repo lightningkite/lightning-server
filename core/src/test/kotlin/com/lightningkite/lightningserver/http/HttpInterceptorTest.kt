@@ -4,6 +4,7 @@ package com.lightningkite.lightningserver.http
 import com.lightningkite.lightningserver.definition.GeneralServerSettings
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
+import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
@@ -23,7 +24,13 @@ class HttpInterceptorTest {
         object : ServerBuilder() {
             init {
                 registerBasicMediaTypeCoders()
-                install(HttpInterceptor { request, cont -> cont(request) })
+                install(object : HttpInterceptor {
+                    context(runtime: ServerRuntime)
+                    override suspend fun <PATH : PathSpec> intercept(
+                        request: HttpRequest<PATH>,
+                        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
+                    ): HttpResponse = cont(request)
+                })
             }
 
             val endpoint = path.path("test").get bind HttpHandler {
@@ -43,13 +50,19 @@ class HttpInterceptorTest {
     @Test
     fun `HttpInterceptor can modify request before passing through`() {
         // Interceptor that adds a custom header to all requests
-        val headerAddingInterceptor = HttpInterceptor { request, cont ->
-            val modifiedRequest = request.copy(
-                headers = request.headers.copy {
-                    add("X-Added-Header", "intercepted")
-                }
-            )
-            cont(modifiedRequest)
+        val headerAddingInterceptor = object : HttpInterceptor {
+            context(runtime: ServerRuntime)
+            override suspend fun <PATH : PathSpec> intercept(
+                request: HttpRequest<PATH>,
+                cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
+            ): HttpResponse {
+                val modifiedRequest = request.copy(
+                    headers = request.headers.copy {
+                        add("X-Added-Header", "intercepted")
+                    }
+                )
+                return cont(modifiedRequest)
+            }
         }
 
         object : ServerBuilder() {
@@ -76,13 +89,19 @@ class HttpInterceptorTest {
     @Test
     fun `HttpInterceptor can modify response after continuation`() {
         // Interceptor that adds a header to all responses
-        val responseModifyingInterceptor = HttpInterceptor { request, cont ->
-            val response = cont(request)
-            response.copy(
-                headers = response.headers.copy {
-                    add("X-Intercepted", "true")
-                }
-            )
+        val responseModifyingInterceptor = object : HttpInterceptor {
+            context(runtime: ServerRuntime)
+            override suspend fun <PATH : PathSpec> intercept(
+                request: HttpRequest<PATH>,
+                cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
+            ): HttpResponse {
+                val response = cont(request)
+                return response.copy(
+                    headers = response.headers.copy {
+                        add("X-Intercepted", "true")
+                    }
+                )
+            }
         }
 
         object : ServerBuilder() {
@@ -108,8 +127,12 @@ class HttpInterceptorTest {
     @Test
     fun `HttpInterceptor can short-circuit and return early response`() {
         // Interceptor that blocks requests with certain header
-        val blockingInterceptor = HttpInterceptor { request, cont ->
-            if (request.headers["X-Block"]?.root == "true") {
+        val blockingInterceptor = object : HttpInterceptor {
+            context(runtime: ServerRuntime)
+            override suspend fun <PATH : PathSpec> intercept(
+                request: HttpRequest<PATH>,
+                cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
+            ): HttpResponse = if (request.headers["X-Block"]?.root == "true") {
                 HttpResponse(
                     status = HttpStatus.Forbidden,
                     body = null
@@ -156,9 +179,9 @@ class HttpInterceptorTest {
             override val name = "FirstInterceptor"
 
             context(runtime: ServerRuntime)
-            override suspend fun intercept(
-                request: HttpRequest<*>,
-                cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+            override suspend fun <PATH : PathSpec> intercept(
+                request: HttpRequest<PATH>,
+                cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
             ): HttpResponse {
                 executionOrder.add("first-before")
                 val response = cont(request)
@@ -171,9 +194,9 @@ class HttpInterceptorTest {
             override val name = "SecondInterceptor"
 
             context(runtime: ServerRuntime)
-            override suspend fun intercept(
-                request: HttpRequest<*>,
-                cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+            override suspend fun <PATH : PathSpec> intercept(
+                request: HttpRequest<PATH>,
+                cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
             ): HttpResponse {
                 executionOrder.add("second-before")
                 val response = cont(request)
@@ -213,9 +236,9 @@ class HttpInterceptorTest {
     fun `HttpInterceptor default name returns class name or anonymous`() {
         val namedInterceptor = object : HttpInterceptor {
             context(runtime: ServerRuntime)
-            override suspend fun intercept(
-                request: HttpRequest<*>,
-                cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+            override suspend fun <PATH : PathSpec> intercept(
+                request: HttpRequest<PATH>,
+                cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
             ): HttpResponse = cont(request)
         }
 
@@ -235,9 +258,15 @@ class HttpInterceptorTest {
     @Test
     fun `compileAndInstrument with single interceptor works`() {
         var called = false
-        val singleInterceptor = HttpInterceptor { request, cont ->
-            called = true
-            cont(request)
+        val singleInterceptor = object : HttpInterceptor {
+            context(runtime: ServerRuntime)
+            override suspend fun <PATH : PathSpec> intercept(
+                request: HttpRequest<PATH>,
+                cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
+            ): HttpResponse {
+                called = true
+                return cont(request)
+            }
         }
 
         object : ServerBuilder() {
@@ -256,37 +285,6 @@ class HttpInterceptorTest {
                 called = false
                 endpoint.test()
                 assertTrue(called, "Single interceptor should be called")
-            }
-        }
-    }
-
-    @Test
-    fun `HttpInterceptor lambda syntax works correctly`() {
-        // Tests the fun interface syntax: HttpInterceptor { request, cont -> ... }
-        val lambdaInterceptor = HttpInterceptor { request, cont ->
-            val response = cont(request)
-            response.copy(
-                headers = response.headers.copy {
-                    add("X-Lambda", "works")
-                }
-            )
-        }
-
-        object : ServerBuilder() {
-            init {
-                registerBasicMediaTypeCoders()
-                install(lambdaInterceptor)
-            }
-
-            val endpoint = path.path("test").get bind HttpHandler {
-                HttpResponse.plainText("Test")
-            }
-        }.test(
-            settings = { generalSettings set GeneralServerSettings() }
-        ) {
-            runBlocking {
-                val response = endpoint.test()
-                assertEquals("works", response.headers["X-Lambda"]?.root)
             }
         }
     }

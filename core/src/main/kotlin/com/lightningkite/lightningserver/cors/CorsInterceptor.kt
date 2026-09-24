@@ -72,9 +72,9 @@ public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpIn
     }
 
     context(runtime: ServerRuntime)
-    override suspend fun intercept(
-        request: HttpRequest<*>,
-        cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+    override suspend fun <PATH : PathSpec> intercept(
+        request: HttpRequest<PATH>,
+        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
     ): HttpResponse {
         // Only the request the browser actually sent has an origin to police; see "Scope" above.
         if (!runtime.execution.isRoot()) return cont(request)

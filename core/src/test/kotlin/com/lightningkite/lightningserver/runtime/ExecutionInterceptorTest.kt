@@ -12,8 +12,10 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.HttpInterceptor
 import com.lightningkite.lightningserver.http.HttpHandler
+import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.get
+import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.RawWebSocketPath
 import com.lightningkite.lightningserver.plainText
@@ -130,12 +132,18 @@ class ExecutionInterceptorTest {
             init {
                 registerBasicMediaTypeCoders()
                 install(Marker("execution", log))
-                install(HttpInterceptor { request, cont ->
-                    log.add("http in")
-                    try {
-                        cont(request)
-                    } finally {
-                        log.add("http out")
+                install(object : HttpInterceptor {
+                    context(runtime: ServerRuntime)
+                    override suspend fun <PATH : PathSpec> intercept(
+                        request: HttpRequest<PATH>,
+                        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
+                    ): HttpResponse {
+                        log.add("http in")
+                        try {
+                            return cont(request)
+                        } finally {
+                            log.add("http out")
+                        }
                     }
                 })
             }

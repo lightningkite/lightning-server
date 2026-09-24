@@ -50,7 +50,7 @@ import kotlinx.coroutines.CancellationException
  * if (!runtime.execution.isRoot()) return cont(request)
  * ```
  */
-public fun interface HttpInterceptor {
+public interface HttpInterceptor {
     /**
      * The name of this interceptor, used for instrumentation and debugging.
      * Defaults to the simple class name or "anonymous" for lambdas.
@@ -65,9 +65,9 @@ public fun interface HttpInterceptor {
      * @return The HTTP response (potentially modified by this interceptor)
      */
     context(runtime: ServerRuntime)
-    public suspend fun intercept(
-        request: HttpRequest<*>,
-        cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+    public suspend fun <PATH : PathSpec> intercept(
+        request: HttpRequest<PATH>,
+        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
     ): HttpResponse
 
     /**
@@ -75,9 +75,9 @@ public fun interface HttpInterceptor {
      */
     public object NoOp : HttpInterceptor {
         context(runtime: ServerRuntime)
-        override suspend fun intercept(
-            request: HttpRequest<*>,
-            cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+        override suspend fun <PATH : PathSpec> intercept(
+            request: HttpRequest<PATH>,
+            cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
         ): HttpResponse {
             return cont(request)
         }
@@ -110,9 +110,9 @@ public fun interface HttpInterceptor {
  * @return The HTTP response
  */
 context(server: ServerRuntime)
-public suspend inline fun HttpInterceptor.interceptInstrumented(
-    request: HttpRequest<*>,
-    noinline action: suspend ServerRuntime.(HttpRequest<*>) -> HttpResponse,
+public suspend inline fun <PATH : PathSpec> HttpInterceptor.interceptInstrumented(
+    request: HttpRequest<PATH>,
+    noinline action: suspend ServerRuntime.(HttpRequest<PATH>) -> HttpResponse,
 ): HttpResponse {
     return try {
         instrument(name) {
@@ -139,9 +139,9 @@ private fun instrumentedLink(interceptor: HttpInterceptor): HttpInterceptor = ob
     override val name: String get() = interceptor.name
 
     context(runtime: ServerRuntime)
-    override suspend fun intercept(
-        request: HttpRequest<*>,
-        cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+    override suspend fun <PATH : PathSpec> intercept(
+        request: HttpRequest<PATH>,
+        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
     ): HttpResponse = interceptor.interceptInstrumented(request, cont)
 }
 
@@ -150,9 +150,9 @@ private fun composeLinks(outer: HttpInterceptor, inner: HttpInterceptor): HttpIn
     override val name: String get() = "${outer.name} -> ${inner.name}"
 
     context(runtime: ServerRuntime)
-    override suspend fun intercept(
-        request: HttpRequest<*>,
-        cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+    override suspend fun <PATH : PathSpec> intercept(
+        request: HttpRequest<PATH>,
+        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
     ): HttpResponse = outer.intercept(request) { inner.interceptInstrumented(it, cont) }
 }
 

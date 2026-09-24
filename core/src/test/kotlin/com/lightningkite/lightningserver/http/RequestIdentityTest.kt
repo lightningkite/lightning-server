@@ -65,9 +65,9 @@ private object SubServer : ServerBuilder() {
     init {
         install(object : HttpInterceptor {
             context(runtime: ServerRuntime)
-            override suspend fun intercept(
-                request: HttpRequest<*>,
-                cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+            override suspend fun <PATH : PathSpec> intercept(
+                request: HttpRequest<PATH>,
+                cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
             ): HttpResponse {
                 subIntercepted += runtime.execution.id
                 return cont(request)
@@ -353,7 +353,7 @@ class RequestIdentityTest {
         SubServer.test(settings = {}) {
             runBlocking {
                 serverRuntime.executeWithoutTelemetry(outer()) {
-                    serverRuntime.handleWithMetrics(subTestRequest("unrouted"), unrouted)
+                    unrouted.handleWithMetrics(subTestRequest("unrouted"))
                 }
             }
         }

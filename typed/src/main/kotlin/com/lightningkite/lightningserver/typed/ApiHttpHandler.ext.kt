@@ -157,10 +157,10 @@ private suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHa
 ): OUTPUT {
     // The interceptor chain only speaks HttpResponse, so the typed result is carried out beside it.
     var outcome: Result<OUTPUT>? = null
-    val response = server.handleWithMetrics(request, HttpHandler(timeout) { req ->
+    val response = HttpHandler(timeout) { req ->
         runCatching { handleInput(req, input) }.also { outcome = it }.getOrThrow()
         HttpResponse(status = successCode)
-    })
+    }.handleWithMetrics(request)
 
     // Rethrow the endpoint's own exception so callers can catch it by type. A timeout is excluded: it
     // is already reported by the response, and rethrowing a CancellationException would read as the
