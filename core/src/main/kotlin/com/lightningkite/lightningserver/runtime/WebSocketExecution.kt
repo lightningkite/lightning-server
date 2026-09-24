@@ -2,8 +2,7 @@ package com.lightningkite.lightningserver.runtime
 
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.RawWebSocketPath
-import com.lightningkite.lightningserver.pathing.path
+import com.lightningkite.lightningserver.pathing.route
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryKey
@@ -41,9 +40,6 @@ private fun <PATH : PathSpec, STORAGE> WebSocketConnection<PATH, STORAGE>.phase(
     phase = phase,
 )
 
-context(_: Engine)
-private fun WebSocketConnectRequest<*>.route() = path.matchOrNull?.pathSpec?.toString() ?: path.pathSegments.toString()
-
 /**
  * Runs [DirectExecutableWebSocketHandler.handleDirect] as the socket's Connect execution, with telemetry
  * and interceptors.
@@ -60,7 +56,7 @@ public suspend fun <PATH : PathSpec, STORAGE> DirectExecutableWebSocketHandler<P
         "handleDirect",
         request.connectPhase(),
         TelemetryAttributes {
-            put(wsRoute, request.route())
+            put(wsRoute, request.path.route())
             put(TelemetryKeys.Net.peerIp, request.sourceIp)
         }
     ) {
@@ -82,7 +78,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.wi
     "willConnect",
     request.connectPhase(),
     TelemetryAttributes {
-        put(wsRoute, request.route())
+        put(wsRoute, request.path.route())
         put(TelemetryKeys.Net.peerIp, request.sourceIp)
     }
 ) {
@@ -103,7 +99,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
         "didConnect",
         connection.phase(Execution.WebSocket.Phase.Connected),
         TelemetryAttributes {
-            put(wsRoute, connection.request.route())
+            put(wsRoute, connection.request.path.route())
             put(TelemetryKeys.Net.peerIp, connection.request.sourceIp)
         }
     ) {
@@ -129,7 +125,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
         "messageFromClient",
         connection.phase(Execution.WebSocket.Phase.ClientMessage),
         TelemetryAttributes {
-            put(wsRoute, connection.request.route())
+            put(wsRoute, connection.request.path.route())
             put(TelemetryKeys.Net.peerIp, connection.request.sourceIp)
             put(
                 wsFrameType, when (frame) {
@@ -165,7 +161,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
         "messageFromSubscription",
         connection.phase(Execution.WebSocket.Phase.SubscriptionMessage),
         TelemetryAttributes {
-            put(wsRoute, connection.request.route())
+            put(wsRoute, connection.request.path.route())
             put(TelemetryKeys.Net.peerIp, connection.request.sourceIp)
             put(wsSubscriptionTopic, topic.topic.location.toString())
         }
@@ -191,7 +187,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
         "disconnect",
         connection.phase(Execution.WebSocket.Phase.Disconnect),
         TelemetryAttributes {
-            put(wsRoute, connection.request.route())
+            put(wsRoute, connection.request.path.route())
             put(TelemetryKeys.Net.peerIp, connection.request.sourceIp)
             put(wsDisconnectCode, reason.code.code.toLong())
             put(wsDisconnectReason, reason.message ?: reason.code.name)

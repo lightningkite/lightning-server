@@ -1,7 +1,6 @@
 package com.lightningkite.lightningserver.websockets
 
 import com.lightningkite.lightningserver.*
-import com.lightningkite.lightningserver.data.pathSpec
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.*
@@ -176,8 +175,8 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
     }
 
     context(runtime: ServerRuntime)
-    private fun MultiplexWebSocketHandlerConnectionInfo.getChannelHandler(channel: String): WebSocketHandler<PathSpec, Any?> {
-        val handler = request.path.match.value
+    private fun MultiplexWebSocketHandlerConnectionInfo.getChannelHandler(): WebSocketHandler<PathSpec, Any?> {
+        val handler = request.path.resolve().value
         @Suppress("UNCHECKED_CAST")
         return runtime.server.interceptIncomingSocket(handler as WebSocketHandler<PathSpec, Any?>)
     }
@@ -215,9 +214,9 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                     ) { it.webSocket } ?: throw NotFoundException()
 
                     @Suppress("UNCHECKED_CAST")
-                    val channelHandler = serverRuntime.server.interceptIncomingSocket(
-                        match.value as WebSocketHandler<PathSpec, Any?>
-                    )
+                    match as PathSpecMap.Match<WebSocketHandler<PathSpec, Any?>>
+
+                    val channelHandler = serverRuntime.server.interceptIncomingSocket(match.value)
 
                     val request = connection.request.subConnection(
                         path = RawWebSocketPath(PathSegments.parse(message.path!!), match),
@@ -262,7 +261,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                     val info = connection.currentState.map[message.channel]
                         ?: throw NotFoundException("No open multiplex channel ${message.channel} to end.")
 
-                    val channelHandler = info.getChannelHandler(message.channel)
+                    val channelHandler = info.getChannelHandler()
 
                     connection.withVirtualConnection(channelHandler, message.channel) {
                         channelHandler.disconnectAndClose(it, WebSocketClose.NORMAL)
@@ -273,7 +272,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                     val info = connection.currentState.map[message.channel]
                         ?: throw NotFoundException("No open multiplex channel ${message.channel} to deliver data to.")
 
-                    val channelHandler = info.getChannelHandler(message.channel)
+                    val channelHandler = info.getChannelHandler()
 
                     connection.withVirtualConnection(channelHandler, message.channel) {
                         channelHandler.messageFromClientWithMetrics(
@@ -300,7 +299,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                     )
                 )
             } else {
-                val channelHandler = info.getChannelHandler(message.channel)
+                val channelHandler = info.getChannelHandler()
                 connection.withVirtualConnection(channelHandler, message.channel) { channelConnection ->
                     channelHandler.disconnectAndClose(
                         channelConnection,
@@ -320,7 +319,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
     ) {
         for ((channel, info) in connection.currentState.map) {
             if (info.topics.contains(topic.path())) {
-                val match = info.request.path.match
+                val match = info.request.path.resolve()
 
                 @Suppress("UNCHECKED_CAST")
                 val otherHandler = serverRuntime.server.compiledWebSocketInterceptors
@@ -338,7 +337,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
         reason: WebSocketClose,
     ) {
         connection.currentState.map.entries.forEach { (channel, info) ->
-            val match = info.request.path.match
+            val match = info.request.path.resolve()
 
             @Suppress("UNCHECKED_CAST")
             val otherHandler = serverRuntime.server.compiledWebSocketInterceptors

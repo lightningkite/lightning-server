@@ -101,4 +101,4 @@ public fun <A, B, C> RawHttpEndpoint(
 
 context(server: Engine)
 public fun RawHttpEndpoint<*>.route(): String =
-    tryResolve()?.pathSpec?.toString() ?: "/${pathSegments}"
+    tryResolve()?.pathSpec?.toString() ?: "/$pathSegments"

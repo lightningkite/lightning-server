@@ -10,25 +10,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * Custom serializer for [RawWebSocketPath] that stores the path as a string.
- */
-public class PathSerializer<T : PathSpec>(ignored: KSerializer<T>) : KSerializer<RawWebSocketPath<T>> {
-    override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor(" com.lightningkite.lightningserver.pathing.RawWebSocketPath", PrimitiveKind.STRING)
-
-    override fun serialize(
-        encoder: Encoder,
-        value: RawWebSocketPath<T>,
-    ) {
-        encoder.encodeString(value.pathSegments.toString())
-    }
-
-    override fun deserialize(decoder: Decoder): RawWebSocketPath<T> {
-        return RawWebSocketPath<T>(PathSegments.parse(decoder.decodeString()))
-    }
-}
-
-/**
  * Represents an unresolved WebSocket path that will be matched against registered endpoints.
  *
  * Similar to [RawHttpEndpoint] but for WebSocket connections. The path is parsed into segments
@@ -48,41 +29,48 @@ public class PathSerializer<T : PathSpec>(ignored: KSerializer<T>) : KSerializer
  * @see RawHttpEndpoint
  * @see HasContextualPath
  */
-@Serializable(with = PathSerializer::class)
-public class RawWebSocketPath<out PATH : PathSpec>(public val pathSegments: PathSegments) : HasContextualPath<PATH> {
+@Serializable(RawWebSocketPath.Serializer::class)
+public class RawWebSocketPath<PATH : PathSpec>(public val pathSegments: PathSegments) : HasContextualPath<PATH> {
     /** Constructs a raw WebSocket path from a string. */
     public constructor(path: String) : this(PathSegments.parse(path))
 
-    @Suppress("UNCHECKED_CAST")
-    context(server: Engine)
-    override val pathInContext: ResolvedPath<PATH> get() = match.path as ResolvedPath<PATH>
+    private var matchIfPresent: PathSpecMap.Match<WebSocketHandler<PATH, *>>? = null
 
     private var searched: Boolean = false
-    private var matchIfPresent: PathSpecMap.Match<WebSocketHandler<*, *>>? = null
+
+    context(server: Engine)
+    public fun tryResolve(): PathSpecMap.Match<WebSocketHandler<PATH, *>>? {
+        if (searched) return matchIfPresent
+        searched = true
+
+        val match = server.server.endpoints.match(
+            server.externalSerialization.stringArrayFormat,
+            pathSegments
+        ) { it.webSocket }
+
+        @Suppress("UNCHECKED_CAST")
+        if (match != null) match as PathSpecMap.Match<WebSocketHandler<PATH, *>>
+
+        matchIfPresent = match
+
+        return match
+    }
 
     context(server: Engine)
     public val matchOrNull: PathSpecMap.Match<WebSocketHandler<*, *>>?
-        get() {
-            if (searched) return this.matchIfPresent
-            searched = true
-
-            val result = server.server.endpoints.match(
-                server.externalSerialization.stringArrayFormat,
-                pathSegments
-            ) { it.webSocket }
-
-            this.matchIfPresent = result
-
-            return result
-        }
+        get() = tryResolve()
 
     context(server: Engine)
-    public val match: PathSpecMap.Match<WebSocketHandler<*, *>>
-        get() = matchOrNull ?: throw NullPointerException("No match for path: $pathSegments. Registered paths are ${server.server.endpoints.keys}")
+    public fun resolve(): PathSpecMap.Match<WebSocketHandler<*, *>> =
+        tryResolve() ?: throw NullPointerException("No match for path: $pathSegments. Registered paths are ${server.server.endpoints.keys}")
+
+    @Suppress("UNCHECKED_CAST")
+    context(server: Engine)
+    override val pathInContext: ResolvedPath<PATH> get() = resolve().path as ResolvedPath<PATH>
 
     public constructor(
         pathSegments: PathSegments,
-        match: PathSpecMap.Match<WebSocketHandler<*, *>>,
+        match: PathSpecMap.Match<WebSocketHandler<PATH, *>>,
     ) : this(pathSegments) {
         this.matchIfPresent = match
     }
@@ -90,6 +78,22 @@ public class RawWebSocketPath<out PATH : PathSpec>(public val pathSegments: Path
     override fun equals(other: Any?): Boolean = other is RawWebSocketPath<*> && other.pathSegments == pathSegments
     override fun hashCode(): Int = pathSegments.hashCode() + 1
     override fun toString(): String = "/$pathSegments"
+
+    public class Serializer<T : PathSpec>(ignored: KSerializer<T>) : KSerializer<RawWebSocketPath<T>> {
+        override val descriptor: SerialDescriptor =
+            PrimitiveSerialDescriptor(" com.lightningkite.lightningserver.pathing.RawWebSocketPath", PrimitiveKind.STRING)
+
+        override fun serialize(
+            encoder: Encoder,
+            value: RawWebSocketPath<T>,
+        ) {
+            encoder.encodeString(value.pathSegments.toString())
+        }
+
+        override fun deserialize(decoder: Decoder): RawWebSocketPath<T> {
+            return RawWebSocketPath<T>(PathSegments.parse(decoder.decodeString()))
+        }
+    }
 }
 
 context(server: Engine)
@@ -126,3 +130,7 @@ public fun <A, B, C> RawWebSocketPath(
     trailingSegments: PathSegments? = null,
 ): RawWebSocketPath<PathSpec3<A, B, C>> =
     RawWebSocketPath(ResolvedPath(spec, path1, path2, path3, trailingSegments))
+
+context(engine: Engine)
+public fun RawWebSocketPath<*>.route(): String =
+    tryResolve()?.pathSpec?.toString() ?: "/$pathSegments"

@@ -75,7 +75,7 @@ public class RequestRecordInterceptor(
         object : DelegatingWebSocketHandler<PATH, T>(handler) {
             context(serverRuntime: ServerRuntime)
             override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
-                table().insert(listOf(request.opening(endpoint = request.route(), method = "WEBSOCKET")))
+                table().insert(listOf(request.opening(endpoint = request.path.route(), method = "WEBSOCKET")))
                 return wrapped.willConnect(request)
             }
 
@@ -118,11 +118,6 @@ public class RequestRecordInterceptor(
         }
     }
 }
-
-
-context(runtime: ServerRuntime)
-private fun WebSocketConnectRequest<*>.route(): String =
-    path.matchOrNull?.pathSpec?.toString() ?: "/${path.pathSegments}"
 
 /**
  * The resolved subject, or null when the request is anonymous or its credentials could not be

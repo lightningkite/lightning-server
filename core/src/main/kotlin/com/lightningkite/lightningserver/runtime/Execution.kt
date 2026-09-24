@@ -104,7 +104,7 @@ public sealed interface Execution {
         override val rootExecution: ID = id,
         /** Constant for the socket's whole lifetime, across all phases. Same id as the 'id' of the first phase. */
         val socketId: ID,
-        val path: RawWebSocketPath<PathSpec>,
+        val path: RawWebSocketPath<*>,
         val phase: Phase,
 //        override val extensions: MutableExtensions = MutableExtensions()
     ) : Execution, Requested {
@@ -112,7 +112,7 @@ public sealed interface Execution {
             id: ID,
             parent: Execution?,
             socketId: ID,
-            path: RawWebSocketPath<PathSpec>,
+            path: RawWebSocketPath<*>,
             phase: Phase
         ) : this(id, causedBy = parent?.id, rootExecution = parent?.rootExecution ?: id, socketId, path, phase)
 

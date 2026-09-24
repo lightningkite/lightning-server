@@ -176,7 +176,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
     context(serverRuntime: ServerRuntime)
     private fun WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>.inner(): WebSocketHandler<PathSpec, Any?> {
         val innerRequest = currentState.request
-        val otherHandler = innerRequest.path.match.value
+        val otherHandler = innerRequest.path.tryResolve()?.value
             ?: throw NotFoundException("No web socket handler found for '${innerRequest.path}'")
         @Suppress("UNCHECKED_CAST")
         return otherHandler as WebSocketHandler<PathSpec, Any?>
