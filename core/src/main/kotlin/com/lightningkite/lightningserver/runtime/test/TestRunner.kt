@@ -8,7 +8,10 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.EngineBase
+import com.lightningkite.lightningserver.runtime.execute
+import com.lightningkite.lightningserver.runtime.executeInlineWithMetrics
 import com.lightningkite.lightningserver.runtime.executeWithoutTelemetry
+import com.lightningkite.lightningserver.runtime.location
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.SettingContext
@@ -72,8 +75,6 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
     override val clock: Clock
         get() = clockGet()
 
-    private val settingsCache = HashMap<ServerSetting<*, *>, Any?>()
-
     private val subscriptions =
         ConcurrentHashMap<WebSocketSubscriptionRequest<*, *>, ArrayList<suspend (WebSocketSubscriptionMessage<*, *>) -> Unit>>()
 
@@ -90,11 +91,10 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
      * Executes tasks inline (synchronously) for testing.
      *
      * Unlike production runtimes, tasks don't run in the background but complete
-     * immediately, making tests deterministic. That also means the task body runs inside the
-     * launching execution rather than as one of its own, so there is nothing for [from] to parent.
+     * immediately, making tests deterministic.
      */
     override suspend fun <T> dispatchTask(task: Task<T>, input: T, from: Execution) {
-        task.executeInline(input)
+        task.executeInlineWithMetrics(task.location, input, from)
     }
 
     /**
