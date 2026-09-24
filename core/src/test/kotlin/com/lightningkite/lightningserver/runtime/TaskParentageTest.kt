@@ -86,7 +86,7 @@ class TaskParentageTest {
             engine.executeWithoutTelemetry(
                 Execution.Http(
                     id = requestId,
-                    endpoint = RawHttpEndpoint<PathSpec>(asString = "/thing", method = HttpMethod.GET),
+                    endpoint = RawHttpEndpoint(asString = "/thing", method = HttpMethod.GET),
                 )
             ) {
                 TestServer.first(Unit)

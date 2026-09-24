@@ -691,7 +691,7 @@ public class NettyEngine(
             }
 
             val adapted = HttpRequest(
-                path = RawHttpEndpoint<PathSpec>(parts.path(), HttpMethod(this.method().name())),
+                path = RawHttpEndpoint(parts.path(), HttpMethod(this.method().name())),
                 queryParameters = QueryParameters(
                     parts.parameters().flatMap { (key, values) -> values.map { key to it } }),
                 headers = headers,
@@ -724,7 +724,7 @@ public class NettyEngine(
             }
 
             return WebSocketConnectRequest(
-                path = RawWebSocketPath<PathSpec>(parts.path()),
+                path = RawWebSocketPath(parts.path()),
                 socketId = identity.requestId,
                 queryParameters = QueryParameters(
                     parts.parameters().flatMap { (key, values) -> values.map { key to it } }),

@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.RawWebSocketPath
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.services.data.Unsafe
 import com.lightningkite.services.pubsub.PubSub
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -88,7 +89,7 @@ class DirectWebSocketSenderTest {
     @Test
     fun engineSocketId_can_be_set_in_request(): Unit = runBlocking {
         // Test that engineSocketId can be explicitly set in a request
-        val request = WebSocketConnectRequest<PathSpec0>(
+        val request = WebSocketConnectRequest(
             path = RawWebSocketPath(PathSegments.EMPTY),
             engineSocketId = "test-socket-123",
             socketId = Execution.ID(UuidV7.generate()),
@@ -100,8 +101,9 @@ class DirectWebSocketSenderTest {
     @Test
     fun storage_preserves_engineSocketId(): Unit = runBlocking {
         // Verify that Storage correctly preserves the request's engineSocketId
-        val request = WebSocketConnectRequest<PathSpec0>(
-            path = RawWebSocketPath(PathSegments.EMPTY),
+        val request = WebSocketConnectRequest(
+            // SAFETY: Empty segments only ever resolve to PathSpec.root, which is a PathSpec0
+            path = @OptIn(Unsafe::class) RawWebSocketPath.fromPathSegments<PathSpec0>(PathSegments.EMPTY),
             engineSocketId = "aws-connection-id-xyz",
             socketId = Execution.ID(UuidV7.generate()),
         )

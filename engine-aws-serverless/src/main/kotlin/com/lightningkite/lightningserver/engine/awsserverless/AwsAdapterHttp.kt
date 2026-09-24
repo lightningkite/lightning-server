@@ -30,7 +30,7 @@ internal class AwsAdapterHttp(val root: AwsAdapter) {
             ?: emptyList()
 
         val request = HttpRequest(
-            path = RawHttpEndpoint<PathSpec>(event.path.removePrefix("/" + event.requestContext.stage), method),
+            path = RawHttpEndpoint(event.path.removePrefix("/" + event.requestContext.stage), method),
             queryParameters = QueryParameters(queryParams),
             headers = headers,
             body = body,

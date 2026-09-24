@@ -212,7 +212,7 @@ public suspend fun HttpHandler<PathSpec0>.test(
     requestId: Execution.ID = Execution.ID.generate(),
     body: TypedData? = null,
 ): HttpResponse {
-    val request: HttpRequest<PathSpec> = HttpRequest(
+    val request = HttpRequest(
         RawHttpEndpoint(location.path, location.method, trailingWildcard),
         queryParameters = queryParameters,
         headers = headers,
@@ -236,7 +236,7 @@ public suspend fun <A> HttpHandler<PathSpec1<A>>.test(
     requestId: Execution.ID = Execution.ID.generate(),
     body: TypedData? = null,
 ): HttpResponse {
-    val request: HttpRequest<PathSpec> = HttpRequest(
+    val request = HttpRequest(
         RawHttpEndpoint(location.path, path1, location.method, trailingWildcard),
         queryParameters = queryParameters,
         headers = headers,
@@ -261,7 +261,7 @@ public suspend fun <A, B> HttpHandler<PathSpec2<A, B>>.test(
     requestId: Execution.ID = Execution.ID.generate(),
     body: TypedData? = null,
 ): HttpResponse {
-    val request: HttpRequest<PathSpec> = HttpRequest(
+    val request = HttpRequest(
         RawHttpEndpoint(location.path, path1, path2, location.method, trailingWildcard),
         queryParameters = queryParameters,
         headers = headers,
@@ -287,7 +287,7 @@ public suspend fun <A, B, C> HttpHandler<PathSpec3<A, B, C>>.test(
     requestId: Execution.ID = Execution.ID.generate(),
     body: TypedData? = null,
 ): HttpResponse {
-    val request: HttpRequest<PathSpec> = HttpRequest(
+    val request = HttpRequest(
         RawHttpEndpoint(location.path, path1, path2, path3, location.method, trailingWildcard),
         queryParameters = queryParameters,
         headers = headers,

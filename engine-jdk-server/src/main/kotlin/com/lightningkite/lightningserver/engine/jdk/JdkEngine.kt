@@ -304,7 +304,7 @@ private fun HttpExchange.requestToLightningServer(
     }
 
     val adapted = HttpRequest(
-        path = RawHttpEndpoint<PathSpec>(uri.path ?: "/", HttpMethod(method)),
+        path = RawHttpEndpoint(uri.path ?: "/", HttpMethod(method)),
         queryParameters = queryParams,
         headers = headers,
         domain = domain,

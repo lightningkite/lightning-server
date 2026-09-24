@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.services.data.Unsafe
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.*
@@ -219,7 +220,8 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
                     val channelHandler = serverRuntime.server.interceptIncomingSocket(match.value)
 
                     val request = connection.request.subConnection(
-                        path = RawWebSocketPath(PathSegments.parse(message.path!!), match),
+                        // SAFETY: match came from routing, which only pairs a handler with the spec it was registered under
+                        path = @OptIn(Unsafe::class) RawWebSocketPath.fromMatch(match),
                         socketId = Execution.ID.generate(),
                         queryParameters = QueryParameters(
                             connection.request.queryParameters + message.queryParams?.entries

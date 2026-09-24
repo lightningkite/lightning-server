@@ -78,13 +78,13 @@ public sealed interface Execution {
         override val id: ID,
         override val causedBy: ID? = null,
         override val rootExecution: ID = id,
-        val endpoint: RawHttpEndpoint<PathSpec>,
+        val endpoint: RawHttpEndpoint<*>,
 //        override val extensions: MutableExtensions = MutableExtensions()
     ) : Execution, Requested {
         @InternalLightningServerApi public constructor(
             id: ID,
             parent: Execution?,
-            endpoint: RawHttpEndpoint<PathSpec>
+            endpoint: RawHttpEndpoint<*>
         ) : this(id, causedBy = parent?.id, rootExecution = parent?.rootExecution ?: id, endpoint)
     }
 

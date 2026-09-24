@@ -26,7 +26,7 @@ import com.lightningkite.lightningserver.runtime.Execution
 class WebSocketConnectRequestTest {
     @Test
     fun serialization(): Unit = runBlocking {
-        val r = WebSocketConnectRequest<PathSpec0>(
+        val r = WebSocketConnectRequest(
             path = RawWebSocketPath(PathSegments.parse("a/b/c")),
             queryParameters = QueryParameters(listOf("a" to "b", "c" to "d")),
             headers = HttpHeaders {

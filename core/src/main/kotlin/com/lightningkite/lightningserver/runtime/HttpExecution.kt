@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.pathing.route
 import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryKey
@@ -46,7 +47,7 @@ private val errorType = TelemetryKey.OfString("error.type")
  */
 @OptIn(InternalLightningServerApi::class)
 public suspend fun Engine.handleRoot(
-    request: HttpRequest<PathSpec>,
+    request: HttpRequest<*>,
     executionId: Execution.ID,
 ): HttpResponse = executeHttpWithMetrics(
     request,
@@ -55,7 +56,7 @@ public suspend fun Engine.handleRoot(
 )
 
 public suspend fun ServerRuntime.handle(
-    request: HttpRequest<PathSpec>,
+    request: HttpRequest<*>,
     executionId: Execution.ID = Execution.ID.generate()
 ): HttpResponse = executeHttpWithMetrics(
     request,
@@ -165,11 +166,9 @@ private suspend fun <PATH : PathSpec> ServerRuntime.route(req: HttpRequest<PATH>
 } catch (notFound: RouteNotFoundException) {
     when (req.path.method) {
         HttpMethod.HEAD -> {
-            // OK, we'll do a get and remove the body.
-            val getRequest = req.copyWithNewPathType(path = req.path.copy(method = HttpMethod.GET))
-
-            @Suppress("UNCHECKED_CAST")
-            val getResult = handleWithTimeout(getRequest.path.resolve().value as HttpHandler<PathSpec>, getRequest)
+            // OK, we'll do a get and remove the body. The GET is routed afresh, so it may not be a PATH.
+            val getRequest = req.copyWithNewPathType(path = RawHttpEndpoint(req.path.pathSegments, HttpMethod.GET))
+            val getResult = handleWithTimeout(getRequest.path.resolve().value, getRequest)
             getResult.copy(
                 body = null,
                 status = if (getResult.status.success) HttpStatus.NoContent else getResult.status,
@@ -182,10 +181,11 @@ private suspend fun <PATH : PathSpec> ServerRuntime.route(req: HttpRequest<PATH>
             }
             if (req.path.pathSegments.isNotEmpty()) {
                 // Let's see if they just got their ending slash wrong.
-                val altSlashEndpoint = req.path.copy(
-                    pathSegments = req.path.pathSegments.segments
+                val altSlashEndpoint = RawHttpEndpoint(
+                    req.path.pathSegments.segments
                         .let { if (it.lastOrNull() == "") it.dropLast(1) else it + "" }
-                        .let(::PathSegments)
+                        .let(::PathSegments),
+                    req.path.method,
                 )
                 if (altSlashEndpoint.tryResolve() != null)
                     HttpResponse.pathMoved(to = "/" + altSlashEndpoint.pathSegments.toString())

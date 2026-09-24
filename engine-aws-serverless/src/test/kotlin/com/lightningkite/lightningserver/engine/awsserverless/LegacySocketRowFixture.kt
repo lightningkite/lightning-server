@@ -3,9 +3,11 @@ package com.lightningkite.lightningserver.engine.awsserverless
 import com.lightningkite.lightningserver.AnonType
 import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.http.HttpHeaders
+import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawWebSocketPath
+import com.lightningkite.services.data.Unsafe
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
@@ -82,7 +84,8 @@ internal fun TestAwsAdapter.stateTableName(): String = ws.webSocketDynamo.baseTa
 
 internal fun TestAwsAdapter.legacyConnectRequest(connectionId: String) = LegacyWebSocketConnectRequest<Nothing>(
     // AWS sockets all arrive at "/" and carry their real path in a query parameter.
-    path = RawWebSocketPath(""),
+    // SAFETY: Only encoded, to fake a legacy state row; nothing resolves it or reads it back as a Nothing
+    path = @OptIn(Unsafe::class) RawWebSocketPath.fromPathSegments(PathSegments.parse("")),
     queryParameters = QueryParameters(listOf("path" to "/echo")),
     requestId = "legacy-request-id",
     engineSocketId = connectionId,

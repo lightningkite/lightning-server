@@ -44,7 +44,7 @@ class RateLimiterTest {
     ) {
 
         val dummy = HttpRequest(
-            RawHttpEndpoint<PathSpec>("", method = HttpMethod.GET),
+            RawHttpEndpoint("", method = HttpMethod.GET),
             queryParameters = QueryParameters.EMPTY,
             headers = HttpHeaders(),
             domain = "Domain",
@@ -242,7 +242,7 @@ class RateLimiterTest {
                 )
 
                 val dummy = HttpRequest(
-                    RawHttpEndpoint<PathSpec>("", method = HttpMethod.GET),
+                    RawHttpEndpoint("", method = HttpMethod.GET),
                     queryParameters = QueryParameters.EMPTY,
                     headers = HttpHeaders(),
                     domain = "Domain",

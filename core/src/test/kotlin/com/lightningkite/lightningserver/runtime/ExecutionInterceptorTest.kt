@@ -93,7 +93,7 @@ class ExecutionInterceptorTest {
                 // exercised the way an engine does it.
                 server.socket.willConnectWithMetrics(
                     request = WebSocketConnectRequest(
-                        RawWebSocketPath("socket"),
+                        RawWebSocketPath(server.socket.location),
                         socketId = Execution.ID.generate(),
                     ),
                 )

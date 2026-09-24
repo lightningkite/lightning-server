@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.*
+import com.lightningkite.services.data.Unsafe
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 
@@ -118,9 +119,9 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
         request: WebSocketConnectRequest<PathSpec0>,
     ): QueryParamWebSocketHandlerData {
         val rawPath =
-            request.headers["x-path"]?.root?.substringBefore('?') ?: request.queryParameters["path"]?.substringBefore(
-                '?'
-            ) ?: "/"
+            request.headers["x-path"]?.root?.substringBefore('?')
+                ?: request.queryParameters["path"]?.substringBefore('?')
+                ?: "/"
         val match = serverRuntime.server.endpoints.match(
             serverRuntime.externalSerialization.stringArrayFormat,
             rawPath
@@ -137,26 +138,19 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
                 } else it
             } + (request.headers["x-path"]?.root?.substringAfter('?')?.let { QueryParameters.parse(it).entries }
                 ?: listOf()))
+            @Suppress("UNCHECKED_CAST")
+            val routed = match as PathSpecMap.Match<WebSocketHandler<PathSpec, *>>
             // Same physical socket, only the path is rewritten, so the socket id carries over.
             request.withPath(
-                path = RawWebSocketPath<PathSpec>(PathSegments.parse(rawPath), match),
+                // SAFETY: match came from routing, which only pairs a handler with the spec it was registered under
+                path = @OptIn(Unsafe::class) RawWebSocketPath.fromMatch(routed),
                 queryParameters = fixedQueryParameters,
             )
         }
         val otherHandler = match.value
         @Suppress("UNCHECKED_CAST")
         otherHandler as WebSocketHandler<PathSpec, *>
-        val startData =
-        // TODO: How do we handle metrics here?
-//            Metrics.handlerPerformance(
-//                WebSockets.HandlerContext(
-//                    request.path,
-//                    WebSockets.WsHandlerType.CONNECTING,
-//                    null /*TODO*/
-//                )
-//            ) {
-            otherHandler.willConnectWithMetrics(request)
-//            }
+        val startData = otherHandler.willConnectWithMetrics(request)
 
         @Suppress("UNCHECKED_CAST")
         return QueryParamWebSocketHandlerData(

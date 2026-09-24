@@ -429,7 +429,8 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                     else listOf(it)
                 }
                 val lkEvent = WebSocketConnectRequest(
-                    path = RawWebSocketPath<PathSpec0>(PathSegments.EMPTY),
+                    // SAFETY: Empty segments only ever resolve to PathSpec.root, which is a PathSpec0
+                    path = @OptIn(Unsafe::class) RawWebSocketPath.fromPathSegments<PathSpec0>(PathSegments.EMPTY),
                     queryParameters = QueryParameters(queryParams),
                     headers = headers,
                     domain = event.requestContext.domainName,

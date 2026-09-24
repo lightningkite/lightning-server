@@ -31,13 +31,13 @@ class InitiatorTest {
             id = execution,
             causedBy = root,
             rootExecution = root,
-            endpoint = RawHttpEndpoint<PathSpec>(asString = "/users/abc", method = HttpMethod.GET),
+            endpoint = RawHttpEndpoint(asString = "/users/abc", method = HttpMethod.GET),
         ).roundTripTest()
         Execution.WebSocket(
             id = execution,
             rootExecution = execution,
             socketId = socket,
-            path = RawWebSocketPath<PathSpec>("/updates"),
+            path = RawWebSocketPath("/updates"),
             phase = Execution.WebSocket.Phase.ClientMessage,
         ).roundTripTest()
         Execution.Task(
