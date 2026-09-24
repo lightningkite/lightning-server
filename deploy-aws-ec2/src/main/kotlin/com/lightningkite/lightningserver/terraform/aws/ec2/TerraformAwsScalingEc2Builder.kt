@@ -54,8 +54,32 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
         securityGroup = expression("aws_security_group.internal.id"),
         privateSubnets = expression("module.vpc.private_subnets"),
         publicSubnets = expression("module.vpc.public_subnets"),
-        applicationSubnet = expression("module.vpc.private_subnets[0]"),
+        applicationRouteTables = expression("module.vpc.private_route_table_ids"),
         natGatewayIps = expression("module.vpc.nat_public_ips"),
+    )
+
+    /**
+     * Uses a VPC that already exists and is not managed by this Terraform.
+     * Instances run in [privateSubnets] and the load balancer in [publicSubnets].
+     *
+     * @param privateRouteTables The route tables of [privateSubnets]. Services that need routes (such as VPC peering) add them here.
+     */
+    public fun existingVPC(
+        id: String,
+        cidr: String,
+        securityGroup: String,
+        privateSubnets: List<String>,
+        publicSubnets: List<String>,
+        privateRouteTables: List<String>,
+        natGatewayIps: List<String> = emptyList(),
+    ): AwsVpc.VpcInfo = VpcInfoExisting(
+        id = id,
+        cidr = cidr,
+        securityGroup = securityGroup,
+        privateSubnets = privateSubnets.toTerraformList(),
+        publicSubnets = publicSubnets.toTerraformList(),
+        applicationRouteTables = privateRouteTables.toTerraformList(),
+        natGatewayIps = natGatewayIps.toTerraformList(),
     )
 
     // === Scaling configuration ===

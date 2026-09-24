@@ -58,8 +58,34 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
         securityGroup = TerraformJsonObject.expression("aws_security_group.internal.id"),
         privateSubnets = TerraformJsonObject.expression("module.vpc.private_subnets"),
         publicSubnets = TerraformJsonObject.expression("module.vpc.public_subnets"),
-        applicationSubnet = TerraformJsonObject.expression("module.vpc.public_subnets[0]"),
+        applicationRouteTables = TerraformJsonObject.expression("module.vpc.public_route_table_ids"),
         natGatewayIps = TerraformJsonObject.expression("module.vpc.nat_public_ips"),
+    )
+
+    /**
+     * Uses a VPC that already exists and is not managed by this Terraform.
+     *
+     * @param instanceSubnet The subnet the EC2 instance is placed in.
+     * @param instanceRouteTable The route table of [instanceSubnet]. Services that need routes (such as VPC peering) add them here.
+     */
+    public fun existingVPC(
+        id: String,
+        cidr: String,
+        securityGroup: String,
+        privateSubnets: List<String>,
+        publicSubnets: List<String>,
+        instanceSubnet: String,
+        instanceRouteTable: String,
+        natGatewayIps: List<String> = emptyList(),
+    ): AwsVpc.VpcInfo = VpcInfoExisting(
+        id = id,
+        cidr = cidr,
+        securityGroup = securityGroup,
+        privateSubnets = privateSubnets.toTerraformList(),
+        publicSubnets = publicSubnets.toTerraformList(),
+        applicationRouteTables = listOf(instanceRouteTable).toTerraformList(),
+        natGatewayIps = natGatewayIps.toTerraformList(),
+        instanceSubnet = instanceSubnet,
     )
 
     // === SSH access (optional, for debugging) ===
@@ -179,7 +205,8 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                     }
 
                     is AwsVpc.VpcInfo -> {
-                        "subnet_id" - vpcInfo.applicationSubnet
+                        "subnet_id" - ((vpcInfo as? VpcInfoExisting)?.instanceSubnet
+                            ?: expression("${vpcInfo.publicSubnets.removePrefix("\${").removeSuffix("}")}[0]"))
                     }
                 }
 
