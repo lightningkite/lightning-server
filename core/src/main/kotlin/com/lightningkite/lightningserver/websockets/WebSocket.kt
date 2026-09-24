@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.location
+import com.lightningkite.services.data.Unsafe
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 
@@ -44,8 +45,9 @@ public data class WebSocketSubscriptionRequest<PATH : PathSpec, T>(
     val topic: WebSocketTopic<PATH, T>,
     val rawPathArguments: List<Any?>,
 ) : HasContextualPath<PATH> {
+    @OptIn(Unsafe::class)
     context(server: Engine)
-    override val pathInContext: ResolvedPath<PATH> get() = ResolvedPath(topic.location, rawPathArguments)
+    override val pathInContext: ResolvedPath<PATH> get() = ResolvedPath.fromRawPathArguments(topic.location, rawPathArguments)
 }
 
 /**
@@ -65,8 +67,9 @@ public data class WebSocketSubscriptionMessage<PATH : PathSpec, T>(
     val rawPathArguments: List<Any?>,
     val value: T,
 ) : HasContextualPath<PATH> {
+    @OptIn(Unsafe::class)
     context(server: Engine)
-    override val pathInContext: ResolvedPath<PATH> get() = ResolvedPath(topic.location, rawPathArguments)
+    override val pathInContext: ResolvedPath<PATH> get() = ResolvedPath.fromRawPathArguments(topic.location, rawPathArguments)
 }
 
 

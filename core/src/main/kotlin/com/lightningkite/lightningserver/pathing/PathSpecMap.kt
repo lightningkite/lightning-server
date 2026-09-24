@@ -1,8 +1,11 @@
 package com.lightningkite.lightningserver.pathing
 
+import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.definition.Locationed
 import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.services.data.StringArrayFormat
+import com.lightningkite.services.data.Unsafe
+import kotlinx.serialization.SerializationException
 
 /**
  * A specialized map for routing requests to handlers based on [PathSpec] patterns.
@@ -98,15 +101,35 @@ public interface PathSpecMap<out V> : Map<PathSpec, V> {
         override val path: ResolvedPath<PathSpec>,
         public val value: V,
     ) : HasResolvedPath<PathSpec> {
-        public constructor(
-            pathSpec: PathSpec,
-            rawPathArguments: List<Any?>,
-            wildcard: PathSegments?,
-            value: V,
-        ) : this(
-            ResolvedPath(pathSpec, rawPathArguments, trailingSegments = wildcard),
-            value
-        )
+        public companion object {
+            public fun <V> parse(
+                format: StringArrayFormat,
+                pathSpec: PathSpec,
+                rawPathArguments: List<String>,
+                wildcard: PathSegments?,
+                value: V,
+            ): Match<V> {
+                require(rawPathArguments.size == pathSpec.wildcards.size) {
+                    "Incorrect number of arguments provided in '$pathSpec'. Expected (${pathSpec.wildcards.size}) got (${rawPathArguments.size})."
+                }
+                return Match(
+                    @OptIn(Unsafe::class)
+                    // SAFETY: Arguments are parsed from the wildcard serializers, so types must be correct
+                    ResolvedPath.fromRawPathArguments(
+                        pathSpec,
+                        rawPathArguments.zip(pathSpec.wildcards) { v, s ->
+                            try {
+                                format.decodeFromString(s.serializer, v)
+                            } catch (e: SerializationException) {
+                                throw BadRequestException("${s.name} in '$pathSpec' is formatted incorrectly", cause = e)
+                            }
+                        },
+                        trailingSegments = wildcard
+                    ),
+                    value
+                )
+            }
+        }
 
         public val pathSpec: PathSpec get() = path.pathSpec
 
