@@ -4,7 +4,6 @@ plugins {
     alias(libs.plugins.ksp)
     application
     alias(libs.plugins.graalVmNative)
-//    alias(libs.plugins.shadow)
 }
 
 group = "com.lightningkite.lightningserver"
