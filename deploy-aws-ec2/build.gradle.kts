@@ -18,8 +18,8 @@ dependencies {
     }
     api(libs.services.aws.client) { excludeNetty() }
     api(libs.aws.s3) { excludeNetty() }
+    api(libs.aws.sqs) { excludeNetty() }
     api(libs.aws.secrets.manager) { excludeNetty() }
-    api("software.amazon.awssdk:sqs:2.40.3") { excludeNetty() }
     implementation(libs.coroutines.reactive)
     implementation(libs.coroutines.jdk)
     api(libs.kotlin.reflect)

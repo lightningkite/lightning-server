@@ -20,8 +20,15 @@ import kotlin.uuid.Uuid
 @GenerateDataClassPaths
 public data class TimeInZone(
     val time: LocalTime,
-    val zone: TimeZone,
-)
+    val zone: String,
+) {
+    public val timeZone: TimeZone get() = TimeZone.of(zone)
+
+    public constructor(
+        time: LocalTime,
+        zone: TimeZone,
+    ) : this(time, zone.id)
+}
 
 /**
  * Represents the frequency at which something should be scheduled, with options for daily, weekly, batch-based, or immediate scheduling.
@@ -87,11 +94,12 @@ public data class Frequency private constructor(
 
     private fun weeklyAt(now: Instant): Instant? {
         val weekDay = onlyOn ?: return null
-        val (time, timeZone) = onlyAt ?: return null
+        val onlyAt = onlyAt ?: return null
+        val timeZone = onlyAt.timeZone
 
         val dateTime = now.toLocalDateTime(timeZone)
         val numDays = (weekDay.ordinal - dateTime.date.dayOfWeek.ordinal) % 7
-        var sendAt = LocalDateTime(dateTime.date.plus(numDays, DateTimeUnit.DAY), time).toInstant(timeZone)
+        var sendAt = LocalDateTime(dateTime.date.plus(numDays, DateTimeUnit.DAY), onlyAt.time).toInstant(timeZone)
         if (sendAt < now) {
             sendAt = sendAt.plus(1, DateTimeUnit.WEEK, timeZone)
         }
@@ -100,10 +108,11 @@ public data class Frequency private constructor(
     }
 
     private fun dailyAt(now: Instant): Instant? {
-        val (time, timeZone) = onlyAt ?: return null
+        val onlyAt = onlyAt ?: return null
+        val timeZone = onlyAt.timeZone
 
         val dateTime = now.toLocalDateTime(timeZone)
-        var sendAt = LocalDateTime(dateTime.date, time).toInstant(timeZone)
+        var sendAt = LocalDateTime(dateTime.date, onlyAt.time).toInstant(timeZone)
         if (sendAt < now) {
             sendAt = sendAt.plus(1, DateTimeUnit.DAY, timeZone)
         }

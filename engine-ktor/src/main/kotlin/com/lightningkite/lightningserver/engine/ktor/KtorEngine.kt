@@ -341,18 +341,26 @@ public class KtorEngine(
                             socketHandler.messageFromClientWithMetrics(match.pathSpec, mid, m)
                         }
 
-                        closingMid.let { mid ->
-                            socketHandler.disconnectWithMetrics(match.pathSpec, mid, WebSocketClose.NORMAL)
+                        // NonCancellable: the session can be cancelled mid-disconnect (e.g. shutdown), which
+                        // would abort the app's disconnect cleanup at its first suspension point.
+                        withContext(NonCancellable) {
+                            socketHandler.disconnectWithMetrics(match.pathSpec, closingMid, WebSocketClose.NORMAL)
                         }
                     } catch (e: Throwable) {
+                        // A cancelled session lands here without ever leaving the incoming loop, so this is
+                        // the only chance to run the app's disconnect cleanup; NonCancellable keeps the
+                        // already-cancelled coroutine from aborting it immediately.
                         closingMid?.let { mid ->
-                            socketHandler.disconnectWithMetrics(
-                                match.pathSpec,
-                                mid,
-                                ((e as? HttpStatusException)?.status
-                                    ?: HttpStatus.InternalServerError).bestWebSocketCloseCode
-                            )
+                            withContext(NonCancellable) {
+                                socketHandler.disconnectWithMetrics(
+                                    match.pathSpec,
+                                    mid,
+                                    ((e as? HttpStatusException)?.status
+                                        ?: HttpStatus.InternalServerError).bestWebSocketCloseCode
+                                )
+                            }
                         }
+                        if (e is CancellationException) throw e
                     }
                 }
             }
