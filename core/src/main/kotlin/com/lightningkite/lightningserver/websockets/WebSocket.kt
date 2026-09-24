@@ -41,13 +41,22 @@ public class WebSocketTopic<PATH : PathSpec, T> internal constructor(
  * @property topic The topic to subscribe to
  * @property rawPathArguments The path parameter values for this subscription
  */
-public data class WebSocketSubscriptionRequest<PATH : PathSpec, T>(
+@ConsistentCopyVisibility
+public data class WebSocketSubscriptionRequest<PATH : PathSpec, T> private constructor(
     val topic: WebSocketTopic<PATH, T>,
     val rawPathArguments: List<Any?>,
 ) : HasContextualPath<PATH> {
     @OptIn(Unsafe::class)
     context(server: Engine)
     override val pathInContext: ResolvedPath<PATH> get() = ResolvedPath.fromRawPathArguments(topic.location, rawPathArguments)
+
+    public companion object {
+        @Unsafe("Arguments must match the types expected by the topic's PathSpec")
+        public fun <PATH : PathSpec, T> fromRawPathArguments(
+            topic: WebSocketTopic<PATH, T>,
+            rawPathArguments: List<Any?>,
+        ): WebSocketSubscriptionRequest<PATH, T> = WebSocketSubscriptionRequest(topic, rawPathArguments)
+    }
 }
 
 /**
@@ -62,7 +71,8 @@ public data class WebSocketSubscriptionRequest<PATH : PathSpec, T>(
  * @property rawPathArguments The path parameters identifying which subscriptions to notify
  * @property value The actual message payload
  */
-public data class WebSocketSubscriptionMessage<PATH : PathSpec, T>(
+@ConsistentCopyVisibility
+public data class WebSocketSubscriptionMessage<PATH : PathSpec, T> private constructor(
     val topic: WebSocketTopic<PATH, T>,
     val rawPathArguments: List<Any?>,
     val value: T,
@@ -70,6 +80,15 @@ public data class WebSocketSubscriptionMessage<PATH : PathSpec, T>(
     @OptIn(Unsafe::class)
     context(server: Engine)
     override val pathInContext: ResolvedPath<PATH> get() = ResolvedPath.fromRawPathArguments(topic.location, rawPathArguments)
+
+    public companion object {
+        @Unsafe("Arguments must match the types expected by the topic's PathSpec")
+        public fun <PATH : PathSpec, T> fromRawPathArguments(
+            topic: WebSocketTopic<PATH, T>,
+            rawPathArguments: List<Any?>,
+            value: T,
+        ): WebSocketSubscriptionMessage<PATH, T> = WebSocketSubscriptionMessage(topic, rawPathArguments, value)
+    }
 }
 
 

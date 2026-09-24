@@ -142,7 +142,7 @@ class AwsAdapterWsLegacyStateRowTest {
 
     private fun TestAwsAdapter.publishToBroadcast() {
         runBlocking {
-            sendWebSocketSubscriptionMessage(WebSocketSubscriptionMessage(SampleServer.broadcast, listOf(), "hello"))
+            sendWebSocketSubscriptionMessage(WebSocketSubscriptionMessage(SampleServer.broadcast, "hello"))
         }
         awaitPendingInvocations()
     }

@@ -16,7 +16,7 @@ import com.lightningkite.lightningserver.websockets.WebSocketTopic
 context(serverRuntime: ServerRuntime)
 public suspend fun <T> WebSocketTopic<PathSpec0, T>.send(value: T): Unit =
     serverRuntime.sendWebSocketSubscriptionMessage(
-        WebSocketSubscriptionMessage(this, listOf(), value)
+        WebSocketSubscriptionMessage(this, value)
     )
 
 /**
@@ -30,7 +30,7 @@ public suspend fun <A, T> WebSocketTopic<PathSpec1<A>, T>.send(
     path1: A,
     value: T,
 ): Unit = serverRuntime.sendWebSocketSubscriptionMessage(
-    WebSocketSubscriptionMessage(this, listOf(path1), value)
+    WebSocketSubscriptionMessage(this, path1, value)
 )
 
 /**
@@ -46,7 +46,7 @@ public suspend fun <A, B, T> WebSocketTopic<PathSpec2<A, B>, T>.send(
     path2: B,
     value: T,
 ): Unit = serverRuntime.sendWebSocketSubscriptionMessage(
-    WebSocketSubscriptionMessage(this, listOf(path1, path2), value)
+    WebSocketSubscriptionMessage(this, path1, path2, value)
 )
 
 /**
@@ -64,7 +64,7 @@ public suspend fun <A, B, C, T> WebSocketTopic<PathSpec3<A, B, C>, T>.send(
     path3: C,
     value: T,
 ): Unit = serverRuntime.sendWebSocketSubscriptionMessage(
-    WebSocketSubscriptionMessage(this, listOf(path1, path2, path3), value)
+    WebSocketSubscriptionMessage(this, path1, path2, path3, value)
 )
 
 /**

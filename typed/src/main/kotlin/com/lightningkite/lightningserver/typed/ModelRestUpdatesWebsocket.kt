@@ -12,6 +12,7 @@ import com.lightningkite.lightningserver.typed.sdk.*
 import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultInfo
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.lightningserver.serialization.approximateJsonSize
+import com.lightningkite.services.data.Unsafe
 import com.lightningkite.services.database.*
 import kotlinx.serialization.KSerializer
 import kotlinx.coroutines.CancellationException
@@ -107,7 +108,12 @@ public class ModelRestUpdatesWebSocket<USER : HasId<*>?, T : HasId<ID>, ID : Com
             val oldTopics: Set<WebSocketSubscriptionRequest<out PathSpec, *>> =
                 connection.currentState.topics.mapTo(HashSet()) {
                     serverRuntime.server.webSocketTopics.match(serverRuntime.internalSerialization.stringArrayFormat, it)
-                        ?.let { match -> WebSocketSubscriptionRequest(match.value, match.path.rawPathArguments) }
+                        ?.let { match ->
+                            // SAFETY: webSocketTopics is keyed by each topic's own location, so the match
+                            // arguments were decoded by that topic's PathSpec serializers
+                            @OptIn(Unsafe::class)
+                            WebSocketSubscriptionRequest.fromRawPathArguments(match.value, match.path.rawPathArguments)
+                        }
                         ?: throw IllegalArgumentException(
                             "WebSocket topic $it does not exist.  " +
                                     "Topics must be registered with the server before they can be used."

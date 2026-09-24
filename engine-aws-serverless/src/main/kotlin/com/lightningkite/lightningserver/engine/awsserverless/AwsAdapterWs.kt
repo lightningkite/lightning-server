@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.websockets.*
+import com.lightningkite.services.data.Unsafe
 import com.lightningkite.services.serializers.KotlinBytesFormat
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -287,7 +288,10 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
                             with(root) {
                                 h.messageFromSubscriptionWithMetrics(
                                     mid,
-                                    WebSocketSubscriptionMessage(
+                                    // SAFETY: webSocketTopics is keyed by each topic's own location, so the match
+                                    // arguments were decoded by that topic's PathSpec serializers
+                                    @OptIn(Unsafe::class)
+                                    WebSocketSubscriptionMessage.fromRawPathArguments(
                                         fullTopicMatch.value,
                                         fullTopicMatch.path.rawPathArguments,
                                         fullValue

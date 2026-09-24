@@ -79,7 +79,7 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
 
     override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>) {
         val subscribers =
-            subscriptions[WebSocketSubscriptionRequest(topic = event.topic, rawPathArguments = event.rawPathArguments)]
+            subscriptions[WebSocketSubscriptionRequest(event)]
 //        /*logger.debug*/run { "'${event.path()}': ${event.value} (${subscribers?.size ?: 0} subscribers)" }.let(::println)
         subscribers?.forEach {
             it(event)

@@ -68,7 +68,7 @@ public abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
                 server.executeWithoutTelemetry(phaseExecution) {
                     handler.messageFromSubscription(
                         this@LocalWebSocketConnection,
-                        WebSocketSubscriptionMessage(topic.topic, topic.pathInContext.rawPathArguments, value),
+                        WebSocketSubscriptionMessage(topic, value),
                     )
                 }
             }

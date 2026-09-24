@@ -4,23 +4,23 @@ import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 
 public fun <T> WebSocketTopic<PathSpec0, T>.request(): WebSocketSubscriptionRequest<PathSpec0, T> =
-    WebSocketSubscriptionRequest(topic = this, rawPathArguments = emptyList())
+    WebSocketSubscriptionRequest(this)
 
 public fun <T, A> WebSocketTopic<PathSpec1<A>, T>.request(path1: A): WebSocketSubscriptionRequest<PathSpec1<A>, T> =
-    WebSocketSubscriptionRequest(topic = this, rawPathArguments = listOf(path1))
+    WebSocketSubscriptionRequest(this, path1)
 
 public fun <T, A, B> WebSocketTopic<PathSpec2<A, B>, T>.request(
     path1: A,
     path2: B,
 ): WebSocketSubscriptionRequest<PathSpec2<A, B>, T> =
-    WebSocketSubscriptionRequest(topic = this, rawPathArguments = listOf(path1, path2))
+    WebSocketSubscriptionRequest(this, path1, path2)
 
 public fun <T, A, B, C> WebSocketTopic<PathSpec3<A, B, C>, T>.request(
     path1: A,
     path2: B,
     path3: C,
 ): WebSocketSubscriptionRequest<PathSpec3<A, B, C>, T> =
-    WebSocketSubscriptionRequest(topic = this, rawPathArguments = listOf(path1, path2, path3))
+    WebSocketSubscriptionRequest(this, path1, path2, path3)
 
 context(connection: WebSocketConnection<PATH, STORAGE>, server: ServerRuntime)
 public suspend fun <PATH : PathSpec, STORAGE, T> subscribe(topic: WebSocketTopic<PathSpec0, T>): Unit =
