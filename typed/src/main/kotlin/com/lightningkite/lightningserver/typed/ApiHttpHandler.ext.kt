@@ -1,12 +1,19 @@
 package com.lightningkite.lightningserver.typed
 
+import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.AuthRequirement
+import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.http.HttpRequest
+import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpStatus
+import com.lightningkite.lightningserver.http.toLSError
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.handleWithMetrics
 import com.lightningkite.lightningserver.runtime.location
+import com.lightningkite.lightningserver.serialization.parse
+import kotlinx.coroutines.CancellationException
 import com.lightningkite.lightningserver.typed.sdk.functionCase
 import com.lightningkite.services.database.HasId
 import com.lightningkite.services.database.serializerOrContextual
@@ -140,10 +147,37 @@ public inline fun <PATH : PathSpec, USER : HasId<*>?, reified INPUT, reified OUT
     )
 
 /**
+ * Runs this endpoint for [request] as a new execution caused by the current one, through the server's
+ * HTTP interceptors, without serializing [input] or the output.
+ */
+context(server: ServerRuntime)
+private suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.execute(
+    request: HttpRequest<PATH>,
+    input: INPUT,
+): OUTPUT {
+    // The interceptor chain only speaks HttpResponse, so the typed result is carried out beside it.
+    var outcome: Result<OUTPUT>? = null
+    val response = server.handleWithMetrics(request, HttpHandler(timeout) { req ->
+        runCatching { handleInput(req, input) }.also { outcome = it }.getOrThrow()
+        HttpResponse(status = successCode)
+    })
+
+    // Rethrow the endpoint's own exception so callers can catch it by type. A timeout is excluded: it
+    // is already reported by the response, and rethrowing a CancellationException would read as the
+    // caller itself being cancelled.
+    outcome?.exceptionOrNull()?.takeIf { it !is CancellationException }?.let { throw it }
+    if (!response.status.success) throw HttpStatusException(response.toLSError())
+    outcome?.let { return it.getOrThrow() }
+    // An interceptor answered in the endpoint's place, so its response is the only output there is.
+    return response.body?.parse(outputType)
+        ?: throw IllegalStateException("An interceptor answered '${request.path}' without a body to read the output from.")
+}
+
+/**
  * Invokes an API endpoint internally from within another endpoint handler.
  *
- * This allows server-side code to call typed endpoints directly, reusing the same
- * business logic and validation. The endpoint is re-authenticated with its own auth requirements.
+ * Runs as its own execution through the server's HTTP interceptors, and is re-authenticated with the
+ * endpoint's own auth requirements.
  *
  * @param input The request input
  * @return The endpoint's output
@@ -151,10 +185,7 @@ public inline fun <PATH : PathSpec, USER : HasId<*>?, reified INPUT, reified OUT
 context(server: ServerRuntime, access: HttpAccess<PATH, out USER>)
 public suspend operator fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.invoke(
     input: INPUT,
-): OUTPUT {
-    val newAccess = access.request.access(auth)
-    return handle(newAccess, input)
-}
+): OUTPUT = execute(access.request, input)
 
 /**
  * Invokes a PathSpec0 endpoint (no path parameters) from server-side code.
@@ -167,10 +198,7 @@ context(server: ServerRuntime)
 public suspend operator fun <USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PathSpec0, USER, INPUT, OUTPUT>.invoke(
     request: HttpRequest<*>,
     input: INPUT,
-): OUTPUT = handle(
-    request.copyWithNewPathType(RawHttpEndpoint(location.path, location.method)).access(auth),
-    input
-)
+): OUTPUT = execute(request.subRequest(RawHttpEndpoint(location.path, location.method)), input)
 
 /**
  * Invokes a PathSpec1 endpoint (one path parameter) from server-side code.
@@ -185,10 +213,7 @@ public suspend operator fun <A, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<
     request: HttpRequest<*>,
     first: A,
     input: INPUT,
-): OUTPUT = handle(
-    request.copyWithNewPathType(RawHttpEndpoint(location.path, first, location.method)).access(auth),
-    input
-)
+): OUTPUT = execute(request.subRequest(RawHttpEndpoint(location.path, first, location.method)), input)
 
 /**
  * Invokes a PathSpec2 endpoint (two path parameters) from server-side code.
@@ -205,10 +230,7 @@ public suspend operator fun <A, B, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandl
     first: A,
     second: B,
     input: INPUT,
-): OUTPUT = handle(
-    request.copyWithNewPathType(RawHttpEndpoint(location.path, first, second, location.method)).access(auth),
-    input
-)
+): OUTPUT = execute(request.subRequest(RawHttpEndpoint(location.path, first, second, location.method)), input)
 
 /**
  * Invokes a PathSpec3 endpoint (three path parameters) from server-side code.
@@ -227,7 +249,4 @@ public suspend operator fun <A, B, C, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHa
     second: B,
     third: C,
     input: INPUT,
-): OUTPUT = handle(
-    request.copyWithNewPathType(RawHttpEndpoint(location.path, first, second, third, location.method)).access(auth),
-    input
-)
+): OUTPUT = execute(request.subRequest(RawHttpEndpoint(location.path, first, second, third, location.method)), input)

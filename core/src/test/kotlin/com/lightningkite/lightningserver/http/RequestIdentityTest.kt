@@ -12,8 +12,10 @@ import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.EngineBase
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.executeWithoutTelemetry
 import com.lightningkite.lightningserver.runtime.handle
+import com.lightningkite.lightningserver.runtime.handleWithMetrics
 import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
@@ -43,16 +45,36 @@ private fun subTestRequest(path: String): HttpRequest<PathSpec> = HttpRequest(
 )
 
 private val subRecorded = mutableListOf<Execution.Http>()
+private val subIntercepted = mutableListOf<Execution.ID>()
+
+/** A handler bound to no route, so it is reachable only by direct dispatch. */
+private val unrouted = HttpHandler<PathSpec> {
+    subRecorded += serverRuntime.execution as Execution.Http
+    HttpResponse.plainText("ok")
+}
 
 /**
  * A sub-request's parentage is no longer derived by a standalone `subRequest` helper; it's derived
- * inline by [com.lightningkite.lightningserver.runtime.handle] (the same seam `/meta/bulk`
+ * inline by [com.lightningkite.lightningserver.runtime.handleWithMetrics] (the same seam `/meta/bulk`
  * dispatches through), so [RequestIdentityTest]'s sub-request tests exercise it end to end: each
  * endpoint records its own [Execution.Http], and `nested` dispatches a further sub-request from
  * inside its own execution to prove the parent follows the nesting rather than always naming the
  * outermost caller.
  */
 private object SubServer : ServerBuilder() {
+    init {
+        install(object : HttpInterceptor {
+            context(runtime: ServerRuntime)
+            override suspend fun intercept(
+                request: HttpRequest<*>,
+                cont: suspend context(ServerRuntime) (HttpRequest<*>) -> HttpResponse,
+            ): HttpResponse {
+                subIntercepted += runtime.execution.id
+                return cont(request)
+            }
+        })
+    }
+
     val a = path.path("a").get bind HttpHandler {
         subRecorded += serverRuntime.execution as Execution.Http
         HttpResponse.plainText("ok")
@@ -322,5 +344,23 @@ class RequestIdentityTest {
         assertEquals(nested.id, inner.causedBy)
         assertEquals(outerId, inner.rootExecution)
         assertNotEquals(outerId, inner.causedBy)
+    }
+
+    @Test
+    fun `dispatching a handler directly gets its own execution and passes the interceptors`() {
+        subRecorded.clear()
+        subIntercepted.clear()
+        SubServer.test(settings = {}) {
+            runBlocking {
+                serverRuntime.executeWithoutTelemetry(outer()) {
+                    serverRuntime.handleWithMetrics(subTestRequest("unrouted"), unrouted)
+                }
+            }
+        }
+
+        val sub = subRecorded.single()
+        assertNotEquals(outerId, sub.id)
+        assertEquals(outerId, sub.causedBy)
+        assertEquals(listOf(sub.id), subIntercepted, "the interceptors must run inside the new execution")
     }
 }

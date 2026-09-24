@@ -90,6 +90,9 @@ public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT
      * 3. Calls [handle] with the parsed input
      * 4. Serializes output based on Accept header content negotiation
      *
+     * Not meant to be overridden: server-side invocations skip parsing and serialization, so changes
+     * made here would not apply to them.
+     *
      * GOTCHA: For GET/HEAD requests, input is parsed from query parameters, which means
      * complex objects should be avoided. For POST/PUT/PATCH, input comes from request body.
      */
@@ -109,28 +112,7 @@ public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT
                 }
         }
 
-        server.validators.assertValidOrBadRequest(inputType, input)
-
-        val result = try {
-            handle(request.access(auth), input)
-        } catch (e: HttpStatusException) {
-            // W6 (advisory only — does NOT change the response): the thrown error slug isn't among the
-            // declared errorCases, so generated SDKs/docs won't advertise it. Warn so the contract can
-            // be kept in sync; the exception is rethrown unchanged.
-            if (e.detail.isNotBlank() && errorCases.none { it.detail == e.detail && it.http == e.status.code }) {
-                errorCaseLogger.warn {
-                    "Endpoint threw HttpStatusException(status=${e.status.code}, detail=\"${e.detail}\") " +
-                        "not present in its declared errorCases ${errorCases.map { "${it.http}:${it.detail}" }}. " +
-                        "Add it to errorCases or align the thrown detail so clients/docs stay accurate."
-                }
-            }
-            throw e
-        }
-
-        // Every typed output is observed while still structured, before it becomes bytes. Placed after
-        // the handler and before serialization so an observer that fails (an audit that could not be
-        // recorded) prevents the send rather than trailing it.
-        emitTypedOutput(request, outputType, result)
+        val result = handleInput(request, input)
 
         return HttpResponse(
             body = if (result == Unit) null else result.toTypedData(request.headers.accept, outputType),
@@ -157,6 +139,36 @@ public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT
         val name: String = "Example",
         val notes: String? = null,
     )
+}
+
+/**
+ * Everything a request to this endpoint does once [input] is parsed: validation, [ApiHttpHandler.auth],
+ * the handler itself, and typed output observation.
+ */
+context(server: ServerRuntime)
+internal suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.handleInput(
+    request: HttpRequest<PATH>,
+    input: INPUT,
+): OUTPUT {
+    server.validators.assertValidOrBadRequest(inputType, input)
+
+    val result = try {
+        handle(request.access(auth), input)
+    } catch (e: HttpStatusException) {
+        // Warn the user if the thrown exception isn't listed in the error cases
+        if (e.detail.isNotBlank() && errorCases.none { it.detail == e.detail && it.http == e.status.code }) {
+            errorCaseLogger.warn {
+                "Endpoint threw HttpStatusException(status=${e.status.code}, detail=\"${e.detail}\") " +
+                    "not present in its declared errorCases ${errorCases.map { "${it.http}:${it.detail}" }}. " +
+                    "Add it to errorCases or align the thrown detail so clients/docs stay accurate."
+            }
+        }
+        throw e
+    }
+
+    // Call typed output hooks
+    emitTypedOutput(request, outputType, result)
+    return result
 }
 
 /*

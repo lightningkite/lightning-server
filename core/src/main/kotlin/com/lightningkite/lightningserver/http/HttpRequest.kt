@@ -36,7 +36,7 @@ import kotlinx.serialization.Transient
  * @property body The request body as TypedData, or null if no body
  */
 @Serializable
-public data class HttpRequest<PATH : PathSpec>(
+public data class HttpRequest<out PATH : PathSpec>(
     override val path: RawHttpEndpoint<PATH>,
     override val queryParameters: QueryParameters,
     override val headers: HttpHeaders,

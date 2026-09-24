@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.http
 
-import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -46,8 +45,7 @@ public interface ExceptionHttpHandler {
      * @return An HTTP response representing the error
      */
     context(server: ServerRuntime)
-    public suspend fun handle(request: HttpRequest<PathSpec>, exception: Exception): HttpResponse
-
+    public suspend fun handle(request: HttpRequest<*>, exception: Exception): HttpResponse
 }
 
 /*

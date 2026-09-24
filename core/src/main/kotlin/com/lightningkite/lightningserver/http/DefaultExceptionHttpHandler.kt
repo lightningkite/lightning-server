@@ -3,7 +3,6 @@ package com.lightningkite.lightningserver.http
 import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.definition.generalSettings
-import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.serialization.parse
 import com.lightningkite.lightningserver.serialization.toTypedData
@@ -26,7 +25,7 @@ import com.lightningkite.lightningserver.serialization.toTypedData
 internal object DefaultExceptionHttpHandler : ExceptionHttpHandler {
     context(server: ServerRuntime)
     override suspend fun handle(
-        request: HttpRequest<PathSpec>,
+        request: HttpRequest<*>,
         exception: Exception,
     ): HttpResponse {
         val lsErrorWithoutTrace = when {

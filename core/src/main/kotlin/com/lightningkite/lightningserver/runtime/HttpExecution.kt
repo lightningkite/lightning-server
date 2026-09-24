@@ -8,7 +8,6 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryKey
 import com.lightningkite.services.telemetry.TelemetryKeys
-import com.lightningkite.services.telemetry.telemetryTrace
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 
@@ -44,29 +43,45 @@ private val errorType = TelemetryKey.OfString("error.type")
 public suspend fun Engine.handleRoot(
     request: HttpRequest<PathSpec>,
     executionId: Execution.ID,
-): HttpResponse = handleInternal(
+): HttpResponse = executeHttpWithMetrics(
     request,
     Execution.Http(id = executionId, endpoint = request.path),
-)
+) { route(it) }
 
-@OptIn(InternalLightningServerApi::class)
 public suspend fun ServerRuntime.handle(
     request: HttpRequest<PathSpec>,
     executionId: Execution.ID = Execution.ID.generate()
-): HttpResponse = handleInternal(
-    request,
+): HttpResponse = executeHttpWithMetrics(request, childHttpExecution(request, executionId)) { route(it) }
+
+/**
+ * Runs this handler for [request] as a new execution caused by the current one, through the server's HTTP
+ * interceptors, exactly as a routed <PATH : _root_ide_package_.com.lightningkite.lightningserver.pathing.PathSpec request would be but without routing.
+ */
+context(runtime: ServerRuntime)
+public suspend fun <PATH : PathSpec> HttpHandler<PATH>.handleWithMetrics(
+    request: HttpRequest<PATH>,
+    executionId: Execution.ID = Execution.ID.generate(),
+): HttpResponse {
+    // The interceptor chain is untyped; it hands the handler back a request for the same endpoint.
+    return runtime.executeHttpWithMetrics(request, runtime.childHttpExecution(request, executionId)) { req ->
+        handleWithTimeout(this@handleWithMetrics, req)
+    }
+}
+
+@OptIn(InternalLightningServerApi::class)
+private fun ServerRuntime.childHttpExecution(request: HttpRequest<*>, executionId: Execution.ID): Execution =
     Execution.Http(
         id = executionId,
         endpoint = request.path,
         causedBy = execution.id,
         rootExecution = execution.rootExecution
     )
-)
 
 @OptIn(InternalLightningServerApi::class)
-private suspend fun Engine.handleInternal(
-    request: HttpRequest<PathSpec>,
-    execution: Execution
+private suspend fun <PATH : PathSpec> Engine.executeHttpWithMetrics(
+    request: HttpRequest<PATH>,
+    execution: Execution,
+    dispatch: suspend ServerRuntime.(HttpRequest<PATH>) -> HttpResponse,
 ): HttpResponse {
     val method = request.path.method.toString()
     val route = try {
@@ -83,7 +98,7 @@ private suspend fun Engine.handleInternal(
         put(TelemetryKeys.Net.peerIp, request.sourceIp)
     }) { trace ->
         val (response, error) = try {
-            val outcome = serverRuntime.innerRequestLogic(request)
+            val outcome = serverRuntime.interceptHttp(request, dispatch)
             outcome.response to outcome.errorType
         } catch (e: Exception) {
             logger.error(e) { "Exception in HTTP interceptor chain" }
@@ -104,7 +119,10 @@ private suspend fun Engine.handleInternal(
 
 private class LogicalRequestOutcome(val response: HttpResponse, val errorType: String?)
 
-private suspend fun ServerRuntime.innerRequestLogic(request: HttpRequest<PathSpec>): LogicalRequestOutcome {
+private suspend fun <PATH : PathSpec> ServerRuntime.interceptHttp(
+    request: HttpRequest<PATH>,
+    dispatch: suspend ServerRuntime.(HttpRequest<PATH>) -> HttpResponse,
+): LogicalRequestOutcome {
     var errorType: String? = null
 
     suspend fun handleError(e: Exception, label: String? = e::class.simpleName): HttpResponse {
@@ -123,58 +141,8 @@ private suspend fun ServerRuntime.innerRequestLogic(request: HttpRequest<PathSpe
         // Map handler/route/compression exceptions to responses in-place so the surrounding
         // interceptors (CORS, etc.) still post-process error responses.
         try {
-            val result = try {
-                // Route resolution must live inside this try so that a RouteNotFoundException (e.g. a HEAD
-                // request with no HEAD handler, or a missing trailing slash) is caught below and recovered
-                // via the HEAD->GET fallback / slash-redirect logic rather than escaping as a bare 404.
-                @Suppress("UNCHECKED_CAST")
-                val handler = req.path.match.value as HttpHandler<PathSpec>
-                instrument("handler") {
-                    // Per-handler request timeout (HttpHandler.timeout, default 30s), enforced at this single
-                    // choke point shared by every engine instead of being duplicated (and high-risk) in each
-                    // engine adapter. Cooperative cancellation: only interrupts at suspension points.
-                    withTimeout(handler.timeout) {
-                        @Suppress("UNCHECKED_CAST")
-                        handler.handle(req as HttpRequest<PathSpec>)
-                    }
-                }
-            } catch (notFound: RouteNotFoundException) {
-                when (req.path.method) {
-                    HttpMethod.HEAD -> {
-                        // OK, we'll do a get and remove the body.
-                        val getRequest = req.copyWithNewPathType(path = req.path.copy(method = HttpMethod.GET))
-
-                        @Suppress("UNCHECKED_CAST")
-                        val headHandler = getRequest.path.match.value as HttpHandler<PathSpec>
-                        val getResult = instrument("handler") {
-                            withTimeout(headHandler.timeout) { headHandler.handle(getRequest) }
-                        }
-                        getResult.copy(
-                            body = null,
-                            status = if (getResult.status.success) HttpStatus.NoContent else getResult.status,
-                        )
-                    }
-
-                    else -> {
-                        this.logger.debug {
-                            "Not found: ${req.path.pathSegments.segments.map { "'$it'" }}, looking for slashes"
-                        }
-                        if (req.path.pathSegments.isNotEmpty()) {
-                            // Let's see if they just got their ending slash wrong.
-                            val altSlashEndpoint = req.path.copy(pathSegments = req.path.pathSegments.segments.let {
-                                if (it.lastOrNull() == "") it.dropLast(1) else it + ""
-                            }.let(::PathSegments))
-                            try {
-                                altSlashEndpoint.match
-                                HttpResponse.pathMoved(to = "/" + altSlashEndpoint.pathSegments.toString())
-                            } catch (_: RouteNotFoundException) {
-                                throw notFound
-                            }
-                        } else throw notFound
-                    }
-                }
-            }
-            result
+            @Suppress("UNCHECKED_CAST")
+            dispatch(req)
         } catch (timeout: TimeoutCancellationException) {
             // A handler exceeded its HttpHandler.timeout. This is a server-side condition (the server
             // couldn't finish in time), so it maps to 503 Service Unavailable — NOT 408, which per
@@ -196,6 +164,56 @@ private suspend fun ServerRuntime.innerRequestLogic(request: HttpRequest<PathSpe
         }
     }
     return LogicalRequestOutcome(response, errorType)
+}
+
+private suspend fun ServerRuntime.route(req: HttpRequest<PathSpec>): HttpResponse = try {
+    // Route resolution must live inside this try so that a RouteNotFoundException (e.g. a HEAD
+    // request with no HEAD handler, or a missing trailing slash) is caught below and recovered
+    // via the HEAD->GET fallback / slash-redirect logic rather than escaping as a bare 404.
+    @Suppress("UNCHECKED_CAST")
+    handleWithTimeout(req.path.match.value as HttpHandler<PathSpec>, req)
+} catch (notFound: RouteNotFoundException) {
+    when (req.path.method) {
+        HttpMethod.HEAD -> {
+            // OK, we'll do a get and remove the body.
+            val getRequest = req.copyWithNewPathType(path = req.path.copy(method = HttpMethod.GET))
+
+            @Suppress("UNCHECKED_CAST")
+            val getResult = handleWithTimeout(getRequest.path.match.value as HttpHandler<PathSpec>, getRequest)
+            getResult.copy(
+                body = null,
+                status = if (getResult.status.success) HttpStatus.NoContent else getResult.status,
+            )
+        }
+
+        else -> {
+            this.logger.debug {
+                "Not found: ${req.path.pathSegments.segments.map { "'$it'" }}, looking for slashes"
+            }
+            if (req.path.pathSegments.isNotEmpty()) {
+                // Let's see if they just got their ending slash wrong.
+                val altSlashEndpoint = req.path.copy(pathSegments = req.path.pathSegments.segments.let {
+                    if (it.lastOrNull() == "") it.dropLast(1) else it + ""
+                }.let(::PathSegments))
+                try {
+                    altSlashEndpoint.match
+                    HttpResponse.pathMoved(to = "/" + altSlashEndpoint.pathSegments.toString())
+                } catch (_: RouteNotFoundException) {
+                    throw notFound
+                }
+            } else throw notFound
+        }
+    }
+}
+
+private suspend fun <PATH : PathSpec> ServerRuntime.handleWithTimeout(
+    handler: HttpHandler<PATH>,
+    req: HttpRequest<PATH>,
+): HttpResponse = instrument("handler") {
+    // Per-handler request timeout (HttpHandler.timeout, default 30s), enforced at this single
+    // choke point shared by every engine instead of being duplicated (and high-risk) in each
+    // engine adapter. Cooperative cancellation: only interrupts at suspension points.
+    withTimeout(handler.timeout) { handler.handle(req) }
 }
 
 /*
