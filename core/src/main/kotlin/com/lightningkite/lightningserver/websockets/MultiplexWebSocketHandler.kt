@@ -89,7 +89,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
 
         context(server: ServerRuntime)
         override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-            val asString = topic.path()
+            val asString = topic.topicPath()
             if (asString !in wrapped.currentState) wrapped.subscribe(topic)
             wrapped.updateStateImmediately { data ->
                 data.updateChannel(channel) { it.copy(topics = it.topics + asString) }
@@ -98,7 +98,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
 
         context(server: ServerRuntime)
         override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-            val asString = topic.path()
+            val asString = topic.topicPath()
             val newState = wrapped.updateStateImmediately { data ->
                 data.updateChannel(channel) { it.copy(topics = it.topics - asString) }
             }
@@ -320,7 +320,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
         topic: WebSocketSubscriptionMessage<*, *>,
     ) {
         for ((channel, info) in connection.currentState.map) {
-            if (info.topics.contains(topic.path())) {
+            if (info.topics.contains(topic.topicPath())) {
                 val match = info.request.path.resolve()
 
                 @Suppress("UNCHECKED_CAST")

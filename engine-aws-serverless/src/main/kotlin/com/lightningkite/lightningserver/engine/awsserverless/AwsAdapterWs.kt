@@ -162,12 +162,12 @@ internal class AwsAdapterWs(val root: AwsAdapter) {
 
         context(server: ServerRuntime)
         override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-            webSocketDynamo.subscribe(path.toString(), with(root) { topic.path() }, connectionId)
+            webSocketDynamo.subscribe(path.toString(), with(root) { topic.topicPath() }, connectionId)
         }
 
         context(server: ServerRuntime)
         override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-            webSocketDynamo.unsubscribe(with(root) { topic.path() }, connectionId)
+            webSocketDynamo.unsubscribe(with(root) { topic.topicPath() }, connectionId)
         }
 
         context(server: ServerRuntime)

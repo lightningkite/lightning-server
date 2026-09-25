@@ -12,6 +12,7 @@ import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionMessage
 import com.lightningkite.lightningserver.websockets.webSocketSettings
 import com.lightningkite.lightningserver.websockets.WebSocketSubscriptionRequest
+import com.lightningkite.lightningserver.websockets.topicPath
 import com.lightningkite.services.telemetry.TelemetryAttributes
 import com.lightningkite.services.telemetry.TelemetryKey
 import com.lightningkite.services.Service
@@ -145,13 +146,13 @@ public abstract class LocalEngine(server: ServerDefinition) : EngineBase(server)
      * Gets a PubSub channel for a WebSocket subscription message.
      */
     protected fun <PATH : PathSpec, T> pubSubChannel(event: WebSocketSubscriptionMessage<PATH, T>): PubSubChannel<T> =
-        pubSub.get(event.path(), event.topic.type)
+        pubSub.get(event.topicPath(), event.topic.type)
 
     /**
      * Gets a PubSub channel for a WebSocket subscription request.
      */
     protected fun <PATH : PathSpec, T> pubSubChannel(event: WebSocketSubscriptionRequest<PATH, T>): PubSubChannel<T> =
-        pubSub.get(event.path(), event.topic.type)
+        pubSub.get(event.topicPath(), event.topic.type)
 
     /**
      * Sends a WebSocket subscription message by emitting it to the appropriate PubSub channel.

@@ -91,6 +91,19 @@ public data class WebSocketSubscriptionMessage<PATH : PathSpec, T> private const
     }
 }
 
+// Topics never leave the server, so their paths are keyed in the internal format, not the external one
+// [HasContextualPath.path] uses.
+
+/** The key this subscription's topic is published and subscribed under. */
+context(server: Engine)
+public fun WebSocketSubscriptionRequest<*, *>.topicPath(): String =
+    pathInContext.path(server.internalSerialization.stringArrayFormat)
+
+/** The key this message's topic is published and subscribed under. */
+context(server: Engine)
+public fun WebSocketSubscriptionMessage<*, *>.topicPath(): String =
+    pathInContext.path(server.internalSerialization.stringArrayFormat)
+
 
 /**
  * The initial WebSocket connection request containing connection metadata.

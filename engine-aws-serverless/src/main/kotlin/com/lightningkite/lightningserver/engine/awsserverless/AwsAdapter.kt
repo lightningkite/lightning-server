@@ -171,7 +171,7 @@ public open class AwsAdapter(server: ServerDefinition) : EngineBase(server), Req
         get() = System.getenv("AWS_LAMBDA_FUNCTION_VERSION") ?: "Unknown"
 
     override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>) {
-        ws.publish(event.path(), event.topic.type, event.value)
+        ws.publish(event.topicPath(), event.topic.type, event.value)
     }
 
     override val directWebSocketSender: DirectWebSocketSender = object : DirectWebSocketSender {
