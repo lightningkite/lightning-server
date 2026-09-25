@@ -583,10 +583,11 @@ mkdir -p /var/log/$$projectPrefix
 touch /var/log/$$projectPrefix/ec2_init.log
 exec > >(tee /var/log/$$projectPrefix/ec2_init.log | logger -t ec2_init -s) 2>&1
 
-# === System update + base packages ===
-echo "[INFO] Updating system packages..."
-apt update -y
-apt install -y openjdk-$${javaVersion.outputString}-jre-headless openssl curl gnupg ca-certificates unzip
+# === Bootstrap packages ===
+# Just enough to fetch ec2_init.sh; the full system update and package install happen there.
+echo "[INFO] Installing bootstrap packages..."
+apt-get -o DPkg::Lock::Timeout=$$aptLockTimeoutSeconds update -y
+apt-get -o DPkg::Lock::Timeout=$$aptLockTimeoutSeconds install -y curl ca-certificates unzip
 """
             )
 
@@ -630,18 +631,16 @@ rm ec2_init.sh
             appendLine(
                 """#!/bin/bash
 set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
 
 echo "[INFO] EC2 Init script started at $(date)"
 """
             )
 
-            // Additional packages - each validated
-            if (additionalPackages.isNotEmpty()) {
-                appendLine("# === Additional Packages ===")
-                appendLine("echo \"[INFO] Installing additional packages at \$(date)\"")
-                appendLine("apt install -y ${additionalPackages.joinToString(" ") { it.shellEscape() }}")
-                appendLine()
-            }
+            // Patching happens deliberately via os-update, never unattended on the live instance.
+            disableUnattendedUpgrades()
+
+            systemPackages()
 
             // Before the app is ever started, so a memory-tight instance has its safety net from
             // the very first boot.
@@ -657,30 +656,21 @@ echo "[INFO] EC2 Init script started at $(date)"
 
             runProvisioningFragments()
 
+            val localHealthUrl = "http://localhost:8080${healthCheckPath}"
+
             // The single instance fills the bucket name via terraform templatefile() and the
             // region is a compile-time constant. The app listens on appPort behind Angie.
             instanceRedeployScript(
                 $$"""BUCKET="${deployment_bucket}"
 REGION="$$applicationRegion"""",
-                localHealthUrl = "http://localhost:8080${detectedOnlinePath ?: "/meta/online"}",
+                localHealthUrl = localHealthUrl,
             )
 
-            if (instanceFiles.isNotEmpty() || instanceFilesRaw.isNotEmpty())
-                instanceFiles()
+            instanceUpdateScript(localHealthUrl = localHealthUrl)
 
-            // Custom ec2_init scripts
-            if (customInstallScripts.isNotEmpty() || customInstallScriptsRaw.isNotEmpty()) {
-                appendLine("echo \"[INFO] Running Custom EC2 Init Scripts at \$(date)\"")
-                appendLine("# === Custom ec2_init Scripts ===")
-                for (script in customInstallScripts) {
-                    appendLine(script.readString().terraformTemplateEscape())
-                    appendLine()
-                }
-                for (script in customInstallScriptsRaw) {
-                    appendLine(script.terraformTemplateEscape())
-                    appendLine()
-                }
-            }
+            instanceFiles()
+
+            runCustomInstallScripts()
 
 
             // language="Shell Script"
@@ -723,6 +713,56 @@ echo "[INFO] EC2 Init script completed in $BOOT_DURATION seconds"
 """
             )
         }
+    }
+
+    /** Install + configure the CloudWatch agent in one step. */
+    private fun StringBuilder.cloudwatchAgent(applicationRegion: String) {
+        cloudwatchAgentInstall(applicationRegion)
+        cloudwatchAgentConfig()
+    }
+
+    /**
+     * Download + install the CloudWatch agent .deb. The scaling builder installs the agent via the
+     * AWS-managed `amazon-cloudwatch-agent-linux` component instead, so it only needs [cloudwatchAgentConfig].
+     */
+    private fun StringBuilder.cloudwatchAgentInstall(applicationRegion: String) {
+        appendLine(
+            $$"""
+# === Install CloudWatch Agent ===
+echo "[INFO] Installing CloudWatch Agent at $(date)"
+curl $${
+                if (instanceArchitecture == CPUArchitecture.Arm)
+                    "https://amazoncloudwatch-agent-${applicationRegion}.s3.${applicationRegion}.amazonaws.com/ubuntu/arm64/latest/amazon-cloudwatch-agent.deb"
+                else
+                    "https://amazoncloudwatch-agent-${applicationRegion}.s3.${applicationRegion}.amazonaws.com/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb"
+            } -o cw_agent.deb
+dpkg -i cw_agent.deb
+rm -f cw_agent.deb
+"""
+        )
+    }
+
+    /**
+     * Download + install the AWS CLI v2. The scaling builder installs it via the AWS-managed
+     * `aws-cli-version-2-linux` component instead.
+     */
+    // language="Shell Script"
+    private fun StringBuilder.awsCli() {
+        appendLine(
+            $$"""
+# === Install AWS CLI v2 ===
+echo "[INFO] Installing AWS CLI V2 at $(date)"
+curl $${
+                if (instanceArchitecture == CPUArchitecture.Arm)
+                    "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip"
+                else
+                    "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
+            } -o "awscliv2.zip"
+unzip -q awscliv2.zip
+./aws/install
+rm -rf aws/ awscliv2.zip
+"""
+        )
     }
 
     private fun StringBuilder.angieInstall() {
@@ -792,9 +832,9 @@ echo "[INFO] Installing Angie $(date)"
 curl -o /etc/apt/trusted.gpg.d/angie-signing.gpg \
             https://angie.software/keys/angie-signing.gpg
 echo "deb https://download.angie.software/angie/$(. /etc/os-release && echo "$ID/$VERSION_ID $VERSION_CODENAME") main" \
-    | sudo tee /etc/apt/sources.list.d/angie.list > /dev/null
-apt-get update -y
-apt-get install -y angie
+    | tee /etc/apt/sources.list.d/angie.list > /dev/null
+apt-get -o DPkg::Lock::Timeout=$$aptLockTimeoutSeconds update -y
+apt-get -o DPkg::Lock::Timeout=$$aptLockTimeoutSeconds install -y angie
 
 # === Angie config (built-in ACME client handles cert issuance + renewal) ===
 echo "[INFO] Creating server.conf for Angie $(date)"

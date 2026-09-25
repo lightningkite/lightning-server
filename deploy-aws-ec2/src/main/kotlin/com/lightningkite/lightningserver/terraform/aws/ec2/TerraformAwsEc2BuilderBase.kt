@@ -27,7 +27,7 @@ import java.util.*
  * - Identity, storage, secrets, domain, and application configuration.
  * - The shared deployment resources: hardened S3 artifact bucket, the EC2 IAM role/instance
  *   profile, the encrypted-settings pipeline, and the JAR upload.
- * - The reusable user-data fragments (CloudWatch agent, AWS CLI, systemd unit, on-instance
+ * - The reusable user-data fragments (CloudWatch agent config, systemd unit, on-instance
  *   redeploy script, instance files, SSM agent) and the input validation/escaping helpers.
  *
  * Subclasses implement [emitDeploymentSpecific] to add their own networking, compute, DNS,
@@ -198,6 +198,9 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
 
     public open val javaVersion: JavaVersion get() = JavaVersion.V_17
 
+    /** Seconds apt waits for the dpkg lock (held briefly at boot by Ubuntu's apt-daily) before failing. */
+    public open val aptLockTimeoutSeconds: Int get() = 600
+
     /**
      * Whether to run the service in a systemd sandbox. When on, the filesystem is read-only to the
      * service except `/var/lib/$projectPrefix`, `/var/cache/$projectPrefix`, `/var/log/$projectPrefix`,
@@ -317,22 +320,14 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
      */
     abstract override val applicationVpc: AwsVpc.EC2Safe
 
+
     /**
-     * The path of the server's lightweight liveness endpoint, discovered by scanning the built
-     * server for a GET endpoint whose last path segment is "online" (which is what
-     * `MetaEndpoints` registers at `/meta/online`). Null if the server exposes no such endpoint.
-     *
-     * This is the right target for a load-balancer/health probe: it is pure liveness ("the
-     * process is accepting connections") and does not check downstream services, so a slow
-     * dependency cannot cascade into the probe failing.
+     * Health-check path the ALB polls; must return 2xx/3xx when the app is alive. Defaults to the
+     * server's autodetected `/meta/online` liveness endpoint (see [detectedOnlinePath]), falling
+     * back to `/meta/online` by convention. Deliberately a *liveness* path, not the deep
+     * `/meta/health`, so a slow downstream service can't make the ALB drain the whole fleet.
      */
-    protected val detectedOnlinePath: String? by lazy {
-        builder.build().endpoints.entries
-            .firstOrNull { (path, group) ->
-                HttpMethod.GET in group.http && path.toString().substringAfterLast('/') == "online"
-            }
-            ?.let { (path, _) -> path.toString() }
-    }
+    public open val healthCheckPath: String get() = "/meta/online"
 
     /**
      * Emits the networking, compute, DNS, TLS, redeploy, and monitoring resources specific to
@@ -695,6 +690,69 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
 
     // === Shared user-data fragments ===
 
+    /**
+     * Unattended upgrades can restart the instance or the service at any time, and unexpected
+     * restarts should never happen on a production server; patching must be controlled and planned.
+     * The scaling builder patches by re-baking its image and rolling the ASG; both builders install
+     * the `os-update` script ([instanceUpdateScript]) for patching instances already running.
+     */
+    // language="Shell Script"
+    protected fun StringBuilder.disableUnattendedUpgrades() {
+        appendLine(
+            """
+# === Disable unattended upgrades ===
+echo "[INFO] Disabling unattended-upgrades and apt daily timers at $(date)"
+cat > /etc/apt/apt.conf.d/20auto-upgrades << 'AUTO_UPGRADES_EOF'
+APT::Periodic::Update-Package-Lists "0";
+APT::Periodic::Download-Upgradeable-Packages "0";
+APT::Periodic::Unattended-Upgrade "0";
+APT::Periodic::AutocleanInterval "0";
+AUTO_UPGRADES_EOF
+systemctl disable --now unattended-upgrades.service || true
+systemctl mask unattended-upgrades.service || true
+systemctl disable --now apt-daily.timer apt-daily-upgrade.timer || true
+systemctl mask apt-daily.timer apt-daily-upgrade.timer apt-daily.service apt-daily-upgrade.service || true
+"""
+        )
+    }
+
+    /** Brings the OS fully up to date and installs the JRE, base tooling, and [additionalPackages]. */
+    // language="Shell Script"
+    protected fun StringBuilder.systemPackages() {
+        // A freshly-booted Ubuntu holds the dpkg lock for the first few minutes (apt-daily/
+        // unattended-upgrades); wait for it instead of failing or appearing to hang.
+        val apt = "apt-get -o DPkg::Lock::Timeout=$aptLockTimeoutSeconds"
+        appendLine("# === System update + base packages ===")
+        appendLine("""echo "[INFO] Updating system packages at $(date)"""")
+        appendLine("$apt update -y")
+        // --with-new-pkgs because a plain `upgrade` never installs new packages, and kernel
+        // security updates arrive as a new package name (linux-image-X-generic) pulled in by a
+        // dependency change on the metapackage. Without it they are silently held back.
+        appendLine("$apt -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold upgrade --with-new-pkgs")
+        appendLine("$apt install -y openjdk-${javaVersion.outputString}-jre-headless openssl curl gnupg ca-certificates unzip")
+        if (additionalPackages.isNotEmpty()) {
+            appendLine("echo \"[INFO] Installing additional packages at \$(date)\"")
+            appendLine("$apt install -y ${additionalPackages.joinToString(" ") { it.shellEscape() }}")
+        }
+        appendLine("$apt -y autoremove")
+        appendLine()
+    }
+
+    /** Render [customInstallScripts] and [customInstallScriptsRaw] into the provisioning script. */
+    protected fun StringBuilder.runCustomInstallScripts() {
+        if (customInstallScripts.isEmpty() && customInstallScriptsRaw.isEmpty()) return
+        appendLine("# === Custom Install Scripts ===")
+        appendLine("echo \"[INFO] Running Custom Install Scripts at \$(date)\"")
+        for (script in customInstallScripts) {
+            appendLine(script.readString().terraformTemplateEscape())
+            appendLine()
+        }
+        for (script in customInstallScriptsRaw) {
+            appendLine(script.terraformTemplateEscape())
+            appendLine()
+        }
+    }
+
     /** Render the registered [provisioningFragments] into the provisioning script. */
     protected fun StringBuilder.runProvisioningFragments() {
         if (provisioningFragments.isEmpty()) return
@@ -717,7 +775,9 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
         }
     }
 
+    // language="Shell Script"
     protected fun StringBuilder.instanceFiles() {
+        if (instanceFiles.isEmpty() && instanceFilesRaw.isEmpty()) return
         val configPath = "/etc/$projectPrefix"
         val scriptPath = "/usr/local/bin"
         appendLine("# === Copying in additional files ===")
@@ -757,6 +817,7 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
         }
     }
 
+    // language="Shell Script"
     protected fun StringBuilder.ssm() {
         appendLine(
             $$"""
@@ -774,34 +835,8 @@ fi
         )
     }
 
-    /** Install + configure the CloudWatch agent in one step (used by the boot-time single-instance path). */
-    protected fun StringBuilder.cloudwatchAgent(applicationRegion: String) {
-        cloudwatchAgentInstall(applicationRegion)
-        cloudwatchAgentConfig()
-    }
-
-    /**
-     * Download + install the CloudWatch agent .deb. The Image Builder path installs the agent via the
-     * AWS-managed `amazon-cloudwatch-agent-linux` component instead, so it only needs [cloudwatchAgentConfig].
-     */
-    protected fun StringBuilder.cloudwatchAgentInstall(applicationRegion: String) {
-        appendLine(
-            $$"""
-# === Install CloudWatch Agent ===
-echo "[INFO] Installing CloudWatch Agent at $(date)"
-curl $${
-                if (instanceArchitecture == CPUArchitecture.Arm)
-                    "https://amazoncloudwatch-agent-${applicationRegion}.s3.${applicationRegion}.amazonaws.com/ubuntu/arm64/latest/amazon-cloudwatch-agent.deb"
-                else
-                    "https://amazoncloudwatch-agent-${applicationRegion}.s3.${applicationRegion}.amazonaws.com/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb"
-            } -o cw_agent.deb
-dpkg -i cw_agent.deb
-rm -f cw_agent.deb
-"""
-        )
-    }
-
     /** Write the CloudWatch agent config (log groups + metrics) and enable the service. */
+    // language="Shell Script"
     protected fun StringBuilder.cloudwatchAgentConfig() {
         appendLine(
             $$"""
@@ -853,24 +888,6 @@ EOF
 
 systemctl enable amazon-cloudwatch-agent
 systemctl restart amazon-cloudwatch-agent
-"""
-        )
-    }
-
-    protected fun StringBuilder.awsCli() {
-        appendLine(
-            $$"""
-# === Install AWS CLI v2 ===
-echo "[INFO] Installing AWS CLI V2 at $(date)"
-curl $${
-                if (instanceArchitecture == CPUArchitecture.Arm)
-                    "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip"
-                else
-                    "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
-            } -o "awscliv2.zip"
-unzip -q awscliv2.zip
-./aws/install
-rm -rf aws/ awscliv2.zip
 """
         )
     }
@@ -985,6 +1002,7 @@ systemctl enable $$projectPrefix-swap.service
         }
     }
 
+    // language="Shell Script"
     protected fun StringBuilder.systemD() {
         // An unprivileged user cannot bind below 1024; grant exactly that capability when needed.
         // Everything is read-only except the systemd-managed State/Cache/Logs directories, the private
@@ -1314,6 +1332,121 @@ printf "LIGHTNING_SERVER_SETTINGS_DECRYPTION='%s'\n" "$SETTINGS_PASS" > "$SECRET
 mv -f "$SECRETS_DIR/settings.env.tmp" "$SECRETS_DIR/settings.env"
 SETTINGS_KEY_EOF
 chmod 0700 /usr/local/bin/$$projectPrefix-settings-key
+"""
+        )
+    }
+
+    /**
+     * Installs `/usr/local/bin/os-update`, the on-instance script that applies OS package updates
+     * and restarts the service. Unattended upgrades are disabled (see [disableUnattendedUpgrades]),
+     * so this is how a running instance gets patched in place. On the scaling builder it is driven
+     * across the fleet by `update-fleet.sh` via SSM, which drains each instance first; on the single
+     * instance it is run directly via SSM Run Command, and the restart is a brief outage.
+     *
+     * There is no rollback: apt has no reliable "undo", so the script instead refuses to report
+     * success unless the service comes back active *and* [localHealthUrl] answers, which is what
+     * keeps a broken instance from being returned to service.
+     *
+     * Note that this script is emitted into a file terraform runs through `templatefile()`, so it
+     * must not use shell parameter expansion (dollar-brace) or a literal percent-brace — terraform
+     * reads both as template interpolations and fails to render the file. Use bare `$NAME` and
+     * `cut`/`grep` instead.
+     */
+    protected fun StringBuilder.instanceUpdateScript(localHealthUrl: String) {
+        // language="Shell Script"
+        appendLine(
+            $$"""
+# === Instance Emergency Update Script ===
+# The "a CVE landed and we are not waiting for a rebuild" lever. On a scaling fleet
+# update-fleet.sh drives it one drained instance at a time; routine patching there still
+# comes from rebuilding the image and rolling the ASG.
+#
+# It restarts the app unconditionally (the JRE is an apt package and may be replaced
+# underneath a running JVM), so it is only interruption-free on an instance already
+# drained from the load balancer.
+#
+# Usage: os-update [package ...]
+#   with no arguments, applies a full upgrade; otherwise upgrades only the named packages.
+echo "[INFO] Creating OS Emergency Update Script"
+cat > /usr/local/bin/os-update << 'UPDATE_EOF'
+#!/bin/bash
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+
+log() { echo "[os-update] $(date '+%Y-%m-%d %H:%M:%S') $*"; }
+err() { echo "[os-update] $(date '+%Y-%m-%d %H:%M:%S') ERROR: $*" >&2; }
+
+LOG_FILE="/var/log/$$projectPrefix/os-update.log"
+PACKAGES="$*"
+
+mkdir -p "$(dirname "$LOG_FILE")"
+touch "$LOG_FILE"
+chown lightning-server:lightning-server "$LOG_FILE"
+exec > >(tee -a "$LOG_FILE" | logger -t os-update -s) 2>&1
+
+log "OS update started"
+apt-get -o DPkg::Lock::Timeout=$$aptLockTimeoutSeconds update -y
+
+# Keep existing config files on conflict; an interactive dpkg prompt would hang the SSM command.
+APT_OPTS="-y -o DPkg::Lock::Timeout=$$aptLockTimeoutSeconds -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
+if [ -n "$PACKAGES" ]; then
+    # `install --only-upgrade` exits 0 for a package that is not installed, so a typo'd or
+    # wrong-architecture name would report a clean patch while changing nothing at all. Check
+    # each name up front and fail loudly instead.
+    for p in $PACKAGES; do
+        name=$(echo "$p" | cut -d= -f1)
+        if ! dpkg-query -s "$name" 2>/dev/null | grep -q 'Status: install ok installed'; then
+            err "not installed on this host, refusing to report a successful update: $p"
+            exit 1
+        fi
+    done
+    log "Upgrading only: $PACKAGES"
+    apt-get $APT_OPTS install --only-upgrade $PACKAGES
+else
+    # --with-new-pkgs because a plain `upgrade` never installs new packages, and kernel security
+    # updates arrive as a new package name (linux-image-X-generic) pulled in by a dependency
+    # change on the metapackage. Without it the one update most likely to need a reboot is the
+    # one silently held back.
+    log "Applying full upgrade"
+    apt-get $APT_OPTS upgrade --with-new-pkgs
+    # Deliberately only on the full-upgrade path. Naming packages means the operator asked for a minimal,
+    # auditable change to one or two packages; autoremove is a whole-system operation that will
+    # happily purge old kernels and anything else currently marked auto-and-no-longer-needed,
+    # which is not a blast radius to take on while chasing a single CVE.
+    apt-get $APT_OPTS autoremove
+fi
+
+log "Restarting $$deploymentTag"
+systemctl restart $$projectPrefix
+sleep 5
+if ! systemctl is-active --quiet $$projectPrefix; then
+    err "Service failed to start after OS update"
+    tail -n 100 /var/log/$$projectPrefix/server.log >&2 || true
+    exit 1
+fi
+
+log "Waiting for liveness at $$localHealthUrl"
+healthy=0
+for i in $(seq 1 20); do
+    if curl -fsS -o /dev/null --max-time 5 "$$localHealthUrl"; then healthy=1; break; fi
+    sleep 3
+done
+if [ "$healthy" -ne 1 ]; then
+    err "Liveness endpoint $$localHealthUrl never returned success"
+    tail -n 100 /var/log/$$projectPrefix/server.log >&2 || true
+    exit 1
+fi
+
+# Breadcrumb for the CloudWatch log; a reboot is needed to activate a patched kernel. Callers that
+# act on it (update-fleet.sh) probe /var/run/reboot-required with their own SSM command rather than
+# reading this back, because SSM truncates command output at 24,000 characters per stream and a
+# full apt upgrade can push a trailing marker past that cap.
+if [ -f /var/run/reboot-required ]; then log "REBOOT_REQUIRED=yes"; else log "REBOOT_REQUIRED=no"; fi
+log "Done"
+UPDATE_EOF
+
+chmod +x /usr/local/bin/os-update
+echo "[INFO] Creating OS Emergency Update Script - DONE"
 """
         )
     }

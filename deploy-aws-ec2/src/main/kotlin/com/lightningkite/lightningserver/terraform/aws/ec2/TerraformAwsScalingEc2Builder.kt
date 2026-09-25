@@ -5,7 +5,6 @@ import com.lightningkite.services.Untested
 import com.lightningkite.services.terraform.*
 import com.lightningkite.services.terraform.TerraformJsonObject.Companion.expression
 import kotlinx.serialization.json.*
-import org.intellij.lang.annotations.Language
 
 /**
  * Terraform builder for deploying Lightning Server to a horizontally-scaled, load-balanced
@@ -96,13 +95,6 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
     /** Exposed publicly for the ALB to reach */
     override val appBindsAllNetworkInterfaces: Boolean get() = true
 
-    /**
-     * Health-check path the ALB polls; must return 2xx/3xx when the app is alive. Defaults to the
-     * server's autodetected `/meta/online` liveness endpoint (see [detectedOnlinePath]), falling
-     * back to `/meta/online` by convention. Deliberately a *liveness* path, not the deep
-     * `/meta/health`, so a slow downstream service can't make the ALB drain the whole fleet.
-     */
-    public open val healthCheckPath: String get() = detectedOnlinePath ?: "/meta/online"
 
     /** Grace period (seconds) before ASG health checks can mark a new instance unhealthy. */
     public open val healthCheckGracePeriodSeconds: Int get() = 300
@@ -176,11 +168,23 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
     public open val baseImageSalt: String get() = "1"
 
     /**
-     * AWS-managed EC2 Image Builder components installed before the custom component. These replace
-     * hand-rolled install steps with AWS-maintained ones (e.g. the AWS CLI and the CloudWatch agent).
+     * AWS-managed components every image needs, installed first. Not overridable: the on-instance
+     * redeploy, pre-deploy, and settings-key scripts call the AWS CLI, and the custom component writes
+     * the CloudWatch agent's config into the directory its package creates.
      */
-    public open val imageManagedComponents: List<ImageComponent>
-        get() = listOf(ImageComponent("aws-cli-version-2-linux"), ImageComponent("amazon-cloudwatch-agent-linux"))
+    private val requiredImageComponents: List<ImageComponent> =
+        listOf(ImageComponent("aws-cli-version-2-linux"), ImageComponent("amazon-cloudwatch-agent-linux"))
+
+    /**
+     * Extra EC2 Image Builder components installed after [requiredImageComponents] and before the
+     * custom component. Empty by default.
+     */
+    public open val additionalImageComponents: List<ImageComponent>
+        get() = emptyList()
+
+    /** Every component that runs before the custom install component, in order. */
+    private val preInstallComponents: List<ImageComponent>
+        get() = requiredImageComponents + additionalImageComponents
 
     /**
      * Components applied *after* everything is installed — typically OS hardening. Empty by default; enable
@@ -188,9 +192,6 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
      */
     public open val hardeningComponents: List<ImageComponent>
         get() = emptyList()
-
-    /** Seconds apt waits for the dpkg lock (held briefly at boot by Ubuntu's apt-daily) before failing. */
-    public open val aptLockTimeoutSeconds: Int get() = 600
 
     /** A full component ARN passes through unchanged; a short name expands to the latest AWS-managed version. */
     private fun managedComponentArn(name: String): String =
@@ -418,10 +419,10 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
                 "name" - "$projectPrefix-recipe"
                 "version" - imageVersion
                 "parent_image" - expression("data.aws_ami.ubuntu.id")
-                // Ordered: AWS-managed installs first, then our custom component, then hardening last so it
-                // locks down the fully-built image.
+                // Ordered: required + additional installs first, then our custom component, then hardening
+                // last so it locks down the fully-built image.
                 "component" - buildList<JsonElement> {
-                    imageManagedComponents.forEach { add(it.toRecipeComponent()) }
+                    preInstallComponents.forEach { add(it.toRecipeComponent()) }
                     add(terraformJsonObject { "component_arn" - expression("aws_imagebuilder_component.install.arn") })
                     hardeningComponents.forEach { add(it.toRecipeComponent()) }
                 }
@@ -485,7 +486,7 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
                 "image_data" - $$"""${templatefile("${path.module}/image_data.yaml", { $$replacements })}"""
                 "image_salt" - baseImageSalt
                 "image_components" - buildList<JsonElement> {
-                    imageManagedComponents.forEach { add(it.toRecipeComponent()) }
+                    preInstallComponents.forEach { add(it.toRecipeComponent()) }
                     hardeningComponents.forEach { add(it.toRecipeComponent()) }
                 }
                 // The recipe's own inputs, which are versioned by [imageVersion] just like the
@@ -515,48 +516,21 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
             appendLine("export DEBIAN_FRONTEND=noninteractive")
             appendLine()
 
-            // Unattended upgrades have the chance of restarting the instance/process. Unexpected restarts should never
-            // happen on a production server. They must be controlled and planned.
-            appendLine("# === Disable unattended upgrades ===")
-            appendLine("# Patching happens by rebuilding this image and rolling the ASG, not in place on a")
-            appendLine("# live instance.")
-            appendLine("""echo "[INFO] Disabling unattended-upgrades and apt daily timers at $(date)"""")
-            appendLine("cat > /etc/apt/apt.conf.d/20auto-upgrades << 'AUTO_UPGRADES_EOF'")
-            appendLine("""APT::Periodic::Update-Package-Lists "0";""")
-            appendLine("""APT::Periodic::Download-Upgradeable-Packages "0";""")
-            appendLine("""APT::Periodic::Unattended-Upgrade "0";""")
-            appendLine("""APT::Periodic::AutocleanInterval "0";""")
-            appendLine("AUTO_UPGRADES_EOF")
-            appendLine("systemctl disable --now unattended-upgrades.service || true")
-            appendLine("systemctl mask unattended-upgrades.service || true")
-            appendLine("systemctl disable --now apt-daily.timer apt-daily-upgrade.timer || true")
-            appendLine("systemctl mask apt-daily.timer apt-daily-upgrade.timer apt-daily.service apt-daily-upgrade.service || true")
-            appendLine()
+            // Patching happens by rebuilding this image and rolling the ASG (or os-update in an
+            // emergency), never unattended on a live instance.
+            disableUnattendedUpgrades()
 
-            // A freshly-booted Ubuntu holds the dpkg lock for the first few minutes (apt-daily/
-            // unattended-upgrades); wait for it instead of failing or appearing to hang.
-            val apt = "apt-get -o DPkg::Lock::Timeout=$aptLockTimeoutSeconds"
-            appendLine("$apt update -y")
-            // --with-new-pkgs because a plain `upgrade` never installs new packages, and kernel
-            // security updates arrive as a new package name (linux-image-X-generic) pulled in by a
-            // dependency change on the metapackage. Without it they are silently held back.
-            appendLine("$apt -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold upgrade --with-new-pkgs")
-            appendLine("$apt install -y openjdk-${javaVersion.outputString}-jre-headless openssl curl gnupg ca-certificates unzip")
-            if (additionalPackages.isNotEmpty()) {
-                appendLine("echo \"[INFO] Installing additional packages at \$(date)\"")
-                appendLine("$apt install -y ${additionalPackages.joinToString(" ") { it.shellEscape() }}")
-            }
-            appendLine("$apt -y autoremove")
-
-            // The AWS CLI and the CloudWatch agent binary are installed by AWS-managed components
-            // (see imageManagedComponents) that run before this one; we only write the agent config here.
-            cloudwatchAgentConfig()
-
-            ssm()
+            systemPackages()
 
             // Baked as an enabled unit only; the ASG's instances allocate the file when they boot,
             // keeping it out of the AMI snapshot.
             swap(activateNow = false)
+
+            // The AWS CLI and the CloudWatch agent binary are installed by AWS-managed components
+            // (see requiredImageComponents) that run before this one; we only write the agent config here.
+            cloudwatchAgentConfig()
+
+            ssm()
 
             systemD()
 
@@ -565,33 +539,22 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
             // any secrets they need from SSM.
             runProvisioningFragments()
 
+            val localHealthUrl = "http://localhost:8080${healthCheckPath}"
+
             // The redeploy script reads the bucket + region from deploy.env written at boot, and
             // validates the new build against the local liveness endpoint before declaring success.
             instanceRedeployScript(
                 """if [ -f /etc/lightning-server/deploy.env ]; then . /etc/lightning-server/deploy.env; fi
 BUCKET="${'$'}DEPLOYMENT_BUCKET"
 REGION="${'$'}AWS_REGION_NAME"""",
-                localHealthUrl = "http://localhost:8080$healthCheckPath",
+                localHealthUrl = localHealthUrl,
             )
 
-            instanceUpdateScript(localHealthUrl = "http://localhost:8080$healthCheckPath")
+            instanceUpdateScript(localHealthUrl = localHealthUrl)
 
-            if (instanceFiles.isNotEmpty() || instanceFilesRaw.isNotEmpty())
-                instanceFiles()
+            instanceFiles()
 
-            // Custom Image Install scripts
-            if (customInstallScripts.isNotEmpty() || customInstallScriptsRaw.isNotEmpty()) {
-                appendLine("echo \"[INFO] Running Custom Image Install Init Scripts at \$(date)\"")
-                appendLine("# === Custom Image Install Scripts ===")
-                for (script in customInstallScripts) {
-                    appendLine(script.readString().terraformTemplateEscape())
-                    appendLine()
-                }
-                for (script in customInstallScriptsRaw) {
-                    appendLine(script.terraformTemplateEscape())
-                    appendLine()
-                }
-            }
+            runCustomInstallScripts()
 
             // Enable (but do not start) the service so it auto-starts after the boot-time deploy.
             appendLine("systemctl enable $projectPrefix || true")
@@ -995,115 +958,6 @@ systemctl enable $$projectPrefix || true
     private fun emitFleetUpdater() {
         emitExtra("update-fleet.sh", fleetUpdateScript())
     }
-
-    /**
-     * Installs `/usr/local/bin/os-update`, the on-instance script that applies OS package updates
-     * and restarts the service. It is driven across the fleet by `update-fleet.sh` via SSM; see
-     * [fleetUpdateScript] for the drain/update/reboot/verify sequence around it.
-     *
-     * There is no rollback: apt has no reliable "undo", so the script instead refuses to report
-     * success unless the service comes back active *and* [localHealthUrl] answers, which is what
-     * keeps a broken instance from being returned to the load balancer.
-     *
-     * Note that this script is emitted into `image_data.yaml`, which terraform runs through
-     * `templatefile()`, so it must not use shell parameter expansion (dollar-brace) or a literal
-     * percent-brace — terraform reads both as template interpolations and fails to render the
-     * file. Use bare `$NAME` and `cut`/`grep` instead.
-     */
-    @Language("Shell Script")
-    private fun StringBuilder.instanceUpdateScript(localHealthUrl: String) = appendLine($$"""
-# === Instance Emergency Update Script ===
-# Driven by update-fleet.sh via SSM as the emergency "a CVE landed and we are not
-# waiting for an AMI bake" lever. Routine patching still comes from rebuilding this
-# image and rolling the ASG; this only patches instances already running.
-#
-# It restarts the app unconditionally (the JRE is an apt package and may be replaced
-# underneath a running JVM), so it is only safe on an instance already drained from
-# the load balancer.
-#
-# Usage: os-update [package ...]
-#   with no arguments, applies a full upgrade; otherwise upgrades only the named packages.
-echo "[INFO] Creating OS Emergency Update Script"
-cat > /usr/local/bin/os-update << 'UPDATE_EOF'
-#!/bin/bash
-set -euo pipefail
-export DEBIAN_FRONTEND=noninteractive
-
-log() { echo "[os-update] $(date '+%Y-%m-%d %H:%M:%S') $*"; }
-err() { echo "[os-update] $(date '+%Y-%m-%d %H:%M:%S') ERROR: $*" >&2; }
-
-LOG_FILE="/var/log/$$projectPrefix/os-update.log"
-PACKAGES="$*"
-
-mkdir -p "$(dirname "$LOG_FILE")"
-touch "$LOG_FILE"
-chown lightning-server:lightning-server "$LOG_FILE"
-exec > >(tee -a "$LOG_FILE" | logger -t os-update -s) 2>&1
-
-log "OS update started"
-apt-get -o DPkg::Lock::Timeout=600 update -y
-
-# Keep existing config files on conflict; an interactive dpkg prompt would hang the SSM command.
-APT_OPTS="-y -o DPkg::Lock::Timeout=600 -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
-if [ -n "$PACKAGES" ]; then
-    # `install --only-upgrade` exits 0 for a package that is not installed, so a typo'd or
-    # wrong-architecture name would report a clean patch while changing nothing at all. Check
-    # each name up front and fail loudly instead.
-    for p in $PACKAGES; do
-        name=$(echo "$p" | cut -d= -f1)
-        if ! dpkg-query -s "$name" 2>/dev/null | grep -q 'Status: install ok installed'; then
-            err "not installed on this host, refusing to report a successful update: $p"
-            exit 1
-        fi
-    done
-    log "Upgrading only: $PACKAGES"
-    apt-get $APT_OPTS install --only-upgrade $PACKAGES
-else
-    # --with-new-pkgs because a plain `upgrade` never installs new packages, and kernel security
-    # updates arrive as a new package name (linux-image-X-generic) pulled in by a dependency
-    # change on the metapackage. Without it the one update most likely to need the reboot this
-    # script performs is the one silently held back.
-    log "Applying full upgrade"
-    apt-get $APT_OPTS upgrade --with-new-pkgs
-    # Deliberately only on the full-upgrade path. `-p` means the operator asked for a minimal,
-    # auditable change to one or two packages; autoremove is a whole-system operation that will
-    # happily purge old kernels and anything else currently marked auto-and-no-longer-needed,
-    # which is not a blast radius to take on while chasing a single CVE.
-    apt-get $APT_OPTS autoremove
-fi
-
-log "Restarting $$deploymentTag"
-systemctl restart $$projectPrefix
-sleep 5
-if ! systemctl is-active --quiet $$projectPrefix; then
-    err "Service failed to start after OS update"
-    tail -n 100 /var/log/$$projectPrefix/server.log >&2 || true
-    exit 1
-fi
-
-log "Waiting for liveness at $$localHealthUrl"
-healthy=0
-for i in $(seq 1 20); do
-    if curl -fsS -o /dev/null --max-time 5 "$$localHealthUrl"; then healthy=1; break; fi
-    sleep 3
-done
-if [ "$healthy" -ne 1 ]; then
-    err "Liveness endpoint $$localHealthUrl never returned success"
-    tail -n 100 /var/log/$$projectPrefix/server.log >&2 || true
-    exit 1
-fi
-
-# Breadcrumb for the CloudWatch log only. update-fleet.sh probes
-# /var/run/reboot-required with its own SSM command rather than reading this back,
-# because SSM truncates command output at 24,000 characters per stream and a full
-# apt upgrade can push a trailing marker past that cap.
-if [ -f /var/run/reboot-required ]; then log "REBOOT_REQUIRED=yes"; else log "REBOOT_REQUIRED=no"; fi
-log "Done"
-UPDATE_EOF
-
-chmod +x /usr/local/bin/os-update
-echo "[INFO] Creating OS Emergency Update Script - DONE"
-""")
 
     /**
      * The helper functions [fleetRedeployScript] and [fleetUpdateScript] share, with log output
