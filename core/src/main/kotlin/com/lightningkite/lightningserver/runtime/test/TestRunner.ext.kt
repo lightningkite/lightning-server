@@ -8,10 +8,10 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.didConnectWithMetrics
+import com.lightningkite.lightningserver.runtime.didConnectAsRoot
 import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.lightningserver.runtime.location
-import com.lightningkite.lightningserver.runtime.willConnectWithMetrics
+import com.lightningkite.lightningserver.runtime.willConnectAsRoot
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.TypedData
 
@@ -38,8 +38,8 @@ private suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.c
     request: WebSocketConnectRequest<PATH>,
 ): TestRunner<*>.TestWebSocket<PATH, STORAGE> {
     val intercepted = test.server.interceptIncomingSocket(this)
-    val storage = intercepted.willConnectWithMetrics(request)
-    return test.TestWebSocket(intercepted, request, storage).also { intercepted.didConnectWithMetrics(it.server) }
+    val storage = intercepted.willConnectAsRoot(request)
+    return test.TestWebSocket(intercepted, request, storage).also { intercepted.didConnectAsRoot(it.server) }
 }
 
 /**

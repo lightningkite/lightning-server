@@ -90,9 +90,8 @@ class ExecutionInterceptorTest {
                 server.schedule.executeWithMetrics(server.schedule.location)
                 server.startup.executeWithMetrics(server.startup.location)
                 server.preDeploy.executeWithMetrics(server.preDeploy.location)
-                // The test runner drives sockets without the metrics helpers, so the socket seam is
-                // exercised the way an engine does it.
-                server.socket.willConnectWithMetrics(
+                // Exercises the socket seam the way an engine does, as a root.
+                server.socket.willConnectAsRoot(
                     request = WebSocketConnectRequest(
                         RawWebSocketPath(server.socket.location),
                         socketId = Execution.ID.generate(),

@@ -14,13 +14,13 @@ import com.lightningkite.lightningserver.engine.local.LocalWebSocketConnection
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.InternalLightningServerApi
-import com.lightningkite.lightningserver.runtime.didConnectWithMetrics
-import com.lightningkite.lightningserver.runtime.disconnectAndClose
+import com.lightningkite.lightningserver.runtime.didConnectAsRoot
+import com.lightningkite.lightningserver.runtime.disconnectAndCloseAsRoot
 import com.lightningkite.lightningserver.runtime.handleRoot
-import com.lightningkite.lightningserver.runtime.messageFromClientWithMetrics
-import com.lightningkite.lightningserver.runtime.willConnectWithMetrics
+import com.lightningkite.lightningserver.runtime.messageFromClientAsRoot
+import com.lightningkite.lightningserver.runtime.willConnectAsRoot
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.handleDirectWithMetrics
+import com.lightningkite.lightningserver.runtime.handleDirectAsRoot
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.data.Data
@@ -252,7 +252,7 @@ public class KtorEngine(
                         }
                     }
 
-                    directHandler.handleDirectWithMetrics(
+                    directHandler.handleDirectAsRoot(
                         request = request,
                         incoming = incomingChannel,
                         send = { frame ->
@@ -270,7 +270,7 @@ public class KtorEngine(
                     @Suppress("UNCHECKED_CAST")
                     socketHandler as WebSocketHandler<PathSpec, Any?>
 
-                    val storage = socketHandler.willConnectWithMetrics(request)
+                    val storage = socketHandler.willConnectAsRoot(request)
 
                     val connection = object : LocalWebSocketConnection<PathSpec, Any?>(
                         startingState = storage,
@@ -297,7 +297,7 @@ public class KtorEngine(
 
                     var exception: Throwable? = null
                     try {
-                        socketHandler.didConnectWithMetrics(connection)
+                        socketHandler.didConnectAsRoot(connection)
 
                         for (incoming in this.incoming) {
                             val m = when (incoming) {
@@ -307,7 +307,7 @@ public class KtorEngine(
                                 is Frame.Ping -> continue
                                 is Frame.Pong -> continue
                             }
-                            socketHandler.messageFromClientWithMetrics(connection, m)
+                            socketHandler.messageFromClientAsRoot(connection, m)
                         }
                     } catch (e: Throwable) {
                         exception = e
@@ -315,7 +315,7 @@ public class KtorEngine(
                         currentCoroutineContext().ensureActive()
                     } finally {
                         withContext(NonCancellable) {
-                            socketHandler.disconnectAndClose(
+                            socketHandler.disconnectAndCloseAsRoot(
                                 connection,
                                 reason = exception?.let(WebSocketClose::exceptional) ?: WebSocketClose.NORMAL
                             )

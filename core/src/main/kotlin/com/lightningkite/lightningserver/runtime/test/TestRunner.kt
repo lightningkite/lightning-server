@@ -9,11 +9,11 @@ import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.EngineBase
 import com.lightningkite.lightningserver.runtime.execute
-import com.lightningkite.lightningserver.runtime.disconnectAndClose
+import com.lightningkite.lightningserver.runtime.disconnectAndCloseAsRoot
 import com.lightningkite.lightningserver.runtime.executeInlineWithMetrics
 import com.lightningkite.lightningserver.runtime.location
-import com.lightningkite.lightningserver.runtime.messageFromClientWithMetrics
-import com.lightningkite.lightningserver.runtime.messageFromSubscriptionWithMetrics
+import com.lightningkite.lightningserver.runtime.messageFromClientAsRoot
+import com.lightningkite.lightningserver.runtime.messageFromSubscriptionAsRoot
 import com.lightningkite.lightningserver.settings.ServerSettings
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.SettingContext
@@ -131,6 +131,7 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
      */
     // Every phase is run with the runner as the engine, as the network would trigger it in production,
     // rather than nested inside whatever the test happens to be doing when it calls send()/close().
+    @OptIn(InternalLightningServerApi::class)
     public inner class TestWebSocket<PATH : PathSpec, STORAGE>(
         private val handler: WebSocketHandler<PATH, STORAGE>,
         public val request: WebSocketConnectRequest<PATH>,
@@ -140,12 +141,12 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
         public var onMessageSent: (frame: WebSocketFrame) -> Unit = {}
         public suspend fun close() {
             /*logger.debug*/run { "$name --> <close>" }.let(::println)
-            with(this@TestRunner) { handler.disconnectAndClose(this@TestWebSocket.server, WebSocketClose.NORMAL) }
+            with(this@TestRunner) { handler.disconnectAndCloseAsRoot(this@TestWebSocket.server, WebSocketClose.NORMAL) }
         }
 
         public suspend fun send(frame: WebSocketFrame) {
             /*logger.debug*/run { "$name --> '$frame'" }.let(::println)
-            with(this@TestRunner) { handler.messageFromClientWithMetrics(this@TestWebSocket.server, frame) }
+            with(this@TestRunner) { handler.messageFromClientAsRoot(this@TestWebSocket.server, frame) }
             server.flush()
         }
 
@@ -154,7 +155,7 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
         public inner class ServerSide() : WebSocketConnection<PATH, STORAGE> {
             private val changeQueue = ArrayList<(STORAGE) -> STORAGE>()
             private val sub: suspend (WebSocketSubscriptionMessage<*, *>) -> Unit = {
-                with(this@TestRunner) { handler.messageFromSubscriptionWithMetrics(this@ServerSide, it) }
+                with(this@TestRunner) { handler.messageFromSubscriptionAsRoot(this@ServerSide, it) }
                 flush()
             }
 
@@ -210,7 +211,7 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
             context(server: ServerRuntime)
             override suspend fun close(reason: WebSocketClose) {
                 // Transport teardown only. The disconnect phase is run by whoever ends the socket (see
-                // [TestWebSocket.close], whose disconnectAndClose ends here); running it from here would
+                // [TestWebSocket.close], whose disconnectAndCloseAsRoot ends here); running it from here would
                 // re-enter it, since disconnect handlers close the connection themselves.
                 /*logger.debug*/run { "$name <-- <close>" }.let(::println)
                 clean()

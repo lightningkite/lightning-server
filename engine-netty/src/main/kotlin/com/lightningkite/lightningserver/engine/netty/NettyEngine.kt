@@ -329,7 +329,7 @@ public class NettyEngine(
         cleanupScope.launch {
             try {
                 // Guarantees mid gets closed even if the handler's own disconnect() throws.
-                handler.disconnectAndClose(mid, reason)
+                handler.disconnectAndCloseAsRoot(mid, reason)
             } catch (e: Exception) {
                 logger.error(e) { "disconnect handling failed" }
             }
@@ -400,7 +400,7 @@ public class NettyEngine(
                         val handler = ctx.channel().attr(HANDLER_KEY).get() ?: return
                         scope.launch(ctx.executor().asCoroutineDispatcher()) {
                             try {
-                                handler.messageFromClientWithMetrics(mid, m)
+                                handler.messageFromClientAsRoot(mid, m)
                             } catch (e: Exception) {
                                 // Route through the normal disconnect lifecycle rather than a bare
                                 // close, so the handler's own cleanup still runs.
@@ -423,7 +423,7 @@ public class NettyEngine(
                         val handler = ctx.channel().attr(HANDLER_KEY).get() ?: return
                         scope.launch(ctx.executor().asCoroutineDispatcher()) {
                             try {
-                                handler.messageFromClientWithMetrics(mid, m)
+                                handler.messageFromClientAsRoot(mid, m)
                             } catch (e: Exception) {
                                 // Route through the normal disconnect lifecycle rather than a bare
                                 // close, so the handler's own cleanup still runs.
@@ -538,7 +538,7 @@ public class NettyEngine(
                 handshaker.handshake(ctx.channel(), req).addListener {
                     scope.launch {
                         try {
-                            directHandler.handleDirectWithMetrics(
+                            directHandler.handleDirectAsRoot(
                                 request = wsRequest,
                                 incoming = incomingChannel,
                                 send = { frame ->
@@ -567,7 +567,7 @@ public class NettyEngine(
                 socketHandler as WebSocketHandler<PathSpec, Any?>
 
                 val startingState = try {
-                    socketHandler.willConnectWithMetrics(wsRequest)
+                    socketHandler.willConnectAsRoot(wsRequest)
                 } catch (e: HttpStatusException) {
                     logger.error(e) { "" }
                     val res = DefaultFullHttpResponse(req.protocolVersion(), HttpResponseStatus.valueOf(e.status.code))
@@ -621,7 +621,7 @@ public class NettyEngine(
                 handshaker.handshake(ctx.channel(), req).addListener {
                     scope.launch {
                         try {
-                            socketHandler.didConnectWithMetrics(mid)
+                            socketHandler.didConnectAsRoot(mid)
                         } catch (_: Throwable) {
                         }
                     }

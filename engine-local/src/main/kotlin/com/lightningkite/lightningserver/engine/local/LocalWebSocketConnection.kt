@@ -4,10 +4,9 @@ package com.lightningkite.lightningserver.engine.local
 
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.executeWithoutTelemetry
+import com.lightningkite.lightningserver.runtime.messageFromSubscriptionAsRoot
 import com.lightningkite.lightningserver.websockets.*
 import com.lightningkite.services.pubsub.PubSubChannel
 import kotlinx.coroutines.CoroutineScope
@@ -57,20 +56,12 @@ public abstract class LocalWebSocketConnection<PATH : PathSpec, STORAGE>(
         subscriptions.remove(topic)?.cancel()
         subscriptions[topic] = scope.launch {
             pubSub(topic).collect { value ->
-                // Delivered from the pub/sub collector, not from within whatever called subscribe(), so there
-                // is no parent execution.
-                val phaseExecution = Execution.WebSocket(
-                    id = Execution.ID.generate(),
-                    socketId = socketId,
-                    path = request.path,
-                    phase = Execution.WebSocket.Phase.SubscriptionMessage,
+                // Each delivery is caused by the published message, not by whatever called subscribe(), so it
+                // runs as a root.
+                handler.messageFromSubscriptionAsRoot(
+                    this@LocalWebSocketConnection,
+                    WebSocketSubscriptionMessage(topic, value),
                 )
-                server.executeWithoutTelemetry(phaseExecution) {
-                    handler.messageFromSubscription(
-                        this@LocalWebSocketConnection,
-                        WebSocketSubscriptionMessage(topic, value),
-                    )
-                }
             }
             yield()
         }
