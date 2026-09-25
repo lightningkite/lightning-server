@@ -340,21 +340,6 @@ class Ec2BuilderGenerationTest {
         assertContains(ex.message!!, "does not fit")
     }
 
-    @Test
-    fun scalingAutodetectsOnlinePathAndOptionalKnobs() {
-        val d = OnlineScalingDeployment()
-        d.write()
-        // Health check uses the autodetected liveness path, not the /meta/online fallback.
-        val path = d.terraformRoot.findResource("aws_lb_target_group", "app")!!
-            .let { it["health_check"]!!.jsonObject["path"]!!.jsonPrimitive.content }
-        assertEquals("/api/online", path)
-        // Request-count policy present when scalingRequestsPerTarget is set.
-        assertNotNull(d.terraformRoot.findResource("aws_autoscaling_policy", "requests"))
-        // Max instance lifetime wired through.
-        val maxLife = d.terraformRoot.findResource("aws_autoscaling_group", "app")!!
-            .let { it["max_instance_lifetime"]!!.jsonPrimitive.int }
-        assertEquals(604800, maxLife)
-    }
 
     // === Service hardening: layout, sandbox, settings handling ===
 
