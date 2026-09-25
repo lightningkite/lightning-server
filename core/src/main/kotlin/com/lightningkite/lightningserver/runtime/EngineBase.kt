@@ -1,5 +1,8 @@
+@file:OptIn(EngineApi::class)
+
 package com.lightningkite.lightningserver.runtime
 
+import com.lightningkite.lightningserver.EngineApi
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.serialization.Serialization

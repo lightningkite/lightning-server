@@ -2,6 +2,7 @@
 
 package com.lightningkite.lightningserver.runtime
 
+import com.lightningkite.lightningserver.EngineApi
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.definition.PreDeployTask
 import com.lightningkite.lightningserver.definition.ScheduledTask
@@ -67,7 +68,7 @@ private suspend fun Engine.executeTaskLike(
  * For running a task that was dispatched elsewhere, where [from] is the launching execution read back
  * from the queue. Inside an execution, use the overload without [from].
  */
-@InternalLightningServerApi
+@EngineApi
 context(engine: Engine)
 public suspend fun <T> Task<T>.executeInlineWithMetrics(input: T, from: Execution): Unit =
     engine.executeTaskLike(
@@ -82,11 +83,13 @@ public suspend fun <T> Task<T>.executeInlineWithMetrics(input: T, from: Executio
     ) { executeInline(input) }
 
 /** Runs this task inline as a new execution caused by the current one, with telemetry and interceptors. */
+@OptIn(EngineApi::class)
 context(runtime: ServerRuntime)
 public suspend fun <T> Task<T>.executeInlineWithMetrics(input: T): Unit =
     executeInlineWithMetrics(input, runtime.execution)
 
 /** Runs this scheduled task as a new root execution, with telemetry and interceptors. */
+@EngineApi
 context(engine: Engine)
 public suspend fun ScheduledTask.executeWithMetrics(): Unit =
     engine.executeTaskLike(
@@ -96,6 +99,7 @@ public suspend fun ScheduledTask.executeWithMetrics(): Unit =
     ) { execute() }
 
 /** Runs this startup task as a new root execution, with telemetry and interceptors. */
+@EngineApi
 context(engine: Engine)
 public suspend fun StartupTask.executeWithMetrics(): Unit =
     engine.executeTaskLike(
@@ -105,6 +109,7 @@ public suspend fun StartupTask.executeWithMetrics(): Unit =
     ) { execute() }
 
 /** Runs this pre-deploy task as a new root execution, with telemetry and interceptors. */
+@EngineApi
 context(engine: Engine)
 public suspend fun PreDeployTask.executeWithMetrics(): Unit =
     engine.executeTaskLike(

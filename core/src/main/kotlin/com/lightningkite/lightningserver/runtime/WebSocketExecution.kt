@@ -2,6 +2,7 @@
 
 package com.lightningkite.lightningserver.runtime
 
+import com.lightningkite.lightningserver.EngineApi
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.route
@@ -23,12 +24,12 @@ private val wsDisconnectReason = TelemetryKey.OfString("ws.disconnect.reason")
 // pub/sub collector), or as a child of the current execution (a handler driving a nested socket, such as a
 // multiplexed channel). They are separate functions, `xAsRoot` and `xWithMetrics`, rather than inferred from
 // whether a ServerRuntime happens to be in scope, so a phase can never pick up an unrelated parent. Only
-// whatever drives a socket needs the roots, so they are internal, like Engine.handleRoot's role for HTTP.
+// whatever drives a socket needs the roots, so they are @EngineApi.
 
 /**
  * Runs [DirectExecutableWebSocketHandler.handleDirect] as the socket's Connect execution, as a root.
  */
-@InternalLightningServerApi
+@EngineApi
 context(engine: Engine)
 public suspend fun <PATH : PathSpec, STORAGE> DirectExecutableWebSocketHandler<PATH, STORAGE>.handleDirectAsRoot(
     request: WebSocketConnectRequest<PATH>,
@@ -62,7 +63,7 @@ public suspend fun <PATH : PathSpec, STORAGE> DirectExecutableWebSocketHandler<P
 }
 
 /** Runs [WebSocketHandler.willConnect] as the socket's Connect execution, as a root. */
-@InternalLightningServerApi
+@EngineApi
 context(engine: Engine)
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.willConnectAsRoot(
     request: WebSocketConnectRequest<PATH>,
@@ -87,7 +88,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.wi
 }
 
 /** Runs [WebSocketHandler.didConnect] as a new root execution. */
-@InternalLightningServerApi
+@EngineApi
 context(engine: Engine)
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.didConnectAsRoot(
     connection: WebSocketConnection<PATH, STORAGE>,
@@ -112,7 +113,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
 }
 
 /** Runs [WebSocketHandler.messageFromClient] as a new root execution. */
-@InternalLightningServerApi
+@EngineApi
 context(engine: Engine)
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.messageFromClientAsRoot(
     connection: WebSocketConnection<PATH, STORAGE>,
@@ -139,7 +140,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
 }
 
 /** Runs [WebSocketHandler.messageFromSubscription] as a new root execution. */
-@InternalLightningServerApi
+@EngineApi
 context(engine: Engine)
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.messageFromSubscriptionAsRoot(
     connection: WebSocketConnection<PATH, STORAGE>,
@@ -169,7 +170,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
  * Runs [WebSocketHandler.disconnect] as a new root execution, then closes [connection] even if the
  * handler throws.
  */
-@InternalLightningServerApi
+@EngineApi
 context(engine: Engine)
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.disconnectAndCloseAsRoot(
     connection: WebSocketConnection<PATH, STORAGE>,

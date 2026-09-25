@@ -1,4 +1,4 @@
-@file:OptIn(com.lightningkite.lightningserver.InternalLightningServerApi::class)
+@file:OptIn(com.lightningkite.lightningserver.InternalLightningServerApi::class, com.lightningkite.lightningserver.EngineApi::class)
 
 package com.lightningkite.lightningserver.engine.awsserverless
 

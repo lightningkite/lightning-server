@@ -18,6 +18,23 @@ package com.lightningkite.lightningserver
 public annotation class InternalLightningServerApi
 
 /**
+ * Marks declarations meant for engine implementations, such as starting the root execution for
+ * something that arrived from outside the server. Server code should use the corresponding
+ * `WithMetrics` functions instead.
+ */
+@RequiresOptIn(
+    "This is for engine implementations. Server code should use the corresponding WithMetrics function.",
+    RequiresOptIn.Level.ERROR
+)
+@Target(
+    AnnotationTarget.PROPERTY,
+    AnnotationTarget.CLASS,
+    AnnotationTarget.CONSTRUCTOR,
+    AnnotationTarget.FUNCTION,
+)
+public annotation class EngineApi
+
+/**
  * Marks the Lightning Server DSL for defining servers and endpoints.
  * This annotation prevents accidental use of DSL functions outside their intended context.
  */

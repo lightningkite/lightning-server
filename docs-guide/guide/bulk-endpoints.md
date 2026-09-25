@@ -31,6 +31,7 @@ All examples in this chapter use the following imports:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/BulkEndpointsSamples.kt#bulk-imports -->
 ```kotlin
+import com.lightningkite.lightningserver.EngineApi
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.auth.noAuth
@@ -174,6 +175,8 @@ directly and bypasses the router, so sub-request path lookups would fail.
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/BulkEndpointsSamples.kt#bulk-test -->
 ```kotlin
+// handleRoot is engine API: the test stands in for the engine receiving this request.
+@OptIn(EngineApi::class)
 fun bulkTest() = BulkServer.testBlocking(settings = {}) {
     // Drive /meta/bulk through the full HTTP pipeline, as an engine would, so the framework
     // can resolve sub-request paths via the registered route table.

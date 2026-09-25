@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.engine.awsserverless
 
 import com.lightningkite.lightningserver.AnonType
-import com.lightningkite.lightningserver.InternalLightningServerApi
+import com.lightningkite.lightningserver.EngineApi
 import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.runtime.Execution
@@ -61,7 +61,7 @@ internal class AwsAdapterTask(val root: AwsAdapter) {
                 @Suppress("UNCHECKED_CAST")
                 task as Task<Any?>
                 with(root) {
-                    @OptIn(InternalLightningServerApi::class)
+                    @OptIn(EngineApi::class)
                     task.executeInlineWithMetrics(
                         event.input.value(root.internalSerialization.kotlinBytesFormat, task.serializer),
                         event.cause,

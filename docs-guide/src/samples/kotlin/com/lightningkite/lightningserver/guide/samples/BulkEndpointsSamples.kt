@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.guide.samples
 
 // region bulk-imports
+import com.lightningkite.lightningserver.EngineApi
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.NotFoundException
 import com.lightningkite.lightningserver.auth.noAuth
@@ -58,6 +59,8 @@ object BulkServer : ServerBuilder() {
 // endregion bulk-server
 
 // region bulk-test
+// handleRoot is engine API: the test stands in for the engine receiving this request.
+@OptIn(EngineApi::class)
 fun bulkTest() = BulkServer.testBlocking(settings = {}) {
     // Drive /meta/bulk through the full HTTP pipeline, as an engine would, so the framework
     // can resolve sub-request paths via the registered route table.

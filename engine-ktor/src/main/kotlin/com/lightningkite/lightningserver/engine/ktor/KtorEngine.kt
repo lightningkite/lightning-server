@@ -1,4 +1,4 @@
-@file:OptIn(InternalLightningServerApi::class)
+@file:OptIn(InternalLightningServerApi::class, EngineApi::class)
 
 package com.lightningkite.lightningserver.engine.ktor
 
@@ -13,6 +13,7 @@ import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
 import com.lightningkite.lightningserver.engine.local.LocalWebSocketConnection
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.EngineApi
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.runtime.didConnectAsRoot
 import com.lightningkite.lightningserver.runtime.disconnectAndCloseAsRoot

@@ -1,4 +1,6 @@
 // by Claude
+@file:OptIn(com.lightningkite.lightningserver.EngineApi::class)
+
 package com.lightningkite.lightningserver.sessions.proofs
 
 import com.lightningkite.lightningserver.BadRequestException

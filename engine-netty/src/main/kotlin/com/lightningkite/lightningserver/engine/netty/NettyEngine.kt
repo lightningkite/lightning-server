@@ -1,4 +1,4 @@
-@file:OptIn(InternalLightningServerApi::class)
+@file:OptIn(InternalLightningServerApi::class, EngineApi::class)
 
 package com.lightningkite.lightningserver.engine.netty
 
@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.engine.local.LocalEngine
 import com.lightningkite.lightningserver.engine.local.WsOversizePolicy
 import com.lightningkite.lightningserver.engine.local.forceWebSocketPubSub
+import com.lightningkite.lightningserver.EngineApi
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.engine.local.LocalWebSocketConnection
 import com.lightningkite.lightningserver.runtime.Execution

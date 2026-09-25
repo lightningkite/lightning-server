@@ -53,6 +53,7 @@ public suspend fun <PATH : PathSpec> HttpHandler<PATH>.handleWithMetrics(
  *   derived from [request], so the two cannot disagree about what ran.
  * @return The HTTP response
  */
+@EngineApi
 public suspend fun Engine.handleRoot(
     request: HttpRequest<*>,
     executionId: Execution.ID,

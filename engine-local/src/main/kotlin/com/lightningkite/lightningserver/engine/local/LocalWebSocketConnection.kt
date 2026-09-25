@@ -1,7 +1,8 @@
-@file:OptIn(InternalLightningServerApi::class)
+@file:OptIn(InternalLightningServerApi::class, EngineApi::class)
 
 package com.lightningkite.lightningserver.engine.local
 
+import com.lightningkite.lightningserver.EngineApi
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.Engine

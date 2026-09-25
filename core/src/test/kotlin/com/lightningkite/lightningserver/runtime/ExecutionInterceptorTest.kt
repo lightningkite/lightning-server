@@ -1,4 +1,4 @@
-@file:OptIn(com.lightningkite.lightningserver.InternalLightningServerApi::class, com.lightningkite.services.data.Unsafe::class)
+@file:OptIn(com.lightningkite.lightningserver.InternalLightningServerApi::class, com.lightningkite.lightningserver.EngineApi::class, com.lightningkite.services.data.Unsafe::class)
 
 package com.lightningkite.lightningserver.runtime
 

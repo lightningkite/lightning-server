@@ -1,5 +1,8 @@
+@file:OptIn(EngineApi::class)
+
 package com.lightningkite.lightningserver.runtime.test
 
+import com.lightningkite.lightningserver.EngineApi
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.definition.ServerSetting
 import com.lightningkite.lightningserver.definition.Task
@@ -132,7 +135,6 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
      */
     // Every phase is run with the runner as the engine, as the network would trigger it in production,
     // rather than nested inside whatever the test happens to be doing when it calls send()/close().
-    @OptIn(InternalLightningServerApi::class)
     public inner class TestWebSocket<PATH : PathSpec, STORAGE>(
         private val handler: WebSocketHandler<PATH, STORAGE>,
         public val request: WebSocketConnectRequest<PATH>,

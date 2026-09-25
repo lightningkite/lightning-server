@@ -103,7 +103,9 @@ Inside a `test { }` block the only context is the `TestRunner`, which is an `Eng
   tasks, sending topic messages — goes inside `execute { }`, which runs it as an `Execution.Direct`. Keep database work
   inside the block; don't return a `Table` from `execute` and use it afterwards.
 - Engine members such as `externalSerialization` or `server` are reached with `engine.X`, and simulating an incoming
-  request is `engine.handleRoot(request, Execution.ID.generate())`.
+  request is `engine.handleRoot(request, Execution.ID.generate())`. `handleRoot`, the `AsRoot` WebSocket helpers, and
+  the task/schedule/startup/pre-deploy `WithMetrics` runners are `@EngineApi`, so a test calling them directly needs
+  `@OptIn(EngineApi::class)`.
 - `testAuth` only needs an `Engine`, so it can be called directly in the test body.
 
 Test servers whose typed endpoints are exercised must call `registerBasicMediaTypeCoders()` in `init`, since typed

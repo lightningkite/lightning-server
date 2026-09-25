@@ -1,3 +1,5 @@
+@file:OptIn(com.lightningkite.lightningserver.EngineApi::class)
+
 package com.lightningkite.lightningserver.sessions
 
 import ch.qos.logback.classic.Level
