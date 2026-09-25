@@ -16,6 +16,7 @@ class TaskTimeoutDefaultsTest {
             override val serializer = String.serializer()
             // Don't override timeout - use default
 
+            @com.lightningkite.lightningserver.OverrideOnly
             context(server: com.lightningkite.lightningserver.runtime.ServerRuntime)
             override suspend fun executeInline(input: String) {
             }
@@ -37,6 +38,7 @@ class TaskTimeoutDefaultsTest {
             override val schedule = Schedule.Frequency(1.minutes)
             // Don't override timeout - use default
 
+            @com.lightningkite.lightningserver.OverrideOnly
             context(server: com.lightningkite.lightningserver.runtime.ServerRuntime)
             override suspend fun execute() {
             }
@@ -74,6 +76,7 @@ class TaskTimeoutDefaultsTest {
         val task = object : StartupTask {
             // Don't override timeout - use default
 
+            @com.lightningkite.lightningserver.OverrideOnly
             context(server: com.lightningkite.lightningserver.runtime.ServerRuntime)
             override suspend fun execute() {
             }

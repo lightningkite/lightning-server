@@ -3,6 +3,7 @@
 package com.lightningkite.lightningserver.runtime
 
 import com.lightningkite.lightningserver.EngineApi
+import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.definition.PreDeployTask
 import com.lightningkite.lightningserver.definition.ScheduledTask
@@ -69,6 +70,7 @@ private suspend fun Engine.executeTaskLike(
  * from the queue. Inside an execution, use the overload without [from].
  */
 @EngineApi
+@OptIn(OverrideOnly::class)
 context(engine: Engine)
 public suspend fun <T> Task<T>.executeInlineWithMetrics(input: T, from: Execution): Unit =
     engine.executeTaskLike(
@@ -85,6 +87,7 @@ public suspend fun <T> Task<T>.executeInlineWithMetrics(input: T): Unit =
 
 /** Runs this scheduled task as a new root execution, with telemetry and interceptors. */
 @EngineApi
+@OptIn(OverrideOnly::class)
 context(engine: Engine)
 public suspend fun ScheduledTask.executeWithMetrics(): Unit =
     engine.executeTaskLike(
@@ -95,6 +98,7 @@ public suspend fun ScheduledTask.executeWithMetrics(): Unit =
 
 /** Runs this startup task as a new root execution, with telemetry and interceptors. */
 @EngineApi
+@OptIn(OverrideOnly::class)
 context(engine: Engine)
 public suspend fun StartupTask.executeWithMetrics(): Unit =
     engine.executeTaskLike(
@@ -105,6 +109,7 @@ public suspend fun StartupTask.executeWithMetrics(): Unit =
 
 /** Runs this pre-deploy task as a new root execution, with telemetry and interceptors. */
 @EngineApi
+@OptIn(OverrideOnly::class)
 context(engine: Engine)
 public suspend fun PreDeployTask.executeWithMetrics(): Unit =
     engine.executeTaskLike(

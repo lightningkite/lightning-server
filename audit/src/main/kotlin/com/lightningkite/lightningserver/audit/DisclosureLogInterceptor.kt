@@ -34,7 +34,7 @@ public class DisclosureLogInterceptor(
      * Built once per process, since the registry it reads only changes during a deploy. Holding it
      * here is also what makes the extractor's path cache worth having.
      */
-    private val extractor = RuntimeDeferred.Cached(RuntimeDeferred { DisclosureExtractor(registry.await()) })
+    private val extractor = RuntimeDeferred.Cached { DisclosureExtractor(registry.await()) }
 
     context(runtime: ServerRuntime)
     override suspend fun <T> outputProduced(request: Request<*>, serializer: KSerializer<T>, value: T) {

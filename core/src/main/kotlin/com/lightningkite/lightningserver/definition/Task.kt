@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.definition
 
+import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.invoke
 import com.lightningkite.lightningserver.serialization.serializerOrContextual
@@ -28,6 +29,7 @@ public interface Task<INPUT> {
     public val serializer: KSerializer<INPUT>
     public val timeout: Duration get() = 5.minutes
 
+    @OverrideOnly
     context(server: ServerRuntime)
     public suspend fun executeInline(input: INPUT)
 }
@@ -67,6 +69,7 @@ public fun <INPUT> Task(
         override val timeout: Duration = timeout
         override val serializer: KSerializer<INPUT> = input
 
+        @OverrideOnly
         context(server: ServerRuntime)
         override suspend fun executeInline(input: INPUT) {
             return handler(server, this, input)
