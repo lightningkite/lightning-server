@@ -1109,10 +1109,12 @@ LOGROTATE_EOF
      * success the script treats the deploy as failed and rolls back. This catches a build that
      * starts cleanly (passes `systemctl is-active`) but is actually broken (returns 5xx).
      */
+
     protected fun StringBuilder.instanceRedeployScript(
         bucketRegionResolution: String,
         localHealthUrl: String? = null,
     ) {
+        // language="Shell Script"
         val healthCheckBlock = if (localHealthUrl != null) $$"""
 log "Waiting for liveness at $$localHealthUrl"
 healthy=0
@@ -1127,6 +1129,7 @@ if [ "$healthy" -ne 1 ]; then
     exit 1
 fi""" else ""
 
+        // language="Shell Script"
         appendLine(
             $$"""
 # === Lightning Server Redeploy Script ===

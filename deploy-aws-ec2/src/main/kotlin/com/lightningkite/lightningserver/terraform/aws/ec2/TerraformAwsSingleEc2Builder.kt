@@ -194,7 +194,11 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                 "ami" - expression("data.aws_ami.ubuntu.id")
                 "instance_type" - instanceType
                 "iam_instance_profile" - expression("aws_iam_instance_profile.ec2.name")
-                "key_name" - expression("aws_key_pair.ec2.key_name")
+
+                if (sshAllowedV4CIDR.isNotEmpty() || sshAllowedV6CIDR.isNotEmpty()) {
+                    "key_name" - expression("aws_key_pair.ec2.key_name")
+                }
+
                 "vpc_security_group_ids" - listOfNotNull(
                     expression("aws_security_group.ec2.id"),
                     (applicationVpc as? AwsVpc.VpcInfo)?.securityGroup,
@@ -222,7 +226,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                     "http_put_response_hop_limit" - 1
                 }
 
-                "user_data" - expression("local.ec2_init")
+                "user_data" - expression("local.ec2_base_init")
                 "user_data_replace_on_change" - true
 
                 "root_block_device" {
@@ -242,6 +246,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                 "depends_on" - (listOf(
                     "null_resource.upload_jar",
                     "null_resource.upload_settings",
+                    "aws_s3_object.init",
                     "aws_ssm_parameter.settings_password",
                     "aws_iam_role_policy_attachment.servicesAccess",
                     "aws_iam_role_policy_attachment.ssm",
@@ -250,9 +255,25 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                 ) + instanceSecretDependencies)
             }
 
+            "resource.aws_s3_object.init" {
+                "bucket" - expression("aws_s3_bucket.deployment.id")
+                "key" - $$"init/component-${local.ec2_init_version}.sh"
+                "content" - expression("local.ec2_init")
+                "content_type" - "application/x-sh"
+            }
+
             // User data script
             "locals" {
+                emitExtra("ec2_init_base.sh", generateEC2BaseInit())
                 emitExtra("ec2_init.sh", generateEC2Init())
+
+                val baseReplacements = listOf(
+                    "deployment_bucket = aws_s3_bucket.deployment.id",
+                    "deployment_script_key = aws_s3_object.init.key",
+                )
+                    .joinToString(", ")
+                "ec2_base_init" - $$"""${templatefile("${path.module}/ec2_init_base.sh", { $$baseReplacements })}"""
+
                 val replacements = listOf(
                     "deployment_bucket = aws_s3_bucket.deployment.id",
                     *provisioningFragments.flatMap { it.second.entries.map { "${it.key} = ${it.value}" } }
@@ -260,6 +281,10 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                 )
                     .joinToString(", ")
                 "ec2_init" - $$"""${templatefile("${path.module}/ec2_init.sh", { $$replacements })}"""
+
+                "ec2_init_version" - expression(
+                    "max(1, parseint(substr(sha256(jsonencode([local.ec2_init])), 0, 7), 16))"
+                )
             }
         }
     }
@@ -538,6 +563,62 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
         }
     }
 
+    private fun generateEC2BaseInit(): String {
+
+        // language="Shell Script"
+        return buildString {
+            appendLine(
+                $$"""#!/bin/bash
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+
+export BOOT_START=$(date +%s)
+
+# === Logging Setup ===
+WORKING_DIR="/var/lib/$$projectPrefix-init"
+mkdir -p -m 0700 "$WORKING_DIR"
+cd "$WORKING_DIR"
+
+mkdir -p /var/log/$$projectPrefix
+touch /var/log/$$projectPrefix/ec2_init.log
+exec > >(tee /var/log/$$projectPrefix/ec2_init.log | logger -t ec2_init -s) 2>&1
+
+# === System update + base packages ===
+echo "[INFO] Updating system packages..."
+apt update -y
+apt install -y openjdk-$${javaVersion.outputString}-jre-headless openssl curl gnupg ca-certificates unzip
+"""
+            )
+
+            awsCli()
+
+            appendLine(
+                $$"""
+
+download_with_retry() {
+    local src="$1" dst="$2" max=5 attempt=1
+    while [ $attempt -le $max ]; do
+        echo "[INFO] Downloading $src (attempt $attempt/$max)"
+        if aws s3 cp "$src" "$dst" --region "$$applicationRegion" --no-progress; then return 0; fi
+        sleep $((attempt * 5))
+        attempt=$((attempt + 1))
+    done
+    echo "[ERROR] Failed to download $src after $max attempts"
+    return 1
+}
+
+echo "[INFO] Downloading EC2 Init script at $(date)"
+download_with_retry "s3://${deployment_bucket}/${deployment_script_key}" "ec2_init.sh"
+chmod +x ec2_init.sh
+
+echo "[INFO] Running EC2 Init script at $(date)"
+./ec2_init.sh
+rm ec2_init.sh
+"""
+            )
+        }
+    }
+
     private fun generateEC2Init(): String {
         val emitter = this@TerraformAwsSingleEc2Builder
 
@@ -548,22 +629,9 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
         return buildString {
             appendLine(
                 """#!/bin/bash
-
 set -euo pipefail
 
-# === Logging Setup ===
-mkdir -p /var/log/$projectPrefix
-touch /var/log/$projectPrefix/ec2_init.log
-exec > >(tee /var/log/$projectPrefix/ec2_init.log | logger -t ec2_init -s) 2>&1
-
-BOOT_START=$(date +%s)
 echo "[INFO] EC2 Init script started at $(date)"
-
-# === System update + base packages ===
-echo "[INFO] Updating system packages..."
-export DEBIAN_FRONTEND=noninteractive
-apt update -y
-apt install -y openjdk-${javaVersion.outputString}-jre-headless openssl curl gnupg ca-certificates unzip
 """
             )
 
@@ -580,8 +648,6 @@ apt install -y openjdk-${javaVersion.outputString}-jre-headless openssl curl gnu
             swap()
 
             cloudwatchAgent(emitter.applicationRegion)
-
-            awsCli()
 
             angieInstall()
 

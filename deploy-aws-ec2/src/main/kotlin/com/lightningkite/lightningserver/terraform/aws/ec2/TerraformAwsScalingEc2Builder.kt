@@ -507,6 +507,8 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
     /** The bash script run by the Image Builder install component to produce the golden AMI. */
     private fun imageInstallScript(): String {
         validateCustomInputs()
+
+        // language="Shell Script"
         return buildString {
             appendLine("#!/bin/bash")
             appendLine("set -euo pipefail")
@@ -541,6 +543,7 @@ public abstract class TerraformAwsScalingEc2Builder<S : ServerBuilder>(
             appendLine("$apt -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold upgrade --with-new-pkgs")
             appendLine("$apt install -y openjdk-${javaVersion.outputString}-jre-headless openssl curl gnupg ca-certificates unzip")
             if (additionalPackages.isNotEmpty()) {
+                appendLine("echo \"[INFO] Installing additional packages at \$(date)\"")
                 appendLine("$apt install -y ${additionalPackages.joinToString(" ") { it.shellEscape() }}")
             }
             appendLine("$apt -y autoremove")
