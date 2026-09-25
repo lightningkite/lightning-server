@@ -121,6 +121,9 @@ public class NettyEngine(
     private lateinit var HANDLER_KEY: AttributeKey<WebSocketHandler<PathSpec, Any?>>
     private lateinit var DIRECT_CHANNEL_KEY: AttributeKey<SendChannel<LkWebSocketFrame>>
 
+    /** A pub/sub socket's own scope, holding its subscription collectors. Cancelled once it disconnects. */
+    private lateinit var SOCKET_SCOPE_KEY: AttributeKey<CoroutineScope>
+
     /**
      * Latch marking that a channel's disconnect phase has already been raised.
      *
@@ -204,6 +207,7 @@ public class NettyEngine(
         MID_KEY = AttributeKey.valueOf("MID")
         HANDLER_KEY = AttributeKey.valueOf("SOCKET_HANDLER")
         DIRECT_CHANNEL_KEY = AttributeKey.valueOf("DIRECT_CHANNEL")
+        SOCKET_SCOPE_KEY = AttributeKey.valueOf("SOCKET_SCOPE")
         DISCONNECTED_KEY = AttributeKey.valueOf("SOCKET_DISCONNECTED")
 
         runBlocking { runStartupTasks() }
@@ -332,6 +336,8 @@ public class NettyEngine(
                 handler.disconnectAndCloseAsRoot(mid, reason)
             } catch (e: Exception) {
                 logger.error(e) { "disconnect handling failed" }
+            } finally {
+                channel.attr(SOCKET_SCOPE_KEY).get()?.cancel()
             }
         }
     }
@@ -580,11 +586,14 @@ public class NettyEngine(
                     return
                 }
 
+                // A child of the engine's scope, so shutdown also stops it.
+                val socketScope = CoroutineScope(scope.coroutineContext + SupervisorJob(scope.coroutineContext.job) + Dispatchers.IO)
+                ctx.channel().attr(SOCKET_SCOPE_KEY).set(socketScope)
                 val mid = object : LocalWebSocketConnection<PathSpec, Any?>(
                     startingState = startingState,
                     request = wsRequest,
                     handler = socketHandler,
-                    scope = CoroutineScope(Dispatchers.IO),
+                    scope = socketScope,
                     pubSub = { this@NettyEngine.pubSubChannel(it) }
                 ) {
                     context(server: ServerRuntime)

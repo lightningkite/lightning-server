@@ -129,6 +129,18 @@ class JdkReliabilityTest {
     }
 
     @Test
+    fun websocket_upgrade_is_refused() {
+        startServer()
+        val request = Request.Builder().url("http://127.0.0.1:$port/echo")
+            .header("Connection", "Upgrade")
+            .header("Upgrade", "websocket")
+            .build()
+        client().newCall(request).execute().use { resp ->
+            assertEquals(HttpStatus.NotImplemented.code, resp.code)
+        }
+    }
+
+    @Test
     fun concurrent_slow_requests_run_in_parallel() {
         // With a bounded pool of 4 threads and runBlocking-per-request, four 1s-handlers should
         // complete in roughly 1s wall-time, not 4s — proving requests are not serialized on a single

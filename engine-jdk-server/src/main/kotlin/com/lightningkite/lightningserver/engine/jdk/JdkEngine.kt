@@ -60,7 +60,8 @@ public val jdkRunConfig: ServerSetting.Direct<JdkRuntimeSettings> = ServerSettin
 /**
  * A Lightning Server engine implementation using the JDK's built-in HTTP server.
  *
- * **IMPORTANT: This engine does NOT support WebSockets.**
+ * **IMPORTANT: This engine does NOT support WebSockets.** Upgrade requests are refused with
+ * 501 Not Implemented.
  *
  * This engine is useful for:
  * - Minimal dependencies (no external server library required)
@@ -130,6 +131,10 @@ public class JdkEngine(
                 val declaredLength = exchange.requestHeaders.getFirst("Content-Length")?.toLongOrNull()
                 if (declaredLength != null && declaredLength > maxBody) {
                     exchange.respondPlain(HttpStatus.PayloadTooLarge.code, "Payload Too Large")
+                    return@createContext
+                }
+                if (exchange.requestHeaders.getFirst("Upgrade").equals("websocket", ignoreCase = true)) {
+                    exchange.respondPlain(HttpStatus.NotImplemented.code, "WebSockets are not supported by this server")
                     return@createContext
                 }
                 val (request, executionId) =
@@ -337,6 +342,6 @@ private fun com.sun.net.httpserver.Headers.adapt(): HttpHeaders = HttpHeaders(
  *    more specific error responses based on exception type
  * 4. The adapt() function splits comma-separated headers, but some headers (like Set-Cookie)
  *    shouldn't be split. Consider header-specific handling.
- * 5. Document the WebSocket limitation more prominently (e.g., throw exception if WebSocket
- *    endpoints are registered)
+ * 5. WebSocket upgrade requests are refused with 501. Consider also warning at startup if WebSocket
+ *    endpoints are registered.
  */
