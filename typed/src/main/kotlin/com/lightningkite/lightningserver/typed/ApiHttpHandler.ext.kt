@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.InternalLightningServerApi
+import com.lightningkite.lightningserver.data.pathSpec
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
@@ -17,6 +18,7 @@ import com.lightningkite.lightningserver.serialization.parse
 import com.lightningkite.lightningserver.serialization.toTypedData
 import com.lightningkite.lightningserver.serialization.validators
 import com.lightningkite.lightningserver.typedoutput.emitTypedOutput
+import com.lightningkite.services.data.Unsafe
 import com.lightningkite.services.database.HasId
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CancellationException
@@ -63,21 +65,6 @@ public suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHan
     return httpResponse.body?.parse(outputType)
         ?: throw IllegalStateException("An interceptor answered '${request.path}' without a body to read the output from.")
 }
-
-
-/**
- * Invokes an API endpoint internally from within another endpoint handler.
- *
- * Runs as its own execution through the server's HTTP interceptors, and is re-authenticated with the
- * endpoint's own auth requirements.
- *
- * @param input The request input
- * @return The endpoint's output
- */
-context(server: ServerRuntime, access: HttpAccess<PATH, out USER>)
-public suspend operator fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.invoke(
-    input: INPUT,
-): OUTPUT = handleWithMetrics(access.request.internalCallTo(access.request.path), input)
 
 /**
  * Invokes a PathSpec0 endpoint (no path parameters) from server-side code.
@@ -155,6 +142,48 @@ public suspend operator fun <A, B, C, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHa
     input
 )
 
+/**
+ * Invokes an API endpoint internally from within another endpoint handler.
+ *
+ * Runs as its own execution through the server's HTTP interceptors, and is re-authenticated with the
+ * endpoint's own auth requirements.
+ *
+ * @param input The request input
+ * @return The endpoint's output
+ */
+@Deprecated("Pass path arguments explicitly rather than implicitly.")
+context(server: ServerRuntime, access: HttpAccess<PATH, out USER>)
+public suspend operator fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.invoke(
+    input: INPUT,
+): OUTPUT {
+    val currentPath = access.request.pathInContext
+    val targetPath = location.path
+    require(
+        currentPath.pathSpec.wildcards.size == targetPath.wildcards.size &&
+                currentPath.pathSpec.wildcards.zip(targetPath.wildcards).all { (a, b) ->
+                    a.serializer.descriptor == b.serializer.descriptor
+                }
+    ) {
+        "calling a PathSpecMany endpoint from another PathSpecMany endpoint requires that both paths have the same type of arguments. This cannot be checked by the type system."
+    }
+    return handleWithMetrics(
+        access.request.internalCallTo(
+            RawHttpEndpoint(
+                @OptIn(Unsafe::class)
+                // SAFETY: The types enforce the same type of PathSpec, and the PathSpecMany edge case is checked above.
+                ResolvedPath.fromRawPathArguments(
+                    targetPath,
+                    currentPath.rawPathArguments,
+                    trailingSegments =
+                        if (location.path.after == PathSpec.Afterwards.TrailingSegments) currentPath.trailingSegments
+                        else null
+                ),
+                location.method
+            )
+        ),
+        input
+    )
+}
 
 
 // INTERNAL IMPLEMENTATION STUFF
