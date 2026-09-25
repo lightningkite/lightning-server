@@ -25,37 +25,6 @@ public suspend inline fun <T> instrument(
     crossinline action: suspend () -> T,
 ): T = runtime.telemetryTrace(name, attributes) { action() }
 
-internal suspend fun <T> ServerRuntime.interceptExecution(body: suspend context(ServerRuntime) () -> T): T =
-    server.compiledExecutionInterceptors.intercept(body)
-
-@InternalLightningServerApi
-public suspend inline fun <T> Engine.execute(
-    opName: String,
-    scope: Execution,
-    attributes: TelemetryAttributes = emptyTelemetryAttributes(),
-    crossinline action: suspend ServerRuntime.(trace: TelemetryTrace) -> T
-): T {
-    @OptIn(Unsafe::class)
-    // SAFETY: The created runtime is immediately used and wrapped in the execution interceptors
-    return with(createRuntime(scope)) {
-        telemetryTrace(opName, attributes) { trace ->
-            server.compiledExecutionInterceptors.intercept { serverRuntime.action(trace) }
-        }
-    }
-}
-
-@InternalLightningServerApi
-public suspend inline fun <T> Engine.executeWithoutTelemetry(
-    scope: Execution,
-    crossinline action: suspend ServerRuntime.() -> T
-): T {
-    @OptIn(Unsafe::class)
-    // SAFETY: The created runtime is immediately used and wrapped in the execution interceptors
-    return with(createRuntime(scope)) {
-        server.compiledExecutionInterceptors.intercept { serverRuntime.action() }
-    }
-}
-
 /*
  * TODO: API Recommendations
  *

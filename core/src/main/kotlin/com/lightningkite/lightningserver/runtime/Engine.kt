@@ -29,9 +29,8 @@ import kotlin.time.Clock
  * - Executing scheduled and startup tasks
  * - Handling WebSocket connections and subscriptions
  *
- * An engine is not running on anyone's behalf, and deliberately has no [Execution]. Code that needs
- * to know what started the work it is doing takes a [ServerRuntime] instead — one is minted per
- * execution, and is an engine plus that attribution.
+ * An engine on its own is not performing any particular work, so it has no [Execution]. Code that
+ * does work takes a [ServerRuntime] instead, which is an engine performing one execution.
  */
 public interface Engine : SettingContext, Namespaced {
     /**

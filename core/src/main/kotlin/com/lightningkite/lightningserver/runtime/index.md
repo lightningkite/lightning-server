@@ -13,14 +13,12 @@ This package contains the core runtime system for Lightning Server applications.
   engines including settings initialization, serialization setup, shared resources management, and startup task
   orchestration.
 
-- **[ServerRuntime.kt](ServerRuntime.kt)** - An engine running one execution, attributed to an [Initiator]. Declaring
+- **[ServerRuntime.kt](ServerRuntime.kt)** - An engine running one execution, attributed to an [Execution]. Only minted by the framework, via `ServerRuntime.create`. Declaring
   `context(ServerRuntime)` rather than `context(Engine)` is how a declaration says its work is attributable. Also holds
   the runtime-scoped extensions: WebSocket topic messaging and task launching.
 
 - **[Execution.kt](Execution.kt)** - What started one execution, and what caused it to start. Serializable, so
   parentage survives a task queue.
-
-- **[ExecutionRuntime.kt](ExecutionRuntime.kt)** - Mints a [ServerRuntime] from an engine plus an initiator.
 
 - **[ExecutionInterceptor.kt](ExecutionInterceptor.kt)** - Wraps every execution the server runs, of every kind — HTTP,
   each WebSocket phase, tasks, schedules, startup and pre-deploy — rather than one kind each, as the HTTP and WebSocket
@@ -44,8 +42,7 @@ telemetry.
 - **[TaskExecution.kt](TaskExecution.kt)** - `executeInlineWithMetrics` for tasks, schedules, startup and pre-deploy tasks,
   which differ only in their telemetry labels and what they invoke.
 
-- **[Instrumentation.kt](Instrumentation.kt)** - `instrument` for naming a child span, and `interceptExecution`, which runs a
-  body inside the `ExecutionInterceptor` chain. Shared by all of the above.
+- **[Instrumentation.kt](Instrumentation.kt)** - `instrument` for naming a child span.
 
 ### Utilities
 
