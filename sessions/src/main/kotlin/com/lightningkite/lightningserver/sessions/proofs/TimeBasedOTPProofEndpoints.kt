@@ -78,15 +78,9 @@ public class TimeBasedOTPProofEndpoints(
                     it.secretBase32.mask("")
                 },
                 update = admin or (mine and active),
-                updateRestrictions = updateRestrictions {
-                    it.subjectType.cannotBeModified()
-                    it.subjectId.cannotBeModified()
-                    it.secretBase32.cannotBeModified()
-                    it.issuer.cannotBeModified()
-                    it.period.cannotBeModified()
-                    it.digits.cannotBeModified()
-                    it.algorithm.cannotBeModified()
-                    it.establishedAt.cannotBeModified()
+                updateRestrictions = whitelistRestrictions {
+                    it.label.canBeModified()
+                    it.disabledAt.canBeModified()
                 },
                 delete = Condition.Never,
             )

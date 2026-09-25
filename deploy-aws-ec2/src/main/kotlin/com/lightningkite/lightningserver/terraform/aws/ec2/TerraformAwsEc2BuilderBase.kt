@@ -1,8 +1,8 @@
 package com.lightningkite.lightningserver.terraform.aws.ec2
 
+import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.definition.*
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.engine.local.engineCache
 import com.lightningkite.lightningserver.engine.local.enginePubSub
 import com.lightningkite.lightningserver.terraform.*
@@ -16,7 +16,6 @@ import kotlinx.serialization.json.*
 import software.amazon.awssdk.regions.Region
 import java.io.File
 import java.util.*
-import kotlin.collections.iterator
 
 /**
  * Shared base for the EC2 Terraform builders ([TerraformAwsSingleEc2Builder] and
@@ -28,7 +27,7 @@ import kotlin.collections.iterator
  * - Identity, storage, secrets, domain, and application configuration.
  * - The shared deployment resources: hardened S3 artifact bucket, the EC2 IAM role/instance
  *   profile, the encrypted-settings pipeline, and the JAR upload.
- * - The reusable user-data fragments (CloudWatch agent, AWS CLI, systemd unit, on-instance
+ * - The reusable user-data fragments (CloudWatch agent config, systemd unit, on-instance
  *   redeploy script, instance files, SSM agent) and the input validation/escaping helpers.
  *
  * Subclasses implement [emitDeploymentSpecific] to add their own networking, compute, DNS,
@@ -50,9 +49,6 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
 
     /** Human-readable display name for the deployment. */
     public abstract val displayName: String
-
-    /** Port the application listens on (the ALB forwards here). */
-    public open val appPort: Int get() = 8080
 
     /** Whether the application is hosted publicly for direct access.  True when a different machine is proxying. */
     public abstract val appBindsAllNetworkInterfaces: Boolean
@@ -192,6 +188,47 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     /** Additional packages to install on EC2 instances. */
     public open val additionalPackages: List<String> = emptyList()
 
+    public enum class JavaVersion(public val outputString: String) {
+        V_8("8"),
+        V_11("11"),
+        V_17("17"),
+        V_21("21"),
+        V_25("25"),
+    }
+
+    public open val javaVersion: JavaVersion get() = JavaVersion.V_17
+
+    /** Seconds apt waits for the dpkg lock (held briefly at boot by Ubuntu's apt-daily) before failing. */
+    public open val aptLockTimeoutSeconds: Int get() = 600
+
+    /**
+     * Whether to run the service in a systemd sandbox. When on, the filesystem is read-only to the
+     * service except `/var/lib/$projectPrefix`, `/var/cache/$projectPrefix`, `/var/log/$projectPrefix`,
+     * its private `/tmp`, and [serviceWritablePaths]. Home directories, physical devices, and other
+     * users' processes are hidden, and it cannot gain capabilities, create setuid files, or create
+     * namespaces. Processes the server launches (e.g. Script [instanceFiles]) inherit these limits.
+     *
+     * Turn off only to diagnose an app that fails under the sandbox; prefer [serviceWritablePaths].
+     */
+    public open val serviceSandboxing: Boolean get() = true
+
+    /** Extra absolute paths the service may write to when [serviceSandboxing] is on. */
+    public open val serviceWritablePaths: List<String> get() = emptyList()
+
+
+    /**
+     * `openssl enc` cipher arguments shared by the local encryption and every on-instance decryption, so
+     * they cannot drift apart. PBKDF2-HMAC-SHA256 at 10000 iterations matches core's `OpenSsl`.
+     * Also a trigger on `encrypt_settings`: changing it re-encrypts and
+     * re-uploads the settings on the next apply.
+     */
+    private val settingsCipherArgs: String get() = "-aes-256-cbc -pbkdf2 -iter 10000 -md sha256"
+
+    /**
+     * A common place for the cloudwatch log group name. This will allow for consistant uses.
+     */
+    protected val projectLogName: String get() = "$projectPrefix-main-log"
+
     /** Additional systemd environment variables. */
     public open val systemdEnvironment: Map<String, String> = emptyMap()
 
@@ -203,7 +240,8 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     /**
      * Additional files to place on EC2 instances. Key = File Name to FileType, Value = raw string content.
      * File Type will determine where the file gets placed. If the type is Config, it will be placed
-     * in /etc/$projectPrefix/. If it is type Script it will be placed in /usr/local/bin. The file name
+     * in /etc/$projectPrefix/, owned root:[serviceUser] with mode 640 (readable only by root and the service,
+     * writable only by root). If it is type Script it will be placed in /usr/local/bin. The file name
      * must be unique. If that file already exists it will not overwrite it.
      * */
     public val instanceFilesRaw: MutableMap<Pair<String, FileType>, String> = mutableMapOf()
@@ -211,10 +249,25 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     /**
      * Additional files to place on EC2 instances. Key = File Name to FileType, Value = KFile on your local system.
      * File Type will determine where the file gets placed. If the type is Config, it will be placed
-     * in /etc/$projectPrefix/. If it is type Script it will be placed in /usr/local/bin. The file name
+     * in /etc/$projectPrefix/, owned root:[serviceUser] with mode 640 (readable only by root and the service,
+     * writable only by root). If it is type Script it will be placed in /usr/local/bin. The file name
      * must be unique. If that file already exists it will not overwrite it.
      * */
     public val instanceFiles: MutableMap<Pair<String, FileType>, KFile> = mutableMapOf()
+
+
+    // === Customization Hooks ===
+    // Additional bash scripts to run near the end of the setup. egregious
+
+    /**
+     * List of raw Bash scripts to be used in the setup script.
+     * */
+    public open val customInstallScriptsRaw: List<String> = emptyList()
+
+    /**
+     * List of shell files to be used in the setup script.
+     * */
+    public open val customInstallScripts: List<KFile> = emptyList()
 
     /**
      * Shell fragments run during instance provisioning — in the cloud-init `user_data` for the
@@ -267,22 +320,14 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
      */
     abstract override val applicationVpc: AwsVpc.EC2Safe
 
+
     /**
-     * The path of the server's lightweight liveness endpoint, discovered by scanning the built
-     * server for a GET endpoint whose last path segment is "online" (which is what
-     * `MetaEndpoints` registers at `/meta/online`). Null if the server exposes no such endpoint.
-     *
-     * This is the right target for a load-balancer/health probe: it is pure liveness ("the
-     * process is accepting connections") and does not check downstream services, so a slow
-     * dependency cannot cascade into the probe failing.
+     * Health-check path the ALB polls; must return 2xx/3xx when the app is alive. Defaults to the
+     * server's autodetected `/meta/online` liveness endpoint (see [detectedOnlinePath]), falling
+     * back to `/meta/online` by convention. Deliberately a *liveness* path, not the deep
+     * `/meta/health`, so a slow downstream service can't make the ALB drain the whole fleet.
      */
-    protected val detectedOnlinePath: String? by lazy {
-        builder.build().endpoints.entries
-            .firstOrNull { (path, group) ->
-                HttpMethod.GET in group.http && path.toString().substringAfterLast('/') == "online"
-            }
-            ?.let { (path, _) -> path.toString() }
-    }
+    public open val healthCheckPath: String get() = "/meta/online"
 
     /**
      * Emits the networking, compute, DNS, TLS, redeploy, and monitoring resources specific to
@@ -339,15 +384,15 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
         fulfillSetting("ktorRunConfig", buildJsonObject {
             settings["ktorRunConfig"]?.let { it as? JsonObject }?.entries?.forEach { put(it.key, it.value) }
             put("host", if (appBindsAllNetworkInterfaces) "0.0.0.0" else "127.0.0.1")
-            put("port", appPort)
+            put("port", 8080)
             put("realIpHeader", "X-Forwarded-For")
         })
 
         // Force certain netty settings
         fulfillSetting("nettyRunConfig", buildJsonObject {
             settings["nettyRunConfig"]?.let { it as? JsonObject }?.entries?.forEach { put(it.key, it.value) }
-            put("host", if(appBindsAllNetworkInterfaces) "0.0.0.0" else "127.0.0.1")
-            put("port", appPort)
+            put("host", if (appBindsAllNetworkInterfaces) "0.0.0.0" else "127.0.0.1")
+            put("port", 8080)
             put("realIpHeader", "X-Forwarded-For")
         })
 
@@ -371,7 +416,7 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
                     "key" - storageBucketPath
                     "region" - applicationRegion
                     "encrypt" - storageEncryptionEnabled
-                    if(useStorageLockFile)
+                    if (useStorageLockFile)
                         "use_lockfile" - true
                 }
             }
@@ -600,11 +645,15 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
 
             // Encrypt settings using PBKDF2 for stronger key derivation
             "resource.null_resource.encrypt_settings" {
+                // Re-encrypt whenever anything that shapes the output changes: the settings, the cipher
+                // parameters, or the password. Changing the command alone would not re-run it.
                 "triggers" {
                     "settings_hash" - expression("local_sensitive_file.settings_raw.content_sha256")
+                    "cipher" - settingsCipherArgs
+                    "password_hash" - expression("sha256(random_password.settings.result)")
                 }
                 "provisioner.local-exec" {
-                    "command" - $$"openssl enc -aes-256-cbc -pbkdf2 -iter 100000 -md sha256 -in \"${local_sensitive_file.settings_raw.filename}\" -out \"${path.module}/build/settings.enc\" -pass env:SETTINGS_PASS"
+                    "command" - $$"openssl enc $$settingsCipherArgs -in \"${local_sensitive_file.settings_raw.filename}\" -out \"${path.module}/build/settings.enc\" -pass env:SETTINGS_PASS"
                     "environment" {
                         "SETTINGS_PASS" - expression("random_password.settings.result")
                     }
@@ -619,7 +668,7 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
                 }
 
                 "provisioner.local-exec" {
-                    "command" - $$"""aws s3 cp "${data.external.jar_hash.result.path}" s3://${aws_s3_bucket.deployment.id}/server.zip --region $${emitter.applicationRegion}"""
+                    "command" - $$"""aws s3 cp "${data.external.jar_hash.result.path}" s3://${aws_s3_bucket.deployment.id}/server.zip --region $${emitter.applicationRegion} --progress-frequency 1"""
                 }
                 "depends_on" - listOf("aws_s3_bucket.deployment")
             }
@@ -627,7 +676,9 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
             // Upload encrypted settings to S3
             "resource.null_resource.upload_settings" {
                 "triggers" {
-                    "settings_hash" - expression("local_sensitive_file.settings_raw.content_sha256")
+                    // A null_resource gets a new id each time it is replaced, so this re-uploads exactly when
+                    // the encrypted file was regenerated, whatever the reason.
+                    "encrypted" - expression("null_resource.encrypt_settings.id")
                 }
                 "provisioner.local-exec" {
                     "command" - $$"aws s3 cp \"${path.module}/build/settings.enc\" s3://${aws_s3_bucket.deployment.id}/settings.enc --region $${emitter.applicationRegion}"
@@ -638,6 +689,69 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
     }
 
     // === Shared user-data fragments ===
+
+    /**
+     * Unattended upgrades can restart the instance or the service at any time, and unexpected
+     * restarts should never happen on a production server; patching must be controlled and planned.
+     * The scaling builder patches by re-baking its image and rolling the ASG; both builders install
+     * the `os-update` script ([instanceUpdateScript]) for patching instances already running.
+     */
+    // language="Shell Script"
+    protected fun StringBuilder.disableUnattendedUpgrades() {
+        appendLine(
+            """
+# === Disable unattended upgrades ===
+echo "[INFO] Disabling unattended-upgrades and apt daily timers at $(date)"
+cat > /etc/apt/apt.conf.d/20auto-upgrades << 'AUTO_UPGRADES_EOF'
+APT::Periodic::Update-Package-Lists "0";
+APT::Periodic::Download-Upgradeable-Packages "0";
+APT::Periodic::Unattended-Upgrade "0";
+APT::Periodic::AutocleanInterval "0";
+AUTO_UPGRADES_EOF
+systemctl disable --now unattended-upgrades.service || true
+systemctl mask unattended-upgrades.service || true
+systemctl disable --now apt-daily.timer apt-daily-upgrade.timer || true
+systemctl mask apt-daily.timer apt-daily-upgrade.timer apt-daily.service apt-daily-upgrade.service || true
+"""
+        )
+    }
+
+    /** Brings the OS fully up to date and installs the JRE, base tooling, and [additionalPackages]. */
+    // language="Shell Script"
+    protected fun StringBuilder.systemPackages() {
+        // A freshly-booted Ubuntu holds the dpkg lock for the first few minutes (apt-daily/
+        // unattended-upgrades); wait for it instead of failing or appearing to hang.
+        val apt = "apt-get -o DPkg::Lock::Timeout=$aptLockTimeoutSeconds"
+        appendLine("# === System update + base packages ===")
+        appendLine("""echo "[INFO] Updating system packages at $(date)"""")
+        appendLine("$apt update -y")
+        // --with-new-pkgs because a plain `upgrade` never installs new packages, and kernel
+        // security updates arrive as a new package name (linux-image-X-generic) pulled in by a
+        // dependency change on the metapackage. Without it they are silently held back.
+        appendLine("$apt -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold upgrade --with-new-pkgs")
+        appendLine("$apt install -y openjdk-${javaVersion.outputString}-jre-headless openssl curl gnupg ca-certificates unzip")
+        if (additionalPackages.isNotEmpty()) {
+            appendLine("echo \"[INFO] Installing additional packages at \$(date)\"")
+            appendLine("$apt install -y ${additionalPackages.joinToString(" ") { it.shellEscape() }}")
+        }
+        appendLine("$apt -y autoremove")
+        appendLine()
+    }
+
+    /** Render [customInstallScripts] and [customInstallScriptsRaw] into the provisioning script. */
+    protected fun StringBuilder.runCustomInstallScripts() {
+        if (customInstallScripts.isEmpty() && customInstallScriptsRaw.isEmpty()) return
+        appendLine("# === Custom Install Scripts ===")
+        appendLine("echo \"[INFO] Running Custom Install Scripts at \$(date)\"")
+        for (script in customInstallScripts) {
+            appendLine(script.readString().terraformTemplateEscape())
+            appendLine()
+        }
+        for (script in customInstallScriptsRaw) {
+            appendLine(script.terraformTemplateEscape())
+            appendLine()
+        }
+    }
 
     /** Render the registered [provisioningFragments] into the provisioning script. */
     protected fun StringBuilder.runProvisioningFragments() {
@@ -661,37 +775,49 @@ public abstract class TerraformAwsEc2BuilderBase<S : ServerBuilder>(
         }
     }
 
+    // language="Shell Script"
     protected fun StringBuilder.instanceFiles() {
+        if (instanceFiles.isEmpty() && instanceFilesRaw.isEmpty()) return
         val configPath = "/etc/$projectPrefix"
         val scriptPath = "/usr/local/bin"
         appendLine("# === Copying in additional files ===")
         appendLine("""echo "[INFO] Copying in additional files at $(date)"""")
         appendLine("""mkdir -p $configPath""")
+        // Config files may hold secrets: only root and the service user may enter the directory. Locked
+        // down before any file is written, so no file is ever reachable while it still has default perms.
+        appendLine("""chown root:lightning-server $configPath""")
+        appendLine("""chmod 750 $configPath""")
 
         fun writeOutput(path: String, type: FileType, base64Content: String) {
             appendLine(
                 """# Write file: $path
 [ ! -e ${path.shellEscape()} ] && echo $base64Content | base64 -d > ${path.shellEscape()} || true"""
             )
-            if (type == FileType.Script) {
-                appendLine("chmod +x ${path.shellEscape()}")
+            when (type) {
+                FileType.Script -> appendLine("chmod +x ${path.shellEscape()}")
+                // Readable by the service, not writable by it, and invisible to every other user.
+                FileType.Config -> {
+                    appendLine("chown root:lightning-server ${path.shellEscape()}")
+                    appendLine("chmod 640 ${path.shellEscape()}")
+                }
             }
             appendLine()
         }
 
         // Instance files - using base64 encoding to prevent heredoc injection
         for ((key, content) in instanceFilesRaw) {
-            val basePath = if(key.second == FileType.Config) configPath else scriptPath
+            val basePath = if (key.second == FileType.Config) configPath else scriptPath
             val base64Content = Base64.getEncoder().encodeToString(content.toByteArray())
             writeOutput("$basePath/${key.first}", key.second, base64Content)
         }
         for ((key, file) in instanceFiles) {
-            val basePath = if(key.second == FileType.Config) configPath else scriptPath
+            val basePath = if (key.second == FileType.Config) configPath else scriptPath
             val base64Content = Base64.getEncoder().encodeToString(file.readByteArray())
             writeOutput("$basePath/${key.first}", key.second, base64Content)
         }
     }
 
+    // language="Shell Script"
     protected fun StringBuilder.ssm() {
         appendLine(
             $$"""
@@ -709,34 +835,8 @@ fi
         )
     }
 
-    /** Install + configure the CloudWatch agent in one step (used by the boot-time single-instance path). */
-    protected fun StringBuilder.cloudwatchAgent(applicationRegion: String) {
-        cloudwatchAgentInstall(applicationRegion)
-        cloudwatchAgentConfig()
-    }
-
-    /**
-     * Download + install the CloudWatch agent .deb. The Image Builder path installs the agent via the
-     * AWS-managed `amazon-cloudwatch-agent-linux` component instead, so it only needs [cloudwatchAgentConfig].
-     */
-    protected fun StringBuilder.cloudwatchAgentInstall(applicationRegion: String) {
-        appendLine(
-            $$"""
-# === Install CloudWatch Agent ===
-echo "[INFO] Installing CloudWatch Agent at $(date)"
-curl $${
-                if (instanceArchitecture == CPUArchitecture.Arm)
-                    "https://amazoncloudwatch-agent-${applicationRegion}.s3.${applicationRegion}.amazonaws.com/ubuntu/arm64/latest/amazon-cloudwatch-agent.deb"
-                else
-                    "https://amazoncloudwatch-agent-${applicationRegion}.s3.${applicationRegion}.amazonaws.com/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb"
-            } -o cw_agent.deb
-dpkg -i cw_agent.deb
-rm -f cw_agent.deb
-"""
-        )
-    }
-
     /** Write the CloudWatch agent config (log groups + metrics) and enable the service. */
+    // language="Shell Script"
     protected fun StringBuilder.cloudwatchAgentConfig() {
         appendLine(
             $$"""
@@ -750,22 +850,22 @@ cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json << EOF
         "collect_list": [
           {
             "file_path": "/var/log/$$projectPrefix/ec2_init.log",
-            "log_group_name": "/ec2/$$projectPrefix/application",
+            "log_group_name": "$$projectLogName",
             "log_stream_name": "{instance_id}/ec2_init"
           },
           {
             "file_path": "/var/log/$$projectPrefix/server.log",
-            "log_group_name": "/ec2/$$projectPrefix/application",
+            "log_group_name": "$$projectLogName",
             "log_stream_name": "{instance_id}/server"
           },
           {
             "file_path": "/var/log/$$projectPrefix/redeploy.log",
-            "log_group_name": "/ec2/$$projectPrefix/application",
+            "log_group_name": "$$projectLogName",
             "log_stream_name": "{instance_id}/redeploy"
           },
           {
             "file_path": "/var/log/$$projectPrefix/os-update.log",
-            "log_group_name": "/ec2/$$projectPrefix/application",
+            "log_group_name": "$$projectLogName",
             "log_stream_name": "{instance_id}/os-update"
           }
         ]
@@ -788,24 +888,6 @@ EOF
 
 systemctl enable amazon-cloudwatch-agent
 systemctl restart amazon-cloudwatch-agent
-"""
-        )
-    }
-
-    protected fun StringBuilder.awsCli() {
-        appendLine(
-            $$"""
-# === Install AWS CLI v2 ===
-echo "[INFO] Installing AWS CLI V2 at $(date)"
-curl $${
-                if (instanceArchitecture == CPUArchitecture.Arm)
-                    "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip"
-                else
-                    "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
-            } -o "awscliv2.zip"
-unzip -q awscliv2.zip
-./aws/install
-rm -rf aws/ awscliv2.zip
 """
         )
     }
@@ -920,9 +1002,46 @@ systemctl enable $$projectPrefix-swap.service
         }
     }
 
+    // language="Shell Script"
     protected fun StringBuilder.systemD() {
+        // An unprivileged user cannot bind below 1024; grant exactly that capability when needed.
+        // Everything is read-only except the systemd-managed State/Cache/Logs directories, the private
+        // /tmp, and serviceWritablePaths. MemoryDenyWriteExecute is deliberately absent: it breaks the JIT.
+        val sandbox = if (!serviceSandboxing) "" else buildString {
+            appendLine("ProtectSystem=strict")
+            if (serviceWritablePaths.isNotEmpty()) appendLine("ReadWritePaths=${serviceWritablePaths.joinToString(" ")}")
+            appendLine("ProtectHome=true")
+            appendLine("PrivateTmp=true")
+            appendLine("PrivateDevices=true")
+            appendLine("ProtectProc=invisible")
+            appendLine("ProtectKernelTunables=true")
+            appendLine("ProtectKernelModules=true")
+            appendLine("ProtectKernelLogs=true")
+            appendLine("ProtectControlGroups=true")
+            appendLine("ProtectClock=true")
+            appendLine("ProtectHostname=true")
+            appendLine("RestrictSUIDSGID=true")
+            appendLine("RestrictNamespaces=true")
+            appendLine("RestrictRealtime=true")
+            appendLine("RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK")
+            appendLine("LockPersonality=true")
+            appendLine("SystemCallArchitectures=native")
+        }
         appendLine(
             $$"""
+# === Service User ===
+echo "[INFO] Creating unprivileged service user lightning-server"
+id -u lightning-server >/dev/null 2>&1 || useradd --system --user-group --home-dir /var/lib/$$projectPrefix --no-create-home --shell /usr/sbin/nologin lightning-server
+
+# === Filesystem Layout ===
+# Code: owned by root, so the service can run it but never modify it.
+install -d -o root -g root -m 0755 /opt/$$projectPrefix
+# Config (settings.json, Config instance files): readable by the service, writable only by root.
+install -d -o root -g lightning-server -m 0750 /etc/$$projectPrefix
+# State and cache: the service's own. systemd's StateDirectory=/CacheDirectory= also manage these.
+install -d -o lightning-server -g lightning-server -m 0700 /var/lib/$$projectPrefix
+install -d -o lightning-server -g lightning-server -m 0700 /var/cache/$$projectPrefix
+
 # === Systemd Service ===
 echo "[INFO] Creating Systemd unit for $$deploymentTag"
 cat > /etc/systemd/system/$$projectPrefix.service << 'UNIT_EOF'
@@ -933,9 +1052,27 @@ Requires=network.target
 
 [Service]
 Type=simple
-User=ubuntu
-WorkingDirectory=/opt/$$projectPrefix
+User=lightning-server
+Group=lightning-server
+WorkingDirectory=/var/lib/$$projectPrefix
 ExecStart=/opt/$$projectPrefix/server/bin/server $$serverCommand
+StateDirectory=$$projectPrefix
+StateDirectoryMode=0700
+CacheDirectory=$$projectPrefix
+CacheDirectoryMode=0700
+LogsDirectory=$$projectPrefix
+# Apps load settings.json relative to the working directory. A read-only bind mount (not a symlink,
+# which the service could swap since it owns the directory) keeps that working without letting the
+# service replace it. No '-' prefix: with no settings deployed yet, the service must not start.
+BindReadOnlyPaths=/etc/$$projectPrefix/settings.enc:/var/lib/$$projectPrefix/settings.json
+# Settings stay encrypted on disk. '+' runs the key fetch as root outside the sandbox; it writes the
+# RAM-backed, root-only file whose password systemd hands to the app. systemd loads EnvironmentFile=
+# before every Exec* (ExecStartPre included), so '-' lets the key fetch run before the file exists.
+ExecStartPre=+/usr/local/bin/$$projectPrefix-settings-key
+EnvironmentFile=-/run/$$projectPrefix-secrets/settings.env
+NoNewPrivileges=true
+UMask=0077
+$$sandbox
 
 Restart=always
 RestartSec=5
@@ -953,7 +1090,7 @@ UNIT_EOF
 echo "[INFO] Preparing server log directory"
 mkdir -p /var/log/$$projectPrefix
 touch /var/log/$$projectPrefix/server.log
-chown -R ubuntu:ubuntu /var/log/$$projectPrefix
+chown -R lightning-server:lightning-server /var/log/$$projectPrefix
 
 cat > /etc/logrotate.d/$$projectPrefix << 'LOGROTATE_EOF'
 /var/log/$$projectPrefix/*.log {
@@ -964,7 +1101,7 @@ cat > /etc/logrotate.d/$$projectPrefix << 'LOGROTATE_EOF'
     missingok
     notifempty
     copytruncate
-    su ubuntu ubuntu
+    su lightning-server lightning-server
 }
 LOGROTATE_EOF
 """
@@ -976,7 +1113,8 @@ LOGROTATE_EOF
      * the JAR + encrypted settings from S3, decrypts the settings, and restarts the service.
      *
      * If the freshly-downloaded version fails to come up, it rolls back to the previous
-     * `server-old` / `settings.json.old` (which it always keeps) and restarts, so a bad deploy
+     * `server-old` and the previous settings (`settings.json.old`, or `settings.enc.old` with
+     * [encryptSettingsAtRest]), which it always keeps, and restarts, so a bad deploy
      * self-heals the instance. It still exits non-zero so the driving redeploy halts and the
      * operator is alerted.
      *
@@ -989,10 +1127,12 @@ LOGROTATE_EOF
      * success the script treats the deploy as failed and rolls back. This catches a build that
      * starts cleanly (passes `systemctl is-active`) but is actually broken (returns 5xx).
      */
+
     protected fun StringBuilder.instanceRedeployScript(
         bucketRegionResolution: String,
         localHealthUrl: String? = null,
     ) {
+        // language="Shell Script"
         val healthCheckBlock = if (localHealthUrl != null) $$"""
 log "Waiting for liveness at $$localHealthUrl"
 healthy=0
@@ -1006,6 +1146,8 @@ if [ "$healthy" -ne 1 ]; then
     rollback
     exit 1
 fi""" else ""
+
+        // language="Shell Script"
         appendLine(
             $$"""
 # === Lightning Server Redeploy Script ===
@@ -1020,15 +1162,19 @@ err() { echo "[lightning-server-redeploy] $(date '+%Y-%m-%d %H:%M:%S') ERROR: $*
 $$bucketRegionResolution
 SSM_PARAM="/$$projectPrefix/settings-password"
 APP_DIR="/opt/$$projectPrefix"
+CONF_DIR="/etc/$$projectPrefix"
+STATE_DIR="/var/lib/$$projectPrefix"
 LOG_FILE="/var/log/$$projectPrefix/redeploy.log"
 
 mkdir -p "$(dirname "$LOG_FILE")"
 touch "$LOG_FILE"
-chown ubuntu:ubuntu "$LOG_FILE"
+chown lightning-server:lightning-server "$LOG_FILE"
 exec > >(tee -a "$LOG_FILE" | logger -t lightning-server-redeploy -s) 2>&1
 
 log "Redeploy started at $(date)"
-mkdir -p "$APP_DIR"
+install -d -o root -g root -m 0755 "$APP_DIR"
+install -d -o root -g lightning-server -m 0750 "$CONF_DIR"
+install -d -o lightning-server -g lightning-server -m 0700 "$STATE_DIR"
 
 download_with_retry() {
     local src="$1" dst="$2" max=5 attempt=1
@@ -1047,8 +1193,7 @@ download_with_retry() {
 rollback() {
     err "Rolling back to previous version"
     [ -d "$APP_DIR/server-old" ] && { rm -rf "$APP_DIR/server"; mv "$APP_DIR/server-old" "$APP_DIR/server"; }
-    [ -f "$APP_DIR/settings.json.old" ] && mv -f "$APP_DIR/settings.json.old" "$APP_DIR/settings.json"
-    chown -R ubuntu:ubuntu "$APP_DIR"
+    [ -f "$CONF_DIR/settings.enc.old" ] && mv -f "$CONF_DIR/settings.enc.old" "$CONF_DIR/settings.enc"
     systemctl restart $$projectPrefix || true
 }
 
@@ -1057,23 +1202,34 @@ download_with_retry "s3://$BUCKET/server.zip" "$APP_DIR/server.zip"
 [ -d "$APP_DIR/server" ] && mv "$APP_DIR/server" "$APP_DIR/server-old"
 log "Successful Download"
 log "Unzipping server.zip"
-unzip -q "$APP_DIR/server.zip" -d $APP_DIR
+unzip -q "$APP_DIR/server.zip" -d "$APP_DIR"
+rm -f "$APP_DIR/server.zip"
+# The build stays root-owned so the service can run it but never modify it. Zip entries can carry
+# arbitrary modes, so normalize to readable (and executable where already so) and root-writable only.
+chown -R root:root "$APP_DIR"
+chmod -R u=rwX,go=rX "$APP_DIR"
 
-download_with_retry "s3://$BUCKET/settings.enc" "$APP_DIR/settings.enc"
+# Settings stay encrypted at rest; the service decrypts them in memory at startup.
+download_with_retry "s3://$BUCKET/settings.enc" "$CONF_DIR/settings.enc.new"
 SETTINGS_PASS=$(aws ssm get-parameter --name "$SSM_PARAM" --with-decryption --query Parameter.Value --output text --region "$REGION")
-if ! openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -md sha256 \
-    -in "$APP_DIR/settings.enc" -out "$APP_DIR/settings.json.new" -pass pass:"$SETTINGS_PASS"; then
+# Test-decrypt (output discarded) so a bad password or corrupt file fails the deploy here rather than
+# at service start. The password goes via openssl's environment, not argv: argv is world-readable.
+if ! SETTINGS_PASS="$SETTINGS_PASS" openssl enc -d $$settingsCipherArgs \
+    -in "$CONF_DIR/settings.enc.new" -out /dev/null -pass env:SETTINGS_PASS; then
     err "Failed to decrypt settings"
+    rm -f "$CONF_DIR/settings.enc.new"
     exit 1
 fi
-log "Successfully decrypted settings"
-[ -f "$APP_DIR/settings.json.old" ] && rm "$APP_DIR/settings.json.old"
-[ -f "$APP_DIR/settings.json" ] && mv "$APP_DIR/settings.json" "$APP_DIR/settings.json.old"
-mv "$APP_DIR/settings.json.new" "$APP_DIR/settings.json"
-rm -f "$APP_DIR/settings.enc"
+chown root:lightning-server "$CONF_DIR/settings.enc.new"
+chmod 640 "$CONF_DIR/settings.enc.new"
+log "Verified settings decrypt"
+[ -f "$CONF_DIR/settings.enc.old" ] && rm "$CONF_DIR/settings.enc.old"
+[ -f "$CONF_DIR/settings.enc" ] && mv "$CONF_DIR/settings.enc" "$CONF_DIR/settings.enc.old"
+mv "$CONF_DIR/settings.enc.new" "$CONF_DIR/settings.enc"
 
-chown -R ubuntu:ubuntu "$APP_DIR"
-chmod 600 "$APP_DIR/settings.json"
+# Mount point for the unit's read-only settings bind mount. Created as the service user: it owns
+# this directory, so root must not follow anything that may have been placed here.
+[ -e "$STATE_DIR/settings.json" ] || sudo -u lightning-server touch "$STATE_DIR/settings.json"
 
 log "Restarting $$deploymentTag"
 systemctl restart $$projectPrefix
@@ -1106,37 +1262,38 @@ err() { echo "[lightning-server-predeploy] ERROR: $*" >&2; }
 
 $$bucketRegionResolution
 SSM_PARAM="/$$projectPrefix/settings-password"
-SCRATCH="/opt/lightning-server/predeploy"
 LOG_FILE="/var/log/$$projectPrefix/predeploy.log"
 
 mkdir -p "$(dirname "$LOG_FILE")"
 touch "$LOG_FILE"
-chown ubuntu:ubuntu "$LOG_FILE"
+chown lightning-server:lightning-server "$LOG_FILE"
 exec > >(tee -a "$LOG_FILE" | logger -t lightning-server-predeploy -s) 2>&1
 
 log "Pre-deploy started at $(date)"
 
-# Fetch the NEW build + settings into a scratch dir; the live server is never touched.
-rm -rf "$SCRATCH"
-mkdir -p "$SCRATCH"
+# Fetch the NEW build + settings into a scratch dir; the live server is never touched. mktemp makes a
+# fresh root-only directory with an unguessable name: a fixed path under world-writable /var/tmp could
+# be pre-created or symlinked by another user to redirect root's writes.
+SCRATCH=$(mktemp -d "/var/tmp/$$projectPrefix-predeploy.XXXXXX")
+trap 'cd /; rm -rf "$SCRATCH"' EXIT
 aws s3 cp "s3://$BUCKET/server.zip" "$SCRATCH/server.zip" --region "$REGION" --no-progress
 unzip -q "$SCRATCH/server.zip" -d "$SCRATCH"
-aws s3 cp "s3://$BUCKET/settings.enc" "$SCRATCH/settings.enc" --region "$REGION" --no-progress
+
+# Encrypted bytes under the name the app loads; the app decrypts them in memory (password passed below).
+aws s3 cp "s3://$BUCKET/settings.enc" "$SCRATCH/settings.json" --region "$REGION" --no-progress
 SETTINGS_PASS=$(aws ssm get-parameter --name "$SSM_PARAM" --with-decryption --query Parameter.Value --output text --region "$REGION")
-if ! openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -md sha256 \
-    -in "$SCRATCH/settings.enc" -out "$SCRATCH/settings.json" -pass pass:"$SETTINGS_PASS"; then
+if ! SETTINGS_PASS="$SETTINGS_PASS" openssl enc -d $$settingsCipherArgs \
+    -in "$SCRATCH/settings.json" -out /dev/null -pass env:SETTINGS_PASS; then
     err "Failed to decrypt settings"
-    rm -rf "$SCRATCH"
     exit 1
 fi
-rm -f "$SCRATCH/settings.enc"
-chown -R ubuntu:ubuntu "$SCRATCH"
+chown -R lightning-server:lightning-server "$SCRATCH"
 chmod 600 "$SCRATCH/settings.json"
 
 # Cap heap so this runs alongside the live server without risking OOM. Heavy migrations may need more.
 log "Running pre-deploy tasks with the new version"
 cd "$SCRATCH"
-if sudo -u ubuntu env "JAVA_OPTS=-Xmx512m" ./server/bin/server $$preDeployCommand; then
+if LIGHTNING_SERVER_SETTINGS_DECRYPTION="$SETTINGS_PASS" runuser -u lightning-server -- env "JAVA_OPTS=-Xmx512m" ./server/bin/server $$preDeployCommand; then
     cd /
     rm -rf "$SCRATCH"
     log "Pre-deploy complete"
@@ -1150,6 +1307,146 @@ PREDEPLOY_EOF
 
 chmod +x /usr/local/bin/lightning-server-predeploy
 echo "[INFO] Creating Lightning Server Pre-Deploy Script - DONE"
+
+# === Settings Key Script (ExecStartPre) ===
+# Runs as root before each service start: fetches the settings password from SSM into a RAM-backed,
+# root-only environment file that systemd hands to the app. Nothing is written to disk.
+echo "[INFO] Creating settings key script"
+cat > /usr/local/bin/$$projectPrefix-settings-key << 'SETTINGS_KEY_EOF'
+#!/bin/bash
+set -euo pipefail
+# systemd runs this root step with the service's environment and working directory, both pointing at
+# /var/lib/$$projectPrefix, which the service can write. Pin them so the service cannot steer root's aws
+# CLI (e.g. with a planted ~/.aws/config credential_process); the instance role supplies credentials.
+cd /
+export HOME=/root AWS_CONFIG_FILE=/dev/null AWS_SHARED_CREDENTIALS_FILE=/dev/null
+$$bucketRegionResolution
+SSM_PARAM="/$$projectPrefix/settings-password"
+SECRETS_DIR="/run/$$projectPrefix-secrets"
+install -d -o root -g root -m 0700 "$SECRETS_DIR"
+SETTINGS_PASS=$(aws ssm get-parameter --name "$SSM_PARAM" --with-decryption --query Parameter.Value --output text --region "$REGION")
+umask 077
+# printf is a shell builtin, so the password never appears in any process's argv. Single quotes make
+# systemd take the value literally; the password's charset (letters, digits, '-', '_') contains none.
+printf "LIGHTNING_SERVER_SETTINGS_DECRYPTION='%s'\n" "$SETTINGS_PASS" > "$SECRETS_DIR/settings.env.tmp"
+mv -f "$SECRETS_DIR/settings.env.tmp" "$SECRETS_DIR/settings.env"
+SETTINGS_KEY_EOF
+chmod 0700 /usr/local/bin/$$projectPrefix-settings-key
+"""
+        )
+    }
+
+    /**
+     * Installs `/usr/local/bin/os-update`, the on-instance script that applies OS package updates
+     * and restarts the service. Unattended upgrades are disabled (see [disableUnattendedUpgrades]),
+     * so this is how a running instance gets patched in place. On the scaling builder it is driven
+     * across the fleet by `update-fleet.sh` via SSM, which drains each instance first; on the single
+     * instance it is run directly via SSM Run Command, and the restart is a brief outage.
+     *
+     * There is no rollback: apt has no reliable "undo", so the script instead refuses to report
+     * success unless the service comes back active *and* [localHealthUrl] answers, which is what
+     * keeps a broken instance from being returned to service.
+     *
+     * Note that this script is emitted into a file terraform runs through `templatefile()`, so it
+     * must not use shell parameter expansion (dollar-brace) or a literal percent-brace — terraform
+     * reads both as template interpolations and fails to render the file. Use bare `$NAME` and
+     * `cut`/`grep` instead.
+     */
+    protected fun StringBuilder.instanceUpdateScript(localHealthUrl: String) {
+        // language="Shell Script"
+        appendLine(
+            $$"""
+# === Instance Emergency Update Script ===
+# The "a CVE landed and we are not waiting for a rebuild" lever. On a scaling fleet
+# update-fleet.sh drives it one drained instance at a time; routine patching there still
+# comes from rebuilding the image and rolling the ASG.
+#
+# It restarts the app unconditionally (the JRE is an apt package and may be replaced
+# underneath a running JVM), so it is only interruption-free on an instance already
+# drained from the load balancer.
+#
+# Usage: os-update [package ...]
+#   with no arguments, applies a full upgrade; otherwise upgrades only the named packages.
+echo "[INFO] Creating OS Emergency Update Script"
+cat > /usr/local/bin/os-update << 'UPDATE_EOF'
+#!/bin/bash
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+
+log() { echo "[os-update] $(date '+%Y-%m-%d %H:%M:%S') $*"; }
+err() { echo "[os-update] $(date '+%Y-%m-%d %H:%M:%S') ERROR: $*" >&2; }
+
+LOG_FILE="/var/log/$$projectPrefix/os-update.log"
+PACKAGES="$*"
+
+mkdir -p "$(dirname "$LOG_FILE")"
+touch "$LOG_FILE"
+chown lightning-server:lightning-server "$LOG_FILE"
+exec > >(tee -a "$LOG_FILE" | logger -t os-update -s) 2>&1
+
+log "OS update started"
+apt-get -o DPkg::Lock::Timeout=$$aptLockTimeoutSeconds update -y
+
+# Keep existing config files on conflict; an interactive dpkg prompt would hang the SSM command.
+APT_OPTS="-y -o DPkg::Lock::Timeout=$$aptLockTimeoutSeconds -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
+if [ -n "$PACKAGES" ]; then
+    # `install --only-upgrade` exits 0 for a package that is not installed, so a typo'd or
+    # wrong-architecture name would report a clean patch while changing nothing at all. Check
+    # each name up front and fail loudly instead.
+    for p in $PACKAGES; do
+        name=$(echo "$p" | cut -d= -f1)
+        if ! dpkg-query -s "$name" 2>/dev/null | grep -q 'Status: install ok installed'; then
+            err "not installed on this host, refusing to report a successful update: $p"
+            exit 1
+        fi
+    done
+    log "Upgrading only: $PACKAGES"
+    apt-get $APT_OPTS install --only-upgrade $PACKAGES
+else
+    # --with-new-pkgs because a plain `upgrade` never installs new packages, and kernel security
+    # updates arrive as a new package name (linux-image-X-generic) pulled in by a dependency
+    # change on the metapackage. Without it the one update most likely to need a reboot is the
+    # one silently held back.
+    log "Applying full upgrade"
+    apt-get $APT_OPTS upgrade --with-new-pkgs
+    # Deliberately only on the full-upgrade path. Naming packages means the operator asked for a minimal,
+    # auditable change to one or two packages; autoremove is a whole-system operation that will
+    # happily purge old kernels and anything else currently marked auto-and-no-longer-needed,
+    # which is not a blast radius to take on while chasing a single CVE.
+    apt-get $APT_OPTS autoremove
+fi
+
+log "Restarting $$deploymentTag"
+systemctl restart $$projectPrefix
+sleep 5
+if ! systemctl is-active --quiet $$projectPrefix; then
+    err "Service failed to start after OS update"
+    tail -n 100 /var/log/$$projectPrefix/server.log >&2 || true
+    exit 1
+fi
+
+log "Waiting for liveness at $$localHealthUrl"
+healthy=0
+for i in $(seq 1 20); do
+    if curl -fsS -o /dev/null --max-time 5 "$$localHealthUrl"; then healthy=1; break; fi
+    sleep 3
+done
+if [ "$healthy" -ne 1 ]; then
+    err "Liveness endpoint $$localHealthUrl never returned success"
+    tail -n 100 /var/log/$$projectPrefix/server.log >&2 || true
+    exit 1
+fi
+
+# Breadcrumb for the CloudWatch log; a reboot is needed to activate a patched kernel. Callers that
+# act on it (update-fleet.sh) probe /var/run/reboot-required with their own SSM command rather than
+# reading this back, because SSM truncates command output at 24,000 characters per stream and a
+# full apt upgrade can push a trailing marker past that cap.
+if [ -f /var/run/reboot-required ]; then log "REBOOT_REQUIRED=yes"; else log "REBOOT_REQUIRED=no"; fi
+log "Done"
+UPDATE_EOF
+
+chmod +x /usr/local/bin/os-update
+echo "[INFO] Creating OS Emergency Update Script - DONE"
 """
         )
     }
@@ -1205,6 +1502,24 @@ echo "[INFO] Creating Lightning Server Pre-Deploy Script - DONE"
             }
         }
 
+        // Validate extra writable paths: they are emitted verbatim into the systemd unit
+        for (path in serviceWritablePaths) {
+            require(path.matches(Regex("^/[A-Za-z0-9._/-]*$")) && ".." !in path.split('/')) {
+                "Invalid serviceWritablePaths entry '$path': must be an absolute path of A-Z a-z 0-9 . _ - / with no '..'"
+            }
+        }
+
+        // The deployed settings live in the Config directory; an instance file of the same name would clobber them
+        val reservedConfigNames = setOf(
+            "settings.json", "settings.json.new", "settings.json.old",
+            "settings.enc", "settings.enc.new", "settings.enc.old",
+        )
+        for ((name, type) in instanceFiles.keys + instanceFilesRaw.keys) {
+            require(type != FileType.Config || name !in reservedConfigNames) {
+                "Instance Config file name '$name' is reserved for the deployed settings"
+            }
+        }
+
         // Validate systemd environment variable names (alphanumeric and underscore only)
         val envKeyRegex = Regex("^[a-zA-Z_][a-zA-Z0-9_]*$")
         for ((key, _) in systemdEnvironment) {
@@ -1236,10 +1551,20 @@ echo "[INFO] Creating Lightning Server Pre-Deploy Script - DONE"
                     put("Sid", "AllowAutoScalingServiceLinkedRole")
                     put("Effect", "Allow")
                     put("Principal", buildJsonObject {
-                        put("AWS", "arn:aws:iam::$account:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling")
+                        put(
+                            "AWS",
+                            "arn:aws:iam::$account:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling"
+                        )
                     })
                     putJsonArray("Action") {
-                        listOf("kms:Encrypt", "kms:Decrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:DescribeKey", "kms:CreateGrant")
+                        listOf(
+                            "kms:Encrypt",
+                            "kms:Decrypt",
+                            "kms:ReEncrypt*",
+                            "kms:GenerateDataKey*",
+                            "kms:DescribeKey",
+                            "kms:CreateGrant"
+                        )
                             .forEach { add(it) }
                     }
                     put("Resource", "*")
@@ -1249,13 +1574,22 @@ echo "[INFO] Creating Lightning Server Pre-Deploy Script - DONE"
                     put("Effect", "Allow")
                     put("Principal", buildJsonObject { put("Service", "logs.$applicationRegion.amazonaws.com") })
                     putJsonArray("Action") {
-                        listOf("kms:Encrypt", "kms:Decrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:DescribeKey")
+                        listOf(
+                            "kms:Encrypt",
+                            "kms:Decrypt",
+                            "kms:ReEncrypt*",
+                            "kms:GenerateDataKey*",
+                            "kms:DescribeKey"
+                        )
                             .forEach { add(it) }
                     }
                     put("Resource", "*")
                     put("Condition", buildJsonObject {
                         put("ArnLike", buildJsonObject {
-                            put("kms:EncryptionContext:aws:logs:arn", "arn:aws:logs:$applicationRegion:$account:log-group:*")
+                            put(
+                                "kms:EncryptionContext:aws:logs:arn",
+                                "arn:aws:logs:$applicationRegion:$account:log-group:*"
+                            )
                         })
                     })
                 }
@@ -1287,6 +1621,9 @@ echo "[INFO] Creating Lightning Server Pre-Deploy Script - DONE"
         } else {
             this
         }
+
+    internal fun String.terraformTemplateEscape(): String =
+        replace($$"${", $$$"$${").replace("%{", "%%{")
 }
 
 /**

@@ -124,14 +124,14 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
      * Emit Terraform configuration into a specific context (file).
      * If context is null, configuration goes into "unclassified.tf.json".
      *
-     * @param context Optional name for the terraform file (without .tf.json extension)
+     * @param fileName Optional name for the terraform file (without .tf.json extension)
      * @param action Builder lambda to construct Terraform JSON objects
      */
     override fun emitExtra(
-        context: String,
+        fileName: String,
         content: String,
     ) {
-        extraFiles.getOrPut(context) { content }
+        extraFiles.getOrPut(fileName) { content }
     }
 
     /**

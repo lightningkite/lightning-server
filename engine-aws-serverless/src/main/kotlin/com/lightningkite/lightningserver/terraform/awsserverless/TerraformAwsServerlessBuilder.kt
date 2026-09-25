@@ -120,11 +120,12 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
         val ipPrefix: String,
         val availabilityZones: List<String>,
         val natGateway: AwsVpc.NatGateway,
+        val createVpcEndpoints: Boolean,
         override val id: String, //= TerraformJsonObject.expression("module.vpc.vpc_id"),
         override val securityGroup: String, //= TerraformJsonObject.expression("aws_security_group.internal.id"),
         override val privateSubnets: String, //= TerraformJsonObject.expression("module.vpc.private_subnets"),
         override val publicSubnets: String, //= TerraformJsonObject.expression("module.vpc.public_subnets"),
-        override val applicationSubnet: String, //= TerraformJsonObject.expression("module.vpc.public_subnets[0]"),
+        override val applicationRouteTables: String, //= TerraformJsonObject.expression("module.vpc.private_route_table_ids"),
         override val natGatewayIps: String, //= TerraformJsonObject.expression("module.vpc.nat_public_ips"),
         override val cidr: String = "$ipPrefix.0.0/16",
     ) : AwsVpc.VpcInfo
@@ -133,17 +134,57 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
         ipPrefix: String,
         availabilityZones: List<String>,
         natGateway: AwsVpc.NatGateway,
+        createVpcEndpoints: Boolean = false,
     ): AwsVpc.VpcInfo = VpcInfoTerraformManaged(
         ipPrefix = ipPrefix,
         availabilityZones = availabilityZones,
         natGateway = natGateway,
+        createVpcEndpoints = createVpcEndpoints,
         id = TerraformJsonObject.expression("module.vpc.vpc_id"),
         securityGroup = TerraformJsonObject.expression("aws_security_group.internal.id"),
         privateSubnets = TerraformJsonObject.expression("module.vpc.private_subnets"),
         publicSubnets = TerraformJsonObject.expression("module.vpc.public_subnets"),
-        applicationSubnet = TerraformJsonObject.expression("module.vpc.public_subnets[0]"),
+        applicationRouteTables = TerraformJsonObject.expression("module.vpc.private_route_table_ids"),
         natGatewayIps = TerraformJsonObject.expression("module.vpc.nat_public_ips"),
     )
+
+    internal class VpcInfoExisting(
+        override val id: String,
+        override val cidr: String,
+        override val securityGroup: String,
+        override val privateSubnets: String,
+        override val publicSubnets: String,
+        override val applicationRouteTables: String,
+        override val natGatewayIps: String,
+    ) : AwsVpc.VpcInfo
+
+    /**
+     * Uses a VPC that already exists and is not managed by this Terraform.
+     * The Lambda runs in [privateSubnets] with only [securityGroup], so it must allow the outbound traffic the Lambda needs.
+     *
+     * @param privateRouteTables The route tables of [privateSubnets]. Services that need routes (such as VPC peering) add them here.
+     */
+    public fun existingVPC(
+        id: String,
+        cidr: String,
+        securityGroup: String,
+        privateSubnets: List<String>,
+        publicSubnets: List<String>,
+        privateRouteTables: List<String>,
+        natGatewayIps: List<String> = emptyList(),
+    ): AwsVpc.VpcInfo = VpcInfoExisting(
+        id = id,
+        cidr = cidr,
+        securityGroup = securityGroup,
+        privateSubnets = privateSubnets.toTerraformList(),
+        publicSubnets = publicSubnets.toTerraformList(),
+        applicationRouteTables = privateRouteTables.toTerraformList(),
+        natGatewayIps = natGatewayIps.toTerraformList(),
+    )
+
+    /** Formats literal IDs as a Terraform list expression, e.g. `${["subnet-a", "subnet-b"]}`. */
+    private fun List<String>.toTerraformList(): String =
+        TerraformJsonObject.expression(joinToString(", ", "[", "]") { "\"$it\"" })
 
     override fun prepareForWrite() {
 
@@ -151,6 +192,7 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
             throw IllegalArgumentException("The projectPrefix has illegal characters in it. It can only contain: Letters, Digits, '-', and '_'.")
 
         super.prepareForWrite()
+
         require(TerraformProviderImport.aws)
         require(
             TerraformProvider(
@@ -191,6 +233,115 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
             "responseLength" - $$"$context.responseLength"
             "integrationErrorMessage" - $$"$context.integrationErrorMessage"
         })
+        (applicationVpc as? VpcInfoTerraformManaged)?.also { info ->
+            emit("cloud") {
+                "module.vpc" {
+                    "source" - "terraform-aws-modules/vpc/aws"
+                    "version" - "6.6.0"
+
+                    "name" - projectPrefix
+                    "cidr" - info.cidr
+
+                    "azs" - info.availabilityZones
+
+                    // IPv4 Subnets
+                    "private_subnets" - List(info.availabilityZones.size) { index -> "${info.ipPrefix}.${index + 1}.0/24" }
+                    "public_subnets" - List(info.availabilityZones.size) { index -> "${info.ipPrefix}.${index + 100}.0/24" }
+
+                    // IPv6 Support and Subnets
+                    if (enableIPv6) {
+                        "enable_ipv6" - true
+                        "create_egress_only_igw" - true
+                        "public_subnet_assign_ipv6_address_on_creation" - true
+                        "public_subnet_ipv6_prefixes" - List(info.availabilityZones.size) { index -> index }
+                        "private_subnet_assign_ipv6_address_on_creation" - true
+                        "private_subnet_ipv6_prefixes" - List(info.availabilityZones.size) { index -> index + 3 }
+                    }
+
+                    "enable_nat_gateway" - (info.natGateway != AwsVpc.NatGateway.None)
+                    "single_nat_gateway" - (info.natGateway == AwsVpc.NatGateway.Single)
+                    "one_nat_gateway_per_az" - (info.natGateway == AwsVpc.NatGateway.PerAvailabilityZone)
+                    "enable_vpn_gateway" - false
+                    "enable_dns_hostnames" - true
+                    "enable_dns_support" - true
+                }
+
+                // The S3 and DynamoDB endpoints are gateways which don't cost money, so we always include them.
+                "resource.aws_vpc_endpoint.s3" {
+                    "vpc_id" - expression("module.vpc.vpc_id")
+                    "service_name" - "com.amazonaws.${applicationRegion}.s3"
+                    "route_table_ids" - expression("concat(module.vpc.private_route_table_ids, module.vpc.public_route_table_ids)")
+                    if (enableIPv6) {
+                        "ip_address_type" - "dualstack"
+                        "dns_options" {
+                            "dns_record_ip_type" - "dualstack"
+                        }
+                    }
+                }
+                // DynamoDB gateway endpoints only support the service-defined DNS record IP type, so no dns_options here.
+                "resource.aws_vpc_endpoint.dynamodb" {
+                    "vpc_id" - expression("module.vpc.vpc_id")
+                    "service_name" - "com.amazonaws.${applicationRegion}.dynamodb"
+                    "route_table_ids" - expression("concat(module.vpc.private_route_table_ids, module.vpc.public_route_table_ids)")
+                }
+                if(info.createVpcEndpoints) {
+                    // This is type interface and costs money, charged per endpoint, per availability zone, per hour.
+                    // So adding one in all three azs with cost about $22 a month. If you don't have a public subnet or NAT Gateway
+                    // or you absolutely need to for security purposes and keeping everything on a private network then turn
+                    // this on
+                    "resource.aws_vpc_endpoint.lambda_invoke" {
+                        "vpc_id" - expression("module.vpc.vpc_id")
+                        "service_name" - "com.amazonaws.${applicationRegion}.lambda"
+                        "security_group_ids" - listOf(expression("aws_security_group.lambda_invoke.id"))
+                        "subnet_ids" - expression("module.vpc.private_subnets")
+                        "vpc_endpoint_type" - "Interface"
+                        "private_dns_enabled" - true
+                    }
+                    "resource.aws_security_group.lambda_invoke" {
+                        "name" - "$projectPrefix-lambda-invoke"
+                        "vpc_id" - expression("module.vpc.vpc_id")
+                    }
+                    "resource.aws_vpc_security_group_ingress_rule.lambda_invoke" {
+                        "security_group_id" - expression("aws_security_group.lambda_invoke.id")
+                        "ip_protocol" - "tcp"
+                        "from_port" - 443
+                        "to_port" - 443
+                        "cidr_ipv4" - expression("module.vpc.vpc_cidr_block")
+                    }
+                }
+                "resource.aws_security_group.internal" {
+                    "name" - "$projectPrefix-private"
+                    "vpc_id" - expression("module.vpc.vpc_id")
+                }
+                "resource.aws_vpc_security_group_ingress_rule.freeInternal" {
+                    "for_each" - expression("toset(module.vpc.private_subnets_cidr_blocks)")
+                    "security_group_id" - expression("aws_security_group.internal.id")
+                    "cidr_ipv4" - expression("each.key")
+                    "ip_protocol" - -1
+                }
+                "resource.aws_vpc_security_group_egress_rule.freeInternal" {
+                    "for_each" - expression("toset(module.vpc.private_subnets_cidr_blocks)")
+                    "security_group_id" - expression("aws_security_group.internal.id")
+                    "cidr_ipv4" - expression("each.key")
+                    "ip_protocol" - -1
+                }
+                "resource.aws_security_group.access_outside" {
+                    "name" - "$projectPrefix-access-outside"
+                    "vpc_id" - expression("module.vpc.vpc_id")
+                }
+                "resource.aws_vpc_security_group_egress_rule.access_outside" {
+                    "security_group_id" - expression("aws_security_group.access_outside.id")
+                    "ip_protocol" - "-1"
+                    "cidr_ipv4" - "0.0.0.0/0"
+                }
+                if (enableIPv6)
+                    "resource.aws_vpc_security_group_egress_rule.access_outside_ipv6" {
+                        "security_group_id" - expression("aws_security_group.access_outside.id")
+                        "ip_protocol" - "-1"
+                        "cidr_ipv6" - "::/0"
+                    }
+            }
+        }
 
         emit("http") {
             // HTTP
@@ -625,9 +776,10 @@ public abstract class TerraformAwsServerlessBuilder<S : ServerBuilder>(
                     "vpc_config" {
                         "ipv6_allowed_for_dual_stack" - enableIPv6
                         "subnet_ids" - vpcInfo.privateSubnets
-                        "security_group_ids" - listOf(
-                            expression("aws_security_group.internal.id"),
-                            expression("aws_security_group.access_outside.id")
+                        // access_outside only exists in a Terraform managed VPC; an existing VPC's security group must allow outbound traffic itself.
+                        "security_group_ids" - listOfNotNull(
+                            vpcInfo.securityGroup,
+                            expression("aws_security_group.access_outside.id").takeIf { vpcInfo is VpcInfoTerraformManaged }
                         )
                     }
                 }

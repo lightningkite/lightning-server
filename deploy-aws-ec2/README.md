@@ -91,9 +91,8 @@ object MyDeployment : TerraformAwsSingleEc2Builder<Server>(Server) {
   script changes (its content hash drives the Image Builder component version) or when
   `baseImageSalt` is bumped.
 - **Health check = liveness, autodetected:** the ALB target health check defaults to the server's
-  `/meta/online` liveness endpoint (autodetected from the built server — see `detectedOnlinePath`),
-  not the deep `/meta/health`, so a slow downstream service can't make the ALB drain the whole
-  fleet. Override `healthCheckPath` if needed.
+  `/meta/online` liveness endpoint, not the deep `/meta/health`, so a slow downstream service can't 
+   make the ALB drain the whole fleet. Override `healthCheckPath` if needed.
 - **Rolling, validated deploys:** on a JAR/settings change, `redeploy-fleet.sh` updates the fleet
   in batches of `redeployBatchSize` (default 1). It suspends the ASG processes that would fight it
   (`HealthCheck`/`ReplaceUnhealthy` so it can't kill a drained instance, plus
