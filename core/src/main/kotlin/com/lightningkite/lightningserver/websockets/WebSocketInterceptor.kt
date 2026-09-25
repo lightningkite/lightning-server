@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.websockets
 
+import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.instrument
@@ -34,24 +35,29 @@ public interface WebSocketInterceptor {
 /** One link of a compiled chain, wrapping every phase of [this] in its own instrumentation span. */
 private fun <PATH : PathSpec, T> WebSocketHandler<PATH, T>.instrumented(name: String): WebSocketHandler<PATH, T> {
     return object : DelegatingWebSocketHandler<PATH, T>(this@instrumented) {
+        @OverrideOnly
         context(serverRuntime: ServerRuntime)
         override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T =
             instrument(name) { wrapped.willConnect(request) }
 
+        @OverrideOnly
         context(serverRuntime: ServerRuntime)
         override suspend fun didConnect(connection: WebSocketConnection<PATH, T>): Unit =
             instrument(name) { wrapped.didConnect(connection) }
 
+        @OverrideOnly
         context(serverRuntime: ServerRuntime)
         override suspend fun messageFromClient(connection: WebSocketConnection<PATH, T>, frame: WebSocketFrame): Unit =
             instrument(name) { wrapped.messageFromClient(connection, frame) }
 
+        @OverrideOnly
         context(serverRuntime: ServerRuntime)
         override suspend fun messageFromSubscription(
             connection: WebSocketConnection<PATH, T>,
             topic: WebSocketSubscriptionMessage<*, *>,
         ): Unit = instrument(name) { wrapped.messageFromSubscription(connection, topic) }
 
+        @OverrideOnly
         context(serverRuntime: ServerRuntime)
         override suspend fun disconnect(connection: WebSocketConnection<PATH, T>, reason: WebSocketClose): Unit =
             instrument(name) { wrapped.disconnect(connection, reason) }

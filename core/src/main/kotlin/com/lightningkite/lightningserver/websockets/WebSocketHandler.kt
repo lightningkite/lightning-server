@@ -4,6 +4,7 @@ package com.lightningkite.lightningserver.websockets
 
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.LightningServerDsl
+import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.serialization.serializerOrContextual
@@ -20,21 +21,26 @@ import kotlinx.serialization.KSerializer
 public interface WebSocketHandler<PATH : PathSpec, STORAGE> {
     public val storageSerializer: KSerializer<STORAGE>
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     public suspend fun willConnect(request: WebSocketConnectRequest<PATH>): STORAGE
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     public suspend fun didConnect(connection: WebSocketConnection<PATH, STORAGE>)
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     public suspend fun messageFromClient(connection: WebSocketConnection<PATH, STORAGE>, frame: WebSocketFrame)
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     public suspend fun messageFromSubscription(
         connection: WebSocketConnection<PATH, STORAGE>,
         topic: WebSocketSubscriptionMessage<*, *>,
     )
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     public suspend fun disconnect(connection: WebSocketConnection<PATH, STORAGE>, reason: WebSocketClose)
 }
@@ -63,6 +69,7 @@ public interface DirectExecutableWebSocketHandler<PATH : PathSpec, STORAGE> : We
      * @param send Function to send frames to the client
      * @param close Function to close the connection with a reason
      */
+    @OverrideOnly
     context(server: ServerRuntime)
     public suspend fun handleDirect(
         request: WebSocketConnectRequest<PATH>,
@@ -93,15 +100,18 @@ public inline fun <PATH : PathSpec, reified STORAGE> WebSocketHandler(
     object : WebSocketHandler<PATH, STORAGE> {
         override val storageSerializer: KSerializer<STORAGE> = storageSerializer
 
+        @OverrideOnly
         context(serverRuntime: ServerRuntime)
         override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): STORAGE =
             willConnect(serverRuntime, request)
 
+        @OverrideOnly
         context(serverRuntime: ServerRuntime)
         override suspend fun didConnect(connection: WebSocketConnection<PATH, STORAGE>) {
             didConnect(serverRuntime, connection)
         }
 
+        @OverrideOnly
         context(serverRuntime: ServerRuntime)
         override suspend fun messageFromClient(connection: WebSocketConnection<PATH, STORAGE>, frame: WebSocketFrame) {
             messageFromClient(serverRuntime, connection, frame)
@@ -109,12 +119,14 @@ public inline fun <PATH : PathSpec, reified STORAGE> WebSocketHandler(
 
         private val subHandler = TopicHandlersBuilder<PATH, STORAGE>().apply(topicHandlers).build()
 
+        @OverrideOnly
         context(serverRuntime: ServerRuntime)
         override suspend fun messageFromSubscription(
             connection: WebSocketConnection<PATH, STORAGE>,
             topic: WebSocketSubscriptionMessage<*, *>,
         ): Unit = subHandler(serverRuntime, connection, topic)
 
+        @OverrideOnly
         context(serverRuntime: ServerRuntime)
         override suspend fun disconnect(connection: WebSocketConnection<PATH, STORAGE>, reason: WebSocketClose) {
             disconnect(serverRuntime, connection, reason)

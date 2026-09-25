@@ -35,6 +35,19 @@ public annotation class InternalLightningServerApi
 public annotation class EngineApi
 
 /**
+ * Marks a method meant to be overridden but not called directly, like `protected`. Call the corresponding
+ * `WithMetrics` function instead, which runs it as its own execution through the server's interceptors.
+ *
+ * Overrides repeat the annotation, which keeps calls through the subclass restricted too.
+ */
+@RequiresOptIn(
+    "This is meant to be overridden, not called. Use the corresponding WithMetrics function.",
+    RequiresOptIn.Level.ERROR
+)
+@Target(AnnotationTarget.FUNCTION)
+public annotation class OverrideOnly
+
+/**
  * Marks the Lightning Server DSL for defining servers and endpoints.
  * This annotation prevents accidental use of DSL functions outside their intended context.
  */

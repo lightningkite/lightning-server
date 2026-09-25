@@ -20,6 +20,7 @@ private val errorType = TelemetryKey.OfString("error.type")
  * interceptors, exactly as a routed request would be but without routing.
  */
 context(runtime: ServerRuntime)
+@OptIn(OverrideOnly::class)
 public suspend fun <PATH : PathSpec> HttpHandler<PATH>.handleWithMetrics(
     request: HttpRequest<PATH>,
 ): HttpResponse =
@@ -181,6 +182,7 @@ private suspend fun <PATH : PathSpec> Engine.executeHttpIntercepted(
 }
 
 
+@OptIn(OverrideOnly::class)
 private suspend fun <PATH : PathSpec> ServerRuntime.routeHttpRequest(req: HttpRequest<PATH>): HttpResponse = try {
     // Route resolution must live inside this try so that a RouteNotFoundException (e.g. a HEAD
     // request with no HEAD handler, or a missing trailing slash) is caught below and recovered

@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.websockets
 import com.lightningkite.lightningserver.AnonType
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.NotFoundException
+import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.pathing.*
@@ -114,6 +115,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
     }
 
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     override suspend fun willConnect(
         request: WebSocketConnectRequest<PathSpec0>,
@@ -176,6 +178,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
         return otherHandler as WebSocketHandler<PathSpec, Any?>
     }
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     override suspend fun didConnect(connection: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>) {
         val otherHandler = connection.inner()
@@ -184,6 +187,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
         }
     }
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     override suspend fun messageFromClient(
         connection: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>,
@@ -195,6 +199,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
         }
     }
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     override suspend fun messageFromSubscription(
         connection: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>,
@@ -206,6 +211,7 @@ public class QueryParamWebSocketHandler() : WebSocketHandler<PathSpec0, QueryPar
         }
     }
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     override suspend fun disconnect(
         connection: WebSocketConnection<PathSpec0, QueryParamWebSocketHandlerData>,

@@ -192,6 +192,7 @@ public class CorsInterceptor(private val config: Runtime<CorsSettings>) : HttpIn
      */
     override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> {
         return object : WebSocketHandler<PATH, T> by handler {
+            @OverrideOnly
             context(serverRuntime: ServerRuntime)
             override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
                 if (!serverRuntime.execution.isRoot()) return handler.willConnect(request)

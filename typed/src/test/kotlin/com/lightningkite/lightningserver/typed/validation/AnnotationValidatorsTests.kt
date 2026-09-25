@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.typed.validation
 
 import com.lightningkite.lightningserver.BadRequestException
+import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -97,6 +98,7 @@ class AnnotationValidatorsTests {
             println(engine.validators.prettyPrint(qualified = true))
 
             runBlocking {
+                @OptIn(OverrideOnly::class)
                 suspend fun handle(model: TestModel) {
                     val request = HttpRequest(
                         RawHttpEndpoint(endpoint.location.path, method = endpoint.location.method),

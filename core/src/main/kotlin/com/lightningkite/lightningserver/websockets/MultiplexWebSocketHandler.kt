@@ -182,14 +182,17 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
         return runtime.server.interceptIncomingSocket(handler as WebSocketHandler<PathSpec, Any?>)
     }
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     override suspend fun willConnect(request: WebSocketConnectRequest<PathSpec0>): MultiplexWebSocketHandlerState =
         MultiplexWebSocketHandlerState(map = emptyMap())
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     override suspend fun didConnect(connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>): Unit =
         Unit
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     override suspend fun messageFromClient(
         connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>,
@@ -314,6 +317,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
         }
     }
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     override suspend fun messageFromSubscription(
         connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>,
@@ -333,6 +337,7 @@ public class MultiplexWebSocketHandler() : WebSocketHandler<PathSpec0, Multiplex
         }
     }
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     override suspend fun disconnect(
         connection: WebSocketConnection<PathSpec0, MultiplexWebSocketHandlerState>,

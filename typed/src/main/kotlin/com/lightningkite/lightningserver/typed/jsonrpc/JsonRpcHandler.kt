@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.typed.jsonrpc
 
 import com.lightningkite.lightningserver.HttpStatusException
+import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -41,6 +42,7 @@ public class JsonRpcHandler<PATH : PathSpec>(
 
     private val methodMap: Map<String, JsonRpcMethod<PATH, *, *, *>> = methods.associateBy { it.name }
 
+    @OverrideOnly
     context(server: ServerRuntime)
     override suspend fun handle(request: HttpRequest<PATH>): HttpResponse {
         // Parse the JSON-RPC request

@@ -91,6 +91,7 @@ public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT
      * GOTCHA: For GET/HEAD requests, input is parsed from query parameters, which means
      * complex objects should be avoided. For POST/PUT/PATCH, input comes from request body.
      */
+    @OverrideOnly
     context(server: ServerRuntime)
     override suspend fun handle(request: HttpRequest<PATH>): HttpResponse {
         @Suppress("UNCHECKED_CAST")

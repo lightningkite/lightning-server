@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpInterceptor
 import com.lightningkite.lightningserver.logger
+import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.logicalId
@@ -76,6 +77,7 @@ public class AccessLogInterceptor : HttpInterceptor, WebSocketInterceptor {
 
     override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> =
         object : DelegatingWebSocketHandler<PATH, T>(handler) {
+            @OverrideOnly
             context(serverRuntime: ServerRuntime)
             override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
                 if (serverRuntime.logger.isInfoEnabled()) {
@@ -88,6 +90,7 @@ public class AccessLogInterceptor : HttpInterceptor, WebSocketInterceptor {
                 return wrapped.willConnect(request)
             }
 
+            @OverrideOnly
             context(serverRuntime: ServerRuntime)
             override suspend fun disconnect(connection: WebSocketConnection<PATH, T>, reason: WebSocketClose) {
                 if (serverRuntime.logger.isInfoEnabled()) {

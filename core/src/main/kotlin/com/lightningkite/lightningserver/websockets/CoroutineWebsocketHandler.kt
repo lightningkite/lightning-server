@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.websockets
 
 import com.lightningkite.lightningserver.HttpStatusException
+import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -141,6 +142,7 @@ public abstract class CoroutineWebSocketHandler : ServerBuilder() {
             // --- DirectExecutableWebSocketHandler implementation ---
             // Used by local engines (Ktor, Netty) to bypass pub/sub overhead
 
+            @OverrideOnly
             context(server: ServerRuntime)
             override suspend fun handleDirect(
                 request: WebSocketConnectRequest<PathSpec0>,
@@ -176,6 +178,7 @@ public abstract class CoroutineWebSocketHandler : ServerBuilder() {
             // --- Standard WebSocketHandler implementation ---
             // Used by distributed engines (AWS Lambda) that need pub/sub
 
+            @OverrideOnly
             context(serverRuntime: ServerRuntime)
             override suspend fun didConnect(connection: WebSocketConnection<PathSpec0, Storage>) {
                 // Only subscribe to outbound topic if direct send is not available
@@ -185,6 +188,7 @@ public abstract class CoroutineWebSocketHandler : ServerBuilder() {
                 }
             }
 
+            @OverrideOnly
             context(serverRuntime: ServerRuntime)
             override suspend fun willConnect(request: WebSocketConnectRequest<PathSpec0>): Storage = coroutineScope {
                 val s = Storage(request = request)
@@ -229,6 +233,7 @@ public abstract class CoroutineWebSocketHandler : ServerBuilder() {
                 return@coroutineScope s
             }
 
+            @OverrideOnly
             context(serverRuntime: ServerRuntime)
             override suspend fun messageFromClient(
                 connection: WebSocketConnection<PathSpec0, Storage>,
@@ -237,6 +242,7 @@ public abstract class CoroutineWebSocketHandler : ServerBuilder() {
                 connection.currentState.inbound().emit(frame.serializable())
             }
 
+            @OverrideOnly
             context(serverRuntime: ServerRuntime)
             override suspend fun messageFromSubscription(
                 connection: WebSocketConnection<PathSpec0, Storage>,
@@ -247,6 +253,7 @@ public abstract class CoroutineWebSocketHandler : ServerBuilder() {
                 }
             }
 
+            @OverrideOnly
             context(serverRuntime: ServerRuntime)
             override suspend fun disconnect(
                 connection: WebSocketConnection<PathSpec0, Storage>,

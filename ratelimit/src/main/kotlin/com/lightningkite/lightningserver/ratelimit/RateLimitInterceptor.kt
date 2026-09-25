@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.ratelimit
 
 import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.LSError
+import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.http.*
@@ -115,6 +116,7 @@ public class RateLimitInterceptor(
 
     override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> {
         return object : WebSocketHandler<PATH, T> by handler {
+            @OverrideOnly
             context(serverRuntime: ServerRuntime)
             override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
                 val settings = settings() ?: return handler.willConnect(request)

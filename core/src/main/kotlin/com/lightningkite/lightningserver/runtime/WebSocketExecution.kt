@@ -4,6 +4,7 @@ package com.lightningkite.lightningserver.runtime
 
 import com.lightningkite.lightningserver.EngineApi
 import com.lightningkite.lightningserver.InternalLightningServerApi
+import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.route
 import com.lightningkite.lightningserver.websockets.*
@@ -30,6 +31,7 @@ private val wsDisconnectReason = TelemetryKey.OfString("ws.disconnect.reason")
  * Runs [DirectExecutableWebSocketHandler.handleDirect] as the socket's Connect execution, as a root.
  */
 @EngineApi
+@OptIn(OverrideOnly::class)
 context(engine: Engine)
 public suspend fun <PATH : PathSpec, STORAGE> DirectExecutableWebSocketHandler<PATH, STORAGE>.handleDirectAsRoot(
     request: WebSocketConnectRequest<PATH>,
@@ -48,6 +50,7 @@ public suspend fun <PATH : PathSpec, STORAGE> DirectExecutableWebSocketHandler<P
  * Runs [DirectExecutableWebSocketHandler.handleDirect] as the socket's Connect execution, caused by the
  * current one.
  */
+@OptIn(OverrideOnly::class)
 context(runtime: ServerRuntime)
 public suspend fun <PATH : PathSpec, STORAGE> DirectExecutableWebSocketHandler<PATH, STORAGE>.handleDirectWithMetrics(
     request: WebSocketConnectRequest<PATH>,
@@ -64,6 +67,7 @@ public suspend fun <PATH : PathSpec, STORAGE> DirectExecutableWebSocketHandler<P
 
 /** Runs [WebSocketHandler.willConnect] as the socket's Connect execution, as a root. */
 @EngineApi
+@OptIn(OverrideOnly::class)
 context(engine: Engine)
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.willConnectAsRoot(
     request: WebSocketConnectRequest<PATH>,
@@ -76,6 +80,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.wi
 }
 
 /** Runs [WebSocketHandler.willConnect] as the socket's Connect execution, caused by the current one. */
+@OptIn(OverrideOnly::class)
 context(runtime: ServerRuntime)
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.willConnectWithMetrics(
     request: WebSocketConnectRequest<PATH>,
@@ -89,6 +94,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.wi
 
 /** Runs [WebSocketHandler.didConnect] as a new root execution. */
 @EngineApi
+@OptIn(OverrideOnly::class)
 context(engine: Engine)
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.didConnectAsRoot(
     connection: WebSocketConnection<PATH, STORAGE>,
@@ -101,6 +107,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
 }
 
 /** Runs [WebSocketHandler.didConnect] as a new execution caused by the current one. */
+@OptIn(OverrideOnly::class)
 context(runtime: ServerRuntime)
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.didConnectWithMetrics(
     connection: WebSocketConnection<PATH, STORAGE>,
@@ -114,6 +121,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
 
 /** Runs [WebSocketHandler.messageFromClient] as a new root execution. */
 @EngineApi
+@OptIn(OverrideOnly::class)
 context(engine: Engine)
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.messageFromClientAsRoot(
     connection: WebSocketConnection<PATH, STORAGE>,
@@ -127,6 +135,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
 }
 
 /** Runs [WebSocketHandler.messageFromClient] as a new execution caused by the current one. */
+@OptIn(OverrideOnly::class)
 context(runtime: ServerRuntime)
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.messageFromClientWithMetrics(
     connection: WebSocketConnection<PATH, STORAGE>,
@@ -141,6 +150,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
 
 /** Runs [WebSocketHandler.messageFromSubscription] as a new root execution. */
 @EngineApi
+@OptIn(OverrideOnly::class)
 context(engine: Engine)
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.messageFromSubscriptionAsRoot(
     connection: WebSocketConnection<PATH, STORAGE>,
@@ -154,6 +164,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
 }
 
 /** Runs [WebSocketHandler.messageFromSubscription] as a new execution caused by the current one. */
+@OptIn(OverrideOnly::class)
 context(runtime: ServerRuntime)
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.messageFromSubscriptionWithMetrics(
     connection: WebSocketConnection<PATH, STORAGE>,
@@ -171,6 +182,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.me
  * handler throws.
  */
 @EngineApi
+@OptIn(OverrideOnly::class)
 context(engine: Engine)
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.disconnectAndCloseAsRoot(
     connection: WebSocketConnection<PATH, STORAGE>,
@@ -191,6 +203,7 @@ public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.di
  * Runs [WebSocketHandler.disconnect] as a new execution caused by the current one, then closes
  * [connection] even if the handler throws.
  */
+@OptIn(OverrideOnly::class)
 context(runtime: ServerRuntime)
 public suspend fun <PATH : PathSpec, STORAGE> WebSocketHandler<PATH, STORAGE>.disconnectAndClose(
     connection: WebSocketConnection<PATH, STORAGE>,

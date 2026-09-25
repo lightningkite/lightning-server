@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.websockets
 
+import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import kotlinx.serialization.KSerializer
@@ -18,26 +19,31 @@ public abstract class DelegatingWebSocketHandler<PATH : PathSpec, STORAGE>(
 ) : WebSocketHandler<PATH, STORAGE> {
     override val storageSerializer: KSerializer<STORAGE> get() = wrapped.storageSerializer
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): STORAGE =
         wrapped.willConnect(request)
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     override suspend fun didConnect(connection: WebSocketConnection<PATH, STORAGE>): Unit =
         wrapped.didConnect(connection)
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     override suspend fun messageFromClient(
         connection: WebSocketConnection<PATH, STORAGE>,
         frame: WebSocketFrame,
     ): Unit = wrapped.messageFromClient(connection, frame)
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     override suspend fun messageFromSubscription(
         connection: WebSocketConnection<PATH, STORAGE>,
         topic: WebSocketSubscriptionMessage<*, *>,
     ): Unit = wrapped.messageFromSubscription(connection, topic)
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     override suspend fun disconnect(
         connection: WebSocketConnection<PATH, STORAGE>,

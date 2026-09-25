@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.LSError
+import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.pathing.PathSpec
@@ -70,6 +71,7 @@ public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
     public suspend fun disconnectTyped(connection: Connection<PATH, STORAGE, USER, INPUT, OUTPUT>, reason: WebSocketClose)
 
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): ApiWebSocketStorage<STORAGE> {
         return willConnectTyped(WebSocketConnectRequestAccess(request, request.auth(auth))).let {
@@ -82,11 +84,13 @@ public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
         }
     }
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     override suspend fun didConnect(connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>) {
         didConnectTyped(connection.typed())
     }
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     override suspend fun messageFromClient(
         connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>,
@@ -100,6 +104,7 @@ public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
         messageFromClientTyped(connection.typed(), parsed)
     }
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     override suspend fun messageFromSubscription(
         connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>,
@@ -108,6 +113,7 @@ public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
         messageFromSubscriptionTyped(connection.typed(), topic)
     }
 
+    @OverrideOnly
     context(serverRuntime: ServerRuntime)
     override suspend fun disconnect(
         connection: WebSocketConnection<PATH, ApiWebSocketStorage<STORAGE>>,

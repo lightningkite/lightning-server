@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.websockets
 
 import com.lightningkite.lightningserver.MultiplexMessage
+import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.cors.CorsInterceptor
@@ -42,12 +43,14 @@ class MultiplexInterceptorTest {
 
         override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> =
             object : DelegatingWebSocketHandler<PATH, T>(handler) {
+                @OverrideOnly
                 context(serverRuntime: ServerRuntime)
                 override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
                     Observed.connects.add("/" + request.path.pathSegments.toString())
                     return wrapped.willConnect(request)
                 }
 
+                @OverrideOnly
                 context(serverRuntime: ServerRuntime)
                 override suspend fun disconnect(connection: WebSocketConnection<PATH, T>, reason: WebSocketClose) {
                     Observed.disconnects.add("/" + connection.request.path.pathSegments.toString())
@@ -65,6 +68,7 @@ class MultiplexInterceptorTest {
 
         override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> =
             object : DelegatingWebSocketHandler<PATH, T>(handler) {
+                @OverrideOnly
                 context(serverRuntime: ServerRuntime)
                 override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
                     if (serverRuntime.execution.isRoot())
@@ -72,6 +76,7 @@ class MultiplexInterceptorTest {
                     return wrapped.willConnect(request)
                 }
 
+                @OverrideOnly
                 context(serverRuntime: ServerRuntime)
                 override suspend fun messageFromClient(
                     connection: WebSocketConnection<PATH, T>,
