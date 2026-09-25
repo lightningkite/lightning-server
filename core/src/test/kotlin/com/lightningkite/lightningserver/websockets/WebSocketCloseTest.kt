@@ -118,4 +118,23 @@ class WebSocketCloseTest {
     fun `an ordinary failure is still INTERNAL_ERROR`() {
         assertEquals(WebSocketClose.Code.INTERNAL_ERROR, RuntimeException("boom").bestWebSocketCloseCode)
     }
+
+    @Test
+    fun `a cancelled socket closes as a plain GOING_AWAY`() {
+        val close = WebSocketClose.exceptional(CancellationException("Job was cancelled"))
+        assertEquals(WebSocketClose.GOING_AWAY, close)
+        assertEquals(false, close.isExceptional)
+    }
+
+    @Test
+    fun `a timed out socket closes as exceptional`() = kotlinx.coroutines.runBlocking {
+        val timeout = try {
+            kotlinx.coroutines.withTimeout(1) { kotlinx.coroutines.delay(1_000); null }
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            e
+        }
+        val close = WebSocketClose.exceptional(timeout as Throwable)
+        assertEquals(WebSocketClose.Code.INTERNAL_ERROR, close.code)
+        assertEquals(true, close.isExceptional)
+    }
 }

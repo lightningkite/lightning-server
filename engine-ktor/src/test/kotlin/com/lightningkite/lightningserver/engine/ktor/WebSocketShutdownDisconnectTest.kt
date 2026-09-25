@@ -32,8 +32,8 @@ import kotlin.test.assertTrue
 /**
  * A socket that is still open when the server goes down is torn down by cancellation, not by an
  * error. This pins both halves of that: the handler's `disconnect` still runs (it is wrapped in
- * `NonCancellable`), and the reason it is given is [WebSocketCloseReason.Code.GOING_AWAY] rather than the
- * [WebSocketCloseReason.Code.INTERNAL_ERROR] that deriving the code from a 500 used to produce.
+ * `NonCancellable`), and the reason it is given is a plain [WebSocketClose.GOING_AWAY] rather than the
+ * [WebSocketClose.Code.INTERNAL_ERROR] that deriving the code from a 500 used to produce.
  */
 class WebSocketShutdownDisconnectTest {
 

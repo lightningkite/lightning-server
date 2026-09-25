@@ -30,8 +30,15 @@ public data class WebSocketClose(
     public companion object {
         public val NORMAL: WebSocketClose get() = WebSocketClose(Code.NORMAL, null, null)
         public val GOING_AWAY: WebSocketClose get() = WebSocketClose(Code.GOING_AWAY, null, null)
+        /**
+         * The close for a socket that ended because [exception] was thrown.
+         *
+         * A cancellation, other than a handler's own timeout, is the socket being torn down rather than
+         * failing, so it gives a plain [GOING_AWAY] with no cause.
+         */
         public fun exceptional(exception: Throwable): WebSocketClose =
-            WebSocketClose(exception.bestWebSocketCloseCode, exception.message, exception)
+            if (exception is CancellationException && exception !is TimeoutCancellationException) GOING_AWAY
+            else WebSocketClose(exception.bestWebSocketCloseCode, exception.message, exception)
     }
 }
 
