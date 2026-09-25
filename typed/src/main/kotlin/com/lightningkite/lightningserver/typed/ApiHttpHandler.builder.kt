@@ -1,0 +1,138 @@
+package com.lightningkite.lightningserver.typed
+
+import com.lightningkite.lightningserver.LSError
+import com.lightningkite.lightningserver.auth.AuthRequirement
+import com.lightningkite.lightningserver.http.HttpStatus
+import com.lightningkite.lightningserver.pathing.PathSpec
+import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.serialization.serializerOrContextual
+import com.lightningkite.lightningserver.typed.sdk.functionCase
+import com.lightningkite.services.database.HasId
+import kotlinx.serialization.KSerializer
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+
+/**
+ * Internal data class implementation of [ApiHttpHandler].
+ *
+ * Stores all endpoint metadata and delegates to the provided implementation lambda.
+ * Users typically don't interact with this class directly; use [ApiHttpHandler] or
+ * [explicitApiHttpHandler] factory functions instead.
+ */
+private data class ApiHttpHandlerData<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT>(
+    override val summary: String,
+    override val description: String = "",
+    override val functionName: String = summary.functionCase(),
+    override val inputType: KSerializer<INPUT>,
+    override val outputType: KSerializer<OUTPUT>,
+    override val auth: AuthRequirement<USER>,
+    override val successCode: HttpStatus = HttpStatus.OK,
+    override val errorCases: List<LSError> = emptyList(),
+    override val examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = emptyList(),
+    override val timeout: Duration = 30.seconds,
+    val implementation: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT,
+) : ApiHttpHandler<PATH, USER, INPUT, OUTPUT> {
+    context(server: ServerRuntime)
+    override suspend fun handle(access: HttpAccess<PATH, USER>, input: INPUT): OUTPUT = access.implementation(input)
+}
+
+/**
+ * Creates an [ApiHttpHandler] with explicit serializers.
+ *
+ * Use this when you need to provide custom serializers or when reified type parameters aren't available.
+ * For most cases, prefer the reified [ApiHttpHandler] function.
+ *
+ * @param summary Short one-line description of what the endpoint does
+ * @param description Detailed description with examples and usage notes
+ * @param functionName Name to use for generated client SDK methods (defaults to camelCase of summary)
+ * @param inputType Serializer for the request input type
+ * @param outputType Serializer for the response output type
+ * @param auth Authentication requirements
+ * @param successCode HTTP status code for successful responses (default: 200 OK)
+ * @param errorCases List of documented error conditions
+ * @param examples Example request/response pairs for documentation
+ * @param implementation Business logic handler receiving authenticated access and parsed input
+ * @return A configured API endpoint handler
+ */
+public fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> explicitApiHttpHandler(
+    summary: String,
+    description: String = "",
+    functionName: String = summary.functionCase(),
+    inputType: KSerializer<INPUT>,
+    outputType: KSerializer<OUTPUT>,
+    auth: AuthRequirement<USER>,
+    successCode: HttpStatus = HttpStatus.OK,
+    errorCases: List<LSError> = emptyList(),
+    examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = emptyList(),
+    timeout: Duration = 30.seconds,
+    implementation: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT,
+): ApiHttpHandler<PATH, USER, INPUT, OUTPUT> =
+    ApiHttpHandlerData(
+        summary,
+        description,
+        functionName,
+        inputType,
+        outputType,
+        auth,
+        successCode,
+        errorCases,
+        examples,
+        timeout,
+        implementation
+    )
+
+/**
+ * Creates an [ApiHttpHandler] with reified type parameters for automatic serializer resolution.
+ *
+ * This is the recommended way to create typed API endpoints. Serializers are automatically
+ * resolved from the type parameters.
+ *
+ * Example:
+ * ```kotlin
+ * val getUser = path.path("users").arg<String>("id").get bind ApiHttpHandler<_, User?, String, User>(
+ *     summary = "Get User",
+ *     description = "Retrieves a user by their ID",
+ *     auth = authOptions<User>(),
+ *     errorCases = listOf(LSError(404, "not-found", "User not found")),
+ *     implementation = { userId ->
+ *         database().users.get(userId) ?: throw NotFoundException()
+ *     }
+ * )
+ * ```
+ *
+ * @param INPUT Request input type (must be serializable)
+ * @param OUTPUT Response output type (must be serializable)
+ * @param summary Short one-line description
+ * @param description Detailed description
+ * @param functionName SDK method name (defaults to camelCase of summary)
+ * @param auth Authentication requirements
+ * @param successCode HTTP status for success (default: 200 OK)
+ * @param errorCases Documented error conditions
+ * @param examples Request/response examples
+ * @param implementation Business logic handler
+ * @return A configured API endpoint handler
+ */
+public inline fun <PATH : PathSpec, USER : HasId<*>?, reified INPUT, reified OUTPUT> ApiHttpHandler(
+    summary: String,
+    description: String = "",
+    functionName: String = summary.functionCase(),
+    auth: AuthRequirement<USER>,
+    successCode: HttpStatus = HttpStatus.OK,
+    errorCases: List<LSError> = emptyList(),
+    examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = emptyList(),
+    timeout: Duration = 30.seconds,
+    noinline implementation: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT,
+): ApiHttpHandler<PATH, USER, INPUT, OUTPUT> =
+    explicitApiHttpHandler(
+        summary,
+        description,
+        functionName,
+        serializerOrContextual<INPUT>(),
+        serializerOrContextual<OUTPUT>(),
+        auth,
+        successCode,
+        errorCases,
+        examples,
+        timeout,
+        implementation
+    )

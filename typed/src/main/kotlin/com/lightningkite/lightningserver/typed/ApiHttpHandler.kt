@@ -7,13 +7,9 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.serialization.*
 import com.lightningkite.lightningserver.typed.sdk.SDK
-import com.lightningkite.lightningserver.typedoutput.emitTypedOutput
 import com.lightningkite.services.database.HasId
-import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
-
-private val errorCaseLogger = KotlinLogging.logger("com.lightningkite.lightningserver.typed.ApiHttpHandler")
 
 /**
  * Typed HTTP endpoint handler with automatic serialization, validation, and documentation.
@@ -35,8 +31,7 @@ private val errorCaseLogger = KotlinLogging.logger("com.lightningkite.lightnings
  *
  * @sample com.lightningkite.lightningserver.guide.samples.echoServerSample
  */
-public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> : HttpHandler<PATH>,
-    SDK.Documentable {
+public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> : HttpHandler<PATH>, SDK.Documentable {
     /**
      * Authentication requirements for this endpoint.
      */
@@ -107,20 +102,13 @@ public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT
                     if (it == null) {
                         if (inputType.descriptor.isNullable) null as INPUT
                         else throw BadRequestException("No request body provided")
-                    }
-                    else it.parse(inputType)
+                    } else it.parse(inputType)
                 }
         }
 
-        val result = handleInput(request, input)
+        val result = this.handleTypedInput(request.access(auth), input)
 
-        return HttpResponse(
-            body = if (result == Unit) null else result.toTypedData(request.headers.accept, outputType),
-            status = successCode,
-            headers = HttpHeaders {
-                add(HttpHeader.Vary, HttpHeader.Accept)
-            }
-        )
+        return result.processed
     }
 
     /**
@@ -141,35 +129,6 @@ public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT
     )
 }
 
-/**
- * Everything a request to this endpoint does once [input] is parsed: validation, [ApiHttpHandler.auth],
- * the handler itself, and typed output observation.
- */
-context(server: ServerRuntime)
-internal suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.handleInput(
-    request: HttpRequest<PATH>,
-    input: INPUT,
-): OUTPUT {
-    server.validators.assertValidOrBadRequest(inputType, input)
-
-    val result = try {
-        handle(request.access(auth), input)
-    } catch (e: HttpStatusException) {
-        // Warn the user if the thrown exception isn't listed in the error cases
-        if (e.detail.isNotBlank() && errorCases.none { it.detail == e.detail && it.http == e.status.code }) {
-            errorCaseLogger.warn {
-                "Endpoint threw HttpStatusException(status=${e.status.code}, detail=\"${e.detail}\") " +
-                    "not present in its declared errorCases ${errorCases.map { "${it.http}:${it.detail}" }}. " +
-                    "Add it to errorCases or align the thrown detail so clients/docs stay accurate."
-            }
-        }
-        throw e
-    }
-
-    // Call typed output hooks
-    emitTypedOutput(request, outputType, result)
-    return result
-}
 
 /*
  * TODO: API Improvements

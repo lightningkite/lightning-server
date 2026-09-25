@@ -86,16 +86,17 @@ public data class HttpRequest<PATH : PathSpec>(
      * Derives a sub-request of this one, as dispatched by a multiplexed request such as `/meta/bulk`.
      *
      * Named separately from [copyWithNewPathType] so that a caller has to say which of the two it
-     * means: the sub-request is a distinct logical request, and the initiator the dispatcher derives
-     * alongside it with [com.lightningkite.lightningserver.runtime.subRequest] is what records that.
+     * means: the sub-request is a distinct logical request, and the execution will change along with it.
      */
     public fun <PATH2 : PathSpec> subRequest(
         path: RawHttpEndpoint<PATH2>,
         queryParameters: QueryParameters = this.queryParameters,
+        headers: HttpHeaders = this.headers,
         body: TypedData? = this.body,
     ): HttpRequest<PATH2> = copyWithNewPathType(
         path = path,
         queryParameters = queryParameters,
+        headers = headers,
         body = body,
     )
 }

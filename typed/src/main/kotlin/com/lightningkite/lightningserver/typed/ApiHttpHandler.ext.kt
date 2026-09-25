@@ -1,177 +1,69 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.HttpStatusException
-import com.lightningkite.lightningserver.LSError
-import com.lightningkite.lightningserver.auth.AuthRequirement
-import com.lightningkite.lightningserver.http.HttpHandler
+import com.lightningkite.lightningserver.InternalLightningServerApi
+import com.lightningkite.lightningserver.http.HttpHeader
+import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.toLSError
 import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.handleWithMetrics
+import com.lightningkite.lightningserver.runtime.executeWithMetrics
 import com.lightningkite.lightningserver.runtime.location
+import com.lightningkite.lightningserver.serialization.assertValidOrBadRequest
 import com.lightningkite.lightningserver.serialization.parse
-import kotlinx.coroutines.CancellationException
-import com.lightningkite.lightningserver.typed.sdk.functionCase
+import com.lightningkite.lightningserver.serialization.toTypedData
+import com.lightningkite.lightningserver.serialization.validators
+import com.lightningkite.lightningserver.typedoutput.emitTypedOutput
 import com.lightningkite.services.database.HasId
-import com.lightningkite.services.database.serializerOrContextual
-import kotlinx.serialization.KSerializer
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
+import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.serialization.builtins.serializer
 
-/**
- * Internal data class implementation of [ApiHttpHandler].
- *
- * Stores all endpoint metadata and delegates to the provided implementation lambda.
- * Users typically don't interact with this class directly; use [ApiHttpHandler] or
- * [explicitApiHttpHandler] factory functions instead.
- */
-private data class ApiHttpHandlerData<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT>(
-    override val summary: String,
-    override val description: String = "",
-    override val functionName: String = summary.functionCase(),
-    override val inputType: KSerializer<INPUT>,
-    override val outputType: KSerializer<OUTPUT>,
-    override val auth: AuthRequirement<USER>,
-    override val successCode: HttpStatus = HttpStatus.OK,
-    override val errorCases: List<LSError> = emptyList(),
-    override val examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = emptyList(),
-    override val timeout: Duration = 30.seconds,
-    val implementation: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT,
-) : ApiHttpHandler<PATH, USER, INPUT, OUTPUT> {
-    context(server: ServerRuntime)
-    override suspend fun handle(access: HttpAccess<PATH, USER>, input: INPUT): OUTPUT = access.implementation(input)
-}
-
-/**
- * Creates an [ApiHttpHandler] with explicit serializers.
- *
- * Use this when you need to provide custom serializers or when reified type parameters aren't available.
- * For most cases, prefer the reified [ApiHttpHandler] function.
- *
- * @param summary Short one-line description of what the endpoint does
- * @param description Detailed description with examples and usage notes
- * @param functionName Name to use for generated client SDK methods (defaults to camelCase of summary)
- * @param inputType Serializer for the request input type
- * @param outputType Serializer for the response output type
- * @param auth Authentication requirements
- * @param successCode HTTP status code for successful responses (default: 200 OK)
- * @param errorCases List of documented error conditions
- * @param examples Example request/response pairs for documentation
- * @param implementation Business logic handler receiving authenticated access and parsed input
- * @return A configured API endpoint handler
- */
-public fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> explicitApiHttpHandler(
-    summary: String,
-    description: String = "",
-    functionName: String = summary.functionCase(),
-    inputType: KSerializer<INPUT>,
-    outputType: KSerializer<OUTPUT>,
-    auth: AuthRequirement<USER>,
-    successCode: HttpStatus = HttpStatus.OK,
-    errorCases: List<LSError> = emptyList(),
-    examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = emptyList(),
-    timeout: Duration = 30.seconds,
-    implementation: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT,
-): ApiHttpHandler<PATH, USER, INPUT, OUTPUT> =
-    ApiHttpHandlerData(
-        summary,
-        description,
-        functionName,
-        inputType,
-        outputType,
-        auth,
-        successCode,
-        errorCases,
-        examples,
-        timeout,
-        implementation
-    )
-
-/**
- * Creates an [ApiHttpHandler] with reified type parameters for automatic serializer resolution.
- *
- * This is the recommended way to create typed API endpoints. Serializers are automatically
- * resolved from the type parameters.
- *
- * Example:
- * ```kotlin
- * val getUser = path.path("users").arg<String>("id").get bind ApiHttpHandler<_, User?, String, User>(
- *     summary = "Get User",
- *     description = "Retrieves a user by their ID",
- *     auth = authOptions<User>(),
- *     errorCases = listOf(LSError(404, "not-found", "User not found")),
- *     implementation = { userId ->
- *         database().users.get(userId) ?: throw NotFoundException()
- *     }
- * )
- * ```
- *
- * @param INPUT Request input type (must be serializable)
- * @param OUTPUT Response output type (must be serializable)
- * @param summary Short one-line description
- * @param description Detailed description
- * @param functionName SDK method name (defaults to camelCase of summary)
- * @param auth Authentication requirements
- * @param successCode HTTP status for success (default: 200 OK)
- * @param errorCases Documented error conditions
- * @param examples Request/response examples
- * @param implementation Business logic handler
- * @return A configured API endpoint handler
- */
-public inline fun <PATH : PathSpec, USER : HasId<*>?, reified INPUT, reified OUTPUT> ApiHttpHandler(
-    summary: String,
-    description: String = "",
-    functionName: String = summary.functionCase(),
-    auth: AuthRequirement<USER>,
-    successCode: HttpStatus = HttpStatus.OK,
-    errorCases: List<LSError> = emptyList(),
-    examples: List<ApiHttpHandler.Example<INPUT, OUTPUT>> = emptyList(),
-    timeout: Duration = 30.seconds,
-    noinline implementation: suspend context(ServerRuntime) HttpAccess<PATH, USER>.(INPUT) -> OUTPUT,
-): ApiHttpHandler<PATH, USER, INPUT, OUTPUT> =
-    explicitApiHttpHandler(
-        summary,
-        description,
-        functionName,
-        serializerOrContextual<INPUT>(),
-        serializerOrContextual<OUTPUT>(),
-        auth,
-        successCode,
-        errorCases,
-        examples,
-        timeout,
-        implementation
-    )
+private val logger = KotlinLogging.logger("com.lightningkite.lightningserver.typed.ApiHttpHandler")
 
 /**
  * Runs this endpoint for [request] as a new execution caused by the current one, through the server's
- * HTTP interceptors, without serializing [input] or the output.
+ * HTTP interceptors, using [input] as-is rather than parsing it from the request.
+ *
+ * Authentication is resolved from the request the interceptors pass on, as it is for a routed request.
  */
 context(server: ServerRuntime)
-private suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.execute(
+public suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.handleWithMetrics(
     request: HttpRequest<PATH>,
     input: INPUT,
 ): OUTPUT {
     // The interceptor chain only speaks HttpResponse, so the typed result is carried out beside it.
-    var outcome: Result<OUTPUT>? = null
-    val response = HttpHandler(timeout) { req ->
-        runCatching { handleInput(req, input) }.also { outcome = it }.getOrThrow()
-        HttpResponse(status = successCode)
-    }.handleWithMetrics(request)
+    var outcome: Result<ApiHttpHandlerOutput<OUTPUT>>? = null
 
-    // Rethrow the endpoint's own exception so callers can catch it by type. A timeout is excluded: it
-    // is already reported by the response, and rethrowing a CancellationException would read as the
-    // caller itself being cancelled.
-    outcome?.exceptionOrNull()?.takeIf { it !is CancellationException }?.let { throw it }
-    if (!response.status.success) throw HttpStatusException(response.toLSError())
-    outcome?.let { return it.getOrThrow() }
-    // An interceptor answered in the endpoint's place, so its response is the only output there is.
-    return response.body?.parse(outputType)
+    @OptIn(InternalLightningServerApi::class)
+    val httpResponse = executeWithMetrics(request) { req ->
+        val result = runCatching { handleTypedInput(req.access(auth), input) }
+        outcome = result
+        result.getOrThrow().processed
+    }
+
+    // Rethrow the endpoint's own exception so callers can catch it by type. A timeout is excluded: it is
+    // already reported by the response, and rethrowing a CancellationException would read as the caller
+    // itself being cancelled.
+    outcome?.exceptionOrNull()?.let {
+        if (it is CancellationException) currentCoroutineContext().ensureActive()
+        else throw it
+    }
+    if (!httpResponse.status.success) throw HttpStatusException(httpResponse.toLSError())
+    outcome?.let { return it.getOrThrow().output }
+
+    // An interceptor answered before the endpoint ran, so its response is the only output there is.
+    @Suppress("UNCHECKED_CAST")
+    if (outputType == Unit.serializer()) return Unit as OUTPUT
+    return httpResponse.body?.parse(outputType)
         ?: throw IllegalStateException("An interceptor answered '${request.path}' without a body to read the output from.")
 }
+
 
 /**
  * Invokes an API endpoint internally from within another endpoint handler.
@@ -185,7 +77,7 @@ private suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHa
 context(server: ServerRuntime, access: HttpAccess<PATH, out USER>)
 public suspend operator fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.invoke(
     input: INPUT,
-): OUTPUT = execute(access.request, input)
+): OUTPUT = handleWithMetrics(access.request.internalCallTo(access.request.path), input)
 
 /**
  * Invokes a PathSpec0 endpoint (no path parameters) from server-side code.
@@ -198,7 +90,10 @@ context(server: ServerRuntime)
 public suspend operator fun <USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PathSpec0, USER, INPUT, OUTPUT>.invoke(
     request: HttpRequest<*>,
     input: INPUT,
-): OUTPUT = execute(request.subRequest(RawHttpEndpoint(location.path, location.method)), input)
+): OUTPUT = handleWithMetrics(
+    request.internalCallTo(RawHttpEndpoint(location.path, location.method)),
+    input
+)
 
 /**
  * Invokes a PathSpec1 endpoint (one path parameter) from server-side code.
@@ -213,7 +108,10 @@ public suspend operator fun <A, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<
     request: HttpRequest<*>,
     first: A,
     input: INPUT,
-): OUTPUT = execute(request.subRequest(RawHttpEndpoint(location.path, first, location.method)), input)
+): OUTPUT = handleWithMetrics(
+    request.internalCallTo(RawHttpEndpoint(location.path, first, location.method)),
+    input
+)
 
 /**
  * Invokes a PathSpec2 endpoint (two path parameters) from server-side code.
@@ -230,7 +128,10 @@ public suspend operator fun <A, B, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandl
     first: A,
     second: B,
     input: INPUT,
-): OUTPUT = execute(request.subRequest(RawHttpEndpoint(location.path, first, second, location.method)), input)
+): OUTPUT = handleWithMetrics(
+    request.internalCallTo(RawHttpEndpoint(location.path, first, second, location.method)),
+    input
+)
 
 /**
  * Invokes a PathSpec3 endpoint (three path parameters) from server-side code.
@@ -249,4 +150,60 @@ public suspend operator fun <A, B, C, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHa
     second: B,
     third: C,
     input: INPUT,
-): OUTPUT = execute(request.subRequest(RawHttpEndpoint(location.path, first, second, third, location.method)), input)
+): OUTPUT = handleWithMetrics(
+    request.internalCallTo(RawHttpEndpoint(location.path, first, second, third, location.method)),
+    input
+)
+
+
+
+// INTERNAL IMPLEMENTATION STUFF
+
+// Drops the caller's Accept header so the called endpoint encodes its output in its own default format:
+// the caller may accept something this output can't be encoded as.
+private fun <PATH : PathSpec> HttpRequest<*>.internalCallTo(path: RawHttpEndpoint<PATH>): HttpRequest<PATH> =
+    subRequest(path, headers = headers.copy { remove(HttpHeader.Accept) })
+
+internal data class ApiHttpHandlerOutput<OUTPUT>(
+    val output: OUTPUT,
+    val processed: HttpResponse
+)
+
+/**
+ * Everything a request to this endpoint does once [input] is parsed: validation, the handler itself,
+ * typed output observation, and encoding the response.
+ */
+context(server: ServerRuntime)
+internal suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.handleTypedInput(
+    access: HttpAccess<PATH, USER>,
+    input: INPUT,
+): ApiHttpHandlerOutput<OUTPUT> {
+    server.validators.assertValidOrBadRequest(inputType, input)
+
+    val result = try {
+        handle(access, input)
+    } catch (e: HttpStatusException) {
+        // Warn the user if the thrown exception isn't listed in the error cases
+        if (e.detail.isNotBlank() && errorCases.none { it.detail == e.detail && it.http == e.status.code }) {
+            logger.warn {
+                "Endpoint threw HttpStatusException(status=${e.status.code}, detail=\"${e.detail}\") " +
+                        "not present in its declared errorCases ${errorCases.map { "${it.http}:${it.detail}" }}. " +
+                        "Add it to errorCases or align the thrown detail so clients/docs stay accurate."
+            }
+        }
+        throw e
+    }
+
+    emitTypedOutput(access.request, outputType, result)
+
+    return ApiHttpHandlerOutput(
+        result,
+        HttpResponse(
+            body = if (result == Unit) null else result.toTypedData(access.request.headers.accept, outputType),
+            status = successCode,
+            headers = HttpHeaders {
+                add(HttpHeader.Vary, HttpHeader.Accept)
+            }
+        )
+    )
+}

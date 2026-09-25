@@ -1,13 +1,7 @@
 package com.lightningkite.lightningserver.runtime
 
 import com.lightningkite.lightningserver.*
-import com.lightningkite.lightningserver.HttpStatusException
-import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.http.*
-import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.HttpStatus
-import com.lightningkite.lightningserver.http.PathSegments
-import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.pathing.route
@@ -16,9 +10,23 @@ import com.lightningkite.services.telemetry.TelemetryKey
 import com.lightningkite.services.telemetry.TelemetryKeys
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
+import kotlin.time.Duration
 
 // Pre-allocated TelemetryKey instance (backend caches by equality).
 private val errorType = TelemetryKey.OfString("error.type")
+
+/**
+ * Runs this handler for [request] as a new execution caused by the current one, through the server's HTTP
+ * interceptors, exactly as a routed request would be but without routing.
+ */
+context(runtime: ServerRuntime)
+public suspend fun <PATH : PathSpec> HttpHandler<PATH>.handleWithMetrics(
+    request: HttpRequest<PATH>,
+): HttpResponse =
+    @OptIn(InternalLightningServerApi::class)
+    executeWithMetrics(request) { req ->
+        this@handleWithMetrics.handle(req)
+    }
 
 /**
  * Handles an HTTP request through the server's routing and middleware system.
@@ -45,43 +53,48 @@ private val errorType = TelemetryKey.OfString("error.type")
  *   derived from [request], so the two cannot disagree about what ran.
  * @return The HTTP response
  */
-@OptIn(InternalLightningServerApi::class)
 public suspend fun Engine.handleRoot(
     request: HttpRequest<*>,
     executionId: Execution.ID,
-): HttpResponse = executeHttpWithMetrics(
-    request,
-    Execution.Http(id = executionId, endpoint = request.path),
-    ServerRuntime::route
-)
+): HttpResponse =
+    @OptIn(InternalLightningServerApi::class)
+    executeHttpIntercepted(
+        request,
+        Execution.Http(id = executionId, endpoint = request.path),
+        ServerRuntime::routeHttpRequest
+    )
 
 public suspend fun ServerRuntime.handle(
     request: HttpRequest<*>,
     executionId: Execution.ID = Execution.ID.generate()
-): HttpResponse = executeHttpWithMetrics(
+): HttpResponse = executeHttpIntercepted(
     request,
     childHttpExecution(request, executionId),
-    ServerRuntime::route
+    ServerRuntime::routeHttpRequest
 )
 
 /**
- * Runs this handler for [request] as a new execution caused by the current one, through the server's HTTP
- * interceptors, exactly as a routed request would be but without routing.
+ * Runs [dispatch] for [request] the way this handler would be run: as a new execution caused by the current
+ * one, through the server's HTTP interceptors, and within this handler's timeout.
  */
+@InternalLightningServerApi
 context(runtime: ServerRuntime)
-public suspend fun <PATH : PathSpec> HttpHandler<PATH>.handleWithMetrics(
+public suspend fun <PATH : PathSpec> HttpHandler<PATH>.executeWithMetrics(
     request: HttpRequest<PATH>,
     executionId: Execution.ID = Execution.ID.generate(),
-): HttpResponse =
-    runtime.executeHttpWithMetrics(
-        request,
-        runtime.childHttpExecution(request, executionId)
-    ) { req ->
-        handleWithTimeout(this@handleWithMetrics, req)
-    }
+    dispatch: suspend ServerRuntime.(HttpRequest<PATH>) -> HttpResponse,
+): HttpResponse = engine.executeHttpIntercepted(
+    request,
+    runtime.childHttpExecution(request, executionId)
+) { req ->
+    runHandler(this@executeWithMetrics.timeout) { dispatch(req) }
+}
+
+
+// INTERNAL IMPLEMENTATION STUFF
 
 @OptIn(InternalLightningServerApi::class)
-private fun ServerRuntime.childHttpExecution(request: HttpRequest<*>, executionId: Execution.ID): Execution =
+private fun ServerRuntime.childHttpExecution(request: HttpRequest<*>, executionId: Execution.ID): Execution.Http =
     Execution.Http(
         id = executionId,
         endpoint = request.path,
@@ -89,14 +102,23 @@ private fun ServerRuntime.childHttpExecution(request: HttpRequest<*>, executionI
         rootExecution = execution.rootExecution
     )
 
+// Per-handler request timeout (HttpHandler.timeout, default 30s), enforced at this single choke point shared
+// by every engine instead of being duplicated (and high-risk) in each engine adapter. Cooperative
+// cancellation: only interrupts at suspension points.
+private suspend fun ServerRuntime.runHandler(
+    timeout: Duration,
+    action: suspend () -> HttpResponse,
+): HttpResponse = instrument("handler") { withTimeout(timeout) { action() } }
+
 @OptIn(InternalLightningServerApi::class)
-private suspend fun <PATH : PathSpec> Engine.executeHttpWithMetrics(
+private suspend fun <PATH : PathSpec> Engine.executeHttpIntercepted(
     request: HttpRequest<PATH>,
-    execution: Execution,
+    execution: Execution.Http,
     dispatch: suspend ServerRuntime.(HttpRequest<PATH>) -> HttpResponse,
 ): HttpResponse {
     val method = request.path.method.toString()
     val route = request.path.route()
+
     return execute("$method $route", execution, TelemetryAttributes {
         put(TelemetryKeys.Http.method, method)
         put(TelemetryKeys.Http.route, route)
@@ -158,17 +180,19 @@ private suspend fun <PATH : PathSpec> Engine.executeHttpWithMetrics(
 }
 
 
-private suspend fun <PATH : PathSpec> ServerRuntime.route(req: HttpRequest<PATH>): HttpResponse = try {
+private suspend fun <PATH : PathSpec> ServerRuntime.routeHttpRequest(req: HttpRequest<PATH>): HttpResponse = try {
     // Route resolution must live inside this try so that a RouteNotFoundException (e.g. a HEAD
     // request with no HEAD handler, or a missing trailing slash) is caught below and recovered
     // via the HEAD->GET fallback / slash-redirect logic rather than escaping as a bare 404.
-    handleWithTimeout(req.path.resolve().value, req)
+    val handler = req.path.resolve().value
+    runHandler(handler.timeout) { handler.handle(req) }
 } catch (notFound: RouteNotFoundException) {
     when (req.path.method) {
         HttpMethod.HEAD -> {
             // OK, we'll do a get and remove the body. The GET is routed afresh, so it may not be a PATH.
             val getRequest = req.copyWithNewPathType(path = RawHttpEndpoint(req.path.pathSegments, HttpMethod.GET))
-            val getResult = handleWithTimeout(getRequest.path.resolve().value, getRequest)
+            val handler = getRequest.path.resolve().value
+            val getResult = runHandler(handler.timeout) { handler.handle(getRequest) }
             getResult.copy(
                 body = null,
                 status = if (getResult.status.success) HttpStatus.NoContent else getResult.status,
@@ -191,20 +215,9 @@ private suspend fun <PATH : PathSpec> ServerRuntime.route(req: HttpRequest<PATH>
                     HttpResponse.pathMoved(to = "/" + altSlashEndpoint.pathSegments.toString())
                 else
                     throw notFound
-            }
-            else throw notFound
+            } else throw notFound
         }
     }
-}
-
-private suspend fun <PATH : PathSpec> ServerRuntime.handleWithTimeout(
-    handler: HttpHandler<PATH>,
-    req: HttpRequest<PATH>,
-): HttpResponse = instrument("handler") {
-    // Per-handler request timeout (HttpHandler.timeout, default 30s), enforced at this single
-    // choke point shared by every engine instead of being duplicated (and high-risk) in each
-    // engine adapter. Cooperative cancellation: only interrupts at suspension points.
-    withTimeout(handler.timeout) { handler.handle(req) }
 }
 
 /*
