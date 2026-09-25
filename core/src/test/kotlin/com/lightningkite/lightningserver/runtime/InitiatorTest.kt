@@ -44,6 +44,7 @@ class InitiatorTest {
             id = execution,
             causedBy = root,
             rootExecution = root,
+            attributedTo = socket,
             location = location,
         ).roundTripTest()
         Execution.Schedule(id = execution, location = location).roundTripTest()
@@ -55,7 +56,7 @@ class InitiatorTest {
     /** Polymorphic dispatch is what makes the persisted form readable back as the right subtype. */
     @Test
     fun `a subtype survives a round trip through the sealed interface`() {
-        val initiator: Execution = Execution.Task(id = execution, causedBy = root, rootExecution = root, location = location)
+        val initiator: Execution = Execution.Task(id = execution, causedBy = root, rootExecution = root, attributedTo = socket, location = location)
         initiator.roundTripTest()
     }
 }

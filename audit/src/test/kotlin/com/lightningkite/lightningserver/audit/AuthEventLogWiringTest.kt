@@ -1,15 +1,21 @@
+@file:OptIn(com.lightningkite.lightningserver.EngineApi::class)
+
 package com.lightningkite.lightningserver.audit
 
 import com.lightningkite.lightningserver.auth.AuthEventType
 import com.lightningkite.lightningserver.HttpMethod
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.handle
+import com.lightningkite.lightningserver.runtime.engine
+import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.sessions.RefreshToken
@@ -19,6 +25,8 @@ import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
+import com.lightningkite.services.data.Unsafe
+import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
@@ -90,7 +98,10 @@ class AuthEventLogWiringTest {
         }
     }
 
-    private fun testId(n: Int) = Uuid.parse("00000000-0000-4000-8000-" + n.toString().padStart(12, '0'))
+    // SAFETY: Fixed, valid v7 ids, so the records they key can be asserted on by value.
+    @OptIn(InternalLightningServerApi::class, Unsafe::class)
+    private fun testId(n: Int) =
+        Execution.ID(UuidV7.fromRaw(Uuid.parse("00000000-0000-7000-8000-" + n.toString().padStart(12, '0'))))
 
     /** A POST to the refresh-token endpoint carrying [token] as its JSON string body. */
     private fun tokenExchange(token: String, userAgent: String? = null) = HttpRequest<PathSpec>(
@@ -108,7 +119,7 @@ class AuthEventLogWiringTest {
 
     private fun onServer(block: suspend context(ServerRuntime) () -> Unit) = runBlocking {
         TestServer.test(settings = { database set Database.Settings(); cache set Cache.Settings() }) {
-            block(serverRuntime)
+            execute { block(serverRuntime) }
         }
     }
 
@@ -129,7 +140,7 @@ class AuthEventLogWiringTest {
     fun `a rejected refresh token reaches the reporter and lands in the table`() = onServer {
         val (sessionId, token) = tokenWithWrongSecret()
 
-        val response = serverRuntime.handle(tokenExchange(token, userAgent = "probe/1.0"), testId(1))
+        val response = engine.handleRoot(tokenExchange(token, userAgent = "probe/1.0"), testId(1))
         assertEquals(HttpStatus.Unauthorized, response.status)
 
         val event = events().single()
@@ -152,7 +163,7 @@ class AuthEventLogWiringTest {
         val subjectId = Uuid.parse("00000000-0000-4000-8000-00000000beef")
         val (_, token) = tokenWithWrongSecret(subjectId)
 
-        serverRuntime.handle(tokenExchange(token, userAgent = "probe/1.0"), testId(7))
+        engine.handleRoot(tokenExchange(token, userAgent = "probe/1.0"), testId(7))
 
         assertEquals(
             subjectId.toString(),
@@ -166,7 +177,7 @@ class AuthEventLogWiringTest {
     fun `the observed source ip and user agent are recorded`() = onServer {
         val (_, token) = tokenWithWrongSecret()
 
-        serverRuntime.handle(tokenExchange(token, userAgent = "probe/1.0"), testId(2))
+        engine.handleRoot(tokenExchange(token, userAgent = "probe/1.0"), testId(2))
 
         val event = events().single()
         assertEquals("203.0.113.7", event.sourceIp)
@@ -182,7 +193,7 @@ class AuthEventLogWiringTest {
     fun `an unobserved user agent is null rather than blank`() = onServer {
         val (_, token) = tokenWithWrongSecret()
 
-        serverRuntime.handle(tokenExchange(token, userAgent = null), testId(3))
+        engine.handleRoot(tokenExchange(token, userAgent = null), testId(3))
 
         val event = events().single()
         assertNull(event.userAgent, "an unsent user agent must not be recorded as an observed one")
@@ -202,7 +213,7 @@ class AuthEventLogWiringTest {
      */
     @Test
     fun `a forged token naming no real session is rejected without recording an event`() = onServer {
-        val response = serverRuntime.handle(tokenExchange(forgedToken(), userAgent = "probe/1.0"), testId(5))
+        val response = engine.handleRoot(tokenExchange(forgedToken(), userAgent = "probe/1.0"), testId(5))
 
         assertEquals(HttpStatus.Unauthorized, response.status)
         assertTrue(
@@ -220,7 +231,7 @@ class AuthEventLogWiringTest {
      */
     @Test
     fun `spraying forged tokens cannot grow the audit table`() = onServer {
-        repeat(25) { serverRuntime.handle(tokenExchange(forgedToken()), testId(100 + it)) }
+        repeat(25) { engine.handleRoot(tokenExchange(forgedToken()), testId(100 + it)) }
 
         assertEquals(0, events().size, "forged tokens wrote audit rows")
     }
@@ -232,11 +243,11 @@ class AuthEventLogWiringTest {
      */
     @Test
     fun `a forged attempt is still visible in the request log`() = onServer {
-        serverRuntime.handle(tokenExchange(forgedToken()), testId(6))
+        engine.handleRoot(tokenExchange(forgedToken()), testId(6))
 
         val requests = TestServer.audit.requests().find(Condition.Always).toList()
         assertTrue(
-            requests.any { it._id == testId(6) },
+            requests.any { it._id == testId(6).uuid },
             "a forged attempt left no trace at all — it must still appear as a request",
         )
     }
@@ -249,12 +260,12 @@ class AuthEventLogWiringTest {
     fun `the event joins the request record of the attempt`() = onServer {
         val (_, token) = tokenWithWrongSecret()
 
-        serverRuntime.handle(tokenExchange(token, userAgent = "probe/1.0"), testId(4))
+        engine.handleRoot(tokenExchange(token, userAgent = "probe/1.0"), testId(4))
 
-        assertEquals(testId(4), events().single().requestId)
+        assertEquals(testId(4).uuid, events().single().requestId)
         val requests = TestServer.audit.requests().find(Condition.Always).toList()
         assertTrue(
-            requests.any { it._id == testId(4) },
+            requests.any { it._id == testId(4).uuid },
             "the auth event points at a request record that was never written",
         )
     }

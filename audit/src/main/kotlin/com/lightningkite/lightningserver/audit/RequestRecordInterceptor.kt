@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.audit
 
+import com.lightningkite.lightningserver.OverrideOnly
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.data.Request
 import com.lightningkite.lightningserver.data.get
@@ -67,35 +68,41 @@ public class RequestRecordInterceptor(
         try {
             return cont(request).also { outcome = it.status.code.toString() }
         } finally {
-            complete(runtime.execution.logicalId.raw.raw, outcome, started.elapsedNow().inWholeMilliseconds)
+            complete(runtime.execution.logicalId.uuid, outcome, started.elapsedNow().inWholeMilliseconds)
         }
     }
 
     override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> =
         object : DelegatingWebSocketHandler<PATH, T>(handler) {
+            @OverrideOnly
             context(serverRuntime: ServerRuntime)
             override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
                 table().insert(listOf(request.opening(endpoint = request.path.route(), method = "WEBSOCKET")))
                 return wrapped.willConnect(request)
             }
 
+            @OverrideOnly
             context(serverRuntime: ServerRuntime)
             override suspend fun disconnect(connection: WebSocketConnection<PATH, T>, reason: WebSocketClose) {
                 try {
                     wrapped.disconnect(connection, reason)
                 } finally {
-                    // A socket's duration is its whole lifetime, which no monotonic mark taken here
-                    // could measure, so it is left to be derived from `at` and the close time.
-                    complete(serverRuntime.execution.requestRecordId, reason.toString(), durationMs = null)
+                    // Keyed by the socket, not this Disconnect phase, so it completes the row the Connect
+                    // phase opened. A socket's duration is its whole lifetime, which no monotonic mark
+                    // taken here could measure, so it is left to be derived from `at` and the close time.
+                    // The close code rather than the whole close, whose message and cause are not audit data.
+                    complete(serverRuntime.execution.logicalId.uuid, reason.code.code.toString(), durationMs = null)
                 }
             }
         }
 
     context(runtime: ServerRuntime)
     private suspend fun Request<*>.opening(endpoint: String, method: String) = RequestRecord(
-        _id = runtime.execution.requestRecordId,
-        parentRequestId = runtime.execution.causedBy?.raw?.raw,
-        rootExecutionId = runtime.execution.rootExecution.raw.raw,
+        _id = runtime.execution.logicalId.uuid,
+        // The parent's request row, not causedBy: when the parent is a WebSocket phase, causedBy names
+        // the phase, whose socket's row is keyed by the socket.
+        parentRequestId = runtime.history.dropLast(1).lastOrNull()?.attributedTo?.uuid,
+        rootExecutionId = runtime.execution.rootExecution.uuid,
         principal = principalOrNull(),
         sourceIp = sourceIp,
         endpoint = endpoint,

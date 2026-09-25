@@ -48,7 +48,7 @@ public class AuthEventLogReporter(
             _id = Uuid.generateV7NonMonotonicAt(runtime.clock.now()),
             // The anchor rather than this execution's own row: an auth event raised inside a task
             // still needs to name a person. Identical for http and websocket, which are their own.
-            requestId = runtime.execution.attributedTo,
+            requestId = runtime.execution.attributedTo.uuid,
             type = type,
             principal = principal,
             actor = actor,

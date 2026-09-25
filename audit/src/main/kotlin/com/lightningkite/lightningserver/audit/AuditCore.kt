@@ -4,13 +4,15 @@ import com.lightningkite.lightningserver.definition.PreDeployTask
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.Engine
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.ApiWebSocketHandler
 import com.lightningkite.lightningserver.typed.DatabaseTableRegistration
 import com.lightningkite.lightningserver.typed.registerTable
 import com.lightningkite.services.database.Database
 import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlin.uuid.Uuid
 
 /**
  * The foundation the other audit layers join to: who asked, from where, and when.
@@ -119,7 +121,7 @@ public class AuditCore(
  * Auditing keys off serializers throughout, never tables. A disclosure is observed with a serializer
  * in hand and nothing else, so the serializer is the only thing that can be detected consistently.
  */
-context(server: ServerRuntime)
+context(server: Engine)
 internal fun auditedModelsOnServer(): Map<String, SerialDescriptor> = buildMap {
     for (endpoints in server.server.endpoints.values) {
         for (handler in endpoints.http.values) {
@@ -134,3 +136,6 @@ internal fun auditedModelsOnServer(): Map<String, SerialDescriptor> = buildMap {
         }
     }
 }
+
+/** The plain [Uuid] audit records store, since the records are multiplatform and cannot hold an [Execution.ID]. */
+internal val Execution.ID.uuid: Uuid get() = raw.raw

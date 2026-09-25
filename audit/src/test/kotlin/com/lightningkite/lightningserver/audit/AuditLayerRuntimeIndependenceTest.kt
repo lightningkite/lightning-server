@@ -1,14 +1,17 @@
 package com.lightningkite.lightningserver.audit
 
+import com.lightningkite.lightningserver.EngineApi
 import com.lightningkite.lightningserver.HttpMethod
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.auth.noAuth
-import com.lightningkite.lightningserver.definition.PreDeployTask
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
-import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.handle
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.runtime.engine
+import com.lightningkite.lightningserver.runtime.handleRoot
+import com.lightningkite.lightningserver.runtime.test.execute
+import com.lightningkite.lightningserver.runtime.test.executePreDeployTasks
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
@@ -16,6 +19,8 @@ import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.allRegisteredTables
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.database.Condition
+import com.lightningkite.services.data.Unsafe
+import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.Database
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
@@ -59,7 +64,9 @@ class AuditLayerRuntimeIndependenceTest {
         )
     }
 
-    private val requestId = Uuid.parse("00000000-0000-4000-8000-000000000101")
+    // SAFETY: A fixed, valid v7 id, so the records it keys can be asserted on by value.
+    @OptIn(InternalLightningServerApi::class, Unsafe::class)
+    private val requestId = Execution.ID(UuidV7.fromRaw(Uuid.parse("00000000-0000-7000-8000-000000000101")))
 
     private fun request() = HttpRequest<PathSpec>(
         path = RawHttpEndpoint(asString = "/patient", method = HttpMethod.GET),
@@ -70,18 +77,7 @@ class AuditLayerRuntimeIndependenceTest {
         sourceIp = "10.0.0.1",
     )
 
-    /** Assignment of bit indices happens in pre-deploy, so a disclosure cannot be read without it. */
-    context(runtime: ServerRuntime)
-    private suspend fun runPreDeployTasks() {
-        val done = HashSet<PreDeployTask>()
-        suspend fun run(task: PreDeployTask) {
-            if (!done.add(task)) return
-            task.dependencies().forEach { run(it) }
-            task.execute()
-        }
-        runtime.server.preDeployTasks.values.forEach { run(it) }
-    }
-
+    @OptIn(EngineApi::class)
     @Test
     fun `a disclosure is recorded with the data access log absent`() = runBlocking {
         assertFalse(
@@ -90,13 +86,14 @@ class AuditLayerRuntimeIndependenceTest {
         )
 
         TestServer.test(settings = { database set Database.Settings(); cache set Cache.Settings() }) {
-            runPreDeployTasks()
-            with(serverRuntime) {
-                val response = handle(request(), requestId)
-                assertEquals(HttpStatus.OK, response.status)
+            // Assignment of bit indices happens in pre-deploy, so a disclosure cannot be read without it.
+            executePreDeployTasks()
+            val response = engine.handleRoot(request(), requestId)
+            assertEquals(HttpStatus.OK, response.status)
 
+            execute {
                 val disclosure = TestServer.disclosureLog.disclosures().find(Condition.Always).toList().single()
-                assertEquals(requestId, disclosure.requestId)
+                assertEquals(requestId.uuid, disclosure.requestId)
                 assertEquals(TestServer.ada._id, disclosure.recordId)
 
                 // The bits are readable, which is the part that actually depends on the core: the
@@ -108,7 +105,7 @@ class AuditLayerRuntimeIndependenceTest {
                 // And the request record the disclosure points at was written, which is the other
                 // thing the core supplies.
                 assertEquals(
-                    listOf(requestId),
+                    listOf(requestId.uuid),
                     TestServer.audit.requests().find(Condition.Always).toList().map { it._id },
                 )
             }

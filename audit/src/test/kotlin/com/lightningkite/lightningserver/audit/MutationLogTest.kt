@@ -3,21 +3,25 @@ package com.lightningkite.lightningserver.audit
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.auth.noAuth
-import com.lightningkite.lightningserver.definition.PreDeployTask
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.engine
 import com.lightningkite.lightningserver.runtime.execute
 import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
+import com.lightningkite.lightningserver.runtime.test.executePreDeployTasks
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.registerTable
 import com.lightningkite.services.cache.Cache
+import com.lightningkite.services.data.Unsafe
+import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
@@ -101,38 +105,33 @@ class MutationLogTest {
         )
     }
 
-    context(runtime: ServerRuntime)
-    private suspend fun runPreDeployTasks() {
-        val done = HashSet<PreDeployTask>()
-        suspend fun run(task: PreDeployTask) {
-            if (!done.add(task)) return
-            task.dependencies().forEach { run(it) }
-            task.execute()
-        }
-        runtime.server.preDeployTasks.values.forEach { run(it) }
-    }
-
     /**
-     * @param initiator What the execution should be attributed to. Defaults to the test runner's own
-     *   `Initiator.Direct`, which is the case with no request record behind it.
+     * @param initiator The execution the block runs as. Defaults to the test runner's own
+     *   `Execution.Direct`, which is the case with no request record behind it.
      */
     private fun onServer(
-        initiator: Initiator? = null,
+        initiator: Execution? = null,
         block: suspend context(ServerRuntime) (ServerRuntime) -> Unit,
     ) = runBlocking {
         TestServer.test(settings = { database set Database.Settings(); cache set Cache.Settings() }) {
-            runPreDeployTasks()
-            val runtime = if (initiator == null) serverRuntime else serverRuntime.execute(initiator)
-            block(runtime, runtime)
+            executePreDeployTasks()
+            if (initiator == null) execute { block(serverRuntime, serverRuntime) }
+            // Runs as a fabricated execution, which is what these attribution tests are about.
+            else engine.execute("test", initiator) { block(this, this) }
         }
     }
 
     private fun onSummaryServer(block: suspend context(ServerRuntime) (ServerRuntime) -> Unit) = runBlocking {
         SummaryServer.test(settings = { database set Database.Settings(); cache set Cache.Settings() }) {
-            runPreDeployTasks()
-            block(serverRuntime, serverRuntime)
+            executePreDeployTasks()
+            execute { block(serverRuntime, serverRuntime) }
         }
     }
+
+    // SAFETY: Fixed, valid v7 ids, so rows can be asserted on by value.
+    @OptIn(Unsafe::class)
+    private fun id(n: Int) =
+        Execution.ID(UuidV7.fromRaw(Uuid.parse("00000000-0000-7000-8000-" + n.toString().padStart(12, '0'))))
 
     context(server: ServerRuntime)
     private suspend fun logged() = TestServer.mutationLog.mutations().find(Condition.Always).toList()
@@ -506,10 +505,8 @@ class MutationLogTest {
     /** A task has no request record to point at, so an id there would join to nothing. */
     @Test
     fun `a schedule tick records no request id`() {
-        val scheduleId = Uuid.parse("00000000-0000-4000-8000-000000000501")
-        val schedule = Initiator.Schedule(
-            executionId = scheduleId,
-            attributedTo = scheduleId,
+        val schedule = Execution.Schedule(
+            id = id(501),
             location = PathSegments(listOf("schedule", "nightly")),
         )
         onServer(schedule) {
@@ -517,7 +514,7 @@ class MutationLogTest {
 
             val row = logged().single()
             assertNull(row.requestId, "a schedule tick has no RequestRecord, so this would dangle")
-            assertEquals(schedule.executionId, row.executionId)
+            assertEquals(schedule.id.uuid, row.executionId)
             assertEquals("schedule", row.initiatorKind)
             assertTrue("schedule" in row.initiator && "nightly" in row.initiator, row.initiator)
         }
@@ -525,16 +522,16 @@ class MutationLogTest {
 
     @Test
     fun `an http request records the id its request record is keyed by`() {
-        val http = Initiator.Http(
-            executionId = Uuid.parse("00000000-0000-4000-8000-000000000601"),
-            endpoint = RawHttpEndpoint<PathSpec>(asString = "/patient", method = HttpMethod.GET),
+        val http = Execution.Http(
+            id = id(601),
+            endpoint = RawHttpEndpoint(asString = "/patient", method = HttpMethod.GET),
         )
         onServer(http) {
             auditedTable().insert(listOf(patient("Ada")))
 
             val row = logged().single()
-            assertEquals(http.executionId, row.requestId)
-            assertEquals(http.executionId, row.executionId)
+            assertEquals(http.id.uuid, row.requestId)
+            assertEquals(http.id.uuid, row.executionId)
             assertEquals("http", row.initiatorKind)
             assertTrue("patient" in row.initiator, row.initiator)
         }
@@ -546,11 +543,11 @@ class MutationLogTest {
      */
     @Test
     fun `an indirect mutation chains back to the root execution`() {
-        val root = Uuid.parse("00000000-0000-4000-8000-000000000701")
-        val nested = Initiator.Task(
-            executionId = Uuid.parse("00000000-0000-4000-8000-000000000702"),
+        val root = id(701)
+        val nested = Execution.Task(
+            id = id(702),
             causedBy = root,
-            rootExecutionId = root,
+            rootExecution = root,
             attributedTo = root,
             location = PathSegments(listOf("task", "cleanup")),
         )
@@ -558,9 +555,9 @@ class MutationLogTest {
             auditedTable().insert(listOf(patient("Ada")))
 
             val row = logged().single()
-            assertEquals(root, row.rootExecutionId)
-            assertEquals(root, row.causedBy)
-            assertEquals(nested.executionId, row.executionId)
+            assertEquals(root.uuid, row.rootExecutionId)
+            assertEquals(root.uuid, row.causedBy)
+            assertEquals(nested.id.uuid, row.executionId)
             assertEquals("task", row.initiatorKind)
         }
     }

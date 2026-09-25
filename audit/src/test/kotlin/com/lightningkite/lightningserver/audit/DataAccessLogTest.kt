@@ -6,9 +6,10 @@ import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
-import com.lightningkite.lightningserver.definition.PreDeployTask
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
+import com.lightningkite.lightningserver.runtime.test.executePreDeployTasks
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.typed.explicitModelInfo
@@ -76,14 +77,8 @@ class DataAccessLogTest {
 
     private fun onServer(block: suspend context(ServerRuntime) (ServerRuntime) -> Unit) = runBlocking {
         TestServer.test(settings = { database set Database.Settings(); cache set Cache.Settings() }) {
-            val done = HashSet<PreDeployTask>()
-            suspend fun run(task: PreDeployTask) {
-                if (!done.add(task)) return
-                task.dependencies().forEach { run(it) }
-                with(serverRuntime) { task.execute() }
-            }
-            serverRuntime.server.preDeployTasks.values.forEach { run(it) }
-            block(serverRuntime, serverRuntime)
+            executePreDeployTasks()
+            execute { block(serverRuntime, serverRuntime) }
         }
     }
 
@@ -282,7 +277,7 @@ class DataAccessLogTest {
         table.count(Condition.Always)
 
         val row = logged().single()
-        assertEquals(runtime.execution.executionId, row.executionId)
-        assertEquals(runtime.execution.attributedTo, row.requestId)
+        assertEquals(runtime.execution.id.uuid, row.executionId)
+        assertEquals(runtime.execution.attributedTo.uuid, row.requestId)
     }
 }

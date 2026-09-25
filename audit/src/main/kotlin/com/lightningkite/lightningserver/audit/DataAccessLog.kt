@@ -67,11 +67,10 @@ public fun <T : Any> DataAccessLog.dataAccessLogged(table: Table<T>): Table<T> {
         wraps = table,
         modelId = { registry.await().modelId(serialName) },
         // The anchor, not this execution's own id. A query run inside a task has no request row of
-        // its own, so `requestRecordId` would store an id that joins to nothing; `attributedTo`
-        // names the row of whoever is responsible. Identical for http and websocket executions,
-        // which are their own anchor.
-        requestId = initiator.attributedTo,
-        executionId = initiator.executionId,
+        // its own, so its own id would join to nothing; `attributedTo` names the row of whoever is
+        // responsible. For http and websocket executions it is their own request row.
+        requestId = initiator.attributedTo.uuid,
+        executionId = initiator.id.uuid,
         json = runtime.internalSerialization.json,
         nowMillis = { runtime.clock.now().toEpochMilliseconds() },
         write = { with(runtime) { dataAccess().insertOne(it) } },

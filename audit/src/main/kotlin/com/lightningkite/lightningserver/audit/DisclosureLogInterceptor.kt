@@ -48,12 +48,12 @@ public class DisclosureLogInterceptor(
         val rows = disclosures.map {
             DisclosureRecord(
                 // v7 so the row carries its own insert time; DisclosureRecord.at reads it back.
-                // Not generateRequestId(): that names execution ids, and this is a row id.
+                // Not Execution.ID.generate(): that mints execution ids, and this is a row id.
                 _id = Uuid.generateV7NonMonotonicAt(runtime.clock.now()),
-                // The anchor, not this execution's own row key. Identical for the http and websocket
-                // executions that actually disclose; anywhere else it names the request that led here
-                // rather than an id that joins to nothing.
-                requestId = runtime.execution.attributedTo,
+                // The anchor, not this execution's own id. The request row itself for the http and
+                // websocket executions that actually disclose; anywhere else it names the request that
+                // led here rather than an id that joins to nothing.
+                requestId = runtime.execution.attributedTo.uuid,
                 modelId = it.modelId,
                 fields0 = it.bits.fields0,
                 fields1 = it.bits.fields1,

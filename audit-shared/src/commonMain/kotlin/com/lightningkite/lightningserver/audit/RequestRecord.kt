@@ -20,7 +20,7 @@ import kotlin.uuid.Uuid
  *
  * ## When is embedded in the id, not stored
  * There is no `at` column. The execution id is a version-7 UUID minted at the instant an execution
- * began (see [com.lightningkite.lightningserver.http.generateRequestId]), so the mint time is in the
+ * began (see `Execution.ID.generate`), so the mint time is in the
  * id itself and [at] is derived from it. Keeping the instant out of the row means the id's
  * time-ordering (its reason for being v7) and the row's timestamp can never disagree, and time-window
  * queries range over the primary key rather than an indexed copy of the same instant. The single

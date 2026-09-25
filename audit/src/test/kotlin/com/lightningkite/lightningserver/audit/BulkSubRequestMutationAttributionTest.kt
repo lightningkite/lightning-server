@@ -21,14 +21,16 @@ import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
+import com.lightningkite.lightningserver.EngineApi
 import com.lightningkite.lightningserver.runtime.EngineBase
 import com.lightningkite.lightningserver.runtime.Execution
-import com.lightningkite.lightningserver.runtime.ExecutionCause
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.execute
 import com.lightningkite.lightningserver.runtime.executeInlineWithMetrics
-import com.lightningkite.lightningserver.runtime.handle
+import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.lightningserver.runtime.invoke
 import com.lightningkite.lightningserver.runtime.location
+import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.MetaEndpoints
@@ -56,14 +58,14 @@ import kotlin.uuid.Uuid
  * The same attribution question as [WebSocketMutationAttributionTest], with no socket involved.
  *
  * A `/meta/bulk` sub-request is structurally what a multiplexed sub-socket is: `HttpRequest.subRequest`
- * gives it its own query parameters while sharing the carrier's `cache`, and `Initiator.Http.subRequest`
- * gives it its own `executionId` while inheriting the carrier's `rootExecutionId`. So if a sub-request
+ * gives it its own query parameters while sharing the carrier's `cache`, and its `Execution.Http` has
+ * its own `id` while inheriting the carrier's `rootExecution`. So if a sub-request
  * can authenticate where the carrier did not, everything the socket tests found follows here too —
  * which is why the fix is not about sockets: `rootExecutionId` names the outermost execution, and the
  * outermost execution is not necessarily the one that authenticated anybody. `attributedTo` is the
  * column that answers "who", and these tests assert it alongside the root so the two stay distinct.
  */
-@OptIn(InternalLightningServerApi::class)
+@OptIn(InternalLightningServerApi::class, EngineApi::class)
 class BulkSubRequestMutationAttributionTest {
 
     private val user = Uuid.parse("00000000-0000-4000-8000-0000000000d1")
@@ -72,7 +74,7 @@ class BulkSubRequestMutationAttributionTest {
         val engine = BulkProbeEngine()
         engine.ready()
         engine.preDeploy()
-        block(engine, engine)
+        engine.direct { block(serverRuntime, engine) }
     }
 
     context(server: ServerRuntime)
@@ -120,7 +122,7 @@ class BulkSubRequestMutationAttributionTest {
     @Test
     fun `a bulk sub-request authenticates on its own query parameters even when the carrier did not`() =
         probe { engine ->
-            val response = engine.handle(bulkOf("/mutate?${credential()}", Uuid.random().toString()), engine.newId())
+            val response = engine.handleRoot(bulkOf("/mutate?${credential()}", Uuid.random().toString()), engine.newId())
             assertEquals(HttpStatus.OK, response.status)
 
             val requests = requests()
@@ -147,7 +149,7 @@ class BulkSubRequestMutationAttributionTest {
     fun `a direct mutation from an authenticated sub-request attributes to the person while its root stays anonymous`() =
         probe { engine ->
             val id = Uuid.random()
-            engine.handle(bulkOf("/mutate?${credential()}", id.toString()), engine.newId())
+            engine.handleRoot(bulkOf("/mutate?${credential()}", id.toString()), engine.newId())
 
             val requests = requests()
             val mutation = mutations().single()
@@ -177,13 +179,13 @@ class BulkSubRequestMutationAttributionTest {
 
     /**
      * The asymmetry with a sub-socket, and the one that matters for a fix: HTTP has no third
-     * identifier. `Initiator.logicalId` is the execution itself for `Http` and the socket for `WebSocket`,
+     * identifier. `logicalId` is the execution itself for `Http` and the socket for `WebSocket`,
      * so a sub-request's row is keyed by its own `executionId` — the id the mutation already carries
      * in `executionId` as well as in `requestId`.
      */
     @Test
     fun `a bulk sub-request's row is keyed by its own executionId`() = probe { engine ->
-        engine.handle(bulkOf("/mutate?${credential()}", Uuid.random().toString()), engine.newId())
+        engine.handleRoot(bulkOf("/mutate?${credential()}", Uuid.random().toString()), engine.newId())
 
         val mutation = mutations().single()
         assertEquals(
@@ -212,13 +214,13 @@ class BulkSubRequestMutationAttributionTest {
      * causal head would answer "anonymous" for a change a known person made.
      *
      * `attributedTo` anchors to the innermost execution that had a request row, and a task inherits
-     * its launcher's anchor through the serialized `ExecutionCause`, so it survives the queue.
+     * its launcher's anchor through the serialized `Execution.Task.attributedTo`, so it survives the queue.
      */
     @Test
     fun `a task launched from an authenticated bulk sub-request attributes to the person who made it`() =
         probe { engine ->
             val id = Uuid.random()
-            engine.handle(bulkOf("/mutate-task?${credential()}", id.toString()), engine.newId())
+            engine.handleRoot(bulkOf("/mutate-task?${credential()}", id.toString()), engine.newId())
             engine.drainTasks()
 
             val mutation = mutations().single()
@@ -263,7 +265,7 @@ class BulkSubRequestMutationAttributionTest {
                     body = it.body,
                 )
             }
-            engine.handle(request, engine.newId())
+            engine.handleRoot(request, engine.newId())
             engine.drainTasks()
 
             val mutation = mutations().single()
@@ -365,15 +367,14 @@ private object BulkTestServer : ServerBuilder() {
 // ===================== the engine =====================
 
 /**
- * The HTTP twin of `WebSocketMutationAttributionTest`'s probe engine: everything is the framework's
- * own `handle`, except that tasks go over a queue that keeps only the serialized payload, so a task
- * really becomes an execution of its own instead of running inline in its launcher.
+ * The HTTP twin of `WebSocketMutationAttributionTest`'s probe engine: requests go through the
+ * framework's own `handleRoot`, and tasks go over a queue that keeps only the serialized payload, so a
+ * task really becomes an execution of its own instead of running inline in its launcher.
  */
-@OptIn(InternalLightningServerApi::class)
-private class BulkProbeEngine : EngineBase(BulkTestServer.build()), ServerRuntime {
+@OptIn(InternalLightningServerApi::class, EngineApi::class)
+private class BulkProbeEngine : EngineBase(BulkTestServer.build()) {
     override val serverId: String = "bulk-probe"
     override val serverVersion: String = "test"
-    override val execution: Initiator = Initiator.Direct(Uuid.random())
 
     override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(
         event: WebSocketSubscriptionMessage<PATH, T>,
@@ -390,19 +391,23 @@ private class BulkProbeEngine : EngineBase(BulkTestServer.build()), ServerRuntim
     suspend fun preDeploy(): Unit = runPreDeployTasks()
 
     /** The id an engine would mint for an incoming request. */
-    fun newId(): Uuid = com.lightningkite.lightningserver.http.generateRequestId()
+    fun newId(): Execution.ID = Execution.ID.generate()
+
+    /** Runs [action] as this probe's own work, the way `TestRunner.execute` does. */
+    suspend fun <T> direct(action: suspend context(ServerRuntime) () -> T): T =
+        execute("probe", Execution.Direct(newId())) { action(this) }
 
     @Serializable
-    private data class Queued(val location: String, val cause: ExecutionCause?, val input: String)
+    private data class Queued(val location: String, val from: Execution, val input: String)
 
     private val queue = ArrayDeque<Queued>()
 
     override suspend fun <T> dispatchTask(task: Task<T>, input: T, from: Execution) {
         queue.addLast(
             Queued(
-                location = location.toString(),
-                cause = from,
-                input = internalSerialization.json.encodeToString(serializer, input),
+                location = task.location.toString(),
+                from = from,
+                input = internalSerialization.json.encodeToString(task.serializer, input),
             )
         )
     }
@@ -410,13 +415,11 @@ private class BulkProbeEngine : EngineBase(BulkTestServer.build()), ServerRuntim
     suspend fun drainTasks() {
         while (queue.isNotEmpty()) {
             val queued = queue.removeFirst()
-            val location = PathSpec0.fromString(queued.location)
             @Suppress("UNCHECKED_CAST")
-            val task = server.tasks.getValue(location) as Task<Any?>
+            val task = server.tasks.getValue(PathSpec0.fromString(queued.location)) as Task<Any?>
             task.executeInlineWithMetrics(
-                location,
                 internalSerialization.json.decodeFromString(task.serializer, queued.input),
-                queued.cause,
+                queued.from,
             )
         }
     }

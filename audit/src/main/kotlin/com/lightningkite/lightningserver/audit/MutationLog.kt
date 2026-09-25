@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.audit
 
 import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.logicalId
 import com.lightningkite.services.database.Table
 import com.lightningkite.services.database.insertOne
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -69,18 +70,18 @@ public fun <T : Any> MutationLog.mutationLogged(table: Table<T>): Table<T> {
     return MutationLogTable(
         wraps = table,
         modelId = { registry.await().modelId(serialName) },
-        // Exactly where a request record exists, which is what logicalId means: a task or schedule
-        // tick is not part of a request, so this is null rather than an id that joins to nothing.
-        requestId = initiator.logicalId,
+        // Exactly where a request record exists: a task or schedule tick is not part of a request,
+        // so this is null rather than an id that joins to nothing.
+        requestId = (initiator as? Execution.Requested)?.logicalId?.uuid,
         // The row that names who is responsible. Unlike `requestId` this is never null: a change
         // made inside a task carries the anchor of whatever launched it, which is the only way an
         // indirect change stays traceable to a person.
-        attributedTo = initiator.attributedTo,
-        executionId = initiator.executionId,
-        causedBy = initiator.causedBy,
-        rootExecutionId = initiator.rootExecutionId,
+        attributedTo = initiator.attributedTo.uuid,
+        executionId = initiator.id.uuid,
+        causedBy = initiator.causedBy?.uuid,
+        rootExecutionId = initiator.rootExecution.uuid,
         initiatorKind = initiator.kind(json),
-        initiator = json.encodeToString(Initiator.serializer(), initiator),
+        initiator = json.encodeToString(Execution.serializer(), initiator),
         json = json,
         nowMillis = { runtime.clock.now().toEpochMilliseconds() },
         write = { with(runtime) { mutations().insertOne(it) } },
@@ -89,13 +90,13 @@ public fun <T : Any> MutationLog.mutationLogged(table: Table<T>): Table<T> {
 }
 
 /**
- * The `@SerialName` discriminator of this initiator's concrete type — "http", "task", and so on.
+ * The `@SerialName` discriminator of this execution's concrete type — "http", "task", and so on.
  *
  * Read back out of the encoded form rather than matched against the subtypes in a `when`, so that the
- * value in the record is by construction the same string the serialized [Initiator] carries. A `when`
+ * value in the record is by construction the same string the serialized [Execution] carries. A `when`
  * would be a second copy of the discriminators, free to drift from the annotations.
  */
 @OptIn(ExperimentalSerializationApi::class)
-private fun Initiator.kind(json: Json): String =
-    json.encodeToJsonElement(Initiator.serializer(), this)
+private fun Execution.kind(json: Json): String =
+    json.encodeToJsonElement(Execution.serializer(), this)
         .jsonObject.getValue(json.configuration.classDiscriminator).jsonPrimitive.content

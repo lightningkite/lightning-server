@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.audit
 
+import com.lightningkite.lightningserver.EngineApi
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.MultiplexMessage
 import com.lightningkite.lightningserver.auth.Authentication
@@ -13,7 +14,6 @@ import com.lightningkite.lightningserver.definition.Task
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders
-import com.lightningkite.lightningserver.http.generateRequestId
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
@@ -21,18 +21,20 @@ import com.lightningkite.lightningserver.pathing.RawWebSocketPath
 import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.runtime.EngineBase
 import com.lightningkite.lightningserver.runtime.Execution
-import com.lightningkite.lightningserver.runtime.ExecutionCause
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.didConnectAsRoot
 import com.lightningkite.lightningserver.runtime.executeInlineWithMetrics
 import com.lightningkite.lightningserver.runtime.execute
 import com.lightningkite.lightningserver.runtime.invoke
 import com.lightningkite.lightningserver.runtime.location
-import com.lightningkite.lightningserver.runtime.phase
+import com.lightningkite.lightningserver.runtime.messageFromClientAsRoot
+import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.willConnectAsRoot
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.registerTable
 import com.lightningkite.lightningserver.websockets.MultiplexWebSocketHandler
-import com.lightningkite.lightningserver.websockets.WebSocketClose.Code
+import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketConnection
 import com.lightningkite.lightningserver.websockets.WebSocketFrame
@@ -58,20 +60,20 @@ import kotlin.uuid.Uuid
 /**
  * Can a change made under a WebSocket be traced back to a person?
  *
- * A [MutationRecord] names a `rootExecutionId`; turning that into a person means looking it up in
- * [RequestRecord] and reading `principal`. For HTTP that join is trivially sound — the row is keyed by
- * the request's own execution id. For a socket it is not obvious: [RequestRecordInterceptor] keys the
- * row by the *socket* id rather than by the phase execution that wrote the change, and a virtual
- * socket multiplexed inside a physical one gets a fresh socket id while inheriting the physical
- * connection's root.
+ * Turning a [MutationRecord] into a person means looking up its `attributedTo` in [RequestRecord] and
+ * reading `principal`. For HTTP that join is trivially sound — the row is keyed by the request's own
+ * execution id. For a socket it is not obvious: [RequestRecordInterceptor] keys the row by the
+ * *socket* id rather than by the phase execution that wrote the change, and a virtual socket
+ * multiplexed inside a physical one gets its own socket id and its own row.
  *
  * These tests answer that by driving real sockets through the real interceptor chain and then
- * performing exactly the join an auditor would: `requests().find { it._id == mutation.attributedTo }`.
+ * performing exactly the join an auditor would: `requests().find { it._id == mutation.attributedTo }`,
+ * and from a sub-socket's row, `parentRequestId` to the connection carrying it.
  *
- * `attributedTo` rather than `rootExecutionId` throughout, and the difference is the point. The root
- * is a *causal* key — it answers "what set this off" — and the head of a causal chain is not
- * necessarily the execution that carried the credentials. A multiplexed socket is exactly where the
- * two come apart, so the tests below assert both, and assert that they disagree where they should.
+ * Not `rootExecutionId`. The root is a *causal* key — the execution at the head of the chain — and a
+ * socket phase follows the same parentage rules as everything else: one nothing dispatched is its own
+ * root. Phases are linked to their socket by `socketId`, not by parentage, so a root phase names no
+ * request row. The tests assert what the root actually is alongside the join, so the two stay apart.
  */
 @OptIn(InternalLightningServerApi::class)
 class WebSocketMutationAttributionTest {
@@ -82,7 +84,7 @@ class WebSocketMutationAttributionTest {
         val engine = ProbeEngine()
         engine.ready()
         engine.preDeploy()
-        block(engine, engine)
+        engine.direct { block(serverRuntime, engine) }
     }
 
     context(server: ServerRuntime)
@@ -113,10 +115,8 @@ class WebSocketMutationAttributionTest {
         val requests = requests()
         val byRequestId = requests.rowFor(mutation.requestId)
         assertNotNull(byRequestId, "requestId ${mutation.requestId} names no request row; rows are ${requests.map { it._id }}")
-        val byRoot = requests.rowFor(mutation.rootExecutionId)
-        assertNotNull(byRoot, "rootExecutionId ${mutation.rootExecutionId} names no request row; rows are ${requests.map { it._id }}")
 
-        assertEquals(socket.initiator.socketId, mutation.requestId, "the row is keyed by the socket, not the phase")
+        assertEquals(socket.request.socketId.uuid, mutation.requestId, "the row is keyed by the socket, not the phase")
 
         val byAttribution = requests.rowFor(mutation.attributedTo)
         assertNotNull(byAttribution, "attributedTo ${mutation.attributedTo} names no request row")
@@ -124,8 +124,7 @@ class WebSocketMutationAttributionTest {
             byAttribution.principal?.contains(user.toString()) == true,
             "the request the change attributes to does not name the authenticated user: ${byAttribution.principal}",
         )
-        // For a plain socket the three ids coincide, which is why one column looked like enough.
-        assertEquals(byAttribution._id, byRoot._id)
+        assertEquals(mutation.executionId, mutation.rootExecutionId, "a message phase nothing dispatched is its own root")
     }
 
     // ===================== 2. a plain socket, mutating from a task =====================
@@ -145,7 +144,7 @@ class WebSocketMutationAttributionTest {
         val byAttribution = requests.rowFor(mutation.attributedTo)
         assertNotNull(byAttribution, "attributedTo ${mutation.attributedTo} names no request row; rows are ${requests.map { it._id }}")
         assertEquals(
-            socket.initiator.socketId,
+            socket.request.socketId.uuid,
             byAttribution._id,
             "the task should attribute to the socket it descends from",
         )
@@ -153,8 +152,9 @@ class WebSocketMutationAttributionTest {
             byAttribution.principal?.contains(user.toString()) == true,
             "the request the change attributes to does not name the authenticated user: ${byAttribution.principal}",
         )
-        // The anchor survived the queue: it is carried in the serialized ExecutionCause, not derived.
-        assertEquals(byAttribution._id, requests.rowFor(mutation.rootExecutionId)?._id)
+        // The anchor survived the queue: it is carried in the serialized Execution.Task, not derived.
+        // The root is the message phase that launched the task, which is its own root.
+        assertEquals(mutation.causedBy, mutation.rootExecutionId)
     }
 
     // ===================== 3. a virtual socket multiplexed inside a physical one =====================
@@ -172,13 +172,16 @@ class WebSocketMutationAttributionTest {
         val requests = requests()
         val byRequestId = requests.rowFor(mutation.requestId)
         assertNotNull(byRequestId, "requestId ${mutation.requestId} names no request row; rows are ${requests.map { it._id to it.endpoint }}")
-        val byRoot = requests.rowFor(mutation.rootExecutionId)
-        assertNotNull(byRoot, "rootExecutionId ${mutation.rootExecutionId} names no request row; rows are ${requests.map { it._id to it.endpoint }}")
 
         assertEquals(
-            physical.initiator.socketId,
-            byRoot._id,
-            "the root of a virtual socket's work should be the physical connection carrying it",
+            physical.request.socketId.uuid,
+            byRequestId.parentRequestId,
+            "a virtual socket's row should be parented to the physical connection carrying it",
+        )
+        assertEquals(
+            mutation.causedBy,
+            mutation.rootExecutionId,
+            "a virtual socket's message is rooted at the physical socket's phase that carried it",
         )
 
         val byAttribution = requests.rowFor(mutation.attributedTo)
@@ -239,7 +242,7 @@ class WebSocketMutationAttributionTest {
             engine.sendOnChannel(physical, "c1", "direct:${Uuid.random()}")
 
             val requests = requests()
-            val carrier = requests.rowFor(physical.initiator.socketId)
+            val carrier = requests.rowFor(physical.request.socketId.uuid)
             assertNotNull(carrier)
             assertNull(carrier.principal, "the carrier was supposed to be anonymous")
 
@@ -251,15 +254,13 @@ class WebSocketMutationAttributionTest {
         }
 
     /**
-     * The two columns pulling apart, on one row.
+     * Who did it, apart from what carried it, on one row.
      *
-     * `attributedTo` names the sub-socket, which authenticated; `rootExecutionId` names the carrier,
-     * which did not. Both are correct answers to their own question — "who did it" and "what set
-     * this off" — and pinned together here so that neither can later be collapsed into the other on
-     * the grounds that they usually agree.
+     * `attributedTo` names the sub-socket, which authenticated; its row's parent is the carrier,
+     * which did not. The carrier must not be what an auditor reads to name the person.
      */
     @Test
-    fun `a direct mutation from an authenticated sub-socket attributes to the person while its root stays anonymous`() =
+    fun `a direct mutation from an authenticated sub-socket attributes to the person while its carrier stays anonymous`() =
         probe { engine ->
             val physical = engine.openSocket(TestServer.multiplex, HttpHeaders.EMPTY)
             engine.startChannel(physical, "c1", tokenQuery())
@@ -276,18 +277,10 @@ class WebSocketMutationAttributionTest {
                 "the sub-socket's own row does not name the person: ${byAttribution.principal}",
             )
 
-            val byRoot = requests.rowFor(mutation.rootExecutionId)
-            assertNotNull(byRoot, "rootExecutionId ${mutation.rootExecutionId} names no request row")
-            assertEquals("/multiplex", byRoot.endpoint)
-            assertNull(
-                byRoot.principal,
-                "the root is the causal head, which here is the anonymous carrier; it must not be " +
-                    "what an auditor reads to name the person",
-            )
-            assertTrue(
-                byAttribution._id != byRoot._id,
-                "the whole reason for two columns is that they can differ, and here they must",
-            )
+            val carrier = requests.rowFor(byAttribution.parentRequestId)
+            assertNotNull(carrier, "the sub-socket's row names no parent row")
+            assertEquals("/multiplex", carrier.endpoint)
+            assertNull(carrier.principal, "the carrier is anonymous, so it must not be what names the person")
         }
 
     /**
@@ -295,12 +288,12 @@ class WebSocketMutationAttributionTest {
      *
      * A task has no request row of its own, so `requestId` is null and there is exactly one column
      * left to trace it by. That column must not be `rootExecutionId`: the root is the head of the
-     * *causal* chain, which here is the multiplex carrier — an execution that authenticated nobody,
-     * because the credential arrived on the sub-socket's own query parameters. Anchoring to the
-     * causal head would therefore answer "anonymous" for a change a known person made.
+     * *causal* chain, which here is the multiplex carrier's phase — an execution that authenticated
+     * nobody, because the credential arrived on the sub-socket's own query parameters. Anchoring to
+     * the causal head would therefore answer "anonymous" for a change a known person made.
      *
      * `attributedTo` anchors instead to the innermost execution that had a request row, and a task
-     * inherits its launcher's anchor through the serialized `ExecutionCause` — so it survives the
+     * inherits its launcher's anchor through the serialized `Execution.Task.attributedTo` — so it survives the
      * queue, which is the only reason it works on a serverless engine at all.
      */
     @Test
@@ -325,25 +318,24 @@ class WebSocketMutationAttributionTest {
                     "${byAttribution.principal}",
             )
 
-            // And the column that used to be the only handle still answers the causal question,
-            // still lands on the carrier, and is still anonymous.
-            val byRoot = requests.rowFor(mutation.rootExecutionId)
-            assertNotNull(byRoot)
-            assertEquals("/multiplex", byRoot.endpoint)
-            assertNull(byRoot.principal)
+            // And the carrier, reached through the sub-socket's parent row, is still anonymous.
+            val carrier = requests.rowFor(byAttribution.parentRequestId)
+            assertNotNull(carrier)
+            assertEquals("/multiplex", carrier.endpoint)
+            assertNull(carrier.principal)
         }
 
     /**
-     * The minting bug underneath all of this: `subConnection` used to draw two separate ids for a
-     * virtual socket's `executionId` and its `socketId`.
+     * A virtual socket's own request row must be reachable from everything it does, or the row exists
+     * and nothing can find it — which is what happened when `subConnection` drew separate ids for a
+     * virtual socket's connect and its socket.
      *
-     * A socket's request row is keyed by `socketId`, so with two ids the row was unreachable from the
-     * execution id anything descending from the socket names — the sub-socket's own row existed and
-     * nothing could find it. Observable here because a phase names its connect in `causedBy` while
-     * the row is keyed by `socketId`: the two are the same id only if the connect minted one.
+     * `causedBy` is not the link: a sub-socket's message phase is caused by the physical socket's
+     * phase that dispatched it. The row is keyed by the socket, and `requestId` and `attributedTo`
+     * name the socket, so they are what an auditor joins on.
      */
     @Test
-    fun `a virtual sub-socket's connect execution and its socket id are the same id`() = probe { engine ->
+    fun `a virtual sub-socket's own request row is reachable from what it does`() = probe { engine ->
         val physical = engine.openSocket(TestServer.multiplex, authHeaders())
         engine.startChannel(physical, "c1")
         engine.sendOnChannel(physical, "c1", "direct:${Uuid.random()}")
@@ -351,23 +343,14 @@ class WebSocketMutationAttributionTest {
         val mutation = mutations().single()
         val subRow = requests().single { it.endpoint == "/socket" }
 
-        // subRow._id is the sub-socket's socketId; mutation.causedBy is its connect executionId.
-        assertEquals(
-            subRow._id,
-            mutation.causedBy,
-            "a sub-socket that mints separate connect and socket ids leaves its own request row " +
-                "unreachable from everything descending from it",
-        )
+        assertEquals(subRow._id, mutation.requestId, "the sub-socket's row is unreachable from its own work")
         assertEquals(subRow._id, mutation.attributedTo)
+        assertTrue(mutation.causedBy != subRow._id, "a sub-socket's phase is caused by the carrier's phase")
     }
 
-    /**
-     * What the root actually points at for a virtual socket, recorded because it is the fidelity the
-     * join gives up: the row found is the *physical* connection's, whose endpoint is the multiplex
-     * path, not the sub-socket's own row.
-     */
+    /** A virtual socket's row is its own, and its parent is the physical connection that carried it. */
     @Test
-    fun `a virtual sub-socket gets its own request row, but the root names the physical connection`() =
+    fun `a virtual sub-socket gets its own request row, parented to the physical connection's`() =
         probe { engine ->
             val physical = engine.openSocket(TestServer.multiplex, authHeaders())
             engine.startChannel(physical, "c1")
@@ -380,13 +363,9 @@ class WebSocketMutationAttributionTest {
             assertNotNull(subRow, "the virtual sub-socket has no request row of its own")
             assertEquals("/socket", subRow.endpoint, "the sub-socket's row should name the sub-socket's endpoint")
 
-            val rootRow = requests.rowFor(mutation.rootExecutionId)
-            assertNotNull(rootRow)
-            assertEquals(
-                "/multiplex",
-                rootRow.endpoint,
-                "the root resolves to the physical connection, so the endpoint an auditor sees is the carrier",
-            )
+            val parentRow = requests.rowFor(subRow.parentRequestId)
+            assertNotNull(parentRow, "the sub-socket's row names no parent row")
+            assertEquals("/multiplex", parentRow.endpoint, "the parent row should be the physical connection")
         }
 }
 
@@ -483,15 +462,21 @@ private object TestServer : ServerBuilder() {
  * payload and drops every live object, as a Lambda invocation does, so what the task run sees is only
  * what was written into that payload — the same technique `TaskParentageTest` uses in core.
  *
- * Nothing here builds an [Initiator] the framework would not: the connect initiator is minted exactly
- * as every engine and `TestRunner` mints it, and every id after that is derived by `phase`,
- * `subConnection` or `executeWithMetrics`.
+ * Nothing here builds an [Execution] the framework would not: sockets are driven through the same
+ * `AsRoot` wrappers every engine uses, and every id after the socket id is derived by them,
+ * `subConnection` or `executeInlineWithMetrics`.
  */
-@OptIn(InternalLightningServerApi::class)
-private class ProbeEngine : EngineBase(TestServer.build()), ServerRuntime {
+@OptIn(InternalLightningServerApi::class, EngineApi::class)
+private class ProbeEngine : EngineBase(TestServer.build()) {
     override val serverId: String = "probe"
     override val serverVersion: String = "test"
-    override val execution: Initiator = Initiator.Direct(Uuid.random())
+
+    /** The id an engine would mint for an incoming socket. */
+    fun newId(): Execution.ID = Execution.ID.generate()
+
+    /** Runs [action] as this probe's own work, the way `TestRunner.execute` does. */
+    suspend fun <T> direct(action: suspend context(ServerRuntime) () -> T): T =
+        execute("probe", Execution.Direct(newId())) { action(this) }
 
     override suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(
         event: WebSocketSubscriptionMessage<PATH, T>,
@@ -511,16 +496,16 @@ private class ProbeEngine : EngineBase(TestServer.build()), ServerRuntime {
     // ----- tasks, over a queue that keeps nothing but the payload -----
 
     @Serializable
-    private data class Queued(val location: String, val cause: ExecutionCause?, val input: String)
+    private data class Queued(val location: String, val from: Execution, val input: String)
 
     private val queue = ArrayDeque<Queued>()
 
     override suspend fun <T> dispatchTask(task: Task<T>, input: T, from: Execution) {
         queue.addLast(
             Queued(
-                location = location.toString(),
-                cause = from,
-                input = internalSerialization.json.encodeToString(serializer, input),
+                location = task.location.toString(),
+                from = from,
+                input = internalSerialization.json.encodeToString(task.serializer, input),
             )
         )
     }
@@ -528,13 +513,11 @@ private class ProbeEngine : EngineBase(TestServer.build()), ServerRuntime {
     suspend fun drainTasks() {
         while (queue.isNotEmpty()) {
             val queued = queue.removeFirst()
-            val location = PathSpec0.fromString(queued.location)
             @Suppress("UNCHECKED_CAST")
-            val task = server.tasks.getValue(location) as Task<Any?>
+            val task = server.tasks.getValue(PathSpec0.fromString(queued.location)) as Task<Any?>
             task.executeInlineWithMetrics(
-                location,
                 internalSerialization.json.decodeFromString(task.serializer, queued.input),
-                queued.cause,
+                queued.from,
             )
         }
     }
@@ -544,7 +527,6 @@ private class ProbeEngine : EngineBase(TestServer.build()), ServerRuntime {
     inner class ProbeSocket<PATH : PathSpec, STORAGE>(
         private val handler: WebSocketHandler<PATH, STORAGE>,
         val request: WebSocketConnectRequest<PATH>,
-        val initiator: Initiator.WebSocket,
         private var state: STORAGE,
     ) {
         val sent: MutableList<WebSocketFrame> = mutableListOf()
@@ -552,29 +534,38 @@ private class ProbeEngine : EngineBase(TestServer.build()), ServerRuntime {
         val connection: WebSocketConnection<PATH, STORAGE> = object : WebSocketConnection<PATH, STORAGE> {
             override val request: WebSocketConnectRequest<PATH> get() = this@ProbeSocket.request
             override val currentState: STORAGE get() = state
+
+            context(server: ServerRuntime)
             override suspend fun repullState(): STORAGE = state
+
+            context(server: ServerRuntime)
             override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE) {
                 state = modification(state)
             }
 
+            context(server: ServerRuntime)
             override suspend fun updateStateImmediately(modification: (STORAGE) -> STORAGE): STORAGE {
                 state = modification(state)
                 return state
             }
 
+            context(server: ServerRuntime)
             override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>): Unit = Unit
+
+            context(server: ServerRuntime)
             override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>): Unit = Unit
+
+            context(server: ServerRuntime)
             override suspend fun send(frame: WebSocketFrame) {
                 sent += frame
             }
 
-            override suspend fun close(reason: WebSocketCloseReason.Code): Unit = Unit
+            context(server: ServerRuntime)
+            override suspend fun close(reason: WebSocketClose): Unit = Unit
         }
 
         suspend fun send(text: String) {
-            with(execute(initiator.phase(Initiator.WebSocket.Phase.ClientMessage))) {
-                handler.messageFromClient(connection, WebSocketFrame.Text(text))
-            }
+            handler.messageFromClientAsRoot(connection, WebSocketFrame.Text(text))
         }
     }
 
@@ -585,23 +576,15 @@ private class ProbeEngine : EngineBase(TestServer.build()), ServerRuntime {
         val intercepted = server.interceptIncomingSocket(handler)
         val request = WebSocketConnectRequest(
             path = RawWebSocketPath(handler.location),
+            socketId = newId(),
             headers = headers,
             domain = "example.com",
             protocol = "wss",
             sourceIp = "10.0.0.9",
         )
-        val socketId = generateRequestId()
-        val initiator = Initiator.WebSocket(
-            executionId = socketId,
-            socketId = socketId,
-            path = request.path,
-            phase = Initiator.WebSocket.Phase.Connect,
-        )
-        val storage = with(execute(initiator)) { intercepted.willConnect(request) }
-        return ProbeSocket(intercepted, request, initiator, storage).also {
-            with(execute(initiator.phase(Initiator.WebSocket.Phase.Connected))) {
-                intercepted.didConnect(it.connection)
-            }
+        val storage = intercepted.willConnectAsRoot(request)
+        return ProbeSocket(intercepted, request, storage).also {
+            intercepted.didConnectAsRoot(it.connection)
         }
     }
 

@@ -57,11 +57,22 @@ public sealed interface Execution {
     public val causedBy: ID?
     public val rootExecution: ID
 
+    /**
+     * The request or socket responsible for this execution: its own [logicalId] when it is one, and
+     * otherwise whatever its launcher was attributed to.
+     *
+     * Not [causedBy], which may be a WebSocket phase or a task with no request of its own, and not
+     * [rootExecution], which for a sub-request with its own credentials is the carrier rather than
+     * the caller.
+     */
+    public val attributedTo: ID
+
     public sealed interface Requested : Execution
 
     public sealed interface ServerManaged : Execution {
         override val rootExecution: ID get() = id
         override val causedBy: ID? get() = null
+        override val attributedTo: ID get() = id
     }
 
     /**
@@ -81,6 +92,8 @@ public sealed interface Execution {
         val endpoint: RawHttpEndpoint<*>,
 //        override val extensions: MutableExtensions = MutableExtensions()
     ) : Execution, Requested {
+        override val attributedTo: ID get() = id
+
         @InternalLightningServerApi public constructor(
             id: ID,
             parent: Execution?,
@@ -108,6 +121,8 @@ public sealed interface Execution {
         val phase: Phase,
 //        override val extensions: MutableExtensions = MutableExtensions()
     ) : Execution, Requested {
+        override val attributedTo: ID get() = socketId
+
         @InternalLightningServerApi public constructor(
             id: ID,
             parent: Execution?,
@@ -131,6 +146,9 @@ public sealed interface Execution {
         override val id: ID,
         override val causedBy: ID,
         override val rootExecution: ID,
+        // Carried rather than derived: once queued, the launcher is gone, and its causedBy alone may
+        // name a phase or task with no request of its own.
+        override val attributedTo: ID,
         val location: PathSegments,
 //        override val extensions: MutableExtensions = MutableExtensions()
     ) : Execution {
@@ -138,7 +156,7 @@ public sealed interface Execution {
             id: ID,
             parent: Execution,
             location: PathSegments
-        ) : this(id, causedBy = parent.id, rootExecution = parent.rootExecution, location)
+        ) : this(id, causedBy = parent.id, rootExecution = parent.rootExecution, attributedTo = parent.attributedTo, location)
     }
 
     /** One tick of a scheduled task. */
@@ -183,7 +201,9 @@ public sealed interface Execution {
         override val causedBy: ID? = null,
         override val rootExecution: ID = id,
 //        override val extensions: MutableExtensions = MutableExtensions()
-    ) : Execution
+    ) : Execution {
+        override val attributedTo: ID get() = id
+    }
 }
 
 /**

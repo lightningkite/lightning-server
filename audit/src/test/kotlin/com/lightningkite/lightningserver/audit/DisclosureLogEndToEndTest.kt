@@ -1,14 +1,20 @@
+@file:OptIn(com.lightningkite.lightningserver.EngineApi::class)
+
 package com.lightningkite.lightningserver.audit
 
 import com.lightningkite.lightningserver.HttpMethod
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
-import com.lightningkite.lightningserver.definition.PreDeployTask
 import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.handle
+import com.lightningkite.lightningserver.runtime.engine
+import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
+import com.lightningkite.lightningserver.runtime.test.executePreDeployTasks
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
@@ -17,6 +23,8 @@ import com.lightningkite.lightningserver.typed.MetaEndpoints
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
+import com.lightningkite.services.data.Unsafe
+import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.Database
 import kotlinx.coroutines.flow.toList
@@ -72,7 +80,10 @@ class DisclosureLogEndToEndTest {
     }
 
     /** A fixed, readable request id, so a record can be asserted against the request that wrote it. */
-    private fun testId(n: Int) = Uuid.parse("00000000-0000-4000-8000-" + n.toString().padStart(12, '0'))
+    // SAFETY: Fixed, valid v7 ids.
+    @OptIn(InternalLightningServerApi::class, Unsafe::class)
+    private fun testId(n: Int) =
+        Execution.ID(UuidV7.fromRaw(Uuid.parse("00000000-0000-7000-8000-" + n.toString().padStart(12, '0'))))
 
     private fun request(path: String, method: HttpMethod = HttpMethod.GET, body: String? = null) =
         HttpRequest<PathSpec>(
@@ -85,27 +96,12 @@ class DisclosureLogEndToEndTest {
             body = body?.let { TypedData.text(it, MediaType.Application.Json) },
         )
 
+    // Pre-deploy is what assigns the audit bit indices, so a disclosure cannot be read without it.
     private fun onServer(block: suspend context(ServerRuntime) Reader.() -> Unit) = runBlocking {
         TestServer.test(settings = { database set Database.Settings(); cache set Cache.Settings() }) {
-            runPreDeployTasks()
-            block(serverRuntime, Reader())
+            executePreDeployTasks()
+            execute { block(serverRuntime, Reader()) }
         }
-    }
-
-    /**
-     * Runs the server's pre-deploy tasks in dependency order, which is what assigns the audit bit
-     * indices. Done here rather than through the runner so the ordering the real deploy pipeline
-     * guarantees is reproduced explicitly.
-     */
-    context(runtime: ServerRuntime)
-    private suspend fun runPreDeployTasks() {
-        val done = HashSet<PreDeployTask>()
-        suspend fun run(task: PreDeployTask) {
-            if (!done.add(task)) return
-            task.dependencies().forEach { run(it) }
-            task.execute()
-        }
-        runtime.server.preDeployTasks.values.forEach { run(it) }
     }
 
     private class Reader {
@@ -136,27 +132,25 @@ class DisclosureLogEndToEndTest {
             settings = { database set Database.Settings(); cache set Cache.Settings() },
             clock = { object : Clock { override fun now(): Instant = fixed } },
         ) {
-            runPreDeployTasks()
-            with(serverRuntime) {
-                val response = handle(request("/patient"), testId(20))
-                assertEquals(HttpStatus.OK, response.status)
-                assertEquals(fixed, Reader().run { disclosures() }.single().at)
-            }
+            executePreDeployTasks()
+            val response = engine.handleRoot(request("/patient"), testId(20))
+            assertEquals(HttpStatus.OK, response.status)
+            execute { assertEquals(fixed, Reader().run { disclosures() }.single().at) }
         }
         Unit
     }
 
     @Test
     fun `a disclosed record is recorded against the request that disclosed it`() = onServer {
-        val response = serverRuntime.handle(request("/patient"), testId(1))
+        val response = engine.handleRoot(request("/patient"), testId(1))
         assertEquals(HttpStatus.OK, response.status)
 
         val disclosure = disclosures().single()
-        assertEquals(testId(1), disclosure.requestId)
+        assertEquals(testId(1).uuid, disclosure.requestId)
         assertEquals(TestServer.ada._id, disclosure.recordId)
         assertEquals(setOf("name", "ssn"), pathsOf(disclosure))
 
-        val record = requests().single { it._id == testId(1) }
+        val record = requests().single { it._id == testId(1).uuid }
         assertEquals("10.0.0.1", record.sourceIp)
         assertEquals("GET", record.method)
         assertEquals("200", record.outcome)
@@ -166,10 +160,10 @@ class DisclosureLogEndToEndTest {
 
     @Test
     fun `a request that discloses nothing still gets a request record and no disclosures`() = onServer {
-        serverRuntime.handle(request("/plain"), testId(2))
+        engine.handleRoot(request("/plain"), testId(2))
 
         assertEquals(emptyList(), disclosures())
-        assertEquals("200", requests().single { it._id == testId(2) }.outcome)
+        assertEquals("200", requests().single { it._id == testId(2).uuid }.outcome)
     }
 
     /**
@@ -178,7 +172,7 @@ class DisclosureLogEndToEndTest {
      */
     @Test
     fun `every disclosure refers to a request record that exists`() = onServer {
-        serverRuntime.handle(request("/patient"), testId(3))
+        engine.handleRoot(request("/patient"), testId(3))
 
         val known = requests().map { it._id }.toSet()
         disclosures().forEach {
@@ -188,7 +182,7 @@ class DisclosureLogEndToEndTest {
 
     @Test
     fun `each sub-request of a multiplexed request is recorded separately and parented`() = onServer {
-        serverRuntime.handle(
+        engine.handleRoot(
             request(
                 "/meta/bulk",
                 HttpMethod.POST,
@@ -197,9 +191,9 @@ class DisclosureLogEndToEndTest {
             testId(4),
         )
 
-        val subs = requests().filter { it.parentRequestId == testId(4) }
+        val subs = requests().filter { it.parentRequestId == testId(4).uuid }
         assertEquals(2, subs.size, "expected one request record per sub-request; saw ${requests().map { it._id }}")
-        assertTrue(requests().any { it._id == testId(4) }, "the carrying request was not recorded")
+        assertTrue(requests().any { it._id == testId(4).uuid }, "the carrying request was not recorded")
 
         val disclosure = disclosures().single()
         assertTrue(
@@ -214,10 +208,10 @@ class DisclosureLogEndToEndTest {
      */
     @Test
     fun `a duplicate request id fails the request and discloses nothing`() = onServer {
-        val first = serverRuntime.handle(request("/patient"), testId(5))
+        val first = engine.handleRoot(request("/patient"), testId(5))
         assertEquals(HttpStatus.OK, first.status)
 
-        val second = serverRuntime.handle(request("/patient"), testId(5))
+        val second = engine.handleRoot(request("/patient"), testId(5))
 
         assertEquals(
             HttpStatus.InternalServerError,

@@ -7,6 +7,7 @@ import ch.qos.logback.core.read.ListAppender
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.lightningserver.typed.registerTable
@@ -37,7 +38,7 @@ class AuditRegistryTest {
     /** Runs [block] against a fresh in-memory database. */
     private fun onServer(block: suspend context(ServerRuntime) Fixture.() -> Unit) = runBlocking {
         TestServer.test(settings = { database set Database.Settings() }) {
-            block(serverRuntime, Fixture())
+            execute { block(serverRuntime, Fixture()) }
         }
     }
 

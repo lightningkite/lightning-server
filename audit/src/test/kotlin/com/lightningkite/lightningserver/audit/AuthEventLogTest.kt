@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.auth.authEventReporters
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.services.cache.Cache
@@ -31,7 +32,7 @@ class AuthEventLogTest {
 
     private fun onServer(block: suspend context(ServerRuntime) (ServerRuntime) -> Unit) = runBlocking {
         TestServer.test(settings = { database set Database.Settings(); cache set Cache.Settings() }) {
-            block(serverRuntime, serverRuntime)
+            execute { block(serverRuntime, serverRuntime) }
         }
     }
 
@@ -50,7 +51,7 @@ class AuthEventLogTest {
         assertEquals(AuthEventType.AuthenticationFailed, event.type)
         assertEquals("user-1", event.principal)
         assertEquals("SecretMismatch", event.failureReason)
-        assertEquals(runtime.execution.attributedTo, event.requestId)
+        assertEquals(runtime.execution.attributedTo.uuid, event.requestId)
     }
 
     /** Events join to the same request record as the disclosures made under the resulting session. */

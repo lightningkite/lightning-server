@@ -201,11 +201,9 @@ class MultiplexInterceptorTest {
     }
 
     /**
-     * A socket's five phases are five executions, each with its own id and each parented to the
-     * connect that opened them. Asking `id == rootExecution` would therefore call every phase after
-     * connect a non-root, and an interceptor guarding a later phase would silently never run on the
-     * real connection. [isRoot] compares the socket's identity instead, so it answers the same for
-     * every phase.
+     * A socket's five phases are five executions, each with its own id, linked by their `socketId`
+     * rather than by parentage. A phase nothing dispatched is a root like any other execution, so an
+     * interceptor guarding a later phase still runs on the real connection.
      */
     @Test
     fun `a physical socket is still root after the connect phase`() = runBlocking {

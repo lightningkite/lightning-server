@@ -1,3 +1,5 @@
+@file:OptIn(com.lightningkite.lightningserver.EngineApi::class)
+
 package com.lightningkite.lightningserver.audit
 
 import com.lightningkite.lightningserver.auth.AuthEventType
@@ -10,9 +12,13 @@ import com.lightningkite.lightningserver.auth.register
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.InternalLightningServerApi
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.handle
+import com.lightningkite.lightningserver.runtime.engine
+import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.sessions.*
@@ -22,6 +28,8 @@ import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
+import com.lightningkite.services.data.Unsafe
+import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
@@ -156,7 +164,10 @@ class ProofAuthEventWiringTest {
 
     private val json = Json { encodeDefaults = true }
 
-    private fun testId(n: Int) = Uuid.parse("00000000-0000-4000-8000-" + n.toString().padStart(12, '0'))
+    // SAFETY: Fixed, valid v7 ids, so the records they key can be asserted on by value.
+    @OptIn(InternalLightningServerApi::class, Unsafe::class)
+    private fun testId(n: Int) =
+        Execution.ID(UuidV7.fromRaw(Uuid.parse("00000000-0000-7000-8000-" + n.toString().padStart(12, '0'))))
 
     private fun post(
         path: String,
@@ -184,7 +195,7 @@ class ProofAuthEventWiringTest {
     private fun onServer(block: suspend context(ServerRuntime) () -> Unit) = runBlocking {
         ProofUser.users.clear()
         TestServer.test(settings = { database set Database.Settings(); cache set Cache.Settings() }) {
-            block(serverRuntime)
+            execute { block(serverRuntime) }
         }
     }
 
@@ -206,7 +217,7 @@ class ProofAuthEventWiringTest {
         val victim = user()
         TestServer.password.establish(ProofUser, victim._id, EstablishPassword("correct-horse"))
 
-        val response = serverRuntime.handle(
+        val response = engine.handleRoot(
             post("/password/prove", identify("email", victim.email, "wrong-password")),
             testId(1),
         )
@@ -225,7 +236,7 @@ class ProofAuthEventWiringTest {
         val victim = user()
         TestServer.password.establish(ProofUser, victim._id, EstablishPassword("correct-horse"))
 
-        serverRuntime.handle(post("/password/prove", identify("email", victim.email, "nope")), testId(2))
+        engine.handleRoot(post("/password/prove", identify("email", victim.email, "nope")), testId(2))
 
         val event = events().single()
         assertEquals("203.0.113.7", event.sourceIp)
@@ -238,7 +249,7 @@ class ProofAuthEventWiringTest {
         val victim = user()
         TestServer.password.establish(ProofUser, victim._id, EstablishPassword("correct-horse"))
 
-        serverRuntime.handle(
+        engine.handleRoot(
             post("/password/prove", identify("email", victim.email, "nope"), userAgent = null),
             testId(3),
         )
@@ -255,7 +266,7 @@ class ProofAuthEventWiringTest {
      */
     @Test
     fun `a failure against no account is still recorded, with no principal`() = onServer {
-        val response = serverRuntime.handle(
+        val response = engine.handleRoot(
             post("/password/prove", identify("email", "nobody@example.com", "guess")),
             testId(4),
         )
@@ -274,7 +285,7 @@ class ProofAuthEventWiringTest {
         val victim = user()
         TestServer.password.establish(ProofUser, victim._id, EstablishPassword("correct-horse"))
 
-        val response = serverRuntime.handle(
+        val response = engine.handleRoot(
             post("/password/prove", identify("email", victim.email, "correct-horse")),
             testId(5),
         )
@@ -298,7 +309,7 @@ class ProofAuthEventWiringTest {
         TestServer.password.establish(ProofUser, victim._id, EstablishPassword("correct-horse"))
 
         repeat(8) {
-            serverRuntime.handle(post("/password/prove", identify("email", victim.email, "nope")), testId(10 + it))
+            engine.handleRoot(post("/password/prove", identify("email", victim.email, "nope")), testId(10 + it))
         }
 
         assertTrue(
@@ -328,7 +339,7 @@ class ProofAuthEventWiringTest {
         val victim = user()
         totpFor(victim)
 
-        serverRuntime.handle(
+        engine.handleRoot(
             post("/totp/prove", identify("ProofUser/_id", victim._id.toString(), "000000")),
             testId(20),
         )
@@ -347,8 +358,8 @@ class ProofAuthEventWiringTest {
         val secret = totpFor(victim)
         val body = identify("ProofUser/_id", victim._id.toString(), secret.code)
 
-        serverRuntime.handle(post("/totp/prove", body), testId(21))
-        serverRuntime.handle(post("/totp/prove", body), testId(22))
+        engine.handleRoot(post("/totp/prove", body), testId(21))
+        engine.handleRoot(post("/totp/prove", body), testId(22))
 
         val all = events()
         assertEquals(1, all.count { it.type == AuthEventType.ProofAccepted })
@@ -371,7 +382,7 @@ class ProofAuthEventWiringTest {
             )
         )
 
-        serverRuntime.handle(
+        engine.handleRoot(
             post("/backup/prove", identify("email", victim.email, "zzzzzzzzzz")),
             testId(30),
         )
@@ -391,7 +402,7 @@ class ProofAuthEventWiringTest {
         val established = TestServer.knownDevice.establish(ProofUser, victim._id, "test device")
         val deviceId = established.secret.substringBefore('/')
 
-        serverRuntime.handle(
+        engine.handleRoot(
             post("/device/prove", "\"$deviceId/not-the-secret\""),
             testId(40),
         )
@@ -408,7 +419,7 @@ class ProofAuthEventWiringTest {
     /** Runs the real `start` endpoint and returns the key it issued alongside the captured PIN. */
     context(server: ServerRuntime)
     private suspend fun startPin(email: String): Pair<String, String> {
-        val response = serverRuntime.handle(post("/pin/start", "\"$email\""), testId(50))
+        val response = engine.handleRoot(post("/pin/start", "\"$email\""), testId(50))
         val key = json.decodeFromString(String.serializer(), response.body!!.text())
         return key to TestServer.pin.sent.last().second
     }
@@ -426,7 +437,7 @@ class ProofAuthEventWiringTest {
         TestServer.pin.sent.clear()
         val (key, _) = startPin("victim@example.com")
 
-        serverRuntime.handle(post("/pin/prove", finish(key, "ZZZZZZ")), testId(51))
+        engine.handleRoot(post("/pin/prove", finish(key, "ZZZZZZ")), testId(51))
 
         val event = events().single()
         assertEquals(AuthEventType.ProofRejected, event.type)
@@ -439,7 +450,7 @@ class ProofAuthEventWiringTest {
     /** An unknown or expired key names nothing: there is no pending attempt behind it to attribute. */
     @Test
     fun `a PIN attempt against an unknown key is recorded with no principal`() = onServer {
-        serverRuntime.handle(post("/pin/prove", finish(Uuid.random().toString(), "ZZZZZZ")), testId(52))
+        engine.handleRoot(post("/pin/prove", finish(Uuid.random().toString(), "ZZZZZZ")), testId(52))
 
         val event = events().single()
         assertEquals(AuthEventType.ProofRejected, event.type)
@@ -453,7 +464,7 @@ class ProofAuthEventWiringTest {
         TestServer.pin.sent.clear()
         val (key, code) = startPin("victim@example.com")
 
-        val response = serverRuntime.handle(post("/pin/prove", finish(key, code)), testId(53))
+        val response = engine.handleRoot(post("/pin/prove", finish(key, code)), testId(53))
         assertEquals(HttpStatus.OK, response.status)
 
         val event = events().single()
@@ -499,7 +510,7 @@ class ProofAuthEventWiringTest {
      */
     @Test
     fun `an issuance names the origin of the request that asked for it`() = onServer {
-        serverRuntime.handle(post("/pin/send-link", "\"victim@example.com\""), testId(20))
+        engine.handleRoot(post("/pin/send-link", "\"victim@example.com\""), testId(20))
 
         val event = events().single()
         assertEquals(AuthEventType.ProofIssued, event.type)
@@ -511,12 +522,12 @@ class ProofAuthEventWiringTest {
     /** And the same origin is reachable through the request log, independently of the event's own columns. */
     @Test
     fun `an issuance joins the request record of the call that asked for it`() = onServer {
-        serverRuntime.handle(post("/pin/send-link", "\"victim@example.com\""), testId(21))
+        engine.handleRoot(post("/pin/send-link", "\"victim@example.com\""), testId(21))
 
         val event = events().single()
-        assertEquals(testId(21), event.requestId)
+        assertEquals(testId(21).uuid, event.requestId)
         val requests = TestServer.audit.requests().find(Condition.Always).toList()
-        val row = requests.singleOrNull { it._id == testId(21) }
+        val row = requests.singleOrNull { it._id == testId(21).uuid }
         assertEquals("203.0.113.7", row?.sourceIp, "the issuance points at no request record")
     }
 
@@ -565,7 +576,7 @@ class ProofAuthEventWiringTest {
             ),
         )
 
-        serverRuntime.handle(post("/webauthn/prove", body), testId(60))
+        engine.handleRoot(post("/webauthn/prove", body), testId(60))
 
         val event = events().single()
         assertEquals(AuthEventType.ProofRejected, event.type)

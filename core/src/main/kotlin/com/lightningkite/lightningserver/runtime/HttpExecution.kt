@@ -10,7 +10,6 @@ import com.lightningkite.services.telemetry.TelemetryKey
 import com.lightningkite.services.telemetry.TelemetryKeys
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
-import kotlin.time.Duration
 
 // Pre-allocated TelemetryKey instance (backend caches by equality).
 private val errorType = TelemetryKey.OfString("error.type")
@@ -20,12 +19,12 @@ private val errorType = TelemetryKey.OfString("error.type")
  * interceptors, exactly as a routed request would be but without routing.
  */
 context(runtime: ServerRuntime)
-@OptIn(OverrideOnly::class)
 public suspend fun <PATH : PathSpec> HttpHandler<PATH>.handleWithMetrics(
     request: HttpRequest<PATH>,
 ): HttpResponse =
     @OptIn(InternalLightningServerApi::class)
     executeWithMetrics(request) { req ->
+        @OptIn(OverrideOnly::class)
         this@handleWithMetrics.handle(req)
     }
 
@@ -59,8 +58,9 @@ public suspend fun Engine.handleRoot(
     request: HttpRequest<*>,
     executionId: Execution.ID,
 ): HttpResponse =
+    // On the process engine, so a root never runs nested inside whatever runtime happens to be in scope.
     @OptIn(InternalLightningServerApi::class)
-    executeHttpIntercepted(
+    processEngine.executeHttpIntercepted(
         request,
         Execution.Http(id = executionId, endpoint = request.path),
         ServerRuntime::routeHttpRequest
@@ -71,7 +71,12 @@ public suspend fun ServerRuntime.handle(
     executionId: Execution.ID = Execution.ID.generate()
 ): HttpResponse = executeHttpIntercepted(
     request,
-    childHttpExecution(request, executionId),
+    @OptIn(InternalLightningServerApi::class)
+    Execution.Http(
+        id = executionId,
+        endpoint = request.path,
+        parent = execution
+    ),
     ServerRuntime::routeHttpRequest
 )
 
@@ -87,30 +92,17 @@ public suspend fun <PATH : PathSpec> HttpHandler<PATH>.executeWithMetrics(
     dispatch: suspend ServerRuntime.(HttpRequest<PATH>) -> HttpResponse,
 ): HttpResponse = engine.executeHttpIntercepted(
     request,
-    runtime.childHttpExecution(request, executionId)
+    Execution.Http(
+        id = executionId,
+        endpoint = request.path,
+        parent = runtime.execution
+    )
 ) { req ->
-    runHandler(this@executeWithMetrics.timeout) { dispatch(req) }
+    instrument("handler") { withTimeout<HttpResponse>(timeout) { dispatch(req) } }
 }
 
 
 // INTERNAL IMPLEMENTATION STUFF
-
-@OptIn(InternalLightningServerApi::class)
-private fun ServerRuntime.childHttpExecution(request: HttpRequest<*>, executionId: Execution.ID): Execution.Http =
-    Execution.Http(
-        id = executionId,
-        endpoint = request.path,
-        causedBy = execution.id,
-        rootExecution = execution.rootExecution
-    )
-
-// Per-handler request timeout (HttpHandler.timeout, default 30s), enforced at this single choke point shared
-// by every engine instead of being duplicated (and high-risk) in each engine adapter. Cooperative
-// cancellation: only interrupts at suspension points.
-private suspend fun ServerRuntime.runHandler(
-    timeout: Duration,
-    action: suspend () -> HttpResponse,
-): HttpResponse = instrument("handler") { withTimeout(timeout) { action() } }
 
 @OptIn(InternalLightningServerApi::class)
 private suspend fun <PATH : PathSpec> Engine.executeHttpIntercepted(
@@ -188,14 +180,20 @@ private suspend fun <PATH : PathSpec> ServerRuntime.routeHttpRequest(req: HttpRe
     // request with no HEAD handler, or a missing trailing slash) is caught below and recovered
     // via the HEAD->GET fallback / slash-redirect logic rather than escaping as a bare 404.
     val handler = req.path.resolve().value
-    runHandler(handler.timeout) { handler.handle(req) }
+    instrument("handler") { withTimeout(handler.timeout) { handler.handle(req) } }
 } catch (notFound: RouteNotFoundException) {
     when (req.path.method) {
         HttpMethod.HEAD -> {
             // OK, we'll do a get and remove the body. The GET is routed afresh, so it may not be a PATH.
             val getRequest = req.copyWithNewPathType(path = RawHttpEndpoint(req.path.pathSegments, HttpMethod.GET))
             val handler = getRequest.path.resolve().value
-            val getResult = runHandler(handler.timeout) { handler.handle(getRequest) }
+            val getResult = instrument("handler") {
+                withTimeout(handler.timeout) {
+                    handler.handle(
+                        getRequest
+                    )
+                }
+            }
             getResult.copy(
                 body = null,
                 status = if (getResult.status.success) HttpStatus.NoContent else getResult.status,

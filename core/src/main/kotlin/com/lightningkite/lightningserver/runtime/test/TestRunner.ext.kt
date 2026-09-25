@@ -32,6 +32,14 @@ import com.lightningkite.services.data.TypedData
 context(test: TestRunner<*>)
 public suspend inline fun <T> execute(crossinline action: suspend context(ServerRuntime) () -> T): T = test.execute(action)
 
+/** Runs the server's startup tasks as the engine does at startup. See [TestRunner.executeStartupTasks]. */
+context(test: TestRunner<*>)
+public suspend fun executeStartupTasks(): Unit = test.executeStartupTasks()
+
+/** Runs the server's pre-deploy tasks as a deploy does. See [TestRunner.executePreDeployTasks]. */
+context(test: TestRunner<*>)
+public suspend fun executePreDeployTasks(): Unit = test.executePreDeployTasks()
+
 // Connects as an engine would: willConnect and didConnect each run as their own phase, through the
 // server's socket interceptors.
 context(test: TestRunner<*>)

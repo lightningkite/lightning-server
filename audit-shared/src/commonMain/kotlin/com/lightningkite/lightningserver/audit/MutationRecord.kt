@@ -96,7 +96,7 @@ public enum class BulkMutationDetail {
  * @property initiatorKind The initiator's `@SerialName` discriminator — "http", "ws", "task",
  *   "schedule", "startup", "predeploy", "direct". Indexed and denormalised out of [initiator] so that
  *   "every mutation not made by a request" is a query rather than a scan of JSON.
- * @property initiator The whole `Initiator`, serialized. Carries the endpoint, socket phase or task
+ * @property initiator The whole `Execution`, serialized. Carries the endpoint, socket phase or task
  *   location that [initiatorKind] alone cannot.
  * @property modelId The audited model, from the same registry [DisclosureRecord] uses.
  * @property recordId The changed row's `_id`, as text — the models this can wrap are not all keyed by

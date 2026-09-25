@@ -74,18 +74,13 @@ public suspend fun <T> Task<T>.executeInlineWithMetrics(input: T, from: Executio
     engine.executeTaskLike(
         TaskKind.Task,
         location,
-        Execution.Task(
-            id = Execution.ID.generate(),
-            causedBy = from.id,
-            rootExecution = from.rootExecution,
-            location = location.asPathSegments(),
-        ),
+        Execution.Task(id = Execution.ID.generate(), parent = from, location = location.asPathSegments()),
     ) { executeInline(input) }
 
 /** Runs this task inline as a new execution caused by the current one, with telemetry and interceptors. */
-@OptIn(EngineApi::class)
 context(runtime: ServerRuntime)
 public suspend fun <T> Task<T>.executeInlineWithMetrics(input: T): Unit =
+    @OptIn(EngineApi::class)
     executeInlineWithMetrics(input, runtime.execution)
 
 /** Runs this scheduled task as a new root execution, with telemetry and interceptors. */
