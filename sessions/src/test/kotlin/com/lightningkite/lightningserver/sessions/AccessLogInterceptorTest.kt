@@ -5,6 +5,7 @@ import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import com.lightningkite.lightningserver.HttpMethod
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.auth.AccessLogInterceptor
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
@@ -12,11 +13,14 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
-import com.lightningkite.lightningserver.runtime.handle
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.runtime.engine
+import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
+import com.lightningkite.services.data.Unsafe
+import com.lightningkite.services.data.UuidV7
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.builtins.serializer
 import org.slf4j.LoggerFactory
@@ -71,6 +75,8 @@ class AccessLogInterceptorTest {
     private fun accessLines(lines: List<String>) = lines.filter { it.contains("accessed by") || it.startsWith("ws ") }
 
     private val requestIdUnderTest = Uuid.parse("11111111-2222-3333-4444-555555555555")
+    @OptIn(InternalLightningServerApi::class, Unsafe::class) // SAFETY: Only matched as a string, never ordered by time
+    private val executionIdUnderTest = Execution.ID(UuidV7.fromRaw(requestIdUnderTest))
 
     private fun get(path: String) = HttpRequest<PathSpec>(
         path = RawHttpEndpoint(asString = path, method = HttpMethod.GET),
@@ -85,7 +91,7 @@ class AccessLogInterceptorTest {
     fun `an http line carries the outcome and the request id`() {
         var lines: List<String> = emptyList()
         TestServer.test(settings = {}) {
-            lines = capturing { runBlocking { serverRuntime.handle(get("/ok"), requestIdUnderTest) } }
+            lines = capturing { runBlocking { engine.handleRoot(get("/ok"), executionIdUnderTest) } }
         }
         val line = accessLines(lines).singleOrNull() ?: fail("expected one access line; got $lines")
         assertTrue(line.contains("-> 200"), "line should carry the status; was: $line")
@@ -100,7 +106,7 @@ class AccessLogInterceptorTest {
         var lines: List<String> = emptyList()
         TestServer.test(settings = {}) {
             lines = capturing {
-                runBlocking { runCatching { serverRuntime.handle(get("/boom"), requestIdUnderTest) } }
+                runBlocking { runCatching { engine.handleRoot(get("/boom"), executionIdUnderTest) } }
             }
         }
         val line = accessLines(lines).singleOrNull() ?: fail("expected one access line; got $lines")

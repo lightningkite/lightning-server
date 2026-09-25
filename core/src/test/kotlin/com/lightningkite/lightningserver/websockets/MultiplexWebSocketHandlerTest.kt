@@ -4,6 +4,8 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.MultiplexMessage
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.send
+import com.lightningkite.lightningserver.runtime.engine
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.builtins.serializer
@@ -56,7 +58,7 @@ class MultiplexWebSocketHandlerTest {
     fun multiplex_basic_flow() = runBlocking {
         TestServer.test(settings = {}) {
             val mux = TestServer.multiplex.test()
-            val json = contextOf<ServerRuntime>().externalSerialization.json
+            val json = engine.externalSerialization.json
             var last: WebSocketFrame? = null
             mux.onMessageSent = { last = it }
             // Start channel a -> /mirror
@@ -92,7 +94,7 @@ class MultiplexWebSocketHandlerTest {
             assertEquals("other:x", bEcho.data)
 
             // Broadcast topic should hit both mirror subscribers through multiplex wrapper
-            TestServer.broadcast.send("topic!")
+            execute { TestServer.broadcast.send("topic!") }
             val tEcho = json.decodeFromString(MultiplexMessage.serializer(), (last as WebSocketFrame.Text).text)
             // last received could be either for a or b depending on order; ensure it's one of them and content matches
             assert(listOf("a", "b").contains(tEcho.channel))
@@ -119,7 +121,7 @@ class MultiplexWebSocketHandlerTest {
     fun unsubscribe_actually_stops_delivery() = runBlocking {
         TestServer.test(settings = {}) {
             val mux = TestServer.multiplex.test()
-            val json = contextOf<ServerRuntime>().externalSerialization.json
+            val json = engine.externalSerialization.json
             var last: WebSocketFrame? = null
             mux.onMessageSent = { last = it }
 
@@ -129,7 +131,7 @@ class MultiplexWebSocketHandlerTest {
             send(MultiplexMessage(channel = "t", path = "/toggle", start = true))
 
             // While subscribed, a broadcast reaches the channel.
-            TestServer.broadcast.send("first")
+            execute { TestServer.broadcast.send("first") }
             val received = json.decodeFromString(MultiplexMessage.serializer(), (last as WebSocketFrame.Text).text)
             assertEquals("t", received.channel)
             assertEquals("first", received.data)
@@ -137,7 +139,7 @@ class MultiplexWebSocketHandlerTest {
             // Ask the handler to unsubscribe, then broadcast again.
             send(MultiplexMessage(channel = "t", data = "off"))
             last = null
-            TestServer.broadcast.send("second")
+            execute { TestServer.broadcast.send("second") }
 
             assertNull(last, "Channel kept receiving the topic after unsubscribing")
 

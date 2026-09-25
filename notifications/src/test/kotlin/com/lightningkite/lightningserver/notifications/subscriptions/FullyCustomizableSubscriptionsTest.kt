@@ -4,6 +4,7 @@ package com.lightningkite.lightningserver.notifications.subscriptions
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.notifications.*
 import com.lightningkite.lightningserver.notifications.events.*
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.setStatic
 import com.lightningkite.lightningserver.typed.sdk.module
@@ -105,11 +106,11 @@ class FullyCustomizableSubscriptionsTest {
         }) {
             runBlocking {
                 val user = TestUser(name = "NewUser")
-                Server.userInfo.table().insertOne(user)
+                execute { Server.userInfo.table().insertOne(user) }
 
                 val eventType = Notifications.modelCreated.event.untyped
                 val subscriptionId = UserEventType(user._id, eventType.name)
-                val subscription = Notifications.subs.info.table().get(subscriptionId)
+                val subscription = execute { Notifications.subs.info.table().get(subscriptionId) }
 
                 assertNotNull(subscription)
                 assertEquals(user._id, subscription._id.user)
@@ -126,15 +127,15 @@ class FullyCustomizableSubscriptionsTest {
         }) {
             runBlocking {
                 val user = TestUser(name = "ToBeDeleted")
-                Server.userInfo.table().insertOne(user)
+                execute { Server.userInfo.table().insertOne(user) }
 
                 val eventType = Notifications.modelCreated.event.untyped
                 val subscriptionId = UserEventType(user._id, eventType.name)
-                assertNotNull(Notifications.subs.info.table().get(subscriptionId))
+                assertNotNull(execute { Notifications.subs.info.table().get(subscriptionId) })
 
-                Server.userInfo.table().deleteOneById(user._id)
+                execute { Server.userInfo.table().deleteOneById(user._id) }
 
-                assertNull(Notifications.subs.info.table().get(subscriptionId))
+                assertNull(execute { Notifications.subs.info.table().get(subscriptionId) })
             }
         }
     }
@@ -147,12 +148,16 @@ class FullyCustomizableSubscriptionsTest {
         }) {
             runBlocking {
                 val user = TestUser(name = "AllEventsUser")
-                Server.userInfo.table().insertOne(user)
+                execute { Server.userInfo.table().insertOne(user) }
 
-                val createdSub = Notifications.subs.info.table()
-                    .get(UserEventType(user._id, Notifications.modelCreated.event.name))
-                val deletedSub = Notifications.subs.info.table()
-                    .get(UserEventType(user._id, Notifications.modelDeleted.event.name))
+                val createdSub = execute {
+                    Notifications.subs.info.table()
+                        .get(UserEventType(user._id, Notifications.modelCreated.event.name))
+                }
+                val deletedSub = execute {
+                    Notifications.subs.info.table()
+                        .get(UserEventType(user._id, Notifications.modelDeleted.event.name))
+                }
 
                 assertNotNull(createdSub)
                 assertNotNull(deletedSub)
@@ -170,14 +175,16 @@ class FullyCustomizableSubscriptionsTest {
         }) {
             runBlocking {
                 val user = TestUser(name = "AlwaysUser")
-                Server.userInfo.table().insertOne(user)
+                val subs = execute {
+                    Server.userInfo.table().insertOne(user)
 
-                val eventDef = Notifications.modelCreated.event
+                    val eventDef = Notifications.modelCreated.event
 
-                // Any model should match since filter is Condition.Always
-                val model = TestModel(name = "AnyModel", ownerId = user._id)
-                val event = Event(eventDef, model)
-                val subs = Notifications.handler.subscriptions.subscribed(event)
+                    // Any model should match since filter is Condition.Always
+                    val model = TestModel(name = "AnyModel", ownerId = user._id)
+                    val event = Event(eventDef, model)
+                    Notifications.handler.subscriptions.subscribed(event)
+                }
 
                 assertTrue(subs.any { it.user == user._id })
             }
@@ -194,20 +201,22 @@ class FullyCustomizableSubscriptionsTest {
         }) {
             runBlocking {
                 val user = TestUser(name = "DisableChannelUser")
-                Server.userInfo.table().insertOne(user)
+                execute { Server.userInfo.table().insertOne(user) }
 
                 val eventDef = Notifications.modelCreated.event
                 val subscriptionId = UserEventType(user._id, eventDef.name)
 
-                val existing = Notifications.subs.info.table().get(subscriptionId)
+                val existing = execute { Notifications.subs.info.table().get(subscriptionId) }
                 assertNotNull(existing)
 
-                Notifications.subs.info.table().replaceOneById(
-                    subscriptionId,
-                    existing.copy(email = null)
-                )
+                val updated = execute {
+                    Notifications.subs.info.table().replaceOneById(
+                        subscriptionId,
+                        existing.copy(email = null)
+                    )
 
-                val updated = Notifications.subs.info.table().get(subscriptionId)
+                    Notifications.subs.info.table().get(subscriptionId)
+                }
                 assertNotNull(updated)
                 assertNull(updated.email)
             }
@@ -222,22 +231,24 @@ class FullyCustomizableSubscriptionsTest {
         }) {
             runBlocking {
                 val user = TestUser(name = "FrequencyChangeUser")
-                Server.userInfo.table().insertOne(user)
+                execute { Server.userInfo.table().insertOne(user) }
 
                 val eventDef = Notifications.modelCreated.event
                 val subscriptionId = UserEventType(user._id, eventDef.name)
 
-                val existing = Notifications.subs.info.table().get(subscriptionId)
+                val existing = execute { Notifications.subs.info.table().get(subscriptionId) }
                 assertNotNull(existing)
                 assertEquals(Frequency.immediately(), existing.email)
 
                 val weekly = Frequency.weekly(kotlinx.datetime.DayOfWeek.FRIDAY, 10, 0, kotlinx.datetime.TimeZone.UTC)
-                Notifications.subs.info.table().replaceOneById(
-                    subscriptionId,
-                    existing.copy(email = weekly)
-                )
+                val updated = execute {
+                    Notifications.subs.info.table().replaceOneById(
+                        subscriptionId,
+                        existing.copy(email = weekly)
+                    )
 
-                val updated = Notifications.subs.info.table().get(subscriptionId)
+                    Notifications.subs.info.table().get(subscriptionId)
+                }
                 assertNotNull(updated)
                 assertEquals(weekly, updated.email)
             }
@@ -255,15 +266,21 @@ class FullyCustomizableSubscriptionsTest {
             runBlocking {
                 val user1 = TestUser(name = "User1")
                 val user2 = TestUser(name = "User2")
-                Server.userInfo.table().insertOne(user1)
-                Server.userInfo.table().insertOne(user2)
+                execute {
+                    Server.userInfo.table().insertOne(user1)
+                    Server.userInfo.table().insertOne(user2)
+                }
 
                 val eventType = Notifications.modelCreated.event.untyped
 
-                val sub1 = Notifications.subs.info.table()
-                    .get(UserEventType(user1._id, eventType.name))
-                val sub2 = Notifications.subs.info.table()
-                    .get(UserEventType(user2._id, eventType.name))
+                val sub1 = execute {
+                    Notifications.subs.info.table()
+                        .get(UserEventType(user1._id, eventType.name))
+                }
+                val sub2 = execute {
+                    Notifications.subs.info.table()
+                        .get(UserEventType(user2._id, eventType.name))
+                }
 
                 assertNotNull(sub1)
                 assertNotNull(sub2)
@@ -282,20 +299,26 @@ class FullyCustomizableSubscriptionsTest {
             runBlocking {
                 val user1 = TestUser(name = "User1ToDelete")
                 val user2 = TestUser(name = "User2ToKeep")
-                Server.userInfo.table().insertOne(user1)
-                Server.userInfo.table().insertOne(user2)
+                execute {
+                    Server.userInfo.table().insertOne(user1)
+                    Server.userInfo.table().insertOne(user2)
+                }
 
                 val eventType = Notifications.modelCreated.event.untyped
 
-                Server.userInfo.table().deleteOneById(user1._id)
+                execute { Server.userInfo.table().deleteOneById(user1._id) }
 
                 assertNull(
-                    Notifications.subs.info.table()
-                        .get(UserEventType(user1._id, eventType.name))
+                    execute {
+                        Notifications.subs.info.table()
+                            .get(UserEventType(user1._id, eventType.name))
+                    }
                 )
                 assertNotNull(
-                    Notifications.subs.info.table()
-                        .get(UserEventType(user2._id, eventType.name))
+                    execute {
+                        Notifications.subs.info.table()
+                            .get(UserEventType(user2._id, eventType.name))
+                    }
                 )
             }
         }
@@ -311,26 +334,28 @@ class FullyCustomizableSubscriptionsTest {
         }) {
             runBlocking {
                 val user = TestUser(name = "PermissionsUser")
-                Server.userInfo.table().insertOne(user)
+                execute { Server.userInfo.table().insertOne(user) }
 
                 val eventDef = Notifications.modelCreated.event
                 val subscriptionId = UserEventType(user._id, eventDef.untyped.name)
 
-                val existing = Notifications.subs.info.table().get(subscriptionId)
+                val existing = execute { Notifications.subs.info.table().get(subscriptionId) }
                 assertNotNull(existing)
 
                 val dailyFreq = Frequency.daily(10, 0, kotlinx.datetime.TimeZone.UTC)
-                Notifications.subs.info.table().replaceOneById(
-                    subscriptionId,
-                    existing.copy(email = dailyFreq)
-                )
+                val afterUpdate = execute {
+                    Notifications.subs.info.table().replaceOneById(
+                        subscriptionId,
+                        existing.copy(email = dailyFreq)
+                    )
 
-                // Update user (triggers UpdateReadPermissions)
-                val updatedUser = user.copy(name = "UpdatedName")
-                Server.userInfo.table().replaceOneById(user._id, updatedUser)
+                    // Update user (triggers UpdateReadPermissions)
+                    val updatedUser = user.copy(name = "UpdatedName")
+                    Server.userInfo.table().replaceOneById(user._id, updatedUser)
 
-                // User's custom email frequency should be preserved
-                val afterUpdate = Notifications.subs.info.table().get(subscriptionId)
+                    // User's custom email frequency should be preserved
+                    Notifications.subs.info.table().get(subscriptionId)
+                }
                 assertNotNull(afterUpdate)
                 assertEquals(dailyFreq, afterUpdate.email)
             }
@@ -345,39 +370,43 @@ class FullyCustomizableSubscriptionsTest {
         }) {
             runBlocking {
                 val user = TestUser(name = "ReplaceUser")
-                Server.userInfo.table().insertOne(user)
+                execute { Server.userInfo.table().insertOne(user) }
 
                 val eventDef = Notifications.modelDeleted.event
                 val subscriptionId = UserEventType(user._id, eventDef.name)
 
-                val existing = Notifications.subs.info.table().get(subscriptionId)
+                val existing = execute { Notifications.subs.info.table().get(subscriptionId) }
                 assertNotNull(existing)
 
-                Notifications.subs.info.table().replaceOneById(
-                    subscriptionId,
-                    existing.copy(
-                        email = Frequency.weekly(
-                            kotlinx.datetime.DayOfWeek.MONDAY,
-                            9,
-                            0,
-                            kotlinx.datetime.TimeZone.UTC
+                // Verify customization
+                val customized = execute {
+                    Notifications.subs.info.table().replaceOneById(
+                        subscriptionId,
+                        existing.copy(
+                            email = Frequency.weekly(
+                                kotlinx.datetime.DayOfWeek.MONDAY,
+                                9,
+                                0,
+                                kotlinx.datetime.TimeZone.UTC
+                            )
                         )
                     )
-                )
 
-                // Verify customization
-                val customized = Notifications.subs.info.table().get(subscriptionId)
+                    Notifications.subs.info.table().get(subscriptionId)
+                }
                 assertEquals(
                     Frequency.weekly(kotlinx.datetime.DayOfWeek.MONDAY, 9, 0, kotlinx.datetime.TimeZone.UTC),
                     customized?.email
                 )
 
-                // Update user (triggers ReplaceExistingWithDefault)
-                val updatedUser = user.copy(name = "UpdatedName")
-                Server.userInfo.table().replaceOneById(user._id, updatedUser)
+                val afterUpdate = execute {
+                    // Update user (triggers ReplaceExistingWithDefault)
+                    val updatedUser = user.copy(name = "UpdatedName")
+                    Server.userInfo.table().replaceOneById(user._id, updatedUser)
 
-                // User's changes should be replaced with default
-                val afterUpdate = Notifications.subs.info.table().get(subscriptionId)
+                    // User's changes should be replaced with default
+                    Notifications.subs.info.table().get(subscriptionId)
+                }
                 assertNotNull(afterUpdate)
                 assertEquals(Frequency.immediately(), afterUpdate.email)
             }

@@ -8,8 +8,8 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.Execution
-import com.lightningkite.lightningserver.runtime.handle
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.engine
+import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.lightningserver.runtime.test.testBlocking
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.typed.*
@@ -59,9 +59,8 @@ object BulkServer : ServerBuilder() {
 
 // region bulk-test
 fun bulkTest() = BulkServer.testBlocking(settings = {}) {
-    // Drive /meta/bulk through the full HTTP pipeline so the framework can resolve
-    // sub-request paths via the registered route table.  ApiHttpHandler.test() would
-    // bypass routing and cannot match sub-request paths, so we use serverRuntime.handle().
+    // Drive /meta/bulk through the full HTTP pipeline, as an engine would, so the framework
+    // can resolve sub-request paths via the registered route table.
     val request = HttpRequest<PathSpec>(
         path = RawHttpEndpoint(asString = "/meta/bulk", method = HttpMethod.POST),
         queryParameters = QueryParameters.EMPTY,
@@ -74,8 +73,7 @@ fun bulkTest() = BulkServer.testBlocking(settings = {}) {
             MediaType.Application.Json,
         ),
     )
-    contextOf<TestRunner>()
-    val response = serverRuntime.handle(request, Execution.ID.generate())
+    val response = engine.handleRoot(request, Execution.ID.generate())
 
     // The outer bulk endpoint always returns HTTP 200; per-sub-request errors appear in the body.
     check(response.status.code == 200)

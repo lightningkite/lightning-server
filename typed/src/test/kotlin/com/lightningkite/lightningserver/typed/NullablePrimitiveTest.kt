@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -13,6 +14,8 @@ import kotlin.test.assertNull
 class NullablePrimitiveTest {
 
     object TestServer : ServerBuilder() {
+        init { registerBasicMediaTypeCoders() }
+
         // Test nullable primitive as input
         val testNullableIntInput = path.path("test-nullable-int").post bind ApiHttpHandler(
             summary = "Test Nullable Int Input",

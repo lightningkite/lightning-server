@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.cors.CorsInterceptor
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.engine
 import com.lightningkite.lightningserver.runtime.isRoot
 import com.lightningkite.lightningserver.runtime.test.test
 import kotlinx.coroutines.runBlocking
@@ -106,7 +107,7 @@ class MultiplexInterceptorTest {
         TestServer.test(settings = {}) {
             runBlocking {
                 val mux = TestServer.multiplex.test()
-                val json = contextOf<ServerRuntime>().externalSerialization.json
+                val json = engine.externalSerialization.json
 
                 mux.send(
                     WebSocketFrame.Text(
@@ -131,7 +132,7 @@ class MultiplexInterceptorTest {
         TestServer.test(settings = {}) {
             runBlocking {
                 val mux = TestServer.multiplex.test()
-                val json = contextOf<ServerRuntime>().externalSerialization.json
+                val json = engine.externalSerialization.json
 
                 mux.send(
                     WebSocketFrame.Text(
@@ -170,7 +171,7 @@ class MultiplexInterceptorTest {
         TestServer.test(settings = {}) {
             runBlocking {
                 val mux = TestServer.multiplex.test()
-                val json = contextOf<ServerRuntime>().externalSerialization.json
+                val json = engine.externalSerialization.json
 
                 mux.send(
                     WebSocketFrame.Text(
@@ -228,7 +229,7 @@ class MultiplexInterceptorTest {
         TestServer.test(settings = {}) {
             runBlocking {
                 val mux = TestServer.multiplex.test()
-                val json = contextOf<ServerRuntime>().externalSerialization.json
+                val json = engine.externalSerialization.json
 
                 mux.send(
                     WebSocketFrame.Text(

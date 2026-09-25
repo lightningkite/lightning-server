@@ -4,6 +4,7 @@ package com.lightningkite.lightningserver.auth
 import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.services.database.HasId
 import kotlinx.coroutines.runBlocking
@@ -178,7 +179,7 @@ class AuthenticationExtTest {
 
         TestServer.test({}) {
             val auth = AuthUser.testAuth(user)
-            val fetched = auth.fetch()
+            val fetched = execute { auth.fetch() }
 
             assertEquals(user, fetched)
             assertEquals("user@example.com", fetched.email)
@@ -196,14 +197,14 @@ class AuthenticationExtTest {
             val auth = AuthUser.testAuth(user)
 
             // First fetch
-            val fetched1 = auth.fetch()
+            val fetched1 = execute { auth.fetch() }
             assertEquals(user, fetched1)
 
             // Modify the store
             AuthUser.store[id] = AuthUser(id, "modified@example.com", "Modified User")
 
             // Second fetch should return cached value
-            val fetched2 = auth.fetch()
+            val fetched2 = execute { auth.fetch() }
             assertEquals("cached@example.com", fetched2.email) // Still cached
         }
     }
@@ -221,7 +222,7 @@ class AuthenticationExtTest {
             )
 
             // The subject should be pre-cached
-            val fetched = auth.fetch()
+            val fetched = execute { auth.fetch() }
             assertEquals(user, fetched)
         }
     }
@@ -521,12 +522,12 @@ class AuthenticationExtTest {
             val auth = AuthUser.testAuth(user)
 
             // First call should calculate
-            val result1 = auth.get(customKey)
+            val result1 = execute { auth.get(customKey) }
             assertEquals("computed-for-${user._id}", result1)
             assertEquals(1, calculateCount)
 
             // Second call should use cached value
-            val result2 = auth.get(customKey)
+            val result2 = execute { auth.get(customKey) }
             assertEquals("computed-for-${user._id}", result2)
             assertEquals(1, calculateCount) // Still 1, not recalculated
         }
@@ -550,11 +551,11 @@ class AuthenticationExtTest {
         TestServer.test({}) {
             val user1 = AuthUser(email = "user1@example.com")
             val auth1 = AuthUser.testAuth(user1)
-            auth1.get(idCapturingKey)
+            execute { auth1.get(idCapturingKey) }
 
             val user2 = AuthUser(email = "user2@example.com")
             val auth2 = AuthUser.testAuth(user2)
-            auth2.get(idCapturingKey)
+            execute { auth2.get(idCapturingKey) }
 
             assertEquals(2, capturedIds.size)
             assertTrue(capturedIds[0] != capturedIds[1])

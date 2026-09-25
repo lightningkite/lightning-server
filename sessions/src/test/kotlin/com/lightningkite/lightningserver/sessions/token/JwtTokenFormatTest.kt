@@ -7,7 +7,9 @@ import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.encryption.*
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.services.database.HasId
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
@@ -52,6 +54,7 @@ class JwtTokenFormatTest {
 
     object TestServer : ServerBuilder() {
         init {
+            registerBasicMediaTypeCoders()
             register(TestUser)
             register(OtherUser)
         }
@@ -82,7 +85,7 @@ class JwtTokenFormatTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val token = jwtFormat.create(TestUser, auth)
+            val token = execute { jwtFormat.create(TestUser, auth) }
             assertNotNull(token)
 
             // Token should have 3 parts separated by dots
@@ -90,7 +93,7 @@ class JwtTokenFormatTest {
             assertEquals(3, parts.size, "JWT should have 3 parts: header.payload.signature")
 
             // Read back the token
-            val readAuth = jwtFormat.read(TestUser, token)
+            val readAuth = execute { jwtFormat.read(TestUser, token) }
             assertNotNull(readAuth, "Should be able to read back the token")
             assertEquals(userId, readAuth.id)
             assertEquals("test-session-123", readAuth.sessionId)
@@ -116,8 +119,8 @@ class JwtTokenFormatTest {
                 scopes = scopes
             )
 
-            val token = jwtFormat.create(TestUser, auth)
-            val readAuth = jwtFormat.read(TestUser, token)
+            val token = execute { jwtFormat.create(TestUser, auth) }
+            val readAuth = execute { jwtFormat.read(TestUser, token) }
 
             assertNotNull(readAuth)
             assertEquals(scopes, readAuth.scopes)
@@ -138,8 +141,8 @@ class JwtTokenFormatTest {
             )
 
             // Token should be valid immediately
-            val token = jwtFormat.create(TestUser, auth)
-            val validRead = jwtFormat.read(TestUser, token)
+            val token = execute { jwtFormat.create(TestUser, auth) }
+            val validRead = execute { jwtFormat.read(TestUser, token) }
             assertNotNull(validRead)
 
             // Create a token with already-expired time using a negative expiration
@@ -150,9 +153,9 @@ class JwtTokenFormatTest {
                 audience = Runtime { "https://test.example.com" }
             )
 
-            val expiredToken = expiredFormat.create(TestUser, auth)
+            val expiredToken = execute { expiredFormat.create(TestUser, auth) }
             assertFailsWith<TokenException>("Expired token should throw") {
-                expiredFormat.read(TestUser, expiredToken)
+                execute { expiredFormat.read(TestUser, expiredToken) }
             }
         }
     }
@@ -183,11 +186,11 @@ class JwtTokenFormatTest {
             )
 
             // Create token with HS256
-            val token = hs256Format.create(TestUser, auth)
+            val token = execute { hs256Format.create(TestUser, auth) }
 
             // Try to read with HS384 - should fail on algorithm mismatch
             assertFailsWith<JwtSignatureException>("Algorithm mismatch should throw JwtSignatureException") {
-                hs384Format.read(TestUser, token)
+                execute { hs384Format.read(TestUser, token) }
             }
         }
     }
@@ -205,7 +208,7 @@ class JwtTokenFormatTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val token = jwtFormat.create(TestUser, auth)
+            val token = execute { jwtFormat.create(TestUser, auth) }
             val parts = token.split(".")
 
             // Tamper with the signature by changing some bytes (not reversing, which invalidates base64)
@@ -216,7 +219,7 @@ class JwtTokenFormatTest {
             val tamperedToken = "${parts[0]}.${parts[1]}.$tamperedSignature"
 
             assertFailsWith<JwtSignatureException>("Tampered signature should throw") {
-                jwtFormat.read(TestUser, tamperedToken)
+                execute { jwtFormat.read(TestUser, tamperedToken) }
             }
         }
     }
@@ -234,7 +237,7 @@ class JwtTokenFormatTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val token = jwtFormat.create(TestUser, auth)
+            val token = execute { jwtFormat.create(TestUser, auth) }
             val parts = token.split(".")
 
             // Tamper with the payload by modifying a few characters (keeping valid base64)
@@ -248,7 +251,7 @@ class JwtTokenFormatTest {
             // or a parsing exception (invalid JSON). Either way, the token is rejected.
             var rejected = false
             try {
-                jwtFormat.read(TestUser, tamperedToken)
+                execute { jwtFormat.read(TestUser, tamperedToken) }
             } catch (e: JwtSignatureException) {
                 rejected = true
             } catch (e: Exception) {
@@ -284,10 +287,10 @@ class JwtTokenFormatTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val token = format1.create(TestUser, auth)
+            val token = execute { format1.create(TestUser, auth) }
 
             // Token for app1 should not work with app2's audience
-            val result = format2.read(TestUser, token)
+            val result = execute { format2.read(TestUser, token) }
             assertNull(result, "Token for different audience should return null")
         }
     }
@@ -308,7 +311,7 @@ class JwtTokenFormatTest {
             )
 
             for (malformed in malformedTokens) {
-                val result = jwtFormat.read(TestUser, malformed)
+                val result = execute { jwtFormat.read(TestUser, malformed) }
                 assertNull(result, "Malformed token '$malformed' should return null")
             }
         }
@@ -327,10 +330,10 @@ class JwtTokenFormatTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val token = jwtFormat.create(TestUser, auth)
+            val token = execute { jwtFormat.create(TestUser, auth) }
 
             // Try to read as different principal type
-            val result = jwtFormat.read(OtherUser, token)
+            val result = execute { jwtFormat.read(OtherUser, token) }
             assertNull(result, "Token for different principal type should return null")
         }
     }
@@ -363,11 +366,11 @@ class JwtTokenFormatTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val token1 = format1.create(TestUser, auth)
+            val token1 = execute { format1.create(TestUser, auth) }
 
             // Token signed with key1 should not verify with key2
             assertFailsWith<JwtSignatureException>("Token from different key should fail verification") {
-                format2.read(TestUser, token1)
+                execute { format2.read(TestUser, token1) }
             }
         }
     }
@@ -386,8 +389,8 @@ class JwtTokenFormatTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val token = jwtFormat.create(TestUser, auth)
-            val readAuth = jwtFormat.read(TestUser, token)
+            val token = execute { jwtFormat.create(TestUser, auth) }
+            val readAuth = execute { jwtFormat.read(TestUser, token) }
 
             assertNotNull(readAuth)
             assertEquals(sessionId, readAuth.sessionId)
@@ -407,8 +410,8 @@ class JwtTokenFormatTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val token = jwtFormat.create(TestUser, auth)
-            val readAuth = jwtFormat.read(TestUser, token)
+            val token = execute { jwtFormat.create(TestUser, auth) }
+            val readAuth = execute { jwtFormat.read(TestUser, token) }
 
             assertNotNull(readAuth)
             assertNull(readAuth.sessionId)
@@ -428,8 +431,8 @@ class JwtTokenFormatTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val token = oneHourFormat.create(TestUser, auth)
-            val readAuth = oneHourFormat.read(TestUser, token)
+            val token = execute { oneHourFormat.create(TestUser, auth) }
+            val readAuth = execute { oneHourFormat.read(TestUser, token) }
 
             assertNotNull(readAuth)
             assertNotNull(readAuth.expiration)
@@ -461,8 +464,8 @@ class JwtTokenFormatTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val token = jwtFormat.create(TestUser, auth)
-            val readAuth = jwtFormat.read(TestUser, token)
+            val token = execute { jwtFormat.create(TestUser, auth) }
+            val readAuth = execute { jwtFormat.read(TestUser, token) }
 
             assertNotNull(readAuth)
             // JWT stores time in seconds, so we compare at second precision
@@ -483,8 +486,8 @@ class JwtTokenFormatTest {
                 scopes = emptySet()
             )
 
-            val token = jwtFormat.create(TestUser, auth)
-            val readAuth = jwtFormat.read(TestUser, token)
+            val token = execute { jwtFormat.create(TestUser, auth) }
+            val readAuth = execute { jwtFormat.read(TestUser, token) }
 
             assertNotNull(readAuth)
             // Empty scope string splits to [""] which becomes one empty GrantedScope

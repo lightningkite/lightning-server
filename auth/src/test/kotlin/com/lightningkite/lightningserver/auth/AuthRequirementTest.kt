@@ -4,6 +4,7 @@ package com.lightningkite.lightningserver.auth
 import com.lightningkite.lightningserver.ForbiddenException
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.services.database.HasId
 import kotlinx.coroutines.runBlocking
@@ -63,7 +64,7 @@ class AuthRequirementTest {
     @Test
     fun `None accepts null auth`() = runBlocking {
         TestServer.test({}) {
-            val result = noAuth.check(null)
+            val result = execute { noAuth.check(null) }
             assertTrue(result is AuthRequirement.Result.Accepted)
             assertNull(result.auth)
         }
@@ -73,7 +74,7 @@ class AuthRequirementTest {
     fun `None accepts any auth`() = runBlocking {
         TestServer.test({}) {
             val auth = TestUser.testAuth(TestUser())
-            val result = noAuth.check(auth)
+            val result = execute { noAuth.check(auth) }
             assertTrue(result is AuthRequirement.Result.Accepted)
         }
     }
@@ -95,7 +96,7 @@ class AuthRequirementTest {
     fun `Authenticated rejects null auth`() = runBlocking {
         TestServer.test({}) {
             val req = anyAuth
-            val result = req.check(null)
+            val result = execute { req.check(null) }
             assertTrue(result is AuthRequirement.Result.Rejected)
             assertTrue(result.reason.contains("required"))
         }
@@ -105,7 +106,7 @@ class AuthRequirementTest {
     fun `Authenticated accepts valid auth`() = runBlocking {
         TestServer.test({}) {
             val auth = TestUser.testAuth(TestUser())
-            val result = anyAuth.check(auth)
+            val result = execute { anyAuth.check(auth) }
             assertTrue(result is AuthRequirement.Result.Accepted)
         }
     }
@@ -116,7 +117,7 @@ class AuthRequirementTest {
             val req = AuthRequirement.Authenticated(scopes = setOf(RequiredScope("admin")))
             val auth = TestUser.testAuth(TestUser(), scopes = setOf(GrantedScope("user")))
 
-            val result = req.check(auth)
+            val result = execute { req.check(auth) }
             assertTrue(result is AuthRequirement.Result.Rejected)
             assertTrue(result.reason.contains("scopes"))
         }
@@ -128,7 +129,7 @@ class AuthRequirementTest {
             val req = AuthRequirement.Authenticated(scopes = setOf(RequiredScope("admin")))
             val auth = TestUser.testAuth(TestUser(), scopes = setOf(GrantedScope("admin")))
 
-            val result = req.check(auth)
+            val result = execute { req.check(auth) }
             assertTrue(result is AuthRequirement.Result.Accepted)
         }
     }
@@ -147,7 +148,7 @@ class AuthRequirementTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val result = req.check(auth)
+            val result = execute { req.check(auth) }
             assertTrue(result is AuthRequirement.Result.Rejected)
             assertTrue(result.reason.contains("max age"))
         }
@@ -159,7 +160,7 @@ class AuthRequirementTest {
             val req = AuthRequirement.Authenticated(maxAge = 1.hours)
             val auth = TestUser.testAuth(TestUser())
 
-            val result = req.check(auth)
+            val result = execute { req.check(auth) }
             assertTrue(result is AuthRequirement.Result.Accepted)
         }
     }
@@ -173,7 +174,7 @@ class AuthRequirementTest {
             )
             val auth = TestUser.testAuth(TestUser())
 
-            val result = req.check(auth)
+            val result = execute { req.check(auth) }
             assertTrue(result is AuthRequirement.Result.Rejected)
             assertTrue(result.reason.contains("additional requirement"))
         }
@@ -188,7 +189,7 @@ class AuthRequirementTest {
             )
             val auth = TestUser.testAuth(TestUser())
 
-            val result = req.check(auth)
+            val result = execute { req.check(auth) }
             assertTrue(result is AuthRequirement.Result.Accepted)
         }
     }
@@ -217,7 +218,7 @@ class AuthRequirementTest {
     fun `AuthenticatedAs rejects null auth`() = runBlocking {
         TestServer.test({}) {
             val req = TestUser.require()
-            val result = req.check(null)
+            val result = execute { req.check(null) }
             assertTrue(result is AuthRequirement.Result.Rejected)
         }
     }
@@ -228,7 +229,7 @@ class AuthRequirementTest {
             val req = TestUser.require()
             val auth = AdminUser.testAuth(AdminUser())
 
-            val result = req.check(auth)
+            val result = execute { req.check(auth) }
             assertTrue(result is AuthRequirement.Result.Rejected)
             assertTrue(result.reason.contains("not of type"))
         }
@@ -240,7 +241,7 @@ class AuthRequirementTest {
             val req = TestUser.require()
             val auth = TestUser.testAuth(TestUser())
 
-            val result = req.check(auth)
+            val result = execute { req.check(auth) }
             assertTrue(result is AuthRequirement.Result.Accepted)
         }
     }
@@ -251,7 +252,7 @@ class AuthRequirementTest {
             val req = TestUser.require(scope = RequiredScope("admin"))
             val auth = TestUser.testAuth(TestUser(), scopes = setOf(GrantedScope("user")))
 
-            val result = req.check(auth)
+            val result = execute { req.check(auth) }
             assertTrue(result is AuthRequirement.Result.Rejected)
         }
     }
@@ -269,7 +270,7 @@ class AuthRequirementTest {
                 scopes = setOf(GrantedScope.root)
             )
 
-            val result = req.check(auth)
+            val result = execute { req.check(auth) }
             assertTrue(result is AuthRequirement.Result.Rejected)
         }
     }
@@ -280,7 +281,7 @@ class AuthRequirementTest {
             val req = TestUser.require { false }
             val auth = TestUser.testAuth(TestUser())
 
-            val result = req.check(auth)
+            val result = execute { req.check(auth) }
             assertTrue(result is AuthRequirement.Result.Rejected)
         }
     }
@@ -291,7 +292,7 @@ class AuthRequirementTest {
             val req = TestUser.require(scopes = setOf(RequiredScope("read"), RequiredScope("write")))
             val auth = TestUser.testAuth(TestUser(), scopes = setOf(GrantedScope("read"), GrantedScope("write")))
 
-            val result = req.check(auth)
+            val result = execute { req.check(auth) }
             assertTrue(result is AuthRequirement.Result.Accepted)
         }
     }
@@ -315,7 +316,7 @@ class AuthRequirementTest {
             val req = TestUser.require() or AdminUser.require()
             val auth = TestUser.testAuth(TestUser())
 
-            val result = req.check(auth)
+            val result = execute { req.check(auth) }
             assertTrue(result is AuthRequirement.Result.Accepted)
         }
     }
@@ -326,7 +327,7 @@ class AuthRequirementTest {
             val req = TestUser.require() or AdminUser.require()
             val auth = AdminUser.testAuth(AdminUser())
 
-            val result = req.check(auth)
+            val result = execute { req.check(auth) }
             assertTrue(result is AuthRequirement.Result.Accepted)
         }
     }
@@ -336,7 +337,7 @@ class AuthRequirementTest {
         TestServer.test({}) {
             val req = TestUser.require() or AdminUser.require()
 
-            val result = req.check(null)
+            val result = execute { req.check(null) }
             assertTrue(result is AuthRequirement.Result.Rejected)
         }
     }
@@ -346,7 +347,7 @@ class AuthRequirementTest {
         TestServer.test({}) {
             val req = TestUser.require() or noAuth
 
-            val result = req.check(null)
+            val result = execute { req.check(null) }
             assertTrue(result is AuthRequirement.Result.Accepted)
         }
     }
@@ -358,7 +359,7 @@ class AuthRequirementTest {
             val req = noAuth or TestUser.require()
             val auth = TestUser.testAuth(TestUser())
 
-            val result = req.check(auth)
+            val result = execute { req.check(auth) }
             assertTrue(result is AuthRequirement.Result.Accepted)
             // If noAuth was checked first, it would still return Accepted(null)
             // but with the actual auth, so this should return the TestUser auth
@@ -394,14 +395,14 @@ class AuthRequirementTest {
     fun `accepts returns true for accepted auth`() = runBlocking {
         TestServer.test({}) {
             val auth = TestUser.testAuth(TestUser())
-            assertTrue(noAuth.accepts(auth))
+            assertTrue(execute { noAuth.accepts(auth) })
         }
     }
 
     @Test
     fun `accepts returns false for rejected auth`() = runBlocking {
         TestServer.test({}) {
-            assertFalse(anyAuth.accepts(null))
+            assertFalse(execute { anyAuth.accepts(null) })
         }
     }
 
@@ -412,7 +413,7 @@ class AuthRequirementTest {
             val auth = TestUser.testAuth(user)
             val req = TestUser.require()
 
-            val result = req.assert(auth)
+            val result = execute { req.assert(auth) }
             assertNotNull(result)
             assertEquals(auth, result)
         }
@@ -424,7 +425,7 @@ class AuthRequirementTest {
             val req = TestUser.require()
 
             assertFailsWith<ForbiddenException> {
-                req.assert(null)
+                execute { req.assert(null) }
             }
         }
     }
@@ -435,7 +436,7 @@ class AuthRequirementTest {
             val req = TestUser.require()
 
             val exception = assertFailsWith<ForbiddenException> {
-                req.assert(null)
+                execute { req.assert(null) }
             }
             assertTrue(exception.message.contains("authorization criteria"))
         }
@@ -482,7 +483,7 @@ class AuthRequirementTest {
     @Test
     fun `IsSuperUser rejects when not configured`() = runBlocking {
         TestServer.test({}) {
-            val result = AuthRequirement.IsSuperUser.check(null)
+            val result = execute { AuthRequirement.IsSuperUser.check(null) }
             assertTrue(result is AuthRequirement.Result.Rejected)
         }
     }
@@ -491,7 +492,7 @@ class AuthRequirementTest {
     fun `IsAdmin falls back to IsSuperUser default`() = runBlocking {
         // IsAdmin has IsSuperUser as default, which is also not configured
         TestServer.test({}) {
-            val result = AuthRequirement.IsAdmin.check(null)
+            val result = execute { AuthRequirement.IsAdmin.check(null) }
             assertTrue(result is AuthRequirement.Result.Rejected)
         }
     }
@@ -500,7 +501,7 @@ class AuthRequirementTest {
     fun `IsDeveloper falls back to IsSuperUser default`() = runBlocking {
         // IsDeveloper has IsSuperUser as default
         TestServer.test({}) {
-            val result = AuthRequirement.IsDeveloper.check(null)
+            val result = execute { AuthRequirement.IsDeveloper.check(null) }
             assertTrue(result is AuthRequirement.Result.Rejected)
         }
     }
@@ -668,7 +669,7 @@ class AuthRequirementTest {
             }
         }.test({}) {
             val auth = TestUser.testAuth(user)
-            val result = AuthRequirement.IsSuperUser.check(auth)
+            val result = execute { AuthRequirement.IsSuperUser.check(auth) }
             assertTrue(result is AuthRequirement.Result.Accepted)
         }
 
@@ -689,7 +690,7 @@ class AuthRequirementTest {
             }
         }.test({}) {
             val auth = TestUser.testAuth(user)
-            val result = AuthRequirement.IsAdmin.check(auth)
+            val result = execute { AuthRequirement.IsAdmin.check(auth) }
             assertTrue(result is AuthRequirement.Result.Accepted)
         }
 
@@ -710,7 +711,7 @@ class AuthRequirementTest {
             }
         }.test({}) {
             val auth = TestUser.testAuth(user)
-            val result = AuthRequirement.IsDeveloper.check(auth)
+            val result = execute { AuthRequirement.IsDeveloper.check(auth) }
             assertTrue(result is AuthRequirement.Result.Accepted)
         }
 

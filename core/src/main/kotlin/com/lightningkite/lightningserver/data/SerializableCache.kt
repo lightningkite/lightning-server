@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.data
 
 import com.lightningkite.lightningserver.data.SerializableCache.CalculatingKey
 import com.lightningkite.lightningserver.data.SerializableCache.Key
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -106,7 +107,7 @@ public class SerializableCache private constructor(
      *
      * @return The cached Expiring wrapper, or null if not found or expired
      */
-    context(server: ServerRuntime)
+    context(server: Engine)
     private fun <T> retrieve(key: Key<T>): Expiring<T>? {
         @Suppress("UNCHECKED_CAST")
         cache[key.id]?.let {
@@ -147,7 +148,7 @@ public class SerializableCache private constructor(
      * If the key is not local-only, the value is serialized for persistence.
      * Sets the [updated] flag to true.
      */
-    context(server: ServerRuntime)
+    context(server: Engine)
     private fun <T> cache(key: Key<T>, value: T) {
         val expiring = Expiring(
             value,
@@ -168,7 +169,7 @@ public class SerializableCache private constructor(
      * @param key The cache key
      * @param value The value to cache
      */
-    context(server: ServerRuntime)
+    context(server: Engine)
     public operator fun <T> set(key: Key<T>, value: T): Unit = cache(key, value)
 
     /**
@@ -177,7 +178,7 @@ public class SerializableCache private constructor(
      * @param key The cache key
      * @return The cached value, or null if not found or expired
      */
-    context(server: ServerRuntime)
+    context(server: Engine)
     public operator fun <T> get(key: Key<T>): T? = retrieve(key)?.value
 
     /**
@@ -200,7 +201,7 @@ public class SerializableCache private constructor(
      * @param key The cache key to check
      * @return true if the key has a non-expired value, false otherwise
      */
-    context(server: ServerRuntime)
+    context(server: Engine)
     public fun containsKey(key: Key<*>): Boolean = retrieve(key) != null
 
     internal val bytes: Map<String, ByteArray> get() = serialized.toMap()
@@ -287,7 +288,7 @@ public class SerializableCache private constructor(
  * @param default Function to compute the value if not cached
  * @return The cached or newly computed value
  */
-context(server: ServerRuntime)
+context(server: Engine)
 public inline fun <T> SerializableCache.getOrPut(key: Key<T>, default: () -> T): T =
     get(key) ?: default().also { set(key, it) }
 
@@ -304,13 +305,13 @@ public interface Caching {
 /**
  * Stores a value in the cache of this Caching object.
  */
-context(server: ServerRuntime)
+context(server: Engine)
 public operator fun <T> Caching.set(key: Key<T>, value: T): Unit = cache.set(key, value)
 
 /**
  * Retrieves a value from the cache of this Caching object.
  */
-context(server: ServerRuntime)
+context(server: Engine)
 public operator fun <T> Caching.get(key: Key<T>): T? = cache[key]
 
 /**

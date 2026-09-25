@@ -8,8 +8,8 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.Execution
-import com.lightningkite.lightningserver.runtime.handle
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.engine
+import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import kotlinx.coroutines.runBlocking
@@ -19,7 +19,7 @@ import kotlin.test.assertEquals
 /**
  * W6: a typed endpoint that throws an error whose `detail` is not in its declared `errorCases`
  * logs an advisory warning, but the thrown exception must still surface unchanged (the warning
- * does NOT alter the response). This goes through the full request path (serverRuntime.handle),
+ * does NOT alter the response). This goes through the full request path (engine.handleRoot),
  * where the warning lives, unlike the typed `.test()` helper which calls handle(access, input)
  * directly.
  */
@@ -63,10 +63,8 @@ class ErrorCaseWarningTest {
     fun undeclaredErrorStillSurfacesAs400() = runBlocking {
         TestServer.test({}) {
             // Warning is logged for /boom; both still return 400 (response unchanged by W6).
-            contextOf<TestRunner>()
-            assertEquals(400, serverRuntime.handle(request("/boom"), Execution.ID.generate()).status.code)
-            contextOf<TestRunner>()
-            assertEquals(400, serverRuntime.handle(request("/declared"), Execution.ID.generate()).status.code)
+            assertEquals(400, engine.handleRoot(request("/boom"), Execution.ID.generate()).status.code)
+            assertEquals(400, engine.handleRoot(request("/declared"), Execution.ID.generate()).status.code)
         }
     }
 }

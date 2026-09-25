@@ -1,9 +1,11 @@
 package com.lightningkite.lightningserver.typed.sdk
 
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.typed.jsonschema.openApiDescription
 import com.lightningkite.lightningserver.typed.sdk.SDK.writeUsingDefaultSettings
 import com.lightningkite.services.kfile.KFile
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 
 class FetcherSdkTests {
@@ -25,7 +27,7 @@ class FetcherSdkTests {
     @Test
     fun openApi() {
         Server.test({}) {
-            openApiDescription
+            runBlocking { execute { openApiDescription } }
                 .paths
                 .flatMap { (_, path) ->
                     listOf(path.get, path.put, path.post, path.patch, path.delete).mapNotNull { it?.operationId }

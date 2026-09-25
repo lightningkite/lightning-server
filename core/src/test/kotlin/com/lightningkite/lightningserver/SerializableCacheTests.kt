@@ -3,7 +3,8 @@ package com.lightningkite.lightningserver
 import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.engine
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import kotlinx.coroutines.runBlocking
@@ -34,14 +35,14 @@ class SerializableCacheTests {
 
         runBlocking {
             Server.test({}) {
-                // need a runtime for caching
+                execute {
+                    val str = cache.get(key, 5)
 
-                val str = cache.get(key, 5)
+                    val serialized = json.encodeToString(cache)
+                    val deserialized = json.decodeFromString<SerializableCache>(serialized)
 
-                val serialized = json.encodeToString(cache)
-                val deserialized = json.decodeFromString<SerializableCache>(serialized)
-
-                deserialized.get(key, 5)
+                    deserialized.get(key, 5)
+                }
             }
         }
     }
@@ -68,17 +69,17 @@ class SerializableCacheTests {
 
         runBlocking {
             Server.test({}) {
-                // need a runtime for caching
+                execute {
+                    cache.get(key, 5)
 
-                cache.get(key, 5)
-
-                var thrown = false
-                try {
-                    cache.get(key2, 5)
-                } catch (_: IllegalStateException) {
-                    thrown = true
+                    var thrown = false
+                    try {
+                        cache.get(key2, 5)
+                    } catch (_: IllegalStateException) {
+                        thrown = true
+                    }
+                    if (!thrown) throw Exception("Did not fail as expected")
                 }
-                if (!thrown) throw Exception("Did not fail as expected")
             }
         }
     }
@@ -104,9 +105,9 @@ class SerializableCacheTests {
 
                 println("Before serialization: $cache")
 
-                val serialized = serverRuntime.internalSerialization.json.encodeToString(cache)
+                val serialized = engine.internalSerialization.json.encodeToString(cache)
                 val deserialized =
-                    serverRuntime.internalSerialization.json.decodeFromString<SerializableCache>(serialized)
+                    engine.internalSerialization.json.decodeFromString<SerializableCache>(serialized)
 
                 println("After serialization: $deserialized")
 

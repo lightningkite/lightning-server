@@ -1,11 +1,12 @@
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.GeneralServerSettings
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
+import com.lightningkite.lightningserver.runtime.engine
 import com.lightningkite.lightningserver.runtime.send
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
@@ -87,7 +88,7 @@ class WebSocketPermissionStalenessTest {
         ) {
             runBlocking {
                 val socket = fixture.ws.webSocket.test()
-                val json = contextOf<ServerRuntime>().externalSerialization.json
+                val json = engine.externalSerialization.json
                 val watchEverything = WebSocketFrame.Text(
                     json.encodeToString(Condition.serializer(Sample.serializer()), Condition.Always)
                 )
@@ -99,9 +100,11 @@ class WebSocketPermissionStalenessTest {
                 block(clock) { sample ->
                     last = null
                     runBlocking {
-                        fixture.ws.generalTopic.send(
-                            CollectionChanges(listOf(EntryChange(old = null, new = sample)))
-                        )
+                        execute {
+                            fixture.ws.generalTopic.send(
+                                CollectionChanges(listOf(EntryChange(old = null, new = sample)))
+                            )
+                        }
                     }
                     (last as? WebSocketFrame.Text)?.let { frame ->
                         json.decodeFromString(

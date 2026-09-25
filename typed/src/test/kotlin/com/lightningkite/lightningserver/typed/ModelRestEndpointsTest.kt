@@ -6,7 +6,9 @@ import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.GeneralServerSettings
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.database.*
@@ -21,6 +23,8 @@ import kotlin.uuid.Uuid
 class ModelRestEndpointsTest {
 
     object CrudTestServer : ServerBuilder() {
+        init { registerBasicMediaTypeCoders() }
+
         val database = setting("database", Database.Settings())
         val info = database.modelInfo<HasId<*>?, CrudItem, Uuid>(
             tableName = "CrudItem",
@@ -116,7 +120,7 @@ class ModelRestEndpointsTest {
             database set Database.Settings()
         }) {
             // Clear any existing data
-            CrudTestServer.info.table().deleteManyIgnoringOld(Condition.Always)
+            execute { CrudTestServer.info.table().deleteManyIgnoringOld(Condition.Always) }
 
             // Insert multiple items
             val item1 = CrudItem(name = "Item 1", category = "A", price = 10.0, quantity = 1)
@@ -339,7 +343,7 @@ class ModelRestEndpointsTest {
             database set Database.Settings()
         }) {
             // Clear any existing data
-            CrudTestServer.info.table().deleteManyIgnoringOld(Condition.Always)
+            execute { CrudTestServer.info.table().deleteManyIgnoringOld(Condition.Always) }
 
             // Insert items in different categories
             val item1 = CrudItem(name = "Keep 1", category = "Keep", price = 10.0, quantity = 1)
@@ -409,7 +413,7 @@ class ModelRestEndpointsTest {
             database set Database.Settings()
         }) {
             // Clear any existing data
-            CrudTestServer.info.table().deleteManyIgnoringOld(Condition.Always)
+            execute { CrudTestServer.info.table().deleteManyIgnoringOld(Condition.Always) }
 
             // Insert items in different categories
             repeat(3) { CrudTestServer.rest.insert.test(null, CrudItem(category = "A")) }
@@ -550,7 +554,7 @@ class ModelRestEndpointsTest {
             database set Database.Settings()
         }) {
             // Clear any existing data
-            CrudTestServer.info.table().deleteManyIgnoringOld(Condition.Always)
+            execute { CrudTestServer.info.table().deleteManyIgnoringOld(Condition.Always) }
 
             val results = CrudTestServer.rest.list.test(null, Query(Condition.Always))
             assertEquals(0, results.size)
@@ -621,7 +625,7 @@ class ModelRestEndpointsTest {
             database set Database.Settings()
         }) {
             // Clear any existing data
-            CrudTestServer.info.table().deleteManyIgnoringOld(Condition.Always)
+            execute { CrudTestServer.info.table().deleteManyIgnoringOld(Condition.Always) }
 
             CrudTestServer.rest.insert.test(null, CrudItem(name = "Test"))
 

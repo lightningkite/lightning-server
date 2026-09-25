@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.notifications.events.event
 import com.lightningkite.lightningserver.notifications.subscriptions.FrequencyCustomizableSubscriptions
 import com.lightningkite.lightningserver.notifications.subscriptions.subscribed
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.setStatic
 import com.lightningkite.lightningserver.typed.ModelInfo
@@ -189,15 +190,16 @@ class SyntaxTest {
             testEmail!!
 
             runBlocking {
-                Server.userInfo.table().insertOne(User(Uuid.random()))
-
                 // Count all users - the subscriber notifies ALL users in the shared in-memory DB,
                 // which may include users from other tests sharing this Server singleton.
-                val userCount = Server.userInfo.table().count(Condition.Always)
+                val userCount = execute {
+                    Server.userInfo.table().insertOne(User(Uuid.random()))
+                    Server.userInfo.table().count(Condition.Always)
+                }
                 val smsCountBefore = testSms.messageHistory.size
                 val emailCountBefore = testEmail.sentEmails.size
 
-                modelEndpoints.info.table().insertOne(Model())
+                execute { modelEndpoints.info.table().insertOne(Model()) }
 
                 assertEquals(userCount, testSms.messageHistory.size - smsCountBefore, "Failed at sms")
                 assertEquals(userCount, testEmail.sentEmails.size - emailCountBefore, "Failed at email")
@@ -221,13 +223,14 @@ class SyntaxTest {
             testEmail!!
 
             runBlocking {
-                Server.userInfo.table().insertOne(User(Uuid.random()))
-
-                val userCount = Server.userInfo.table().count(Condition.Always)
+                val userCount = execute {
+                    Server.userInfo.table().insertOne(User(Uuid.random()))
+                    Server.userInfo.table().count(Condition.Always)
+                }
                 val smsCountBefore = testSms.messageHistory.size
                 val emailCountBefore = testEmail.sentEmails.size
 
-                modelEndpoints.info.table().insertOne(Model())
+                execute { modelEndpoints.info.table().insertOne(Model()) }
 
                 assertEquals(userCount, testSms.messageHistory.size - smsCountBefore, "Failed at sms")
                 assertEquals(userCount, testEmail.sentEmails.size - emailCountBefore, "Failed at email")

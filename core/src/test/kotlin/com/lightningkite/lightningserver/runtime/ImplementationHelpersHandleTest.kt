@@ -132,7 +132,7 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
@@ -155,7 +155,7 @@ class ImplementationHelpersHandleTest {
     @Test
     fun test_blocking_runs_suspend_body_without_run_blocking() {
         TestServer.testBlocking(settings = {}) {
-            val resp = serverRuntime.handle(
+            val resp = engine.handleRoot(
                 HttpRequest(
                     path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
                     queryParameters = QueryParameters.EMPTY,
@@ -187,7 +187,7 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.HEAD),
                         queryParameters = QueryParameters.EMPTY,
@@ -221,7 +221,7 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.OPTIONS),
                         queryParameters = QueryParameters.EMPTY,
@@ -261,7 +261,7 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/slash", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
@@ -298,7 +298,7 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/slash/", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
@@ -332,7 +332,7 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
@@ -366,7 +366,7 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
@@ -407,7 +407,7 @@ class ImplementationHelpersHandleTest {
         // regardless of which engine runs it.
         TestServer.test(settings = {}) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/slow", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
@@ -431,7 +431,7 @@ class ImplementationHelpersHandleTest {
         // 404) is invisible to client JS.
         TestServer.test(settings = {}) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/boom", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
@@ -486,7 +486,7 @@ class ImplementationHelpersHandleTest {
         // see a normal response back from their continuation and still post-process it.
         InterceptorFailureTestServer.test(settings = {}) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/anything", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
@@ -512,7 +512,7 @@ class ImplementationHelpersHandleTest {
         // This test server installs SecurityHeadersInterceptor: an https response must carry nosniff and HSTS.
         TestServer.test(settings = {}) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
@@ -538,7 +538,7 @@ class ImplementationHelpersHandleTest {
         // HSTS must never be sent over plain http (per the HSTS spec), but nosniff still applies.
         TestServer.test(settings = {}) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
@@ -564,7 +564,7 @@ class ImplementationHelpersHandleTest {
         // them too.
         TestServer.test(settings = {}) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/boom", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
@@ -590,7 +590,7 @@ class ImplementationHelpersHandleTest {
     fun fast_handler_completes_within_its_timeout() {
         TestServer.test(settings = {}) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/fast", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
@@ -623,7 +623,7 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/ping", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
@@ -659,7 +659,7 @@ class ImplementationHelpersHandleTest {
             }
         ) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/bigstream", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
@@ -688,7 +688,7 @@ class ImplementationHelpersHandleTest {
         // The blocking Data.Source path must stream-compress (no full-body buffering) and still produce valid gzip.
         TestServer.test(settings = {}) {
             runBlocking {
-                val resp = serverRuntime.handle(
+                val resp = engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/bigsource", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,

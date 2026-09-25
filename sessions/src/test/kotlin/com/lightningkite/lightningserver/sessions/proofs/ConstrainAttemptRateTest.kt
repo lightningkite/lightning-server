@@ -4,7 +4,9 @@ package com.lightningkite.lightningserver.sessions.proofs
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.sessions.proofs.extensions.constrainAttemptRate
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.withClock
@@ -27,6 +29,8 @@ import kotlin.time.Instant
 class ConstrainAttemptRateTest {
 
     object TestServer : ServerBuilder() {
+        init { registerBasicMediaTypeCoders() }
+
         val cache = setting("cache", Cache.Settings("ram"))
     }
 
@@ -68,7 +72,7 @@ class ConstrainAttemptRateTest {
         val clock = MutableClock()
         TestServer.test(settings = {}, clock = { clock }) {
             withClock(clock) {
-                val message = TestServer.cache().hitLimit("first-block", count = 3, blocked = 10.minutes)
+                val message = execute { TestServer.cache().hitLimit("first-block", count = 3, blocked = 10.minutes) }
                 assertTrue(message.contains("10 minutes"), "Expected first block of 10 minutes, got: $message")
             }
         }
@@ -83,7 +87,7 @@ class ConstrainAttemptRateTest {
                 val key = "popcorn"
 
                 // Round 1: first offense -> base block (level 0).
-                val first = cache.hitLimit(key, count = 3, blocked = 10.minutes)
+                val first = execute { cache.hitLimit(key, count = 3, blocked = 10.minutes) }
                 assertTrue(first.contains("10 minutes"), "Round 1 should be 10 minutes, got: $first")
 
                 // Let the block window (and attempt counter) lapse, but not the long-lived strike level.
@@ -91,7 +95,7 @@ class ConstrainAttemptRateTest {
 
                 // Round 2: returning attacker gets a fresh batch of attempts, but the remembered
                 // strike level doubles the block -> 20 minutes. This is the popcorn defense.
-                val second = cache.hitLimit(key, count = 3, blocked = 10.minutes)
+                val second = execute { cache.hitLimit(key, count = 3, blocked = 10.minutes) }
                 assertTrue(second.contains("20 minutes"), "Round 2 should be 20 minutes (exponential), got: $second")
             }
         }
@@ -106,22 +110,22 @@ class ConstrainAttemptRateTest {
                 val key = "reset"
 
                 // Escalate to level 1.
-                assertTrue(cache.hitLimit(key, count = 3, blocked = 10.minutes).contains("10 minutes"))
+                assertTrue(execute { cache.hitLimit(key, count = 3, blocked = 10.minutes) }.contains("10 minutes"))
                 clock.advance(11.minutes)
-                assertTrue(cache.hitLimit(key, count = 3, blocked = 10.minutes).contains("20 minutes"))
+                assertTrue(execute { cache.hitLimit(key, count = 3, blocked = 10.minutes) }.contains("20 minutes"))
 
                 // Let the block lapse (attempt counter expires), then succeed.
                 // Because failedAttempts == 0 at this point, the level is NOT cleared.
                 // This is intentional: we optimize the happy path by skipping cache writes
                 // when there are no recent failures to clear.
                 clock.advance(21.minutes)
-                val ok = cache.constrainAttemptRate(key, count = 3, blocked = 10.minutes) { "success" }
+                val ok = execute { cache.constrainAttemptRate(key, count = 3, blocked = 10.minutes) { "success" } }
                 assertEquals("success", ok)
 
                 // The strike level persists, so a later offense still faces escalated blocking.
                 // This is "unforgiving" but maintains security and keeps the happy path fast.
                 clock.advance(1.minutes)
-                val stillEscalated = cache.hitLimit(key, count = 3, blocked = 10.minutes)
+                val stillEscalated = execute { cache.hitLimit(key, count = 3, blocked = 10.minutes) }
                 assertTrue(stillEscalated.contains("40 minutes"), "Strike level should persist when success had no recent failures, got: $stillEscalated")
             }
         }
@@ -140,15 +144,17 @@ class ConstrainAttemptRateTest {
 
                 // First failure fills the single allowed attempt.
                 assertFailsWith<IllegalStateException> {
-                    cache.constrainAttemptRate(key, count = count, blocked = blocked, maxBlocked = maxBlocked) {
-                        throw IllegalStateException("simulated failure")
+                    execute {
+                        cache.constrainAttemptRate(key, count = count, blocked = blocked, maxBlocked = maxBlocked) {
+                            throw IllegalStateException("simulated failure")
+                        }
                     }
                 }
 
                 // Hammer past the limit; the block escalates 10 -> 20 -> capped at 25 (not 40) minutes.
                 val messages = (0 until 3).map {
                     assertFailsWith<BadRequestException> {
-                        cache.constrainAttemptRate(key, count = count, blocked = blocked, maxBlocked = maxBlocked) { }
+                        execute { cache.constrainAttemptRate(key, count = count, blocked = blocked, maxBlocked = maxBlocked) { } }
                     }.message
                 }
                 assertTrue(messages[0].contains("10 minutes"), "First block should be 10 minutes, got: ${messages[0]}")

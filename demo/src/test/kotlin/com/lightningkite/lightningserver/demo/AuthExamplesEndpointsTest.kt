@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.demo
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.demo.endpoints.AuthExamplesEndpoints
 import com.lightningkite.lightningserver.http.HttpStatus
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.runBlocking
@@ -16,7 +17,7 @@ class AuthExamplesEndpointsTest {
     @Test
     fun whoAmIReturnsTheCallersOwnIdentity() = runBlocking {
         TestHelper.testServer {
-            val user = Server.userInfo.table().insertOne(User(email = "whoami@example.com"))!!
+            val user = execute { Server.userInfo.table().insertOne(User(email = "whoami@example.com"))!! }
             val auth = Authentication(Server.UserAuth, id = user._id, sessionId = null)
 
             val result = AuthExamplesEndpoints.whoAmI.test(auth, Unit)
@@ -46,7 +47,7 @@ class AuthExamplesEndpointsTest {
     @Test
     fun greetIsPersonalForLoggedInCallers() = runBlocking {
         TestHelper.testServer {
-            val user = Server.userInfo.table().insertOne(User(email = "greet@example.com"))!!
+            val user = execute { Server.userInfo.table().insertOne(User(email = "greet@example.com"))!! }
             val auth = Authentication(Server.UserAuth, id = user._id, sessionId = null)
 
             val result = AuthExamplesEndpoints.greet.test(auth, Unit)
@@ -67,7 +68,7 @@ class AuthExamplesEndpointsTest {
     @Test
     fun adminOnlyRejectsALoggedInNonAdminFromItsHandlerBody() = runBlocking {
         TestHelper.testServer {
-            val user = Server.userInfo.table().insertOne(User(email = "regular@example.com"))!!
+            val user = execute { Server.userInfo.table().insertOne(User(email = "regular@example.com"))!! }
             val auth = Authentication(Server.UserAuth, id = user._id, sessionId = null)
 
             val exception = assertFailsWith<com.lightningkite.lightningserver.HttpStatusException> {
@@ -81,7 +82,9 @@ class AuthExamplesEndpointsTest {
     @Test
     fun adminOnlyAdmitsALoggedInSuperUserFromItsHandlerBody() = runBlocking {
         TestHelper.testServer {
-            val admin = Server.userInfo.table().insertOne(User(email = "admin@example.com", isSuperUser = true))!!
+            val admin = execute {
+                Server.userInfo.table().insertOne(User(email = "admin@example.com", isSuperUser = true))!!
+            }
             val auth = Authentication(Server.UserAuth, id = admin._id, sessionId = null)
 
             val result = AuthExamplesEndpoints.adminOnly.test(auth, Unit)
@@ -98,10 +101,13 @@ class AuthExamplesEndpointsTest {
     @Test
     fun aStrangerSeesAnotherUsersHashedPasswordMasked() = runBlocking {
         TestHelper.testServer {
-            val target = Server.userInfo.table().insertOne(
-                User(email = "target@example.com", hashedPassword = "super-secret-hash")
-            )!!
-            val stranger = Server.userInfo.table().insertOne(User(email = "stranger@example.com"))!!
+            val (target, stranger) = execute {
+                val target = Server.userInfo.table().insertOne(
+                    User(email = "target@example.com", hashedPassword = "super-secret-hash")
+                )!!
+                val stranger = Server.userInfo.table().insertOne(User(email = "stranger@example.com"))!!
+                target to stranger
+            }
             val strangerAuth = Authentication(Server.UserAuth, id = stranger._id, sessionId = null)
 
             val seenByStranger = Server.UserEndpoints.rest.detail.test(target._id, strangerAuth, Unit)

@@ -8,8 +8,8 @@ import com.lightningkite.lightningserver.definition.telemetrySettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.Execution
-import com.lightningkite.lightningserver.runtime.handle
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.engine
+import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
@@ -134,8 +134,7 @@ class BulkSpanTest {
             }
         ) {
             runBlocking {
-                contextOf<TestRunner>()
-                serverRuntime.handle(
+                engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/meta/bulk", method = HttpMethod.POST),
                         queryParameters = QueryParameters.EMPTY,

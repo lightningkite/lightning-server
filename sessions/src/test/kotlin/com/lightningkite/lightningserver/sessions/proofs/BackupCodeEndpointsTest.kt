@@ -17,9 +17,10 @@ import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.handle
+import com.lightningkite.lightningserver.runtime.engine
+import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.lightningserver.runtime.now
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.sessions.proofs.extensions.TooManyAttemptsException
@@ -128,6 +129,7 @@ class BackupCodeEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -142,22 +144,24 @@ class BackupCodeEndpointsTest {
         }.let { server ->
             server.test({}) {
                 // Insert codes directly for testing format
-                val table = server.backupCodes.modelInfo.table()
-                table.insert(
-                    listOf(
-                        BackupCodeSecret(
-                            code = "abcdefghij",
-                            subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name,
-                            createdAt = now()
+                val codes = execute {
+                    val table = server.backupCodes.modelInfo.table()
+                    table.insert(
+                        listOf(
+                            BackupCodeSecret(
+                                code = "abcdefghij",
+                                subjectId = TestUser.idString(userId),
+                                subjectType = TestUser.name,
+                                createdAt = now()
+                            )
                         )
                     )
-                )
 
-                // Verify code was stored
-                val codes = table.find(condition<BackupCodeSecret> {
-                    it.subjectId.eq(TestUser.idString(userId)) and it.subjectType.eq(TestUser.name)
-                }).toList()
+                    // Verify code was stored
+                    table.find(condition<BackupCodeSecret> {
+                        it.subjectId.eq(TestUser.idString(userId)) and it.subjectType.eq(TestUser.name)
+                    }).toList()
+                }
 
                 assertEquals(1, codes.size)
                 assertEquals("abcdefghij", codes[0].code)
@@ -177,6 +181,7 @@ class BackupCodeEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -189,17 +194,18 @@ class BackupCodeEndpointsTest {
         }.let { server ->
             server.test({}) {
                 // Insert a backup code
-                val table = server.backupCodes.modelInfo.table()
-                table.insert(
-                    listOf(
-                        BackupCodeSecret(
-                            code = "testbackupcode",
-                            subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name,
-                            createdAt = now()
+                execute {
+                    server.backupCodes.modelInfo.table().insert(
+                        listOf(
+                            BackupCodeSecret(
+                                code = "testbackupcode",
+                                subjectId = TestUser.idString(userId),
+                                subjectType = TestUser.name,
+                                createdAt = now()
+                            )
                         )
                     )
-                )
+                }
 
                 // Prove with the code
                 val proof = server.backupCodes.prove.test(
@@ -231,6 +237,7 @@ class BackupCodeEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -242,24 +249,26 @@ class BackupCodeEndpointsTest {
             )
         }.let { server ->
             server.test({}) {
-                val table = server.backupCodes.modelInfo.table()
+                var codeCount = execute {
+                    val table = server.backupCodes.modelInfo.table()
 
-                // Insert a backup code
-                table.insert(
-                    listOf(
-                        BackupCodeSecret(
-                            code = "onetimecode",
-                            subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name,
-                            createdAt = now()
+                    // Insert a backup code
+                    table.insert(
+                        listOf(
+                            BackupCodeSecret(
+                                code = "onetimecode",
+                                subjectId = TestUser.idString(userId),
+                                subjectType = TestUser.name,
+                                createdAt = now()
+                            )
                         )
                     )
-                )
 
-                // Verify code exists
-                var codeCount = table.find(condition<BackupCodeSecret> {
-                    it.subjectId.eq(TestUser.idString(userId))
-                }).count()
+                    // Verify code exists
+                    table.find(condition<BackupCodeSecret> {
+                        it.subjectId.eq(TestUser.idString(userId))
+                    }).count()
+                }
                 assertEquals(1, codeCount)
 
                 // Use the code
@@ -273,18 +282,22 @@ class BackupCodeEndpointsTest {
                 )
 
                 // The row survives — it is the only evidence the code was ever used — but is spent.
-                val after = table.find(condition<BackupCodeSecret> {
-                    it.subjectId.eq(TestUser.idString(userId))
-                }).toList()
+                val after = execute {
+                    server.backupCodes.modelInfo.table().find(condition<BackupCodeSecret> {
+                        it.subjectId.eq(TestUser.idString(userId))
+                    }).toList()
+                }
                 assertEquals(1, after.size, "using a backup code destroyed the record that it existed")
                 assertNotNull(after.single().usedAt, "a used backup code was not marked as used")
 
                 // And it no longer counts as an established method.
                 assertEquals(
                     0,
-                    table.find(condition<BackupCodeSecret> {
-                        it.subjectId.eq(TestUser.idString(userId)) and it.usedAt.eq(null)
-                    }).count(),
+                    execute {
+                        server.backupCodes.modelInfo.table().find(condition<BackupCodeSecret> {
+                            it.subjectId.eq(TestUser.idString(userId)) and it.usedAt.eq(null)
+                        }).count()
+                    },
                     "a spent backup code still reads as usable",
                 )
             }
@@ -303,6 +316,7 @@ class BackupCodeEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -314,19 +328,19 @@ class BackupCodeEndpointsTest {
             )
         }.let { server ->
             server.test({}) {
-                val table = server.backupCodes.modelInfo.table()
-
                 // Insert a backup code
-                table.insert(
-                    listOf(
-                        BackupCodeSecret(
-                            code = "singlusecode",
-                            subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name,
-                            createdAt = now()
+                execute {
+                    server.backupCodes.modelInfo.table().insert(
+                        listOf(
+                            BackupCodeSecret(
+                                code = "singlusecode",
+                                subjectId = TestUser.idString(userId),
+                                subjectType = TestUser.name,
+                                createdAt = now()
+                            )
                         )
                     )
-                )
+                }
 
                 // First use should succeed
                 server.backupCodes.prove.test(
@@ -365,6 +379,7 @@ class BackupCodeEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -376,19 +391,19 @@ class BackupCodeEndpointsTest {
             )
         }.let { server ->
             server.test({}) {
-                val table = server.backupCodes.modelInfo.table()
-
                 // Insert a backup code
-                table.insert(
-                    listOf(
-                        BackupCodeSecret(
-                            code = "validcode",
-                            subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name,
-                            createdAt = now()
+                execute {
+                    server.backupCodes.modelInfo.table().insert(
+                        listOf(
+                            BackupCodeSecret(
+                                code = "validcode",
+                                subjectId = TestUser.idString(userId),
+                                subjectType = TestUser.name,
+                                createdAt = now()
+                            )
                         )
                     )
-                )
+                }
 
                 // Try with invalid code
                 assertFailsWith<BadRequestException>("Invalid backup code should be rejected") {
@@ -417,6 +432,7 @@ class BackupCodeEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -428,19 +444,19 @@ class BackupCodeEndpointsTest {
             )
         }.let { server ->
             server.test({}) {
-                val table = server.backupCodes.modelInfo.table()
-
                 // Insert a backup code (stored lowercase without dashes)
-                table.insert(
-                    listOf(
-                        BackupCodeSecret(
-                            code = "abcdefghij",
-                            subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name,
-                            createdAt = now()
+                execute {
+                    server.backupCodes.modelInfo.table().insert(
+                        listOf(
+                            BackupCodeSecret(
+                                code = "abcdefghij",
+                                subjectId = TestUser.idString(userId),
+                                subjectType = TestUser.name,
+                                createdAt = now()
+                            )
                         )
                     )
-                )
+                }
 
                 // Prove with uppercase and dashes
                 val proof = server.backupCodes.prove.test(
@@ -470,6 +486,7 @@ class BackupCodeEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -482,23 +499,24 @@ class BackupCodeEndpointsTest {
         }.let { server ->
             server.test({}) {
                 // Before inserting codes, should return false
-                assertFalse(server.backupCodes.established(TestUser, user))
+                assertFalse(execute { server.backupCodes.established(TestUser, user) })
 
                 // Insert a backup code
-                val table = server.backupCodes.modelInfo.table()
-                table.insert(
-                    listOf(
-                        BackupCodeSecret(
-                            code = "backupcode",
-                            subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name,
-                            createdAt = now()
+                execute {
+                    server.backupCodes.modelInfo.table().insert(
+                        listOf(
+                            BackupCodeSecret(
+                                code = "backupcode",
+                                subjectId = TestUser.idString(userId),
+                                subjectType = TestUser.name,
+                                createdAt = now()
+                            )
                         )
                     )
-                )
+                }
 
                 // After inserting, should return true
-                assertTrue(server.backupCodes.established(TestUser, user))
+                assertTrue(execute { server.backupCodes.established(TestUser, user) })
             }
         }
     }
@@ -519,6 +537,7 @@ class BackupCodeEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -530,19 +549,19 @@ class BackupCodeEndpointsTest {
             )
         }.let { server ->
             server.test({}) {
-                val table = server.backupCodes.modelInfo.table()
-
                 // Insert backup code for user1 (must be lowercase letters only since codes are normalized)
-                table.insert(
-                    listOf(
-                        BackupCodeSecret(
-                            code = "useronecode",
-                            subjectId = TestUser.idString(userId1),
-                            subjectType = TestUser.name,
-                            createdAt = now()
+                execute {
+                    server.backupCodes.modelInfo.table().insert(
+                        listOf(
+                            BackupCodeSecret(
+                                code = "useronecode",
+                                subjectId = TestUser.idString(userId1),
+                                subjectType = TestUser.name,
+                                createdAt = now()
+                            )
                         )
                     )
-                )
+                }
 
                 // User1 should be able to use their code
                 val proof = server.backupCodes.prove.test(
@@ -556,16 +575,18 @@ class BackupCodeEndpointsTest {
                 assertNotNull(proof)
 
                 // Insert backup code for user2
-                table.insert(
-                    listOf(
-                        BackupCodeSecret(
-                            code = "usertwocode",
-                            subjectId = TestUser.idString(userId2),
-                            subjectType = TestUser.name,
-                            createdAt = now()
+                execute {
+                    server.backupCodes.modelInfo.table().insert(
+                        listOf(
+                            BackupCodeSecret(
+                                code = "usertwocode",
+                                subjectId = TestUser.idString(userId2),
+                                subjectType = TestUser.name,
+                                createdAt = now()
+                            )
                         )
                     )
-                )
+                }
 
                 // User2 should NOT be able to use user1's code (which was deleted)
                 assertFailsWith<BadRequestException>("User2 should not be able to use deleted code") {
@@ -605,6 +626,7 @@ class BackupCodeEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -616,39 +638,41 @@ class BackupCodeEndpointsTest {
             )
         }.let { server ->
             server.test({}) {
-                val table = server.backupCodes.modelInfo.table()
+                execute {
+                    val table = server.backupCodes.modelInfo.table()
 
-                // Insert multiple backup codes
-                table.insert(
-                    listOf(
-                        BackupCodeSecret(
-                            code = "firstcode",
-                            subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name,
-                            createdAt = now()
+                    // Insert multiple backup codes
+                    table.insert(
+                        listOf(
+                            BackupCodeSecret(
+                                code = "firstcode",
+                                subjectId = TestUser.idString(userId),
+                                subjectType = TestUser.name,
+                                createdAt = now()
+                            )
                         )
                     )
-                )
-                table.insert(
-                    listOf(
-                        BackupCodeSecret(
-                            code = "secondcode",
-                            subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name,
-                            createdAt = now()
+                    table.insert(
+                        listOf(
+                            BackupCodeSecret(
+                                code = "secondcode",
+                                subjectId = TestUser.idString(userId),
+                                subjectType = TestUser.name,
+                                createdAt = now()
+                            )
                         )
                     )
-                )
-                table.insert(
-                    listOf(
-                        BackupCodeSecret(
-                            code = "thirdcode",
-                            subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name,
-                            createdAt = now()
+                    table.insert(
+                        listOf(
+                            BackupCodeSecret(
+                                code = "thirdcode",
+                                subjectId = TestUser.idString(userId),
+                                subjectType = TestUser.name,
+                                createdAt = now()
+                            )
                         )
                     )
-                )
+                }
 
                 // All codes should work (and be marked spent after use)
                 server.backupCodes.prove.test(
@@ -661,15 +685,19 @@ class BackupCodeEndpointsTest {
                 )
 
                 // Every row survives; only the redeemed one is spent, and the others stay usable.
-                val allCodes = table.find(condition<BackupCodeSecret> {
-                    it.subjectId.eq(TestUser.idString(userId))
-                }).toList()
+                val allCodes = execute {
+                    server.backupCodes.modelInfo.table().find(condition<BackupCodeSecret> {
+                        it.subjectId.eq(TestUser.idString(userId))
+                    }).toList()
+                }
                 assertEquals(3, allCodes.size, "using one code removed rows")
                 assertEquals(listOf("secondcode"), allCodes.filter { it.usedAt != null }.map { it.code })
 
-                val stillUsable = table.find(condition<BackupCodeSecret> {
-                    it.subjectId.eq(TestUser.idString(userId)) and it.usedAt.eq(null)
-                }).toList()
+                val stillUsable = execute {
+                    server.backupCodes.modelInfo.table().find(condition<BackupCodeSecret> {
+                        it.subjectId.eq(TestUser.idString(userId)) and it.usedAt.eq(null)
+                    }).toList()
+                }
                 assertEquals(2, stillUsable.size)
                 assertTrue(stillUsable.none { it.code == "secondcode" })
             }
@@ -703,6 +731,7 @@ class BackupCodeEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -724,22 +753,21 @@ class BackupCodeEndpointsTest {
             )
         }.let { server ->
             server.test({}) {
-                val table = server.backupCodes.modelInfo.table()
-                table.insert(
-                    listOf(
-                        BackupCodeSecret(
-                            code = "contestedcode",
-                            subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name,
-                            createdAt = now(),
+                val liveCodes = execute {
+                    val table = server.backupCodes.modelInfo.table()
+                    table.insert(
+                        listOf(
+                            BackupCodeSecret(
+                                code = "contestedcode",
+                                subjectId = TestUser.idString(userId),
+                                subjectType = TestUser.name,
+                                createdAt = now(),
+                            )
                         )
                     )
-                )
-                assertEquals(
-                    1,
-                    table.find(condition<BackupCodeSecret> { it.usedAt.eq(null) }).count(),
-                    "there is no live code to contest",
-                )
+                    table.find(condition<BackupCodeSecret> { it.usedAt.eq(null) }).count()
+                }
+                assertEquals(1, liveCodes, "there is no live code to contest")
 
                 val request = IdentificationAndPassword(
                     type = "TestUser",
@@ -764,7 +792,7 @@ class BackupCodeEndpointsTest {
                     "the rejection came from the rate limiter, not from losing the claim",
                 )
 
-                val after = table.find(Condition.Always).toList()
+                val after = execute { server.backupCodes.modelInfo.table().find(Condition.Always).toList() }
                 assertEquals(1, after.size, "the contested code's row did not survive")
                 assertNotNull(after.single().usedAt, "the code that produced a proof was not marked spent")
             }
@@ -800,6 +828,7 @@ class BackupCodeEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -813,38 +842,40 @@ class BackupCodeEndpointsTest {
             )
         }.let { server ->
             server.test({}) {
-                val table = server.backupCodes.modelInfo.table()
                 val spentAt = now()
 
-                table.insert(
-                    listOf(
-                        BackupCodeSecret(
-                            code = "liveonecode",
-                            subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name,
-                            createdAt = now(),
-                        ),
-                        BackupCodeSecret(
-                            code = "livetwocode",
-                            subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name,
-                            createdAt = now(),
-                        ),
-                        BackupCodeSecret(
-                            code = "alreadyspent",
-                            subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name,
-                            createdAt = now(),
-                            usedAt = spentAt,
-                        ),
+                val before = execute {
+                    val table = server.backupCodes.modelInfo.table()
+                    table.insert(
+                        listOf(
+                            BackupCodeSecret(
+                                code = "liveonecode",
+                                subjectId = TestUser.idString(userId),
+                                subjectType = TestUser.name,
+                                createdAt = now(),
+                            ),
+                            BackupCodeSecret(
+                                code = "livetwocode",
+                                subjectId = TestUser.idString(userId),
+                                subjectType = TestUser.name,
+                                createdAt = now(),
+                            ),
+                            BackupCodeSecret(
+                                code = "alreadyspent",
+                                subjectId = TestUser.idString(userId),
+                                subjectType = TestUser.name,
+                                createdAt = now(),
+                                usedAt = spentAt,
+                            ),
+                        )
                     )
-                )
 
-                // The fixture has to actually be in the state the test claims, or every assertion
-                // below would hold just as well against an empty table.
-                val before = table.find(condition<BackupCodeSecret> {
-                    it.subjectId.eq(TestUser.idString(userId))
-                }).toList()
+                    // The fixture has to actually be in the state the test claims, or every assertion
+                    // below would hold just as well against an empty table.
+                    table.find(condition<BackupCodeSecret> {
+                        it.subjectId.eq(TestUser.idString(userId))
+                    }).toList()
+                }
                 assertEquals(3, before.size)
                 assertEquals(2, before.count { it.usedAt == null })
 
@@ -852,9 +883,11 @@ class BackupCodeEndpointsTest {
                 val issued = server.backupCodes.resetCodes.test(auth, Unit)
                 assertEquals(5, issued.size, "reset did not issue a fresh set of codes")
 
-                val after = table.find(condition<BackupCodeSecret> {
-                    it.subjectId.eq(TestUser.idString(userId))
-                }).toList()
+                val after = execute {
+                    server.backupCodes.modelInfo.table().find(condition<BackupCodeSecret> {
+                        it.subjectId.eq(TestUser.idString(userId))
+                    }).toList()
+                }
 
                 val spent = after.filter { it.usedAt != null }
                 assertEquals(listOf("alreadyspent"), spent.map { it.code }, "revocation erased a redemption record")
@@ -883,6 +916,7 @@ class BackupCodeEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -894,38 +928,42 @@ class BackupCodeEndpointsTest {
             )
         }.let { server ->
             server.test({}) {
-                val table = server.backupCodes.modelInfo.table()
                 val spentAt = now()
 
-                table.insert(
-                    listOf(
-                        BackupCodeSecret(
-                            code = "stillusable",
-                            subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name,
-                            createdAt = now(),
-                        ),
-                        BackupCodeSecret(
-                            code = "alreadyspent",
-                            subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name,
-                            createdAt = now(),
-                            usedAt = spentAt,
-                        ),
+                val before = execute {
+                    val table = server.backupCodes.modelInfo.table()
+                    table.insert(
+                        listOf(
+                            BackupCodeSecret(
+                                code = "stillusable",
+                                subjectId = TestUser.idString(userId),
+                                subjectType = TestUser.name,
+                                createdAt = now(),
+                            ),
+                            BackupCodeSecret(
+                                code = "alreadyspent",
+                                subjectId = TestUser.idString(userId),
+                                subjectType = TestUser.name,
+                                createdAt = now(),
+                                usedAt = spentAt,
+                            ),
+                        )
                     )
-                )
-                val before = table.find(condition<BackupCodeSecret> {
-                    it.subjectId.eq(TestUser.idString(userId))
-                }).toList()
+                    table.find(condition<BackupCodeSecret> {
+                        it.subjectId.eq(TestUser.idString(userId))
+                    }).toList()
+                }
                 assertEquals(2, before.size)
                 assertEquals(1, before.count { it.usedAt == null })
 
                 val auth = Authentication(TestUser, userId, sessionId = null).forEndpoint()
                 server.backupCodes.clearCodes.test(auth, Unit)
 
-                val after = table.find(condition<BackupCodeSecret> {
-                    it.subjectId.eq(TestUser.idString(userId))
-                }).toList()
+                val after = execute {
+                    server.backupCodes.modelInfo.table().find(condition<BackupCodeSecret> {
+                        it.subjectId.eq(TestUser.idString(userId))
+                    }).toList()
+                }
                 assertEquals(
                     listOf("alreadyspent"),
                     after.map { it.code },
@@ -933,7 +971,7 @@ class BackupCodeEndpointsTest {
                 )
                 assertEquals(spentAt, after.single().usedAt, "the redemption's timestamp did not survive clearing")
                 assertFalse(
-                    server.backupCodes.established(TestUser, user),
+                    execute { server.backupCodes.established(TestUser, user) },
                     "a cleared user still reads as having backup codes established",
                 )
             }
@@ -957,6 +995,7 @@ class BackupCodeEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -970,43 +1009,44 @@ class BackupCodeEndpointsTest {
             )
         }.let { server ->
             server.test({}) {
-                val table = server.backupCodes.modelInfo.table()
-                table.insert(
-                    listOf(
-                        BackupCodeSecret(
-                            code = "ownerscodeone",
-                            subjectId = TestUser.idString(ownerId),
-                            subjectType = TestUser.name,
-                            createdAt = now(),
-                        ),
-                        BackupCodeSecret(
-                            code = "ownerscodetwo",
-                            subjectId = TestUser.idString(ownerId),
-                            subjectType = TestUser.name,
-                            createdAt = now(),
-                        ),
+                execute {
+                    server.backupCodes.modelInfo.table().insert(
+                        listOf(
+                            BackupCodeSecret(
+                                code = "ownerscodeone",
+                                subjectId = TestUser.idString(ownerId),
+                                subjectType = TestUser.name,
+                                createdAt = now(),
+                            ),
+                            BackupCodeSecret(
+                                code = "ownerscodetwo",
+                                subjectId = TestUser.idString(ownerId),
+                                subjectType = TestUser.name,
+                                createdAt = now(),
+                            ),
+                        )
                     )
-                )
+                }
                 val ownersLiveCodes = condition<BackupCodeSecret> {
                     it.subjectId.eq(TestUser.idString(ownerId)) and it.usedAt.eq(null)
                 }
                 assertEquals(
                     listOf("ownerscodeone", "ownerscodetwo"),
-                    table.find(ownersLiveCodes).toList().map { it.code }.sorted(),
+                    execute { server.backupCodes.modelInfo.table().find(ownersLiveCodes).toList() }.map { it.code }.sorted(),
                 )
 
                 val otherAuth = Authentication(TestUser, otherId, sessionId = null).forEndpoint()
                 server.backupCodes.resetCodes.test(otherAuth, Unit)
                 assertEquals(
                     listOf("ownerscodeone", "ownerscodetwo"),
-                    table.find(ownersLiveCodes).toList().map { it.code }.sorted(),
+                    execute { server.backupCodes.modelInfo.table().find(ownersLiveCodes).toList() }.map { it.code }.sorted(),
                     "resetting one subject's codes revoked another subject's",
                 )
 
                 server.backupCodes.clearCodes.test(otherAuth, Unit)
                 assertEquals(
                     listOf("ownerscodeone", "ownerscodetwo"),
-                    table.find(ownersLiveCodes).toList().map { it.code }.sorted(),
+                    execute { server.backupCodes.modelInfo.table().find(ownersLiveCodes).toList() }.map { it.code }.sorted(),
                     "clearing one subject's codes revoked another subject's",
                 )
             }
@@ -1029,8 +1069,8 @@ class BackupCodeEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
-                register(TestUser)
                 registerBasicMediaTypeCoders()
+                register(TestUser)
             }
 
             val backupCodes = path.path("auth").path("backup") include BackupCodeEndpoints(
@@ -1041,18 +1081,21 @@ class BackupCodeEndpointsTest {
             )
         }.let { server ->
             server.test({}) {
-                val table = server.backupCodes.modelInfo.table()
-                table.insert(
-                    listOf(
-                        BackupCodeSecret(
-                            code = "targetedcode",
-                            subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name,
-                            createdAt = now(),
+                val initialCount = execute {
+                    val table = server.backupCodes.modelInfo.table()
+                    table.insert(
+                        listOf(
+                            BackupCodeSecret(
+                                code = "targetedcode",
+                                subjectId = TestUser.idString(userId),
+                                subjectType = TestUser.name,
+                                createdAt = now(),
+                            )
                         )
                     )
-                )
-                assertEquals(1, table.find(Condition.Always).count())
+                    table.find(Condition.Always).count()
+                }
+                assertEquals(1, initialCount)
 
                 // What is required is not merely "some authenticated caller" but a recent proof of this
                 // very method — the same bar as changing the credential these codes back up.
@@ -1061,8 +1104,7 @@ class BackupCodeEndpointsTest {
 
                 for (endpoint in listOf("reset-codes", "clear-codes")) {
                     val response = runBlocking {
-                        contextOf<TestRunner>()
-                        serverRuntime.handle(
+                        engine.handleRoot(
                             HttpRequest(
                                 path = RawHttpEndpoint(asString = "/auth/backup/$endpoint", method = HttpMethod.POST),
                                 queryParameters = QueryParameters.EMPTY,
@@ -1085,7 +1127,7 @@ class BackupCodeEndpointsTest {
 
                 assertEquals(
                     1,
-                    table.find(Condition.Always).count(),
+                    execute { server.backupCodes.modelInfo.table().find(Condition.Always).count() },
                     "an unauthenticated request revoked a code anyway",
                 )
             }
@@ -1109,6 +1151,7 @@ class BackupCodeEndpointsTest {
             val cache = setting("cache", Cache.Settings("ram"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -1120,16 +1163,18 @@ class BackupCodeEndpointsTest {
             )
         }.let { server ->
             server.test({}) {
-                server.backupCodes.modelInfo.table().insert(
-                    listOf(
-                        BackupCodeSecret(
-                            code = "validcode",
-                            subjectId = TestUser.idString(userId),
-                            subjectType = TestUser.name,
-                            createdAt = now()
+                execute {
+                    server.backupCodes.modelInfo.table().insert(
+                        listOf(
+                            BackupCodeSecret(
+                                code = "validcode",
+                                subjectId = TestUser.idString(userId),
+                                subjectType = TestUser.name,
+                                createdAt = now()
+                            )
                         )
                     )
-                )
+                }
 
                 // Five distinct case variants that all normalize to "test@example.com". The default limit
                 // is 5 attempts; five failing attempts across these variants must fill ONE shared bucket.

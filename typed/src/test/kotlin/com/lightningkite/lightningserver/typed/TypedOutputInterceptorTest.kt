@@ -8,9 +8,12 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.InternalLightningServerApi
+import com.lightningkite.lightningserver.runtime.Engine
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.handle
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.engine
+import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
@@ -19,6 +22,8 @@ import com.lightningkite.lightningserver.websockets.WebSocketFrame
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
+import com.lightningkite.services.data.Unsafe
+import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
@@ -37,8 +42,8 @@ import kotlin.uuid.Uuid
 class TypedOutputInterceptorTest {
 
     private data class Seen(
-        val executionId: Uuid,
-        val causedBy: Uuid?,
+        val executionId: Execution.ID,
+        val causedBy: Execution.ID?,
         val serialName: String,
         val value: Any?,
     )
@@ -110,7 +115,8 @@ class TypedOutputInterceptorTest {
         )
     }
 
-    private val outerRequestId = Uuid.parse("00000000-0000-4000-8000-000000000001")
+    @OptIn(InternalLightningServerApi::class, Unsafe::class) // SAFETY: Only compared for identity, never ordered by time
+    private val outerRequestId = Execution.ID(UuidV7.fromRaw(Uuid.parse("00000000-0000-4000-8000-000000000001")))
 
     private fun request(path: String, method: HttpMethod = HttpMethod.GET, body: String? = null) =
         HttpRequest<PathSpec>(
@@ -123,17 +129,17 @@ class TypedOutputInterceptorTest {
             body = body?.let { TypedData.text(it, MediaType.Application.Json) },
         )
 
-    private fun onServer(block: suspend context(ServerRuntime) () -> Unit) = TestServer.test(settings = {
+    private fun onServer(block: suspend context(Engine) () -> Unit) = TestServer.test(settings = {
         generalSettings set GeneralServerSettings()
         database set Database.Settings()
     }) {
         Observed.reset()
-        runBlocking { block(serverRuntime) }
+        runBlocking { block(engine) }
     }
 
     @Test
     fun `an http response is observed with its serializer and value`() = onServer {
-        serverRuntime.handle(request("/alpha"), outerRequestId)
+        engine.handleRoot(request("/alpha"), outerRequestId)
 
         assertEquals(1, Observed.seen.size, "expected exactly one observation, saw ${Observed.seen}")
         val seen = Observed.seen.single()
@@ -148,7 +154,7 @@ class TypedOutputInterceptorTest {
      */
     @Test
     fun `every sub-response of a multiplexed request is observed separately`() = onServer {
-        serverRuntime.handle(
+        engine.handleRoot(
             request(
                 "/meta/bulk",
                 HttpMethod.POST,
@@ -173,7 +179,7 @@ class TypedOutputInterceptorTest {
     @Test
     fun `a failing interceptor prevents the response`() = onServer {
         Observed.failOn = "alpha"
-        val response = serverRuntime.handle(request("/alpha"), outerRequestId)
+        val response = engine.handleRoot(request("/alpha"), outerRequestId)
 
         assertEquals(HttpStatus.InternalServerError, response.status, "the response was sent anyway")
     }
@@ -186,7 +192,7 @@ class TypedOutputInterceptorTest {
         }) {
             Observed.reset()
             val socket = TestServer.updates.webSocket.test()
-            val json = contextOf<ServerRuntime>().externalSerialization.json
+            val json = engine.externalSerialization.json
             val always: Condition<Sample> = Condition.Always
             socket.send(WebSocketFrame.Text(json.encodeToString(Condition.serializer(Sample.serializer()), always)))
 

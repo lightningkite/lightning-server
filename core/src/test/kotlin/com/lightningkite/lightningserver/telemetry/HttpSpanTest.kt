@@ -9,8 +9,8 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.plainText
 import com.lightningkite.lightningserver.runtime.Execution
-import com.lightningkite.lightningserver.runtime.handle
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.engine
+import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.services.telemetry.TelemetryBackend
@@ -54,7 +54,7 @@ class HttpSpanTest {
             }
         ) {
             runBlocking {
-                serverRuntime.handle(
+                engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/users/abc", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,
@@ -117,7 +117,7 @@ class HttpSpanTest {
             }
         ) {
             runBlocking {
-                serverRuntime.handle(
+                engine.handleRoot(
                     HttpRequest(
                         path = RawHttpEndpoint(asString = "/does/not/exist", method = HttpMethod.GET),
                         queryParameters = QueryParameters.EMPTY,

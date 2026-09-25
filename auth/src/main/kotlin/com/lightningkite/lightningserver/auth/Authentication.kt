@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.data.*
 import com.lightningkite.lightningserver.definition.MutableExtensions
 import com.lightningkite.lightningserver.http.HttpHeader
+import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.*
@@ -27,7 +28,7 @@ import kotlin.time.Instant
  * @param cache Optional cache for storing fetched data
  * @return A new [Authentication] instance
  */
-context(server: ServerRuntime)
+context(server: Engine)
 public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
     principalType: PrincipalType<SUBJECT, ID>,
     id: ID,
@@ -172,7 +173,7 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
      * @throws UnauthorizedException if the principal type is not registered
      */
     @Suppress("UNCHECKED_CAST")
-    context(server: ServerRuntime)
+    context(server: Engine)
     public val untypedPrincipal: PrincipalType<SUBJECT, *>
         get() = cachedType
             ?: (server.server.principalTypes[principalName] as? PrincipalType<SUBJECT, *>)?.also { cachedType = it }
@@ -186,7 +187,7 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
      *
      * The ID is lazily deserialized from [rawId] and cached for subsequent access.
      */
-    context(server: ServerRuntime)
+    context(server: Engine)
     public val untypedId: Comparable<*>
         get() = cachedId
             ?: server.internalSerialization.stringArrayFormat
@@ -408,12 +409,12 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
  */
 
 @Suppress("UNCHECKED_CAST")
-context(server: ServerRuntime)
+context(server: Engine)
 public val <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication<SUBJECT>.principalType: PrincipalType<SUBJECT, ID>
     get() = untypedPrincipal as PrincipalType<SUBJECT, ID>
 
 @Suppress("UNCHECKED_CAST")
-context(server: ServerRuntime)
+context(server: Engine)
 public val <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication<SUBJECT>.id: ID
     get() = untypedId as ID
 

@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.sessions.proofs
 
 import com.lightningkite.lightningserver.auth.PrincipalType
 import com.lightningkite.lightningserver.auth.register
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.encryption.SecretBasis
@@ -49,6 +50,7 @@ class EmailProofEndpointsTest {
         val email = setting("email", EmailService.Settings("test"))
 
         init {
+            registerBasicMediaTypeCoders()
             register(TestUser)
         }
     }
@@ -59,6 +61,7 @@ class EmailProofEndpointsTest {
         val email = setting("email", EmailService.Settings("test"))
 
         init {
+            registerBasicMediaTypeCoders()
             register(TestUser)
         }
     }
@@ -68,6 +71,7 @@ class EmailProofEndpointsTest {
         val email = setting("email", EmailService.Settings("test"))
 
         init {
+            registerBasicMediaTypeCoders()
             register(TestUser)
         }
     }
@@ -77,6 +81,7 @@ class EmailProofEndpointsTest {
         val email = setting("email", EmailService.Settings("test"))
 
         init {
+            registerBasicMediaTypeCoders()
             register(TestUser)
         }
     }
@@ -88,6 +93,7 @@ class EmailProofEndpointsTest {
             val email = setting("email", EmailService.Settings("test"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -133,6 +139,7 @@ class EmailProofEndpointsTest {
             val email = setting("email", EmailService.Settings("test"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -185,6 +192,7 @@ class EmailProofEndpointsTest {
             val email = setting("email", EmailService.Settings("test"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 
@@ -228,6 +236,7 @@ class EmailProofEndpointsTest {
             val email = setting("email", EmailService.Settings("test"))
 
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
 

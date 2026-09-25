@@ -2,6 +2,7 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.runBlocking
@@ -71,11 +72,13 @@ class DoOnceTest {
         TestServer.test({}) {
             var executed = false
 
-            doOnce(
-                key = "first-call-test",
-                database = database
-            ) {
-                executed = true
+            execute {
+                doOnce(
+                    key = "first-call-test",
+                    database = database
+                ) {
+                    executed = true
+                }
             }
 
             assertTrue(executed, "Action should be executed on first call")
@@ -87,20 +90,22 @@ class DoOnceTest {
         TestServer.test({}) {
             var executionCount = 0
 
-            // First call
-            doOnce(
-                key = "second-call-test",
-                database = database
-            ) {
-                executionCount++
-            }
+            execute {
+                // First call
+                doOnce(
+                    key = "second-call-test",
+                    database = database
+                ) {
+                    executionCount++
+                }
 
-            // Second call
-            doOnce(
-                key = "second-call-test",
-                database = database
-            ) {
-                executionCount++
+                // Second call
+                doOnce(
+                    key = "second-call-test",
+                    database = database
+                ) {
+                    executionCount++
+                }
             }
 
             assertEquals(1, executionCount, "Action should only execute once")
@@ -110,11 +115,13 @@ class DoOnceTest {
     @Test
     fun `doOnce creates ActionHasOccurred record in database`() = runBlocking {
         TestServer.test({}) {
-            doOnce(
-                key = "record-test",
-                database = database
-            ) {
-                // Empty action
+            execute {
+                doOnce(
+                    key = "record-test",
+                    database = database
+                ) {
+                    // Empty action
+                }
             }
 
             val table = database().table(actionTable)
@@ -129,11 +136,13 @@ class DoOnceTest {
     @Test
     fun `doOnce marks action as completed on success`() = runBlocking {
         TestServer.test({}) {
-            doOnce(
-                key = "completion-test",
-                database = database
-            ) {
-                // Successful action
+            execute {
+                doOnce(
+                    key = "completion-test",
+                    database = database
+                ) {
+                    // Successful action
+                }
             }
 
             val table = database().table(actionTable)
@@ -150,11 +159,13 @@ class DoOnceTest {
     fun `doOnce stores error message when action throws`() = runBlocking {
         TestServer.test({}) {
             try {
-                doOnce(
-                    key = "error-test",
-                    database = database
-                ) {
-                    throw Exception("Test error message")
+                execute {
+                    doOnce(
+                        key = "error-test",
+                        database = database
+                    ) {
+                        throw Exception("Test error message")
+                    }
                 }
             } catch (e: Exception) {
                 // Expected
@@ -177,23 +188,27 @@ class DoOnceTest {
 
             // First call - throws error
             try {
-                doOnce(
-                    key = "retry-test",
-                    database = database
-                ) {
-                    executionCount++
-                    throw Exception("First attempt error")
+                execute {
+                    doOnce(
+                        key = "retry-test",
+                        database = database
+                    ) {
+                        executionCount++
+                        throw Exception("First attempt error")
+                    }
                 }
             } catch (e: Exception) {
                 // Expected
             }
 
             // Second call - should retry since first failed
-            doOnce(
-                key = "retry-test",
-                database = database
-            ) {
-                executionCount++
+            execute {
+                doOnce(
+                    key = "retry-test",
+                    database = database
+                ) {
+                    executionCount++
+                }
             }
 
             assertEquals(2, executionCount, "Action should execute twice - once for failure, once for retry")
@@ -208,12 +223,14 @@ class DoOnceTest {
             var count1 = 0
             var count2 = 0
 
-            doOnce(key = "independent-key-1", database = database) { count1++ }
-            doOnce(key = "independent-key-2", database = database) { count2++ }
+            execute {
+                doOnce(key = "independent-key-1", database = database) { count1++ }
+                doOnce(key = "independent-key-2", database = database) { count2++ }
 
-            // Second calls
-            doOnce(key = "independent-key-1", database = database) { count1++ }
-            doOnce(key = "independent-key-2", database = database) { count2++ }
+                // Second calls
+                doOnce(key = "independent-key-1", database = database) { count1++ }
+                doOnce(key = "independent-key-2", database = database) { count2++ }
+            }
 
             assertEquals(1, count1, "Key 1 should only execute once")
             assertEquals(1, count2, "Key 2 should only execute once")
@@ -226,11 +243,13 @@ class DoOnceTest {
     fun `doOnce uses default timeout`() = runBlocking {
         TestServer.test({}) {
             // This test just verifies doOnce accepts default timeout
-            doOnce(
-                key = "default-timeout-test",
-                database = database
-            ) {
-                // Action completes
+            execute {
+                doOnce(
+                    key = "default-timeout-test",
+                    database = database
+                ) {
+                    // Action completes
+                }
             }
 
             val table = database().table(actionTable)
@@ -242,12 +261,14 @@ class DoOnceTest {
     @Test
     fun `doOnce accepts custom timeout`() = runBlocking {
         TestServer.test({}) {
-            doOnce(
-                key = "custom-timeout-test",
-                database = database,
-                timeout = 120.seconds
-            ) {
-                // Action completes
+            execute {
+                doOnce(
+                    key = "custom-timeout-test",
+                    database = database,
+                    timeout = 120.seconds
+                ) {
+                    // Action completes
+                }
             }
 
             val table = database().table(actionTable)

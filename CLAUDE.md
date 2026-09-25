@@ -86,7 +86,7 @@ For typed endpoints requiring authentication:
 Server.test(settings = {}) {
     runBlocking {
         val user = User(email = "test@example.com")
-        Server.userInfo.table().insertOne(user)
+        execute { Server.userInfo.table().insertOne(user) }
 
         val auth = Server.userPrincipal.testAuth(user)
         val result = Server.someProtectedEndpoint.test(auth = auth, input = Unit)
@@ -95,8 +95,19 @@ Server.test(settings = {}) {
 }
 ```
 
-`testAuth` is a `context(server: ServerRuntime)` extension on `PrincipalType`, so it must be called
-inside a `test { }` block where a `ServerRuntime` is in context.
+Inside a `test { }` block the only context is the `TestRunner`, which is an `Engine`, not a `ServerRuntime`:
+
+- The `.test()` helpers on handlers run the call the way an engine would, as a root execution through the server's
+  interceptors, so they need no runtime.
+- Anything the test does itself that needs a `ServerRuntime` — database access, auth fetches, sessions, launching
+  tasks, sending topic messages — goes inside `execute { }`, which runs it as an `Execution.Direct`. Keep database work
+  inside the block; don't return a `Table` from `execute` and use it afterwards.
+- Engine members such as `externalSerialization` or `server` are reached with `engine.X`, and simulating an incoming
+  request is `engine.handleRoot(request, Execution.ID.generate())`.
+- `testAuth` only needs an `Engine`, so it can be called directly in the test body.
+
+Test servers whose typed endpoints are exercised must call `registerBasicMediaTypeCoders()` in `init`, since typed
+calls encode their output.
 
 #### Common Testing Pitfalls
 

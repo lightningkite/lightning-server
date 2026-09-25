@@ -4,7 +4,7 @@ import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.engine
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
@@ -56,15 +56,15 @@ class FileSystemEndpointsTest {
             file.put(TypedData.text("Hello world!", MediaType.Text.Plain))
             println(file)
             println(file.signedUrl)
-            val serialized = serverRuntime.externalSerialization.stringArrayFormat.encodeToString(
+            val serialized = engine.externalSerialization.stringArrayFormat.encodeToString(
                 uploadEarly.serializer(),
                 file.serverFile
             )
             println("Serialized: $serialized")
             files().parseExternalUrl(serialized)!!
             println("Url parse successful")
-            val match = serverRuntime.server.endpoints.match(
-                serverRuntime.externalSerialization.stringArrayFormat,
+            val match = engine.server.endpoints.match(
+                engine.externalSerialization.stringArrayFormat,
                 serialized.substringBefore('?').substringAfter("://").substringAfter("/")
             ) { it.http[HttpMethod.GET] }!!
             Server.served.fetch.test(
@@ -126,15 +126,15 @@ class FileSystemEndpointsTest {
                 TypedData.text(List(1000) { it }.joinToString(""), MediaType.Text.Plain)
             )
 
-            val serialized = serverRuntime.externalSerialization.stringArrayFormat.encodeToString(
+            val serialized = engine.externalSerialization.stringArrayFormat.encodeToString(
                 uploadEarly.serializer(),
                 file.serverFile
             )
 
             files().parseExternalUrl(serialized)!!
 
-            val match = serverRuntime.server.endpoints.match(
-                serverRuntime.externalSerialization.stringArrayFormat,
+            val match = engine.server.endpoints.match(
+                engine.externalSerialization.stringArrayFormat,
                 serialized.substringBefore('?').substringAfter("://").substringAfter("/")
             ) { it.http[HttpMethod.GET] }!!
 

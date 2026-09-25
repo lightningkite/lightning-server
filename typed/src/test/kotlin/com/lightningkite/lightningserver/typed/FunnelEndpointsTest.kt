@@ -7,7 +7,9 @@ import com.lightningkite.lightningserver.definition.GeneralServerSettings
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.services.data.HealthStatus
 import com.lightningkite.services.data.ZonedDateTime
@@ -43,6 +45,7 @@ class FunnelEndpointsTest {
         val database = setting("database", Database.Settings())
 
         init {
+            registerBasicMediaTypeCoders()
             register(AdminUser)
             // IsAdmin is only a name until a server says what it means: left unconfigured it falls
             // back to IsSuperUser, which has no default and so rejects everyone. Defining it here is
@@ -86,7 +89,7 @@ class FunnelEndpointsTest {
             assertNotNull(id)
 
             // Verify the instance was created
-            val instance = TestServer.funnel.info.table().get(id)
+            val instance = execute { TestServer.funnel.info.table().get(id) }
             assertNotNull(instance)
             assertEquals("test-funnel", instance.funnel)
             assertEquals("TestAgent/1.0", instance.userAgent)
@@ -112,7 +115,7 @@ class FunnelEndpointsTest {
             TestServer.funnel.error.test(id, null, "Test error message")
 
             // Verify the error was added
-            val instance = TestServer.funnel.info.table().get(id)
+            val instance = execute { TestServer.funnel.info.table().get(id) }
             assertNotNull(instance)
             assertTrue(instance.errors.contains("Test error message"))
         }
@@ -137,7 +140,7 @@ class FunnelEndpointsTest {
             TestServer.funnel.error.test(id, null, "Error 3")
 
             // Verify all errors were added
-            val instance = TestServer.funnel.info.table().get(id)
+            val instance = execute { TestServer.funnel.info.table().get(id) }
             assertNotNull(instance)
             assertEquals(3, instance.errors.size)
             assertTrue(instance.errors.containsAll(setOf("Error 1", "Error 2", "Error 3")))
@@ -161,7 +164,7 @@ class FunnelEndpointsTest {
             TestServer.funnel.step.test(id, null, 3)
 
             // Verify the step was updated
-            val instance = TestServer.funnel.info.table().get(id)
+            val instance = execute { TestServer.funnel.info.table().get(id) }
             assertNotNull(instance)
             assertEquals(3, instance.step)
         }
@@ -181,7 +184,7 @@ class FunnelEndpointsTest {
             val id = TestServer.funnel.start.test(null, funnelStart)
 
             // Initially, success should be null
-            val initialInstance = TestServer.funnel.info.table().get(id)
+            val initialInstance = execute { TestServer.funnel.info.table().get(id) }
             assertNotNull(initialInstance)
             assertEquals(null, initialInstance.success)
 
@@ -189,7 +192,7 @@ class FunnelEndpointsTest {
             TestServer.funnel.success.test(id, null, Unit)
 
             // Verify success was recorded
-            val instance = TestServer.funnel.info.table().get(id)
+            val instance = execute { TestServer.funnel.info.table().get(id) }
             assertNotNull(instance)
             assertNotNull(instance.success)
         }
@@ -220,8 +223,10 @@ class FunnelEndpointsTest {
             database set Database.Settings()
         }) {
             // Clear any existing data
-            TestServer.funnel.info.table().deleteManyIgnoringOld(Condition.Always)
-            TestServer.funnel.summaryInfo.table().deleteManyIgnoringOld(Condition.Always)
+            execute {
+                TestServer.funnel.info.table().deleteManyIgnoringOld(Condition.Always)
+                TestServer.funnel.summaryInfo.table().deleteManyIgnoringOld(Condition.Always)
+            }
 
             val targetDate = LocalDate(2024, 1, 15)
             val zone = TimeZone.of("America/Denver")
@@ -230,67 +235,69 @@ class FunnelEndpointsTest {
             // Insert test funnel instances directly
             val testFunnel = "summarize-test-funnel"
 
-            // 2 successful (no errors)
-            // Note: summarize uses gt/lt (strict comparison), so we need to start > dayStart
-            repeat(2) {
+            execute {
+                // 2 successful (no errors)
+                // Note: summarize uses gt/lt (strict comparison), so we need to start > dayStart
+                repeat(2) {
+                    TestServer.funnel.info.table().insertOne(
+                        FunnelInstance(
+                            funnel = testFunnel,
+                            userAgent = "Test",
+                            version = "1.0",
+                            started = dayStart + (it + 1).minutes,  // Start at 1 minute after dayStart
+                            expiry = dayStart + 20.minutes,
+                            success = dayStart + 5.minutes,
+                            errors = emptySet()
+                        )
+                    )
+                }
+
+                // 1 successful after error
                 TestServer.funnel.info.table().insertOne(
                     FunnelInstance(
                         funnel = testFunnel,
                         userAgent = "Test",
                         version = "1.0",
-                        started = dayStart + (it + 1).minutes,  // Start at 1 minute after dayStart
-                        expiry = dayStart + 20.minutes,
-                        success = dayStart + 5.minutes,
+                        started = dayStart + 10.minutes,
+                        expiry = dayStart + 30.minutes,
+                        success = dayStart + 15.minutes,
+                        errors = setOf("recoverable error")
+                    )
+                )
+
+                // 1 error (no success)
+                TestServer.funnel.info.table().insertOne(
+                    FunnelInstance(
+                        funnel = testFunnel,
+                        userAgent = "Test",
+                        version = "1.0",
+                        started = dayStart + 20.minutes,
+                        expiry = dayStart + 40.minutes,
+                        success = null,
+                        errors = setOf("fatal error")
+                    )
+                )
+
+                // 1 abandoned (no success, no errors)
+                TestServer.funnel.info.table().insertOne(
+                    FunnelInstance(
+                        funnel = testFunnel,
+                        userAgent = "Test",
+                        version = "1.0",
+                        started = dayStart + 30.minutes,
+                        expiry = dayStart + 50.minutes,
+                        success = null,
                         errors = emptySet()
                     )
                 )
             }
 
-            // 1 successful after error
-            TestServer.funnel.info.table().insertOne(
-                FunnelInstance(
-                    funnel = testFunnel,
-                    userAgent = "Test",
-                    version = "1.0",
-                    started = dayStart + 10.minutes,
-                    expiry = dayStart + 30.minutes,
-                    success = dayStart + 15.minutes,
-                    errors = setOf("recoverable error")
-                )
-            )
-
-            // 1 error (no success)
-            TestServer.funnel.info.table().insertOne(
-                FunnelInstance(
-                    funnel = testFunnel,
-                    userAgent = "Test",
-                    version = "1.0",
-                    started = dayStart + 20.minutes,
-                    expiry = dayStart + 40.minutes,
-                    success = null,
-                    errors = setOf("fatal error")
-                )
-            )
-
-            // 1 abandoned (no success, no errors)
-            TestServer.funnel.info.table().insertOne(
-                FunnelInstance(
-                    funnel = testFunnel,
-                    userAgent = "Test",
-                    version = "1.0",
-                    started = dayStart + 30.minutes,
-                    expiry = dayStart + 50.minutes,
-                    success = null,
-                    errors = emptySet()
-                )
-            )
-
             // Run summarize for that date
-            TestServer.funnel.summarizeNow.test(adminAuth(), targetDate)
+            TestServer.funnel.summarizeNow.test(execute { adminAuth() }, targetDate)
 
             // Verify summary was created
             val summaries =
-                TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList()
+                execute { TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList() }
             assertEquals(1, summaries.size)
 
             val summary = summaries.first()
@@ -316,7 +323,7 @@ class FunnelEndpointsTest {
             database set Database.Settings()
         }) {
             // Clear any existing data
-            TestServer.funnel.summaryInfo.table().deleteManyIgnoringOld(Condition.Always)
+            execute { TestServer.funnel.summaryInfo.table().deleteManyIgnoringOld(Condition.Always) }
 
             val targetDate = LocalDate(2024, 2, 20)
 
@@ -350,12 +357,14 @@ class FunnelEndpointsTest {
                 count = 30
             )
 
-            TestServer.funnel.summaryInfo.table().insertOne(summary1)
-            TestServer.funnel.summaryInfo.table().insertOne(summary2)
-            TestServer.funnel.summaryInfo.table().insertOne(summaryOtherDate)
+            execute {
+                TestServer.funnel.summaryInfo.table().insertOne(summary1)
+                TestServer.funnel.summaryInfo.table().insertOne(summary2)
+                TestServer.funnel.summaryInfo.table().insertOne(summaryOtherDate)
+            }
 
             // Get summaries for target date
-            val result = TestServer.funnel.summaries.test(targetDate, adminAuth(), Unit)
+            val result = TestServer.funnel.summaries.test(targetDate, execute { adminAuth() }, Unit)
 
             assertEquals(2, result.size)
             assertTrue(result.any { it.funnel == "funnel-a" })
@@ -370,8 +379,10 @@ class FunnelEndpointsTest {
             generalSettings set GeneralServerSettings()
             database set Database.Settings()
         }) {
-            TestServer.funnel.info.table().deleteManyIgnoringOld(Condition.Always)
-            TestServer.funnel.summaryInfo.table().deleteManyIgnoringOld(Condition.Always)
+            execute {
+                TestServer.funnel.info.table().deleteManyIgnoringOld(Condition.Always)
+                TestServer.funnel.summaryInfo.table().deleteManyIgnoringOld(Condition.Always)
+            }
 
             val targetDate = LocalDate(2024, 3, 1)
             val zone = TimeZone.of("America/Denver")
@@ -382,37 +393,39 @@ class FunnelEndpointsTest {
 
             // Insert 100 successful instances, 1 error (1% actual error rate, well below 10% threshold)
             // Note: summarize uses gt/lt (strict comparison), so we need to start > dayStart
-            repeat(100) {
+            execute {
+                repeat(100) {
+                    TestServer.funnel.info.table().insertOne(
+                        FunnelInstance(
+                            funnel = testFunnel,
+                            userAgent = "Test",
+                            version = "1.0",
+                            started = dayStart + (it + 1).minutes,  // Start at 1 minute after dayStart
+                            expiry = dayStart + (it + 21).minutes,
+                            success = dayStart + (it + 6).minutes,
+                            errors = emptySet(),
+                            expectedErrorRate = expectedErrorRate
+                        )
+                    )
+                }
                 TestServer.funnel.info.table().insertOne(
                     FunnelInstance(
                         funnel = testFunnel,
                         userAgent = "Test",
                         version = "1.0",
-                        started = dayStart + (it + 1).minutes,  // Start at 1 minute after dayStart
-                        expiry = dayStart + (it + 21).minutes,
-                        success = dayStart + (it + 6).minutes,
-                        errors = emptySet(),
+                        started = dayStart + 102.minutes,
+                        expiry = dayStart + 122.minutes,
+                        success = null,
+                        errors = setOf("error"),
                         expectedErrorRate = expectedErrorRate
                     )
                 )
             }
-            TestServer.funnel.info.table().insertOne(
-                FunnelInstance(
-                    funnel = testFunnel,
-                    userAgent = "Test",
-                    version = "1.0",
-                    started = dayStart + 102.minutes,
-                    expiry = dayStart + 122.minutes,
-                    success = null,
-                    errors = setOf("error"),
-                    expectedErrorRate = expectedErrorRate
-                )
-            )
 
-            TestServer.funnel.summarizeNow.test(adminAuth(), targetDate)
+            TestServer.funnel.summarizeNow.test(execute { adminAuth() }, targetDate)
 
             val summaries =
-                TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList()
+                execute { TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList() }
             assertEquals(1, summaries.size)
 
             val summary = summaries.first()
@@ -427,8 +440,10 @@ class FunnelEndpointsTest {
             generalSettings set GeneralServerSettings()
             database set Database.Settings()
         }) {
-            TestServer.funnel.info.table().deleteManyIgnoringOld(Condition.Always)
-            TestServer.funnel.summaryInfo.table().deleteManyIgnoringOld(Condition.Always)
+            execute {
+                TestServer.funnel.info.table().deleteManyIgnoringOld(Condition.Always)
+                TestServer.funnel.summaryInfo.table().deleteManyIgnoringOld(Condition.Always)
+            }
 
             val targetDate = LocalDate(2024, 3, 2)
             val zone = TimeZone.of("America/Denver")
@@ -439,39 +454,41 @@ class FunnelEndpointsTest {
 
             // Insert 85 successful instances, 15 errors (15% actual error rate, between 10% and 20%)
             // Note: summarize uses gt/lt (strict comparison), so we need to start > dayStart
-            repeat(85) {
-                TestServer.funnel.info.table().insertOne(
-                    FunnelInstance(
-                        funnel = testFunnel,
-                        userAgent = "Test",
-                        version = "1.0",
-                        started = dayStart + (it + 1).minutes,  // Start at 1 minute after dayStart
-                        expiry = dayStart + (it + 21).minutes,
-                        success = dayStart + (it + 6).minutes,
-                        errors = emptySet(),
-                        expectedErrorRate = expectedErrorRate
+            execute {
+                repeat(85) {
+                    TestServer.funnel.info.table().insertOne(
+                        FunnelInstance(
+                            funnel = testFunnel,
+                            userAgent = "Test",
+                            version = "1.0",
+                            started = dayStart + (it + 1).minutes,  // Start at 1 minute after dayStart
+                            expiry = dayStart + (it + 21).minutes,
+                            success = dayStart + (it + 6).minutes,
+                            errors = emptySet(),
+                            expectedErrorRate = expectedErrorRate
+                        )
                     )
-                )
-            }
-            repeat(15) {
-                TestServer.funnel.info.table().insertOne(
-                    FunnelInstance(
-                        funnel = testFunnel,
-                        userAgent = "Test",
-                        version = "1.0",
-                        started = dayStart + (86 + it).minutes,
-                        expiry = dayStart + (106 + it).minutes,
-                        success = null,
-                        errors = setOf("error"),
-                        expectedErrorRate = expectedErrorRate
+                }
+                repeat(15) {
+                    TestServer.funnel.info.table().insertOne(
+                        FunnelInstance(
+                            funnel = testFunnel,
+                            userAgent = "Test",
+                            version = "1.0",
+                            started = dayStart + (86 + it).minutes,
+                            expiry = dayStart + (106 + it).minutes,
+                            success = null,
+                            errors = setOf("error"),
+                            expectedErrorRate = expectedErrorRate
+                        )
                     )
-                )
+                }
             }
 
-            TestServer.funnel.summarizeNow.test(adminAuth(), targetDate)
+            TestServer.funnel.summarizeNow.test(execute { adminAuth() }, targetDate)
 
             val summaries =
-                TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList()
+                execute { TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList() }
             assertEquals(1, summaries.size)
 
             val summary = summaries.first()
@@ -486,8 +503,10 @@ class FunnelEndpointsTest {
             generalSettings set GeneralServerSettings()
             database set Database.Settings()
         }) {
-            TestServer.funnel.info.table().deleteManyIgnoringOld(Condition.Always)
-            TestServer.funnel.summaryInfo.table().deleteManyIgnoringOld(Condition.Always)
+            execute {
+                TestServer.funnel.info.table().deleteManyIgnoringOld(Condition.Always)
+                TestServer.funnel.summaryInfo.table().deleteManyIgnoringOld(Condition.Always)
+            }
 
             val targetDate = LocalDate(2024, 3, 3)
             val zone = TimeZone.of("America/Denver")
@@ -498,39 +517,41 @@ class FunnelEndpointsTest {
 
             // Insert 70 successful instances, 30 errors (30% actual error rate, above 10%)
             // Note: summarize uses gt/lt (strict comparison), so we need to start > dayStart
-            repeat(70) {
-                TestServer.funnel.info.table().insertOne(
-                    FunnelInstance(
-                        funnel = testFunnel,
-                        userAgent = "Test",
-                        version = "1.0",
-                        started = dayStart + (it + 1).minutes,  // Start at 1 minute after dayStart
-                        expiry = dayStart + (it + 21).minutes,
-                        success = dayStart + (it + 6).minutes,
-                        errors = emptySet(),
-                        expectedErrorRate = expectedErrorRate
+            execute {
+                repeat(70) {
+                    TestServer.funnel.info.table().insertOne(
+                        FunnelInstance(
+                            funnel = testFunnel,
+                            userAgent = "Test",
+                            version = "1.0",
+                            started = dayStart + (it + 1).minutes,  // Start at 1 minute after dayStart
+                            expiry = dayStart + (it + 21).minutes,
+                            success = dayStart + (it + 6).minutes,
+                            errors = emptySet(),
+                            expectedErrorRate = expectedErrorRate
+                        )
                     )
-                )
-            }
-            repeat(30) {
-                TestServer.funnel.info.table().insertOne(
-                    FunnelInstance(
-                        funnel = testFunnel,
-                        userAgent = "Test",
-                        version = "1.0",
-                        started = dayStart + (71 + it).minutes,
-                        expiry = dayStart + (91 + it).minutes,
-                        success = null,
-                        errors = setOf("error"),
-                        expectedErrorRate = expectedErrorRate
+                }
+                repeat(30) {
+                    TestServer.funnel.info.table().insertOne(
+                        FunnelInstance(
+                            funnel = testFunnel,
+                            userAgent = "Test",
+                            version = "1.0",
+                            started = dayStart + (71 + it).minutes,
+                            expiry = dayStart + (91 + it).minutes,
+                            success = null,
+                            errors = setOf("error"),
+                            expectedErrorRate = expectedErrorRate
+                        )
                     )
-                )
+                }
             }
 
-            TestServer.funnel.summarizeNow.test(adminAuth(), targetDate)
+            TestServer.funnel.summarizeNow.test(execute { adminAuth() }, targetDate)
 
             val summaries =
-                TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList()
+                execute { TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList() }
             assertEquals(1, summaries.size)
 
             val summary = summaries.first()
@@ -545,45 +566,49 @@ class FunnelEndpointsTest {
             generalSettings set GeneralServerSettings()
             database set Database.Settings()
         }) {
-            TestServer.funnel.info.table().deleteManyIgnoringOld(Condition.Always)
-            TestServer.funnel.summaryInfo.table().deleteManyIgnoringOld(Condition.Always)
+            execute {
+                TestServer.funnel.info.table().deleteManyIgnoringOld(Condition.Always)
+                TestServer.funnel.summaryInfo.table().deleteManyIgnoringOld(Condition.Always)
+            }
 
             val targetDate = LocalDate(2024, 4, 1)
             val zone = TimeZone.of("America/Denver")
             val dayStart = ZonedDateTime(LocalDateTime(targetDate, LocalTime(8, 0, 0)), zone).toInstant()
 
-            // Insert an existing summary
-            TestServer.funnel.summaryInfo.table().insertOne(
-                FunnelSummary(
-                    funnel = "replace-test",
-                    date = targetDate,
-                    status = HealthStatus.Level.ERROR,
-                    success = 0.1f,
-                    count = 10
-                )
-            )
-
-            // Insert new funnel instances
-            // Note: summarize uses gt/lt (strict comparison), so we need to start > dayStart
-            repeat(5) {
-                TestServer.funnel.info.table().insertOne(
-                    FunnelInstance(
+            execute {
+                // Insert an existing summary
+                TestServer.funnel.summaryInfo.table().insertOne(
+                    FunnelSummary(
                         funnel = "replace-test",
-                        userAgent = "Test",
-                        version = "1.0",
-                        started = dayStart + (it + 1).minutes,  // Start at 1 minute after dayStart
-                        expiry = dayStart + (it + 21).minutes,
-                        success = dayStart + (it + 6).minutes,
-                        errors = emptySet()
+                        date = targetDate,
+                        status = HealthStatus.Level.ERROR,
+                        success = 0.1f,
+                        count = 10
                     )
                 )
+
+                // Insert new funnel instances
+                // Note: summarize uses gt/lt (strict comparison), so we need to start > dayStart
+                repeat(5) {
+                    TestServer.funnel.info.table().insertOne(
+                        FunnelInstance(
+                            funnel = "replace-test",
+                            userAgent = "Test",
+                            version = "1.0",
+                            started = dayStart + (it + 1).minutes,  // Start at 1 minute after dayStart
+                            expiry = dayStart + (it + 21).minutes,
+                            success = dayStart + (it + 6).minutes,
+                            errors = emptySet()
+                        )
+                    )
+                }
             }
 
             // Run summarize - should replace the existing summary
-            TestServer.funnel.summarizeNow.test(adminAuth(), targetDate)
+            TestServer.funnel.summarizeNow.test(execute { adminAuth() }, targetDate)
 
             val summaries =
-                TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList()
+                execute { TestServer.funnel.summaryInfo.table().find(condition<FunnelSummary> { it.date.eq(targetDate) }).toList() }
             assertEquals(1, summaries.size)
 
             val summary = summaries.first()
@@ -617,7 +642,7 @@ class FunnelEndpointsTest {
             TestServer.funnel.success.test(id, null, Unit)
 
             // Verify final state
-            val instance = TestServer.funnel.info.table().get(id)
+            val instance = execute { TestServer.funnel.info.table().get(id) }
             assertNotNull(instance)
             assertEquals("checkout-flow", instance.funnel)
             assertEquals(3, instance.step)
@@ -648,7 +673,7 @@ class FunnelEndpointsTest {
             TestServer.funnel.success.test(id, null, Unit)
 
             // Verify state shows success after error
-            val instance = TestServer.funnel.info.table().get(id)
+            val instance = execute { TestServer.funnel.info.table().get(id) }
             assertNotNull(instance)
             assertEquals(1, instance.errors.size)
             assertNotNull(instance.success)

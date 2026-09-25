@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.notifications.*
 import com.lightningkite.lightningserver.notifications.events.Event
 import com.lightningkite.lightningserver.notifications.events.event
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.setStatic
 import com.lightningkite.lightningserver.typed.sdk.module
@@ -91,12 +92,14 @@ class NonCustomizableSubscriptionsTest {
         }) {
             runBlocking {
                 val user = TestUser(name = "TestUser")
-                Server.userInfo.table().insertOne(user)
+                val subscriptions = execute {
+                    Server.userInfo.table().insertOne(user)
 
-                val model = TestModel(ownerId = user._id)
-                val event = Event(Notifications.modelCreated.event, model)
+                    val model = TestModel(ownerId = user._id)
+                    val event = Event(Notifications.modelCreated.event, model)
 
-                val subscriptions = Notifications.handler.subscriptions.subscribed(event)
+                    Notifications.handler.subscriptions.subscribed(event)
+                }
 
                 assertEquals(1, subscriptions.size)
                 assertEquals(user._id, subscriptions.first().user)
@@ -112,12 +115,14 @@ class NonCustomizableSubscriptionsTest {
         }) {
             runBlocking {
                 val user = TestUser(name = "FrequencyUser")
-                Server.userInfo.table().insertOne(user)
+                val subscriptions = execute {
+                    Server.userInfo.table().insertOne(user)
 
-                val model = TestModel(ownerId = user._id)
-                val event = Event(Notifications.modelCreated.event, model)
+                    val model = TestModel(ownerId = user._id)
+                    val event = Event(Notifications.modelCreated.event, model)
 
-                val subscriptions = Notifications.handler.subscriptions.subscribed(event)
+                    Notifications.handler.subscriptions.subscribed(event)
+                }
                 val sub = subscriptions.find { it.user == user._id }!!
 
                 assertEquals(Frequency.immediately(), sub.email)
@@ -137,13 +142,15 @@ class NonCustomizableSubscriptionsTest {
             runBlocking {
                 val owner = TestUser(name = "Owner")
                 val other = TestUser(name = "Other")
-                Server.userInfo.table().insertOne(owner)
-                Server.userInfo.table().insertOne(other)
+                val subscriptions = execute {
+                    Server.userInfo.table().insertOne(owner)
+                    Server.userInfo.table().insertOne(other)
 
-                val model = TestModel(ownerId = owner._id)
-                val event = Event(Notifications.modelDeleted.event, model)
+                    val model = TestModel(ownerId = owner._id)
+                    val event = Event(Notifications.modelDeleted.event, model)
 
-                val subscriptions = Notifications.handler.subscriptions.subscribed(event)
+                    Notifications.handler.subscriptions.subscribed(event)
+                }
 
                 assertTrue(subscriptions.any { it.user == owner._id })
                 assertTrue(subscriptions.none { it.user == other._id })
@@ -159,12 +166,14 @@ class NonCustomizableSubscriptionsTest {
         }) {
             runBlocking {
                 val owner = TestUser(name = "Owner")
-                Server.userInfo.table().insertOne(owner)
+                val subs = execute {
+                    Server.userInfo.table().insertOne(owner)
 
-                val model = TestModel(ownerId = owner._id)
-                val event = Event(Notifications.modelDeleted.event, model)
+                    val model = TestModel(ownerId = owner._id)
+                    val event = Event(Notifications.modelDeleted.event, model)
 
-                val subs = Notifications.handler.subscriptions.subscribed(event)
+                    Notifications.handler.subscriptions.subscribed(event)
+                }
                 val sub = subs.find { it.user == owner._id }!!
 
                 // modelDeleted has sms = null
@@ -182,12 +191,14 @@ class NonCustomizableSubscriptionsTest {
         }) {
             runBlocking {
                 val owner = TestUser(name = "Owner")
-                Server.userInfo.table().insertOne(owner)
+                val subs = execute {
+                    Server.userInfo.table().insertOne(owner)
 
-                val model = TestModel(ownerId = owner._id)
-                val event = Event(Notifications.modelDeleted.event, model)
+                    val model = TestModel(ownerId = owner._id)
+                    val event = Event(Notifications.modelDeleted.event, model)
 
-                val subs = Notifications.handler.subscriptions.subscribed(event)
+                    Notifications.handler.subscriptions.subscribed(event)
+                }
                 val sub = subs.find { it.user == owner._id }!!
 
                 assertEquals(Frequency.daily(9, 0, kotlinx.datetime.TimeZone.UTC), sub.email)

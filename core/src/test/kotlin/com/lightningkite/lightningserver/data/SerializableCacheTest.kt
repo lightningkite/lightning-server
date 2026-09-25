@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.definition.GeneralServerSettings
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.set
 import kotlinx.coroutines.runBlocking
@@ -142,13 +143,15 @@ class SerializableCacheTest {
                     }
                 }
 
-                // First call should calculate
-                assertEquals("HELLO", cache.get(key, "hello"))
-                assertEquals(1, calculationCount)
+                execute {
+                    // First call should calculate
+                    assertEquals("HELLO", cache.get(key, "hello"))
+                    assertEquals(1, calculationCount)
 
-                // Second call should use cache
-                assertEquals("HELLO", cache.get(key, "hello"))
-                assertEquals(1, calculationCount) // Still 1, not recalculated
+                    // Second call should use cache
+                    assertEquals("HELLO", cache.get(key, "hello"))
+                    assertEquals(1, calculationCount) // Still 1, not recalculated
+                }
             }
         }
     }

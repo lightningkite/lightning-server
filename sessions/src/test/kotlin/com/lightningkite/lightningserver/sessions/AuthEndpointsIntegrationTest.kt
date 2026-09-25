@@ -11,7 +11,9 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.encryption.SecretBasis
 import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.sessions.proofs.IdentificationAndPassword
 import com.lightningkite.lightningserver.sessions.proofs.PasswordProofEndpoints
 import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
@@ -105,6 +107,8 @@ class AuthEndpointsIntegrationTest {
         AuthTestUser.users[userId] = user
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
             val cache = setting("cache", Cache.Settings("ram"))
 
@@ -119,7 +123,7 @@ class AuthEndpointsIntegrationTest {
         }.let { server ->
             server.test({}) {
                 // Establish password
-                server.passwordEndpoints.establish(AuthTestUser, userId, EstablishPassword("securePassword123"))
+                execute { server.passwordEndpoints.establish(AuthTestUser, userId, EstablishPassword("securePassword123")) }
 
                 // Get password proof
                 val proof = server.passwordEndpoints.prove.test(
@@ -149,6 +153,8 @@ class AuthEndpointsIntegrationTest {
         AuthTestUser.users[userId] = user
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
             val cache = setting("cache", Cache.Settings("ram"))
 
@@ -162,7 +168,7 @@ class AuthEndpointsIntegrationTest {
             val authEndpoints = path.path("auth") include TestAuthEndpoints(database = database, cache = cache)
         }.let { server ->
             server.test({}) {
-                server.passwordEndpoints.establish(AuthTestUser, userId, EstablishPassword("securePassword123"))
+                execute { server.passwordEndpoints.establish(AuthTestUser, userId, EstablishPassword("securePassword123")) }
                 val proof = server.passwordEndpoints.prove.test(
                     null, IdentificationAndPassword(
                         type = "AuthTestUser",
@@ -197,6 +203,8 @@ class AuthEndpointsIntegrationTest {
         AuthTestUser.users[userId] = user
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
             val cache = setting("cache", Cache.Settings("ram"))
 
@@ -211,7 +219,7 @@ class AuthEndpointsIntegrationTest {
         }.let { server ->
             server.test({}) {
                 // Establish password
-                server.passwordEndpoints.establish(AuthTestUser, userId, EstablishPassword("adminPassword"))
+                execute { server.passwordEndpoints.establish(AuthTestUser, userId, EstablishPassword("adminPassword")) }
 
                 // Get password proof
                 val proof = server.passwordEndpoints.prove.test(
@@ -245,6 +253,8 @@ class AuthEndpointsIntegrationTest {
         AuthTestUser.users[userId] = user
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
             val cache = setting("cache", Cache.Settings("ram"))
 
@@ -259,7 +269,7 @@ class AuthEndpointsIntegrationTest {
         }.let { server ->
             server.test({}) {
                 // Establish password
-                server.passwordEndpoints.establish(AuthTestUser, userId, EstablishPassword("myPassword"))
+                execute { server.passwordEndpoints.establish(AuthTestUser, userId, EstablishPassword("myPassword")) }
 
                 // Get password proof
                 val proof = server.passwordEndpoints.prove.test(
@@ -294,6 +304,8 @@ class AuthEndpointsIntegrationTest {
         AuthTestUser.users[userId2] = user2
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
             val cache = setting("cache", Cache.Settings("ram"))
 
@@ -308,8 +320,10 @@ class AuthEndpointsIntegrationTest {
         }.let { server ->
             server.test({}) {
                 // Establish passwords for both users
-                server.passwordEndpoints.establish(AuthTestUser, userId1, EstablishPassword("password1"))
-                server.passwordEndpoints.establish(AuthTestUser, userId2, EstablishPassword("password2"))
+                execute {
+                    server.passwordEndpoints.establish(AuthTestUser, userId1, EstablishPassword("password1"))
+                    server.passwordEndpoints.establish(AuthTestUser, userId2, EstablishPassword("password2"))
+                }
 
                 // Get proofs for both users
                 val proof1 = server.passwordEndpoints.prove.test(
@@ -346,6 +360,8 @@ class AuthEndpointsIntegrationTest {
         AuthTestUser.users[userId] = user
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
             val cache = setting("cache", Cache.Settings("ram"))
 
@@ -360,7 +376,7 @@ class AuthEndpointsIntegrationTest {
         }.let { server ->
             server.test({}) {
                 // Establish password
-                server.passwordEndpoints.establish(AuthTestUser, userId, EstablishPassword("securePassword"))
+                execute { server.passwordEndpoints.establish(AuthTestUser, userId, EstablishPassword("securePassword")) }
 
                 // Get password proof
                 val proof = server.passwordEndpoints.prove.test(
@@ -394,6 +410,8 @@ class AuthEndpointsIntegrationTest {
         AuthTestUser.users.clear()
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
             val cache = setting("cache", Cache.Settings("ram"))
 
@@ -413,6 +431,8 @@ class AuthEndpointsIntegrationTest {
         AuthTestUser.users.clear()
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
             val cache = setting("cache", Cache.Settings("ram"))
 
@@ -449,6 +469,8 @@ class AuthEndpointsIntegrationTest {
         AuthTestUser.users[userId] = user
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
             val cache = setting("cache", Cache.Settings("ram"))
 
@@ -463,7 +485,7 @@ class AuthEndpointsIntegrationTest {
         }.let { server ->
             server.test({}) {
                 // Establish password
-                server.passwordEndpoints.establish(AuthTestUser, userId, EstablishPassword("adminPassword"))
+                execute { server.passwordEndpoints.establish(AuthTestUser, userId, EstablishPassword("adminPassword")) }
 
                 // Get password proof
                 val proof = server.passwordEndpoints.prove.test(
@@ -496,6 +518,8 @@ class AuthEndpointsIntegrationTest {
         AuthTestUser.users[userId] = user
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
             val cache = setting("cache", Cache.Settings("ram"))
 
@@ -510,7 +534,7 @@ class AuthEndpointsIntegrationTest {
         }.let { server ->
             server.test({}) {
                 // Establish password
-                server.passwordEndpoints.establish(AuthTestUser, userId, EstablishPassword("adminPassword"))
+                execute { server.passwordEndpoints.establish(AuthTestUser, userId, EstablishPassword("adminPassword")) }
 
                 // Get password proof
                 val proof = server.passwordEndpoints.prove.test(
@@ -538,6 +562,8 @@ class AuthEndpointsIntegrationTest {
         AuthTestUser.users[userId] = user
 
         object : ServerBuilder() {
+            init { registerBasicMediaTypeCoders() }
+
             val database = setting("database", Database.Settings("ram"))
             val cache = setting("cache", Cache.Settings("ram"))
 
@@ -552,7 +578,7 @@ class AuthEndpointsIntegrationTest {
         }.let { server ->
             server.test({}) {
                 // Establish password
-                server.passwordEndpoints.establish(AuthTestUser, userId, EstablishPassword("testPassword"))
+                execute { server.passwordEndpoints.establish(AuthTestUser, userId, EstablishPassword("testPassword")) }
 
                 // Get password proof
                 val proof = server.passwordEndpoints.prove.test(

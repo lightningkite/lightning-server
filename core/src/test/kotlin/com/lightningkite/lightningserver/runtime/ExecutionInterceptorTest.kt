@@ -19,6 +19,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.RawWebSocketPath
 import com.lightningkite.lightningserver.plainText
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.set
@@ -85,7 +86,7 @@ class ExecutionInterceptorTest {
         server.test(settings = { generalSettings set GeneralServerSettings() }) {
             runBlocking {
                 server.endpoint.test()
-                server.task.executeInlineWithMetrics(server.task.location, Unit, serverRuntime.execution)
+                execute { server.task.executeInlineWithMetrics(server.task.location, Unit, serverRuntime.execution) }
                 server.schedule.executeWithMetrics(server.schedule.location)
                 server.startup.executeWithMetrics(server.startup.location)
                 server.preDeploy.executeWithMetrics(server.preDeploy.location)
@@ -101,7 +102,7 @@ class ExecutionInterceptorTest {
         }
 
         assertEquals(
-            listOf("Http", "Task", "Schedule", "Startup", "PreDeploy", "WebSocket"),
+            listOf("Http", "Direct", "Task", "Schedule", "Startup", "PreDeploy", "WebSocket"),
             recorder.seen.map { it::class.simpleName },
         )
     }

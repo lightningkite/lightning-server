@@ -7,7 +7,9 @@ import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.encryption.SecretBasis
 import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.sessions.proofs.extensions.makeProof
 import com.lightningkite.services.database.HasId
 import kotlinx.coroutines.runBlocking
@@ -90,6 +92,7 @@ class ProofMethodsTest {
 
         object : ServerBuilder() {
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
         }.let { server ->
@@ -111,7 +114,7 @@ class ProofMethodsTest {
                 )
 
                 // Verify should return true
-                assertTrue(proofMethod.isValid(proof))
+                assertTrue(execute { proofMethod.isValid(proof) })
             }
         }
     }
@@ -122,6 +125,7 @@ class ProofMethodsTest {
 
         object : ServerBuilder() {
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
         }.let { server ->
@@ -143,7 +147,7 @@ class ProofMethodsTest {
                 )
 
                 // Verify should return false because via doesn't match
-                assertFalse(proofMethod.isValid(proof))
+                assertFalse(execute { proofMethod.isValid(proof) })
             }
         }
     }
@@ -154,6 +158,7 @@ class ProofMethodsTest {
 
         object : ServerBuilder() {
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
         }.let { server ->
@@ -177,7 +182,7 @@ class ProofMethodsTest {
                 )
 
                 // Verify should return false because property doesn't match
-                assertFalse(proofMethod.isValid(proof))
+                assertFalse(execute { proofMethod.isValid(proof) })
             }
         }
     }
@@ -188,6 +193,7 @@ class ProofMethodsTest {
 
         object : ServerBuilder() {
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
         }.let { server ->
@@ -211,7 +217,7 @@ class ProofMethodsTest {
                 )
 
                 // Verify should return true because method accepts any property
-                assertTrue(proofMethod.isValid(proof))
+                assertTrue(execute { proofMethod.isValid(proof) })
             }
         }
     }
@@ -222,6 +228,7 @@ class ProofMethodsTest {
 
         object : ServerBuilder() {
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
         }.let { server ->
@@ -244,7 +251,7 @@ class ProofMethodsTest {
                 )
 
                 // Verify should return false because proof is expired
-                assertFalse(proofMethod.isValid(proof))
+                assertFalse(execute { proofMethod.isValid(proof) })
             }
         }
     }
@@ -255,6 +262,7 @@ class ProofMethodsTest {
 
         object : ServerBuilder() {
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
         }.let { server ->
@@ -278,7 +286,7 @@ class ProofMethodsTest {
                 )
 
                 // Verify should return false because signature doesn't match
-                assertFalse(proofMethod.isValid(proof))
+                assertFalse(execute { proofMethod.isValid(proof) })
             }
         }
     }
@@ -292,6 +300,7 @@ class ProofMethodsTest {
 
         object : ServerBuilder() {
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
         }.let { server ->
@@ -306,7 +315,7 @@ class ProofMethodsTest {
                 )
 
                 // User has email, so established should return true
-                assertTrue(proofMethod.established(TestUser, user))
+                assertTrue(execute { proofMethod.established(TestUser, user) })
             }
         }
     }
@@ -320,6 +329,7 @@ class ProofMethodsTest {
 
         object : ServerBuilder() {
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
         }.let { server ->
@@ -334,7 +344,7 @@ class ProofMethodsTest {
                 )
 
                 // User doesn't have phone, so established should return false
-                assertFalse(proofMethod.established(TestUser, user))
+                assertFalse(execute { proofMethod.established(TestUser, user) })
             }
         }
     }
@@ -348,6 +358,7 @@ class ProofMethodsTest {
 
         object : ServerBuilder() {
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
         }.let { server ->
@@ -362,7 +373,7 @@ class ProofMethodsTest {
                 )
 
                 // Default implementation returns false when property is null
-                assertFalse(proofMethod.established(TestUser, user))
+                assertFalse(execute { proofMethod.established(TestUser, user) })
             }
         }
     }
@@ -373,6 +384,7 @@ class ProofMethodsTest {
 
         object : ServerBuilder() {
             init {
+                registerBasicMediaTypeCoders()
                 register(TestUser)
             }
         }.let { server ->

@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
@@ -43,7 +44,7 @@ class OpenApiTest {
     @Test
     fun errorCasesAppearAsResponses() = runBlocking {
         TestServer.test({}) {
-            val op = openApiDescription.paths.entries.first { it.key.contains("items") }.value.get
+            val op = execute { openApiDescription }.paths.entries.first { it.key.contains("items") }.value.get
             assertNotNull(op)
 
             // Success response is still present.
@@ -67,7 +68,7 @@ class OpenApiTest {
     @Test
     fun pathArgumentsAppearAsParameters() = runBlocking {
         TestServer.test({}) {
-            val paths = openApiDescription.paths
+            val paths = execute { openApiDescription }.paths
 
             val itemsPath = paths.entries.first { it.key.contains("items") }.value
             val idParam = itemsPath.parameters.singleOrNull { it.name == "id" }

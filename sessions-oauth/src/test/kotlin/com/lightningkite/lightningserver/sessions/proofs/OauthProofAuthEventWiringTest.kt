@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.auth.AuthEventReporter
 import com.lightningkite.lightningserver.auth.AuthEventType
 import com.lightningkite.lightningserver.auth.installAuthEventReporter
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.sessions.proofs.oauth.*
 import com.lightningkite.services.cache.Cache
@@ -106,7 +107,7 @@ class OauthProofAuthEventWiringTest {
         FakeTokenEndpoint().use { fake ->
             val server = testServer(fake.tokenUrl, profileEmail = "user@example.com")
             server.test({}) {
-                server.oauth.callback.handle(OauthCode(code = "auth-code-xyz", state = nonceFor(server.oauth.callback)))
+                execute { server.oauth.callback.handle(OauthCode(code = "auth-code-xyz", state = nonceFor(server.oauth.callback))) }
 
                 val event = server.reporter.events.single()
                 assertEquals(AuthEventType.ProofAccepted, event.type)

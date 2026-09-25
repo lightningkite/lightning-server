@@ -4,6 +4,7 @@ package com.lightningkite.lightningserver.notifications.subscriptions
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.notifications.*
 import com.lightningkite.lightningserver.notifications.events.*
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.setStatic
 import com.lightningkite.lightningserver.typed.sdk.module
@@ -97,12 +98,14 @@ class FrequencyCustomizableSubscriptionsTest {
         }) {
             runBlocking {
                 val user = TestUser(name = "DefaultUser")
-                Server.userInfo.table().insertOne(user)
+                val subscriptions = execute {
+                    Server.userInfo.table().insertOne(user)
 
-                val model = TestModel(ownerId = user._id)
-                val event = Event(Notifications.modelCreated.event, model)
+                    val model = TestModel(ownerId = user._id)
+                    val event = Event(Notifications.modelCreated.event, model)
 
-                val subscriptions = Notifications.handler.subscriptions.subscribed(event)
+                    Notifications.handler.subscriptions.subscribed(event)
+                }
                 val sub = subscriptions.find { it.user == user._id }!!
 
                 assertEquals(Frequency.immediately(), sub.email)
@@ -123,25 +126,27 @@ class FrequencyCustomizableSubscriptionsTest {
         }) {
             runBlocking {
                 val user = TestUser(name = "OverrideUser")
-                Server.userInfo.table().insertOne(user)
+                val subscriptions = execute {
+                    Server.userInfo.table().insertOne(user)
 
-                val eventDef = Notifications.modelCreated.event
+                    val eventDef = Notifications.modelCreated.event
 
-                // Insert user override
-                Notifications.subs.info.table().insertOne(
-                    NotificationSendMethods(
-                        _id = UserEventType(user._id, eventDef.name),
-                        email = Frequency.daily(9, 0, kotlinx.datetime.TimeZone.UTC),
-                        sms = null, // Disable SMS
-                        push = Frequency.immediately(),
-                        inApp = Frequency.immediately()
+                    // Insert user override
+                    Notifications.subs.info.table().insertOne(
+                        NotificationSendMethods(
+                            _id = UserEventType(user._id, eventDef.name),
+                            email = Frequency.daily(9, 0, kotlinx.datetime.TimeZone.UTC),
+                            sms = null, // Disable SMS
+                            push = Frequency.immediately(),
+                            inApp = Frequency.immediately()
+                        )
                     )
-                )
 
-                val model = TestModel(ownerId = user._id)
-                val event = Event(eventDef, model)
+                    val model = TestModel(ownerId = user._id)
+                    val event = Event(eventDef, model)
 
-                val subscriptions = Notifications.handler.subscriptions.subscribed(event)
+                    Notifications.handler.subscriptions.subscribed(event)
+                }
                 val sub = subscriptions.find { it.user == user._id }!!
 
                 assertEquals(Frequency.daily(9, 0, kotlinx.datetime.TimeZone.UTC), sub.email)
@@ -159,25 +164,27 @@ class FrequencyCustomizableSubscriptionsTest {
         }) {
             runBlocking {
                 val user = TestUser(name = "DisableUser")
-                Server.userInfo.table().insertOne(user)
+                val subscriptions = execute {
+                    Server.userInfo.table().insertOne(user)
 
-                val eventDef = Notifications.modelCreated.event
+                    val eventDef = Notifications.modelCreated.event
 
-                // User disables all channels except inApp
-                Notifications.subs.info.table().insertOne(
-                    NotificationSendMethods(
-                        _id = UserEventType(user._id, eventDef.name),
-                        email = null,
-                        sms = null,
-                        push = null,
-                        inApp = Frequency.immediately()
+                    // User disables all channels except inApp
+                    Notifications.subs.info.table().insertOne(
+                        NotificationSendMethods(
+                            _id = UserEventType(user._id, eventDef.name),
+                            email = null,
+                            sms = null,
+                            push = null,
+                            inApp = Frequency.immediately()
+                        )
                     )
-                )
 
-                val model = TestModel(ownerId = user._id)
-                val event = Event(eventDef, model)
+                    val model = TestModel(ownerId = user._id)
+                    val event = Event(eventDef, model)
 
-                val subscriptions = Notifications.handler.subscriptions.subscribed(event)
+                    Notifications.handler.subscriptions.subscribed(event)
+                }
                 val sub = subscriptions.find { it.user == user._id }!!
 
                 assertNull(sub.email)
@@ -196,14 +203,16 @@ class FrequencyCustomizableSubscriptionsTest {
         }) {
             runBlocking {
                 val user = TestUser(name = "DailyUser")
-                Server.userInfo.table().insertOne(user)
+                execute { Server.userInfo.table().insertOne(user) }
 
                 // modelDeleted configured with daily defaults
-                val deletedEvent = Event(
-                    Notifications.modelDeleted.event,
-                    TestModel(ownerId = user._id)
-                )
-                val deletedSubs = Notifications.handler.subscriptions.subscribed(deletedEvent)
+                val deletedSubs = execute {
+                    val deletedEvent = Event(
+                        Notifications.modelDeleted.event,
+                        TestModel(ownerId = user._id)
+                    )
+                    Notifications.handler.subscriptions.subscribed(deletedEvent)
+                }
                 val deletedSub = deletedSubs.find { it.user == user._id }!!
 
                 assertEquals(Frequency.daily(9, 0, kotlinx.datetime.TimeZone.UTC), deletedSub.email)
@@ -211,11 +220,13 @@ class FrequencyCustomizableSubscriptionsTest {
                 assertEquals(Frequency.immediately(), deletedSub.push)
 
                 // modelCreated configured with immediate defaults
-                val createdEvent = Event(
-                    Notifications.modelCreated.event,
-                    TestModel(ownerId = user._id)
-                )
-                val createdSubs = Notifications.handler.subscriptions.subscribed(createdEvent)
+                val createdSubs = execute {
+                    val createdEvent = Event(
+                        Notifications.modelCreated.event,
+                        TestModel(ownerId = user._id)
+                    )
+                    Notifications.handler.subscriptions.subscribed(createdEvent)
+                }
                 val createdSub = createdSubs.find { it.user == user._id }!!
 
                 assertEquals(Frequency.immediately(), createdSub.email)
@@ -231,40 +242,44 @@ class FrequencyCustomizableSubscriptionsTest {
         }) {
             runBlocking {
                 val user = TestUser(name = "MultiEventUser")
-                Server.userInfo.table().insertOne(user)
+                execute {
+                    Server.userInfo.table().insertOne(user)
 
-                // Override only for modelDeleted
-                Notifications.subs.info.table().insertOne(
-                    NotificationSendMethods(
-                        _id = UserEventType(user._id, Notifications.modelDeleted.event.name),
-                        email = Frequency.weekly(
-                            kotlinx.datetime.DayOfWeek.FRIDAY,
-                            10,
-                            0,
-                            kotlinx.datetime.TimeZone.UTC
-                        ),
-                        sms = null,
-                        push = Frequency.immediately(),
-                        inApp = Frequency.immediately()
+                    // Override only for modelDeleted
+                    Notifications.subs.info.table().insertOne(
+                        NotificationSendMethods(
+                            _id = UserEventType(user._id, Notifications.modelDeleted.event.name),
+                            email = Frequency.weekly(
+                                kotlinx.datetime.DayOfWeek.FRIDAY,
+                                10,
+                                0,
+                                kotlinx.datetime.TimeZone.UTC
+                            ),
+                            sms = null,
+                            push = Frequency.immediately(),
+                            inApp = Frequency.immediately()
+                        )
                     )
-                )
+                }
 
                 // modelCreated should still use defaults
-                val createdEvent = Event(
-                    Notifications.modelCreated.event,
-                    TestModel(ownerId = user._id)
-                )
-                val createdSub = Notifications.handler.subscriptions.subscribed(createdEvent)
-                    .find { it.user == user._id }!!
+                val createdSub = execute {
+                    val createdEvent = Event(
+                        Notifications.modelCreated.event,
+                        TestModel(ownerId = user._id)
+                    )
+                    Notifications.handler.subscriptions.subscribed(createdEvent)
+                }.find { it.user == user._id }!!
                 assertEquals(Frequency.immediately(), createdSub.email)
 
                 // modelDeleted uses override
-                val deletedEvent = Event(
-                    Notifications.modelDeleted.event,
-                    TestModel(ownerId = user._id)
-                )
-                val deletedSub = Notifications.handler.subscriptions.subscribed(deletedEvent)
-                    .find { it.user == user._id }!!
+                val deletedSub = execute {
+                    val deletedEvent = Event(
+                        Notifications.modelDeleted.event,
+                        TestModel(ownerId = user._id)
+                    )
+                    Notifications.handler.subscriptions.subscribed(deletedEvent)
+                }.find { it.user == user._id }!!
                 assertEquals(
                     Frequency.weekly(kotlinx.datetime.DayOfWeek.FRIDAY, 10, 0, kotlinx.datetime.TimeZone.UTC),
                     deletedSub.email

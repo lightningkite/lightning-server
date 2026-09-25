@@ -8,7 +8,8 @@ import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.runtime.location
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.engine
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.serialization.validators
@@ -93,26 +94,25 @@ class AnnotationValidatorsTests {
     @Test
     fun testApiEndpointValidation() {
         TestServer.test({}) {
-            println(serverRuntime.validators.prettyPrint(qualified = true))
+            println(engine.validators.prettyPrint(qualified = true))
 
             runBlocking {
                 suspend fun handle(model: TestModel) {
-                    endpoint.handle(
-                        HttpRequest(
-                            RawHttpEndpoint(endpoint.location.path, method = endpoint.location.method),
-                            queryParameters = QueryParameters.EMPTY,
-                            headers = HttpHeaders(),
-                            domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
-                            protocol = generalSettings().publicUrl.substringBefore("://"),
-                            sourceIp = "localhost",
-                            body = TypedData.text(
-                                serverRuntime.externalSerialization.json.encodeToString(
-                                    endpoint.inputType,
-                                    model
-                                ), MediaType.Application.Json
-                            ),
-                        )
+                    val request = HttpRequest(
+                        RawHttpEndpoint(endpoint.location.path, method = endpoint.location.method),
+                        queryParameters = QueryParameters.EMPTY,
+                        headers = HttpHeaders(),
+                        domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
+                        protocol = generalSettings().publicUrl.substringBefore("://"),
+                        sourceIp = "localhost",
+                        body = TypedData.text(
+                            engine.externalSerialization.json.encodeToString(
+                                endpoint.inputType,
+                                model
+                            ), MediaType.Application.Json
+                        ),
                     )
+                    execute { endpoint.handle(request) }
                 }
 
                 suspend fun assertOkay(model: TestModel) = handle(model)

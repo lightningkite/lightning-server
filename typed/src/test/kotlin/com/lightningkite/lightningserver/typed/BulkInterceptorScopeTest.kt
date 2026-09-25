@@ -6,16 +6,19 @@ import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
+import com.lightningkite.lightningserver.InternalLightningServerApi
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.handle
+import com.lightningkite.lightningserver.runtime.engine
+import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.lightningserver.runtime.isRoot
-import com.lightningkite.lightningserver.runtime.handleSubRequest
-import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
+import com.lightningkite.services.data.Unsafe
+import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.Database
 import kotlinx.coroutines.runBlocking
 import java.util.Collections
@@ -34,9 +37,10 @@ import kotlin.uuid.Uuid
  */
 class BulkInterceptorScopeTest {
 
-    private data class Seen(val path: String, val requestId: Uuid, val parentRequestId: Uuid?)
+    private data class Seen(val path: String, val requestId: Execution.ID, val parentRequestId: Execution.ID?)
 
-    private val outerRequestId = Uuid.parse("00000000-0000-4000-8000-000000000001")
+    @OptIn(InternalLightningServerApi::class, Unsafe::class) // SAFETY: Only compared for identity, never ordered by time
+    private val outerRequestId = Execution.ID(UuidV7.fromRaw(Uuid.parse("00000000-0000-4000-8000-000000000001")))
 
     private object Observed {
         val logical: MutableList<Seen> = Collections.synchronizedList(mutableListOf())
@@ -122,7 +126,7 @@ class BulkInterceptorScopeTest {
     private fun bulk(body: String, block: () -> Unit = {}) = TestServer.test(settings = {}) {
         Observed.reset()
         runBlocking {
-            serverRuntime.handle(
+            engine.handleRoot(
                 HttpRequest<PathSpec>(
                     path = RawHttpEndpoint(asString = "/meta/bulk", method = HttpMethod.POST),
                     queryParameters = QueryParameters.EMPTY,
@@ -168,31 +172,6 @@ class BulkInterceptorScopeTest {
         assertEquals(2, subs.map { it.requestId }.toSet().size, "sub-requests must have distinct ids")
         assertTrue(subs.none { it.requestId == outerRequestId }, "a sub-request reused the outer id")
     }
-
-    /**
-     * The guard exists because a sub-request dispatched from outside an HTTP execution has nothing to
-     * be a sub-request *of*: it would be unattributable to the request that carried it, which corrupts
-     * the audit trail silently rather than failing.
-     */
-    @Test
-    fun `handleSubRequest rejects a dispatch from outside an http execution`() =
-        TestServer.test(settings = {}) {
-            val notASubRequest = HttpRequest<PathSpec>(
-                path = RawHttpEndpoint(asString = "/alpha", method = HttpMethod.GET),
-                queryParameters = QueryParameters.EMPTY,
-                headers = HttpHeaders.EMPTY,
-                domain = "example.com",
-                protocol = "https",
-                sourceIp = "local",
-            )
-            val failure = assertFailsWith<IllegalArgumentException> {
-                runBlocking { serverRuntime.handleSubRequest(notASubRequest) }
-            }
-            assertTrue(
-                failure.message.orEmpty().contains("HTTP execution"),
-                "the message should say why there is nothing to parent to; was: ${failure.message}",
-            )
-        }
 
     @Test
     fun `a failing sub-request is still observed`() = bulk(
