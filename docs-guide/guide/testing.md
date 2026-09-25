@@ -17,6 +17,7 @@ import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.runtime.*
 import com.lightningkite.lightningserver.runtime.test.*
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.*
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.services.cache.*
@@ -85,6 +86,8 @@ database table instead.
 <!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-server -->
 ```kotlin
 object TestingServer : ServerBuilder() {
+    init { registerBasicMediaTypeCoders() }
+
     val cache = setting("cache", Cache.Settings())
 
     init {
@@ -206,8 +209,8 @@ For endpoints that require a specific principal type (`auth = Member.require()`)
 pass a non-null `Authentication<Member>`.
 
 `PrincipalType.testAuth(subject)` creates a synthetic authentication token for
-testing.  It must be called **inside** a `test {}` block because it needs a
-`ServerRuntime` in context (to capture the current clock time as `issuedAt`).
+testing.  It must be called **inside** a `test {}` block because it needs the
+test engine in context (to capture the current clock time as `issuedAt`).
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/TestingSamples.kt#testing-auth-typed -->
 ```kotlin
@@ -216,7 +219,6 @@ fun authTypedTest() = TestingServer.testBlocking(settings = { cache set Cache.Se
     Member.store[alice._id] = alice  // seed the in-memory store so fetch() finds her
 
     // testAuth() creates a synthetic Authentication<Member> for the test.
-    // It must be called inside a test {} block because it needs a ServerRuntime in context.
     val aliceAuth = Member.testAuth(alice)
 
     // For authenticated endpoints (USER is non-nullable), pass a non-null Authentication.

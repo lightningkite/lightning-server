@@ -18,6 +18,7 @@ import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.runtime.test.*
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.typed.*
 import kotlinx.coroutines.*
 import kotlinx.serialization.*
@@ -58,6 +59,7 @@ implementation must throw the matching exception:
 <!-- sample: com/lightningkite/lightningserver/guide/samples/TypedEndpointsSamples.kt#divide-server -->
 ```kotlin
 object DivideServer : ServerBuilder() {
+    init { registerBasicMediaTypeCoders() }
 
     // POST /divide — divides two numbers; declares two error cases
     val divide = path.path("divide").post bind ApiHttpHandler(
@@ -167,6 +169,7 @@ data class NoteResponse(val id: String, val text: String)
 <!-- sample: com/lightningkite/lightningserver/guide/samples/TypedEndpointsSamples.kt#success-code-server -->
 ```kotlin
 object NoteServer : ServerBuilder() {
+    init { registerBasicMediaTypeCoders() }
 
     // POST /notes — uses HttpStatus.Created (201) instead of the default 200
     val create = path.path("notes").post bind ApiHttpHandler(
@@ -211,6 +214,8 @@ provide with a real test:
 <!-- sample: com/lightningkite/lightningserver/guide/samples/TypedEndpointsSamples.kt#examples-field -->
 ```kotlin
 object ExamplesServer : ServerBuilder() {
+    init { registerBasicMediaTypeCoders() }
+
     // ApiHttpHandler.Example values are documentation only — they appear in the generated
     // OpenAPI spec and SDK but are NOT run or asserted automatically.
     // Write a real test alongside any example you provide.

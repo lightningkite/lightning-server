@@ -30,6 +30,7 @@ import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.runtime.test.*
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.settings.*
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.services.data.*
@@ -73,6 +74,8 @@ then passed to `ModelRestEndpoints`:
 <!-- sample: com/lightningkite/lightningserver/guide/samples/ModelRestSamples.kt#mr-server -->
 ```kotlin
 object PostRestServer : ServerBuilder() {
+    init { registerBasicMediaTypeCoders() }
+
     val database = setting("database", Database.Settings())
 
     // modelInfo<USER, Model, ID>:

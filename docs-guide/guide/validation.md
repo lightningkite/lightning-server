@@ -173,17 +173,17 @@ back to individual fields.
 
 > To wrap these examples in a test class, annotate your test methods with `@Test` — see [Testing Your Server](testing.md) for the complete `@Test` + `testBlocking` pattern.
 
-The typed `ApiHttpHandler.test(auth, input)` helper calls the typed `handle`
-method directly and **bypasses the validation step**. To test constraint
-enforcement, use `HttpHandler.test(body = ...)` — it routes through the full
-HTTP pipeline, including the validation middleware:
+The typed `ApiHttpHandler.test(auth, input)` helper also validates its input, but
+a rejection surfaces as a thrown `BadRequestException`. To assert on the HTTP
+response a client would see, use `HttpHandler.test(body = ...)` — it sends a raw
+body through the full HTTP pipeline, including parsing and validation:
 
 <!-- sample: com/lightningkite/lightningserver/guide/samples/ValidationSamples.kt#validation-reject-test -->
 ```kotlin
 fun validationRejectTest() = ValidationServer.testBlocking(settings = {}) {
     // Encode a CreateUserRequest whose name exceeds @MaxLength(50).
     val body = TypedData.text(
-        serverRuntime.externalSerialization.json.encodeToString(
+        engine.externalSerialization.json.encodeToString(
             CreateUserRequest.serializer(),
             CreateUserRequest(name = "A".repeat(51), email = "user@example.com", age = 25, tags = emptyList())
         ),
@@ -191,18 +191,16 @@ fun validationRejectTest() = ValidationServer.testBlocking(settings = {}) {
     )
     // HttpHandler.test(body = ...) drives the full HTTP pipeline, including the validation
     // step that runs before the implementation lambda.
-    // The typed ApiHttpHandler.test(auth, input) helper bypasses validation — always use
-    // HttpHandler.test() when testing constraint enforcement.
     val response = ValidationServer.createUser.test(body = body)
     check(response.status.code == 400)
 }
 ```
 
-`serverRuntime.externalSerialization.json` gives the server's configured `Json`
+`engine.externalSerialization.json` gives the server's configured `Json`
 instance.  `TypedData.text(text, MediaType.Application.Json)` wraps the encoded
 string into a typed body that the HTTP handler can parse.
 
-`HttpHandler.test()` goes through `ServerRuntime.handle()`, which routes the
+`HttpHandler.test()` goes through `Engine.handleRoot()`, which routes the
 request to the endpoint, applies interceptors, runs validation, and if an
 exception is thrown, converts it to an HTTP response via the exception handler.
 The result is an `HttpResponse` — inspect `.status.code` to confirm 400.
@@ -213,7 +211,7 @@ The result is an `HttpResponse` — inspect `.status.code` to confirm 400.
 ```kotlin
 fun validationPassTest() = ValidationServer.testBlocking(settings = {}) {
     val body = TypedData.text(
-        serverRuntime.externalSerialization.json.encodeToString(
+        engine.externalSerialization.json.encodeToString(
             CreateUserRequest.serializer(),
             CreateUserRequest(name = "Alice", email = "alice@example.com", age = 30, tags = emptyList())
         ),

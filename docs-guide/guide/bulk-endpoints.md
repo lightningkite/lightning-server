@@ -37,8 +37,9 @@ import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
-import com.lightningkite.lightningserver.runtime.handle
-import com.lightningkite.lightningserver.runtime.serverRuntime
+import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.runtime.engine
+import com.lightningkite.lightningserver.runtime.handleRoot
 import com.lightningkite.lightningserver.runtime.test.testBlocking
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.typed.*
@@ -164,7 +165,7 @@ bulk request to fail.
 ### Testing the bulk endpoint
 
 Because the bulk handler dispatches sub-requests through the registered route table, you
-must exercise it through the full HTTP pipeline (`serverRuntime.handle()`), not through
+must exercise it through the full HTTP pipeline (`engine.handleRoot()`), not through
 the typed `ApiHttpHandler.test()` helper — the typed helper calls the handler lambda
 directly and bypasses the router, so sub-request path lookups would fail.
 
@@ -174,9 +175,8 @@ directly and bypasses the router, so sub-request path lookups would fail.
 <!-- sample: com/lightningkite/lightningserver/guide/samples/BulkEndpointsSamples.kt#bulk-test -->
 ```kotlin
 fun bulkTest() = BulkServer.testBlocking(settings = {}) {
-    // Drive /meta/bulk through the full HTTP pipeline so the framework can resolve
-    // sub-request paths via the registered route table.  ApiHttpHandler.test() would
-    // bypass routing and cannot match sub-request paths, so we use serverRuntime.handle().
+    // Drive /meta/bulk through the full HTTP pipeline, as an engine would, so the framework
+    // can resolve sub-request paths via the registered route table.
     val request = HttpRequest<PathSpec>(
         path = RawHttpEndpoint(asString = "/meta/bulk", method = HttpMethod.POST),
         queryParameters = QueryParameters.EMPTY,
@@ -189,7 +189,7 @@ fun bulkTest() = BulkServer.testBlocking(settings = {}) {
             MediaType.Application.Json,
         ),
     )
-    val response = serverRuntime.handle(request, generateRequestId())
+    val response = engine.handleRoot(request, Execution.ID.generate())
 
     // The outer bulk endpoint always returns HTTP 200; per-sub-request errors appear in the body.
     check(response.status.code == 200)
@@ -211,9 +211,9 @@ fun bulkTest() = BulkServer.testBlocking(settings = {}) {
 }
 ```
 
-`testBlocking` provides a live `ServerRuntime` (as a `context` receiver), so
-`serverRuntime` and `serverRuntime.handle()` are available directly without wrapping in
-`runBlocking`.
+`testBlocking` provides the test engine as a `context` receiver, so `engine.handleRoot()`
+runs the request as a new root execution, exactly as an engine does for an incoming request,
+without wrapping in `runBlocking`.
 
 ### Telemetry: per-sub-request spans
 

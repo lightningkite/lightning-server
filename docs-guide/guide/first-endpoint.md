@@ -17,6 +17,7 @@ import com.lightningkite.lightningserver.definition.builder.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.runtime.test.*
+import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.typed.*
 import kotlinx.coroutines.*
 import kotlinx.serialization.*
@@ -118,6 +119,7 @@ Then bind the endpoint with `ApiHttpHandler`:
 <!-- sample: com/lightningkite/lightningserver/guide/samples/FirstEndpointSamples.kt#echo-server -->
 ```kotlin
 object EchoServer : ServerBuilder() {
+    init { registerBasicMediaTypeCoders() }
 
     // POST /echo — accepts typed JSON, returns typed JSON
     val echo = path.path("echo").post bind ApiHttpHandler(

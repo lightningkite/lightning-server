@@ -184,7 +184,6 @@ fun authTest() = UserProfileServer.testBlocking(settings = { database set Databa
         .insertOne(UserProfile(name = "Alice", email = "alice@example.com"))
 
     // testAuth() creates an Authentication<UserProfile> for use in tests.
-    // It must be called inside a testBlocking {} block because it needs a ServerRuntime in context.
     val aliceAuth = UserAuth.testAuth(alice)
 
     // Pass the auth token as the first argument to the typed .test() call.
@@ -196,13 +195,10 @@ fun authTest() = UserProfileServer.testBlocking(settings = { database set Databa
 ```
 
 The `test {}` block (from `com.lightningkite.lightningserver.runtime.test.test`)
-provides a live `ServerRuntime` with all settings resolved.  The `settings`
-lambda configures each setting before the runtime starts — here, `database set
+provides a test engine with all settings resolved.  The `settings` lambda
+configures each setting before the engine starts — here, `database set
 Database.Settings("ram")` switches to the in-process RAM database so no
 external infrastructure is needed.
-
-Note: `settings` is a context extension on `ServerRuntime` (same as in the
-Services chapter).
 
 ## Testing: the Rejection Path
 
