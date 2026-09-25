@@ -97,7 +97,7 @@ public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
         frame: WebSocketFrame,
     ) {
         val parsed = try {
-            connection.currentState.mediaType.decoder!!(frame, inputType)
+            connection.currentState.mediaType.decoder!!.decode(frame, inputType)
         } catch (e: SerializationException) {
             throw BadRequestException(e.message ?: "Could not parse", cause = e)
         }
@@ -145,7 +145,7 @@ public interface ApiWebSocketHandler<PATH : PathSpec, STORAGE, USER : HasId<*>?,
             // The single chokepoint for every typed WebSocket output, model update streams included. See
             // TypedOutputInterceptor for why observation happens before encoding.
             override suspend fun send(frame: OUTPUT) {
-                emitTypedOutput(wraps.request, outputSerializer, frame)
+                serverRuntime.emitTypedOutput(wraps.request, outputSerializer, frame)
                 wraps.send(wraps.currentState.mediaType.encoder!!.ws(wraps.currentState.mediaType, outputSerializer, frame))
             }
 

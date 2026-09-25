@@ -192,7 +192,7 @@ class MediaTypeRegistryTest {
         override fun accepts(parameters: Map<String, String>): Boolean = true
 
         context(runtime: ServerRuntime)
-        override suspend fun <T> invoke(
+        override suspend fun <T> encode(
             mediaType: MediaType,
             serializer: SerializationStrategy<T>,
             value: T,
@@ -207,7 +207,7 @@ class MediaTypeRegistryTest {
         override fun accepts(parameters: Map<String, String>): Boolean = true
 
         context(runtime: ServerRuntime)
-        override suspend fun <T> invoke(content: TypedData, serializer: DeserializationStrategy<T>): T {
+        override suspend fun <T> decode(content: TypedData, serializer: DeserializationStrategy<T>): T {
             @Suppress("UNCHECKED_CAST")
             return Unit as T
         }

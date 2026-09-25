@@ -97,7 +97,7 @@ public class JsonRpcHandler<PATH : PathSpec>(
 
             // Execute the method
             val (result, customHeaders) = typedMethod.handleWithCustomHeaders(access, params)
-            emitTypedOutput(request, typedMethod.outputType, result)
+            server.emitTypedOutput(request, typedMethod.outputType, result)
 
             // Notifications get 202 Accepted with no body per JSON-RPC/MCP spec
             if (isNotification) return HttpResponse(status = HttpStatus.Accepted)

@@ -291,9 +291,8 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             summary = "Log In",
             description = "Attempt to log in as a ${principal.name} using various proofs.",
             errorCases = errors,
-//            belongsToInterface = belongsToInterface,
             implementation = { proofs: List<Proof> ->
-                login2(LogInRequest(proofs))
+                login2(request, LogInRequest(proofs))
             }
         )
 
@@ -336,9 +335,8 @@ public abstract class AuthEndpoints<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             summary = "Log In With Limitations",
             description = "Attempt to log in as a ${principal.name} using various proofs.",
             errorCases = errors,
-//            belongsToInterface = belongsToInterface,
             implementation = { input: LogInRequest ->
-                proofsCheck(input.proofs).let {
+                proofsCheck(request, input.proofs).let {
                     IdAndAuthMethods(
                         id = it.id,
                         options = it.options,

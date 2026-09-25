@@ -51,9 +51,8 @@ public interface TypedOutputInterceptor {
  *
  * Exceptions propagate to the caller, which is the point — see [TypedOutputInterceptor].
  */
-context(server: ServerRuntime)
-public suspend fun <T> emitTypedOutput(request: Request<*>, serializer: KSerializer<T>, value: T) {
-    val interceptors = server.server.typedOutputInterceptors
+public suspend fun <T> ServerRuntime.emitTypedOutput(request: Request<*>, serializer: KSerializer<T>, value: T) {
+    val interceptors = server.typedOutputInterceptors
     if (interceptors.isEmpty()) return
     for (interceptor in interceptors) {
         instrument(interceptor.name) { interceptor.outputProduced(request, serializer, value) }

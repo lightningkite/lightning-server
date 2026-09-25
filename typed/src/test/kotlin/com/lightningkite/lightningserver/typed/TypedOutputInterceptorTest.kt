@@ -103,6 +103,13 @@ class TypedOutputInterceptorTest {
             implementation = { _: Unit -> "beta" }
         )
 
+        /** Calls [alpha] from server code, so alpha's output reaches this endpoint rather than a client. */
+        val gamma = path.path("gamma").get bind ApiHttpHandler(
+            summary = "Gamma",
+            auth = noAuth,
+            implementation = { _: Unit -> "gamma:" + alpha(Unit) }
+        )
+
         val info = database.modelInfo<HasId<*>?, Sample, String>(
             tableName = "Sample",
             auth = noAuth,
@@ -172,6 +179,17 @@ class TypedOutputInterceptorTest {
         val subs = Observed.seen.filter { it.value == "alpha" || it.value == "beta" }
         subs.forEach { assertEquals(outerRequestId, it.causedBy, "sub-response lost its parent") }
         assertEquals(2, subs.map { it.executionId }.toSet().size, "sub-responses must be separately attributable")
+    }
+
+    /**
+     * An endpoint called from server code sends its output nowhere; only what the outer endpoint
+     * returns leaves the server. Observing the inner call would record a disclosure that never happened.
+     */
+    @Test
+    fun `an internal endpoint call is not observed, only the response that leaves the server`() = onServer {
+        engine.handleRoot(request("/gamma"), outerRequestId)
+
+        assertEquals(listOf<Any?>("gamma:alpha"), Observed.seen.map { it.value })
     }
 
     /**

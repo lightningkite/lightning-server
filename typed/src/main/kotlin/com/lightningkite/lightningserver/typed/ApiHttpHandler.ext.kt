@@ -17,7 +17,6 @@ import com.lightningkite.lightningserver.serialization.assertValidOrBadRequest
 import com.lightningkite.lightningserver.serialization.parse
 import com.lightningkite.lightningserver.serialization.toTypedData
 import com.lightningkite.lightningserver.serialization.validators
-import com.lightningkite.lightningserver.typedoutput.emitTypedOutput
 import com.lightningkite.services.data.Unsafe
 import com.lightningkite.services.database.HasId
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -40,13 +39,13 @@ public suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHan
     input: INPUT,
 ): OUTPUT {
     // The interceptor chain only speaks HttpResponse, so the typed result is carried out beside it.
-    var outcome: Result<ApiHttpHandlerOutput<OUTPUT>>? = null
+    var outcome: Result<OUTPUT>? = null
 
     @OptIn(InternalLightningServerApi::class)
     val httpResponse = executeWithMetrics(request) { req ->
         val result = runCatching { handleTypedInput(req.access(auth), input) }
         outcome = result
-        result.getOrThrow().processed
+        typedResponse(req, result.getOrThrow())
     }
 
     // Rethrow the endpoint's own exception so callers can catch it by type. A timeout is excluded: it is
@@ -57,7 +56,7 @@ public suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHan
         else throw it
     }
     if (!httpResponse.status.success) throw HttpStatusException(httpResponse.toLSError())
-    outcome?.let { return it.getOrThrow().output }
+    outcome?.let { return it.getOrThrow() }
 
     // An interceptor answered before the endpoint ran, so its response is the only output there is.
     @Suppress("UNCHECKED_CAST")
@@ -193,20 +192,17 @@ public suspend operator fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> A
 private fun <PATH : PathSpec> HttpRequest<*>.internalCallTo(path: RawHttpEndpoint<PATH>): HttpRequest<PATH> =
     subRequest(path, headers = headers.copy { remove(HttpHeader.Accept) })
 
-internal data class ApiHttpHandlerOutput<OUTPUT>(
-    val output: OUTPUT,
-    val processed: HttpResponse
-)
-
 /**
- * Everything a request to this endpoint does once [input] is parsed: validation, the handler itself,
- * typed output observation, and encoding the response.
+ * Everything a call to this endpoint does once [input] is parsed: validation and the handler itself.
+ *
+ * Deliberately not typed output observation, which only a routed request does: an internal call returns
+ * its output to server code rather than sending it to a client.
  */
 context(server: ServerRuntime)
 internal suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.handleTypedInput(
     access: HttpAccess<PATH, USER>,
     input: INPUT,
-): ApiHttpHandlerOutput<OUTPUT> {
+): OUTPUT {
     server.validators.assertValidOrBadRequest(inputType, input)
 
     val result = try {
@@ -223,16 +219,18 @@ internal suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpH
         throw e
     }
 
-    emitTypedOutput(access.request, outputType, result)
-
-    return ApiHttpHandlerOutput(
-        result,
-        HttpResponse(
-            body = if (result == Unit) null else result.toTypedData(access.request.headers.accept, outputType),
-            status = successCode,
-            headers = HttpHeaders {
-                add(HttpHeader.Vary, HttpHeader.Accept)
-            }
-        )
-    )
+    return result
 }
+
+/** The response this endpoint sends for [output], encoded as [request] accepts. */
+context(server: ServerRuntime)
+internal suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHandler<PATH, USER, INPUT, OUTPUT>.typedResponse(
+    request: HttpRequest<*>,
+    output: OUTPUT,
+): HttpResponse = HttpResponse(
+    body = if (output == Unit) null else output.toTypedData(request.headers.accept, outputType),
+    status = successCode,
+    headers = HttpHeaders {
+        add(HttpHeader.Vary, HttpHeader.Accept)
+    }
+)

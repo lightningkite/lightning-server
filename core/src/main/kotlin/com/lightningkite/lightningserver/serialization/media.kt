@@ -115,12 +115,11 @@ public val List<MediaType>.encoder: Pair<MediaType, MediaTypeEncoder>?
  */
 context(serverRuntime: ServerRuntime)
 public val defaultEncoder: Pair<MediaType, MediaTypeEncoder>
-    get() = (serverRuntime.server.mediaTypeEncoders.values.asSequence().flatten().maxByOrNull { it.priority }
-        .let {
-            it
-                ?: throw IllegalStateException("No encoders found - you need to register some media coders.  Try adding `init { registerBasicMediaTypeCoders() }` to your server builder.")
-        }
-        .let { it.mediaType to it })
+    get() = serverRuntime.server.mediaTypeEncoders.values.asSequence()
+        .flatten()
+        .maxByOrNull { it.priority }
+        ?.let { it.mediaType to it }
+        ?: throw IllegalStateException("No encoders found - you need to register some media coders.  Try adding `init { registerBasicMediaTypeCoders() }` to your server builder.")
 
 /**
  * Finds a decoder for this media type.
@@ -147,7 +146,7 @@ public suspend fun <T> TypedData.parse(serializer: DeserializationStrategy<T>): 
     val format = mediaType.decoder
         ?: throw BadRequestException("No media type decoder found supporting $mediaType")
     return try {
-        format(this, serializer)
+        format.decode(this, serializer)
     } catch (e: SerializationException) {
         throw BadRequestException(e.message ?: "Unknown formatting error", cause = e.cause)
     }
@@ -175,7 +174,7 @@ public suspend inline fun <reified T> T.toTypedData(accepts: List<MediaType>): T
 context(serverRuntime: ServerRuntime)
 public suspend fun <T> T.toTypedData(accepts: List<MediaType>, serializer: SerializationStrategy<T>): TypedData {
     val (type, format) = accepts.encoder ?: defaultEncoder
-    return format(type, serializer, this)
+    return format.encode(type, serializer, this)
 }
 
 /**

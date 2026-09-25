@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.serialization.*
 import com.lightningkite.lightningserver.typed.sdk.SDK
+import com.lightningkite.lightningserver.typedoutput.emitTypedOutput
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
@@ -107,9 +108,11 @@ public interface ApiHttpHandler<PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT
                 }
         }
 
-        val result = this.handleTypedInput(request.access(auth), input)
-
-        return result.processed
+        val output = this.handleTypedInput(request.access(auth), input)
+        // Only here, where the output is sent to a client, and before it is encoded, so a throwing
+        // observer stops the body from ever being built.
+        server.emitTypedOutput(request, outputType, output)
+        return typedResponse(request, output)
     }
 
     /**

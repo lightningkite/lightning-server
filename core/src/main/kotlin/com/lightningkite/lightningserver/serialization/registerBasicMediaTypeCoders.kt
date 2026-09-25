@@ -36,8 +36,8 @@ public open class BinaryFormatMediaTypeCoder(
 
     private var _formatCached: BinaryFormat? = null
 
-    private context(runtime: ServerRuntime)
-    val formatCached: BinaryFormat
+    context(runtime: ServerRuntime)
+    private val formatCached: BinaryFormat
         get() {
             return _formatCached ?: run {
                 val retrieved = format()
@@ -46,28 +46,28 @@ public open class BinaryFormatMediaTypeCoder(
             }
         }
 
-    override context(runtime: ServerRuntime)
-    suspend fun <T> invoke(content: TypedData, serializer: DeserializationStrategy<T>): T {
+    context(runtime: ServerRuntime)
+    override suspend fun <T> decode(content: TypedData, serializer: DeserializationStrategy<T>): T {
         return formatCached.decodeFromByteArray(serializer, content.data.bytes())
     }
 
-    override context(runtime: ServerRuntime)
-    suspend fun <T> invoke(mediaType: MediaType, serializer: SerializationStrategy<T>, value: T): TypedData =
+    context(runtime: ServerRuntime)
+    override suspend fun <T> encode(mediaType: MediaType, serializer: SerializationStrategy<T>, value: T): TypedData =
         TypedData.bytes(
             formatCached.encodeToByteArray(serializer, value),
             mediaType
         )
 
-    override context(runtime: ServerRuntime)
-    suspend fun <T> invoke(content: WebSocketFrame, serializer: DeserializationStrategy<T>): T {
+    context(runtime: ServerRuntime)
+    override suspend fun <T> decode(content: WebSocketFrame, serializer: DeserializationStrategy<T>): T {
         return when (content) {
             is WebSocketFrame.Binary -> formatCached.decodeFromByteArray(serializer, content.content)
             is WebSocketFrame.Text -> formatCached.decodeFromByteArray(serializer, Base64.decode(content.content))
         }
     }
 
-    override context(runtime: ServerRuntime)
-    suspend fun <T> ws(mediaType: MediaType, serializer: SerializationStrategy<T>, value: T): WebSocketFrame {
+    context(runtime: ServerRuntime)
+    override suspend fun <T> ws(mediaType: MediaType, serializer: SerializationStrategy<T>, value: T): WebSocketFrame {
         return WebSocketFrame.Binary(formatCached.encodeToByteArray(serializer, value))
     }
 }
@@ -88,8 +88,8 @@ public open class StringFormatMediaTypeCoder(
 
     private var _formatCached: StringFormat? = null
 
-    private context(runtime: ServerRuntime)
-    val formatCached: StringFormat
+    context(runtime: ServerRuntime)
+    private val formatCached: StringFormat
         get() {
             return _formatCached ?: run {
                 val retrieved = format()
@@ -98,20 +98,20 @@ public open class StringFormatMediaTypeCoder(
             }
         }
 
-    override context(runtime: ServerRuntime)
-    suspend fun <T> invoke(content: TypedData, serializer: DeserializationStrategy<T>): T {
+    context(runtime: ServerRuntime)
+    override suspend fun <T> decode(content: TypedData, serializer: DeserializationStrategy<T>): T {
         return formatCached.decodeFromString(serializer, content.data.text())
     }
 
-    override context(runtime: ServerRuntime)
-    suspend fun <T> invoke(mediaType: MediaType, serializer: SerializationStrategy<T>, value: T): TypedData =
+    context(runtime: ServerRuntime)
+    override suspend fun <T> encode(mediaType: MediaType, serializer: SerializationStrategy<T>, value: T): TypedData =
         TypedData.text(
             formatCached.encodeToString(serializer, value),
             mediaType
         )
 
-    override context(runtime: ServerRuntime)
-    suspend fun <T> invoke(content: WebSocketFrame, serializer: DeserializationStrategy<T>): T {
+    context(runtime: ServerRuntime)
+    override suspend fun <T> decode(content: WebSocketFrame, serializer: DeserializationStrategy<T>): T {
         return when (content) {
             is WebSocketFrame.Binary -> formatCached.decodeFromString(
                 serializer,
@@ -122,8 +122,8 @@ public open class StringFormatMediaTypeCoder(
         }
     }
 
-    override context(runtime: ServerRuntime)
-    suspend fun <T> ws(mediaType: MediaType, serializer: SerializationStrategy<T>, value: T): WebSocketFrame {
+    context(runtime: ServerRuntime)
+    override suspend fun <T> ws(mediaType: MediaType, serializer: SerializationStrategy<T>, value: T): WebSocketFrame {
         return WebSocketFrame.Text(formatCached.encodeToString(serializer, value))
     }
 }
@@ -144,8 +144,8 @@ public class JsonMediaTypeCoder(
 
     private var _formatCached: Json? = null
 
-    private context(runtime: ServerRuntime)
-    val formatCached: Json
+    context(runtime: ServerRuntime)
+    private val formatCached: Json
         get() {
             return _formatCached ?: run {
                 val retrieved = json()
@@ -158,15 +158,15 @@ public class JsonMediaTypeCoder(
      * Deserializes JSON content with streaming support for Source data.
      */
     @OptIn(ExperimentalSerializationApi::class)
-    override context(runtime: ServerRuntime)
-    suspend fun <T> invoke(content: TypedData, serializer: DeserializationStrategy<T>): T {
+    context(runtime: ServerRuntime)
+    override suspend fun <T> decode(content: TypedData, serializer: DeserializationStrategy<T>): T {
         return when (val body = content.data) {
             is Data.Source -> withContext(Dispatchers.IO) {
                 body.source.use {
                     formatCached.decodeFromSource(serializer, it)
                 }
             }
-            else -> super.invoke(content, serializer)
+            else -> super.decode(content, serializer)
         }
     }
 
@@ -174,8 +174,8 @@ public class JsonMediaTypeCoder(
      * Serializes to JSON with streaming support via Sink.
      */
     @OptIn(ExperimentalSerializationApi::class)
-    override context(runtime: ServerRuntime)
-    suspend fun <T> invoke(mediaType: MediaType, serializer: SerializationStrategy<T>, value: T): TypedData {
+    context(runtime: ServerRuntime)
+    override suspend fun <T> encode(mediaType: MediaType, serializer: SerializationStrategy<T>, value: T): TypedData {
         return TypedData.sink(
             mediaType,
             // Do NOT close `sink` — it is caller-owned (see Data.write's contract); the consumer manages its lifecycle.
