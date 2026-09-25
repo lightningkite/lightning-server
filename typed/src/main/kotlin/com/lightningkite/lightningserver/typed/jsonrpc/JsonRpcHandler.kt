@@ -4,8 +4,11 @@ import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.serialization.assertValidOrBadRequest
 import com.lightningkite.lightningserver.serialization.parse
+import com.lightningkite.lightningserver.serialization.validators
 import com.lightningkite.lightningserver.typed.access
+import com.lightningkite.lightningserver.typedoutput.emitTypedOutput
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
 import com.lightningkite.services.database.HasId
@@ -78,7 +81,7 @@ public class JsonRpcHandler<PATH : PathSpec>(
                         typedMethod.inputType,
                         rpcRequest.params
                     )
-                }
+                }.also { server.validators.assertValidOrBadRequest(typedMethod.inputType, it) }
             } catch (e: Exception) {
                 return if (isNotification) HttpResponse(status = HttpStatus.Accepted)
                 else errorResponse(
@@ -92,6 +95,7 @@ public class JsonRpcHandler<PATH : PathSpec>(
 
             // Execute the method
             val (result, customHeaders) = typedMethod.handleWithCustomHeaders(access, params)
+            emitTypedOutput(request, typedMethod.outputType, result)
 
             // Notifications get 202 Accepted with no body per JSON-RPC/MCP spec
             if (isNotification) return HttpResponse(status = HttpStatus.Accepted)

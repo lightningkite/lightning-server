@@ -1,18 +1,27 @@
 package com.lightningkite.lightningserver.typed.jsonrpc
 
 import com.lightningkite.lightningserver.auth.noAuth
+import com.lightningkite.lightningserver.data.Request
+import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.pathing.PathSpec0
+import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
+import com.lightningkite.lightningserver.typedoutput.TypedOutputInterceptor
+import com.lightningkite.services.data.MaxLength
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
+import com.lightningkite.services.database.validation.AnnotationValidators
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.json.*
 import org.junit.Test
+import java.util.Collections
 import kotlin.test.*
 
 class JsonRpcHandlerTest {
@@ -34,15 +43,35 @@ class JsonRpcHandlerTest {
     )
 
     @Serializable
+    data class ShortName(
+        @MaxLength(5) val name: String,
+    )
+
+    @Serializable
     data class ComplexData(
         val id: String,
         val values: List<Int>,
         val metadata: Map<String, String>,
     )
 
+    object Outputs : TypedOutputInterceptor {
+        val seen: MutableList<Any?> = Collections.synchronizedList(mutableListOf())
+        override val name: String = "Outputs"
+
+        context(runtime: ServerRuntime)
+        override suspend fun <T> outputProduced(request: Request<*>, serializer: KSerializer<T>, value: T) {
+            seen.add(value)
+        }
+    }
+
     object TestServer : ServerBuilder() {
+        override val annotationValidators: Runtime<AnnotationValidators> = Runtime {
+            AnnotationValidators(SerializersModule { })
+        }
+
         init {
             registerBasicMediaTypeCoders()
+            install(Outputs)
         }
 
         // Define RPC methods
@@ -85,15 +114,48 @@ class JsonRpcHandlerTest {
             }
         )
 
+        val shortEchoMethod = JsonRpcMethod<PathSpec0, Nothing?, ShortName, String>(
+            name = "shortEcho",
+            description = "Echoes a name of at most five characters",
+            auth = noAuth,
+            implementation = { params -> params.name }
+        )
+
         // Create the JSON-RPC endpoint
         val rpcEndpoint = path.path("rpc").post bind JsonRpcHandler(
             methods = listOf(
                 addMethod,
                 greetMethod,
                 complexMethod,
-                nullableMethod
+                nullableMethod,
+                shortEchoMethod,
             )
         )
+    }
+
+    private fun rpcBody(method: String, params: String) = TypedData.text(
+        """{"jsonrpc": "2.0", "method": "$method", "params": $params, "id": 1}""",
+        MediaType.Application.Json
+    )
+
+    @Test
+    fun testParamsAreValidated() = runBlocking {
+        TestServer.test({}) {
+            val response = TestServer.rpcEndpoint.test(body = rpcBody("shortEcho", """{"name": "much too long"}"""))
+
+            val errorResponse = Json.decodeFromString<JsonRpcErrorResponse>(response.body!!.text())
+            assertEquals(JsonRpcError.INVALID_PARAMS, errorResponse.error.code)
+        }
+    }
+
+    @Test
+    fun testResultIsObservedAsTypedOutput() = runBlocking {
+        TestServer.test({}) {
+            Outputs.seen.clear()
+            TestServer.rpcEndpoint.test(body = rpcBody("shortEcho", """{"name": "Ann"}"""))
+
+            assertEquals(listOf<Any?>("Ann"), Outputs.seen)
+        }
     }
 
     @Test

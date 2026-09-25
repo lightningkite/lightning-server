@@ -102,7 +102,8 @@ public class TestRunner<SERVER : ServerBuilder> @Deprecated("Please use SERVER.t
      * immediately, making tests deterministic.
      */
     override suspend fun <T> dispatchTask(task: Task<T>, input: T, from: Execution) {
-        task.executeInlineWithMetrics(task.location, input, from)
+        @OptIn(InternalLightningServerApi::class)
+        task.executeInlineWithMetrics(input, from)
     }
 
     /**

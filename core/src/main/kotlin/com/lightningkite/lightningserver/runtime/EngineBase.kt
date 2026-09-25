@@ -118,7 +118,7 @@ public abstract class EngineBase(override val server: ServerDefinition) : Engine
      * @throws Exception if any startup task fails
      */
     protected suspend fun runStartupTasks(): Unit =
-        runTaskGraph(server.startupTasks, { it.dependencies }) { location, task -> task.executeWithMetrics(location) }
+        runTaskGraph(server.startupTasks, { it.dependencies }) { _, task -> task.executeWithMetrics() }
 
     /**
      * Executes all pre-deploy tasks respecting their dependency order, failing fast.
@@ -131,7 +131,7 @@ public abstract class EngineBase(override val server: ServerDefinition) : Engine
      * @throws Exception if any pre-deploy task fails
      */
     protected suspend fun runPreDeployTasks(): Unit =
-        runTaskGraph(server.preDeployTasks, { it.dependencies() }) { location, task -> task.executeWithMetrics(location) }
+        runTaskGraph(server.preDeployTasks, { it.dependencies() }) { _, task -> task.executeWithMetrics() }
 }
 
 /*

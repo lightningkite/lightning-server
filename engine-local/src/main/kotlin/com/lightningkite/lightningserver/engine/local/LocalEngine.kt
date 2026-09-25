@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.engine.local
 
+import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.data.Schedule
 import com.lightningkite.lightningserver.data.plus
 import com.lightningkite.lightningserver.definition.*
@@ -184,7 +185,8 @@ public abstract class LocalEngine(server: ServerDefinition) : EngineBase(server)
         scope.launch {
             try {
                 logger.debug { "Handling task: ${task.location}" }
-                task.executeInlineWithMetrics(task.location, input, from)
+                @OptIn(InternalLightningServerApi::class)
+                task.executeInlineWithMetrics(input, from)
             } catch (_: Exception) {
                 /*squish; already reported*/
             }
@@ -252,7 +254,7 @@ public abstract class LocalEngine(server: ServerDefinition) : EngineBase(server)
                             cache.set("$name-lock", true, scheduleLockTtl)
                             try {
                                 logger.debug { "Running Schedule: $name" }
-                                it.executeWithMetrics(location)
+                                it.executeWithMetrics()
                                 cache.set<Long>("$name-nextRun", nextRun)
                             } catch (e: CancellationException) {
                                 // Shutdown (or scope cancellation) interrupted this tick — honor it and stop the

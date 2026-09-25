@@ -62,15 +62,14 @@ private suspend fun Engine.executeTaskLike(
 }
 
 /**
- * Executes a task with telemetry metrics.
+ * Runs this task inline as a new execution caused by [from], with telemetry and interceptors.
  *
- * @param location The path specification for this task
- * @param input The input parameter for the task
- * @param cause The execution that launched this task, or null when nothing launched it, such as a
- *   manual invocation.
+ * For running a task that was dispatched elsewhere, where [from] is the launching execution read back
+ * from the queue. Inside an execution, use the overload without [from].
  */
+@InternalLightningServerApi
 context(engine: Engine)
-public suspend fun <T> Task<T>.executeInlineWithMetrics(location: PathSpec0, input: T, from: Execution): Unit =
+public suspend fun <T> Task<T>.executeInlineWithMetrics(input: T, from: Execution): Unit =
     engine.executeTaskLike(
         TaskKind.Task,
         location,
@@ -82,39 +81,32 @@ public suspend fun <T> Task<T>.executeInlineWithMetrics(location: PathSpec0, inp
         ),
     ) { executeInline(input) }
 
-/**
- * Executes a scheduled task with telemetry metrics.
- *
- * @param location The path specification for this scheduled task
- */
+/** Runs this task inline as a new execution caused by the current one, with telemetry and interceptors. */
+context(runtime: ServerRuntime)
+public suspend fun <T> Task<T>.executeInlineWithMetrics(input: T): Unit =
+    executeInlineWithMetrics(input, runtime.execution)
+
+/** Runs this scheduled task as a new root execution, with telemetry and interceptors. */
 context(engine: Engine)
-public suspend fun ScheduledTask.executeWithMetrics(location: PathSpec0): Unit =
+public suspend fun ScheduledTask.executeWithMetrics(): Unit =
     engine.executeTaskLike(
         TaskKind.Schedule,
         location,
         Execution.Schedule(id = Execution.ID.generate(), location = location.asPathSegments()),
     ) { execute() }
 
-/**
- * Executes a startup task with telemetry metrics.
- *
- * @param location The path specification for this startup task
- */
+/** Runs this startup task as a new root execution, with telemetry and interceptors. */
 context(engine: Engine)
-public suspend fun StartupTask.executeWithMetrics(location: PathSpec0): Unit =
+public suspend fun StartupTask.executeWithMetrics(): Unit =
     engine.executeTaskLike(
         TaskKind.Startup,
         location,
         Execution.Startup(id = Execution.ID.generate(), location = location.asPathSegments()),
     ) { execute() }
 
-/**
- * Executes a pre-deploy task with telemetry metrics.
- *
- * @param location The path specification for this pre-deploy task
- */
+/** Runs this pre-deploy task as a new root execution, with telemetry and interceptors. */
 context(engine: Engine)
-public suspend fun PreDeployTask.executeWithMetrics(location: PathSpec0): Unit =
+public suspend fun PreDeployTask.executeWithMetrics(): Unit =
     engine.executeTaskLike(
         TaskKind.PreDeploy,
         location,

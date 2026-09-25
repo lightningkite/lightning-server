@@ -18,7 +18,7 @@ internal class AwsAdapterSchedule(val root: AwsAdapter) {
             )
         try {
             with(root) {
-                schedule.executeWithMetrics(p)
+                schedule.executeWithMetrics()
             }
             return APIGatewayV2HTTPResponse(statusCode = 200)
         } catch (e: Exception) {

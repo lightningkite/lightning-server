@@ -42,7 +42,7 @@ object ScheduleServer : ServerBuilder() {
 // This tests the work the schedule does, not the timing.
 fun scheduleTest() = ScheduleServer.testBlocking(settings = {}) {
     // Run the schedule the same way the engine does when the timer fires.
-    ScheduleServer.cleanup.executeWithMetrics(ScheduleServer.cleanup.location)
+    ScheduleServer.cleanup.executeWithMetrics()
 
     val count = ScheduleServer.cache().get<Int>("cleanup:last-count")
     assertEquals(42, count)

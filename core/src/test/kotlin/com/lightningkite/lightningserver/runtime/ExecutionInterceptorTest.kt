@@ -86,10 +86,10 @@ class ExecutionInterceptorTest {
         server.test(settings = { generalSettings set GeneralServerSettings() }) {
             runBlocking {
                 server.endpoint.test()
-                execute { server.task.executeInlineWithMetrics(server.task.location, Unit, serverRuntime.execution) }
-                server.schedule.executeWithMetrics(server.schedule.location)
-                server.startup.executeWithMetrics(server.startup.location)
-                server.preDeploy.executeWithMetrics(server.preDeploy.location)
+                execute { server.task.executeInlineWithMetrics(Unit) }
+                server.schedule.executeWithMetrics()
+                server.startup.executeWithMetrics()
+                server.preDeploy.executeWithMetrics()
                 // Exercises the socket seam the way an engine does, as a root.
                 server.socket.willConnectAsRoot(
                     request = WebSocketConnectRequest(

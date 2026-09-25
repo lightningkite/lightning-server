@@ -50,11 +50,11 @@ class TaskSpanTest {
                 telemetrySettings.set(TelemetryBackend.Settings(url = "memory"))
             }
         ) {
-            cleanup.executeWithMetrics(cleanup.location)
-            reindex.executeWithMetrics(reindex.location)
-            execute { sendEmail.executeInlineWithMetrics(sendEmail.location, Unit, serverRuntime.execution) }
-            migrate.executeWithMetrics(migrate.location)
-            warmup.executeWithMetrics(warmup.location)
+            cleanup.executeWithMetrics()
+            reindex.executeWithMetrics()
+            execute { sendEmail.executeInlineWithMetrics(Unit) }
+            migrate.executeWithMetrics()
+            warmup.executeWithMetrics()
 
             // Two schedules must produce two distinguishable trace names, not one shared one.
             val cleanupSpan = spanNamed("lightningserver.schedule /cleanup")
