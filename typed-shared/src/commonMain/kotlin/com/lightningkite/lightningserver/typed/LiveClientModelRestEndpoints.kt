@@ -16,6 +16,7 @@ import kotlinx.serialization.builtins.*
  * - GET /{subpath}/_permissions_ - permissions()
  * - POST /{subpath}/query - query()
  * - POST /{subpath}/query-partial - queryPartial()
+ * - POST /{subpath}/text-search - textSearch()
  * - GET /{subpath}/{id} - detail()
  * - POST /{subpath}/bulk - insertBulk()
  * - POST /{subpath} - insert()
@@ -77,6 +78,14 @@ public open class LiveClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID
         QueryPartial.serializer(serializer),
         input,
         ListSerializer(PartialSerializer(serializer))
+    )
+
+    override suspend fun textSearch(input: TextSearch<T>): List<T> = fetcher(
+        "$subpath/text-search",
+        HttpMethod.POST,
+        TextSearch.serializer(serializer),
+        input,
+        ListSerializer(serializer)
     )
 
     override suspend fun detail(id: ID): T = fetcher(

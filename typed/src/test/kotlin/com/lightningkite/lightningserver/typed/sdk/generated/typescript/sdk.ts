@@ -52,6 +52,13 @@ export namespace TestModel {
 	}
 }
 
+export interface TextSearch<T> {
+	query: string
+	condition: Condition<T>
+	skip: number
+	limit: number
+}
+
 export interface UpdateRestrictions<T> {
 	mode: UpdateRestrictions.Mode
 	fields: Array<UpdateRestrictions.Part<T>>
@@ -158,6 +165,14 @@ export interface Api {
 		 * **Auth Requirements:** No Requirements
 		 * */
 		permissions(): Promise<ModelPermissions<TestModel>>
+		/**
+		 * Text Search
+		 * 
+		 * Gets the TestModels matching a full-text search, most relevant first.
+		 * 
+		 * **Auth Requirements:** No Requirements
+		 * */
+		textSearch(input: TextSearch<TestModel>): Promise<Array<TestModel>>
 		/**
 		 * QueryPartial
 		 * 
@@ -344,6 +359,14 @@ export interface Api {
 			 * **Auth Requirements:** Authenticated
 			 * */
 			permissions(): Promise<ModelPermissions<TestModel>>
+			/**
+			 * Text Search
+			 * 
+			 * Gets the TestModels matching a full-text search, most relevant first.
+			 * 
+			 * **Auth Requirements:** Authenticated
+			 * */
+			textSearch(input: TextSearch<TestModel>): Promise<Array<TestModel>>
 			/**
 			 * QueryPartial
 			 * 
@@ -542,6 +565,14 @@ export interface Api {
 			 * */
 			permissions(): Promise<ModelPermissions<TestModel>>
 			/**
+			 * Text Search
+			 * 
+			 * Gets the TestModels matching a full-text search, most relevant first.
+			 * 
+			 * **Auth Requirements:** Authenticated
+			 * */
+			textSearch(input: TextSearch<TestModel>): Promise<Array<TestModel>>
+			/**
 			 * QueryPartial
 			 * 
 			 * Gets parts of TestModels that match the given query.
@@ -739,6 +770,14 @@ export interface Api {
 		 * **Auth Requirements:** Authenticated
 		 * */
 		permissions(): Promise<ModelPermissions<TestModel>>
+		/**
+		 * Text Search
+		 * 
+		 * Gets the TestModels matching a full-text search, most relevant first.
+		 * 
+		 * **Auth Requirements:** Authenticated
+		 * */
+		textSearch(input: TextSearch<TestModel>): Promise<Array<TestModel>>
 		/**
 		 * QueryPartial
 		 * 
@@ -947,6 +986,14 @@ export interface Api {
 			 * */
 			permissions(): Promise<ModelPermissions<TestModel>>
 			/**
+			 * Text Search
+			 * 
+			 * Gets the TestModels matching a full-text search, most relevant first.
+			 * 
+			 * **Auth Requirements:** No Requirements
+			 * */
+			textSearch(input: TextSearch<TestModel>): Promise<Array<TestModel>>
+			/**
 			 * QueryPartial
 			 * 
 			 * Gets parts of TestModels that match the given query.
@@ -1125,6 +1172,14 @@ export interface Api {
 			 * */
 			permissions(): Promise<ModelPermissions<TestModel>>
 			/**
+			 * Text Search
+			 * 
+			 * Gets the TestModels matching a full-text search, most relevant first.
+			 * 
+			 * **Auth Requirements:** No Requirements
+			 * */
+			textSearch(input: TextSearch<TestModel>): Promise<Array<TestModel>>
+			/**
 			 * QueryPartial
 			 * 
 			 * Gets parts of TestModels that match the given query.
@@ -1302,6 +1357,7 @@ export class LiveApi implements Api {
 		list: (input) => this.fetcher(`/m1/rest`, "GET", input),
 		insert: (input) => this.fetcher(`/m1/rest`, "POST", input),
 		permissions: () => this.fetcher(`/m1/rest/_permissions_`, "GET", undefined),
+		textSearch: (input) => this.fetcher(`/m1/rest/text-search`, "POST", input),
 		queryPartial: (input) => this.fetcher(`/m1/rest/query-partial`, "POST", input),
 		groupAggregate2: (input) => this.fetcher(`/m1/rest/group-aggregate-2`, "POST", input),
 		groupAggregate: (input) => this.fetcher(`/m1/rest/group-aggregate`, "POST", input),
@@ -1327,6 +1383,7 @@ export class LiveApi implements Api {
 			list: (input) => this.fetcher(`/m1/second/rest`, "GET", input),
 			insert: (input) => this.fetcher(`/m1/second/rest`, "POST", input),
 			permissions: () => this.fetcher(`/m1/second/rest/_permissions_`, "GET", undefined),
+			textSearch: (input) => this.fetcher(`/m1/second/rest/text-search`, "POST", input),
 			queryPartial: (input) => this.fetcher(`/m1/second/rest/query-partial`, "POST", input),
 			groupAggregate2: (input) => this.fetcher(`/m1/second/rest/group-aggregate-2`, "POST", input),
 			groupAggregate: (input) => this.fetcher(`/m1/second/rest/group-aggregate`, "POST", input),
@@ -1356,6 +1413,7 @@ export class LiveApi implements Api {
 			list: (input) => this.fetcher(`/m1/duplicate/rest`, "GET", input),
 			insert: (input) => this.fetcher(`/m1/duplicate/rest`, "POST", input),
 			permissions: () => this.fetcher(`/m1/duplicate/rest/_permissions_`, "GET", undefined),
+			textSearch: (input) => this.fetcher(`/m1/duplicate/rest/text-search`, "POST", input),
 			queryPartial: (input) => this.fetcher(`/m1/duplicate/rest/query-partial`, "POST", input),
 			groupAggregate2: (input) => this.fetcher(`/m1/duplicate/rest/group-aggregate-2`, "POST", input),
 			groupAggregate: (input) => this.fetcher(`/m1/duplicate/rest/group-aggregate`, "POST", input),
@@ -1386,6 +1444,7 @@ export class LiveApi implements Api {
 		list: (input) => this.fetcher(`/m2/rest`, "GET", input),
 		insert: (input) => this.fetcher(`/m2/rest`, "POST", input),
 		permissions: () => this.fetcher(`/m2/rest/_permissions_`, "GET", undefined),
+		textSearch: (input) => this.fetcher(`/m2/rest/text-search`, "POST", input),
 		queryPartial: (input) => this.fetcher(`/m2/rest/query-partial`, "POST", input),
 		groupAggregate2: (input) => this.fetcher(`/m2/rest/group-aggregate-2`, "POST", input),
 		groupAggregate: (input) => this.fetcher(`/m2/rest/group-aggregate`, "POST", input),
@@ -1418,6 +1477,7 @@ export class LiveApi implements Api {
 			list: (input) => this.fetcher(`/third/rest`, "GET", input),
 			insert: (input) => this.fetcher(`/third/rest`, "POST", input),
 			permissions: () => this.fetcher(`/third/rest/_permissions_`, "GET", undefined),
+			textSearch: (input) => this.fetcher(`/third/rest/text-search`, "POST", input),
 			queryPartial: (input) => this.fetcher(`/third/rest/query-partial`, "POST", input),
 			groupAggregate2: (input) => this.fetcher(`/third/rest/group-aggregate-2`, "POST", input),
 			groupAggregate: (input) => this.fetcher(`/third/rest/group-aggregate`, "POST", input),
@@ -1442,6 +1502,7 @@ export class LiveApi implements Api {
 			list: (input) => this.fetcher(`/third/rest2`, "GET", input),
 			insert: (input) => this.fetcher(`/third/rest2`, "POST", input),
 			permissions: () => this.fetcher(`/third/rest2/_permissions_`, "GET", undefined),
+			textSearch: (input) => this.fetcher(`/third/rest2/text-search`, "POST", input),
 			queryPartial: (input) => this.fetcher(`/third/rest2/query-partial`, "POST", input),
 			groupAggregate2: (input) => this.fetcher(`/third/rest2/group-aggregate-2`, "POST", input),
 			groupAggregate: (input) => this.fetcher(`/third/rest2/group-aggregate`, "POST", input),

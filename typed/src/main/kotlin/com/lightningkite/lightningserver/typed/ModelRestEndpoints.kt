@@ -107,6 +107,24 @@ public class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         )
 
 
+    public val textSearch: ApiHttpHandler<PathSpec0, USER, TextSearch<T>, List<T>> =
+        path.path("text-search").post bind explicitApiHttpHandler(
+            summary = "Text Search",
+            description = "Gets the ${info.tableName}s matching a full-text search, most relevant first.",
+            inputType = TextSearch.serializer(info.serializer),
+            outputType = ListSerializer(info.serializer),
+            auth = info.auth.subscope(ModelInfo.Scopes.read),
+            errorCases = emptyList(),
+            examples = emptyList(),
+            implementation = { input: TextSearch<T> ->
+                info.table(this)
+                    .fullTextSearch(input.query, input.condition, input.skip, input.limit)
+                    .toList()
+                    .map { it.model }
+            }
+        )
+
+
     public val detail: ApiHttpHandler<PathSpec1<ID>, USER, Unit, T> =
         detailPath.get bind explicitApiHttpHandler(
             summary = "Detail",

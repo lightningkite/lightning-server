@@ -1,5 +1,5 @@
 import type { Query, MassModification, EntryChange, ListChange, Modification, Condition, GroupCountQuery, AggregateQuery, GroupAggregateQuery, Aggregate, SortPart, DataClassPath, DataClassPathPartial, QueryPartial, DeepPartial, Fetcher, Brand } from '@lightningkite/lightning-server-simplified'
-import type { CollectionUpdates, TestModel, Mask, UpdateRestrictions, ModelPermissions, Pair, TestInput, Uuid } from './models.ts'
+import type { CollectionUpdates, TestModel, Mask, UpdateRestrictions, ModelPermissions, Pair, TestInput, TextSearch, Uuid } from './models.ts'
 
 export interface Api {
 	index(): Promise<number>
@@ -16,6 +16,7 @@ export interface Api {
 		list(input: Query<TestModel>): Promise<Array<TestModel>>
 		insert(input: TestModel): Promise<TestModel>
 		permissions(): Promise<ModelPermissions<TestModel>>
+		textSearch(input: TextSearch<TestModel>): Promise<Array<TestModel>>
 		queryPartial(input: QueryPartial<TestModel>): Promise<Array<Partial<TestModel>>>
 		groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 		groupAggregate(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
@@ -41,6 +42,7 @@ export interface Api {
 			list(input: Query<TestModel>): Promise<Array<TestModel>>
 			insert(input: TestModel): Promise<TestModel>
 			permissions(): Promise<ModelPermissions<TestModel>>
+			textSearch(input: TextSearch<TestModel>): Promise<Array<TestModel>>
 			queryPartial(input: QueryPartial<TestModel>): Promise<Array<Partial<TestModel>>>
 			groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			groupAggregate(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
@@ -70,6 +72,7 @@ export interface Api {
 			list(input: Query<TestModel>): Promise<Array<TestModel>>
 			insert(input: TestModel): Promise<TestModel>
 			permissions(): Promise<ModelPermissions<TestModel>>
+			textSearch(input: TextSearch<TestModel>): Promise<Array<TestModel>>
 			queryPartial(input: QueryPartial<TestModel>): Promise<Array<Partial<TestModel>>>
 			groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			groupAggregate(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
@@ -100,6 +103,7 @@ export interface Api {
 		list(input: Query<TestModel>): Promise<Array<TestModel>>
 		insert(input: TestModel): Promise<TestModel>
 		permissions(): Promise<ModelPermissions<TestModel>>
+		textSearch(input: TextSearch<TestModel>): Promise<Array<TestModel>>
 		queryPartial(input: QueryPartial<TestModel>): Promise<Array<Partial<TestModel>>>
 		groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 		groupAggregate(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
@@ -132,6 +136,7 @@ export interface Api {
 			list(input: Query<TestModel>): Promise<Array<TestModel>>
 			insert(input: TestModel): Promise<TestModel>
 			permissions(): Promise<ModelPermissions<TestModel>>
+			textSearch(input: TextSearch<TestModel>): Promise<Array<TestModel>>
 			queryPartial(input: QueryPartial<TestModel>): Promise<Array<Partial<TestModel>>>
 			groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			groupAggregate(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
@@ -156,6 +161,7 @@ export interface Api {
 			list(input: Query<TestModel>): Promise<Array<TestModel>>
 			insert(input: TestModel): Promise<TestModel>
 			permissions(): Promise<ModelPermissions<TestModel>>
+			textSearch(input: TextSearch<TestModel>): Promise<Array<TestModel>>
 			queryPartial(input: QueryPartial<TestModel>): Promise<Array<Partial<TestModel>>>
 			groupAggregate2(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>
 			groupAggregate(input: GroupAggregateQuery<TestModel>): Promise<Record<string, number | null | undefined>>

@@ -40,6 +40,14 @@ public interface ClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>> {
     public suspend fun queryPartial(input: QueryPartial<T>): List<Partial<T>>
 
     /**
+     * Full-text searches the model's text-indexed fields, most relevant first.
+     *
+     * @param input Search terms, plus an optional filter and pagination
+     * @return Matching models, most relevant first
+     */
+    public suspend fun textSearch(input: TextSearch<T>): List<T>
+
+    /**
      * Gets a single model by ID.
      *
      * @param id The model's ID

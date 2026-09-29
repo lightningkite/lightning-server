@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.settings.set
 import com.lightningkite.services.data.GenerateDataClassPaths
+import com.lightningkite.services.data.TextIndex
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
@@ -128,6 +129,25 @@ class ModelRestEndpointsTest {
 
             assertEquals(2, results.size)
             assertTrue(results.all { it.category == "CategoryA" })
+        }
+    }
+
+    @Test
+    fun textSearch_returns_matches_that_pass_the_condition() = runBlocking {
+        CrudTestServer.test(settings = {
+            generalSettings set GeneralServerSettings()
+            database set Database.Settings()
+        }) {
+            val match = CrudItem(name = "Walnut Desk", category = "Furniture")
+            CrudTestServer.rest.insert.test(null, match)
+            CrudTestServer.rest.insert.test(null, CrudItem(name = "Walnut Shelf", category = "Clearance"))
+            CrudTestServer.rest.insert.test(null, CrudItem(name = "Oak Desk", category = "Furniture"))
+
+            val results = CrudTestServer.rest.textSearch.test(
+                null, TextSearch(query = "walnut", condition = condition { it.category eq "Furniture" })
+            )
+
+            assertEquals(listOf(match._id), results.map { it._id })
         }
     }
 
@@ -608,6 +628,7 @@ class ModelRestEndpointsTest {
 // Data class for CRUD tests - defined outside test class to avoid KSP conflicts
 @Serializable
 @GenerateDataClassPaths
+@TextIndex(["name"])
 data class CrudItem(
     override val _id: Uuid = Uuid.random(),
     val name: String = "",

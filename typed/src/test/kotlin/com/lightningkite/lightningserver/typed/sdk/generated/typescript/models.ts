@@ -52,6 +52,13 @@ export namespace TestModel {
 	}
 }
 
+export interface TextSearch<T> {
+	query: string
+	condition: Condition<T>
+	skip: number
+	limit: number
+}
+
 export interface UpdateRestrictions<T> {
 	mode: UpdateRestrictions.Mode
 	fields: Array<UpdateRestrictions.Part<T>>
