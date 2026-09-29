@@ -58,8 +58,34 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
         securityGroup = TerraformJsonObject.expression("aws_security_group.internal.id"),
         privateSubnets = TerraformJsonObject.expression("module.vpc.private_subnets"),
         publicSubnets = TerraformJsonObject.expression("module.vpc.public_subnets"),
-        applicationSubnet = TerraformJsonObject.expression("module.vpc.public_subnets[0]"),
+        applicationRouteTables = TerraformJsonObject.expression("module.vpc.public_route_table_ids"),
         natGatewayIps = TerraformJsonObject.expression("module.vpc.nat_public_ips"),
+    )
+
+    /**
+     * Uses a VPC that already exists and is not managed by this Terraform.
+     *
+     * @param instanceSubnet The subnet the EC2 instance is placed in.
+     * @param instanceRouteTable The route table of [instanceSubnet]. Services that need routes (such as VPC peering) add them here.
+     */
+    public fun existingVPC(
+        id: String,
+        cidr: String,
+        securityGroup: String,
+        privateSubnets: List<String>,
+        publicSubnets: List<String>,
+        instanceSubnet: String,
+        instanceRouteTable: String,
+        natGatewayIps: List<String> = emptyList(),
+    ): AwsVpc.VpcInfo = VpcInfoExisting(
+        id = id,
+        cidr = cidr,
+        securityGroup = securityGroup,
+        privateSubnets = privateSubnets.toTerraformList(),
+        publicSubnets = publicSubnets.toTerraformList(),
+        applicationRouteTables = listOf(instanceRouteTable).toTerraformList(),
+        natGatewayIps = natGatewayIps.toTerraformList(),
+        instanceSubnet = instanceSubnet,
     )
 
     // === SSH access (optional, for debugging) ===
@@ -168,7 +194,11 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                 "ami" - expression("data.aws_ami.ubuntu.id")
                 "instance_type" - instanceType
                 "iam_instance_profile" - expression("aws_iam_instance_profile.ec2.name")
-                "key_name" - expression("aws_key_pair.ec2.key_name")
+
+                if (sshAllowedV4CIDR.isNotEmpty() || sshAllowedV6CIDR.isNotEmpty()) {
+                    "key_name" - expression("aws_key_pair.ec2.key_name")
+                }
+
                 "vpc_security_group_ids" - listOfNotNull(
                     expression("aws_security_group.ec2.id"),
                     (applicationVpc as? AwsVpc.VpcInfo)?.securityGroup,
@@ -179,7 +209,8 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                     }
 
                     is AwsVpc.VpcInfo -> {
-                        "subnet_id" - vpcInfo.applicationSubnet
+                        "subnet_id" - ((vpcInfo as? VpcInfoExisting)?.instanceSubnet
+                            ?: expression("${vpcInfo.publicSubnets.removePrefix("\${").removeSuffix("}")}[0]"))
                     }
                 }
 
@@ -195,7 +226,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                     "http_put_response_hop_limit" - 1
                 }
 
-                "user_data" - expression("local.ec2_init")
+                "user_data" - expression("local.ec2_base_init")
                 "user_data_replace_on_change" - true
 
                 "root_block_device" {
@@ -215,6 +246,7 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                 "depends_on" - (listOf(
                     "null_resource.upload_jar",
                     "null_resource.upload_settings",
+                    "aws_s3_object.init",
                     "aws_ssm_parameter.settings_password",
                     "aws_iam_role_policy_attachment.servicesAccess",
                     "aws_iam_role_policy_attachment.ssm",
@@ -223,9 +255,25 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                 ) + instanceSecretDependencies)
             }
 
+            "resource.aws_s3_object.init" {
+                "bucket" - expression("aws_s3_bucket.deployment.id")
+                "key" - $$"init/component-${local.ec2_init_version}.sh"
+                "content" - expression("local.ec2_init")
+                "content_type" - "application/x-sh"
+            }
+
             // User data script
             "locals" {
+                emitExtra("ec2_init_base.sh", generateEC2BaseInit())
                 emitExtra("ec2_init.sh", generateEC2Init())
+
+                val baseReplacements = listOf(
+                    "deployment_bucket = aws_s3_bucket.deployment.id",
+                    "deployment_script_key = aws_s3_object.init.key",
+                )
+                    .joinToString(", ")
+                "ec2_base_init" - $$"""${templatefile("${path.module}/ec2_init_base.sh", { $$baseReplacements })}"""
+
                 val replacements = listOf(
                     "deployment_bucket = aws_s3_bucket.deployment.id",
                     *provisioningFragments.flatMap { it.second.entries.map { "${it.key} = ${it.value}" } }
@@ -233,6 +281,10 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
                 )
                     .joinToString(", ")
                 "ec2_init" - $$"""${templatefile("${path.module}/ec2_init.sh", { $$replacements })}"""
+
+                "ec2_init_version" - expression(
+                    "max(1, parseint(substr(sha256(jsonencode([local.ec2_init])), 0, 7), 16))"
+                )
             }
         }
     }
@@ -511,6 +563,63 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
         }
     }
 
+    private fun generateEC2BaseInit(): String {
+
+        // language="Shell Script"
+        return buildString {
+            appendLine(
+                $$"""#!/bin/bash
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+
+export BOOT_START=$(date +%s)
+
+# === Logging Setup ===
+WORKING_DIR="/var/lib/$$projectPrefix-init"
+mkdir -p -m 0700 "$WORKING_DIR"
+cd "$WORKING_DIR"
+
+mkdir -p /var/log/$$projectPrefix
+touch /var/log/$$projectPrefix/ec2_init.log
+exec > >(tee /var/log/$$projectPrefix/ec2_init.log | logger -t ec2_init -s) 2>&1
+
+# === Bootstrap packages ===
+# Just enough to fetch ec2_init.sh; the full system update and package install happen there.
+echo "[INFO] Installing bootstrap packages..."
+apt-get -o DPkg::Lock::Timeout=$$aptLockTimeoutSeconds update -y
+apt-get -o DPkg::Lock::Timeout=$$aptLockTimeoutSeconds install -y curl ca-certificates unzip
+"""
+            )
+
+            awsCli()
+
+            appendLine(
+                $$"""
+
+download_with_retry() {
+    local src="$1" dst="$2" max=5 attempt=1
+    while [ $attempt -le $max ]; do
+        echo "[INFO] Downloading $src (attempt $attempt/$max)"
+        if aws s3 cp "$src" "$dst" --region "$$applicationRegion" --no-progress; then return 0; fi
+        sleep $((attempt * 5))
+        attempt=$((attempt + 1))
+    done
+    echo "[ERROR] Failed to download $src after $max attempts"
+    return 1
+}
+
+echo "[INFO] Downloading EC2 Init script at $(date)"
+download_with_retry "s3://${deployment_bucket}/${deployment_script_key}" "ec2_init.sh"
+chmod +x ec2_init.sh
+
+echo "[INFO] Running EC2 Init script at $(date)"
+./ec2_init.sh
+rm ec2_init.sh
+"""
+            )
+        }
+    }
+
     private fun generateEC2Init(): String {
         val emitter = this@TerraformAwsSingleEc2Builder
 
@@ -521,40 +630,23 @@ public abstract class TerraformAwsSingleEc2Builder<S : ServerBuilder>(
         return buildString {
             appendLine(
                 """#!/bin/bash
-
 set -euo pipefail
-
-# === Logging Setup ===
-mkdir -p /var/log/$projectPrefix
-touch /var/log/$projectPrefix/ec2_init.log
-exec > >(tee /var/log/$projectPrefix/ec2_init.log | logger -t ec2_init -s) 2>&1
-
-BOOT_START=$(date +%s)
-echo "[INFO] EC2 Init script started at $(date)"
-
-# === System update + base packages ===
-echo "[INFO] Updating system packages..."
 export DEBIAN_FRONTEND=noninteractive
-apt update -y
-apt install -y openjdk-${javaVersion.outputString}-jre-headless openssl curl gnupg ca-certificates unzip
+
+echo "[INFO] EC2 Init script started at $(date)"
 """
             )
 
-            // Additional packages - each validated
-            if (additionalPackages.isNotEmpty()) {
-                appendLine("# === Additional Packages ===")
-                appendLine("echo \"[INFO] Installing additional packages at \$(date)\"")
-                appendLine("apt install -y ${additionalPackages.joinToString(" ") { it.shellEscape() }}")
-                appendLine()
-            }
+            // Patching happens deliberately via os-update, never unattended on the live instance.
+            disableUnattendedUpgrades()
+
+            systemPackages()
 
             // Before the app is ever started, so a memory-tight instance has its safety net from
             // the very first boot.
             swap()
 
             cloudwatchAgent(emitter.applicationRegion)
-
-            awsCli()
 
             angieInstall()
 
@@ -564,30 +656,21 @@ apt install -y openjdk-${javaVersion.outputString}-jre-headless openssl curl gnu
 
             runProvisioningFragments()
 
+            val localHealthUrl = "http://localhost:8080${healthCheckPath}"
+
             // The single instance fills the bucket name via terraform templatefile() and the
             // region is a compile-time constant. The app listens on appPort behind Angie.
             instanceRedeployScript(
                 $$"""BUCKET="${deployment_bucket}"
 REGION="$$applicationRegion"""",
-                localHealthUrl = "http://localhost:8080${detectedOnlinePath ?: "/meta/online"}",
+                localHealthUrl = localHealthUrl,
             )
 
-            if (instanceFiles.isNotEmpty() || instanceFilesRaw.isNotEmpty())
-                instanceFiles()
+            instanceUpdateScript(localHealthUrl = localHealthUrl)
 
-            // Custom ec2_init scripts
-            if (customInstallScripts.isNotEmpty() || customInstallScriptsRaw.isNotEmpty()) {
-                appendLine("echo \"[INFO] Running Custom EC2 Init Scripts at \$(date)\"")
-                appendLine("# === Custom ec2_init Scripts ===")
-                for (script in customInstallScripts) {
-                    appendLine(script.readString().terraformTemplateEscape())
-                    appendLine()
-                }
-                for (script in customInstallScriptsRaw) {
-                    appendLine(script.terraformTemplateEscape())
-                    appendLine()
-                }
-            }
+            instanceFiles()
+
+            runCustomInstallScripts()
 
 
             // language="Shell Script"
@@ -630,6 +713,56 @@ echo "[INFO] EC2 Init script completed in $BOOT_DURATION seconds"
 """
             )
         }
+    }
+
+    /** Install + configure the CloudWatch agent in one step. */
+    private fun StringBuilder.cloudwatchAgent(applicationRegion: String) {
+        cloudwatchAgentInstall(applicationRegion)
+        cloudwatchAgentConfig()
+    }
+
+    /**
+     * Download + install the CloudWatch agent .deb. The scaling builder installs the agent via the
+     * AWS-managed `amazon-cloudwatch-agent-linux` component instead, so it only needs [cloudwatchAgentConfig].
+     */
+    private fun StringBuilder.cloudwatchAgentInstall(applicationRegion: String) {
+        appendLine(
+            $$"""
+# === Install CloudWatch Agent ===
+echo "[INFO] Installing CloudWatch Agent at $(date)"
+curl $${
+                if (instanceArchitecture == CPUArchitecture.Arm)
+                    "https://amazoncloudwatch-agent-${applicationRegion}.s3.${applicationRegion}.amazonaws.com/ubuntu/arm64/latest/amazon-cloudwatch-agent.deb"
+                else
+                    "https://amazoncloudwatch-agent-${applicationRegion}.s3.${applicationRegion}.amazonaws.com/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb"
+            } -o cw_agent.deb
+dpkg -i cw_agent.deb
+rm -f cw_agent.deb
+"""
+        )
+    }
+
+    /**
+     * Download + install the AWS CLI v2. The scaling builder installs it via the AWS-managed
+     * `aws-cli-version-2-linux` component instead.
+     */
+    // language="Shell Script"
+    private fun StringBuilder.awsCli() {
+        appendLine(
+            $$"""
+# === Install AWS CLI v2 ===
+echo "[INFO] Installing AWS CLI V2 at $(date)"
+curl $${
+                if (instanceArchitecture == CPUArchitecture.Arm)
+                    "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip"
+                else
+                    "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
+            } -o "awscliv2.zip"
+unzip -q awscliv2.zip
+./aws/install
+rm -rf aws/ awscliv2.zip
+"""
+        )
     }
 
     private fun StringBuilder.angieInstall() {
@@ -699,9 +832,9 @@ echo "[INFO] Installing Angie $(date)"
 curl -o /etc/apt/trusted.gpg.d/angie-signing.gpg \
             https://angie.software/keys/angie-signing.gpg
 echo "deb https://download.angie.software/angie/$(. /etc/os-release && echo "$ID/$VERSION_ID $VERSION_CODENAME") main" \
-    | sudo tee /etc/apt/sources.list.d/angie.list > /dev/null
-apt-get update -y
-apt-get install -y angie
+    | tee /etc/apt/sources.list.d/angie.list > /dev/null
+apt-get -o DPkg::Lock::Timeout=$$aptLockTimeoutSeconds update -y
+apt-get -o DPkg::Lock::Timeout=$$aptLockTimeoutSeconds install -y angie
 
 # === Angie config (built-in ACME client handles cert issuance + renewal) ===
 echo "[INFO] Creating server.conf for Angie $(date)"

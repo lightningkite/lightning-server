@@ -10,7 +10,7 @@ internal class VpcInfoTerraformManaged(
     override val securityGroup: String,
     override val privateSubnets: String,
     override val publicSubnets: String,
-    override val applicationSubnet: String,
+    override val applicationRouteTables: String,
     override val natGatewayIps: String,
     override val cidr: String = "$ipPrefix.0.0/16",
 ) : AwsVpc.VpcInfo
