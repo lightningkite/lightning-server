@@ -2,6 +2,7 @@
 package com.lightningkite.lightningserver.sessions
 
 import com.lightningkite.lightningserver.ForbiddenException
+import com.lightningkite.lightningserver.UnauthorizedException
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.definition.Runtime
@@ -19,17 +20,21 @@ import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import org.slf4j.LoggerFactory
 import com.lightningkite.lightningserver.sessions.token.PrivateTinyTokenFormat
+import com.lightningkite.lightningserver.typed.ModelRestEndpoints
 import com.lightningkite.lightningserver.typed.test
-import com.lightningkite.services.database.Database
-import com.lightningkite.services.database.HasId
+import com.lightningkite.services.database.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.Json
 import org.junit.Test
 import kotlin.test.*
 import kotlin.time.Duration
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -429,6 +434,198 @@ class SessionManagerTest {
                 assertEquals(refreshToken.type, reconstructed.type)
                 assertEquals(refreshToken._id, reconstructed._id)
                 assertEquals(refreshToken.plainTextSecret, reconstructed.plainTextSecret)
+            }
+        }
+    }
+
+    @Test
+    fun `sub-session keeps the parent's authentication time`() = runBlocking {
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
+        var time = Clock.System.now()
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(database = database)
+        }.let { server ->
+            server.test({}, clock = { object : Clock { override fun now() = time } }) {
+                val (parent, _) = server.sessions.newSession(userId)
+                time += 1.hours
+
+                val subRefresh = server.sessions.createSubSession.test(
+                    with(server.sessions) { parent.toAuth() },
+                    SubSessionRequest(label = "sub")
+                )
+                val accessToken = server.sessions.tokenSimple.test(null, subRefresh)
+                val subAuth = server.sessions.tokenFormat().read(SessionTestUser, accessToken)!!
+
+                assertIs<AuthRequirement.Result.Rejected>(
+                    AuthRequirement.Authenticated(maxAge = 10.minutes).check(subAuth)
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `legacy stored session without authenticatedAt is treated as authenticated at createdAt`() = runBlocking {
+        val createdAt = Instant.parse("2024-01-01T00:00:00Z")
+        val json = """{"secretHash":"x","subjectId":"${Uuid.random()}","createdAt":"$createdAt","lastUsed":"$createdAt"}"""
+        val session = Json.decodeFromString(
+            Session.serializer(SessionTestUser.serializer(), Uuid.serializer()),
+            json
+        )
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(database = database)
+        }.let { server ->
+            server.test({}) {
+                assertEquals(createdAt, with(server.sessions) { session.toAuth() }.issuedAt)
+            }
+        }
+    }
+
+    @Test
+    fun `terminating or deleting a session terminates sessions derived from it`() = runBlocking {
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(database = database)
+        }.let { server ->
+            server.test({}) {
+                val (parent, _) = server.sessions.newSession(userId)
+                val childRefresh = server.sessions.createSubSession.test(
+                    with(server.sessions) { parent.toAuth() },
+                    SubSessionRequest(label = "child")
+                )
+                val child = server.sessions.sessionInfo.table().get(RefreshToken(childRefresh)._id)!!
+                val grandchildRefresh = server.sessions.createSubSession.test(
+                    with(server.sessions) { child.toAuth() },
+                    SubSessionRequest(label = "grandchild")
+                )
+
+                server.sessions.sessionTerminate.test(with(server.sessions) { parent.toAuth() }, Unit)
+
+                assertFailsWith<UnauthorizedException> { server.sessions.tokenSimple.test(null, childRefresh) }
+                assertFailsWith<UnauthorizedException> { server.sessions.tokenSimple.test(null, grandchildRefresh) }
+
+                val (deleted, _) = server.sessions.newSession(userId)
+                val deletedChild = server.sessions.createSubSession.test(
+                    with(server.sessions) { deleted.toAuth() },
+                    SubSessionRequest(label = "child")
+                )
+                server.sessions.sessionInfo.table().deleteOneById(deleted._id)
+                assertFailsWith<UnauthorizedException> { server.sessions.tokenSimple.test(null, deletedChild) }
+            }
+        }
+    }
+
+    @Test
+    fun `a superuser terminating or deleting a session over REST terminates sessions derived from it`() = runBlocking {
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        val adminId = Uuid.random()
+        SessionTestUser.users[userId] = SessionTestUser(userId, "user@example.com")
+        SessionTestUser.users[adminId] = SessionTestUser(adminId, "admin@example.com")
+        val spath = Session.path(SessionTestUser.serializer(), Uuid.serializer())
+
+        object : ServerBuilder() {
+            init {
+                AuthRequirement.isSuperUser = SessionTestUser.require { it.id == adminId }
+            }
+
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(database = database)
+            val rest = path.path("sessions") include ModelRestEndpoints(sessions.sessionInfo)
+        }.let { server ->
+            server.test({}) {
+                val adminAuth = with(server.sessions) { server.sessions.newSession(adminId).first.toAuth() }
+
+                val (terminated, _) = server.sessions.newSession(userId)
+                val terminatedChild = server.sessions.createSubSession.test(
+                    with(server.sessions) { terminated.toAuth() },
+                    SubSessionRequest(label = "child")
+                )
+                server.rest.modify.test(
+                    terminated._id,
+                    adminAuth,
+                    modification(spath) { it.terminated assign com.lightningkite.lightningserver.runtime.now() }
+                )
+                assertFailsWith<UnauthorizedException> { server.sessions.tokenSimple.test(null, terminatedChild) }
+
+                val (deleted, _) = server.sessions.newSession(userId)
+                val deletedChild = server.sessions.createSubSession.test(
+                    with(server.sessions) { deleted.toAuth() },
+                    SubSessionRequest(label = "child")
+                )
+                server.rest.deleteItem.test(deleted._id, adminAuth, Unit)
+                assertFailsWith<UnauthorizedException> { server.sessions.tokenSimple.test(null, deletedChild) }
+            }
+        }
+    }
+
+    @Test
+    fun `sub-session cannot be created from a terminated session`() = runBlocking {
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(database = database)
+        }.let { server ->
+            server.test({}) {
+                val (parent, _) = server.sessions.newSession(userId)
+                val stillValidAccessToken = with(server.sessions) { parent.toAuth() }
+                server.sessions.sessionTerminate.test(stillValidAccessToken, Unit)
+
+                assertFailsWith<UnauthorizedException> {
+                    server.sessions.createSubSession.test(stillValidAccessToken, SubSessionRequest(label = "sub"))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `sub-session scopes default to the parent's and cannot be broader`() = runBlocking {
+        SessionTestUser.users.clear()
+        val userId = Uuid.random()
+        SessionTestUser.users[userId] = SessionTestUser(userId, "test@example.com")
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+
+            val sessions = path.path("auth") include TestSessionManager(database = database)
+        }.let { server ->
+            server.test({}) {
+                val (parent, _) = server.sessions.newSession(userId, scopes = setOf(GrantedScope("auth:sessions")))
+                val parentAuth = with(server.sessions) { parent.toAuth() }
+
+                val inherited = server.sessions.createSubSession.test(parentAuth, SubSessionRequest(label = "default"))
+                val inheritedSession = server.sessions.sessionInfo.table().get(RefreshToken(inherited)._id)!!
+                assertEquals(setOf(GrantedScope("auth:sessions")), inheritedSession.scopes)
+
+                assertFailsWith<ForbiddenException> {
+                    server.sessions.createSubSession.test(
+                        parentAuth,
+                        SubSessionRequest(label = "other", scopes = setOf(GrantedScope("auth:self")))
+                    )
+                }
+                val narrower = server.sessions.createSubSession.test(
+                    parentAuth,
+                    SubSessionRequest(label = "narrower", scopes = setOf(GrantedScope("auth:sessions:create")))
+                )
+                val narrowerSession = server.sessions.sessionInfo.table().get(RefreshToken(narrower)._id)!!
+                assertEquals(setOf(GrantedScope("auth:sessions:create")), narrowerSession.scopes)
             }
         }
     }

@@ -14,7 +14,8 @@ import kotlin.uuid.Uuid
  * Useful for creating temporary, scope-limited sessions for specific operations.
  *
  * @property label Human-readable label describing the purpose of this sub-session
- * @property scopes Set of scopes to grant to this sub-session. Defaults to root access but typically should be restricted
+ * @property scopes Scopes to grant to this sub-session. The default, root, means "the parent session's scopes";
+ *   anything else must be within the parent's scopes.
  * @property oauthClient Optional OAuth client ID if this sub-session is for OAuth purposes
  * @property expires Optional expiration time for the sub-session. If not provided, inherits from parent session
  */
@@ -35,10 +36,14 @@ public data class SubSessionRequest(
  * @param ID The ID type of the subject
  * @property _id Unique session identifier
  * @property secretHash Hash of the session secret token (never store the raw secret)
- * @property derivedFrom ID of parent session if this is a sub-session
+ * @property derivedFrom ID of parent session if this is a sub-session; terminating the parent terminates this session
  * @property label Human-readable description of the session (e.g., "Web Browser", "Mobile App")
  * @property subjectId ID of the authenticated subject
  * @property createdAt When the session was created
+ * @property authenticatedAt When the subject last proved their identity for this session's lineage. Sub-sessions
+ *   inherit it from their parent, so `maxAge` requirements measure time since real authentication, not since minting.
+ *   Null (sessions stored before this field existed) means [createdAt]. Nullable so that SQL databases can add
+ *   the column to a populated table.
  * @property lastUsed When the session was last used (updated on each request)
  * @property expires Optional hard expiration time for the session
  * @property stale Optional time when session should be considered stale and require re-authentication
@@ -54,10 +59,11 @@ public data class SubSessionRequest(
 public data class Session<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     override val _id: Uuid = Uuid.random(),
     val secretHash: String,
-    val derivedFrom: Uuid? = null,
+    @Index val derivedFrom: Uuid? = null,
     val label: String? = null,
     val subjectId: ID,
     val createdAt: Instant,
+    val authenticatedAt: Instant? = null,
     val lastUsed: Instant,
     val expires: Instant? = null,
     val stale: Instant? = null,
