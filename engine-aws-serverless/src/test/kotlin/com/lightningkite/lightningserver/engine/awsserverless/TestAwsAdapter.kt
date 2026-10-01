@@ -16,10 +16,27 @@ import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemResponse
 import software.amazon.awssdk.services.lambda.model.*
 import java.io.ByteArrayOutputStream
+import java.net.ServerSocket
 import java.util.Collections
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Consumer
+
+/**
+ * The embedded DynamoDB for this test JVM, on a free port rather than [embeddedDynamo]'s default 7999.
+ *
+ * On a fixed port, a second test JVM running at the same time (an IDE run alongside Gradle, or two builds)
+ * fails to bind and silently talks to the first JVM's instance instead - which the first JVM kills on exit,
+ * failing the second JVM's in-flight requests with connection refused.
+ *
+ * [embeddedDynamo] keeps one instance per JVM and ignores the port once it exists, so every test must come
+ * through here; a single direct call that runs first would pin the whole JVM back to 7999.
+ */
+private val testDynamoInstance: DynamoDbAsyncClient by lazy {
+    embeddedDynamo(port = ServerSocket(0).use { it.localPort })
+}
+
+fun testDynamo(): DynamoDbAsyncClient = testDynamoInstance
 
 /**
  * Wraps a DynamoDB client to count rejected conditional writes, letting tests assert that socket state
@@ -43,7 +60,7 @@ class CountingDynamoDbAsyncClient(basis: DynamoDbAsyncClient) : DynamoDbAsyncCli
 }
 
 class TestAwsAdapter(server: ServerDefinition) : AwsAdapter(server) {
-    val countingDynamo: CountingDynamoDbAsyncClient by lazy { CountingDynamoDbAsyncClient(embeddedDynamo()) }
+    val countingDynamo: CountingDynamoDbAsyncClient by lazy { CountingDynamoDbAsyncClient(testDynamo()) }
     override val dynamo: DynamoDbAsyncClient
         get() = countingDynamo
 
