@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.sessions
 
+import kotlinx.coroutines.flow.toList
 import com.lightningkite.lightningserver.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.data.Request
@@ -168,6 +169,12 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             serializer = Session.serializer(principal.subjectSerializer, principal.idSerializer),
             idSerializer = Uuid.serializer(),
             tableName = principal.name + "Session",
+            // Covers every way a session ends, including a superuser's REST update or delete.
+            signals = { table ->
+                table
+                    .postChange { old, new -> if (old.terminated == null && new.terminated != null) terminateDerivedFrom(new._id) }
+                    .postDelete { terminateDerivedFrom(it._id) }
+            },
             permissions = {
                 val auth = this.authOrNull
                 val canUse: Condition<Session<SUBJECT, ID>> = when {
@@ -179,7 +186,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
                 ModelPermissions(
                     create = isRoot,
-                    read = canUse,
+                    read = canUse or isRoot,
                     readMask = Mask(
                         listOf(
                             Condition.Never to modification(spath) { it.secretHash assign "" }
@@ -269,7 +276,8 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
      * @param stale Initial staleness time (auto-updated on each use based on [sessionStaleAfter])
      * @param scopes Set of granted scopes for this session (defaults to root/full access)
      * @param oauthClient OAuth client ID if this session was created via OAuth (currently unused)
-     * @param derivedFrom Parent session ID if this is a sub-session (for audit trail)
+     * @param derivedFrom Parent session ID if this is a sub-session
+     * @param authenticatedAt See [Session.authenticatedAt]
      * @return Pair of the created Session and its RefreshToken (containing plaintext secret)
      */
     context(_: ServerRuntime)
@@ -281,6 +289,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         scopes: Set<GrantedScope> = setOf(GrantedScope.root),
         oauthClient: String? = null,
         derivedFrom: Uuid? = null,
+        authenticatedAt: Instant = now(),
     ): Pair<Session<SUBJECT, ID>, RefreshToken> {
         // Generate a cryptographically secure 24-byte random secret
         val secret = Base64.encode(CryptographyRandom.nextBytes(24))
@@ -297,6 +306,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             stale = stale,
             scopes = scopes,
             createdAt = now(),
+            authenticatedAt = authenticatedAt,
             lastUsed = now(),
 //            oauthClient = oauthClient,  TODO: OAuth
             derivedFrom = derivedFrom,
@@ -318,7 +328,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         principalType = principal,
         id = subjectId,
         sessionId = _id,
-        issuedAt = createdAt,
+        issuedAt = authenticatedAt ?: createdAt,
         scopes = scopes,
     )
 
@@ -329,6 +339,27 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             if (owner != requireOwnershipOf) throw ForbiddenException()
         }
         sessionInfo.table().updateOneById(id, modification(spath) { it.terminated assign now() })
+    }
+
+    // Collected breadth-first, then terminated in one update. Recursing level by level through the postChange hook
+    // overflows the stack on a long chain of sub-sessions when the database never suspends (RAM, JSON files).
+    // `seen` stops a derivedFrom cycle, which a superuser could create through the REST endpoints.
+    context(server: ServerRuntime)
+    private suspend fun terminateDerivedFrom(root: Uuid) {
+        val seen = hashSetOf(root)
+        var parents = listOf(root)
+        while (parents.isNotEmpty()) {
+            parents = sessionInfo.table()
+                .find((spath.derivedFrom inside parents) and (spath.terminated eq null))
+                .toList()
+                .map { it._id }
+                .filter { it !in seen }
+            seen += parents
+        }
+        sessionInfo.table().updateMany(
+            (spath._id inside seen) and (spath.terminated eq null),
+            modification(spath) { it.terminated assign now() },
+        )
     }
 
     /**
@@ -452,14 +483,14 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
      * - Implementing least-privilege access patterns
      *
      * **Security constraints**:
-     * - Sub-session scopes cannot exceed parent session scopes
+     * - Sub-session scopes cannot exceed parent session scopes; requesting root (the default) grants the parent's scopes
      * - Sub-session expiration cannot exceed parent session expiration
      * - Sub-sessions inherit the parent's stale duration
-     * - Terminating the parent session does NOT automatically terminate sub-sessions
      *
      * @input SubSessionRequest - Configuration for the new restricted session
      * @output String - A refresh token for the new sub-session
-     * @throws UnauthorizedException if the current session cannot be found or has no session ID
+     * @throws UnauthorizedException if the current session cannot be found, has no session ID, or is terminated
+     * @throws ForbiddenException if the requested scopes exceed the parent session's scopes
      */
     public val createSubSession: ApiHttpHandler<PathSpec0, SUBJECT, SubSessionRequest, String> =
         path.path("sub-session").post bind explicitApiHttpHandler(
@@ -472,19 +503,24 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 val sessionUuid = this.auth.sessionId?.let(Uuid::parse) ?: throw UnauthorizedException()
                 val session = sessionInfo.table().get(sessionUuid)
                     ?: throw UnauthorizedException()
+                // An access token outlives its session's termination by a few minutes.
+                if (session.terminated != null) throw UnauthorizedException("Session has been terminated.")
+                val scopes = if (request.scopes == setOf(GrantedScope.root)) session.scopes else request.scopes
+                if (!session.scopes.meetsRequirements(scopes.mapTo(HashSet()) { RequiredScope(it.asString) }))
+                    throw ForbiddenException("Sub-session scopes must be within the parent session's scopes.")
 
-                // SECURITY: Ensure sub-session cannot have more permissions than parent
                 newSession(
                     label = request.label,
                     subjectId = auth.id,
                     derivedFrom = sessionUuid,
-                    scopes = request.scopes,
+                    scopes = scopes,
                     // Sub-session expires can't exceed parent session expiration
                     expires = session.expires
                         ?.let { minOf(it, request.expires ?: Instant.DISTANT_FUTURE) }
                         ?: request.expires,
                     stale = session.stale,
                     oauthClient = request.oauthClient,
+                    authenticatedAt = session.authenticatedAt ?: session.createdAt,
                 ).second.string
             }
         )
@@ -526,9 +562,6 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
      * - User-initiated logout
      * - Security-triggered session revocation
      * - "Logout from this device" functionality
-     *
-     * **Note**: This does NOT terminate derived sub-sessions. To terminate all sessions,
-     * clients should call this endpoint for each session individually.
      *
      * Requires the 'auth:sessions:terminate' scope.
      */
@@ -609,8 +642,7 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
  *
  * 1. BULK SESSION TERMINATION
  *    - Add endpoint to terminate all sessions for a user (except current)
- *    - Add endpoint to terminate all derived sub-sessions from a parent session
- *    - Useful for "logout from all devices" and cascading termination
+ *    - Useful for "logout from all devices"
  *
  * 3. REFRESH TOKEN ROTATION
  *    - Implement refresh token rotation for better security
@@ -622,11 +654,6 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
  *    - Currently tracks user agent and IP, but doesn't enforce consistency
  *    - Consider optional "trusted device" mode that alerts on IP/UA changes
  *    - Add anomaly detection for suspicious session usage patterns
- *
- * 5. SCOPE VALIDATION FOR SUB-SESSIONS
- *    - Current implementation trusts client to provide valid scopes
- *    - Add validation that requested scopes are subset of parent session scopes
- *    - Prevent scope escalation attacks
  *
  * 6. SESSION REFRESH OPTIMIZATION
  *    - Currently updates session metadata on every refresh token use (DB write)
