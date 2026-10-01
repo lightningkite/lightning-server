@@ -27,9 +27,8 @@ plugins {
     alias(libs.plugins.dokka) apply false
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.androidApp) apply false
-    alias(libs.plugins.androidLibrary) apply false
+    alias(libs.plugins.androidKmpLibrary) apply false
     alias(libs.plugins.graalVmNative) apply false
-    alias(libs.plugins.shadow) apply false
     alias(libs.plugins.vanniktechMavenPublish) apply false
     alias(libs.plugins.kover)
     alias(libs.plugins.detekt) apply false
