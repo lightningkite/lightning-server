@@ -33,6 +33,11 @@ sealed class Modification<T>  {
         override fun toString(): String = modifications.joinToString("; ") { it.toString() }
     }
 
+    /**
+     * Applies [modification] only when the value isn't null. Backends must never write onto a null or missing value:
+     * guards validate the in-memory result of a client's modification, so such a write would be a way around them.
+     * MongoDB is stricter and leaves the whole row unchanged when any check fails.
+     */
     @Serializable(ModificationIfNotNullSerializer::class)
     data class IfNotNull<T>(val modification: Modification<T>): Modification<T?>() {
         override fun invoke(on: T?): T? = on?.let { modification(it) }
@@ -174,6 +179,7 @@ sealed class Modification<T>  {
         override fun toString(): String = " += $map"
     }
 
+    /** Modifies existing entries only: a missing key throws in memory, and MongoDB leaves the row unchanged. */
     @Serializable(ModificationModifyByKeySerializer::class)
     data class ModifyByKey<T>(val map: Map<String, Modification<T>>): Modification<Map<String, T>>() {
         override fun invoke(on: Map<String, T>): Map<String, T> = on + map.mapValues { (on[it.key]?.let { e -> it.value(e) } ?: throw Exception()) }

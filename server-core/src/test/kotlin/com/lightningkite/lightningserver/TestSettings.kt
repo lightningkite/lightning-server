@@ -128,6 +128,11 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
         database,
         cache
     )
+    val proofBackupCode = BackupCodeEndpoints(
+        ServerPath(UUID.random().toString()),
+        database,
+        cache
+    )
     val proofSms = SmsProofEndpoints(
         ServerPath(UUID.random().toString()),
         PinHandler(cache, "pin2"),

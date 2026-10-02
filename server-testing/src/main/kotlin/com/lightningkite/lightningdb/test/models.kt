@@ -161,6 +161,21 @@ data class LargeTestModel(
 
 @GenerateDataClassPaths
 @Serializable
+data class NullableElementsModel(
+    override val _id: UUID = UUID.random(),
+    var ints: List<Int?> = listOf(),
+    var intsNullable: List<Int?>? = null,
+    var holders: List<NullableValueHolder> = listOf(),
+) : HasId<UUID>
+
+@GenerateDataClassPaths
+@Serializable
+data class NullableValueHolder(
+    var value: Int? = null,
+)
+
+@GenerateDataClassPaths
+@Serializable
 data class SimpleLargeTestModel(
     override val _id: UUID = UUID.random(),
     var boolean: Boolean = false,

@@ -25,20 +25,25 @@ data class UpdateRestrictions<T>(
     val fields: List<UpdateRestrictionsPart<T>> = listOf()
 ) {
 
+    /**
+     * The condition a row must meet for [on] to be allowed: the [UpdateRestrictionsPart.limitedIf] of every rule whose
+     * field [on] writes (including by writing a parent of it), plus what must already hold for its
+     * [UpdateRestrictionsPart.limitedTo] to hold afterwards (see [requiredBefore]).
+     */
     operator fun invoke(on: Modification<T>): Condition<T> {
-        val totalConditions = ArrayList<Condition<T>>()
+        val totalConditions = LinkedHashSet<Condition<T>>()
         for(field in fields) {
             if(on.affects(field.path)) {
-                totalConditions.add(field.limitedIf)
-                if(field.limitedTo !is Condition.Always) {
-                    if(!field.limitedTo.guaranteedAfter(on)) return Condition.Never
-                }
+                val limitedToBefore = field.limitedTo.requiredBefore(on)
+                if(limitedToBefore == Condition.Never || field.limitedIf == Condition.Never) return Condition.Never
+                if(limitedToBefore != Condition.Always) totalConditions.add(limitedToBefore)
+                if(field.limitedIf != Condition.Always) totalConditions.add(field.limitedIf)
             }
         }
         return when(totalConditions.size) {
             0 -> Condition.Always
-            1 -> totalConditions[0]
-            else -> Condition.And(totalConditions)
+            1 -> totalConditions.single()
+            else -> Condition.And(totalConditions.toList())
         }
     }
 
@@ -55,6 +60,7 @@ data class UpdateRestrictions<T>(
         }
         /**
          * Makes a field only modifiable if the item matches the [condition].
+         * Read masks don't apply to [condition], so whether an update matched can reveal a masked value it tests.
          */
         infix fun DataClassPath<T, *>.requires(condition: Condition<T>) {
             fields.add(UpdateRestrictionsPart(this, condition, Condition.Always))
@@ -68,6 +74,8 @@ data class UpdateRestrictions<T>(
         }
         /**
          * The value is only allowed to change to a value that matches [valueMust].
+         * A write that doesn't set the whole field is only allowed on rows where the parts of [valueMust] it leaves
+         * alone already hold, which is added to the update's condition; see [requiredBefore].
          */
         inline fun <reified V> DataClassPath<T, V>.mustBe(valueMust: (DataClassPath<V, V>)->Condition<V>) {
             fields.add(UpdateRestrictionsPart(this, Condition.Always, this.condition(valueMust)))

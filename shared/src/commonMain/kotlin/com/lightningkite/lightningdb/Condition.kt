@@ -241,6 +241,7 @@ sealed class Condition<in T> {
         override fun toString(): String = ".containsKey($key)"
     }
 
+    /** Never matches a missing key, whatever [condition] is; backends must match this exactly. */
     @Serializable
     @SerialName("OnKey")
     data class OnKey<V>(val key: String, val condition: Condition<V>) :
@@ -263,6 +264,7 @@ sealed class Condition<in T> {
         }
     }
 
+    /** Never matches a null or missing value, whatever [condition] is; backends must match this exactly. */
     @Serializable(ConditionIfNotNullSerializer::class)
     @SerialName("IfNotNull")
     data class IfNotNull<T>(val condition: Condition<T>) : Condition<T?>() {
