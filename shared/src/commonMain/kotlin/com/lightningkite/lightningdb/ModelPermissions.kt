@@ -23,7 +23,7 @@ data class ModelPermissions<Model>(
      */
     val readMask: Mask<Model> = Mask(listOf()),
     /**
-     * The user may only update models that match this condition.
+     * The user may only update models that match this condition and [read].
      */
     val update: Condition<Model> = Condition.Never,
     /**
@@ -31,7 +31,7 @@ data class ModelPermissions<Model>(
      */
     val updateRestrictions: UpdateRestrictions<Model> = UpdateRestrictions(listOf()),
     /**
-     * The user may only delete models that match this condition.
+     * The user may only delete models that match this condition and [read].
      */
     val delete: Condition<Model> = Condition.Never,
     val maxQueryTimeMs: Long = 1_000L

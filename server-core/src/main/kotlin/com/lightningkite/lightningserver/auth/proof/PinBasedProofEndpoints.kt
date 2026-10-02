@@ -9,6 +9,8 @@ import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.encryption.SecureHasher
 import com.lightningkite.lightningserver.encryption.hasher
 import com.lightningkite.lightningserver.encryption.secretBasis
+import com.lightningkite.lightningserver.exceptions.BadRequestException
+import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.typed.ApiExample
@@ -57,13 +59,14 @@ abstract class PinBasedProofEndpoints(
         implementation = { valueUnsafe: String ->
             val value = normalize(valueUnsafe)
 
-            pin.cache().constrainAttemptRate(
-                cacheKey = "$name-pin-count-${value}"
-            ) {
-                val p = pin.establish(value)
-                send(value, p.pin)
-                p.key
-            }
+            // Every send counts, not just failures, so this can't be used to flood an inbox or phone.
+            val sendsKey = "$name-pin-sends-$value"
+            pin.cache().add(sendsKey, 1, pin.expiration)
+            if (pin.cache().get<Int>(sendsKey)!! > 5)
+                throw BadRequestException("Too many codes requested; please wait ${pin.expiration.inWholeMinutes} minutes.")
+            val p = pin.establish(value)
+            send(value, p.pin)
+            p.key
         }
     )
 

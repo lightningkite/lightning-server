@@ -22,7 +22,9 @@ import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
+import java.security.MessageDigest
 import java.security.SecureRandom
+import java.util.Base64
 import kotlin.time.Duration.Companion.seconds
 
 @Serializable
@@ -58,6 +60,10 @@ class BackupCodeEndpoints(
         Authentication.register(this)
     }
     val availableCharacters = ('A'..'Z').toList() - setOf('I', 'O')
+
+    // Unsalted is fine since codes carry about 90 bits of entropy, and it must be deterministic to query by it.
+    private fun codeHash(normalizedCode: String): String =
+        Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(normalizedCode.toByteArray()))
 
     val loggedInInterfaceInfo: Documentable.InterfaceInfo =
         Documentable.InterfaceInfo(path, "AuthenticatedBackupCodeProofClientEndpoints", listOf())
@@ -104,7 +110,7 @@ class BackupCodeEndpoints(
 
             modelInfo.collection().insert(newCodes.map {
                 BackupCodeSecret(
-                    code = it.lowercase(),
+                    code = codeHash(it.lowercase()),
                     subjectId = auth.idString,
                     subjectType = auth.subject.name,
                 )
@@ -176,30 +182,25 @@ class BackupCodeEndpoints(
         ),
         successCode = HttpStatus.OK,
         implementation = { input: IdentificationAndPassword ->
+            val subject = input.type
+            val handler = Authentication.subjects.values.find { it.name == subject }
+                ?: throw IllegalArgumentException("No subject $subject recognized")
+            val normalizedValue = handler.normalizePropertyValue(input.property, input.value)
+            val subjectId = handler.findUserIdString(input.property, normalizedValue)
 
-            cache().constrainAttemptRate(
-                cacheKey = "backup-code-count-${input.property}-${input.value}"
-            ) {
-                val subject = input.type
-
-                val handler = Authentication.subjects.values.find { it.name == subject }
-                    ?: throw IllegalArgumentException("No subject $subject recognized")
-
-                val subjectId = handler.findUserIdString(input.property, input.value)
-                    ?: throw BadRequestException("Invalid Backup Code")
-
-                val secrets = modelInfo.collection().find(condition {
-                    it.subjectId.eq(subjectId) and
-                            it.subjectType.eq(subject)
-                })
-                    .toList()
-
+            // Unknown identities are limited too, so being limited doesn't reveal which accounts exist.
+            cache().constrainAttemptRate(cacheKey = "backup-code-count-$subject-${subjectId ?: "unknown-$normalizedValue"}") {
+                if (subjectId == null) throw BadRequestException("Invalid Backup Code")
                 val normalizedCode = input.password.filter { it.isLetter() }.lowercase()
-                val match = secrets.find { normalizedCode == it.code }
-                    ?: throw BadRequestException("Invalid Backup Code")
+                // Deleting is what claims the code, so two concurrent requests can't both use it.
+                // Codes stored before hashing was introduced are plain text.
+                modelInfo.collection().deleteOne(condition {
+                    it.subjectId.eq(subjectId) and
+                            it.subjectType.eq(subject) and
+                            it.code.inside(listOf(codeHash(normalizedCode), normalizedCode))
+                }) ?: throw BadRequestException("Invalid Backup Code")
 
-                modelInfo.collection().deleteOneById(match._id)
-
+                // A backup code stands in for a lost factor; proofsCheck won't accept it as the only one.
                 proofHasher().makeProof(
                     info = info.copy(strength = 10),
                     property = input.property,

@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.auth.subject
 
 import com.lightningkite.lightningdb.GenerateDataClassPaths
 import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningdb.Index
 import com.lightningkite.lightningdb.References
 import com.lightningkite.lightningserver.auth.oauth.OauthClient
 import com.lightningkite.lightningserver.auth.proof.ProofOption
@@ -30,10 +31,14 @@ data class SubSessionRequest(
 data class Session<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     override val _id: UUID = UUID.random(),
     val secretHash: String,
-    val derivedFrom: UUID? = null,
+    @Index val derivedFrom: UUID? = null,
     val label: String? = null,
     val subjectId: ID,
     val createdAt: Instant = now(),
+    // When the subject last proved their identity for this session's lineage; derived sessions inherit it so that
+    // `maxAge` measures time since real authentication.  Null (sessions stored before this field) means createdAt.
+    // Nullable so SQL databases can add the column to a populated table.
+    val authenticatedAt: Instant? = null,
     val lastUsed: Instant = now(),
     val expires: Instant? = null,
     val stale: Instant? = null,
