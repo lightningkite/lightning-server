@@ -21,7 +21,7 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
  *
  * @param PATH The path specification type for this request
  */
-public abstract class Request<out PATH : PathSpec> : HasContextualPath<PATH>, Caching {
+public abstract class Request<out PATH : PathSpec> : HasContextualPath<PATH>, Caching<Request<*>> {
     /** The resolved path information for this request. */
     public abstract val path: HasContextualPath<PATH>
 
@@ -57,6 +57,8 @@ public abstract class Request<out PATH : PathSpec> : HasContextualPath<PATH>, Ca
     context(engine: Engine)
     override val pathInContext: ResolvedPath<PATH>
         get() = path.pathInContext
+
+    public typealias CacheKey<PATH, T> = SerializableCache.CalculatingKey<Request<PATH>, Request<PATH>, T>
 }
 
 context(_: Engine)
@@ -72,7 +74,7 @@ public val <PATH : PathSpec> Request<PATH>.pathSpec: PATH get() = pathInContext.
  * @return The cached or newly calculated value
  */
 context(server: ServerRuntime)
-public suspend operator fun <T> Request<*>.get(key: SerializableCache.CalculatingKey<Request<*>, T>): T {
+public suspend operator fun <T, PATH : PathSpec> Request<PATH>.get(key: Request.CacheKey<*, T>): T {
     return cache.get(key, this)
 }
 

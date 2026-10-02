@@ -36,8 +36,8 @@ class SerializableCacheTest {
             settings = { generalSettings set GeneralServerSettings() }
         ) {
             runBlocking {
-                val cache = SerializableCache()
-                val key = SerializableCache.Key("user", String.serializer())
+                val cache = SerializableCache<Any?>()
+                val key = SerializableCache.Key<Any?, _>("user", String.serializer())
 
                 cache.set(key, "Alice")
                 assertEquals("Alice", cache.get(key))
@@ -51,8 +51,8 @@ class SerializableCacheTest {
             settings = { generalSettings set GeneralServerSettings() }
         ) {
             runBlocking {
-                val cache = SerializableCache()
-                val key = SerializableCache.Key("missing", String.serializer())
+                val cache = SerializableCache<Any?>()
+                val key = SerializableCache.Key<Any?, _>("missing", String.serializer())
 
                 assertNull(cache.get(key))
             }
@@ -67,8 +67,8 @@ class SerializableCacheTest {
             clock = { clock },
         ) {
             runBlocking {
-                val cache = SerializableCache()
-                val key = SerializableCache.Key(
+                val cache = SerializableCache<Any?>()
+                val key = SerializableCache.Key<Any?, _>(
                     "expiring",
                     String.serializer(),
                     expireAfter = 10.milliseconds
@@ -91,8 +91,8 @@ class SerializableCacheTest {
             settings = { generalSettings set GeneralServerSettings() }
         ) {
             runBlocking {
-                val cache = SerializableCache()
-                val key = SerializableCache.Key(
+                val cache = SerializableCache<Any?>()
+                val key = SerializableCache.Key<Any?, _>(
                     "local",
                     String.serializer(),
                     localOnly = true
@@ -113,8 +113,8 @@ class SerializableCacheTest {
             settings = { generalSettings set GeneralServerSettings() }
         ) {
             runBlocking {
-                val cache = SerializableCache()
-                val key = SerializableCache.Key("test", String.serializer())
+                val cache = SerializableCache<Any?>()
+                val key = SerializableCache.Key<Any?, _>("test", String.serializer())
 
                 assertFalse(cache.containsKey(key))
                 cache.set(key, "value")
@@ -129,10 +129,10 @@ class SerializableCacheTest {
             settings = { generalSettings set GeneralServerSettings() }
         ) {
             runBlocking {
-                val cache = SerializableCache()
+                val cache = SerializableCache<Any?>()
                 var calculationCount = 0
 
-                val key = object : SerializableCache.CalculatingKey<String, String> {
+                val key = object : SerializableCache.CalculatingKey<Any?, String, String> {
                     override val id = "calculated"
                     override val serializer = String.serializer()
 
@@ -162,8 +162,8 @@ class SerializableCacheTest {
             settings = { generalSettings set GeneralServerSettings() }
         ) {
             runBlocking {
-                val cache = SerializableCache()
-                val key = SerializableCache.Key("test", Int.serializer())
+                val cache = SerializableCache<Any?>()
+                val key = SerializableCache.Key<Any?, _>("test", Int.serializer())
                 var computeCount = 0
 
                 val value1 = cache.getOrPut(key) {
@@ -189,8 +189,8 @@ class SerializableCacheTest {
             settings = { generalSettings set GeneralServerSettings() }
         ) {
             runBlocking {
-                val cache = SerializableCache()
-                val key = SerializableCache.Key("test", String.serializer())
+                val cache = SerializableCache<Any?>()
+                val key = SerializableCache.Key<Any?, _>("test", String.serializer())
 
                 cache.set(key, "value")
                 assertTrue(cache.containsKey(key))
@@ -208,8 +208,8 @@ class SerializableCacheTest {
             settings = { generalSettings set GeneralServerSettings() }
         ) {
             runBlocking {
-                val cache = SerializableCache()
-                val key = SerializableCache.Key("test", String.serializer())
+                val cache = SerializableCache<Any?>()
+                val key = SerializableCache.Key<Any?, _>("test", String.serializer())
 
                 assertFalse(cache.updated)
 
@@ -228,8 +228,8 @@ class SerializableCacheTest {
             settings = { generalSettings set GeneralServerSettings() }
         ) {
             runBlocking {
-                val cache = SerializableCache()
-                val key = SerializableCache.Key("user", User.serializer())
+                val cache = SerializableCache<Any?>()
+                val key = SerializableCache.Key<Any?, _>("user", User.serializer())
                 val user = User("Alice", 30)
 
                 cache.set(key, user)
@@ -244,9 +244,9 @@ class SerializableCacheTest {
             settings = { generalSettings set GeneralServerSettings() }
         ) {
             runBlocking {
-                val cache1 = SerializableCache()
-                val cache2 = SerializableCache()
-                val key = SerializableCache.Key("test", String.serializer())
+                val cache1 = SerializableCache<Any?>()
+                val cache2 = SerializableCache<Any?>()
+                val key = SerializableCache.Key<Any?, _>("test", String.serializer())
 
                 assertEquals(cache1, cache2) // Both empty
 
@@ -264,12 +264,12 @@ class SerializableCacheTest {
             settings = { generalSettings set GeneralServerSettings() }
         ) {
             runBlocking {
-                class TestCaching : Caching {
-                    override val cache = SerializableCache()
+                class TestCaching : Caching<Any?> {
+                    override val cache = SerializableCache<Any?>()
                 }
 
                 val caching = TestCaching()
-                val key = SerializableCache.Key("test", String.serializer())
+                val key = SerializableCache.Key<Any?, _>("test", String.serializer())
 
                 caching.set(key, "value")
                 assertEquals("value", caching.get(key))
@@ -283,10 +283,10 @@ class SerializableCacheTest {
             settings = { generalSettings set GeneralServerSettings() }
         ) {
             runBlocking {
-                val cache = SerializableCache()
-                val key1 = SerializableCache.Key("key1", String.serializer())
-                val key2 = SerializableCache.Key("key2", Int.serializer())
-                val key3 = SerializableCache.Key("key3", User.serializer())
+                val cache = SerializableCache<Any?>()
+                val key1 = SerializableCache.Key<Any?, _>("key1", String.serializer())
+                val key2 = SerializableCache.Key<Any?, _>("key2", Int.serializer())
+                val key3 = SerializableCache.Key<Any?, _>("key3", User.serializer())
 
                 cache.set(key1, "value1")
                 cache.set(key2, 42)
@@ -305,14 +305,14 @@ class SerializableCacheTest {
             settings = { generalSettings set GeneralServerSettings() }
         ) {
             runBlocking {
-                val cache1 = SerializableCache()
-                val key = SerializableCache.Key("test", String.serializer())
+                val cache1 = SerializableCache<Any?>()
+                val key = SerializableCache.Key<Any?, _>("test", String.serializer())
 
                 cache1.set(key, "test value")
 
                 // Simulate serialization/deserialization by creating new cache from bytes
                 val bytes = cache1.bytes
-                val cache2 = SerializableCache(bytes)
+                val cache2 = SerializableCache<Any?>(bytes)
 
                 // Should be able to retrieve the value from deserialized cache
                 assertEquals("test value", cache2.get(key))
@@ -326,8 +326,8 @@ class SerializableCacheTest {
             settings = { generalSettings set GeneralServerSettings() }
         ) {
             runBlocking {
-                val cache = SerializableCache()
-                val key = SerializableCache.Key("test", String.serializer())
+                val cache = SerializableCache<Any?>()
+                val key = SerializableCache.Key<Any?, _>("test", String.serializer())
 
                 cache.set(key, "value")
 
@@ -346,8 +346,8 @@ class SerializableCacheTest {
             clock = { clock },
         ) {
             runBlocking {
-                val cache = SerializableCache()
-                val key = SerializableCache.Key(
+                val cache = SerializableCache<Any?>()
+                val key = SerializableCache.Key<Any?, _>(
                     "expiring",
                     String.serializer(),
                     expireAfter = 100.milliseconds

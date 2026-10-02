@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.RawWebSocketPath
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
@@ -42,12 +43,12 @@ class WebSocketConnectRequestTest {
         object : ServerBuilder() {}.test(
             settings = {}
         ) {
-            r[CacheKey]
+            execute { r[CacheKey] }
             r.roundTripTest()
         }
     }
 
-    private object CacheKey : SerializableCache.CalculatingKey<Request<*>, String> {
+    private object CacheKey : SerializableCache.CalculatingKey<Request<*>, Request<*>, String> {
         override val id: String
             get() = "cache"
         override val serializer: KSerializer<String>

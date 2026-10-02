@@ -98,7 +98,7 @@ public interface PrincipalType<SUBJECT : HasId<ID>, ID : Comparable<ID>> {
      * Subjects are cached for 5 minutes by default and only stored locally
      * (not in distributed caches).
      */
-    public val subjectCacheKey: SerializableCache.Key<SUBJECT>
+    public val subjectCacheKey: SerializableCache.Key<Authentication<SUBJECT>, SUBJECT>
         get() = SerializableCache.Key(
             "$name-subject",
             subjectSerializer,

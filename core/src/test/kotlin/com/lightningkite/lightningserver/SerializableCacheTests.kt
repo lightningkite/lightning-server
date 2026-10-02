@@ -17,11 +17,11 @@ class SerializableCacheTests {
 
     @Test
     fun testSerialization() {
-        val cache = SerializableCache()
+        val cache = SerializableCache<Unit>()
 
         var calculated = false
 
-        val key = object : SerializableCache.CalculatingKey<Int, String> {
+        val key = object : SerializableCache.CalculatingKey<Any?, Int, String> {
             override val id: String = "key"
             override val serializer: KSerializer<String> = String.serializer()
 
@@ -39,7 +39,7 @@ class SerializableCacheTests {
                     val str = cache.get(key, 5)
 
                     val serialized = json.encodeToString(cache)
-                    val deserialized = json.decodeFromString<SerializableCache>(serialized)
+                    val deserialized = json.decodeFromString<SerializableCache<Unit>>(serialized)
 
                     deserialized.get(key, 5)
                 }
@@ -49,9 +49,9 @@ class SerializableCacheTests {
 
     @Test
     fun disallowsDuplicateKeys() {
-        val cache = SerializableCache()
+        val cache = SerializableCache<Unit>()
 
-        val key = object : SerializableCache.CalculatingKey<Int, String> {
+        val key = object : SerializableCache.CalculatingKey<Any?, Int, String> {
             override val id: String = "key"
             override val serializer: KSerializer<String> = String.serializer()
 
@@ -59,7 +59,7 @@ class SerializableCacheTests {
             override suspend fun calculate(input: Int): String = input.toString()
         }
 
-        val key2 = object : SerializableCache.CalculatingKey<Int, String> {
+        val key2 = object : SerializableCache.CalculatingKey<Any?, Int, String> {
             override val id: String = "key"
             override val serializer: KSerializer<String> = String.serializer()
 
@@ -84,14 +84,14 @@ class SerializableCacheTests {
         }
     }
 
-    private inline fun <reified T : Any> Key(id: String) = object : SerializableCache.Key<T> {
+    private inline fun <reified T : Any> Key(id: String) = object : SerializableCache.Key<Any?, T> {
         override val id: String = id
         override val serializer: KSerializer<T> = serializerOrContextual<T>()
     }
 
     @Test
     fun stringRepr() {
-        val cache = SerializableCache()
+        val cache = SerializableCache<Unit>()
 
         val str = Key<String>("str")
         val int = Key<Int>("int")
@@ -107,7 +107,7 @@ class SerializableCacheTests {
 
                 val serialized = engine.internalSerialization.json.encodeToString(cache)
                 val deserialized =
-                    engine.internalSerialization.json.decodeFromString<SerializableCache>(serialized)
+                    engine.internalSerialization.json.decodeFromString<SerializableCache<Unit>>(serialized)
 
                 println("After serialization: $deserialized")
 

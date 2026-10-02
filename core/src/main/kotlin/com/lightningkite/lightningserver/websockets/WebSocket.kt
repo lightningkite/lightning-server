@@ -122,7 +122,7 @@ public data class WebSocketConnectRequest<PATH : PathSpec>(
     override val protocol: String = "",
     override val sourceIp: String = "",
     override val upstreamRequestId: String? = null,
-    override val cache: SerializableCache = SerializableCache(),
+    override val cache: SerializableCache<WebSocketConnectRequest<*>> = SerializableCache(),
     /**
      * Engine-specific socket identifier for direct message sending.
      * For AWS API Gateway, this is the connection ID.

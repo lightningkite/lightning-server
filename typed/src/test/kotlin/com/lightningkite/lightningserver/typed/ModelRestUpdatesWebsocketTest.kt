@@ -125,7 +125,7 @@ class ModelRestUpdatesWebSocketTest {
             auth = noAuth,
             permissions = { ModelPermissions.allowAll() }
         )
-        val ws = path.path("keyed").path("updates") include ModelRestUpdatesWebSocket(info, Sample_name)
+        val ws = path.path("keyed").path("updates") include ModelRestUpdatesWebSocket(info, Sample.name)
 
         init {
             registerBasicMediaTypeCoders()

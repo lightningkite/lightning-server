@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.runtime
 
 import com.lightningkite.lightningserver.InternalLightningServerApi
+import com.lightningkite.lightningserver.data.SerializableCache
 import com.lightningkite.lightningserver.definition.Extendable
 import com.lightningkite.lightningserver.definition.MutableExtensions
 import com.lightningkite.lightningserver.http.PathSegments
@@ -58,14 +59,11 @@ public sealed interface Execution {
     public val rootExecution: ID
 
     /**
-     * The request or socket responsible for this execution: its own [logicalId] when it is one, and
-     * otherwise whatever its launcher was attributed to.
-     *
-     * Not [causedBy], which may be a WebSocket phase or a task with no request of its own, and not
-     * [rootExecution], which for a sub-request with its own credentials is the carrier rather than
-     * the caller.
+     * The request or socket responsible for this execution
      */
     public val attributedTo: ID
+
+    public val context: SerializableCache<Execution>
 
     public sealed interface Requested : Execution
 
@@ -90,7 +88,7 @@ public sealed interface Execution {
         override val causedBy: ID? = null,
         override val rootExecution: ID = id,
         val endpoint: RawHttpEndpoint<*>,
-//        override val extensions: MutableExtensions = MutableExtensions()
+        override val context: SerializableCache<Execution> = SerializableCache()
     ) : Execution, Requested {
         override val attributedTo: ID get() = id
 
@@ -98,7 +96,13 @@ public sealed interface Execution {
             id: ID,
             parent: Execution?,
             endpoint: RawHttpEndpoint<*>
-        ) : this(id, causedBy = parent?.id, rootExecution = parent?.rootExecution ?: id, endpoint)
+        ) : this(
+            id,
+            causedBy = parent?.id,
+            rootExecution = parent?.rootExecution ?: id,
+            endpoint,
+            context = parent?.context?.copy() ?: SerializableCache()
+        )
     }
 
     /**
@@ -119,7 +123,7 @@ public sealed interface Execution {
         val socketId: ID,
         val path: RawWebSocketPath<*>,
         val phase: Phase,
-//        override val extensions: MutableExtensions = MutableExtensions()
+        override val context: SerializableCache<Execution> = SerializableCache()
     ) : Execution, Requested {
         override val attributedTo: ID get() = socketId
 
@@ -129,7 +133,15 @@ public sealed interface Execution {
             socketId: ID,
             path: RawWebSocketPath<*>,
             phase: Phase
-        ) : this(id, causedBy = parent?.id, rootExecution = parent?.rootExecution ?: id, socketId, path, phase)
+        ) : this(
+            id,
+            causedBy = parent?.id,
+            rootExecution = parent?.rootExecution ?: id,
+            socketId,
+            path,
+            phase,
+            context = parent?.context?.copy() ?: SerializableCache()
+        )
 
         public enum class Phase { Connect, Connected, ClientMessage, SubscriptionMessage, Disconnect }
     }
@@ -150,13 +162,20 @@ public sealed interface Execution {
         // name a phase or task with no request of its own.
         override val attributedTo: ID,
         val location: PathSegments,
-//        override val extensions: MutableExtensions = MutableExtensions()
+        override val context: SerializableCache<Execution> = SerializableCache()
     ) : Execution {
         @InternalLightningServerApi public constructor(
             id: ID,
             parent: Execution,
             location: PathSegments
-        ) : this(id, causedBy = parent.id, rootExecution = parent.rootExecution, attributedTo = parent.attributedTo, location)
+        ) : this(
+            id,
+            causedBy = parent.id,
+            rootExecution = parent.rootExecution,
+            attributedTo = parent.attributedTo,
+            location,
+            context = parent.context.copy()
+        )
     }
 
     /** One tick of a scheduled task. */
@@ -165,7 +184,7 @@ public sealed interface Execution {
     public data class Schedule @InternalLightningServerApi constructor(
         override val id: ID,
         val location: PathSegments,
-//        override val extensions: MutableExtensions = MutableExtensions()
+        override val context: SerializableCache<Execution> = SerializableCache()
     ) : Execution, ServerManaged
 
     /** One run of a startup task. */
@@ -174,7 +193,7 @@ public sealed interface Execution {
     public data class Startup @InternalLightningServerApi constructor(
         override val id: ID,
         val location: PathSegments,
-//        override val extensions: MutableExtensions = MutableExtensions()
+        override val context: SerializableCache<Execution> = SerializableCache()
     ) : Execution, ServerManaged
 
     /** One run of a pre-deploy task. */
@@ -183,7 +202,7 @@ public sealed interface Execution {
     public data class PreDeploy @InternalLightningServerApi constructor(
         override val id: ID,
         val location: PathSegments,
-//        override val extensions: MutableExtensions = MutableExtensions()
+        override val context: SerializableCache<Execution> = SerializableCache()
     ) : Execution, ServerManaged
 
     /**
@@ -200,7 +219,7 @@ public sealed interface Execution {
         override val id: ID,
         override val causedBy: ID? = null,
         override val rootExecution: ID = id,
-//        override val extensions: MutableExtensions = MutableExtensions()
+        override val context: SerializableCache<Execution> = SerializableCache()
     ) : Execution {
         override val attributedTo: ID get() = id
     }

@@ -562,7 +562,7 @@ ones (like authentication).
 
 ## Exception Handling
 
-Lightning Server automatically converts exceptions to HTTP responses using `ExceptionHttpHandler`.
+Lightning Server automatically converts exceptions to HTTP responses using `HttpExceptionHandler`.
 
 ### Default Behavior
 
@@ -588,7 +588,7 @@ object CustomExceptionHandler : ExceptionHttpHandler {
                 status = HttpStatus.NotFound,
                 body = TypedData.json(mapOf("message" to exception.message))
             )
-            else -> DefaultExceptionHttpHandler.handle(request, exception)
+            else -> ExceptionHttpHandler.Default.handle(request, exception)
         }
     }
 }

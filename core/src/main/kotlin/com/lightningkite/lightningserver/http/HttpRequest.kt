@@ -45,7 +45,7 @@ public data class HttpRequest<PATH : PathSpec>(
     override val sourceIp: String,
     override val upstreamRequestId: String? = null,
     override val engineRequestId: String? = null,
-    override val cache: SerializableCache = SerializableCache(),
+    override val cache: SerializableCache<HttpRequest<*>> = SerializableCache(),
     @Transient public val body: TypedData? = null,
 ) : Request<PATH>() {
     /**
@@ -67,7 +67,7 @@ public data class HttpRequest<PATH : PathSpec>(
         sourceIp: String = this.sourceIp,
         upstreamRequestId: String? = this.upstreamRequestId,
         engineRequestId: String? = this.engineRequestId,
-        cache: SerializableCache = this.cache,
+        cache: SerializableCache<HttpRequest<*>> = this.cache,
         body: TypedData? = this.body,
     ): HttpRequest<PATH2> = HttpRequest(
         path = path,

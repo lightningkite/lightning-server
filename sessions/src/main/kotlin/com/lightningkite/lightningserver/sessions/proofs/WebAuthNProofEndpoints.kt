@@ -718,7 +718,9 @@ public class WebAuthNProofEndpoints(
                         // The credential id is what identifies the account here, so an unknown one
                         // resolves no subject.
                         reportProofRejected(info, ProofFailureReason.NoSuchSubject, request = request)
-                        throw ForbiddenException("Failed to verify Authenticator")
+                        // Deliberately the same opaque error the signature check below raises: an unknown credential
+                        // id, a credential belonging to another subject, and a bad signature must not be told apart.
+                        throw BadRequestException("Failed to verify Authenticator")
                     }
 
                 val authRequest = AuthenticationRequest(

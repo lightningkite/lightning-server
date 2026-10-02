@@ -1,6 +1,10 @@
 package com.lightningkite.lightningserver.http
 
+import com.lightningkite.lightningserver.HttpStatusException
+import com.lightningkite.lightningserver.LSError
+import com.lightningkite.lightningserver.definition.generalSettings
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.serialization.toTypedData
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -8,7 +12,7 @@ import kotlin.time.Duration.Companion.seconds
  * Interface for handling exceptions that occur during HTTP request processing.
  *
  * When an exception is thrown by a handler or interceptor, the exception handler converts
- * it into an appropriate HTTP response. The default implementation ([DefaultExceptionHttpHandler])
+ * it into an appropriate HTTP response. The default implementation ([HttpExceptionHandler.Default])
  * converts [HttpStatusException] instances to their corresponding status codes and error details,
  * and returns 500 Internal Server Error for other exceptions.
  *
@@ -24,13 +28,13 @@ import kotlin.time.Duration.Companion.seconds
  *                 status = HttpStatus.BadRequest,
  *                 body = TypedData.json(mapOf("errors" to exception.errors))
  *             )
- *             else -> DefaultExceptionHttpHandler.handle(request, exception)
+ *             else -> ExceptionHttpHandler.Default.handle(request, exception)
  *         }
  *     }
  * }
  * ```
  */
-public interface ExceptionHttpHandler {
+public interface HttpExceptionHandler {
     /**
      * The maximum duration for handling an exception.
      * Defaults to 30 seconds to match handler timeouts.
@@ -46,23 +50,38 @@ public interface ExceptionHttpHandler {
      */
     context(server: ServerRuntime)
     public suspend fun handle(request: HttpRequest<*>, exception: Exception): HttpResponse
-}
 
-/*
- * TODO: API Recommendations for ExceptionHttpHandler.kt
- *
- * 1. Add lifecycle hooks for exception logging/monitoring before response generation:
- *    - fun onException(request: HttpRequest<PathSpec>, exception: Exception)
- *    This would allow centralized error tracking without duplicating response logic.
- *
- * 2. Consider supporting exception handler chains similar to interceptors:
- *    - Allow multiple exception handlers to try handling an exception
- *    - Fall back to next handler if one returns null
- *
- * 3. Add a way to provide context-specific error details based on the exception type:
- *    - Interface could include error codes, user-friendly messages, etc.
- *
- * 4. The timeout applies to exception handling but what happens if handling times out?
- *    Document the fallback behavior or add a simple emergency handler.
- */
+    public object Default : HttpExceptionHandler {
+        context(server: ServerRuntime)
+        override suspend fun handle(
+            request: HttpRequest<*>,
+            exception: Exception,
+        ): HttpResponse {
+            val lsErrorWithoutTrace = when {
+                exception is HttpStatusException -> exception.toLSError()
+
+                generalSettings().debug -> LSError(
+                    HttpStatus.InternalServerError.code,
+                    detail = exception::class.simpleName ?: "Unknown",
+                    message = exception.message ?: "No exception message provided."
+                )
+
+                else -> LSError(
+                    HttpStatus.InternalServerError.code,
+                    detail = "unknown",
+                    message = "An unknown error occurred"
+                )
+            }
+
+            val lsError =
+                if (generalSettings().debug) lsErrorWithoutTrace.copy(stackTrace = exception.stackTraceToString())
+                else lsErrorWithoutTrace
+
+            return HttpResponse(
+                status = HttpStatus(lsError.http),
+                body = lsError.toTypedData(request.headers.accept)
+            )
+        }
+    }
+}
 

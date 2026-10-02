@@ -51,7 +51,7 @@ class QueryParamWebSocketHandlerTest {
 
         val qp = path.path("qp") bind QueryParamWebSocketHandler()
 
-        object CacheKey : com.lightningkite.lightningserver.data.SerializableCache.Key<String> {
+        object CacheKey : com.lightningkite.lightningserver.data.SerializableCache.Key<com.lightningkite.lightningserver.data.Request<*>, String> {
             override val id: String = "qp-test-cache"
             override val serializer = String.serializer()
         }

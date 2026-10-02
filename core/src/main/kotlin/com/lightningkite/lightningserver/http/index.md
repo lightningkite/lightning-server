@@ -29,8 +29,8 @@ includes types for requests, responses, headers, status codes, URL parsing, and 
 
 ### Exception Handling
 
-- **[ExceptionHttpHandler](ExceptionHttpHandler.kt)** - Interface for converting exceptions to HTTP responses
-- **[DefaultExceptionHttpHandler](DefaultExceptionHttpHandler.kt)** - Default implementation that handles
+- **[ExceptionHttpHandler](HttpExceptionHandler.kt)** - Interface for converting exceptions to HTTP responses
+- **[ExceptionHttpHandler.Default](ExceptionHttpHandler.Default.kt)** - Default implementation that handles
   HttpStatusException and generic errors
 
 ### URL Parsing
@@ -184,7 +184,7 @@ object MyExceptionHandler : ExceptionHttpHandler {
             status = HttpStatus.BadRequest,
             body = TypedData.json(exception.errors)
         )
-        else -> DefaultExceptionHttpHandler.handle(request, exception)
+        else -> ExceptionHttpHandler.Default.handle(request, exception)
     }
 }
 ```

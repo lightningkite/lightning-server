@@ -315,12 +315,12 @@ When you see it, either add the missing `LSError` to `errorCases` or change the
 
 If the built-in exception handler does not cover your needs — for example, you
 want to map `IllegalArgumentException` to 400 or include a correlation ID in
-all 500 responses — implement `ExceptionHttpHandler`:
+all 500 responses — implement `HttpExceptionHandler`:
 
 ```kotlin
 // Illustrative — not drift-checked.
 // ExceptionHttpHandler is in com.lightningkite.lightningserver.http.
-// Note: DefaultExceptionHttpHandler is internal to the framework; you cannot
+// Note: ExceptionHttpHandler.Default is internal to the framework; you cannot
 // call it directly from your code. Reconstruct an HttpStatusException and
 // let the framework handle it, or build the HttpResponse manually.
 object CorrelatingExceptionHandler : ExceptionHttpHandler {
@@ -350,12 +350,12 @@ object CorrelatingExceptionHandler : ExceptionHttpHandler {
 }
 ```
 
-> `DefaultExceptionHttpHandler` is `internal` to the framework — you cannot
+> `ExceptionHttpHandler.Default` is `internal` to the framework — you cannot
 > reference it from your own code.  If you need fall-through to the default
 > behaviour, replicate the logic above: convert `HttpStatusException` via
 > `.toLSError()`, return a generic 500 for everything else.
 >
-> Wart: there is currently no registration API for a custom `ExceptionHttpHandler`
+> Wart: there is currently no registration API for a custom `HttpExceptionHandler`
 > documented in the public guide.  Check the engine documentation for your
 > deployment target (Ktor, Netty, JDK server) for the wiring point.  The
 > interface itself is public and stable.

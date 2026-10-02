@@ -149,6 +149,7 @@ class ProofAuthEventWiringTest {
             database = database,
             cache = cache,
             rpId = { "example.com" },
+            allowedOrigins = { setOf("*") },
             registrationForUser = { _, _ ->
                 WebAuthN.Registration.RegistrationOptions(
                     user = WebAuthN.PublicKeyCredentialUserEntity("Test", "id", "test")

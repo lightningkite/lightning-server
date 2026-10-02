@@ -1,16 +1,18 @@
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.data.SerializableCache
-import com.lightningkite.lightningserver.definition.*
+import com.lightningkite.lightningserver.definition.ListRegistryExtension
+import com.lightningkite.lightningserver.definition.ServerDefinition
 import com.lightningkite.lightningserver.definition.builder.ListRegistry
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.definition.getValue
 import com.lightningkite.lightningserver.runtime.Engine
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.services.database.HasId
 import kotlin.time.Instant
 
 
-public typealias AuthCacheKey<SUBJECT, T> = SerializableCache.CalculatingKey<Authentication<SUBJECT>, T>
+public typealias AuthCacheKey<SUBJECT, T> = SerializableCache.CalculatingKey<Authentication<SUBJECT>, Authentication<SUBJECT>, T>
 
 context(_: ServerRuntime)
 public suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>, T> Authentication<SUBJECT>.get(
@@ -53,7 +55,7 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
         expiration,
         scopes,
         fromMasquerade,
-        SerializableCache().apply {
+        SerializableCache<Authentication<SUBJECT>>().apply {
             set(principalType.subjectCacheKey, subject)
         }
     )

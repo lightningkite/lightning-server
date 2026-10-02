@@ -81,8 +81,15 @@ public suspend fun ServerRuntime.handle(
 )
 
 /**
- * Runs [dispatch] for [request] the way this handler would be run: as a new execution caused by the current
- * one, through the server's HTTP interceptors, and within this handler's timeout.
+ * Wraps the handling of an [HttpRequest] with all the required invariants, interceptors, and executions.
+ * Basically, if you need to call [HttpHandler.handle] you should wrap it in this, it adds a lot of important stuff.
+ *
+ * ## What this does
+ * - Starts a new [Execution.Http] as a child of the current execution context
+ * - Adds http telemetry traces and tracking
+ * - Runs the [HttpInterceptor] chain for the server
+ * - Instruments the handler and enforces the handler's timeout when executing
+ * - Handles errors across this whole process appropriately to properly convert them into a proper response
  */
 @InternalLightningServerApi
 context(runtime: ServerRuntime)

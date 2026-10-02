@@ -369,7 +369,7 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
         println("/!\\ STOP! /!\\")
         println("You are about to destroy all of the infrastructure related to the ${projectPrefix} deployment.")
         println("If you are SURE you want to proceed, please enter 'destroy ${projectPrefix}'.")
-        if (readLine() != "destroy $projectPrefix") {
+        if (readlnOrNull() != "destroy $projectPrefix") {
             println("That didn't match.  Bailing out...")
             return
         }

@@ -1,11 +1,20 @@
 package com.lightningkite.lightningserver.auth
 
-import com.lightningkite.lightningserver.*
-import com.lightningkite.lightningserver.data.*
-import com.lightningkite.lightningserver.definition.MutableExtensions
+import com.lightningkite.lightningserver.BadRequestException
+import com.lightningkite.lightningserver.ForbiddenException
+import com.lightningkite.lightningserver.UnauthorizedException
+import com.lightningkite.lightningserver.data.Caching
+import com.lightningkite.lightningserver.data.Request
+import com.lightningkite.lightningserver.data.SerializableCache
+import com.lightningkite.lightningserver.data.getOrPut
 import com.lightningkite.lightningserver.http.HttpHeader
+import com.lightningkite.lightningserver.http.HttpHeaders
+import com.lightningkite.lightningserver.logger
+import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.runtime.Engine
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.services.data.Unsafe
 import com.lightningkite.services.database.HasId
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.NothingSerializer
@@ -37,18 +46,10 @@ public fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> Authentication(
     expiration: Instant? = null,
     scopes: Set<GrantedScope> = setOf(GrantedScope.root),
     fromMasquerade: Authentication<*>? = null,
-    cache: SerializableCache? = null,
-): Authentication<SUBJECT> = Authentication(
-    principalType = principalType,
-    id = id,
-    rawId = principalType.idString(id),
-    sessionId = sessionId,
-    issuedAt = issuedAt,
-    expiration = expiration,
-    scopes = scopes,
-    fromMasquerade = fromMasquerade,
-    cache = cache
-)
+    cache: SerializableCache<Authentication<SUBJECT>>? = null,
+): Authentication<SUBJECT> =
+    @OptIn(Unsafe::class) // SAFETY: Invariants upheld by function signature and type params.
+    Authentication.fromRawParts(principalType, id, rawId = principalType.idString(id), sessionId, issuedAt, expiration, scopes, fromMasquerade, cache)
 
 /**
  * Represents an authenticated entity with associated permissions and metadata.
@@ -132,31 +133,37 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
     public val expiration: Instant? = null,
     public val scopes: Set<GrantedScope> = setOf(GrantedScope.root),
     public val fromMasquerade: Authentication<*>? = null,
-    override val cache: SerializableCache = SerializableCache(),
-) : Caching {
-    internal constructor(
-        // I wish kotlin had file-private visibility
-        principalType: PrincipalType<SUBJECT, *>,
-        id: Comparable<*>,
-        rawId: String,
-        sessionId: String?,
-        issuedAt: Instant,
-        expiration: Instant?,
-        scopes: Set<GrantedScope>,
-        fromMasquerade: Authentication<*>?,
-        cache: SerializableCache?,
-    ) : this(
-        principalName = principalType.name,
-        rawId = rawId,
-        sessionId = sessionId,
-        issuedAt = issuedAt,
-        expiration = expiration,
-        scopes = scopes,
-        fromMasquerade = fromMasquerade,
-        cache = cache ?: SerializableCache()
-    ) {
-        cachedId = id
-        cachedType = principalType
+    override val cache: SerializableCache<Authentication<SUBJECT>> = SerializableCache(),
+) : Caching<Authentication<SUBJECT>> {
+    public companion object {
+        @Unsafe("Principal id must match expected type and be serialized correctly")
+        context(_: Engine)
+        internal fun <SUBJECT : HasId<*>> fromRawParts(
+            principalType: PrincipalType<SUBJECT, *>,
+            id: Comparable<*>,
+            rawId: String,
+            sessionId: String?,
+            issuedAt: Instant,
+            expiration: Instant?,
+            scopes: Set<GrantedScope>,
+            fromMasquerade: Authentication<*>?,
+            cache: SerializableCache<Authentication<SUBJECT>>?,
+        ): Authentication<SUBJECT> {
+            val auth = Authentication(
+                principalName = principalType.name,
+                rawId = rawId,
+                sessionId = sessionId,
+                issuedAt = issuedAt,
+                expiration = expiration,
+                scopes = scopes,
+                fromMasquerade = fromMasquerade,
+                cache = cache ?: SerializableCache()
+            )
+            auth.cachedType = principalType
+            auth.cachedId = id
+
+            return auth
+        }
     }
 
     // typed parameters
@@ -231,97 +238,82 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
     // caching
 
     @Suppress("UNCHECKED_CAST")
-    public object CacheKey : SerializableCache.CalculatingKey<Request<*>, Authentication<*>?> {
+    public object CacheKey : Request.CacheKey<PathSpec, Authentication<*>?> {
         override val id: String = "authentication"
 
         @OptIn(ExperimentalSerializationApi::class)
         override val serializer: KSerializer<Authentication<*>?> =
             serializer(NothingSerializer()).nullable as KSerializer<Authentication<*>?>
 
-//        private object ExecutionCacheKey : MutableExtensions.SetOnceKey<Authentication<*>>
-
         context(server: ServerRuntime)
-        override suspend fun calculate(input: Request<*>): Authentication<*>? {
-            val auth = run {
-                for (reader in server.server.authReaders.sortedByDescending { it.priority }) {
-                    val auth = reader.read(input) ?: continue
+        override suspend fun calculate(input: Request<*>): Authentication<*>? =
+            server.server.authReaders.sortedByDescending { it.priority }.firstNotNullOfOrNull { reader ->
+                val auth = reader.read(input) ?: return@firstNotNullOfOrNull null
 
-                    input.headers[HttpHeader.XMasquerade]?.let { header ->
-                        val masquerade = header.root
-
-                        val validEncodings = mapOf(
-                            "str-array" to server.externalSerialization.stringArrayFormat,
-                            "json" to server.externalSerialization.json
-                        )
-
-                        if (!masquerade.contains('/')) throw BadRequestException(
-                            """Invalid masquerade value. Expected to be in the form: <principal-name>/<subject-id> (; encoding=[${
-                                validEncodings.keys.withIndex().joinToString(" | ") { (idx, enc) ->
-                                    if (idx == 0) "${enc}(default)"
-                                    else enc
-                                }
-                            }])"""
-                        )
-
-                        val principalName = masquerade.substringBefore('/')
-                        val principal = server.server.principalTypes[principalName] as? PrincipalType<HasId<*>, *>
-                            ?: throw BadRequestException("Principal type $principalName is unrecognized for masquerade")
-
-                        val encoding = header.parameters["encoding"]
-                            ?.let {
-                                validEncodings[it] ?: throw BadRequestException("Invalid encoding type. Supported types are ${validEncodings.keys}")
-                            }
-                            ?: validEncodings.values.first()
-
-                        val idString = masquerade.substringAfter('/')
-                        val id = try {
-                            encoding.decodeFromString(principal.idSerializer, idString)
-                        } catch (e: SerializationException) {
-                            throw BadRequestException(
-                                message = "Invalid masquerade id: ${e.message}",
-                                data = idString,
-                                cause = e
-                            )
-                        }
-
-                        val mask = Authentication(
-                            principalType = principal,
-                            id = id,
-                            rawId = idString,
-                            sessionId = null,
-                            issuedAt = server.clock.now(),
-                            expiration = auth.expiration,
-                            scopes = auth.scopes,
-                            fromMasquerade = auth,
-                            cache = auth.cache,
-                        )
-
-                        if (principal.permitMasquerade(auth, mask)) return@run mask
-                        else {
-                            server.logger.warn { "$auth denied masquerade as $masquerade" }
-                            throw ForbiddenException("You are not allowed to masquerade as $masquerade")
-                        }
-                    }
-
-                    return@run auth
-                }
-                return@run null
+                auth.masquerade(input.headers) ?: auth
             }
 
-//            if (auth != null) server.execution.extensions[ExecutionCacheKey] = auth
+        context(server: ServerRuntime)
+        private suspend fun Authentication<*>.masquerade(headers: HttpHeaders): Authentication<*>? {
+            val header = headers[HttpHeader.XMasquerade] ?: return null
 
-            return auth
+            val masquerade = header.root
+
+            val validEncodings = mapOf(
+                "str-array" to server.externalSerialization.stringArrayFormat,
+                "json" to server.externalSerialization.json
+            )
+
+            if (!masquerade.contains('/')) throw BadRequestException(
+                """Invalid masquerade value. Expected to be in the form: <principal-name>/<subject-id> (; encoding=[${
+                    validEncodings.keys.withIndex().joinToString(" | ") { (idx, enc) ->
+                        if (idx == 0) "${enc}(default)"
+                        else enc
+                    }
+                }])"""
+            )
+
+            val principalName = masquerade.substringBefore('/')
+            val principal = server.server.principalTypes[principalName] as? PrincipalType<HasId<*>, *>
+                ?: throw BadRequestException("Principal type $principalName is unrecognized for masquerade")
+
+            val encoding = header.parameters["encoding"]
+                ?.let {
+                    validEncodings[it] ?: throw BadRequestException("Invalid encoding type. Supported types are ${validEncodings.keys}")
+                }
+                ?: validEncodings.values.first()
+
+            val idString = masquerade.substringAfter('/')
+            val id = try {
+                encoding.decodeFromString(principal.idSerializer, idString)
+            } catch (e: SerializationException) {
+                throw BadRequestException(
+                    message = "Invalid masquerade id: ${e.message}",
+                    data = idString,
+                    cause = e
+                )
+            }
+
+            @OptIn(Unsafe::class) // SAFETY: serialization and types are checked above when deserializing
+            val mask = Authentication.fromRawParts(
+                principalType = principal,
+                id = id,
+                rawId = idString,
+                sessionId = null,
+                issuedAt = server.clock.now(),
+                expiration = this.expiration,
+                scopes = this.scopes,
+                fromMasquerade = this,
+                cache = this.cache as SerializableCache<Authentication<HasId<*>>>,
+            )
+
+            return if (principal.permitMasquerade(this, mask)) mask
+            else {
+                server.logger.warn { "$this denied masquerade as $masquerade" }
+                throw ForbiddenException("You are not allowed to masquerade as $masquerade")
+            }
         }
     }
-
-    @Deprecated("Dont cache auth within itself.", level = DeprecationLevel.ERROR)
-    public operator fun get(key: CacheKey): Authentication<*> = throw NotImplementedError()
-
-    @Deprecated("Dont cache auth within itself.", level = DeprecationLevel.ERROR)
-    public fun get(key: CacheKey, input: Request<*>): Authentication<*> = throw NotImplementedError()
-
-
-    // related types
 
     /**
      * Interface for reading [Authentication] from HTTP requests.
@@ -371,42 +363,6 @@ public data class Authentication<SUBJECT : HasId<*>> private constructor(
         public suspend fun read(request: Request<*>): Authentication<SUBJECT>?
     }
 }
-
-/*
- * TODO: API Recommendations
- *
- * 1. The masquerade functionality in CacheKey.calculate() (lines 236-264) has several considerations:
- *    - The X-Masquerade header format "principal/id" could be documented more clearly
- *    - Consider adding a dedicated MasqueradeRequest data class instead of parsing strings
- *    - The permitMasquerade check happens AFTER creating the mask Authentication, which could
- *      be inefficient. Consider checking permission before construction.
- *
- * 2. The precache() function iterates serially. For better performance, consider:
- *    ```kotlin
- *    coroutineScope {
- *        keys.map { key -> async { cache.get(key, this@Authentication) } }.awaitAll()
- *    }
- *    ```
- *
- * 3. The copy() method only allows changing expiration and scopes. Users may want to copy
- *    with modified sessionId or other fields. Consider making it more flexible or documenting
- *    why these are the only mutable fields.
- *
- * 4. The toString() includes cache contents which could be very large. Consider truncating
- *    or summarizing the cache for better log readability.
- *
- * 5. The @Deprecated methods for caching auth within itself are good, but the error messages
- *    could be more helpful (explain WHY this is problematic).
- *
- * 6. Consider adding a method to check if authentication is expired:
- *    ```kotlin
- *    context(server: ServerRuntime)
- *    fun isExpired(): Boolean = expiration?.let { it < server.clock.now() } ?: false
- *    ```
- *
- * 7. The Reader interface could benefit from a default implementation or helper for common
- *    patterns (e.g., reading from Authorization header with different schemes).
- */
 
 @Suppress("UNCHECKED_CAST")
 context(server: Engine)

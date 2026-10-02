@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.audit
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialInfo
 
 /**
@@ -42,6 +43,7 @@ import kotlinx.serialization.SerialInfo
  * behaves identically on every target. `@SerialInfo` is what puts the marker where that walk can
  * find it, which also means this only has an effect on `@Serializable` classes.
  */
+@OptIn(ExperimentalSerializationApi::class)
 @SerialInfo
 @Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY)
 @Retention(AnnotationRetention.RUNTIME)

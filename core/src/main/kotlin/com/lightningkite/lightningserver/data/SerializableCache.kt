@@ -23,10 +23,13 @@ import kotlin.time.Duration
  * - In-memory cache of deserialized objects
  * - Serialized byte representation for persistence
  *
+ * The [SCOPE] type parameter restricts which keys the cache accepts: a [Key] scoped to `S` can only be used with a
+ * cache whose scope is `S` or a subtype of `S`. Keys scoped to `Any?` work with every cache.
+ *
  * Example:
  * ```kotlin
- * val cache = SerializableCache()
- * val userKey = SerializableCache.Key("user", User.serializer(), expireAfter = 5.minutes)
+ * val cache = SerializableCache<Any?>()
+ * val userKey = SerializableCache.Key<Any?, User>("user", User.serializer(), expireAfter = 5.minutes)
  *
  * with(serverRuntime) {
  *     cache[userKey] = currentUser
@@ -38,8 +41,9 @@ import kotlin.time.Duration
  * interface, providing request-scoped caching with optional persistence.
  */
 @Serializable(SerializableCache.Serializer::class)
-public class SerializableCache private constructor(
+public class SerializableCache<out SCOPE> private constructor(
     private val serialized: HashMap<String, ByteArray>,
+    private val cache: HashMap<String, KeyAndResult<*>> = HashMap()
 ) {
     internal constructor(serialized: Map<String, ByteArray>) : this(HashMap(serialized))
 
@@ -49,9 +53,10 @@ public class SerializableCache private constructor(
     /**
      * A cache key that identifies a cached value.
      *
+     * @param SCOPE The most general cache scope this key may be used in
      * @param T The type of value stored under this key
      */
-    public interface Key<T> {
+    public interface Key<in SCOPE, T> {
         /** Unique identifier for this cache entry. Must be unique across all keys. */
         public val id: String
 
@@ -74,10 +79,11 @@ public class SerializableCache private constructor(
      * When the cache doesn't contain this key, the [calculate] function is invoked
      * to compute the value, which is then cached for future retrievals.
      *
+     * @param SCOPE The most general cache scope this key may be used in
      * @param INPUT The input type needed to calculate the value
      * @param T The type of value stored/calculated
      */
-    public interface CalculatingKey<INPUT, T> : Key<T> {
+    public interface CalculatingKey<in SCOPE, INPUT, T> : Key<SCOPE, T> {
         /**
          * Calculates the value for this key given the input.
          *
@@ -87,9 +93,7 @@ public class SerializableCache private constructor(
         public suspend fun calculate(input: INPUT): T
     }
 
-    private data class KeyAndResult<T>(val key: Key<T>, val result: Expiring<T>)
-
-    private val cache = HashMap<String, KeyAndResult<*>>()
+    private data class KeyAndResult<T>(val key: Key<*, T>, val result: Expiring<T>)
 
     /**
      * Indicates whether the cache has been modified since creation or last clear.
@@ -108,7 +112,7 @@ public class SerializableCache private constructor(
      * @return The cached Expiring wrapper, or null if not found or expired
      */
     context(server: Engine)
-    private fun <T> retrieve(key: Key<T>): Expiring<T>? {
+    private fun <T> retrieve(key: Key<*, T>): Expiring<T>? {
         @Suppress("UNCHECKED_CAST")
         cache[key.id]?.let {
             if (it.key != key) throw IllegalStateException("SerializableCache encountered keys with duplicate ids. ID: ${key.id}")
@@ -149,7 +153,7 @@ public class SerializableCache private constructor(
      * Sets the [updated] flag to true.
      */
     context(server: Engine)
-    private fun <T> cache(key: Key<T>, value: T) {
+    private fun <T> cache(key: Key<*, T>, value: T) {
         val expiring = Expiring(
             value,
             expireAfter = key.expireAfter
@@ -170,7 +174,7 @@ public class SerializableCache private constructor(
      * @param value The value to cache
      */
     context(server: Engine)
-    public operator fun <T> set(key: Key<T>, value: T): Unit = cache(key, value)
+    public operator fun <T> set(key: Key<SCOPE, T>, value: T): Unit = cache(key, value)
 
     /**
      * Retrieves a value from the cache.
@@ -179,7 +183,7 @@ public class SerializableCache private constructor(
      * @return The cached value, or null if not found or expired
      */
     context(server: Engine)
-    public operator fun <T> get(key: Key<T>): T? = retrieve(key)?.value
+    public operator fun <T> get(key: Key<SCOPE, T>): T? = retrieve(key)?.value
 
     /**
      * Retrieves or calculates a value using a calculating key.
@@ -192,7 +196,7 @@ public class SerializableCache private constructor(
      * @return The cached or newly calculated value
      */
     context(server: ServerRuntime)
-    public suspend fun <INPUT, T> get(key: CalculatingKey<INPUT, T>, input: INPUT): T =
+    public suspend fun <INPUT, T> get(key: CalculatingKey<SCOPE, INPUT, T>, input: INPUT): T =
         retrieve(key)?.value ?: key.calculate(input).also { cache(key, it) }
 
     /**
@@ -202,11 +206,11 @@ public class SerializableCache private constructor(
      * @return true if the key has a non-expired value, false otherwise
      */
     context(server: Engine)
-    public fun containsKey(key: Key<*>): Boolean = retrieve(key) != null
+    public fun containsKey(key: Key<SCOPE, *>): Boolean = retrieve(key) != null
 
     internal val bytes: Map<String, ByteArray> get() = serialized.toMap()
 
-    override fun equals(other: Any?): Boolean = other is SerializableCache && run {
+    override fun equals(other: Any?): Boolean = other is SerializableCache<*> && run {
         val a = this.bytes
         val b = other.bytes
         if (a.size != b.size) return false
@@ -239,13 +243,18 @@ public class SerializableCache private constructor(
         updated = false
     }
 
+    public fun copy(): SerializableCache<SCOPE> = SerializableCache(
+        HashMap(serialized),
+        HashMap(cache)
+    )
+
     public companion object {
-        private data class KeyData<T>(
+        private data class KeyData<SCOPE, T>(
             override val id: String,
             override val serializer: KSerializer<T>,
             override val expireAfter: Duration? = null,
             override val localOnly: Boolean = false,
-        ) : Key<T>
+        ) : Key<SCOPE, T>
 
         /**
          * Creates a simple cache key.
@@ -256,25 +265,25 @@ public class SerializableCache private constructor(
          * @param localOnly If true, value won't be serialized for persistence
          * @return A new Key instance
          */
-        public fun <T> Key(
+        public fun <SCOPE, T> Key(
             id: String,
             serializer: KSerializer<T>,
             expireAfter: Duration? = null,
             localOnly: Boolean = false,
-        ): Key<T> = KeyData(id, serializer, expireAfter, localOnly)
+        ): Key<SCOPE, T> = KeyData(id, serializer, expireAfter, localOnly)
     }
 
-    public object Serializer : KSerializer<SerializableCache> {
+    public class Serializer<SCOPE>(ignored: KSerializer<SCOPE>) : KSerializer<SerializableCache<SCOPE>> {
         private val defer = MapSerializer(String.serializer(), ByteArraySerializer())
 
         override val descriptor: SerialDescriptor
             get() = SerialDescriptor("com.lightningkite.lightningserver.data.SerializableCache", defer.descriptor)
 
-        override fun serialize(encoder: Encoder, value: SerializableCache) {
-            defer.serialize(encoder, value.bytes)
+        override fun serialize(encoder: Encoder, value: SerializableCache<SCOPE>) {
+            encoder.encodeSerializableValue(defer, value.serialized)
         }
 
-        override fun deserialize(decoder: Decoder): SerializableCache =
+        override fun deserialize(decoder: Decoder): SerializableCache<SCOPE> =
             SerializableCache(decoder.decodeSerializableValue(defer))
     }
 }
@@ -289,7 +298,7 @@ public class SerializableCache private constructor(
  * @return The cached or newly computed value
  */
 context(server: Engine)
-public inline fun <T> SerializableCache.getOrPut(key: Key<T>, default: () -> T): T =
+public inline fun <SCOPE, T> SerializableCache<SCOPE>.getOrPut(key: Key<SCOPE, T>, default: () -> T): T =
     get(key) ?: default().also { set(key, it) }
 
 /**
@@ -298,27 +307,27 @@ public inline fun <T> SerializableCache.getOrPut(key: Key<T>, default: () -> T):
  * This is typically implemented by request-like objects to provide
  * request-scoped caching.
  */
-public interface Caching {
-    public val cache: SerializableCache
+public interface Caching<out SCOPE> {
+    public val cache: SerializableCache<SCOPE>
 }
 
 /**
  * Stores a value in the cache of this Caching object.
  */
 context(server: Engine)
-public operator fun <T> Caching.set(key: Key<T>, value: T): Unit = cache.set(key, value)
+public operator fun <SCOPE, T> Caching<SCOPE>.set(key: Key<SCOPE, T>, value: T): Unit = cache.set(key, value)
 
 /**
  * Retrieves a value from the cache of this Caching object.
  */
 context(server: Engine)
-public operator fun <T> Caching.get(key: Key<T>): T? = cache[key]
+public operator fun <SCOPE, T> Caching<SCOPE>.get(key: Key<SCOPE, T>): T? = cache[key]
 
 /**
  * Retrieves or calculates a value from the cache of this Caching object.
  */
 context(server: ServerRuntime)
-public suspend fun <INPUT, T> Caching.get(key: CalculatingKey<INPUT, T>, input: INPUT): T = cache.get(key, input)
+public suspend fun <SCOPE, INPUT, T> Caching<SCOPE>.get(key: CalculatingKey<SCOPE, INPUT, T>, input: INPUT): T = cache.get(key, input)
 
 /*
  * TODO: API Recommendations for SerializableCache.kt

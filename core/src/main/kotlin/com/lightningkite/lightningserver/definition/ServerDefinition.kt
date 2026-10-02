@@ -43,7 +43,7 @@ public data class ServerDefinition(
         public val httpInterceptors: List<HttpInterceptor>,
         public val webSocketInterceptors: List<WebSocketInterceptor>,
         public val typedOutputInterceptors: List<TypedOutputInterceptor>,
-        public val exceptionHandler: ExceptionHttpHandler = DefaultExceptionHttpHandler,
+        public val exceptionHandler: HttpExceptionHandler = HttpExceptionHandler.Default,
 
         public val startupTasks: Map<PathSpec0, StartupTask>,
         public val preDeployTasks: Map<PathSpec0, PreDeployTask>,
@@ -98,7 +98,7 @@ public data class ServerDefinition(
      */
     public val typedOutputInterceptors: List<TypedOutputInterceptor> get() = flattened.typedOutputInterceptors
 
-    public val exceptionHandler: ExceptionHttpHandler get() = flattened.exceptionHandler
+    public val exceptionHandler: HttpExceptionHandler get() = flattened.exceptionHandler
 
     public val startupTasks: Map<PathSpec0, StartupTask> get() = flattened.startupTasks
     public val preDeployTasks: Map<PathSpec0, PreDeployTask> get() = flattened.preDeployTasks

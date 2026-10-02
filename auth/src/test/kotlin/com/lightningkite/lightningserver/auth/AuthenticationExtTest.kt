@@ -370,7 +370,7 @@ class AuthenticationExtTest {
     fun `Authentication cache stores values`() = runBlocking {
         TestServer.test({}) {
             val user = AuthUser()
-            val cache = SerializableCache()
+            val cache = SerializableCache<Authentication<AuthUser>>()
             val auth = Authentication(
                 principalType = AuthUser,
                 id = user._id,

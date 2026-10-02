@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.http.PathSegments
 import com.lightningkite.lightningserver.http.QueryParameters
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawWebSocketPath
+import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.services.data.Unsafe
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.runBlocking
@@ -46,7 +47,7 @@ class LegacyWebSocketConnectRequest<PATH : PathSpec>(
     /** Removed on this branch. */
     val parentRequestId: String? = null,
     val upstreamRequestId: String? = null,
-    val cache: SerializableCache = SerializableCache(),
+    val cache: SerializableCache<WebSocketConnectRequest<*>> = SerializableCache(),
     val engineSocketId: String? = null,
 )
 

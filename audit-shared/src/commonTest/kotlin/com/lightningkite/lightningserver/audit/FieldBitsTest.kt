@@ -103,11 +103,11 @@ class FieldBitsTest {
     @Test
     fun `the top bit of a column produces the mask and column the layout promises`() {
         assertEquals(
-            Condition.OnField(DisclosureRecord_fields1, Condition.IntBitsAnySet(1 shl 31)),
+            Condition.OnField(DisclosureRecord.fields1, Condition.IntBitsAnySet(1 shl 31)),
             (disclosedAny(listOf(63)) as Condition.Or).conditions.single(),
         )
         assertEquals(
-            Condition.OnField(DisclosureRecord_fields0, Condition.IntBitsSet(1 shl 31)),
+            Condition.OnField(DisclosureRecord.fields0, Condition.IntBitsSet(1 shl 31)),
             (disclosedAll(listOf(31)) as Condition.And).conditions.single(),
         )
     }

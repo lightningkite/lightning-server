@@ -148,7 +148,7 @@ fun divideErrorTest() = DivideServer.testBlocking(settings = {}) {
 ```
 
 This works because `ApiHttpHandler.test()` bypasses the
-`DefaultExceptionHttpHandler` that normally converts exceptions to HTTP
+`ExceptionHttpHandler.Default` that normally converts exceptions to HTTP
 responses in a live server.  Real HTTP clients receive a serialised `LSError`
 JSON body; tests receive the raw exception.
 

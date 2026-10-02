@@ -109,4 +109,4 @@ private inline fun columnConditions(
         .map { Condition.OnField(disclosureFieldColumns[it], columnCondition(bits.column(it))) }
 }
 
-private val disclosureFieldColumns = listOf(DisclosureRecord_fields0, DisclosureRecord_fields1)
+private val disclosureFieldColumns = listOf(DisclosureRecord.fields0, DisclosureRecord.fields1)

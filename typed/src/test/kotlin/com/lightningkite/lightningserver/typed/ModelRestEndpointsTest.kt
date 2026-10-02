@@ -66,7 +66,7 @@ class ModelRestEndpointsTest {
             val item = CrudItem(name = "Partial Test", category = "Books", price = 1.0, quantity = 1)
             CrudTestServer.rest.insert.test(null, item)
 
-            val nameOnly = DataClassPathSelf(CrudItem.serializer())[CrudItem_name]
+            val nameOnly = CrudItem.path.name
             val results = CrudTestServer.rest.queryPartial.test(null, QueryPartial(fields = setOf(nameOnly)))
 
             val returned = results.single()

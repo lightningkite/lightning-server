@@ -116,7 +116,7 @@ private suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHa
         domain = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
         protocol = generalSettings().publicUrl.substringBefore("://"),
         sourceIp = "localhost",
-        cache = SerializableCache().apply { set(Authentication.CacheKey, presented) },
+        cache = SerializableCache<HttpRequest<*>>().apply { set(Authentication.CacheKey, presented) },
         body = TypedData.text(
             test.externalSerialization.json.encodeToString(inputType, input),
             MediaType.Application.Json

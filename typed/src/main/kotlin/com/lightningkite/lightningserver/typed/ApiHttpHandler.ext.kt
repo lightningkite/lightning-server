@@ -2,14 +2,11 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.HttpStatusException
 import com.lightningkite.lightningserver.InternalLightningServerApi
-import com.lightningkite.lightningserver.data.pathSpec
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.toLSError
 import com.lightningkite.lightningserver.pathing.*
-import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.executeWithMetrics
 import com.lightningkite.lightningserver.runtime.location
@@ -17,6 +14,7 @@ import com.lightningkite.lightningserver.serialization.assertValidOrBadRequest
 import com.lightningkite.lightningserver.serialization.parse
 import com.lightningkite.lightningserver.serialization.toTypedData
 import com.lightningkite.lightningserver.serialization.validators
+import com.lightningkite.lightningserver.toLSError
 import com.lightningkite.services.data.Unsafe
 import com.lightningkite.services.database.HasId
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -48,9 +46,6 @@ public suspend fun <PATH : PathSpec, USER : HasId<*>?, INPUT, OUTPUT> ApiHttpHan
         typedResponse(req, result.getOrThrow())
     }
 
-    // Rethrow the endpoint's own exception so callers can catch it by type. A timeout is excluded: it is
-    // already reported by the response, and rethrowing a CancellationException would read as the caller
-    // itself being cancelled.
     outcome?.exceptionOrNull()?.let {
         if (it is CancellationException) currentCoroutineContext().ensureActive()
         else throw it

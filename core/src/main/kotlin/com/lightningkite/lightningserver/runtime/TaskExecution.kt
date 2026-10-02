@@ -35,7 +35,7 @@ private enum class TaskKind(
     // Startup and pre-deploy have no launcher and no request anywhere in their ancestry, so they
     // derive their own anchor and there is nothing to pass.
     Startup("startup", "STARTUP"),
-    PreDeploy("predeploy", "PREDEPLOY"),
+    PreDeploy("predeploy", "PREDEPLOY");
 }
 
 /**
