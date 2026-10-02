@@ -43,7 +43,7 @@ open class HttpStatusException(
         if (request.headers.accept.firstOrNull() == ContentType.Text.Html) {
             return HttpResponse(status = status, body = HttpContent.Text(string = HtmlDefaults.basePage("""
                 <h1>${status.toString().escapeHTML()}</h1>
-                <p>${message}</p>
+                <p>${message.escapeHTML()}</p>
                 ${detail.let { "<!--${it.escapeHTML()}-->" }}
                 ${if (generalSettings().debug) "<!--${stackTraceToString().escapeHTML()}-->" else ""}
             """.trimIndent()), type = ContentType.Text.Html), headers = headers)

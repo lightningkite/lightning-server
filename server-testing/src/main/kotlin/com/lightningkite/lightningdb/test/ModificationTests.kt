@@ -8,6 +8,7 @@ import kotlin.test.assertEquals
 import com.lightningkite.lightningdb.*
 import com.lightningkite.prepareModelsShared
 import com.lightningkite.serialization.*
+import com.lightningkite.UUID
 
 abstract class ModificationTests() {
 
@@ -1096,6 +1097,57 @@ abstract class ModificationTests() {
         assertEquals(mapOf("b" to 2), result.map)
         assertEquals(modification(item), result)
         Unit
+    }
+
+    // A notNull modification must never write onto a null value: guards check the in-memory result of a modification.
+
+    private suspend fun <T : HasId<UUID>> updateAsInMemory(collection: FieldCollection<T>, rows: List<T>, modification: Modification<T>) {
+        collection.insert(rows)
+        for (row in rows) collection.updateOneById(row._id, modification)
+        for (row in rows) assertEquals(modification(row), collection.get(row._id))
+    }
+
+    @Test fun test_notNull_assign_skipsNull() = runBlocking {
+        val rows = listOf(LargeTestModel(intNullable = null), LargeTestModel(intNullable = 1))
+        updateAsInMemory(database.collection<LargeTestModel>("test_notNull_assign_skipsNull"), rows, modification { it.intNullable.notNull assign 5 })
+    }
+
+    @Test fun test_notNull_increment_skipsNull() = runBlocking {
+        val rows = listOf(LargeTestModel(intNullable = null), LargeTestModel(intNullable = 1))
+        updateAsInMemory(database.collection<LargeTestModel>("test_notNull_increment_skipsNull"), rows, modification { it.intNullable.notNull += 1 })
+    }
+
+    @Test fun test_notNull_embedded_skipsNull() = runBlocking {
+        val rows = listOf(LargeTestModel(embeddedNullable = null), LargeTestModel(embeddedNullable = ClassUsedForEmbedding("a", 1)))
+        updateAsInMemory(database.collection<LargeTestModel>("test_notNull_embedded_skipsNull"), rows, modification { it.embeddedNullable.notNull.value1 assign "x" })
+    }
+
+    @Test fun test_notNull_checksValueAfterEarlierParts() = runBlocking {
+        val rows = listOf(LargeTestModel(intNullable = null), LargeTestModel(intNullable = 1))
+        updateAsInMemory(database.collection<LargeTestModel>("test_notNull_checksValueAfterEarlierParts"), rows, modification {
+            it.intNullable assign 3
+            it.intNullable.notNull += 1
+        })
+    }
+
+    @Test fun test_notNull_updateMany_skipsNull() = runBlocking {
+        val collection = database.collection<LargeTestModel>("test_notNull_updateMany_skipsNull")
+        val rows = listOf(LargeTestModel(intNullable = null), LargeTestModel(intNullable = 1), LargeTestModel(intNullable = 2))
+        collection.insert(rows)
+        val modification = modification<LargeTestModel> { it.intNullable.notNull += 1 }
+        collection.updateMany(Condition.Always, modification)
+        collection.updateManyIgnoringResult(Condition.Always, modification)
+        for (row in rows) assertEquals(modification(modification(row)), collection.get(row._id))
+    }
+
+    @Test fun test_notNull_insideList_skipsNull() = runBlocking {
+        val rows = listOf(NullableElementsModel(holders = listOf(NullableValueHolder(null), NullableValueHolder(1))))
+        updateAsInMemory(database.collection<NullableElementsModel>("test_notNull_insideList_skipsNull"), rows, modification { it.holders.forEach { it.value.notNull += 1 } })
+    }
+
+    @Test fun test_forEach_unconditioned() = runBlocking {
+        val rows = listOf(LargeTestModel(list = listOf(1, 2, 3)))
+        updateAsInMemory(database.collection<LargeTestModel>("test_forEach_unconditioned"), rows, modification { it.list.forEach { it += 1 } })
     }
 
     @Test fun san(){

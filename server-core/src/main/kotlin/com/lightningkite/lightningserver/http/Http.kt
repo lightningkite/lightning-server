@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.http
 
+import io.ktor.util.escapeHTML
 import com.lightningkite.lightningserver.HtmlDefaults
 import com.lightningkite.lightningserver.auth.authAny
 import com.lightningkite.lightningserver.core.ServerPath
@@ -53,7 +54,7 @@ object Http {
             <p>Sorry, the page you're looking for isn't here.</p>
             ${
                     if (generalSettings().debug) {
-                        "<p>Your path is $path.</p>"
+                        "<p>Your path is ${path.toString().escapeHTML()}.</p>"
                     } else ""
                 }
         """.trimIndent()

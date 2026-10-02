@@ -115,6 +115,10 @@ val collection = Server.database().collection<Post>()
 
 Creating views of databases like this is incredibly useful for centralizing rules about what users can and cannot do.
 
+Updates, replaces, upserts and deletes only reach rows that also match `read`, so give `read` at least the reach of `update` and `delete`; an upsert whose match the user can't read inserts instead.
+A filter (or a `forEachIf`/`removeAll`/`-=` inside a modification) that reads a masked field only matches rows where the mask's `unless` holds, and aggregates over a masked field skip the other rows.
+`mustBe` rules are checked against what a write sets; a write to part of the field also requires the rest of the rule to already hold.
+
 Later, we'll even show you how to use this to automatically generate REST endpoints with proper permissions.
 
 ## Available Backends

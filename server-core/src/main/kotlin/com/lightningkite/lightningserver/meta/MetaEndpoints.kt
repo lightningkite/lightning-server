@@ -168,7 +168,7 @@ class MetaEndpoints(
                         <script>
                           window.onload = function() {
                             const ui = SwaggerUIBundle({
-                              spec: ${Serialization.jsonWithoutDefaults.encodeToString(openApiDescription)},
+                              url: 'openapi.json',
                               dom_id: '#swagger-ui',
                               deepLinking: true,
                               presets: [
@@ -245,7 +245,9 @@ class MetaEndpoints(
                 const pathElement = document.getElementById("path") 
                 const messagesElement = document.getElementById("messages")
                 const token = getCookie("Authorization")
-                const url = "${generalSettings().wsUrl}" + pathElement.value + (token ? "?jwt=" + token : "")
+                // Anything not starting with "/" would change the host, e.g. "@evil.example" would send the token there.
+                const path = pathElement.value.startsWith("/") ? pathElement.value : "/"
+                const url = "${generalSettings().wsUrl}" + path + (token ? "?jwt=" + token : "")
                 console.log(url)
                 ws = new WebSocket(url, url.substring(0, url.indexOf("://")))
                 ws.addEventListener('open', ev => {
@@ -290,7 +292,7 @@ class MetaEndpoints(
             }
             </script>
             <div>
-                <label>Path <input id='path' value='${it.queryParameter("path") ?: "/"}'/></label>
+                <label>Path <input id='path' value='/'/></label>
                 <button type='button' onclick='connectClick()'>Connect</button>
                 <button type='button' onclick='closeClick()'>Close</button>
             </div>
@@ -300,8 +302,13 @@ class MetaEndpoints(
             </div>
             <button type='button' onclick='clearClick()'>clear</button>
             <div id='messages'></div>
+            <script>
+            const pathParameter = new URLSearchParams(location.search).get("path")
+            if (pathParameter) document.getElementById("path").value = pathParameter
+            </script>
         """.trimIndent()
-            )
+            ),
+            headers = { set("Content-Security-Policy", "frame-ancestors 'none'") },
         )
     }
     val endpoints = listOf<HttpEndpoint>(

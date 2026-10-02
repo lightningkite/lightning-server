@@ -7,6 +7,10 @@ import kotlinx.serialization.KSerializer
 
 /**
  * Uses [ModelPermissions] to secure a [FieldCollection].
+ *
+ * Writes and deletes only reach rows the user can read, and [aggregate] and [groupAggregate] over a masked property
+ * (or grouped by one) skip rows the mask applies to, so they return a total over fewer rows with no sign that rows
+ * were left out.
  */
 open class ModelPermissionsFieldCollection<Model : Any>(
     override val wraps: FieldCollection<Model>,
@@ -81,7 +85,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         condition: Condition<Model>,
         property: DataClassPath<Model, N>
     ): Double? =
-        wraps.aggregate(aggregate, condition and permissions.read and permissions.readMask(condition, textIndexPaths), property)
+        wraps.aggregate(aggregate, fullCondition(condition) and permissions.readMask(property), property)
 
     override suspend fun <N : Number?, Key> groupAggregate(
         aggregate: Aggregate,
@@ -90,7 +94,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         property: DataClassPath<Model, N>
     ): Map<Key, Double?> = wraps.groupAggregate(
         aggregate,
-        condition and permissions.read and permissions.readMask(groupBy) and permissions.readMask(condition, textIndexPaths),
+        fullCondition(condition) and permissions.readMask(groupBy) and permissions.readMask(property),
         groupBy,
         property
     )
@@ -102,7 +106,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
     ): EntryChange<Model> {
         val sortImposedConditions = permissions.readMask.permitSort(orderBy)
         return wraps.replaceOne(
-            condition and permissions.allowed(Modification.Assign(model)) and sortImposedConditions,
+            writeCondition(condition, Modification.Assign(model)) and sortImposedConditions,
             model,
             orderBy
         ).map { permissions.mask(it) }
@@ -114,7 +118,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         model: Model
     ): EntryChange<Model> {
         if (!permissions.create(model)) throw SecurityException("You do not have permission to insert this instance.  You can only insert instances that adhere to the following condition: ${permissions.create}")
-        return wraps.upsertOne(condition and permissions.allowed(modification), modification, model)
+        return wraps.upsertOne(writeCondition(condition, modification), modification, model)
             .map { permissions.mask(it) }
     }
 
@@ -125,7 +129,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
     ): EntryChange<Model> {
         val sortImposedConditions = permissions.readMask.permitSort(orderBy)
         return wraps.updateOne(
-            condition and permissions.allowed(modification) and sortImposedConditions,
+            writeCondition(condition, modification) and sortImposedConditions,
             modification,
             orderBy
         )
@@ -139,23 +143,23 @@ open class ModelPermissionsFieldCollection<Model : Any>(
     ): Boolean {
         val sortImposedConditions = permissions.readMask.permitSort(orderBy)
         return wraps.updateOneIgnoringResult(
-            condition and permissions.allowed(modification) and sortImposedConditions,
+            writeCondition(condition, modification) and sortImposedConditions,
             modification,
             orderBy
         )
     }
 
     override suspend fun updateManyIgnoringResult(condition: Condition<Model>, modification: Modification<Model>): Int {
-        return wraps.updateManyIgnoringResult(condition and permissions.allowed(modification), modification)
+        return wraps.updateManyIgnoringResult(writeCondition(condition, modification), modification)
     }
 
     override suspend fun deleteOneIgnoringOld(condition: Condition<Model>, orderBy: List<SortPart<Model>>): Boolean {
         val sortImposedConditions = permissions.readMask.permitSort(orderBy)
-        return wraps.deleteOneIgnoringOld(condition and permissions.delete and sortImposedConditions, orderBy)
+        return wraps.deleteOneIgnoringOld(fullCondition(condition) and permissions.delete and sortImposedConditions, orderBy)
     }
 
     override suspend fun deleteManyIgnoringOld(condition: Condition<Model>): Int {
-        return wraps.deleteManyIgnoringOld(condition and permissions.delete)
+        return wraps.deleteManyIgnoringOld(fullCondition(condition) and permissions.delete)
     }
 
     override suspend fun replaceOneIgnoringResult(
@@ -165,7 +169,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
     ): Boolean {
         val sortImposedConditions = permissions.readMask.permitSort(orderBy)
         return wraps.replaceOneIgnoringResult(
-            condition and permissions.allowed(Modification.Assign(model)) and sortImposedConditions,
+            writeCondition(condition, Modification.Assign(model)) and sortImposedConditions,
             model,
             orderBy
         )
@@ -177,29 +181,33 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         model: Model
     ): Boolean {
         if (!permissions.create(model)) throw SecurityException("You do not have permission to insert this instance.  You can only insert instances that adhere to the following condition: ${permissions.create}")
-        return wraps.upsertOneIgnoringResult(condition and permissions.allowed(modification), modification, model)
+        return wraps.upsertOneIgnoringResult(writeCondition(condition, modification), modification, model)
     }
 
     override suspend fun updateMany(
         condition: Condition<Model>,
         modification: Modification<Model>
     ): CollectionChanges<Model> {
-        return wraps.updateMany(condition and permissions.allowed(modification), modification)
+        return wraps.updateMany(writeCondition(condition, modification), modification)
             .map { permissions.mask(it) }
     }
 
     override suspend fun deleteOne(condition: Condition<Model>, orderBy: List<SortPart<Model>>): Model? {
         val sortImposedConditions = permissions.readMask.permitSort(orderBy)
-        return wraps.deleteOne(condition and permissions.delete and sortImposedConditions, orderBy)
+        return wraps.deleteOne(fullCondition(condition) and permissions.delete and sortImposedConditions, orderBy)
             ?.let { permissions.mask(it) }
     }
 
     override suspend fun deleteMany(condition: Condition<Model>): List<Model> {
-        return wraps.deleteMany(condition and permissions.delete).map { permissions.mask(it) }
+        return wraps.deleteMany(fullCondition(condition) and permissions.delete).map { permissions.mask(it) }
     }
 
     override suspend fun fullCondition(condition: Condition<Model>): Condition<Model> =
         permissions.read and condition and permissions.readMask(condition, textIndexPaths)
+
+    // An upsert whose match is unreadable inserts instead.
+    private suspend fun writeCondition(condition: Condition<Model>, modification: Modification<Model>): Condition<Model> =
+        fullCondition(condition) and permissions.allowed(modification) and permissions.readMask(modification, textIndexPaths)
 
     override suspend fun mask(): Mask<Model> = permissions.readMask
 }
