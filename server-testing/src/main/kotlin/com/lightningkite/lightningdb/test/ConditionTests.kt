@@ -2860,12 +2860,101 @@ abstract class ConditionTests() {
         assertTrue(higher !in results)
         Unit
     }
-    
-    
-    
-    
-    
-    
-    
-    
+
+    // notNull and map-key conditions must never match a null or missing value, whatever the inner condition: in memory
+    // they don't, and permission checks rely on that.
+
+    private suspend fun <T : HasId<UUID>> findAsInMemory(collection: FieldCollection<T>, rows: List<T>, condition: Condition<T>): List<T> {
+        collection.insert(rows)
+        val results = collection.find(condition).toList().sortedBy { it._id }
+        assertEquals(rows.filter { condition(it) }.sortedBy { it._id }, results)
+        return results
+    }
+
+    @Test fun test_notNull_neq_excludesNull() = runBlocking {
+        val two = LargeTestModel(intNullable = 2)
+        val rows = listOf(LargeTestModel(intNullable = null), LargeTestModel(intNullable = 1), two)
+        val results = findAsInMemory(database.collection<LargeTestModel>("test_notNull_neq_excludesNull"), rows, condition { it.intNullable.notNull neq 1 })
+        assertEquals(listOf(two), results)
+    }
+
+    @Test fun test_notNull_notInside_excludesNull() = runBlocking {
+        val rows = listOf(LargeTestModel(intNullable = null), LargeTestModel(intNullable = 1), LargeTestModel(intNullable = 2))
+        findAsInMemory(database.collection<LargeTestModel>("test_notNull_notInside_excludesNull"), rows, condition { it.intNullable.notNull notInside listOf(1) })
+        Unit
+    }
+
+    @Test fun test_notNull_not_excludesNull() = runBlocking {
+        val rows = listOf(LargeTestModel(intNullable = null), LargeTestModel(intNullable = 1), LargeTestModel(intNullable = 2))
+        findAsInMemory(database.collection<LargeTestModel>("test_notNull_not_excludesNull"), rows, condition { it.intNullable.notNull.condition { !(it eq 1) } })
+        Unit
+    }
+
+    @Test fun test_notNull_embedded_neq_excludesNull() = runBlocking {
+        val rows = listOf(
+            LargeTestModel(embeddedNullable = null),
+            LargeTestModel(embeddedNullable = ClassUsedForEmbedding("a", 1)),
+            LargeTestModel(embeddedNullable = ClassUsedForEmbedding("b", 2)),
+        )
+        findAsInMemory(database.collection<LargeTestModel>("test_notNull_embedded_neq_excludesNull"), rows, condition { it.embeddedNullable.notNull.value1 neq "a" })
+        Unit
+    }
+
+    @Test fun test_notNull_list_all_excludesNull() = runBlocking {
+        val rows = listOf(LargeTestModel(listNullable = null), LargeTestModel(listNullable = listOf(1, 5)), LargeTestModel(listNullable = listOf(5)))
+        findAsInMemory(database.collection<LargeTestModel>("test_notNull_list_all_excludesNull"), rows, condition { it.listNullable.notNull.all { it gt 3 } })
+        Unit
+    }
+
+    @Test fun test_listEmbedded_all() = runBlocking {
+        val rows = listOf(
+            LargeTestModel(listEmbedded = listOf()),
+            LargeTestModel(listEmbedded = listOf(ClassUsedForEmbedding(value2 = 1))),
+            LargeTestModel(listEmbedded = listOf(ClassUsedForEmbedding(value2 = 2), ClassUsedForEmbedding(value2 = 3))),
+        )
+        findAsInMemory(database.collection<LargeTestModel>("test_listEmbedded_all"), rows, condition { it.listEmbedded.all { it.value2 gt 1 } })
+        Unit
+    }
+
+    @Test fun test_mapKey_neq_excludesMissing() = runBlocking {
+        val rows = listOf(LargeTestModel(map = mapOf()), LargeTestModel(map = mapOf("a" to 1)), LargeTestModel(map = mapOf("a" to 2)))
+        findAsInMemory(database.collection<LargeTestModel>("test_mapKey_neq_excludesMissing"), rows, condition { it.map.condition { Condition.OnKey("a", Condition.NotEqual(1)) } })
+        Unit
+    }
+
+    @Test fun test_mapKey_not_excludesMissing() = runBlocking {
+        val rows = listOf(LargeTestModel(map = mapOf()), LargeTestModel(map = mapOf("a" to 1)), LargeTestModel(map = mapOf("a" to 2)))
+        findAsInMemory(database.collection<LargeTestModel>("test_mapKey_not_excludesMissing"), rows, condition { it.map.condition { Condition.OnKey("a", Condition.Not(Condition.Equal(1))) } })
+        Unit
+    }
+
+    @Test fun test_mapKey_always_excludesMissing() = runBlocking {
+        val rows = listOf(LargeTestModel(map = mapOf()), LargeTestModel(map = mapOf("a" to 1)), LargeTestModel(map = mapOf("b" to 2)))
+        findAsInMemory(database.collection<LargeTestModel>("test_mapKey_always_excludesMissing"), rows, condition { it.map.condition { Condition.OnKey("a", Condition.Always) } })
+        Unit
+    }
+
+    @Test fun test_notMapKey_includesMissing() = runBlocking {
+        val rows = listOf(LargeTestModel(map = mapOf()), LargeTestModel(map = mapOf("a" to 1)), LargeTestModel(map = mapOf("a" to 2)))
+        findAsInMemory(database.collection<LargeTestModel>("test_notMapKey_includesMissing"), rows, condition { !it.map.condition { Condition.OnKey("a", Condition.Equal(1)) } })
+        Unit
+    }
+
+    @Test fun test_nullableElements_any_notNull_neq() = runBlocking {
+        val rows = listOf(NullableElementsModel(ints = listOf(null, 7)), NullableElementsModel(ints = listOf(null, 5)), NullableElementsModel(ints = listOf()))
+        findAsInMemory(database.collection<NullableElementsModel>("test_nullableElements_any_notNull_neq"), rows, condition { it.ints.any { it.notNull neq 5 } })
+        Unit
+    }
+
+    @Test fun test_nullableElements_all_notNull() = runBlocking {
+        val rows = listOf(NullableElementsModel(ints = listOf(null, 7)), NullableElementsModel(ints = listOf(5)), NullableElementsModel(ints = listOf()))
+        findAsInMemory(database.collection<NullableElementsModel>("test_nullableElements_all_notNull"), rows, condition { it.ints.all { it.notNull gt 1 } })
+        Unit
+    }
+
+    @Test open fun test_nullableList_withNullElement_notNull() = runBlocking {
+        val rows = listOf(NullableElementsModel(intsNullable = null), NullableElementsModel(intsNullable = listOf(null, 7)), NullableElementsModel(intsNullable = listOf(5)))
+        findAsInMemory(database.collection<NullableElementsModel>("test_nullableList_withNullElement_notNull"), rows, condition { it.intsNullable.notNull.all { it neq 5 } })
+        Unit
+    }
 }

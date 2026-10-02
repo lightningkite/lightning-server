@@ -15,6 +15,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.*
 import org.bson.BsonBoolean
 import org.bson.BsonDocument
+import org.bson.Document
 import org.bson.conversions.Bson
 import java.util.concurrent.TimeUnit
 import kotlin.reflect.KClass
@@ -68,6 +69,13 @@ class MongoFieldCollection<Model : Any>(
         }
     }
 
+    private fun Bson.andCheck(check: Document?): Bson = if (check == null) this else Filters.and(this, check)
+
+    // A row that matched but failed the modification's check: it's left as it is, and an upsert mustn't insert a copy.
+    private suspend fun MongoCollection<BsonDocument>.existingUnchanged(filter: Bson, update: UpdateWithOptions): EntryChange<Model>? =
+        if (update.check == null) null
+        else find(filter).limit(1).firstOrNull()?.let { Serialization.Internal.bson.load(serializer, it) }?.let { EntryChange(it, it) }
+
     override suspend fun upsertOne(
         condition: Condition<Model>,
         modification: Modification<Model>,
@@ -96,7 +104,7 @@ class MongoFieldCollection<Model : Any>(
                     ?: EntryChange(null, model)
             } else {
                 findOneAndUpdate(
-                    cs.bson(serializer),
+                    cs.bson(serializer).andCheck(m.check),
                     m.document,
                     FindOneAndUpdateOptions()
                         .returnDocument(ReturnDocument.BEFORE)
@@ -107,6 +115,7 @@ class MongoFieldCollection<Model : Any>(
                         .hint(m.options.hint)
                         .hintString(m.options.hintString)
                 )?.let { Serialization.Internal.bson.load(serializer, it) }?.let { EntryChange(it, modification(it)) }
+                    ?: existingUnchanged(cs.bson(serializer), m)
                     ?: run {
                         insertOne(Serialization.Internal.bson.stringify(serializer, model)); EntryChange(
                         null,
@@ -132,7 +141,7 @@ class MongoFieldCollection<Model : Any>(
             if (m.upsert(model, serializer)) {
                 updateOne(cs.bson(serializer), m.document, m.options).matchedCount > 0
             } else {
-                if (updateOne(cs.bson(serializer), m.document, m.options).matchedCount != 0L) {
+                if (updateOne(cs.bson(serializer).andCheck(m.check), m.document, m.options).matchedCount != 0L || existingUnchanged(cs.bson(serializer), m) != null) {
                     true
                 } else {
                     insertOne(Serialization.Internal.bson.stringify(serializer, model))
@@ -153,8 +162,9 @@ class MongoFieldCollection<Model : Any>(
         if (simplifiedModification.isNothing) return EntryChange(null, null)
         val m = simplifiedModification.bson(serializer)
         val before = access<Model?> {
+            // With orderBy, this updates the first row that passes the modification's check.
             findOneAndUpdate(
-                cs.bson(serializer),
+                cs.bson(serializer).andCheck(m.check),
                 m.document,
                 FindOneAndUpdateOptions()
                     .returnDocument(ReturnDocument.BEFORE)
@@ -181,7 +191,7 @@ class MongoFieldCollection<Model : Any>(
         val simplifiedModification = modification.simplify()
         if (simplifiedModification.isNothing) return false
         val m = simplifiedModification.bson(serializer)
-        return access { updateOne(cs.bson(serializer), m.document, m.options).matchedCount != 0L }
+        return access { updateOne(cs.bson(serializer).andCheck(m.check), m.document, m.options).matchedCount != 0L }
     }
 
     override suspend fun updateMany(
@@ -196,8 +206,8 @@ class MongoFieldCollection<Model : Any>(
         val changes = ArrayList<EntryChange<Model>>()
         // TODO: Don't love that we have to do this in chunks, but I guess we'll live.  Could this be done with pipelines?
         access {
-            find(cs.bson(serializer)).collectChunked(1000) { list ->
-                updateMany(Filters.`in`("_id", list.map { it["_id"] }), m.document, m.options)
+            find(cs.bson(serializer).andCheck(m.check)).collectChunked(1000) { list ->
+                updateMany(Filters.`in`("_id", list.map { it["_id"] }).andCheck(m.check), m.document, m.options)
                 list.asSequence().map { Serialization.Internal.bson.load(serializer, it) }
                     .forEach {
                         changes.add(EntryChange(it, modification(it)))
@@ -218,7 +228,7 @@ class MongoFieldCollection<Model : Any>(
         val m = simplifiedModification.bson(serializer)
         return access {
             updateMany(
-                cs.bson(serializer),
+                cs.bson(serializer).andCheck(m.check),
                 m.document,
                 m.options
             ).matchedCount.toInt()
@@ -296,7 +306,11 @@ class MongoFieldCollection<Model : Any>(
                                 "text" to documentOf(
                                     "query" to anyFts!!.value,
                                     "fuzzy" to documentOf(),
-                                    "path" to documentOf("wildcard" to "*"),
+                                    // ModelPermissionsFieldCollection decides whether a search reads masked data from the
+                                    // @TextIndex fields alone, and treats a model without them as searching everything.
+                                    "path" to (serializer.descriptor.annotations.filterIsInstance<TextIndex>().firstOrNull()?.fields
+                                        ?.takeIf { it.isNotEmpty() }?.toList()
+                                        ?: documentOf("wildcard" to "*")),
                                     "matchCriteria" to if(anyFts!!.requireAllTermsPresent) "all" else "any"
                                 )
                             )

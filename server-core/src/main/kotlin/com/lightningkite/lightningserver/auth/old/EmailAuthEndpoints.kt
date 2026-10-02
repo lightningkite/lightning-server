@@ -2,6 +2,7 @@
 
 package com.lightningkite.lightningserver.auth.old
 
+import io.ktor.util.escapeHTML
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.HtmlDefaults
 import com.lightningkite.lightningserver.auth.oauth.OauthCallbackEndpoint
@@ -209,7 +210,7 @@ open class EmailAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
                     """
                 <p>Success!  An email has been sent with a code to log in.</p>
                 <form action='../form-post-code/' enctype='application/x-www-form-urlencoded' method='post'>
-                    <input type='text' name='email' value='$email'/>
+                    <input type='text' name='email' value='${email.escapeHTML()}'/>
                     <p>Enter Email PIN</p>
                     <input type='text' name='pin'/>
                     <button type='submit'>Submit</button>

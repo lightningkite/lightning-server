@@ -103,9 +103,10 @@ private fun <T> ISqlExpressionBuilder.condition(
             val keyValue = PostgresCollection.format.encode(fieldSet.serializer.mapKeyElement()!! as KSerializer<Any?>, condition.key)[""]
             ContainsOp(fieldSet.single, LiteralOp(fieldSet.single.columnType, listOf(keyValue)))
         }
+        // The key check is needed because a missing key reads as null, which conditions like NotEqual accept.
         is Condition.OnKey<*> -> {
             val keyValue = PostgresCollection.format.encode(fieldSet.serializer.mapKeyElement()!! as KSerializer<Any?>, condition.key)[""]
-            condition(
+            val onValue = condition(
                 condition = condition.condition as Condition<Any?>,
                 fieldSet = FieldSet2<Any?>(
                     serializer = fieldSet.serializer.mapValueElement()!! as KSerializer<Any?>,
@@ -126,6 +127,7 @@ private fun <T> ISqlExpressionBuilder.condition(
                         }
                 )
             )
+            AndOp(listOf(ContainsOp(fieldSet.single, LiteralOp(fieldSet.single.columnType, listOf(keyValue))), onValue))
         }
 //        is Condition.FullTextSearch -> throw IllegalArgumentException()
 
@@ -138,7 +140,7 @@ private fun <T> ISqlExpressionBuilder.condition(
                 fieldSet.exists,
                 condition<Any?>(
                     condition.condition as Condition<Any?>,
-                    fieldSet as FieldSet2<Any?>
+                    FieldSet2(fieldSet.serializer.nullElement()!! as KSerializer<Any?>, fieldSet.fields)
                 )
             ))
         }
@@ -242,13 +244,14 @@ private fun <T> ISqlExpressionBuilder.condition(
 
 internal interface FieldModifier {
     fun modify(key: String, modify: (Expression<Any?>)->Expression<Any?>)
+    /** The column's value after the modifications so far. */
+    fun current(key: String): Expression<Any?>
 }
 internal fun FieldModifier.sub(subKey: String): FieldModifier {
+    fun full(key: String) = if (key.isEmpty()) subKey else subKey + "__" + key
     return object: FieldModifier {
-        override fun modify(key: String, modify: (Expression<Any?>) -> Expression<Any?>) {
-            if(key.isEmpty()) this@sub.modify(subKey, modify)
-            else this@sub.modify(subKey + "__" + key, modify)
-        }
+        override fun modify(key: String, modify: (Expression<Any?>) -> Expression<Any?>) = this@sub.modify(full(key), modify)
+        override fun current(key: String) = this@sub.current(full(key))
     }
 }
 internal inline fun <T> FieldModifier.modifySingle(set: FieldSet2<T>, crossinline action: (type: IColumnType, old: Expression<Any?>) -> Expression<Any?>) {
@@ -273,8 +276,9 @@ fun <T> UpdateBuilder<*>.modification(
     object: FieldModifier {
         fun default(key: String) = table.col[key]!! as Expression<Any?>
         override fun modify(key: String, modify: (Expression<Any?>) -> Expression<Any?>) {
-            map[key] = modify(map[key] ?: default(key))
+            map[key] = modify(current(key))
         }
+        override fun current(key: String) = map[key] ?: default(key)
     }.modification(modification, serializer, table)
     for(entry in map) {
         this.update(table.col[entry.key]!! as Column<Any?>, entry.value)
@@ -291,8 +295,9 @@ fun <T> UpdateReturningOldStatement.modification(
     object: FieldModifier {
         fun default(key: String) = table.col[key]!! as Expression<Any?>
         override fun modify(key: String, modify: (Expression<Any?>) -> Expression<Any?>) {
-            map[key] = modify(map[key] ?: default(key))
+            map[key] = modify(current(key))
         }
+        override fun current(key: String) = map[key] ?: default(key)
     }.modification(modification, serializer, table)
     for(entry in map) {
         this.update(table.col[entry.key]!! as Column<Any?>, entry.value)
@@ -313,7 +318,18 @@ private fun <T> FieldModifier.modification(
         is Modification.Nothing -> Modification.Nothing
         is Modification.Chain -> modification.modifications.forEach { modification(it, fieldSet) }
         is Modification.Assign -> modifyEach(fieldSet, modification.value) { type, it, old -> it }
-        is Modification.IfNotNull<*> -> modification<Any?>(modification.modification as Modification<Any?>, fieldSet as FieldSet2<Any?>)
+        // Every column the inner modification writes keeps its value when the field is null, as IfNotNull does in memory.
+        // The null check reads the value after the earlier parts of the modification, not the stored one.
+        is Modification.IfNotNull<*> -> {
+            val exists = fieldSet.fields["exists"]?.let { current("exists") as Expression<Boolean> }
+                ?: IsNotNullOp(current(fieldSet.fields.keys.first()))
+            object : FieldModifier {
+                override fun modify(key: String, modify: (Expression<Any?>) -> Expression<Any?>) {
+                    this@modification.modify(key) { old -> SqlExpressionBuilder.case().When(exists, modify(old)).Else(old) }
+                }
+                override fun current(key: String) = this@modification.current(key)
+            }.modification<Any?>(modification.modification as Modification<Any?>, fieldSet as FieldSet2<Any?>)
+        }
         is Modification.CoerceAtMost -> modifySingle(fieldSet) { type, old -> CustomFunction("LEAST", type, fieldSet.formatSingleExpression(modification.value), old) }
         is Modification.CoerceAtLeast -> modifySingle(fieldSet) { type, old -> CustomFunction("GREATEST", type, fieldSet.formatSingleExpression(modification.value), old) }
         is Modification.Increment -> modifySingle(fieldSet) { type, old -> PlusOp(fieldSet.formatSingleExpression(modification.by), old, type) }
@@ -334,6 +350,7 @@ private fun <T> FieldModifier.modification(
                         override fun modify(key: String, modify: (Expression<Any?>) -> Expression<Any?>) {
                             result = modify(f.fields[it.key]!!)
                         }
+                        override fun current(key: String) = f.fields[key]!!
                     }.modification(modification.modification as Modification<Any?>, f)
                     if(modification.condition is Condition.Always) result
                     else with(SqlExpressionBuilder) {
@@ -384,6 +401,7 @@ private fun <T> FieldModifier.modification(
                         override fun modify(key: String, modify: (Expression<Any?>) -> Expression<Any?>) {
                             result = modify(f.fields[it.key]!!)
                         }
+                        override fun current(key: String) = f.fields[key]!!
                     }.modification(modification.modification as Modification<Any?>, f)
                     if(modification.condition is Condition.Always) result
                     else with(SqlExpressionBuilder) {

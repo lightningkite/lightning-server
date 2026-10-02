@@ -53,13 +53,15 @@ open class PinHandler(
     suspend fun assert(key: String, pin: String): String {
         val hashedPin = cache().get<String>(cacheKey(key))
             ?: throw NotFoundException(detail = "pin-expired", message = "PIN has expired.")
-        val attempts = (cache().get<Int>(attemptCacheKey(key)) ?: 0) + 1
+        // Counted before reading so concurrent guesses can't all see the same count.  A missing counter means a
+        // concurrent request just finished with this PIN, by success or by using up the attempts.
+        cache().add(attemptCacheKey(key), 1)
+        val attempts = cache().get<Int>(attemptCacheKey(key)) ?: maxAttempts
         if (attempts >= maxAttempts) {
             cache().remove(cacheKey(key))
             cache().remove(attemptCacheKey(key))
             throw NotFoundException(detail = "pin-expired", message = "PIN has expired.")
         }
-        cache().add(attemptCacheKey(key), 1)
         val fixedPin = if(mixedCaseMode) pin else pin.lowercase()
         if (!fixedPin.checkAgainstHash(hashedPin)) throw BadRequestException(
             detail = "pin-incorrect",
