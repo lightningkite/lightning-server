@@ -385,6 +385,68 @@ class BackupCodeEndpointsTest {
     }
 
     @Test
+    fun `codes from resetCodes prove regardless of case, dashes, and whitespace`() = runBlocking {
+        TestUser.users.clear()
+        val userId = Uuid.random()
+        val user = TestUser(userId, "test@example.com")
+        TestUser.users[userId] = user
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
+
+            init {
+                register(TestUser)
+            }
+
+            val backupCodes = path.path("auth").path("backup") include BackupCodeEndpoints(
+                database = database,
+                cache = cache,
+                proofSigner = RuntimeDeferred.Cached { testBasis.signer("proof") },
+                proofExpiration = 1.hours,
+                generateCount = 4
+            )
+        }.let { server ->
+            server.test({}) {
+                @Suppress("UNCHECKED_CAST")
+                val auth = TestUser.testAuth(user) as Authentication<HasId<*>>
+                val codes = server.backupCodes.resetCodes.test(auth, Unit)
+                assertEquals(4, codes.size)
+
+                // Codes are stored hashed, never as the plaintext that was handed out
+                val stored = server.backupCodes.modelInfo.table().find(condition<BackupCodeSecret> {
+                    it.subjectId.eq(TestUser.idString(userId))
+                }).toList().map { it.code }
+                val plainForms = codes.flatMap { listOf(it, it.lowercase(), it.filter { c -> c.isLetter() }.lowercase()) }
+                assertTrue(stored.none { it in plainForms })
+
+                val variants = listOf(
+                    codes[0],
+                    codes[1].lowercase(),
+                    codes[2].filter { it.isLetter() },
+                    " ${codes[3]}\n",
+                )
+                for (variant in variants) {
+                    val proof = server.backupCodes.prove.test(
+                        null, IdentificationAndPassword(
+                            type = "TestUser",
+                            property = "email",
+                            value = "Test@Example.com",
+                            password = variant
+                        )
+                    )
+                    // The proof carries the normalized value so proofsCheck can match it to the user
+                    assertEquals("test@example.com", proof.value)
+                }
+
+                assertEquals(0, server.backupCodes.modelInfo.table().find(condition<BackupCodeSecret> {
+                    it.subjectId.eq(TestUser.idString(userId))
+                }).count())
+            }
+        }
+    }
+
+    @Test
     fun `established returns true when codes exist`() = runBlocking {
         TestUser.users.clear()
         val userId = Uuid.random()

@@ -7,11 +7,15 @@ import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.now
 import com.lightningkite.services.cache.*
 import com.lightningkite.services.data.ExperimentalLightningServer
+import kotlinx.coroutines.delay
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.pow
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
+import kotlin.time.TimeSource
 
 /**
  * Atomically claims [cacheKey] for single use, returning `true` only for the very first caller.
@@ -51,6 +55,8 @@ public suspend fun Cache.claimOnce(cacheKey: String, ttl: Duration): Boolean =
  *  @param expires The time frame for allowed attempts. Starts on the first attempt and resets every [expires] time passed.
  *  @param blocked The base block time frame applied the first time the limit is hit (level 0). Should be greater than or equal to [expires].
  *  @param maxBlocked The maximum block window; the exponentially-growing block is capped here. Should be greater than or equal to [blocked].
+ *  @param minFailureDuration The minimum amount of time required to pass before returning on failure attempts. This prevents enumeration on endpoints if early returns happen before heavy work.
+ *      As well, it further slows down brute force attempts.
  *  @param action The action you want to make against the [cacheKey]
  *
  *  @throws [BadRequestException] if attempt is denied.
@@ -62,8 +68,11 @@ public suspend inline fun <R> Cache.constrainAttemptRate(
     expires: Duration = 5.minutes,
     blocked: Duration = expires,
     maxBlocked: Duration = 3.hours,
+    minFailureDuration: Duration = 200.milliseconds,
     action: () -> R,
 ): R {
+    val started = TimeSource.Monotonic.markNow()
+
     val startKey = "$cacheKey-start-time"
     val levelKey = "$cacheKey-level"
 
@@ -104,7 +113,9 @@ public suspend inline fun <R> Cache.constrainAttemptRate(
         }
         result
     } catch (e: Throwable) {
+        if (e is CancellationException) throw e
         this.add(cacheKey, 1, baseBlockDuration)
+        delay(minFailureDuration - started.elapsedNow())
         throw e
     }
 }

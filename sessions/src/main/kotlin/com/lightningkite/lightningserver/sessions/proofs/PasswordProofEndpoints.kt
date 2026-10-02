@@ -23,6 +23,7 @@ import kotlinx.serialization.builtins.serializer
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
 
 @OptIn(InternalSerializationApi::class)
@@ -174,7 +175,7 @@ public class PasswordProofEndpoints(
                 // account share one bucket. Keying on the raw value would let an attacker dodge the limiter
                 // (and its exponential backoff) simply by varying case or whitespace.
                 val normalizedValue = handler.normalizePropertyValue(input.property, input.value)
-                cache().constrainAttemptRate("password-${input.property}-${normalizedValue}") {
+                cache().constrainAttemptRate("password-${input.property}-${normalizedValue}", minFailureDuration = 1.seconds) {
                     val subjectId = handler.fetchUserIdString(input.property, normalizedValue)
                         ?: throw BadRequestException("User ID and code do not match")
 
