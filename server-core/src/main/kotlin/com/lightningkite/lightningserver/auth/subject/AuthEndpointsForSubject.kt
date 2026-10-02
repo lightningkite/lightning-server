@@ -36,6 +36,7 @@ import com.lightningkite.lightningserver.websocket.WebSockets
 import com.lightningkite.now
 import com.lightningkite.serialization.DataClassPathSelf
 import io.ktor.http.*
+import kotlinx.coroutines.flow.toList
 import kotlinx.datetime.Instant
 import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.Serializable
@@ -88,10 +89,11 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             )
         ) + Authentication.isAdmin + Authentication.isSuperUser,
         getBaseCollection = {
-            database().collection(
-                sessionSerializer,
-                "${handler.name}Session"
-            )
+            val sessions = database().collection(sessionSerializer, "${handler.name}Session")
+            // Covers every way a session ends, including a superuser's REST update or delete.
+            sessions
+                .postChange { old, new -> if (old.terminated == null && new.terminated != null) terminateDerivedFrom(sessions, new._id) }
+                .postDelete { terminateDerivedFrom(sessions, it._id) }
         },
         getCollection = { it },
         forUser = { collection: FieldCollection<Session<SUBJECT, ID>> ->
@@ -154,7 +156,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 subject = handler,
                 sessionId = forSession._id,
                 rawId = forSession.subjectId,
-                issuedAt = now(),
+                issuedAt = forSession.authenticatedAt ?: forSession.createdAt,
                 scopes = forSession.scopes,
                 fromMasquerade = null,
                 requirements = requirements
@@ -228,7 +230,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         stale = stale,
         scopes = scopes,
         oauthClient = oauthClient,
-        derivedFrom = derivedFrom
+        parent = derivedFrom?.let { parentSession(it) }
     )
 
     suspend fun newSession(
@@ -255,8 +257,14 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         stale: Instant? = null,
         scopes: Set<String>,
         oauthClient: String? = null,
-        derivedFrom: UUID? = null,
+        parent: Session<SUBJECT, ID>? = null,
     ): Pair<Session<SUBJECT, ID>, RefreshToken> {
+        if (parent != null) {
+            // An access token outlives its session's termination by a few minutes.
+            if (parent.terminated != null) throw UnauthorizedException("Session has been terminated.")
+            if ("*" !in parent.scopes && !parent.scopes.containsAll(scopes))
+                throw ForbiddenException("A derived session's scopes must be within its parent session's scopes.")
+        }
         val secret = Base64.getEncoder().encodeToString(ByteArray(24).apply {
             SecureRandom.getInstanceStrong().nextBytes(this)
         })
@@ -268,7 +276,9 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             stale = stale,
             scopes = scopes,
             oauthClient = oauthClient,
-            derivedFrom = derivedFrom,
+            derivedFrom = parent?._id,
+            // Minting a session from another is not re-authenticating; maxAge must still see the original time.
+            authenticatedAt = parent?.let { it.authenticatedAt ?: it.createdAt } ?: now(),
         ).also { sessionInfo.collection().insertOne(it) }.let {
             it to RefreshToken(handler.name, it._id, secret)
         }
@@ -344,8 +354,10 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             val maxStrengthPossible =
                 proofMethods.groupBy { it.info.property }.values.sumOf { it.maxOf { it.info.strength } }
             val actStrenReq = min(handler.desiredStrengthFor(subject), maxStrengthPossible)
+            // A method declaring strength 0 (backup codes) only stands in for a lost factor; it can't be the only one.
+            val hasStandaloneProof = proofs.any { Authentication.proofMethods[it.via]?.info?.strength != 0 }
             ProofsCheckResult(
-                readyToLogIn = strength >= actStrenReq,
+                readyToLogIn = strength >= actStrenReq && hasStandaloneProof,
                 maxExpiration = handler.getSessionExpiration(subject),
                 id = subject._id,
                 options = proofMethods
@@ -412,7 +424,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             val (_, secret) = newSessionPrivate(
                 label = future.label,
                 subjectId = future.subjectId,
-                derivedFrom = future.originalSessionId,
+                parent = future.originalSessionId?.let { parentSession(it) },
                 scopes = future.scopes,
                 expires = future.sessionExpiration,
                 stale = handler.getSessionStaleLength(handler.fetch(future.subjectId))?.let { now() + it },
@@ -431,14 +443,13 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         description = "Creates a session with more limited authorization",
         errorCases = listOf(),
         implementation = { request: SubSessionRequest ->
-            val session = sessionInfo.collection().get(this.auth.sessionId ?: throw UnauthorizedException())
-                ?: throw UnauthorizedException()
+            val session = parentSession(this.auth.sessionId ?: throw UnauthorizedException())
 
             newSessionPrivate(
                 label = request.label,
                 subjectId = user()._id,
-                derivedFrom = auth.sessionId,
-                scopes = request.scopes,
+                parent = session,
+                scopes = if (request.scopes == setOf("*")) session.scopes else request.scopes,
                 expires = session.expires?.let { minOf(it, request.expires ?: Instant.DISTANT_FUTURE) }
                     ?: request.expires,
                 stale = session.stale,
@@ -447,10 +458,32 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
+    private suspend fun parentSession(id: UUID): Session<SUBJECT, ID> =
+        sessionInfo.collection().get(id) ?: throw UnauthorizedException("No such session")
+
+    // Collected breadth-first, then terminated in one update on the unwrapped collection, so the cascade doesn't
+    // re-trigger itself.  `seen` stops a derivedFrom cycle, which a superuser could create through the REST endpoints.
+    private suspend fun terminateDerivedFrom(sessions: FieldCollection<Session<SUBJECT, ID>>, root: UUID) {
+        val seen = hashSetOf(root)
+        var parents = listOf(root)
+        while (parents.isNotEmpty()) {
+            parents = sessions
+                .find((dataClassPath.derivedFrom inside parents) and (dataClassPath.terminated eq null))
+                .toList()
+                .map { it._id }
+                .filter { it !in seen }
+            seen += parents
+        }
+        sessions.updateManyIgnoringResult(
+            (dataClassPath._id inside seen) and (dataClassPath.terminated eq null),
+            modification(dataClassPath) { it.terminated assign now() },
+        )
+    }
+
     private fun Session<SUBJECT, ID>.toAuth(): RequestAuth<SUBJECT> = RequestAuth(
         subject = handler,
         rawId = this.subjectId,
-        issuedAt = this.createdAt,
+        issuedAt = this.authenticatedAt ?: this.createdAt,
         scopes = this.scopes,
         sessionId = this._id,
         thirdParty = this.oauthClient
@@ -502,7 +535,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                     val (s, secret) = newSessionPrivate(
                         label = future.label ?: "Oauth with ${client.niceName}",
                         subjectId = future.subjectId,
-                        derivedFrom = future.originalSessionId,
+                        parent = future.originalSessionId?.let { parentSession(it) },
                         scopes = future.scopes,
                         expires = future.sessionExpiration,
                         stale = handler.getSessionStaleLength(handler.fetch(future.subjectId))?.let { now() + it },

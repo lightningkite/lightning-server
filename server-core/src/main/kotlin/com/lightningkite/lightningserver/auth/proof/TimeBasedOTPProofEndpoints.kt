@@ -170,16 +170,15 @@ class TimeBasedOTPProofEndpoints(
         implementation = { input: IdentificationAndPassword ->
             val now = now()
             val gracePeriod = now().minus(5.seconds)
-            cache().constrainAttemptRate(
-                cacheKey = "totp-count-${input.property}-${input.value}"
-            ) {
-                val subject = input.type
-                val handler = Authentication.subjects.values.find { it.name == subject }
-                    ?: throw IllegalArgumentException("No subject $subject recognized")
-                val normalizedValue = handler.normalizePropertyValue(input.property, input.value)
-                val subjectId = handler.findUserIdString(input.property, normalizedValue)
-                    ?: throw BadRequestException("User ID and code do not match")
+            val subject = input.type
+            val handler = Authentication.subjects.values.find { it.name == subject }
+                ?: throw IllegalArgumentException("No subject $subject recognized")
+            val normalizedValue = handler.normalizePropertyValue(input.property, input.value)
+            val subjectId = handler.findUserIdString(input.property, normalizedValue)
 
+            // Unknown identities are limited too, so being limited doesn't reveal which accounts exist.
+            cache().constrainAttemptRate(cacheKey = "totp-count-$subject-${subjectId ?: "unknown-$normalizedValue"}") {
+                if (subjectId == null) throw BadRequestException("User ID and code do not match")
                 val active = modelInfo.collection().find(condition {
                     it.subjectId.eq(subjectId) and it.subjectType.eq(subject) and active
                 }).toList()
