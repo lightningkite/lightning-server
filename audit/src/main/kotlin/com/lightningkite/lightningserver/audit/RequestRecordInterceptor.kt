@@ -9,119 +9,146 @@ import com.lightningkite.lightningserver.http.HttpInterceptor
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.pathing.PathSpec
-import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.pathing.route
+import com.lightningkite.lightningserver.runtime.ExecutionInterceptor
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.logicalId
 import com.lightningkite.lightningserver.websockets.DelegatingWebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketClose
-import com.lightningkite.lightningserver.websockets.WebSocketClose.Code
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketConnection
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketInterceptor
 import com.lightningkite.services.database.Table
+import com.lightningkite.services.database.insertOne
 import com.lightningkite.services.database.modification
 import com.lightningkite.services.database.updateOneByIdIgnoringResult
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlin.time.TimeSource
 import kotlin.uuid.Uuid
 
 private val logger = KotlinLogging.logger("com.lightningkite.lightningserver.audit.RequestRecordInterceptor")
+//
+///**
+// * Writes the [RequestRecord] that every [DisclosureRecord] of this request refers to.
+// *
+// * Logical scope, so each sub-request of a multiplexed request gets its own row — otherwise a bulk
+// * request would record one row no matter how much was disclosed inside it.
+// *
+// * ## Two writes, and why they fail differently
+// *
+// * The row is written **before** the handler runs and updated **after** it finishes, because outcome
+// * and duration are not known until the end while disclosures are written throughout. Writing first
+// * guarantees the referent exists before anything points at it, and the same shape works for a
+// * WebSocket, whose connection is recorded at connect and updated at close.
+// *
+// * The opening write is **fail-closed**: if it fails, the request fails, because nothing may be
+// * disclosed under a request id that names no request.
+// *
+// * The closing update is **best-effort and logged**. By then the audit trail already answers who
+// * received what; only outcome and duration are missing, and they are operational metadata rather
+// * than disclosure facts. Failing a request whose disclosures were correctly recorded would destroy
+// * more information than it protects.
+// */
+//public class RequestRecordInterceptor(
+//    private val table: Runtime<Table<RequestRecord>>,
+//) : HttpInterceptor, WebSocketInterceptor {
+//    override val name: String = "RequestRecord"
+//
+//    context(runtime: ServerRuntime)
+//    override suspend fun <PATH : PathSpec> intercept(
+//        request: HttpRequest<PATH>,
+//        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
+//    ): HttpResponse {
+//        val started = TimeSource.Monotonic.markNow()
+//        table().insert(listOf(request.opening(endpoint = request.path.route(), method = request.path.method.toString())))
+//
+//        var outcome = "failed"
+//        try {
+//            return cont(request).also { outcome = it.status.code.toString() }
+//        } finally {
+//            complete(runtime.execution.logicalId.uuid, outcome, started.elapsedNow().inWholeMilliseconds)
+//        }
+//    }
+//
+//    override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> =
+//        object : DelegatingWebSocketHandler<PATH, T>(handler) {
+//            @OverrideOnly
+//            context(serverRuntime: ServerRuntime)
+//            override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
+//                table().insert(listOf(request.opening(endpoint = request.path.route(), method = "WEBSOCKET")))
+//                return wrapped.willConnect(request)
+//            }
+//
+//            @OverrideOnly
+//            context(serverRuntime: ServerRuntime)
+//            override suspend fun disconnect(connection: WebSocketConnection<PATH, T>, reason: WebSocketClose) {
+//                try {
+//                    wrapped.disconnect(connection, reason)
+//                } finally {
+//                    // Keyed by the socket, not this Disconnect phase, so it completes the row the Connect
+//                    // phase opened. A socket's duration is its whole lifetime, which no monotonic mark
+//                    // taken here could measure, so it is left to be derived from `at` and the close time.
+//                    // The close code rather than the whole close, whose message and cause are not audit data.
+//                    complete(serverRuntime.execution.logicalId.uuid, reason.code.code.toString(), durationMs = null)
+//                }
+//            }
+//        }
+//
+//    context(runtime: ServerRuntime)
+//    private suspend fun Request<*>.opening(endpoint: String, method: String) = RequestRecord(
+//        _id = runtime.execution.logicalId.uuid,
+//        // The parent's request row, not causedBy: when the parent is a WebSocket phase, causedBy names
+//        // the phase, whose socket's row is keyed by the socket.
+//        parentRequestId = runtime.history.dropLast(1).lastOrNull()?.origin?.uuid,
+//        rootExecutionId = runtime.execution.rootExecution.uuid,
+//        principal = principalOrNull(),
+//        sourceIp = sourceIp,
+//        endpoint = endpoint,
+//        method = method,
+//        engineRequestId = engineRequestId,
+//        upstreamRequestId = upstreamRequestId,
+//    )
+//
+//    context(runtime: ServerRuntime)
+//    private suspend fun complete(requestId: Uuid, outcome: String, durationMs: Long?) {
+//        try {
+//            table().updateOneByIdIgnoringResult(requestId, modification(RequestRecord.path) {
+//                it.outcome assign outcome
+//                it.durationMs assign durationMs
+//            })
+//        } catch (e: CancellationException) {
+//            throw e
+//        } catch (e: Exception) {
+//            logger.error(e) { "Could not complete the audit request record for $requestId" }
+//        }
+//    }
+//}
+//
 
-/**
- * Writes the [RequestRecord] that every [DisclosureRecord] of this request refers to.
- *
- * Logical scope, so each sub-request of a multiplexed request gets its own row — otherwise a bulk
- * request would record one row no matter how much was disclosed inside it.
- *
- * ## Two writes, and why they fail differently
- *
- * The row is written **before** the handler runs and updated **after** it finishes, because outcome
- * and duration are not known until the end while disclosures are written throughout. Writing first
- * guarantees the referent exists before anything points at it, and the same shape works for a
- * WebSocket, whose connection is recorded at connect and updated at close.
- *
- * The opening write is **fail-closed**: if it fails, the request fails, because nothing may be
- * disclosed under a request id that names no request.
- *
- * The closing update is **best-effort and logged**. By then the audit trail already answers who
- * received what; only outcome and duration are missing, and they are operational metadata rather
- * than disclosure facts. Failing a request whose disclosures were correctly recorded would destroy
- * more information than it protects.
- */
 public class RequestRecordInterceptor(
-    private val table: Runtime<Table<RequestRecord>>,
-) : HttpInterceptor, WebSocketInterceptor {
-    override val name: String = "RequestRecord"
-
+    private val table: Runtime<Table<RequestRecord>>
+) : ExecutionInterceptor {
     context(runtime: ServerRuntime)
-    override suspend fun <PATH : PathSpec> intercept(
-        request: HttpRequest<PATH>,
-        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
-    ): HttpResponse {
-        val started = TimeSource.Monotonic.markNow()
-        table().insert(listOf(request.opening(endpoint = request.path.route(), method = request.path.method.toString())))
+    override suspend fun <T> intercept(cont: suspend context(ServerRuntime) () -> T): T {
+        val execution = runtime.execution
+        // we only need to record origins
+        return if (execution.origin != execution.id) cont()
+        else coroutineScope {
+            launch {
+                table().insertOne(
+                    RequestRecord(
+                        _id = RequestRecord.ID(execution.id.toExternal()),
 
-        var outcome = "failed"
-        try {
-            return cont(request).also { outcome = it.status.code.toString() }
-        } finally {
-            complete(runtime.execution.logicalId.uuid, outcome, started.elapsedNow().inWholeMilliseconds)
-        }
-    }
 
-    override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> =
-        object : DelegatingWebSocketHandler<PATH, T>(handler) {
-            @OverrideOnly
-            context(serverRuntime: ServerRuntime)
-            override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
-                table().insert(listOf(request.opening(endpoint = request.path.route(), method = "WEBSOCKET")))
-                return wrapped.willConnect(request)
+                    )
+                )
             }
-
-            @OverrideOnly
-            context(serverRuntime: ServerRuntime)
-            override suspend fun disconnect(connection: WebSocketConnection<PATH, T>, reason: WebSocketClose) {
-                try {
-                    wrapped.disconnect(connection, reason)
-                } finally {
-                    // Keyed by the socket, not this Disconnect phase, so it completes the row the Connect
-                    // phase opened. A socket's duration is its whole lifetime, which no monotonic mark
-                    // taken here could measure, so it is left to be derived from `at` and the close time.
-                    // The close code rather than the whole close, whose message and cause are not audit data.
-                    complete(serverRuntime.execution.logicalId.uuid, reason.code.code.toString(), durationMs = null)
-                }
-            }
-        }
-
-    context(runtime: ServerRuntime)
-    private suspend fun Request<*>.opening(endpoint: String, method: String) = RequestRecord(
-        _id = runtime.execution.logicalId.uuid,
-        // The parent's request row, not causedBy: when the parent is a WebSocket phase, causedBy names
-        // the phase, whose socket's row is keyed by the socket.
-        parentRequestId = runtime.history.dropLast(1).lastOrNull()?.attributedTo?.uuid,
-        rootExecutionId = runtime.execution.rootExecution.uuid,
-        principal = principalOrNull(),
-        sourceIp = sourceIp,
-        endpoint = endpoint,
-        method = method,
-        engineRequestId = engineRequestId,
-        upstreamRequestId = upstreamRequestId,
-    )
-
-    context(runtime: ServerRuntime)
-    private suspend fun complete(requestId: Uuid, outcome: String, durationMs: Long?) {
-        try {
-            table().updateOneByIdIgnoringResult(requestId, modification(RequestRecord.path) {
-                it.outcome assign outcome
-                it.durationMs assign durationMs
-            })
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            logger.error(e) { "Could not complete the audit request record for $requestId" }
+            cont()
         }
     }
 }

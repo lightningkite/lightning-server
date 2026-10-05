@@ -53,7 +53,7 @@ public class DisclosureLogInterceptor(
                 // The anchor, not this execution's own id. The request row itself for the http and
                 // websocket executions that actually disclose; anywhere else it names the request that
                 // led here rather than an id that joins to nothing.
-                requestId = runtime.execution.attributedTo.uuid,
+                requestId = runtime.execution.origin.uuid,
                 modelId = it.modelId,
                 fields0 = it.bits.fields0,
                 fields1 = it.bits.fields1,

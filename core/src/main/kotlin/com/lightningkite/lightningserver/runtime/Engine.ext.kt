@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.http.HttpHandler
 import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketTopic
+import com.lightningkite.services.data.UuidV7
 import kotlin.time.Instant
 
 /**
@@ -37,6 +38,9 @@ public operator fun <SERIALIZABLE, GOAL> ServerSetting<SERIALIZABLE, GOAL>.invok
  */
 context(server: Engine)
 public fun now(): Instant = server.clock.now()
+
+context(server: Engine)
+public fun UuidV7.Companion.generateFromServerClock(): UuidV7 = UuidV7.generateNonMonotonicAt(server.clock.now())
 
 /**
  * Provides access to the Engine instance from a context receiver.

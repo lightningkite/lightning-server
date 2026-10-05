@@ -100,12 +100,12 @@ class TaskParentageTest {
         assertEquals(2, recorded.size, "Expected both tasks to run. Got: $recorded")
 
         val first = recorded[0] as Execution.Task
-        assertEquals(requestId, first.causedBy, "The task should name the request that launched it.")
+        assertEquals(requestId, first.parent, "The task should name the request that launched it.")
         assertEquals(requestId, first.rootExecution)
         assertNotEquals(requestId, first.id, "A task is its own execution, not the request's.")
 
         val second = recorded[1] as Execution.Task
-        assertEquals(first.id, second.causedBy, "A task launched from a task names that task.")
+        assertEquals(first.id, second.parent, "A task launched from a task names that task.")
         assertEquals(
             requestId,
             second.rootExecution,

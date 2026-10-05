@@ -76,9 +76,9 @@ public fun <T : Any> MutationLog.mutationLogged(table: Table<T>): Table<T> {
         // The row that names who is responsible. Unlike `requestId` this is never null: a change
         // made inside a task carries the anchor of whatever launched it, which is the only way an
         // indirect change stays traceable to a person.
-        attributedTo = initiator.attributedTo.uuid,
+        attributedTo = initiator.origin.uuid,
         executionId = initiator.id.uuid,
-        causedBy = initiator.causedBy?.uuid,
+        causedBy = initiator.parent?.uuid,
         rootExecutionId = initiator.rootExecution.uuid,
         initiatorKind = initiator.kind(json),
         initiator = json.encodeToString(Execution.serializer(), initiator),

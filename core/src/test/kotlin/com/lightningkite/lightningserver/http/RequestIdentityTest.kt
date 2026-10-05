@@ -309,7 +309,7 @@ class RequestIdentityTest {
 
         val sub = subRecorded.single()
         assertNotEquals(outerId, sub.id)
-        assertEquals(outerId, sub.causedBy)
+        assertEquals(outerId, sub.parent)
         assertEquals(outerId, sub.rootExecution)
     }
 
@@ -327,8 +327,8 @@ class RequestIdentityTest {
 
         val (a, b) = subRecorded
         assertNotEquals(a.id, b.id)
-        assertEquals(outerId, a.causedBy)
-        assertEquals(outerId, b.causedBy)
+        assertEquals(outerId, a.parent)
+        assertEquals(outerId, b.parent)
     }
 
     @Test
@@ -341,10 +341,10 @@ class RequestIdentityTest {
         }
 
         val (nested, inner) = subRecorded
-        assertEquals(outerId, nested.causedBy)
-        assertEquals(nested.id, inner.causedBy)
+        assertEquals(outerId, nested.parent)
+        assertEquals(nested.id, inner.parent)
         assertEquals(outerId, inner.rootExecution)
-        assertNotEquals(outerId, inner.causedBy)
+        assertNotEquals(outerId, inner.parent)
     }
 
     @Test
@@ -361,7 +361,7 @@ class RequestIdentityTest {
 
         val sub = subRecorded.single()
         assertNotEquals(outerId, sub.id)
-        assertEquals(outerId, sub.causedBy)
+        assertEquals(outerId, sub.parent)
         assertEquals(listOf(sub.id), subIntercepted, "the interceptors must run inside the new execution")
     }
 }

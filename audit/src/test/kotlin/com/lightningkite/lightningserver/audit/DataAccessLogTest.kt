@@ -2,7 +2,6 @@ package com.lightningkite.lightningserver.audit
 
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
-import com.lightningkite.lightningserver.pathing.*
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.serialization.registerBasicMediaTypeCoders
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
@@ -278,6 +277,6 @@ class DataAccessLogTest {
 
         val row = logged().single()
         assertEquals(runtime.execution.id.uuid, row.executionId)
-        assertEquals(runtime.execution.attributedTo.uuid, row.requestId)
+        assertEquals(runtime.execution.origin.uuid, row.requestId)
     }
 }

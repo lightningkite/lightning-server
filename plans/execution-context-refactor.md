@@ -55,7 +55,7 @@ request. Do not "fix" `RequestRecord` to store concrete segments.
 
 ### 2.2 The initiator is serializable
 
-Required, and not merely for log convenience: it is how `causedBy` crosses a queue. When a task is
+Required, and not merely for log convenience: it is how `parent` crosses a queue. When a task is
 launched from a request, the launching `id` is serialized into the queued payload, so the
 task knows its parent with no database read. This is the only mechanism that works on serverless.
 
@@ -74,7 +74,7 @@ On AWS each of the five WebSocket lifecycle methods is a **separate Lambda invoc
 socket as one execution is therefore factually wrong. Each phase gets its own `id`; the
 socket's identity is a separate `socketId` that is constant across all phases of that socket.
 
-### 2.5 Parentage: `causedBy` plus `root`
+### 2.5 Parentage: `parent` plus `root`
 
 Three real sources of parentage, no more:
 
@@ -84,7 +84,7 @@ Three real sources of parentage, no more:
 | multiplexed WebSocket sub-sockets | no |
 | a task launched from a request | **yes** — via the serialized initiator |
 
-`causedBy` must live on `Execution` rather than only in `RequestRecord`, otherwise launching a task
+`parent` must live on `Execution` rather than only in `RequestRecord`, otherwise launching a task
 from a request could not stamp parentage without a database read.
 
 `root` is carried as well (**approved**; it originated as a recommendation rather than a
@@ -219,7 +219,7 @@ public interface ServerRuntime : Engine {
 ```
 
 Plus an implementation that is `Engine by engine`, and overrides `Task.invoke` to stamp the current
-`id` as the launched task's `causedBy` (and propagate `root`).
+`id` as the launched task's `parent` (and propagate `root`).
 
 ### 3.3 `WebSocketHandler`
 
@@ -318,7 +318,7 @@ typed socket in the repo follow.
 - Rename `ServerRuntime` → `Engine`, `ServerRuntimeBase` → `EngineBase`. **Do not touch use sites.**
 - Add the new `ServerRuntime` per 3.2 and mint it at the seam in 2.7.
 - Move genuinely engine-scoped declarations to take `Engine` (2.8).
-- `Task.invoke` stamps `causedBy` / `root`.
+- `Task.invoke` stamps `parent` / `root`.
 
 ### Stage 5 — `ExecutionInterceptor`
 

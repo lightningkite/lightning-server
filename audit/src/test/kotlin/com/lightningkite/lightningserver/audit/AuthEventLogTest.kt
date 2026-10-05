@@ -51,7 +51,7 @@ class AuthEventLogTest {
         assertEquals(AuthEventType.AuthenticationFailed, event.type)
         assertEquals("user-1", event.principal)
         assertEquals("SecretMismatch", event.failureReason)
-        assertEquals(runtime.execution.attributedTo.uuid, event.requestId)
+        assertEquals(runtime.execution.origin.uuid, event.requestId)
     }
 
     /** Events join to the same request record as the disclosures made under the resulting session. */

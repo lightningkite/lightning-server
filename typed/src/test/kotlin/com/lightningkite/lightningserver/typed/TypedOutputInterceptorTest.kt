@@ -71,7 +71,7 @@ class TypedOutputInterceptorTest {
             Observed.seen.add(
                 Seen(
                     runtime.execution.id,
-                    runtime.execution.causedBy,
+                    runtime.execution.parent,
                     serializer.descriptor.serialName,
                     value,
                 )

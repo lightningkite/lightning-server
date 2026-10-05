@@ -1,14 +1,14 @@
 package com.lightningkite.lightningserver.audit
 
 import com.lightningkite.lightningserver.auth.AuthEventType
-
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.data.Index
+import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.HasId
-import kotlinx.serialization.Serializable
+import com.lightningkite.services.database.TypedId
+import kotlin.jvm.JvmInline
 import kotlin.time.Instant
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
+import kotlinx.serialization.Serializable
 
 /**
  * One authentication event: the history that a session row's mutable state cannot provide.
@@ -39,8 +39,8 @@ import kotlin.uuid.Uuid
 @GenerateDataClassPaths
 @Serializable
 public data class AuthEventRecord(
-    override val _id: Uuid,
-    @Index val requestId: Uuid,
+    override val _id: ID,
+    @Index val requestId: RequestRecord.ID,
     @Index val type: AuthEventType,
     @Index val principal: String? = null,
     val actor: String? = null,
@@ -50,11 +50,14 @@ public data class AuthEventRecord(
     val failureReason: String? = null,
     val method: String? = null,
     val methodProperty: String? = null,
-) : HasId<Uuid> {
+) : HasId<AuthEventRecord.ID> {
+    @Serializable
+    @JvmInline
+    public value class ID(override val raw: UuidV7) : TypedId<UuidV7, ID>
+
     /** When the event happened, derived from the version-7 [_id]. See [RequestRecord]. */
-    @OptIn(ExperimentalUuidApi::class)
     public val at: Instant
-        get() = Instant.fromEpochMilliseconds(_id.epochMilliseconds)
+        get() = _id.timestamp()
 
     public companion object
 }

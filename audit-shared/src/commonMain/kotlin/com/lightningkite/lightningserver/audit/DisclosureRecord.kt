@@ -17,8 +17,8 @@ import kotlin.uuid.Uuid
 @Serializable
 public data class DisclosureRecord(
     override val _id: ID,
-    @SerialName("qid") @Index val requestId: ExecutionId,
-    @SerialName("rt") val recordType: Int,
+    @SerialName("qid") @Index val requestId: RequestRecord.ID,
+    @SerialName("rt") val recordType: ModelTypeId,
     @SerialName("rid") val recordId: Uuid,
     @SerialName("d") val disclosed: FieldIdentifierSet,
 ) : HasId<DisclosureRecord.ID> {

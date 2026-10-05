@@ -354,26 +354,6 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     }
 
     /**
-     * Validates a refresh token and returns the associated session.
-     *
-     * This method performs comprehensive validation of a refresh token:
-     * 1. Validates token format and structure
-     * 2. Checks token type matches this principal
-     * 3. Verifies the secret hash against database record
-     * 4. Checks expiration times (both hard and stale)
-     * 5. Ensures session hasn't been terminated
-     * 6. Updates session metadata (lastUsed, userAgents, ips)
-     * 7. Resets the stale time based on [sessionStaleAfter]
-     *
-     * **Security note**: This method tracks user agents and IP addresses for each session use.
-     * This provides an audit trail but also means the database is updated on every refresh
-     * token use. Consider the performance implications for high-traffic applications.
-     *
-     * @param request The HTTP request (used to extract user agent and IP for tracking)
-     * @return The validated Session, or null if token is malformed
-     * @throws UnauthorizedException if token is well-formed but invalid (wrong secret, expired, etc.)
-     */
-    /**
      * The single point every authentication rejection passes through.
      *
      * Exists so the reason is a value rather than a sentence: the auth event log
@@ -412,13 +392,27 @@ public abstract class SessionManager<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         }
     }
 
-    context(server: ServerRuntime)
     /**
-     * [request] is non-null because both call sites are request handlers; the type says so rather
-     * than leaving a branch that cannot be reached. It was nullable, which made the placeholder
-     * fallback below unreachable *and* untestable — a mutation reintroducing a literal `"test"` ip
-     * could not be killed by any test, because no caller can supply the null that would select it.
+     * Validates a refresh token and returns the associated session.
+     *
+     * This method performs comprehensive validation of a refresh token:
+     * 1. Validates token format and structure
+     * 2. Checks token type matches this principal
+     * 3. Verifies the secret hash against database record
+     * 4. Checks expiration times (both hard and stale)
+     * 5. Ensures session hasn't been terminated
+     * 6. Updates session metadata (lastUsed, userAgents, ips)
+     * 7. Resets the stale time based on [sessionStaleAfter]
+     *
+     * **Security note**: This method tracks user agents and IP addresses for each session use.
+     * This provides an audit trail but also means the database is updated on every refresh
+     * token use. Consider the performance implications for high-traffic applications.
+     *
+     * @param request The HTTP request (used to extract user agent and IP for tracking)
+     * @return The validated Session, or null if token is malformed
+     * @throws UnauthorizedException if token is well-formed but invalid (wrong secret, expired, etc.)
      */
+    context(server: ServerRuntime)
     private suspend fun RefreshToken.session(request: Request<*>): Session<SUBJECT, ID>? {
         if (!valid) {
             authFailed(AuthFailureReason.TokenMalformed, request = request)

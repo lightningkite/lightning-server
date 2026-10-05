@@ -157,8 +157,6 @@ private suspend fun reportProofEvent(
     request: Request<*>?,
     detail: String?,
 ) {
-    // Reporters must not throw (see AuthEventReporter): a rejection path is already failing, and a
-    // second failure raised here would obscure the first.
     server.server.authEventReporters.forEach {
         it.report(
             type = type,

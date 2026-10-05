@@ -2,11 +2,12 @@ package com.lightningkite.lightningserver.audit
 
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.data.Index
+import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.HasId
-import kotlinx.serialization.Serializable
+import com.lightningkite.services.database.TypedId
+import kotlin.jvm.JvmInline
 import kotlin.time.Instant
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
+import kotlinx.serialization.Serializable
 
 /** The kind of change a [MutationRecord] describes. */
 @Serializable
@@ -16,39 +17,6 @@ public enum class MutationOperation {
     Replace,
     Upsert,
     Delete,
-}
-
-/**
- * How much a bulk mutation is worth recording — the one trade in this layer that a deployment gets
- * to make.
- *
- * The `…IgnoringResult` / `…IgnoringOld` methods exist so a backend can skip reading rows it is about
- * to overwrite. That is exactly the information this log is for, so the default gives the saving up.
- */
-@Serializable
-public enum class BulkMutationDetail {
-    /**
-     * Record every changed row, whichever method the caller reached for.
-     *
-     * The `Ignoring*` calls are upgraded to their effect-returning equivalents, so an
-     * `updateManyIgnoringResult` over a large table materialises every matched row and writes a
-     * [MutationRecord] per change. That cost is accepted deliberately: a log that can be circumvented
-     * by choosing a different method on the same interface is not an audit log, it is a convention.
-     *
-     * Callers see no difference — an upgraded call returns exactly what the method it replaced would
-     * have returned.
-     */
-    RecordEveryRow,
-
-    /**
-     * Let the `Ignoring*` variants keep their cheap path, and record one summary row for the call.
-     *
-     * The escape hatch for deployments whose bulk writes are too large to pay [RecordEveryRow] for.
-     * What it gives up is the whole point of the layer for those calls: a summary row says *how many*
-     * rows changed, never *which* ones or *from what*. Prefer narrowing which models are mutation
-     * logged over turning this on globally.
-     */
-    SummaryOnly,
 }
 
 /**
@@ -98,7 +66,7 @@ public enum class BulkMutationDetail {
  *   "every mutation not made by a request" is a query rather than a scan of JSON.
  * @property initiator The whole `Execution`, serialized. Carries the endpoint, socket phase or task
  *   location that [initiatorKind] alone cannot.
- * @property modelId The audited model, from the same registry [DisclosureRecord] uses.
+ * @property modelType The audited model, from the same registry [DisclosureRecord] uses.
  * @property recordId The changed row's `_id`, as text — the models this can wrap are not all keyed by
  *   `Uuid`. Null only on a summary row, where by construction no single row is named.
  * @property old The previous value, serialized. Null for an insert, and for the inserting branch of
@@ -112,25 +80,28 @@ public enum class BulkMutationDetail {
 @GenerateDataClassPaths
 @Serializable
 public data class MutationRecord(
-    override val _id: Uuid,
-    @Index val requestId: Uuid? = null,
-    @Index val attributedTo: Uuid,
-    @Index val executionId: Uuid,
-    val causedBy: Uuid? = null,
-    @Index val rootExecutionId: Uuid,
+    override val _id: ID,
+    @Index val requestId: RequestRecord.ID? = null,
+    @Index val attributedTo: RequestRecord.ID,
+    @Index val executionId: ExecutionId,
+    val causedBy: ExecutionId? = null,
+    @Index val rootExecutionId: ExecutionId,
     @Index val initiatorKind: String,
     val initiator: String,
-    @Index val modelId: Int,
+    @Index val modelType: ModelTypeId,
     @Index val recordId: String? = null,
     val operation: MutationOperation,
     val old: String? = null,
     val new: String? = null,
     val affectedCount: Int? = null,
-) : HasId<Uuid> {
+) : HasId<MutationRecord.ID> {
+    @Serializable
+    @JvmInline
+    public value class ID(override val raw: UuidV7) : TypedId<UuidV7, ID>
+
     /** When the change happened, derived from the version-7 [_id]. See [RequestRecord] for why it lives there. */
-    @OptIn(ExperimentalUuidApi::class)
     public val at: Instant
-        get() = Instant.fromEpochMilliseconds(_id.epochMilliseconds)
+        get() = _id.timestamp()
 
     public companion object
 }

@@ -3,7 +3,6 @@ package com.lightningkite.lightningserver.runtime
 import com.lightningkite.lightningserver.HttpMethod
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.http.PathSegments
-import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.pathing.RawWebSocketPath
 import com.lightningkite.lightningserver.roundTripTest
@@ -29,7 +28,7 @@ class InitiatorTest {
     fun `every subtype survives a round trip`() {
         Execution.Http(
             id = execution,
-            causedBy = root,
+            parent = root,
             rootExecution = root,
             endpoint = RawHttpEndpoint(asString = "/users/abc", method = HttpMethod.GET),
         ).roundTripTest()
@@ -42,9 +41,9 @@ class InitiatorTest {
         ).roundTripTest()
         Execution.Task(
             id = execution,
-            causedBy = root,
+            parent = root,
             rootExecution = root,
-            attributedTo = socket,
+            origin = socket,
             location = location,
         ).roundTripTest()
         Execution.Schedule(id = execution, location = location).roundTripTest()
@@ -56,7 +55,7 @@ class InitiatorTest {
     /** Polymorphic dispatch is what makes the persisted form readable back as the right subtype. */
     @Test
     fun `a subtype survives a round trip through the sealed interface`() {
-        val initiator: Execution = Execution.Task(id = execution, causedBy = root, rootExecution = root, attributedTo = socket, location = location)
+        val initiator: Execution = Execution.Task(id = execution, parent = root, rootExecution = root, origin = socket, location = location)
         initiator.roundTripTest()
     }
 }

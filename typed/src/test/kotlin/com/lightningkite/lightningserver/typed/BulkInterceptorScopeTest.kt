@@ -26,7 +26,6 @@ import kotlinx.coroutines.runBlocking
 import java.util.Collections
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
@@ -58,7 +57,7 @@ class BulkInterceptorScopeTest {
     context(runtime: ServerRuntime)
     private fun record(into: MutableList<Seen>, request: HttpRequest<*>) {
         val initiator = runtime.execution
-        into.add(Seen("/" + request.path.pathSegments.toString(), initiator.id, initiator.causedBy))
+        into.add(Seen("/" + request.path.pathSegments.toString(), initiator.id, initiator.parent))
     }
 
     /** Takes the default scope: every logical request, sub-requests included. */

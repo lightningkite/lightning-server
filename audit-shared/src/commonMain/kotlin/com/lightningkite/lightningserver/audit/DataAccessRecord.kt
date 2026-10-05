@@ -2,11 +2,12 @@ package com.lightningkite.lightningserver.audit
 
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.data.Index
+import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.HasId
-import kotlinx.serialization.Serializable
+import com.lightningkite.services.database.TypedId
+import kotlin.jvm.JvmInline
 import kotlin.time.Instant
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
+import kotlinx.serialization.Serializable
 
 /** The kind of database operation a [DataAccessRecord] describes. */
 @Serializable
@@ -32,9 +33,6 @@ public enum class DataAccessOperation {
  * condition makes all three the same shape of evidence — a binary search appears as thousands of
  * rows whose conditions walk a value.
  *
- * Sits at the database layer rather than the typed layer precisely so it also sees the privileged
- * internal reads that never reach a user. See `plans/audit-logging.md` sections 6.1 and 6.2.
- *
  * ## The query is stored as text
  * `Condition<T>` and `Modification<T>` are serializable, but only against the model's own serializer,
  * and this one table holds rows for every audited model. A generic record type would mean a table per
@@ -52,7 +50,7 @@ public enum class DataAccessOperation {
  * @property executionId The execution that actually issued the query. Recorded alongside [requestId]
  *   because that one deliberately blurs a socket's phases together; this is what places a query at a
  *   specific message on a long-lived connection.
- * @property modelId The audited model, from the same registry [DisclosureRecord] uses.
+ * @property modelType The audited model, from the same registry [DisclosureRecord] uses.
  * @property condition The `Condition<T>` applied, serialized with the model's serializer.
  * @property sort The ordering applied, where the operation takes one. A sort is an oracle too.
  * @property modification The change applied, for write operations.
@@ -72,10 +70,10 @@ public enum class DataAccessOperation {
 @GenerateDataClassPaths
 @Serializable
 public data class DataAccessRecord(
-    override val _id: Uuid,
-    @Index val requestId: Uuid,
-    @Index val executionId: Uuid,
-    @Index val modelId: Int,
+    override val _id: ID,
+    @Index val requestId: RequestRecord.ID,
+    @Index val executionId: ExecutionId,
+    @Index val modelType: ModelTypeId,
     val operation: DataAccessOperation,
     val condition: String,
     val sort: String? = null,
@@ -85,11 +83,12 @@ public data class DataAccessRecord(
     val limit: Int? = null,
     val fields: String? = null,
     val aggregate: String? = null,
-) : HasId<Uuid> {
-    /** When the query ran, derived from the version-7 [_id]. See [RequestRecord] for why it lives there. */
-    @OptIn(ExperimentalUuidApi::class)
-    public val at: Instant
-        get() = Instant.fromEpochMilliseconds(_id.epochMilliseconds)
+) : HasId<DataAccessRecord.ID> {
+    @Serializable
+    @JvmInline
+    public value class ID(override val raw: UuidV7) : TypedId<UuidV7, ID>
 
-    public companion object
+    /** When the query ran, derived from the version-7 [_id]. See [RequestRecord] for why it lives there. */
+    public val at: Instant
+        get() = _id.timestamp()
 }

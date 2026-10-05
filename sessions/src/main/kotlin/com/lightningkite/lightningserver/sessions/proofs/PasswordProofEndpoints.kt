@@ -18,6 +18,10 @@ import com.lightningkite.lightningserver.typed.sdk.SdkModule.Companion.defaultIn
 import com.lightningkite.services.cache.Cache
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.toList
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.Month
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.builtins.serializer
 import kotlin.time.Clock
@@ -157,7 +161,7 @@ public class PasswordProofEndpoints(
                         property = "email",
                         strength = info.strength,
                         value = "test@test.com",
-                        at = Clock.System.now(),
+                        at = LocalDate(2002, Month.SEPTEMBER, 19).atStartOfDayIn(TimeZone.currentSystemDefault()),
                         expiresAt = Clock.System.now() + proofExpiration,
                         signature = "opaquesignaturevalue"
                     )
@@ -170,7 +174,7 @@ public class PasswordProofEndpoints(
                 val handler = serverRuntime.server.principalTypes.values.find { it.name == subject }
                     ?: run {
                         reportProofRejected(info, ProofFailureReason.MalformedRequest, request = request)
-                        throw IllegalArgumentException("No subject $subject recognized")
+                        throw BadRequestException("No subject $subject recognized")
                     }
                 // Normalize BEFORE building the rate-limit key: the key must be derived from the canonical
                 // identifier so that case/whitespace variants (e.g. "Bob@x.com" vs "bob@x.com ") of the same

@@ -2,10 +2,7 @@ package com.lightningkite.lightningserver.runtime
 
 import com.lightningkite.lightningserver.InternalLightningServerApi
 import com.lightningkite.lightningserver.data.SerializableCache
-import com.lightningkite.lightningserver.definition.Extendable
-import com.lightningkite.lightningserver.definition.MutableExtensions
 import com.lightningkite.lightningserver.http.PathSegments
-import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.RawHttpEndpoint
 import com.lightningkite.lightningserver.pathing.RawWebSocketPath
 import com.lightningkite.services.data.UuidV7
@@ -23,7 +20,7 @@ import kotlin.time.Instant
  * all, and threading correlation ids through request objects meant only requests could be correlated.
  *
  * ## Serializable, and deliberately small
- * Serialization is not a logging convenience: it is how [causedBy] crosses a queue. A task launched
+ * Serialization is not a logging convenience: it is how [parent] crosses a queue. A task launched
  * from a request carries the launching execution's id in its queued payload, which is the only
  * mechanism that works on a serverless engine, where the launcher's process is gone by the time the
  * task runs. That means an initiator really is persisted — into task queues and into the DynamoDB
@@ -55,13 +52,21 @@ public sealed interface Execution {
 
     /** Identifies this one execution. */
     public val id: ID
-    public val causedBy: ID?
+    public val parent: ID?
     public val rootExecution: ID
 
     /**
-     * The request or socket responsible for this execution
-     */
-    public val attributedTo: ID
+     * The *logical* ID of the last non-task execution in the chain. Or, more intuitively,
+     * the ID of the execution that conceptually 'originated' this one.
+     *
+     * This corresponds to the last execution in the chain that carried some
+     * kind of authentication, if it exists.
+     *
+     * For websockets the origin is the `socketId`, which is the ID of the connect request.
+     * For tasks the origin is the origin of whatever launched the task.
+     * For all other executions the origin is itself.
+     * */
+    public val origin: ID
 
     public val context: SerializableCache<Execution>
 
@@ -69,8 +74,8 @@ public sealed interface Execution {
 
     public sealed interface ServerManaged : Execution {
         override val rootExecution: ID get() = id
-        override val causedBy: ID? get() = null
-        override val attributedTo: ID get() = id
+        override val parent: ID? get() = null
+        override val origin: ID get() = id
     }
 
     /**
@@ -85,12 +90,12 @@ public sealed interface Execution {
     @SerialName("http")
     public data class Http @InternalLightningServerApi constructor(
         override val id: ID,
-        override val causedBy: ID? = null,
+        override val parent: ID? = null,
         override val rootExecution: ID = id,
         val endpoint: RawHttpEndpoint<*>,
         override val context: SerializableCache<Execution> = SerializableCache()
     ) : Execution, Requested {
-        override val attributedTo: ID get() = id
+        override val origin: ID get() = id
 
         @InternalLightningServerApi public constructor(
             id: ID,
@@ -98,7 +103,7 @@ public sealed interface Execution {
             endpoint: RawHttpEndpoint<*>
         ) : this(
             id,
-            causedBy = parent?.id,
+            parent = parent?.id,
             rootExecution = parent?.rootExecution ?: id,
             endpoint,
             context = parent?.context?.copy() ?: SerializableCache()
@@ -117,7 +122,7 @@ public sealed interface Execution {
     @SerialName("websocket")
     public data class WebSocket @InternalLightningServerApi constructor(
         override val id: ID,
-        override val causedBy: ID? = null,
+        override val parent: ID? = null,
         override val rootExecution: ID = id,
         /** Constant for the socket's whole lifetime, across all phases. Same id as the 'id' of the first phase. */
         val socketId: ID,
@@ -125,7 +130,7 @@ public sealed interface Execution {
         val phase: Phase,
         override val context: SerializableCache<Execution> = SerializableCache()
     ) : Execution, Requested {
-        override val attributedTo: ID get() = socketId
+        override val origin: ID get() = socketId
 
         @InternalLightningServerApi public constructor(
             id: ID,
@@ -135,7 +140,7 @@ public sealed interface Execution {
             phase: Phase
         ) : this(
             id,
-            causedBy = parent?.id,
+            parent = parent?.id,
             rootExecution = parent?.rootExecution ?: id,
             socketId,
             path,
@@ -156,11 +161,11 @@ public sealed interface Execution {
     @SerialName("task")
     public data class Task @InternalLightningServerApi constructor(
         override val id: ID,
-        override val causedBy: ID,
+        override val parent: ID,
         override val rootExecution: ID,
         // Carried rather than derived: once queued, the launcher is gone, and its causedBy alone may
         // name a phase or task with no request of its own.
-        override val attributedTo: ID,
+        override val origin: ID,
         val location: PathSegments,
         override val context: SerializableCache<Execution> = SerializableCache()
     ) : Execution {
@@ -170,9 +175,9 @@ public sealed interface Execution {
             location: PathSegments
         ) : this(
             id,
-            causedBy = parent.id,
+            parent = parent.id,
             rootExecution = parent.rootExecution,
-            attributedTo = parent.attributedTo,
+            origin = parent.origin,
             location,
             context = parent.context.copy()
         )
@@ -217,11 +222,11 @@ public sealed interface Execution {
     public data class Direct @InternalLightningServerApi constructor(
         // TODO: Require textual explanation?
         override val id: ID,
-        override val causedBy: ID? = null,
+        override val parent: ID? = null,
         override val rootExecution: ID = id,
         override val context: SerializableCache<Execution> = SerializableCache()
     ) : Execution {
-        override val attributedTo: ID get() = id
+        override val origin: ID get() = id
     }
 }
 
@@ -243,10 +248,10 @@ public val Execution.logicalId: Execution.ID get() = when (this) {
  * or pre-deploy task. False for anything dispatched inside something else: a `/meta/bulk` sub-request,
  * a virtual socket multiplexed inside a real one, a task launched by a request.
  *
- * Equivalent to `rootExecution == id`, since a [causedBy] of `null` is exactly the case where nothing
- * caused this execution to inherit another's root. [causedBy] is the more direct read.
+ * Equivalent to `rootExecution == id`, since a [parent] of `null` is exactly the case where nothing
+ * caused this execution to inherit another's root. [parent] is the more direct read.
  *
  * Interceptors use this when their concern belongs to the connection rather than to the work, since
  * the interceptor chains run for every logical request and socket.
  */
-public fun Execution.isRoot(): Boolean = causedBy == null
+public fun Execution.isRoot(): Boolean = parent == null

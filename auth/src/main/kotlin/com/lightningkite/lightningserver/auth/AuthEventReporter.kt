@@ -72,36 +72,7 @@ public interface AuthEventReporter {
     )
 }
 
-
-/**
- * The reporters installed on a server, as a registry `auth` owns rather than `core`.
- *
- * Uses the same extension mechanism as `typed`'s table registry: the key supplies a default, a merge
- * for nested modules, and a seal applied when the definition is finalised. `core` never names an
- * authentication concept.
- */
-public class AuthEventReporters private constructor(
-    private val list: MutableList<AuthEventReporter>,
-) : List<AuthEventReporter> by list {
-    public constructor() : this(mutableListOf())
-
-    internal fun register(reporter: AuthEventReporter) {
-        list += reporter
-    }
-
-    public companion object ExtensionKey :
-        MutableExtensions.WritableKey<AuthEventReporters, List<AuthEventReporter>> {
-        override fun default(): AuthEventReporters = AuthEventReporters()
-
-        override fun AuthEventReporters.include(other: List<AuthEventReporter>) {
-            other.forEach { register(it) }
-        }
-
-        override fun seal(data: List<AuthEventReporter>): List<AuthEventReporter> = data.toSealedList()
-    }
-}
-
-internal val ServerBuilder.authEventReporterRegistry: AuthEventReporters by AuthEventReporters
+private object AuthEventReporters : ListRegistryExtension<AuthEventReporter>
 
 /**
  * Every auth event reporter installed on this server. Empty when nothing records them, which is the
@@ -111,11 +82,8 @@ public val ServerDefinition.authEventReporters: List<AuthEventReporter> by AuthE
 
 /**
  * Installs [reporter] so that everything raising auth events reaches it.
- *
- * Named rather than another `install` overload because `ServerBuilder.install` is a member, and a
- * member always wins over an extension — a module calling `install(myReporter)` would silently pick
- * the wrong one.
  */
-context(builder: ServerBuilder)
-public fun <T : AuthEventReporter> installAuthEventReporter(reporter: T): T =
-    reporter.also { builder.authEventReporterRegistry.register(it) }
+public fun <T : AuthEventReporter> ServerBuilder.installAuthEventReporter(reporter: T): T {
+    extensions[AuthEventReporters].register(reporter)
+    return reporter
+}

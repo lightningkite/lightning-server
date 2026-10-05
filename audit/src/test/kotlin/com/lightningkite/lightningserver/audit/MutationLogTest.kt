@@ -546,9 +546,9 @@ class MutationLogTest {
         val root = id(701)
         val nested = Execution.Task(
             id = id(702),
-            causedBy = root,
+            parent = root,
             rootExecution = root,
-            attributedTo = root,
+            origin = root,
             location = PathSegments(listOf("task", "cleanup")),
         )
         onServer(nested) {

@@ -69,7 +69,7 @@ public fun <T : Any> DataAccessLog.dataAccessLogged(table: Table<T>): Table<T> {
         // The anchor, not this execution's own id. A query run inside a task has no request row of
         // its own, so its own id would join to nothing; `attributedTo` names the row of whoever is
         // responsible. For http and websocket executions it is their own request row.
-        requestId = initiator.attributedTo.uuid,
+        requestId = initiator.origin.uuid,
         executionId = initiator.id.uuid,
         json = runtime.internalSerialization.json,
         nowMillis = { runtime.clock.now().toEpochMilliseconds() },

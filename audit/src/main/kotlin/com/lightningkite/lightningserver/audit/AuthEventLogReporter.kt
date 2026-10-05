@@ -5,8 +5,12 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import com.lightningkite.lightningserver.auth.AuthEventReporter
 import com.lightningkite.lightningserver.auth.AuthEventType
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.generateFromServerClock
+import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.Table
 import com.lightningkite.services.database.insertOne
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -26,7 +30,6 @@ import kotlin.uuid.Uuid
  */
 private val authEventLogger = KotlinLogging.logger("com.lightningkite.lightningserver.audit.AuthEventLog")
 
-@OptIn(ExperimentalUuidApi::class)
 public class AuthEventLogReporter(
     private val table: Runtime<Table<AuthEventRecord>>,
 ) : AuthEventReporter {
@@ -45,10 +48,8 @@ public class AuthEventLogReporter(
         methodProperty: String?,
     ) {
         val record = AuthEventRecord(
-            _id = Uuid.generateV7NonMonotonicAt(runtime.clock.now()),
-            // The anchor rather than this execution's own row: an auth event raised inside a task
-            // still needs to name a person. Identical for http and websocket, which are their own.
-            requestId = runtime.execution.attributedTo.uuid,
+            _id = AuthEventRecord.ID(UuidV7.generateFromServerClock()),
+            requestId = runtime.execution.origin.uuid,
             type = type,
             principal = principal,
             actor = actor,
@@ -62,10 +63,7 @@ public class AuthEventLogReporter(
         try {
             with(runtime) { table().insertOne(record) }
         } catch (e: Exception) {
-            // Cancellation is the caller being torn down, not a sink failure. Swallowing it here
-            // would report this coroutine as having completed normally and break structured
-            // concurrency on every cancelled request.
-            if (e is kotlin.coroutines.cancellation.CancellationException) throw e
+            if (e is kotlin.coroutines.cancellation.CancellationException) currentCoroutineContext().ensureActive()
             authEventLogger.error(e) { "Failed to record auth event $type; authentication continued unrecorded." }
         }
     }
