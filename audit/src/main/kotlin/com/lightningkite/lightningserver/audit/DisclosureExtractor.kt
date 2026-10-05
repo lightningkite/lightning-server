@@ -20,7 +20,7 @@ import kotlin.uuid.Uuid
 internal data class Disclosure(
     val modelId: Int,
     val recordId: Uuid,
-    val bits: FieldBits,
+    val bits: FieldIndices,
 )
 
 /**
@@ -81,7 +81,7 @@ internal class DisclosureExtractor(private val registry: AuditRegistry) {
 
     /** The record being assembled for one audited instance. */
     private class RecordBuilder(val modelId: Int) {
-        var bits: FieldBits = FieldBits.EMPTY
+        var bits: FieldIndices = FieldIndices.EMPTY
         var recordId: Uuid? = null
     }
 
