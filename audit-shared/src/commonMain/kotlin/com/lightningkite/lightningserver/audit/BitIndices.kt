@@ -52,13 +52,14 @@ public value class BitIndices(public val mask: Int) : Set<Int> {
         return mask and (1 shl MAX_INDEX - index) != 0
     }
 
-    override fun contains(element: Int): Boolean = get(element)
+    /** Unlike [get], returns `false` for an index outside `0-31` rather than throwing. */
+    override fun contains(element: Int): Boolean = element in 0..<CAPACITY && get(element)
 
     override fun containsAll(elements: Collection<Int>): Boolean {
         var total = 0
         for (idx in elements) {
-            ensureValidIndex(idx)
-            total = total or idx
+            if (idx !in 0..<CAPACITY) return false
+            total = total or (1 shl MAX_INDEX - idx)
         }
         return (total and mask) == total
     }
@@ -76,7 +77,7 @@ public value class BitIndices(public val mask: Int) : Set<Int> {
         return arr
     }
 
-    override fun toString(): String = "BitIndices${toArray()}"
+    override fun toString(): String = joinToString(prefix = "BitIndices[", postfix = "]")
 
     public companion object {
         public const val CAPACITY: Int = 32

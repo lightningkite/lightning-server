@@ -12,10 +12,10 @@ class FieldBitsTest {
 
     @Test
     fun `a bit index lands in the column and position the layout promises`() {
-        for (index in 0 until FieldIndices.CAPACITY) {
-            val bits = FieldIndices.EMPTY + index
+        for (index in 0 until FieldIdentifierSet.CAPACITY) {
+            val bits = FieldIdentifierSet.EMPTY + index
             assertEquals(1 shl (index % 32), bits.column(index / 32), "index $index landed wrong")
-            for (other in 0 until FieldIndices.SEGMENTS) {
+            for (other in 0 until FieldIdentifierSet.SEGMENTS) {
                 if (other != index / 32) assertEquals(0, bits.column(other), "index $index leaked into column $other")
             }
         }
@@ -23,31 +23,31 @@ class FieldBitsTest {
 
     @Test
     fun `every index round-trips through the whole capacity`() {
-        val all = (0 until FieldIndices.CAPACITY).toList()
-        assertEquals(all, FieldIndices.from(all).indices())
+        val all = (0 until FieldIdentifierSet.CAPACITY).toList()
+        assertEquals(all, FieldIdentifierSet.from(all).indices())
     }
 
     @Test
     fun `contains reports exactly the indices that were added`() {
-        val bits = FieldIndices.from(listOf(0, 31, 32, 63))
+        val bits = FieldIdentifierSet.from(listOf(0, 31, 32, 63))
         listOf(0, 31, 32, 63).forEach { assertTrue(it in bits, "$it should be present") }
         listOf(1, 30, 33, 62).forEach { assertFalse(it in bits, "$it should be absent") }
     }
 
     @Test
     fun `union merges every column`() {
-        val merged = FieldIndices.from(listOf(1, 40)) + FieldIndices.from(listOf(7, 60))
+        val merged = FieldIdentifierSet.from(listOf(1, 40)) + FieldIdentifierSet.from(listOf(7, 60))
         assertEquals(listOf(1, 7, 40, 60), merged.indices())
     }
 
     @Test
     fun `an index outside the capacity is rejected rather than silently wrapping`() {
-        assertFailsWith<IllegalArgumentException> { FieldIndices.EMPTY + FieldIndices.CAPACITY }
-        assertFailsWith<IllegalArgumentException> { FieldIndices.EMPTY + -1 }
+        assertFailsWith<IllegalArgumentException> { FieldIdentifierSet.EMPTY + FieldIdentifierSet.CAPACITY }
+        assertFailsWith<IllegalArgumentException> { FieldIdentifierSet.EMPTY + -1 }
     }
 
     private fun record(vararg indices: Int): DisclosureRecord {
-        val bits = FieldIndices.from(indices.toList())
+        val bits = FieldIdentifierSet.from(indices.toList())
         return DisclosureRecord(
             _id = Uuid.NIL,
             requestId = Uuid.NIL,

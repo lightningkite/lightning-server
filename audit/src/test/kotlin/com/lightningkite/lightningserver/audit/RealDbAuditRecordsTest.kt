@@ -205,7 +205,7 @@ class RealDbAuditRecordsTest {
         val modelId = 900
 
         fun disclosure(vararg indices: Int): DisclosureRecord {
-            val bits = FieldIndices.from(indices.toList())
+            val bits = FieldIdentifierSet.from(indices.toList())
             return DisclosureRecord(
                 _id = Uuid.random(),
                 requestId = Uuid.random(),

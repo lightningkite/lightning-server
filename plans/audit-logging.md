@@ -540,7 +540,7 @@ There are no `Long`, `ULong`, or `ByteArray` equivalents. A `ULong` or `ByteArra
 **storable but not queryable** — "which requests disclosed the SSN field?" would require a full scan
 and client-side filtering, which is unusable at audit-table volume.
 
-Layout: bit index `i` lives in column `i / 32` at bit `i % 32`. `FieldIndices` owns this arithmetic;
+Layout: bit index `i` lives in column `i / 32` at bit `i % 32`. `FieldIdentifierSet` owns this arithmetic;
 `disclosedAll(indices)` and `disclosedAny(indices)` build one condition per column touched and
 combine them with `And` / `Or`.
 
@@ -569,7 +569,7 @@ The in-memory `invoke()` implementations were correct, so any test running again
 table passed while the real database returned different rows. The fix shipped with conformance tests
 that run the full truth table against **each real engine**.
 
-**Round two — the sign bit.** Found while testing `FieldIndices`, and *not* catchable by round one's
+**Round two — the sign bit.** Found while testing `FieldIdentifierSet`, and *not* catchable by round one's
 tests, because those compare each engine against the in-memory reference and the reference itself
 was wrong:
 

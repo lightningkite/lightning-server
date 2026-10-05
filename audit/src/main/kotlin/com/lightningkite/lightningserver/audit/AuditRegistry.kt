@@ -138,9 +138,9 @@ internal suspend fun reconcileAuditRegistry(
         var nextBit = (assigned.maxOfOrNull { it.bitIndex } ?: -1) + 1
 
         descriptor.auditFieldPaths().filter { it !in byPath }.map { path ->
-            if (nextBit >= FieldIndices.CAPACITY) throw IllegalStateException(
+            if (nextBit >= FieldIdentifierSet.CAPACITY) throw IllegalStateException(
                 "Audited model \"$serialName\" has run out of field bits at \"$path\": " +
-                    "${assigned.size} of ${FieldIndices.CAPACITY} are already assigned. Indices are never " +
+                    "${assigned.size} of ${FieldIdentifierSet.CAPACITY} are already assigned. Indices are never " +
                     "reused, so renamed and removed fields still hold theirs. Remove @Audited from " +
                     "properties that do not need itemising, or mark a nested entity type @Audited so " +
                     "it becomes its own disclosure record."
@@ -172,9 +172,9 @@ private fun warnOnLowCapacity(
     val total = existing.mapValues { it.value.size }.toMutableMap()
     added.groupBy { it.modelId }.forEach { (modelId, rows) -> total[modelId] = total.getOrElse(modelId) { 0 } + rows.size }
     val names = modelIds.entries.associate { it.value to it.key }
-    total.filter { it.value >= FieldIndices.CAPACITY * 3 / 4 }.forEach { (modelId, used) ->
+    total.filter { it.value >= FieldIdentifierSet.CAPACITY * 3 / 4 }.forEach { (modelId, used) ->
         logger.warn {
-            "Audited model \"${names[modelId] ?: modelId}\" has used $used of ${FieldIndices.CAPACITY} " +
+            "Audited model \"${names[modelId] ?: modelId}\" has used $used of ${FieldIdentifierSet.CAPACITY} " +
                 "field bits. Indices are never reused, so this only grows."
         }
     }
