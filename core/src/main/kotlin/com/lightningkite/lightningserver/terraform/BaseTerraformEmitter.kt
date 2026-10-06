@@ -343,23 +343,21 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
     /**
      * Performs a complete deployment workflow:
      * 1. `terraform init` - Initialize Terraform and download providers
-     * 2. `terraform plan` - Show planned changes
-     * 3. Wait for user confirmation (press enter)
-     * 4. `terraform apply` - Apply the changes to cloud infrastructure
+     * 2. `terraform apply` - Show planned changes, wait for the user to type `yes` (unless [autoApprove]),
+     *    then apply them to cloud infrastructure
      *
      * This is the primary method for deploying your server to cloud infrastructure.
+     *
+     * The plan is never saved to a file: a saved plan holds sensitive values in plaintext. Terraform keeps it
+     * in memory and holds the state lock while waiting for approval, so exactly the approved plan is applied.
+     * Declining the prompt makes terraform exit non-zero, which throws.
      */
     public open fun deploy(autoApprove: Boolean = false) {
         println("Initializing...")
         terraform("init", "-upgrade", "-input=false", "-no-color")
-        println("Planning...")
-        terraform("plan", "-input=false", "-no-color", "-out=plan.tfplan")
-        if (!autoApprove) {
-            println("Press enter to continue with plan...")
-            readln()
-        }
         println("Applying...")
-        terraform("apply", "-input=false", "-auto-approve", "-no-color", "plan.tfplan")
+        if (autoApprove) terraform("apply", "-input=false", "-auto-approve", "-no-color")
+        else terraform("apply", "-no-color")
         println("Deployed!")
     }
 
@@ -369,13 +367,13 @@ public abstract class BaseTerraformEmitter<S : ServerBuilder> : TerraformEmitter
         println("/!\\ STOP! /!\\")
         println("You are about to destroy all of the infrastructure related to the ${projectPrefix} deployment.")
         println("If you are SURE you want to proceed, please enter 'destroy ${projectPrefix}'.")
-        if (readLine() != "destroy $projectPrefix") {
+        if (readlnOrNull() != "destroy $projectPrefix") {
             println("That didn't match.  Bailing out...")
             return
         }
         println("Destroying...")
-        terraform("destroy", "-input=false", "-auto-approve", "-no-color", "plan.tfplan")
-        println("Deployed!")
+        terraform("destroy", "-input=false", "-auto-approve", "-no-color")
+        println("Destroyed!")
     }
 
     /**

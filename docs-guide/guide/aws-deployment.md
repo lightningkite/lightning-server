@@ -328,16 +328,16 @@ with `byVariable()`.  Values are stored in the `EncryptedFileSecretSource` (or
 object ProductionDeploy {
     @JvmStatic fun main(vararg args: String) {
         ProcessBuilder("./gradlew", "your-module:lambda").inheritIO().start().waitFor()
-        Production.deploy()              // init → plan → prompt → apply
+        Production.deploy()              // init → apply (shows plan, asks for 'yes')
     }
 }
 ```
 
 `deploy()` calls, in order:
 1. `terraform init -upgrade` — downloads providers.
-2. `terraform plan -out=plan.tfplan` — shows what will change.
-3. Waits for you to press Enter (pass `autoApprove = true` to skip).
-4. `terraform apply plan.tfplan` — applies.
+2. `terraform apply` — shows what will change, waits for you to type `yes`
+   (pass `autoApprove = true` to skip), then applies. The plan is never saved
+   to a file, since a saved plan holds secrets in plaintext.
 
 On subsequent deploys, only the Lambda ZIP changes if no infrastructure changed.
 
