@@ -359,7 +359,6 @@ A minimal deployment (one Lambda, no custom domain) produces:
 | `aws_sns_topic.emergency` | Alerts topic (email subscription to `emergencyContact`) |
 | `aws_cloudwatch_metric_alarm.*` | Cost and error alarms |
 | `random_password.settings` | 32-char password used to AES-encrypt `settings.json` |
-| `local_sensitive_file.settings_raw` | The assembled `settings.json` before encryption |
 
 Adding `TerraformAwsServerlessDomainBuilder` adds ACM certificates, Route 53
 records, and API Gateway custom domain mappings.

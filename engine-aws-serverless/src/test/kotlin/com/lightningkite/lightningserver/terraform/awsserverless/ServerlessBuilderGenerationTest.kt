@@ -80,10 +80,7 @@ class ServerlessBuilderGenerationTest {
         this["provisioner"]!!.jsonObject["local-exec"]!!.let { it as? JsonArray ?: JsonArray(listOf(it)) }
             .map { it.jsonObject }
 
-    private fun String.isCleanup(): Boolean = contains("rm -f") || contains("Remove-Item")
-
     @Test
-    @Ignore("Feature to be added later")
     fun settingsNeverLandOnDiskInPlaintext() {
         val d = Deployment()
         d.write()
@@ -92,57 +89,50 @@ class ServerlessBuilderGenerationTest {
             d.terraformRoot.resourceTypes().contains("local_sensitive_file"),
             "local_sensitive_file must not be emitted; it wrote settings to disk in cleartext",
         )
-        // The only surviving mentions of the old plaintext paths are the commands that delete them.
         d.terraformRoot.allStrings().filter { it.contains("raw-settings.json") }.forEach {
-            assertTrue(it.isCleanup(), "raw-settings.json referenced outside a cleanup command: $it")
+            fail("raw-settings.json must not be referenced: $it")
         }
 
-        val steps = d.terraformRoot.findResource("null_resource", "lambda_jar_source")!!.localExecSteps()
-        // Settings reach the shell through the environment, not a tracked file.
-        assertTrue(
-            steps.any { it["environment"]?.jsonObject?.containsKey("SETTINGS_JSON") == true },
-            "the encryption chain must pass the settings via a SETTINGS_JSON environment variable",
+        val encrypt = d.terraformRoot.findResource("null_resource", "lambda_jar_source")!!.localExecSteps()
+            .single { it["command"]!!.jsonPrimitive.content.contains("openssl enc -aes-256-cbc") }
+        // Settings reach openssl through the environment and a pipe, never a file.
+        assertEquals(
+            "\${jsonencode(local.settings_raw)}",
+            encrypt["environment"]!!.jsonObject["SETTINGS_JSON"]!!.jsonPrimitive.content,
         )
-        // ...and the scratch file openssl reads is shredded in the same chain.
-        assertTrue(
-            steps.any { it["command"]!!.jsonPrimitive.content.let { c -> c.isCleanup() && c.contains("build/settings-plain.json") } },
-            "the encryption chain must remove build/settings-plain.json after encrypting",
-        )
+        val command = encrypt["command"]!!.jsonPrimitive.content
+        assertContains(command, "\$env:SETTINGS_JSON | openssl enc")
+        assertContains(command, "printf '%s' \\\"\$SETTINGS_JSON\\\" | openssl enc")
+        assertFalse(command.contains(" -in "), "the encryption must read the settings from stdin: $command")
     }
 
+    /** The package is rebuilt, and so re-encrypted, whenever the settings change. */
     @Test
-    @Ignore("Feature to be added later")
-    fun settingsRereadDiscardsDecryptedOutput() {
+    fun settingsChangesRetriggerEncryption() {
         val d = Deployment()
         d.write()
-        val command = d.terraformRoot.findResource("null_resource", "settings_reread")!!
-            .localExecSteps().single()["command"]!!.jsonPrimitive.content
-        // The decryption is a proof the bundle opens, not a way to get the plaintext back.
-        assertContains(command, "/dev/null")
-        assertContains(command, "NUL")
-        assertFalse(command.contains(".decrypted.json"), "settings_reread must not write a decrypted dump: $command")
+        val jar = d.terraformRoot.findResource("null_resource", "lambda_jar_source")!!["triggers"]!!.jsonObject
+        assertEquals("\${sha256(jsonencode(local.settings_raw))}", jar["settingsHash"]!!.jsonPrimitive.content)
     }
 
     /**
-     * The shred must live in the *same* command as the encryption.  Terraform abandons the rest of a
-     * provisioner chain as soon as one step fails, so splitting them back into separate steps would
-     * silently reintroduce the leak on exactly the openssl failure that strands the plaintext.
+     * A missing build directory (fresh checkout, or deleted) must rebuild the package: the marker file
+     * creates build/ for the copy, and recreating it changes the package trigger, which defers the
+     * archive read until the package exists.
      */
     @Test
-    @Ignore("Feature to be added later")
-    fun shredShareIsAtomicWithEncryption() {
+    fun missingBuildDirectoryRebuildsPackage() {
         val d = Deployment()
         d.write()
-        val encryptSteps = d.terraformRoot.findResource("null_resource", "lambda_jar_source")!!.localExecSteps()
-            .map { it["command"]!!.jsonPrimitive.content }
-            .filter { it.contains("openssl enc -aes-256-cbc") }
-        assertTrue(encryptSteps.isNotEmpty(), "expected an encryption step")
-        encryptSteps.forEach {
-            assertTrue(
-                it.contains("trap ") && it.contains("finally"),
-                "the encrypting command must delete the plaintext on every exit path: $it",
-            )
+        val marker = d.terraformRoot.findResource("local_file", "lambda_package_marker")!!
+        assertEquals("\${path.module}/build/.lambda-package", marker["filename"]!!.jsonPrimitive.content)
+        val jar = d.terraformRoot.findResource("null_resource", "lambda_jar_source")!!["triggers"]!!.jsonObject
+        assertEquals("\${local_file.lambda_package_marker.id}", jar["packageMarker"]!!.jsonPrimitive.content)
+        // The marker sits beside the package, not inside it: the package step wipes build/lambda.
+        val archive = d.terraformRoot.listFiles { f -> f.name.endsWith(".tf.json") }!!.firstNotNullOf {
+            (Json.parseToJsonElement(it.readText()).jsonObject["data"] as? JsonObject)?.get("archive_file")?.jsonObject?.get("lambda")?.jsonObject
         }
+        assertEquals("\${path.module}/build/lambda", archive["source_dir"]!!.jsonPrimitive.content)
     }
 
 }

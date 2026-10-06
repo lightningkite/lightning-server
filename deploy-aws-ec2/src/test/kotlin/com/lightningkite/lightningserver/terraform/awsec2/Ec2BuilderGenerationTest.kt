@@ -524,7 +524,22 @@ class Ec2BuilderGenerationTest {
         assertNull(upload["settings_hash"])
         // Encryption and on-instance decryption use the same cipher arguments.
         val terraform = d.terraformRoot.listFiles { f -> f.name.endsWith(".tf.json") }!!.joinToString("\n") { it.readText() }
-        assertContains(terraform, "openssl enc $cipherArgs -in")
+        assertContains(terraform, "openssl enc $cipherArgs -out")
         assertContains(File(d.terraformRoot, "ec2_init.sh").readText(), "openssl enc -d $cipherArgs")
+    }
+
+    @Test
+    fun settingsNeverLandOnDiskBeforeEncryption() {
+        val d = SingleDeployment()
+        d.write()
+        val terraform = d.terraformRoot.listFiles { f -> f.name.endsWith(".tf.json") }!!.joinToString("\n") { it.readText() }
+        assertFalse(terraform.contains("raw-settings.json"), "the plaintext settings file must not be written")
+        assertEquals("\${sha256(jsonencode(local.settings_raw))}", d.terraformRoot.triggersOf("encrypt_settings")["settings_hash"]!!.jsonPrimitive.content)
+        // Settings reach openssl through the environment and a pipe, never a file.
+        val exec = d.terraformRoot.findResource("null_resource", "encrypt_settings")!!["provisioner"]!!.jsonObject["local-exec"]!!.jsonObject
+        assertEquals("\${jsonencode(local.settings_raw)}", exec["environment"]!!.jsonObject["SETTINGS_JSON"]!!.jsonPrimitive.content)
+        assertContains(exec["command"]!!.jsonPrimitive.content, "printf '%s' \"\$SETTINGS_JSON\" | openssl enc $cipherArgs -out")
+        // The pipe needs a real shell; local-exec would otherwise use cmd on Windows.
+        assertEquals(listOf("bash", "-c"), exec["interpreter"]!!.jsonArray.map { it.jsonPrimitive.content })
     }
 }

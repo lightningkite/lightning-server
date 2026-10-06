@@ -211,7 +211,6 @@ custom domain) produces:
 | `aws_apigatewayv2_api.ws` | WebSocket API Gateway (connect/disconnect/default → Lambda) |
 | `aws_cloudwatch_log_group.main` | Lambda log group (30-day retention) |
 | `random_password.settings` | 32-char AES key for `settings.enc` |
-| `local_sensitive_file.settings_raw` | Assembled `settings.json` before encryption |
 | `aws_sns_topic.emergency` | Alerts topic (email → `emergencyContact`) |
 | `aws_cloudwatch_metric_alarm.*` | Spend alarms (compute-seconds per month) |
 
@@ -264,7 +263,7 @@ Both EC2 builders use the same settings pipeline:
 settings map (Kotlin)
      │ fulfillSetting() calls in settings()
      ▼
-local_sensitive_file.settings_raw    ← plaintext JSON on your machine during apply
+local.settings_raw                   ← plaintext JSON only in Terraform memory; piped to openssl
      │ null_resource.encrypt_settings (openssl enc -aes-256-cbc -pbkdf2 -iter 100000)
      ▼
 build/settings.enc                   ← AES-256 encrypted
