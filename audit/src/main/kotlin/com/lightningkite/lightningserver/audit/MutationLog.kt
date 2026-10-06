@@ -72,19 +72,24 @@ public fun <T : Any> MutationLog.mutationLogged(table: Table<T>): Table<T> {
         modelId = { registry.await().modelId(serialName) },
         // Exactly where a request record exists: a task or schedule tick is not part of a request,
         // so this is null rather than an id that joins to nothing.
-        requestId = (initiator as? Execution.Requested)?.logicalId?.uuid,
+        requestId = (initiator as? Execution.Requested)?.logicalId?.let { OriginRecord.ID(it.toExternal()) },
         // The row that names who is responsible. Unlike `requestId` this is never null: a change
         // made inside a task carries the anchor of whatever launched it, which is the only way an
         // indirect change stays traceable to a person.
-        attributedTo = initiator.origin.uuid,
-        executionId = initiator.id.uuid,
-        causedBy = initiator.parent?.uuid,
-        rootExecutionId = initiator.rootExecution.uuid,
+        attributedTo = OriginRecord.ID(initiator.origin.toExternal()),
+        executionId = initiator.id.toExternal(),
+        causedBy = initiator.parent?.toExternal(),
+        rootExecutionId = initiator.rootExecution.toExternal(),
         initiatorKind = initiator.kind(json),
         initiator = json.encodeToString(Execution.serializer(), initiator),
         json = json,
         nowMillis = { runtime.clock.now().toEpochMilliseconds() },
-        write = { with(runtime) { mutations().insertOne(it) } },
+        write = {
+            with(runtime) {
+                origins.ensureRecorded()
+                mutations().insertOne(it)
+            }
+        },
         bulkDetail = bulkDetail,
     )
 }

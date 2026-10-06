@@ -526,10 +526,10 @@ class ProofAuthEventWiringTest {
         engine.handleRoot(post("/pin/send-link", "\"victim@example.com\""), testId(21))
 
         val event = events().single()
-        assertEquals(testId(21).uuid, event.requestId)
+        assertEquals(testId(21).originId, event.requestId)
         val requests = TestServer.audit.requests().find(Condition.Always).toList()
-        val row = requests.singleOrNull { it._id == testId(21).uuid }
-        assertEquals("203.0.113.7", row?.sourceIp, "the issuance points at no request record")
+        val row = requests.singleOrNull { it._id == testId(21).originId }
+        assertEquals("203.0.113.7", row?.request?.sourceIp, "the issuance points at no request record")
     }
 
     /**

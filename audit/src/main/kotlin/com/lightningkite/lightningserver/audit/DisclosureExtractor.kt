@@ -81,7 +81,7 @@ internal class DisclosureExtractor(private val registry: AuditRegistry) {
 
     /** The record being assembled for one audited instance. */
     private class RecordBuilder(val modelId: Int) {
-        var bits: FieldIdentifierSet = FieldIdentifierSet.EMPTY
+        var bits: FieldIdentifierSet = fieldIndicesOf()
         var recordId: Uuid? = null
     }
 
@@ -171,7 +171,7 @@ internal class DisclosureExtractor(private val registry: AuditRegistry) {
             if (index < 0 || index >= plan.bitIndexes.size) return
             val bit = plan.bitIndexes[index]
             if (bit == NO_BIT) return
-            frame.record?.let { it.bits += bit }
+            frame.record?.let { it.bits += fieldIndicesOf(bit) }
         }
 
         /**

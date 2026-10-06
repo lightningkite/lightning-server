@@ -63,7 +63,7 @@ class DisclosureExtractorTest {
         /** The disclosed field paths of one disclosure, resolved back through the registry. */
         fun paths(disclosure: Disclosure): Set<String> {
             val byBit = registry.fields(disclosure.modelId).entries.associate { it.value to it.key }
-            return disclosure.bits.indices().map { byBit.getValue(it) }.toSet()
+            return disclosure.bits.map { byBit.getValue(it) }.toSet()
         }
 
         fun modelIdOf(serializer: KSerializer<*>): Int = registry.modelId(serializer.descriptor.serialName)

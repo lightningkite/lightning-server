@@ -1,5 +1,8 @@
 package com.lightningkite.lightningserver.audit
 
+import com.lightningkite.lightningserver.websockets.WebSocketInterceptor
+import com.lightningkite.lightningserver.http.HttpInterceptor
+import com.lightningkite.lightningserver.runtime.ExecutionInterceptor
 import com.lightningkite.lightningserver.definition.PreDeployTask
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
@@ -103,8 +106,13 @@ public class AuditCore(
         )
     }
 
+    internal val origins: OriginRecordInterceptor = OriginRecordInterceptor(requests)
+
     init {
-        install(OriginRecordInterceptor(requests))
+        // It is all three kinds of interceptor, so each registration is named explicitly.
+        install<ExecutionInterceptor>(origins)
+        install<HttpInterceptor>(origins)
+        install<WebSocketInterceptor>(origins)
     }
 }
 

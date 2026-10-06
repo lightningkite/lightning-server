@@ -281,7 +281,7 @@ class SerializableCacheTest {
     }
 
     @Test
-    fun testConcurrentGetOrPutAgreesOnOneValue() {
+    fun testConcurrentGetOrPutRunsOnce() {
         TestServer.test(
             settings = { generalSettings set GeneralServerSettings() }
         ) {
@@ -294,6 +294,7 @@ class SerializableCacheTest {
                     (1..200).map { async(Dispatchers.Default) { cache.getOrPut(key) { next.incrementAndGet() } } }
                         .awaitAll()
                 }
+                assertEquals(1, next.get())
                 assertEquals(1, results.toSet().size, "callers disagreed: ${results.toSet()}")
                 assertEquals(results.first(), cache[key])
                 // The bytes must match the in-memory value, or a persisted copy would disagree with this one.

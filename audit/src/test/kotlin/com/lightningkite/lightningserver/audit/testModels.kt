@@ -211,3 +211,15 @@ data class PlainThing(override val _id: Uuid, val value: String) : HasId<Uuid>
 @Serializable
 @GenerateDataClassPaths
 data class PatientWrapper(override val _id: Uuid, val patient: Patient) : HasId<Uuid>
+
+/** The [OriginRecord] id that audit records made under this execution's origin join to. */
+internal val com.lightningkite.lightningserver.runtime.Execution.ID.originId: OriginRecord.ID
+    get() = OriginRecord.ID(toExternal())
+
+/** The route part of [OriginRecord.location], e.g. `/meta/bulk` for `POST /meta/bulk`. */
+internal val OriginRecord.endpoint: String
+    get() = location.substringAfter(' ')
+
+// SAFETY: Freshly generated v7, standing in for an execution that was never run.
+@OptIn(com.lightningkite.services.data.Unsafe::class)
+internal fun randomExecutionId(): ExecutionId = ExecutionId(com.lightningkite.services.data.UuidV7.generate())

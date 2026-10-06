@@ -19,176 +19,138 @@ import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketInterceptor
 import com.lightningkite.services.database.Table
-import com.lightningkite.services.database.insertOne
+import com.lightningkite.services.database.condition
+import com.lightningkite.services.database.eq
+import com.lightningkite.services.database.modification
+import com.lightningkite.lightningserver.data.SerializableCache
+import com.lightningkite.lightningserver.runtime.isRoot
+import kotlinx.serialization.Serializable
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.launch
+import kotlinx.serialization.KSerializer
 
-private val logger = KotlinLogging.logger("com.lightningkite.lightningserver.audit.RequestRecordInterceptor")
-//
-///**
-// * Writes the [RequestRecord] that every [DisclosureRecord] of this request refers to.
-// *
-// * Logical scope, so each sub-request of a multiplexed request gets its own row — otherwise a bulk
-// * request would record one row no matter how much was disclosed inside it.
-// *
-// * ## Two writes, and why they fail differently
-// *
-// * The row is written **before** the handler runs and updated **after** it finishes, because outcome
-// * and duration are not known until the end while disclosures are written throughout. Writing first
-// * guarantees the referent exists before anything points at it, and the same shape works for a
-// * WebSocket, whose connection is recorded at connect and updated at close.
-// *
-// * The opening write is **fail-closed**: if it fails, the request fails, because nothing may be
-// * disclosed under a request id that names no request.
-// *
-// * The closing update is **best-effort and logged**. By then the audit trail already answers who
-// * received what; only outcome and duration are missing, and they are operational metadata rather
-// * than disclosure facts. Failing a request whose disclosures were correctly recorded would destroy
-// * more information than it protects.
-// */
-//public class RequestRecordInterceptor(
-//    private val table: Runtime<Table<RequestRecord>>,
-//) : HttpInterceptor, WebSocketInterceptor {
-//    override val name: String = "RequestRecord"
-//
-//    context(runtime: ServerRuntime)
-//    override suspend fun <PATH : PathSpec> intercept(
-//        request: HttpRequest<PATH>,
-//        cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse,
-//    ): HttpResponse {
-//        val started = TimeSource.Monotonic.markNow()
-//        table().insert(listOf(request.opening(endpoint = request.path.route(), method = request.path.method.toString())))
-//
-//        var outcome = "failed"
-//        try {
-//            return cont(request).also { outcome = it.status.code.toString() }
-//        } finally {
-//            complete(runtime.execution.logicalId.uuid, outcome, started.elapsedNow().inWholeMilliseconds)
-//        }
-//    }
-//
-//    override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> =
-//        object : DelegatingWebSocketHandler<PATH, T>(handler) {
-//            @OverrideOnly
-//            context(serverRuntime: ServerRuntime)
-//            override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
-//                table().insert(listOf(request.opening(endpoint = request.path.route(), method = "WEBSOCKET")))
-//                return wrapped.willConnect(request)
-//            }
-//
-//            @OverrideOnly
-//            context(serverRuntime: ServerRuntime)
-//            override suspend fun disconnect(connection: WebSocketConnection<PATH, T>, reason: WebSocketClose) {
-//                try {
-//                    wrapped.disconnect(connection, reason)
-//                } finally {
-//                    // Keyed by the socket, not this Disconnect phase, so it completes the row the Connect
-//                    // phase opened. A socket's duration is its whole lifetime, which no monotonic mark
-//                    // taken here could measure, so it is left to be derived from `at` and the close time.
-//                    // The close code rather than the whole close, whose message and cause are not audit data.
-//                    complete(serverRuntime.execution.logicalId.uuid, reason.code.code.toString(), durationMs = null)
-//                }
-//            }
-//        }
-//
-//    context(runtime: ServerRuntime)
-//    private suspend fun Request<*>.opening(endpoint: String, method: String) = RequestRecord(
-//        _id = runtime.execution.logicalId.uuid,
-//        // The parent's request row, not causedBy: when the parent is a WebSocket phase, causedBy names
-//        // the phase, whose socket's row is keyed by the socket.
-//        parentRequestId = runtime.history.dropLast(1).lastOrNull()?.origin?.uuid,
-//        rootExecutionId = runtime.execution.rootExecution.uuid,
-//        principal = principalOrNull(),
-//        sourceIp = sourceIp,
-//        endpoint = endpoint,
-//        method = method,
-//        engineRequestId = engineRequestId,
-//        upstreamRequestId = upstreamRequestId,
-//    )
-//
-//    context(runtime: ServerRuntime)
-//    private suspend fun complete(requestId: Uuid, outcome: String, durationMs: Long?) {
-//        try {
-//            table().updateOneByIdIgnoringResult(requestId, modification(RequestRecord.path) {
-//                it.outcome assign outcome
-//                it.durationMs assign durationMs
-//            })
-//        } catch (e: CancellationException) {
-//            throw e
-//        } catch (e: Exception) {
-//            logger.error(e) { "Could not complete the audit request record for $requestId" }
-//        }
-//    }
-//}
-//
-
+/**
+ * Records the [OriginRecord] that other audit records reference, the first time one is needed.
+ *
+ * An execution that touches nothing audited writes no origin row.
+ */
 public class OriginRecordInterceptor(
     private val table: Runtime<Table<OriginRecord>>
 ) : ExecutionInterceptor, WebSocketInterceptor, HttpInterceptor {
     override val name: String = "OriginRecordInterceptor"
 
-    private fun Execution.isOrigin() = origin == id
+    /**
+     * The origins an execution has yet to record, and the ones already recorded.
+     *
+     * Carried in the execution's context, so child executions and tasks inherit it.
+     */
+    @Serializable
+    private data class AuditOrigins(
+        val pending: List<OriginRecord> = emptyList(),
+        val recorded: Set<ExecutionId> = emptySet(),
+    ) {
+        companion object : SerializableCache.Key<Execution, AuditOrigins> {
+            override val id: String = "com.lightningkite.lightningserver.audit.OriginRecordInterceptor"
+            override val serializer: KSerializer<AuditOrigins> = serializer()
+        }
+    }
+
+    /**
+     * Records every origin this execution descends from that is not yet recorded.
+     *
+     * Call before writing any audit record that references the execution's origin.
+     *
+     * @throws IllegalStateException if the execution's origin was never captured.
+     */
+    context(runtime: ServerRuntime)
+    internal suspend fun ensureRecorded() {
+        val execution = runtime.execution
+        val origins = execution.context[AuditOrigins] ?: AuditOrigins()
+        var recorded = origins.recorded
+        if (origins.pending.isNotEmpty()) {
+            for (row in origins.pending) {
+                table().upsertOneIgnoringResult(
+                    condition<OriginRecord> { it._id eq row._id },
+                    modification<OriginRecord> { it.kind assign row.kind },
+                    row,
+                )
+            }
+            recorded = recorded + origins.pending.map { it._id.raw }
+            execution.context[AuditOrigins] = AuditOrigins(pending = emptyList(), recorded = recorded)
+        }
+        check(execution.origin.toExternal() in recorded) {
+            "Execution ${execution.id} has no captured origin, so its audit records would reference nothing."
+        }
+    }
 
     context(runtime: ServerRuntime)
-    private suspend fun record(request: Request<*>?) {
+    private suspend fun Execution.recordOrigin(request: Request<*>?) {
         val execution = runtime.execution
-        table().insertOne(
-            OriginRecord(
-                _id = OriginRecord.ID(execution.id.toExternal()),
-                parent = execution.parent?.toExternal(),
-                root = execution.rootExecution.toExternal(),
-                kind = when (execution) {
-                    is Execution.Direct -> OriginRecord.ExecutionKind.Direct
-                    is Execution.Http -> OriginRecord.ExecutionKind.Http
-                    is Execution.PreDeploy -> OriginRecord.ExecutionKind.PreDeploy
-                    is Execution.WebSocket -> OriginRecord.ExecutionKind.WebSocket
-                    is Execution.Schedule -> OriginRecord.ExecutionKind.Schedule
-                    is Execution.Startup -> OriginRecord.ExecutionKind.Startup
-                    is Execution.Task -> OriginRecord.ExecutionKind.Task
-                },
-                location = when (execution) {
-                    is Execution.Direct -> ""
-                    is Execution.Http -> "${execution.endpoint.method} ${execution.endpoint.route()}"
-                    is Execution.WebSocket -> execution.path.route()
-                    is Execution.PreDeploy -> execution.location.toString()
-                    is Execution.Schedule -> execution.location.toString()
-                    is Execution.Startup -> execution.location.toString()
-                    is Execution.Task -> execution.location.toString()
-                },
-                request = request?.let {
-                    val auth = try {
-                        request[Authentication.CacheKey]?.let { it.fromMasquerade ?: it }
-                    } catch (e: Exception) {
-                        currentCoroutineContext().ensureActive()
-                        runtime.logger.error(e) { "Could not determine auth of request for origin recording" }
-                        null
-                    }
-                    OriginRecord.RequestInfo(
-                        principal = auth?.principalName,
-                        subjectId = auth?.rawId,
-                        sessionId = auth?.sessionId,
-                        sourceIp = request.sourceIp,
-                        engineRequestId = request.engineRequestId,
-                        upstreamRequestId = request.upstreamRequestId
-                    )
+        val row = OriginRecord(
+            _id = OriginRecord.ID(execution.id.toExternal()),
+            parent = execution.parent?.toExternal(),
+            root = execution.rootExecution.toExternal(),
+            kind = when (execution) {
+                is Execution.Direct -> OriginRecord.ExecutionKind.Direct
+                is Execution.Http -> OriginRecord.ExecutionKind.Http
+                is Execution.PreDeploy -> OriginRecord.ExecutionKind.PreDeploy
+                is Execution.WebSocket -> OriginRecord.ExecutionKind.WebSocket
+                is Execution.Schedule -> OriginRecord.ExecutionKind.Schedule
+                is Execution.Startup -> OriginRecord.ExecutionKind.Startup
+                is Execution.Task -> OriginRecord.ExecutionKind.Task
+            },
+            location = when (execution) {
+                is Execution.Direct -> ""
+                is Execution.Http -> "${execution.endpoint.method} ${execution.endpoint.route()}"
+                is Execution.WebSocket -> execution.path.route()
+                is Execution.PreDeploy -> execution.location.toString()
+                is Execution.Schedule -> execution.location.toString()
+                is Execution.Startup -> execution.location.toString()
+                is Execution.Task -> execution.location.toString()
+            },
+            request = request?.let {
+                // Resolved now rather than when the row is written: the request is not reachable from
+                // a later point, such as a task. Resolution is cached, so the handler reuses it.
+                val auth = try {
+                    request[Authentication.CacheKey]?.let { it.fromMasquerade ?: it }
+                } catch (e: Exception) {
+                    currentCoroutineContext().ensureActive()
+                    runtime.logger.error(e) { "Could not determine auth of request for origin recording" }
+                    null
                 }
-            )
+                OriginRecord.RequestInfo(
+                    principal = auth?.principalName,
+                    subjectId = auth?.rawId,
+                    sessionId = auth?.sessionId,
+                    sourceIp = request.sourceIp,
+                    engineRequestId = request.engineRequestId,
+                    upstreamRequestId = request.upstreamRequestId
+                )
+            }
         )
+        val origins = context[AuditOrigins] ?: AuditOrigins()
+        context[AuditOrigins] = origins.copy(pending = origins.pending + row)
     }
 
     context(runtime: ServerRuntime)
     override suspend fun <T> intercept(cont: suspend context(ServerRuntime) () -> T): T {
         val execution = runtime.execution
 
-        val result = cont()
+        when (execution) {
+            is Execution.Http -> {}
+            is Execution.WebSocket -> {
+                if (execution.phase != Execution.WebSocket.Phase.Connect) {
+                    val current = execution.context[AuditOrigins] ?: AuditOrigins()
+                    // Above when we 'ensure recorded' it checks against the recorded on the context.
+                    // A WebSocket's origin is recorded on connect, subsequent phases are not children and do not inherit connect's context
+                    execution.context[AuditOrigins] = current.copy(recorded = current.recorded + execution.origin.toExternal())
+                }
+            }
+            else -> if (execution.id == execution.origin) execution.recordOrigin(request = null)
+        }
 
-        // we only need to record origins. Http and WebSockets are handled specifically below.
-        if (execution.isOrigin() && execution !is Execution.Http && execution !is Execution.WebSocket) record(null)
-
-        return result
+        return cont()
     }
 
     override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> =
@@ -196,9 +158,10 @@ public class OriginRecordInterceptor(
             @OverrideOnly
             context(serverRuntime: ServerRuntime)
             override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
-                val result = wrapped.willConnect(request)
-                record(request)
-                return result
+                // Recorded at once rather than lazily: later phases cannot see this phase's context.
+                serverRuntime.execution.recordOrigin(request)
+                ensureRecorded()
+                return wrapped.willConnect(request)
             }
         }
 
@@ -206,8 +169,7 @@ public class OriginRecordInterceptor(
     override suspend fun <PATH : PathSpec> intercept(
         request: HttpRequest<PATH>, cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse
     ): HttpResponse {
-        val result = cont(request)
-        record(request)
-        return result
+        runtime.execution.recordOrigin(request)
+        return cont(request)
     }
 }

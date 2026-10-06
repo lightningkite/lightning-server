@@ -514,7 +514,7 @@ class MutationLogTest {
 
             val row = logged().single()
             assertNull(row.requestId, "a schedule tick has no RequestRecord, so this would dangle")
-            assertEquals(schedule.id.uuid, row.executionId)
+            assertEquals(schedule.id.toExternal(), row.executionId)
             assertEquals("schedule", row.initiatorKind)
             assertTrue("schedule" in row.initiator && "nightly" in row.initiator, row.initiator)
         }
@@ -530,8 +530,8 @@ class MutationLogTest {
             auditedTable().insert(listOf(patient("Ada")))
 
             val row = logged().single()
-            assertEquals(http.id.uuid, row.requestId)
-            assertEquals(http.id.uuid, row.executionId)
+            assertEquals(http.id.originId, row.requestId)
+            assertEquals(http.id.toExternal(), row.executionId)
             assertEquals("http", row.initiatorKind)
             assertTrue("patient" in row.initiator, row.initiator)
         }
@@ -555,9 +555,9 @@ class MutationLogTest {
             auditedTable().insert(listOf(patient("Ada")))
 
             val row = logged().single()
-            assertEquals(root.uuid, row.rootExecutionId)
-            assertEquals(root.uuid, row.causedBy)
-            assertEquals(nested.id.uuid, row.executionId)
+            assertEquals(root.toExternal(), row.rootExecutionId)
+            assertEquals(root.toExternal(), row.causedBy)
+            assertEquals(nested.id.toExternal(), row.executionId)
             assertEquals("task", row.initiatorKind)
         }
     }
@@ -603,10 +603,10 @@ class MutationLogTest {
             wraps = underlying,
             modelId = { 1 },
             requestId = null,
-            executionId = Uuid.random(),
+            executionId = randomExecutionId(),
             causedBy = null,
-            rootExecutionId = Uuid.random(),
-            attributedTo = Uuid.random(),
+            rootExecutionId = randomExecutionId(),
+            attributedTo = OriginRecord.ID(randomExecutionId()),
             initiatorKind = "direct",
             initiator = "{}",
             json = runtime.internalSerialization.json,
@@ -638,6 +638,6 @@ class MutationLogTest {
         val row = logged().single()
         // Keyed by the full serial name, which is what the walk records — not the class's short name.
         val serialName = Patient.serializer().descriptor.serialName
-        assertEquals(TestServer.audit.registry.await().modelId(serialName), row.modelId)
+        assertEquals(TestServer.audit.registry.await().modelId(serialName), row.modelType.raw)
     }
 }

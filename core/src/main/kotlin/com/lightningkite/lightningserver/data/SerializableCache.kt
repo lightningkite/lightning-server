@@ -43,7 +43,7 @@ import kotlin.time.Duration
  * **Important**: This cache is designed to be attached to objects like [Request] via the [Caching]
  * interface, providing request-scoped caching with optional persistence.
  *
- * Safe for concurrent use. Concurrent retrievals of the same [CalculatingKey] calculate it only once.
+ * Safe for concurrent use. Concurrent [getOrPut]s or [CalculatingKey] retrievals of one key calculate it once.
  */
 @Serializable(SerializableCache.Serializer::class)
 public class SerializableCache<out SCOPE> private constructor(
@@ -55,7 +55,7 @@ public class SerializableCache<out SCOPE> private constructor(
     /** Creates an empty cache. */
     public constructor() : this(ConcurrentHashMap())
 
-    // One lock per calculating key, so a calculation runs once rather than once per concurrent caller.
+    // One lock per key being calculated, so a calculation runs once rather than once per concurrent caller.
     // Not carried by copies: a copy shares no in-flight calculations with its source.
     private val calculating = ConcurrentHashMap<String, Mutex>()
 
@@ -157,30 +157,16 @@ public class SerializableCache<out SCOPE> private constructor(
      */
     context(server: Engine)
     private fun <T> cache(key: Key<*, T>, value: T) {
-        store(key, Expiring(value, expireAfter = key.expireAfter)) { _ -> true }
-    }
-
-    // Stores [expiring] under [key] unless [replace] rejects the current entry, and returns whichever
-    // entry is stored afterwards. The entry and its bytes are written together under the key's lock in
-    // `cache`, so concurrent writers cannot leave them disagreeing. Encoding happens outside the lock.
-    context(server: Engine)
-    private fun <T> store(
-        key: Key<*, T>,
-        expiring: Expiring<T>,
-        replace: (current: KeyAndResult<*>?) -> Boolean,
-    ): KeyAndResult<*> {
+        val expiring = Expiring(value, expireAfter = key.expireAfter)
         val bytes = if (key.localOnly) null else server.internalSerialization.kotlinBytesFormat
             .encodeToByteArray(Expiring.serializer(key.serializer), expiring)
-        var stored = false
-        val result = cache.compute(key.id) { _, current ->
-            if (!replace(current)) return@compute current
+        // The entry and its bytes are written together under the key's lock in `cache`, so concurrent
+        // writers cannot leave them disagreeing.
+        cache.compute(key.id) { _, _ ->
             if (bytes != null) serialized[key.id] = bytes
-            stored = true
             KeyAndResult(key, expiring)
-        }!!
-        if (stored) updated = true
-        if (result.key != key) throw IllegalStateException("SerializableCache encountered keys with duplicate ids. ID: ${key.id}")
-        return result
+        }
+        updated = true
     }
 
     /**
@@ -204,16 +190,17 @@ public class SerializableCache<out SCOPE> private constructor(
     /**
      * Retrieves the value for [key], storing the result of [default] if there is none.
      *
-     * Concurrent callers all receive the same stored value, but [default] may run more than once.
-     * Use a [CalculatingKey] when it must run only once.
+     * Concurrent callers for the same key wait for a single run of [default]. [default] must not
+     * retrieve [key] itself.
      */
-    @Suppress("UNCHECKED_CAST")
     context(server: Engine)
-    public fun <T> getOrPut(key: Key<SCOPE, T>, default: () -> T): T {
+    public suspend fun <T> getOrPut(key: Key<SCOPE, T>, default: suspend () -> T): T {
+        // Checked as an entry, not a value, so a cached null is a hit rather than a recalculation.
         retrieve(key)?.let { return it.value }
-        // Run outside the key's lock: default may itself use this cache.
-        val candidate = Expiring(default(), expireAfter = key.expireAfter)
-        return (store(key, candidate) { it == null || it.result.expired }.result as Expiring<T>).value
+        return calculating.getOrPut(key.id) { Mutex() }.withLock {
+            retrieve(key)?.let { return@withLock it.value }
+            default().also { cache(key, it) }
+        }
     }
 
     /**
@@ -227,14 +214,8 @@ public class SerializableCache<out SCOPE> private constructor(
      * @return The cached or newly calculated value
      */
     context(server: ServerRuntime)
-    public suspend fun <INPUT, T> get(key: CalculatingKey<SCOPE, INPUT, T>, input: INPUT): T {
-        // Checked as an entry, not a value, so a cached null is a hit rather than a recalculation.
-        retrieve(key)?.let { return it.value }
-        return calculating.getOrPut(key.id) { Mutex() }.withLock {
-            retrieve(key)?.let { return@withLock it.value }
-            key.calculate(input).also { cache(key, it) }
-        }
-    }
+    public suspend fun <INPUT, T> get(key: CalculatingKey<SCOPE, INPUT, T>, input: INPUT): T =
+        getOrPut(key) { key.calculate(input) }
 
     /**
      * Checks if the cache contains a non-expired value for the given key.

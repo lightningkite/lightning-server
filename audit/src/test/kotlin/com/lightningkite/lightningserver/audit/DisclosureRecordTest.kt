@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.audit
 
+import com.lightningkite.services.data.Unsafe
+import com.lightningkite.services.data.UuidV7
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Instant
@@ -8,11 +10,13 @@ import kotlin.uuid.Uuid
 
 class DisclosureRecordTest {
 
+    @OptIn(Unsafe::class)
     private fun record(id: Uuid) = DisclosureRecord(
-        _id = id,
-        requestId = Uuid.random(),
-        modelId = 1,
+        _id = DisclosureRecord.ID(UuidV7.fromRaw(id)),
+        requestId = OriginRecord.ID(ExecutionId(UuidV7.generate())),
+        recordType = ModelTypeId(1),
         recordId = Uuid.random(),
+        disclosed = fieldIndicesOf(),
     )
 
     /**

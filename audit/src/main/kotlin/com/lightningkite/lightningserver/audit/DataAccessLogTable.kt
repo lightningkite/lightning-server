@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.audit
 
+import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.builtins.ListSerializer
@@ -22,8 +23,8 @@ internal class DataAccessLogTable<T : Any>(
     override val wraps: Table<T>,
     /** Throws when the model is audited but has no registry entry; see [DataAccessLogTable]. */
     private val modelId: suspend () -> Int,
-    private val requestId: Uuid,
-    private val executionId: Uuid,
+    private val requestId: OriginRecord.ID,
+    private val executionId: ExecutionId,
     private val json: Json,
     private val nowMillis: () -> Long,
     private val write: suspend (DataAccessRecord) -> Unit,
@@ -53,10 +54,10 @@ internal class DataAccessLogTable<T : Any>(
         val modelId = modelId()
         write(
             DataAccessRecord(
-                _id = Uuid.generateV7NonMonotonicAt(kotlin.time.Instant.fromEpochMilliseconds(nowMillis())),
+                _id = DataAccessRecord.ID(UuidV7.generateNonMonotonicAt(kotlin.time.Instant.fromEpochMilliseconds(nowMillis()))),
                 requestId = requestId,
                 executionId = executionId,
-                modelId = modelId,
+                modelType = ModelTypeId(modelId),
                 operation = operation,
                 condition = conditionText(condition),
                 sort = sort,

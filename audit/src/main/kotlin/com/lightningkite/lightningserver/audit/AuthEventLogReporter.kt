@@ -31,6 +31,7 @@ import kotlin.uuid.Uuid
 private val authEventLogger = KotlinLogging.logger("com.lightningkite.lightningserver.audit.AuthEventLog")
 
 public class AuthEventLogReporter(
+    private val origins: OriginRecordInterceptor,
     private val table: Runtime<Table<AuthEventRecord>>,
 ) : AuthEventReporter {
     override val name: String = "AuthEventLog"
@@ -49,7 +50,7 @@ public class AuthEventLogReporter(
     ) {
         val record = AuthEventRecord(
             _id = AuthEventRecord.ID(UuidV7.generateFromServerClock()),
-            requestId = runtime.execution.origin.uuid,
+            requestId = OriginRecord.ID(runtime.execution.origin.toExternal()),
             type = type,
             principal = principal,
             actor = actor,
@@ -61,7 +62,10 @@ public class AuthEventLogReporter(
             methodProperty = methodProperty,
         )
         try {
-            with(runtime) { table().insertOne(record) }
+            with(runtime) {
+                origins.ensureRecorded()
+                table().insertOne(record)
+            }
         } catch (e: Exception) {
             if (e is kotlin.coroutines.cancellation.CancellationException) currentCoroutineContext().ensureActive()
             authEventLogger.error(e) { "Failed to record auth event $type; authentication continued unrecorded." }

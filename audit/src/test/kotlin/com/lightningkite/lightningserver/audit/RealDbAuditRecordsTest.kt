@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.audit
 
 import com.lightningkite.services.TestSettingContext
+import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.*
 import com.lightningkite.services.database.postgres.PostgresDatabase
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres
@@ -126,7 +127,7 @@ class RealDbAuditRecordsTest {
         table("RealDbIndexedRequest", OriginRecord.serializer())
 
         val access = indexedColumnSets("RealDbIndexedAccess")
-        for (column in listOf("requestid", "executionid", "modelid")) {
+        for (column in listOf("requestid", "executionid", "modeltype")) {
             assertTrue(
                 access.any { it == listOf(column) },
                 "DataAccessRecord.$column is annotated @Index but no index on it was created: $access",
@@ -135,16 +136,16 @@ class RealDbAuditRecordsTest {
 
         val disclosure = indexedColumnSets(DISCLOSURES)
         assertTrue(
-            disclosure.any { it == listOf("modelid", "recordid") },
-            "DisclosureRecord's @IndexSet(modelId, recordId) was not created: $disclosure",
+            disclosure.any { it == listOf("rt", "rid") },
+            "DisclosureRecord's @IndexSet(recordType, recordId) was not created: $disclosure",
         )
         assertTrue(
-            disclosure.any { it == listOf("requestid") },
+            disclosure.any { it == listOf("qid") },
             "DisclosureRecord.requestId is annotated @Index but no index on it was created: $disclosure",
         )
 
         val request = indexedColumnSets("RealDbIndexedRequest")
-        for (column in listOf("parentrequestid", "rootexecutionid", "principal")) {
+        for (column in listOf("parent", "root")) {
             assertTrue(
                 request.any { it == listOf(column) },
                 "RequestRecord.$column is annotated @Index but no index on it was created: $request",
@@ -164,10 +165,11 @@ class RealDbAuditRecordsTest {
         table.insert(
             (0 until 2000).map {
                 DisclosureRecord(
-                    _id = Uuid.random(),
-                    requestId = Uuid.random(),
-                    modelId = it % 8,
+                    _id = DisclosureRecord.ID(UuidV7.generate()),
+                    requestId = OriginRecord.ID(randomExecutionId()),
+                    recordType = ModelTypeId(it % 8),
                     recordId = if (it == 7) target else Uuid.random(),
+                    disclosed = fieldIndicesOf(),
                 )
             }
         )
@@ -175,8 +177,8 @@ class RealDbAuditRecordsTest {
 
         val plan = explain(
             "SELECT * FROM \"${actualTableName(DISCLOSURES)}\" " +
-                "WHERE \"${actualColumnName(DISCLOSURES, "modelId")}\" = 7 " +
-                "AND \"${actualColumnName(DISCLOSURES, "recordId")}\" = '$target'"
+                "WHERE \"${actualColumnName(DISCLOSURES, "rt")}\" = 7 " +
+                "AND \"${actualColumnName(DISCLOSURES, "rid")}\" = '$target'"
         )
         // The named index specifically, not merely "some index": `modelId` is the leading column of
         // the composite one but is also cheap to reach other ways, so a plan that just says "Index
@@ -188,7 +190,7 @@ class RealDbAuditRecordsTest {
     }
 
     /**
-     * `disclosedAll` and `disclosedAny` are the queries an investigation actually runs, and they are
+     * `containsAll` and `containsAny` on [DisclosureRecord.disclosed] are the queries an investigation actually runs, and they are
      * the only place this package emits a non-trivial condition: bitwise tests over two `Int` columns,
      * spanning both when the field indices do. A real backend has to translate those into SQL, whereas
      * the in-memory database evaluates the very predicate the helpers were written against and so
@@ -205,14 +207,12 @@ class RealDbAuditRecordsTest {
         val modelId = 900
 
         fun disclosure(vararg indices: Int): DisclosureRecord {
-            val bits = FieldIdentifierSet.from(indices.toList())
             return DisclosureRecord(
-                _id = Uuid.random(),
-                requestId = Uuid.random(),
-                modelId = modelId,
-                fields0 = bits.segment(0),
-                fields1 = bits.segment(1),
+                _id = DisclosureRecord.ID(UuidV7.generate()),
+                requestId = OriginRecord.ID(randomExecutionId()),
+                recordType = ModelTypeId(modelId),
                 recordId = Uuid.random(),
+                disclosed = fieldIndicesOf(*indices),
             )
         }
 
@@ -224,19 +224,19 @@ class RealDbAuditRecordsTest {
 
         // Scoped to this test's own rows, since the table is shared.
         fun mine(bits: Condition<DisclosureRecord>) =
-            Condition.And(listOf(condition<DisclosureRecord> { it.modelId.eq(modelId) }, bits))
+            Condition.And(listOf(condition<DisclosureRecord> { it.recordType.eq(ModelTypeId(modelId)) }, bits))
 
         suspend fun ids(bits: Condition<DisclosureRecord>) =
             table.find(mine(bits)).toList().map { it._id }.toSet()
 
-        assertEquals(setOf(both._id), ids(disclosedAll(listOf(ssn, dob))))
-        assertEquals(setOf(both._id, ssnOnly._id, farOnly._id), ids(disclosedAny(listOf(ssn, dob, far))))
+        assertEquals(setOf(both._id), ids(DisclosureRecord.path.disclosed.containsAll(fieldIndicesOf(ssn, dob))))
+        assertEquals(setOf(both._id, ssnOnly._id, farOnly._id), ids(DisclosureRecord.path.disclosed.containsAny(fieldIndicesOf(ssn, dob, far))))
         // Straddling the columns must be an AND across them, not a union of the two.
-        assertEquals(emptySet(), ids(disclosedAll(listOf(ssn, far))))
-        assertEquals(setOf(farOnly._id), ids(disclosedAll(listOf(far))))
+        assertEquals(emptySet(), ids(DisclosureRecord.path.disclosed.containsAll(fieldIndicesOf(ssn, far))))
+        assertEquals(setOf(farOnly._id), ids(DisclosureRecord.path.disclosed.containsAll(fieldIndicesOf(far))))
         // The documented degenerate cases: every set contains none of nothing, and none contains one.
-        assertEquals(4, table.count(mine(disclosedAll(emptyList()))))
-        assertEquals(0, table.count(mine(disclosedAny(emptyList()))))
+        assertEquals(4, table.count(mine(DisclosureRecord.path.disclosed.containsAll(fieldIndicesOf()))))
+        assertEquals(0, table.count(mine(DisclosureRecord.path.disclosed.containsAny(fieldIndicesOf()))))
     }
 
     // ---------------------------------------------------------------- 3. request lifecycle
@@ -246,29 +246,31 @@ class RealDbAuditRecordsTest {
      * end to fill in outcome and duration. The second write is an `updateOne` matched on the id, and
      * on a real backend it is a genuine `UPDATE ... WHERE` rather than a map replacement.
      */
-    @Test
-    fun `a request record's two-write lifecycle completes`() = runBlocking {
-        val table = table("RealDbRequestLifecycle", OriginRecord.serializer())
-        val id = Uuid.generateV7NonMonotonicAt(Instant.fromEpochMilliseconds(1_700_000_123_456))
-
-        table.insert(listOf(request(id)))
-        val opened = assertNotNull(table.get(id))
-        assertNull(opened.outcome, "the opening write must not claim an outcome")
-        assertNull(opened.durationMs)
-
-        val changed = table.updateOne(
-            condition { it._id.eq(id) },
-            modification { it.outcome assign "200"; it.durationMs assign 42L },
-        )
-
-        assertEquals("200", assertNotNull(changed.new).outcome)
-        val closed = assertNotNull(table.get(id))
-        assertEquals("200", closed.outcome)
-        assertEquals(42L, closed.durationMs)
-        // The id carries the instant; a rewritten row must not disturb it.
-        assertEquals(Instant.fromEpochMilliseconds(1_700_000_123_456), closed.at)
-        assertEquals(1, table.count(Condition.Always), "the completion write inserted a second row")
-    }
+    // TODO: OriginRecord no longer has outcome/durationMs and is written once, so there is no
+    //  second write to test. Rework or delete.
+    // @Test
+    // fun `a request record's two-write lifecycle completes`() = runBlocking {
+    //     val table = table("RealDbRequestLifecycle", OriginRecord.serializer())
+    //     val id = Uuid.generateV7NonMonotonicAt(Instant.fromEpochMilliseconds(1_700_000_123_456))
+    //
+    //     table.insert(listOf(request(id)))
+    //     val opened = assertNotNull(table.get(id))
+    //     assertNull(opened.outcome, "the opening write must not claim an outcome")
+    //     assertNull(opened.durationMs)
+    //
+    //     val changed = table.updateOne(
+    //         condition { it._id.eq(id) },
+    //         modification { it.outcome assign "200"; it.durationMs assign 42L },
+    //     )
+    //
+    //     assertEquals("200", assertNotNull(changed.new).outcome)
+    //     val closed = assertNotNull(table.get(id))
+    //     assertEquals("200", closed.outcome)
+    //     assertEquals(42L, closed.durationMs)
+    //     // The id carries the instant; a rewritten row must not disturb it.
+    //     assertEquals(Instant.fromEpochMilliseconds(1_700_000_123_456), closed.at)
+    //     assertEquals(1, table.count(Condition.Always), "the completion write inserted a second row")
+    // }
 
     /**
      * The design requires a duplicate execution id to be a hard failure rather than a silent merge of
@@ -278,7 +280,7 @@ class RealDbAuditRecordsTest {
     @Test
     fun `a duplicate request id fails loudly`() = runBlocking {
         val table = table("RealDbRequestDuplicate", OriginRecord.serializer())
-        val id = Uuid.random()
+        val id = randomExecutionId()
         table.insert(listOf(request(id)))
 
         assertFailsWith<UniqueViolationException> {
@@ -302,8 +304,8 @@ class RealDbAuditRecordsTest {
         table(DISCLOSURES, DisclosureRecord.serializer())
 
         assertEquals("uuid", columnType(DISCLOSURES, "_id"))
-        assertEquals("uuid", columnType(DISCLOSURES, "requestId"))
-        assertEquals("uuid", columnType(DISCLOSURES, "recordId"))
+        assertEquals("uuid", columnType(DISCLOSURES, "qid"))
+        assertEquals("uuid", columnType(DISCLOSURES, "rid"))
     }
 
     /** v7 ids sort by mint time, and that only holds if the column sorts them as uuids. */
@@ -311,7 +313,7 @@ class RealDbAuditRecordsTest {
     fun `v7 keys come back in mint order`() = runBlocking {
         val table = table("RealDbUuidOrder", DataAccessRecord.serializer())
         val instants = listOf(1_700_000_000_000L, 1_700_000_050_000L, 1_700_000_100_000L)
-        val ids = instants.map { Uuid.generateV7NonMonotonicAt(Instant.fromEpochMilliseconds(it)) }
+        val ids = instants.map { DataAccessRecord.ID(UuidV7.generateNonMonotonicAt(Instant.fromEpochMilliseconds(it))) }
         // Inserted out of order, so a table that preserved insertion order would fail this.
         table.insert(listOf(ids[2], ids[0], ids[1]).map { dataAccess(id = it, condition = "{}") })
 
@@ -330,7 +332,7 @@ class RealDbAuditRecordsTest {
     @Test
     fun `a few thousand data access records insert and remain queryable`() = runBlocking {
         val table = table("RealDbVolume", DataAccessRecord.serializer())
-        val requestId = Uuid.random()
+        val requestId = OriginRecord.ID(randomExecutionId())
         val total = 3000
         val ofInterest = 250
 
@@ -340,7 +342,7 @@ class RealDbAuditRecordsTest {
             table.insert(
                 chunk.map {
                     dataAccess(
-                        requestId = if (it < ofInterest) requestId else Uuid.random(),
+                        requestId = if (it < ofInterest) requestId else OriginRecord.ID(randomExecutionId()),
                         condition = Json.encodeToString(
                             Condition.serializer(Patient.serializer()),
                             condition<Patient> { p -> p.ssn.eq("value-$it") },
@@ -376,7 +378,7 @@ class RealDbAuditRecordsTest {
 
         val before = """{"_id":"x","name":"Ann \"The Brace\" O'Neil {x} \\ 🩺 日本語"}"""
         val after = """{"_id":"x","name":"changed"}"""
-        val fromRequest = mutation(requestId = Uuid.random(), old = before, new = after)
+        val fromRequest = mutation(requestId = OriginRecord.ID(randomExecutionId()), old = before, new = after)
         val fromSchedule = mutation(requestId = null, old = before, new = null)
         table.insert(listOf(fromRequest, fromSchedule))
 
@@ -398,7 +400,7 @@ class RealDbAuditRecordsTest {
         table("RealDbIndexedMutation", MutationRecord.serializer())
 
         val indexes = indexedColumnSets("RealDbIndexedMutation")
-        for (column in listOf("requestid", "executionid", "rootexecutionid", "initiatorkind", "modelid", "recordid")) {
+        for (column in listOf("requestid", "executionid", "rootexecutionid", "initiatorkind", "modeltype", "recordid")) {
             assertTrue(
                 indexes.any { it == listOf(column) },
                 "MutationRecord.$column is annotated @Index but no index on it was created: $indexes",
@@ -409,8 +411,8 @@ class RealDbAuditRecordsTest {
     // ---------------------------------------------------------------- helpers
 
     private fun dataAccess(
-        id: Uuid = Uuid.random(),
-        requestId: Uuid = Uuid.random(),
+        id: DataAccessRecord.ID = DataAccessRecord.ID(UuidV7.generate()),
+        requestId: OriginRecord.ID = OriginRecord.ID(randomExecutionId()),
         condition: String,
         modification: String? = null,
         skip: Int? = null,
@@ -418,8 +420,8 @@ class RealDbAuditRecordsTest {
     ) = DataAccessRecord(
         _id = id,
         requestId = requestId,
-        executionId = Uuid.random(),
-        modelId = 1,
+        executionId = randomExecutionId(),
+        modelType = ModelTypeId(1),
         operation = DataAccessOperation.Find,
         condition = condition,
         modification = modification,
@@ -428,33 +430,40 @@ class RealDbAuditRecordsTest {
     )
 
     private fun mutation(
-        id: Uuid = Uuid.random(),
-        requestId: Uuid?,
+        id: MutationRecord.ID = MutationRecord.ID(UuidV7.generate()),
+        requestId: OriginRecord.ID?,
         old: String? = null,
         new: String? = null,
     ) = MutationRecord(
         _id = id,
         requestId = requestId,
-        executionId = Uuid.random(),
+        executionId = randomExecutionId(),
         // Whatever wrote the row is what it attributes to; for a request-shaped one that is the
         // request itself, and for a schedule tick it is an id that resolves to nothing.
-        attributedTo = requestId ?: Uuid.random(),
-        rootExecutionId = Uuid.random(),
+        attributedTo = requestId ?: OriginRecord.ID(randomExecutionId()),
+        rootExecutionId = randomExecutionId(),
         initiatorKind = if (requestId == null) "schedule" else "http",
         initiator = """{"type":"direct"}""",
-        modelId = 1,
+        modelType = ModelTypeId(1),
         recordId = "x",
         operation = MutationOperation.Update,
         old = old,
         new = new,
     )
 
-    private fun request(id: Uuid, endpoint: String = "/x") = OriginRecord(
-        _id = id,
-        rootExecutionId = id,
-        sourceIp = "1.2.3.4",
-        endpoint = endpoint,
-        method = "GET",
+    private fun request(id: ExecutionId, endpoint: String = "/x") = OriginRecord(
+        _id = OriginRecord.ID(id),
+        root = id,
+        kind = OriginRecord.ExecutionKind.Http,
+        location = "GET $endpoint",
+        request = OriginRecord.RequestInfo(
+            principal = null,
+            subjectId = null,
+            sessionId = null,
+            sourceIp = "1.2.3.4",
+            engineRequestId = null,
+            upstreamRequestId = null,
+        ),
     )
 
     /** Prepares [name] the way the deploy-time task does — `Database.prepare`, which creates the DDL. */

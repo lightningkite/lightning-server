@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.audit
 
+import com.lightningkite.services.data.Unsafe
+import com.lightningkite.services.data.UuidV7
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Instant
@@ -7,6 +9,14 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 class RequestRecordTest {
+
+    private fun origin(id: ExecutionId) = OriginRecord(
+        _id = OriginRecord.ID(id),
+        root = id,
+        kind = OriginRecord.ExecutionKind.Http,
+        location = "GET /x",
+        request = null,
+    )
 
     /**
      * RequestRecord carries no `at` column; the instant is derived from the version-7 `_id`. This
@@ -17,31 +27,19 @@ class RequestRecordTest {
     @Test
     fun `at derives the id's embedded timestamp`() {
         val instant = Instant.fromEpochMilliseconds(1_700_000_123_456)
-        val id = Uuid.generateV7NonMonotonicAt(instant)
+        @OptIn(Unsafe::class)
+        val id = ExecutionId(UuidV7.generateNonMonotonicAt(instant))
 
-        val record = OriginRecord(
-            _id = id,
-            rootExecutionId = id,
-            sourceIp = "1.2.3.4",
-            endpoint = "/x",
-            method = "GET",
-        )
+        val record = origin(id)
 
         assertEquals(instant, record.at)
     }
 
     /** A legacy (non-v7) id has no embedded timestamp; at must degrade to the epoch rather than throw. */
-    @OptIn(ExperimentalUuidApi::class)
+    @OptIn(ExperimentalUuidApi::class, Unsafe::class)
     @Test
     fun `a non-v7 id degrades to the epoch`() {
-        val v4 = Uuid.random()
-        val record = OriginRecord(
-            _id = v4,
-            rootExecutionId = v4,
-            sourceIp = "1.2.3.4",
-            endpoint = "/x",
-            method = "GET",
-        )
+        val record = origin(ExecutionId(UuidV7.fromRaw(Uuid.random())))
 
         assertEquals(Instant.fromEpochMilliseconds(0), record.at)
     }

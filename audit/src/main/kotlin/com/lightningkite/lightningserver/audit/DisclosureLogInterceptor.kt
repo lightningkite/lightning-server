@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.typedoutput.TypedOutputInterceptor
+import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.Table
 import kotlinx.serialization.KSerializer
 import kotlin.uuid.ExperimentalUuidApi
@@ -26,6 +27,7 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalUuidApi::class)
 public class DisclosureLogInterceptor(
     registry: RuntimeDeferred<AuditRegistry>,
+    private val origins: OriginRecordInterceptor,
     private val table: Runtime<Table<DisclosureRecord>>,
 ) : TypedOutputInterceptor {
     override val name: String = "DisclosureLog"
@@ -49,17 +51,17 @@ public class DisclosureLogInterceptor(
             DisclosureRecord(
                 // v7 so the row carries its own insert time; DisclosureRecord.at reads it back.
                 // Not Execution.ID.generate(): that mints execution ids, and this is a row id.
-                _id = Uuid.generateV7NonMonotonicAt(runtime.clock.now()),
+                _id = DisclosureRecord.ID(UuidV7.generateNonMonotonicAt(runtime.clock.now())),
                 // The anchor, not this execution's own id. The request row itself for the http and
                 // websocket executions that actually disclose; anywhere else it names the request that
                 // led here rather than an id that joins to nothing.
-                requestId = runtime.execution.origin.uuid,
-                modelId = it.modelId,
-                fields0 = it.bits.fields0,
-                fields1 = it.bits.fields1,
+                requestId = OriginRecord.ID(runtime.execution.origin.toExternal()),
+                recordType = ModelTypeId(it.modelId),
                 recordId = it.recordId,
+                disclosed = it.bits,
             )
         }
+        origins.ensureRecorded()
         table().insert(rows)
     }
 }

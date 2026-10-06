@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.audit
 
+import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.Json
@@ -39,11 +40,11 @@ internal class MutationLogTable<T : Any>(
     override val wraps: Table<T>,
     /** Throws when the model is audited but has no registry entry; see [mutationLogged]. */
     private val modelId: suspend () -> Int,
-    private val requestId: Uuid?,
-    private val attributedTo: Uuid,
-    private val executionId: Uuid,
-    private val causedBy: Uuid?,
-    private val rootExecutionId: Uuid,
+    private val requestId: OriginRecord.ID?,
+    private val attributedTo: OriginRecord.ID,
+    private val executionId: ExecutionId,
+    private val causedBy: ExecutionId?,
+    private val rootExecutionId: ExecutionId,
     private val initiatorKind: String,
     private val initiator: String,
     private val json: Json,
@@ -79,7 +80,7 @@ internal class MutationLogTable<T : Any>(
         new: JsonObject?,
         affectedCount: Int? = null,
     ) = MutationRecord(
-        _id = Uuid.generateV7NonMonotonicAt(kotlin.time.Instant.fromEpochMilliseconds(nowMillis())),
+        _id = MutationRecord.ID(UuidV7.generateNonMonotonicAt(kotlin.time.Instant.fromEpochMilliseconds(nowMillis()))),
         requestId = requestId,
         attributedTo = attributedTo,
         executionId = executionId,
@@ -87,7 +88,7 @@ internal class MutationLogTable<T : Any>(
         rootExecutionId = rootExecutionId,
         initiatorKind = initiatorKind,
         initiator = initiator,
-        modelId = modelId,
+        modelType = ModelTypeId(modelId),
         recordId = recordId,
         operation = operation,
         old = old?.toString(),

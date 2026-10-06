@@ -27,7 +27,7 @@ public class DisclosureLog(private val core: AuditCore) : ServerBuilder() {
 
     init {
         core.claim("DisclosureLog")
-        install(DisclosureLogInterceptor(core.registry, disclosures))
+        install(DisclosureLogInterceptor(core.registry, core.origins, disclosures))
     }
 }
 
@@ -55,6 +55,7 @@ public class DataAccessLog(private val core: AuditCore) : ServerBuilder() {
         core.database.registerTable("AuditDataAccess", DataAccessRecord.serializer())
 
     internal val registry get() = core.registry
+    internal val origins get() = core.origins
 
     init {
         core.claim("DataAccessLog")
@@ -84,7 +85,7 @@ public class AuthEventLog(private val core: AuditCore) : ServerBuilder() {
 
     init {
         core.claim("AuthEventLog")
-        installAuthEventReporter(AuthEventLogReporter(authEvents))
+        installAuthEventReporter(AuthEventLogReporter(core.origins, authEvents))
     }
 }
 
@@ -121,6 +122,7 @@ public class MutationLog(
         core.database.registerTable("AuditMutation", MutationRecord.serializer())
 
     internal val registry get() = core.registry
+    internal val origins get() = core.origins
 
     init {
         core.claim("MutationLog")

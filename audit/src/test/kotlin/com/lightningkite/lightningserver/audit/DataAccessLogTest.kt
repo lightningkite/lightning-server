@@ -161,8 +161,8 @@ class DataAccessLogTest {
         val table = DataAccessLogTable(
             wraps = counting,
             modelId = { 1 },
-            requestId = Uuid.random(),
-            executionId = Uuid.random(),
+            requestId = OriginRecord.ID(randomExecutionId()),
+            executionId = randomExecutionId(),
             json = runtime.internalSerialization.json,
             nowMillis = { 1L },
             write = { throw RuntimeException("audit sink down") },
@@ -276,7 +276,7 @@ class DataAccessLogTest {
         table.count(Condition.Always)
 
         val row = logged().single()
-        assertEquals(runtime.execution.id.uuid, row.executionId)
-        assertEquals(runtime.execution.origin.uuid, row.requestId)
+        assertEquals(runtime.execution.id.toExternal(), row.executionId)
+        assertEquals(runtime.execution.origin.originId, row.requestId)
     }
 }
