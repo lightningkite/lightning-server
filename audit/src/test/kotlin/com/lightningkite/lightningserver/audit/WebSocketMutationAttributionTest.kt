@@ -18,7 +18,6 @@ import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.PathSpec0
 import com.lightningkite.lightningserver.pathing.RawWebSocketPath
-import com.lightningkite.lightningserver.pathing.path
 import com.lightningkite.lightningserver.runtime.EngineBase
 import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ServerRuntime
@@ -60,9 +59,9 @@ import kotlin.uuid.Uuid
 /**
  * Can a change made under a WebSocket be traced back to a person?
  *
- * Turning a [MutationRecord] into a person means looking up its `attributedTo` in [RequestRecord] and
+ * Turning a [MutationRecord] into a person means looking up its `attributedTo` in [OriginRecord] and
  * reading `principal`. For HTTP that join is trivially sound — the row is keyed by the request's own
- * execution id. For a socket it is not obvious: [RequestRecordInterceptor] keys the row by the
+ * execution id. For a socket it is not obvious: [OriginRecordInterceptor] keys the row by the
  * *socket* id rather than by the phase execution that wrote the change, and a virtual socket
  * multiplexed inside a physical one gets its own socket id and its own row.
  *
@@ -99,7 +98,7 @@ class WebSocketMutationAttributionTest {
     private fun tokenQuery() = mapOf(HttpHeader.Authorization to listOf(user.toString()))
 
     /** The join an auditor performs, as one call, so every test below asks the same question. */
-    private fun List<RequestRecord>.rowFor(id: Uuid?): RequestRecord? = firstOrNull { it._id == id }
+    private fun List<OriginRecord>.rowFor(id: Uuid?): OriginRecord? = firstOrNull { it._id == id }
 
     // ===================== 1. a plain socket, mutating directly =====================
 
@@ -175,7 +174,7 @@ class WebSocketMutationAttributionTest {
 
         assertEquals(
             physical.request.socketId.uuid,
-            byRequestId.parentRequestId,
+            byRequestId.parent,
             "a virtual socket's row should be parented to the physical connection carrying it",
         )
         assertEquals(
@@ -277,7 +276,7 @@ class WebSocketMutationAttributionTest {
                 "the sub-socket's own row does not name the person: ${byAttribution.principal}",
             )
 
-            val carrier = requests.rowFor(byAttribution.parentRequestId)
+            val carrier = requests.rowFor(byAttribution.parent)
             assertNotNull(carrier, "the sub-socket's row names no parent row")
             assertEquals("/multiplex", carrier.endpoint)
             assertNull(carrier.principal, "the carrier is anonymous, so it must not be what names the person")
@@ -319,7 +318,7 @@ class WebSocketMutationAttributionTest {
             )
 
             // And the carrier, reached through the sub-socket's parent row, is still anonymous.
-            val carrier = requests.rowFor(byAttribution.parentRequestId)
+            val carrier = requests.rowFor(byAttribution.parent)
             assertNotNull(carrier)
             assertEquals("/multiplex", carrier.endpoint)
             assertNull(carrier.principal)
@@ -363,7 +362,7 @@ class WebSocketMutationAttributionTest {
             assertNotNull(subRow, "the virtual sub-socket has no request row of its own")
             assertEquals("/socket", subRow.endpoint, "the sub-socket's row should name the sub-socket's endpoint")
 
-            val parentRow = requests.rowFor(subRow.parentRequestId)
+            val parentRow = requests.rowFor(subRow.parent)
             assertNotNull(parentRow, "the sub-socket's row names no parent row")
             assertEquals("/multiplex", parentRow.endpoint, "the parent row should be the physical connection")
         }

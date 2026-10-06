@@ -123,7 +123,7 @@ class RealDbAuditRecordsTest {
     fun `the declared indexes are created on the real table`() = runBlocking {
         table("RealDbIndexedAccess", DataAccessRecord.serializer())
         table(DISCLOSURES, DisclosureRecord.serializer())
-        table("RealDbIndexedRequest", RequestRecord.serializer())
+        table("RealDbIndexedRequest", OriginRecord.serializer())
 
         val access = indexedColumnSets("RealDbIndexedAccess")
         for (column in listOf("requestid", "executionid", "modelid")) {
@@ -248,7 +248,7 @@ class RealDbAuditRecordsTest {
      */
     @Test
     fun `a request record's two-write lifecycle completes`() = runBlocking {
-        val table = table("RealDbRequestLifecycle", RequestRecord.serializer())
+        val table = table("RealDbRequestLifecycle", OriginRecord.serializer())
         val id = Uuid.generateV7NonMonotonicAt(Instant.fromEpochMilliseconds(1_700_000_123_456))
 
         table.insert(listOf(request(id)))
@@ -272,12 +272,12 @@ class RealDbAuditRecordsTest {
 
     /**
      * The design requires a duplicate execution id to be a hard failure rather than a silent merge of
-     * two principals' activity under one identifier — see the `_id` note on [RequestRecord]. On a
+     * two principals' activity under one identifier — see the `_id` note on [OriginRecord]. On a
      * real backend that is a primary-key violation; an in-memory map would simply overwrite.
      */
     @Test
     fun `a duplicate request id fails loudly`() = runBlocking {
-        val table = table("RealDbRequestDuplicate", RequestRecord.serializer())
+        val table = table("RealDbRequestDuplicate", OriginRecord.serializer())
         val id = Uuid.random()
         table.insert(listOf(request(id)))
 
@@ -449,7 +449,7 @@ class RealDbAuditRecordsTest {
         new = new,
     )
 
-    private fun request(id: Uuid, endpoint: String = "/x") = RequestRecord(
+    private fun request(id: Uuid, endpoint: String = "/x") = OriginRecord(
         _id = id,
         rootExecutionId = id,
         sourceIp = "1.2.3.4",

@@ -8,28 +8,23 @@ import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.http.HttpInterceptor
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
+import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.pathing.PathSpec
 import com.lightningkite.lightningserver.pathing.route
+import com.lightningkite.lightningserver.runtime.Execution
 import com.lightningkite.lightningserver.runtime.ExecutionInterceptor
 import com.lightningkite.lightningserver.runtime.ServerRuntime
-import com.lightningkite.lightningserver.runtime.logicalId
 import com.lightningkite.lightningserver.websockets.DelegatingWebSocketHandler
-import com.lightningkite.lightningserver.websockets.WebSocketClose
 import com.lightningkite.lightningserver.websockets.WebSocketConnectRequest
-import com.lightningkite.lightningserver.websockets.WebSocketConnection
 import com.lightningkite.lightningserver.websockets.WebSocketHandler
 import com.lightningkite.lightningserver.websockets.WebSocketInterceptor
 import com.lightningkite.services.database.Table
 import com.lightningkite.services.database.insertOne
-import com.lightningkite.services.database.modification
-import com.lightningkite.services.database.updateOneByIdIgnoringResult
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
-import kotlin.time.TimeSource
-import kotlin.uuid.Uuid
 
 private val logger = KotlinLogging.logger("com.lightningkite.lightningserver.audit.RequestRecordInterceptor")
 //
@@ -130,42 +125,89 @@ private val logger = KotlinLogging.logger("com.lightningkite.lightningserver.aud
 //}
 //
 
-public class RequestRecordInterceptor(
-    private val table: Runtime<Table<RequestRecord>>
-) : ExecutionInterceptor {
+public class OriginRecordInterceptor(
+    private val table: Runtime<Table<OriginRecord>>
+) : ExecutionInterceptor, WebSocketInterceptor, HttpInterceptor {
+    override val name: String = "OriginRecordInterceptor"
+
+    private fun Execution.isOrigin() = origin == id
+
+    context(runtime: ServerRuntime)
+    private suspend fun record(request: Request<*>?) {
+        val execution = runtime.execution
+        table().insertOne(
+            OriginRecord(
+                _id = OriginRecord.ID(execution.id.toExternal()),
+                parent = execution.parent?.toExternal(),
+                root = execution.rootExecution.toExternal(),
+                kind = when (execution) {
+                    is Execution.Direct -> OriginRecord.ExecutionKind.Direct
+                    is Execution.Http -> OriginRecord.ExecutionKind.Http
+                    is Execution.PreDeploy -> OriginRecord.ExecutionKind.PreDeploy
+                    is Execution.WebSocket -> OriginRecord.ExecutionKind.WebSocket
+                    is Execution.Schedule -> OriginRecord.ExecutionKind.Schedule
+                    is Execution.Startup -> OriginRecord.ExecutionKind.Startup
+                    is Execution.Task -> OriginRecord.ExecutionKind.Task
+                },
+                location = when (execution) {
+                    is Execution.Direct -> ""
+                    is Execution.Http -> "${execution.endpoint.method} ${execution.endpoint.route()}"
+                    is Execution.WebSocket -> execution.path.route()
+                    is Execution.PreDeploy -> execution.location.toString()
+                    is Execution.Schedule -> execution.location.toString()
+                    is Execution.Startup -> execution.location.toString()
+                    is Execution.Task -> execution.location.toString()
+                },
+                request = request?.let {
+                    val auth = try {
+                        request[Authentication.CacheKey]?.let { it.fromMasquerade ?: it }
+                    } catch (e: Exception) {
+                        currentCoroutineContext().ensureActive()
+                        runtime.logger.error(e) { "Could not determine auth of request for origin recording" }
+                        null
+                    }
+                    OriginRecord.RequestInfo(
+                        principal = auth?.principalName,
+                        subjectId = auth?.rawId,
+                        sessionId = auth?.sessionId,
+                        sourceIp = request.sourceIp,
+                        engineRequestId = request.engineRequestId,
+                        upstreamRequestId = request.upstreamRequestId
+                    )
+                }
+            )
+        )
+    }
+
     context(runtime: ServerRuntime)
     override suspend fun <T> intercept(cont: suspend context(ServerRuntime) () -> T): T {
         val execution = runtime.execution
-        // we only need to record origins
-        return if (execution.origin != execution.id) cont()
-        else coroutineScope {
-            launch {
-                table().insertOne(
-                    RequestRecord(
-                        _id = RequestRecord.ID(execution.id.toExternal()),
 
+        val result = cont()
 
-                    )
-                )
+        // we only need to record origins. Http and WebSockets are handled specifically below.
+        if (execution.isOrigin() && execution !is Execution.Http && execution !is Execution.WebSocket) record(null)
+
+        return result
+    }
+
+    override fun <PATH : PathSpec, T> intercept(handler: WebSocketHandler<PATH, T>): WebSocketHandler<PATH, T> =
+        object : DelegatingWebSocketHandler<PATH, T>(handler) {
+            @OverrideOnly
+            context(serverRuntime: ServerRuntime)
+            override suspend fun willConnect(request: WebSocketConnectRequest<PATH>): T {
+                val result = wrapped.willConnect(request)
+                record(request)
+                return result
             }
-            cont()
         }
+
+    context(runtime: ServerRuntime)
+    override suspend fun <PATH : PathSpec> intercept(
+        request: HttpRequest<PATH>, cont: suspend context(ServerRuntime) (HttpRequest<PATH>) -> HttpResponse
+    ): HttpResponse {
+        val result = cont(request)
+        record(request)
+        return result
     }
 }
-
-/**
- * The resolved subject, or null when the request is anonymous or its credentials could not be
- * resolved at all.
- *
- * Resolved here, at the start of the request, rather than at the end: a request that dies mid-flight
- * should still be attributable. Resolution is memoized, so the handler's own auth check reuses it.
- */
-context(runtime: ServerRuntime)
-private suspend fun Request<*>.principalOrNull(): String? = try {
-    this[Authentication.CacheKey]?.toString()
-} catch (e: CancellationException) {
-    throw e
-} catch (_: Exception) {
-    null
-}
-

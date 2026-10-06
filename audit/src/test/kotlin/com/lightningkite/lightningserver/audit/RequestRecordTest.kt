@@ -19,7 +19,7 @@ class RequestRecordTest {
         val instant = Instant.fromEpochMilliseconds(1_700_000_123_456)
         val id = Uuid.generateV7NonMonotonicAt(instant)
 
-        val record = RequestRecord(
+        val record = OriginRecord(
             _id = id,
             rootExecutionId = id,
             sourceIp = "1.2.3.4",
@@ -35,7 +35,7 @@ class RequestRecordTest {
     @Test
     fun `a non-v7 id degrades to the epoch`() {
         val v4 = Uuid.random()
-        val record = RequestRecord(
+        val record = OriginRecord(
             _id = v4,
             rootExecutionId = v4,
             sourceIp = "1.2.3.4",

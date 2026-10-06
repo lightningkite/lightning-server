@@ -121,14 +121,14 @@ public data class HttpRequest<PATH : PathSpec>(
   which is intended — engines are the only legitimate constructors. The `TestRunner` helpers take
   `requestId: String = generateRequestId()`, so tests get one for free but can pin it when asserting
   correlation.
-- `parentRequestId` — set for sub-requests dispatched inside a multiplexed request (see
+- `parent` — set for sub-requests dispatched inside a multiplexed request (see
   [section 4.1](#41-metabulk-bypasses-the-entire-interceptor-chain)).
 - `upstreamRequestId` — informational only, see the security note below.
 
 `copyWithNewPathType` gained the corresponding parameters and preserves identity unchanged. Deriving
 a *new* logical request is a separate, explicitly-named operation so it cannot happen by accident:
 
-- `HttpRequest.subRequest(...)` — fresh `requestId`, `parentRequestId` set to the outer request. Used
+- `HttpRequest.subRequest(...)` — fresh `requestId`, `parent` set to the outer request. Used
   by the `/meta/bulk` dispatcher.
 - `WebSocketConnectRequest.subConnection(...)` — the same, for multiplexing. Used by
   `MultiplexWebSocketHandler`, where each channel is a distinct logical socket.
@@ -198,7 +198,7 @@ Correlation gaps land exactly where the unlogged disclosure channels are, so the
 - **WebSocket connections**: a `connectionId` established at connect. Each inbound message and each
   outbound push gets its own ID parented to the `connectionId`.
 - **Scheduled tasks and background jobs**: generated at dispatch. If a task was enqueued by a
-  request, `parentRequestId` carries that request's ID.
+  request, `parent` carries that request's ID.
 
 ---
 
@@ -856,7 +856,7 @@ session rather than to a frame. Socket-keying reproduces that exactly.
 
 **Resolved: keep socket-keyed rows, and carry the execution id on the records instead.**
 
-The question was whether per-phase attribution justified a `RequestRecord` row per phase execution —
+The question was whether per-phase attribution justified a `OriginRecord` row per phase execution —
 for a chatty socket, a row per client message, against a fail-closed write path. It does not, because
 the precision that was actually wanted can be had without those rows. Both record types written
 during a socket's life now carry `executionId` alongside `requestId`:
@@ -1001,7 +1001,7 @@ join on their contents.
 so a query joins to the same request record as a disclosure — which for a socket names the socket.
 `executionId` is the phase that actually issued the query. Carrying both costs 16 bytes and recovers
 the per-phase precision [5.8.2](#582-a-sockets-row-is-keyed-by-the-socket-not-by-the-phase-resolved)
-gives up, without a `RequestRecord` row per phase.
+gives up, without a `OriginRecord` row per phase.
 
 **Installation is the `log` slot, and scope is the registry.** The decorator is passed as
 `ModelInfo`'s `log` parameter (see 6.1), and no-ops for any model the audit registry does not know —
@@ -1213,7 +1213,7 @@ Sequenced so each step is independently shippable and testable, and so prerequis
    Must ship with per-engine conformance tests, not in-memory ones.
 6. ~~**Disclosure log**~~ ([section 5](#5-layer-2-the-disclosure-log-audited)) — **DONE.** Typed-output
    interception, the marker, the record shape and bit registry, the recording `Encoder`, the
-   [`RequestRecord`](#58-the-request-record--what-requestid-points-at) table with its two-write
+   [`OriginRecord`](#58-the-request-record--what-requestid-points-at) table with its two-write
    lifecycle, the fail-closed database sink, and the `_id`-in-partials rule from 5.3.3. Included as
    `AuditCore`.
 7. ~~**Data access log: conditions and sorts**~~ ([section 6.1](#61-extend-it-to-reads-every-condition-and-every-sort))

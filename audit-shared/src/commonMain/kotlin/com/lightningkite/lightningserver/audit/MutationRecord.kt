@@ -81,8 +81,8 @@ public enum class MutationOperation {
 @Serializable
 public data class MutationRecord(
     override val _id: ID,
-    @Index val requestId: RequestRecord.ID? = null,
-    @Index val attributedTo: RequestRecord.ID,
+    @Index val requestId: OriginRecord.ID? = null,
+    @Index val attributedTo: OriginRecord.ID,
     @Index val executionId: ExecutionId,
     val causedBy: ExecutionId? = null,
     @Index val rootExecutionId: ExecutionId,
@@ -99,7 +99,7 @@ public data class MutationRecord(
     @JvmInline
     public value class ID(override val raw: UuidV7) : TypedId<UuidV7, ID>
 
-    /** When the change happened, derived from the version-7 [_id]. See [RequestRecord] for why it lives there. */
+    /** When the change happened, derived from the version-7 [_id]. See [OriginRecord] for why it lives there. */
     public val at: Instant
         get() = _id.timestamp()
 

@@ -45,7 +45,7 @@ public enum class DataAccessOperation {
  * construction there are no record ids to name. A deployment that cannot accept that should deny the
  * grouping through permissions rather than expect the framework to forbid it.
  *
- * @property requestId Joins to [RequestRecord], and matches the id a [DisclosureRecord] from the same
+ * @property requestId Joins to [OriginRecord], and matches the id a [DisclosureRecord] from the same
  *   execution carries. For a WebSocket this names the socket, not the phase.
  * @property executionId The execution that actually issued the query. Recorded alongside [requestId]
  *   because that one deliberately blurs a socket's phases together; this is what places a query at a
@@ -71,7 +71,7 @@ public enum class DataAccessOperation {
 @Serializable
 public data class DataAccessRecord(
     override val _id: ID,
-    @Index val requestId: RequestRecord.ID,
+    @Index val requestId: OriginRecord.ID,
     @Index val executionId: ExecutionId,
     @Index val modelType: ModelTypeId,
     val operation: DataAccessOperation,
@@ -88,7 +88,7 @@ public data class DataAccessRecord(
     @JvmInline
     public value class ID(override val raw: UuidV7) : TypedId<UuidV7, ID>
 
-    /** When the query ran, derived from the version-7 [_id]. See [RequestRecord] for why it lives there. */
+    /** When the query ran, derived from the version-7 [_id]. See [OriginRecord] for why it lives there. */
     public val at: Instant
         get() = _id.timestamp()
 }

@@ -51,7 +51,7 @@ Tasks, schedules, startup and pre-deploy tasks are registered under all-constant
 **Cardinality note.** The initiator holds the *concrete* path (`/users/abc123`). `RequestRecord.endpoint`
 deliberately stores the *pattern* (`/users/{id}`) to keep that column's cardinality bounded — see
 `audit-logging.md`. That stays true; the pattern is now derived from the initiator rather than the
-request. Do not "fix" `RequestRecord` to store concrete segments.
+request. Do not "fix" `OriginRecord` to store concrete segments.
 
 ### 2.2 The initiator is serializable
 
@@ -84,7 +84,7 @@ Three real sources of parentage, no more:
 | multiplexed WebSocket sub-sockets | no |
 | a task launched from a request | **yes** — via the serialized initiator |
 
-`parent` must live on `Execution` rather than only in `RequestRecord`, otherwise launching a task
+`parent` must live on `Execution` rather than only in `OriginRecord`, otherwise launching a task
 from a request could not stamp parentage without a database read.
 
 `root` is carried as well (**approved**; it originated as a recommendation rather than a
@@ -106,7 +106,7 @@ call that reads the **selected clock for the execution** (the same `Engine.clock
 [`now()`](execution-context-refactor.md)), so a test's injected clock controls the id's embedded
 timestamp. Using v7 does two things: it makes the ids roughly time-ordered (so the append-mostly
 audit log inserts and its "last N" scans stay hot), and it *embeds the mint time in the id itself*,
-which is what lets `RequestRecord` drop its separate `at` column and derive the instant from the id.
+which is what lets `OriginRecord` drop its separate `at` column and derive the instant from the id.
 Every execution-id minting site — engines, initiator sub-request/phase/sub-connection, task runs,
 and `TestRunner.Direct` — goes through this generator so the derivation and the ordering are uniform.
 
@@ -114,7 +114,7 @@ API Gateway ids are **not** UUIDs and not 128 bits (HTTP API request ids and Web
 are both the compact ~11-byte base64 form). We do not attempt to map them. We always mint our own.
 
 The join to the gateway's access log is preserved by a new **`engineRequestId: String?`** column on
-`RequestRecord`: trusted, engine-supplied, holding the gateway/proxy's own id. It is deliberately
+`OriginRecord`: trusted, engine-supplied, holding the gateway/proxy's own id. It is deliberately
 **distinct from `upstreamRequestId`**, which is documented as an untrusted client claim and must not
 be conflated with a trusted gateway id. The join is: gateway log `requestId` → `engineRequestId` →
 our `Uuid`.
@@ -270,9 +270,9 @@ Each stage is one commit, must compile, and must leave `./gradlew check` no wors
   `context(engine: Engine)` function; drop the `SecureRandom` path entirely. Route every
   execution-id minting site (engines, `subRequest`/`phase`/`subConnection`, task runs,
   `TestRunner.Direct`) through it.
-- `Request.requestId` / `parentRequestId` → `Uuid` / `Uuid?`.
-- `RequestRecord._id` / `parentRequestId` → `Uuid` / `Uuid?`; `DisclosureRecord.requestId` → `Uuid`.
-- `RequestRecord` drops its `at` column; `RequestRecord.at` becomes a derived property reading the
+- `Request.requestId` / `parent` → `Uuid` / `Uuid?`.
+- `RequestRecord._id` / `parent` → `Uuid` / `Uuid?`; `DisclosureRecord.requestId` → `Uuid`.
+- `OriginRecord` drops its `at` column; `RequestRecord.at` becomes a derived property reading the
   v7 timestamp from `_id`. See `audit-logging.md` §5.8.
 - Add `RequestRecord.engineRequestId: String?` (see 2.6), separate from `upstreamRequestId`.
 - AWS: mint our own `Uuid` (v7); put `requestContext.requestId` in `engineRequestId`. Do **not** adopt.
@@ -287,9 +287,9 @@ Each stage is one commit, must compile, and must leave `./gradlew check` no wors
   handlers (`MultiplexWebSocketHandler`, `QueryParamWebSocketHandler`, `CoroutineWebSocketHandler`,
   `ApiWebSocketHandler`) and the interceptors.
 - Removes the `with(connection as ServerRuntime)` casts in `AccessLogInterceptor` and
-  `RequestRecordInterceptor`.
+  `OriginRecordInterceptor`.
 - **Add `abstract class DelegatingWebSocketHandler(wrapped)`** in core. `AccessLogInterceptor` and
-  `RequestRecordInterceptor` each hand-write all five methods to pass four of them straight through.
+  `OriginRecordInterceptor` each hand-write all five methods to pass four of them straight through.
 - **Fix `WebSocketInterceptor.compileAndInstrument()`**: its 3-branch `when` drops the `name` override
   in the `else` branch and never filters `None`. The HTTP side is a clean `fold`. Unify them.
 
@@ -308,7 +308,7 @@ typed socket in the repo follow.
 ### Stage 3 — `Execution`
 
 - Add the type per 3.1.
-- Move `requestId` / `parentRequestId` **off** `Request` onto `Execution`. `Request` keeps
+- Move `requestId` / `parent` **off** `Request` onto `Execution`. `Request` keeps
   `upstreamRequestId` only (a wire-level fact about the caller).
 - AWS persists the initiator alongside the connect request in the DynamoDB socket row so `socketId`
   survives the round trip.
@@ -354,7 +354,7 @@ Two things differ from the plan above, both deliberate:
 
 ### Known gaps left behind
 
-- `RequestRecord` for a socket is keyed by `socketId`, so a disclosure during a message phase answers
+- `OriginRecord` for a socket is keyed by `socketId`, so a disclosure during a message phase answers
   "sometime during this session" rather than "in response to this message". Non-regressing, since a
   socket's correlation id was already lifetime-constant. Finer attribution means a row per phase —
   see `audit-logging.md` §5.8.2.
@@ -366,4 +366,4 @@ Two things differ from the plan above, both deliberate:
 - `TestRunner` drives WebSocket phases directly rather than through the `*WithMetrics` helpers, so
   neither execution interceptors nor telemetry fire for sockets under test.
 - Eight typed test helpers in `typed/testing.kt` still run on `Initiator.Direct`, so disclosures from
-  them reference no `RequestRecord`. Pre-existing, and true before this work too.
+  them reference no `OriginRecord`. Pre-existing, and true before this work too.

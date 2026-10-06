@@ -29,7 +29,7 @@ import kotlin.uuid.Uuid
  * }
  * ```
  *
- * Every other layer's records carry a `requestId` that points at a [RequestRecord] here, so this is
+ * Every other layer's records carry a `requestId` that points at a [OriginRecord] here, so this is
  * the one piece that is not optional once anything else is included.
  *
  * ## Why auditing is a switch and not a default
@@ -54,8 +54,8 @@ import kotlin.uuid.Uuid
 public class AuditCore(
     internal val database: Runtime<Database>,
 ) : ServerBuilder() {
-    public val requests: DatabaseTableRegistration<RequestRecord> =
-        database.registerTable("AuditRequest", RequestRecord.serializer())
+    public val requests: DatabaseTableRegistration<OriginRecord> =
+        database.registerTable("AuditRequest", OriginRecord.serializer())
 
     private val registrations: DatabaseTableRegistration<AuditModelRegistration> =
         database.registerTable("AuditModelRegistration", AuditModelRegistration.serializer())
@@ -104,7 +104,7 @@ public class AuditCore(
     }
 
     init {
-        install(RequestRecordInterceptor(requests))
+        install(OriginRecordInterceptor(requests))
     }
 }
 

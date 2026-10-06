@@ -155,7 +155,7 @@ class DisclosureLogEndToEndTest {
         assertEquals("GET", record.method)
         assertEquals("200", record.outcome)
         assertNotNull(record.durationMs)
-        assertNull(record.parentRequestId)
+        assertNull(record.parent)
     }
 
     @Test
@@ -191,7 +191,7 @@ class DisclosureLogEndToEndTest {
             testId(4),
         )
 
-        val subs = requests().filter { it.parentRequestId == testId(4).uuid }
+        val subs = requests().filter { it.parent == testId(4).uuid }
         assertEquals(2, subs.size, "expected one request record per sub-request; saw ${requests().map { it._id }}")
         assertTrue(requests().any { it._id == testId(4).uuid }, "the carrying request was not recorded")
 

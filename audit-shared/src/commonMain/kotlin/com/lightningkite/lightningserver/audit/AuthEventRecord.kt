@@ -19,7 +19,7 @@ import kotlinx.serialization.Serializable
  * deleted on the next success, or a debug `println`. None of those can be counted, ordered, or
  * alerted on.
  *
- * @property requestId Joins to [RequestRecord], so an auth event and the disclosures made under the
+ * @property requestId Joins to [OriginRecord], so an auth event and the disclosures made under the
  *   resulting session share one identifier.
  * @property principal Who the event is about — the subject id, as a string, since principals differ
  *   in key type across a deployment.
@@ -40,7 +40,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 public data class AuthEventRecord(
     override val _id: ID,
-    @Index val requestId: RequestRecord.ID,
+    @Index val requestId: OriginRecord.ID,
     @Index val type: AuthEventType,
     @Index val principal: String? = null,
     val actor: String? = null,
@@ -55,7 +55,7 @@ public data class AuthEventRecord(
     @JvmInline
     public value class ID(override val raw: UuidV7) : TypedId<UuidV7, ID>
 
-    /** When the event happened, derived from the version-7 [_id]. See [RequestRecord]. */
+    /** When the event happened, derived from the version-7 [_id]. See [OriginRecord]. */
     public val at: Instant
         get() = _id.timestamp()
 

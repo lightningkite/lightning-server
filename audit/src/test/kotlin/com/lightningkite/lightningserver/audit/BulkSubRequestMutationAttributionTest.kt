@@ -83,7 +83,7 @@ class BulkSubRequestMutationAttributionTest {
     context(server: ServerRuntime)
     private suspend fun mutations() = BulkTestServer.mutationLog.mutations().find(Condition.Always).toList()
 
-    private fun List<RequestRecord>.rowFor(id: Uuid?): RequestRecord? = firstOrNull { it._id == id }
+    private fun List<OriginRecord>.rowFor(id: Uuid?): OriginRecord? = firstOrNull { it._id == id }
 
     /**
      * A bulk request carrying one sub-request, with no credential of its own.
