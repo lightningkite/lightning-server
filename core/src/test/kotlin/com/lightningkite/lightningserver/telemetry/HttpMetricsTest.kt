@@ -9,47 +9,8 @@ import kotlin.test.assertEquals
 class HttpMetricsTest {
 
     @Test
-    fun `statusCategory returns correct category for various status codes`() {
-        // 1xx Informational
-        assertEquals("1xx", HttpMetrics.statusCategory(100))
-        assertEquals("1xx", HttpMetrics.statusCategory(101))
-        assertEquals("1xx", HttpMetrics.statusCategory(199))
-
-        // 2xx Success
-        assertEquals("2xx", HttpMetrics.statusCategory(200))
-        assertEquals("2xx", HttpMetrics.statusCategory(201))
-        assertEquals("2xx", HttpMetrics.statusCategory(204))
-        assertEquals("2xx", HttpMetrics.statusCategory(299))
-
-        // 3xx Redirection
-        assertEquals("3xx", HttpMetrics.statusCategory(300))
-        assertEquals("3xx", HttpMetrics.statusCategory(301))
-        assertEquals("3xx", HttpMetrics.statusCategory(307))
-        assertEquals("3xx", HttpMetrics.statusCategory(399))
-
-        // 4xx Client Error
-        assertEquals("4xx", HttpMetrics.statusCategory(400))
-        assertEquals("4xx", HttpMetrics.statusCategory(401))
-        assertEquals("4xx", HttpMetrics.statusCategory(404))
-        assertEquals("4xx", HttpMetrics.statusCategory(499))
-
-        // 5xx Server Error
-        assertEquals("5xx", HttpMetrics.statusCategory(500))
-        assertEquals("5xx", HttpMetrics.statusCategory(502))
-        assertEquals("5xx", HttpMetrics.statusCategory(503))
-        assertEquals("5xx", HttpMetrics.statusCategory(599))
-
-        // Unknown
-        assertEquals("unknown", HttpMetrics.statusCategory(0))
-        assertEquals("unknown", HttpMetrics.statusCategory(99))
-        assertEquals("unknown", HttpMetrics.statusCategory(600))
-        assertEquals("unknown", HttpMetrics.statusCategory(-1))
-    }
-
-    @Test
     fun `record increments counters correctly`() {
         val requestCountValue = AtomicLong(0)
-        val responseCategoryValue = AtomicLong(0)
         val errorCountValue = AtomicLong(0)
         val durationValue = AtomicLong(0)
 
@@ -68,7 +29,6 @@ class HttpMetricsTest {
                             override fun add(value: Long) {
                                 when (name) {
                                     "http.server.request.count" -> requestCountValue.addAndGet(value)
-                                    "http.server.response.status.category" -> responseCategoryValue.addAndGet(value)
                                     "http.server.errors" -> errorCountValue.addAndGet(value)
                                 }
                             }
@@ -135,7 +95,6 @@ class HttpMetricsTest {
         )
 
         assertEquals(1L, requestCountValue.get())
-        assertEquals(1L, responseCategoryValue.get())
         assertEquals(0L, errorCountValue.get())
         assertEquals(45L, durationValue.get())
 
@@ -148,7 +107,6 @@ class HttpMetricsTest {
         )
 
         assertEquals(2L, requestCountValue.get())
-        assertEquals(2L, responseCategoryValue.get())
         assertEquals(0L, errorCountValue.get())
         assertEquals(100L, durationValue.get())
 
@@ -162,7 +120,6 @@ class HttpMetricsTest {
         )
 
         assertEquals(3L, requestCountValue.get())
-        assertEquals(3L, responseCategoryValue.get())
         assertEquals(1L, errorCountValue.get())
         assertEquals(200L, durationValue.get())
     }

@@ -10,7 +10,6 @@ import io.opentelemetry.api.metrics.*
  * Provides standard HTTP server metrics following OpenTelemetry semantic conventions:
  * - http.server.request.duration: Duration of HTTP requests (histogram)
  * - http.server.request.count: Total count of HTTP requests (counter)
- * - http.server.response.status.category: Count by status code category (counter)
  * - http.server.errors: Count of server errors (counter)
  *
  * Usage:
@@ -38,15 +37,6 @@ public class HttpMetrics(meter: Meter) {
     public val requestCount: LongCounter = meter.counterBuilder("http.server.request.count")
         .setDescription("Total count of HTTP server requests")
         .setUnit("{request}")
-        .build()
-
-    /**
-     * Counter for HTTP responses by status category.
-     * Attributes: http.method, http.route, http.status_category (1xx, 2xx, 3xx, 4xx, 5xx)
-     */
-    public val responsesByCategory: LongCounter = meter.counterBuilder("http.server.response.status.category")
-        .setDescription("Count of HTTP responses by status category")
-        .setUnit("{response}")
         .build()
 
     /**
@@ -80,20 +70,11 @@ public class HttpMetrics(meter: Meter) {
             HTTP_STATUS_CODE, statusCode.toLong()
         )
 
-        val categoryAttributes = Attributes.of(
-            HTTP_METHOD, method,
-            HTTP_ROUTE, route,
-            HTTP_STATUS_CATEGORY, statusCategory(statusCode)
-        )
-
         // Record request duration
         requestDuration.record(durationMs, attributes)
 
         // Increment request count
         requestCount.add(1, attributes)
-
-        // Increment category counter
-        responsesByCategory.add(1, categoryAttributes)
 
         // Record errors (5xx)
         if (statusCode >= 500) {
@@ -111,19 +92,6 @@ public class HttpMetrics(meter: Meter) {
         public val HTTP_METHOD: AttributeKey<String> = AttributeKey.stringKey("http.method")
         public val HTTP_ROUTE: AttributeKey<String> = AttributeKey.stringKey("http.route")
         public val HTTP_STATUS_CODE: AttributeKey<Long> = AttributeKey.longKey("http.status_code")
-        public val HTTP_STATUS_CATEGORY: AttributeKey<String> = AttributeKey.stringKey("http.status_category")
         public val ERROR_TYPE: AttributeKey<String> = AttributeKey.stringKey("error.type")
-
-        /**
-         * Converts HTTP status code to category string (1xx, 2xx, 3xx, 4xx, 5xx).
-         */
-        public fun statusCategory(code: Int): String = when (code) {
-            in 100..199 -> "1xx"
-            in 200..299 -> "2xx"
-            in 300..399 -> "3xx"
-            in 400..499 -> "4xx"
-            in 500..599 -> "5xx"
-            else -> "unknown"
-        }
     }
 }

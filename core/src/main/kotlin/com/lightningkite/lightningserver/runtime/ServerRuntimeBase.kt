@@ -82,7 +82,6 @@ public abstract class ServerRuntimeBase(override val server: ServerDefinition) :
      * Provides metrics for:
      * - Request duration (histogram)
      * - Request count (counter)
-     * - Response status category (counter)
      * - Server errors (counter)
      */
     public val httpMetrics: HttpMetrics? by lazy {
