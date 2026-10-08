@@ -1,16 +1,24 @@
 package com.lightningkite.lightningserver.audit
 
+import com.lightningkite.lightningserver.auth.Authentication
+import com.lightningkite.lightningserver.data.Request
+import com.lightningkite.lightningserver.data.get
 import com.lightningkite.lightningserver.definition.PreDeployTask
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
+import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.runtime.Engine
-import com.lightningkite.lightningserver.runtime.Execution
+import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.serverRuntime
 import com.lightningkite.lightningserver.typed.ApiHttpHandler
 import com.lightningkite.lightningserver.typed.ApiWebSocketHandler
 import com.lightningkite.lightningserver.typed.DatabaseTableRegistration
 import com.lightningkite.lightningserver.typed.registerTable
 import com.lightningkite.services.database.Database
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlin.uuid.Uuid
 
@@ -51,11 +59,13 @@ import kotlin.uuid.Uuid
  * @property registry What every model id and every bit permanently mean. Needed to read a disclosure:
  *   a [DisclosureRecord]'s bits are meaningless without it.
  */
-public class AuditCore(
+public class AuditCore<REQUEST_INFO>(
     internal val database: Runtime<Database>,
+    requestInfoSerializer: KSerializer<REQUEST_INFO>,
+    getInfo: suspend context(ServerRuntime) (Request<*>) -> REQUEST_INFO
 ) : ServerBuilder() {
-    public val originsTable: DatabaseTableRegistration<OriginRecord> =
-        database.registerTable("AuditRequest", OriginRecord.serializer())
+    public val originsTable: DatabaseTableRegistration<OriginRecord<REQUEST_INFO>> =
+        database.registerTable("AuditRequest", OriginRecord.serializer(requestInfoSerializer))
 
     private val modelRegistrations: DatabaseTableRegistration<AuditModelRegistration> =
         database.registerTable("AuditModelRegistration", AuditModelRegistration.serializer())
@@ -103,12 +113,34 @@ public class AuditCore(
         )
     }
 
-    internal val origins: OriginRecordInterceptor = OriginRecordInterceptor(originsTable)
+    public val origins: OriginRecordInterceptor<REQUEST_INFO> = OriginRecordInterceptor(
+        originsTable,
+        requestInfoSerializer,
+        getInfo
+    )
 
     init {
         origins.install()
     }
 }
+
+public fun AuditCore(database: Runtime<Database>): AuditCore<OriginRecord.StandardRequestInfo> =
+    AuditCore(database, OriginRecord.StandardRequestInfo.serializer()) { request ->
+        val auth = try {
+            request[Authentication.CacheKey]?.let { it.fromMasquerade ?: it }
+        } catch (e: Exception) {
+            currentCoroutineContext().ensureActive()
+            serverRuntime.logger.error(e) { "Could not determine auth of request for origin recording" }
+            null
+        }
+        OriginRecord.StandardRequestInfo(
+            subjectId = auth?.rawId?.let(Uuid::parseOrNull),
+            sessionId = auth?.sessionId?.let(Uuid::parseOrNull),
+            sourceIp = request.sourceIp,
+            engineRequestId = request.engineRequestId,
+            upstreamRequestId = request.upstreamRequestId,
+        )
+    }
 
 /**
  * Every audited model this server can disclose, found by walking the serializers its endpoints

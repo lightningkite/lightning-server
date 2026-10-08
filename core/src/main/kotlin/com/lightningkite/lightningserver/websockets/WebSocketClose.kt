@@ -28,8 +28,9 @@ public data class WebSocketClose(
     public val isExceptional: Boolean get() = cause != null
 
     public companion object {
-        public val NORMAL: WebSocketClose get() = WebSocketClose(Code.NORMAL, null, null)
-        public val GOING_AWAY: WebSocketClose get() = WebSocketClose(Code.GOING_AWAY, null, null)
+        public val NORMAL: WebSocketClose = WebSocketClose(Code.NORMAL, null, null)
+        public val GOING_AWAY: WebSocketClose = WebSocketClose(Code.GOING_AWAY, null, null)
+
         /**
          * The close for a socket that ended because [exception] was thrown.
          *
