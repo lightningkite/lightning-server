@@ -51,9 +51,14 @@ public fun TotpSecret(
 )
 
 public val TotpSecret.secret: ByteArray get() = Base32.decode(secretBase32)
-public val TotpSecret.url: String
-    get() = OtpAuthUriBuilder.forTotp(secretBase32.toByteArray())
-        .label(label, issuer)
+
+/**
+ * The `otpauth://` URI for this secret. [accountName] becomes the account part of the URI's `Issuer:AccountName`
+ * label, which authenticator apps show to tell accounts apart, so it should identify the subject (e.g. an email).
+ */
+public fun TotpSecret.url(accountName: String): String =
+    OtpAuthUriBuilder.forTotp(secretBase32.toByteArray())
+        .label(accountName, issuer)
         .issuer(issuer)
         .digits(digits)
         .period(period.inWholeMilliseconds, TimeUnit.MILLISECONDS)

@@ -43,6 +43,12 @@ public class TimeBasedOTPProofEndpoints(
         codeDigits = 6,
         hmacAlgorithm = HmacAlgorithm.SHA1
     ),
+    /**
+     * Supplies the account name authenticator apps show for a new secret (the account part of the `otpauth://` URI's
+     * label), usually the subject's email or username. Returning null falls back to the secret's [TotpSecret.label],
+     * which puts the user's own name for the secret into their authenticator app instead.
+     */
+    private val accountName: context(ServerRuntime) (HasId<*>) -> String? = { null },
 ) : ServerBuilder(), DirectProofMethod {
     init {
         proofMethodsRegistry.register(this)
@@ -115,7 +121,7 @@ public class TimeBasedOTPProofEndpoints(
                     config = config,
                 )
                 modelInfo.table().insertOne(secret)
-                secret.url
+                secret.url(accountName(auth.fetch()) ?: secret.label)
             }
         )
 

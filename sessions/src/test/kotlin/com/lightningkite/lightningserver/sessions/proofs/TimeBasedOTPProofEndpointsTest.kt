@@ -9,21 +9,25 @@ import com.lightningkite.lightningserver.encryption.SecretBasis
 import com.lightningkite.lightningserver.encryption.signer
 import com.lightningkite.lightningserver.runtime.ServerRuntime
 import com.lightningkite.lightningserver.runtime.test.test
+import com.lightningkite.lightningserver.sessions.EstablishTotp
 import com.lightningkite.lightningserver.sessions.TotpSecret
 import com.lightningkite.lightningserver.sessions.proofs.extensions.code
 import com.lightningkite.lightningserver.sessions.proofs.extensions.generator
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.services.cache.Cache
+import com.lightningkite.services.database.Condition
 import com.lightningkite.services.database.Database
 import com.lightningkite.services.database.HasId
 import dev.turingcomplete.kotlinonetimepassword.HmacAlgorithm
 import dev.turingcomplete.kotlinonetimepassword.TimeBasedOneTimePasswordConfig
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import org.bouncycastle.util.encoders.Base32
 import org.junit.Test
+import java.net.URLDecoder
 import java.util.concurrent.TimeUnit
 import kotlin.test.*
 import kotlin.time.Clock
@@ -600,6 +604,84 @@ class TimeBasedOTPProofEndpointsTest {
                     blocked.message.contains("Too many attempts"),
                     "Expected the shared rate limiter to block, but got: ${blocked.message}"
                 )
+            }
+        }
+    }
+
+    /** The account name and issuer from an `otpauth://totp/Issuer:AccountName?...` URI. */
+    private fun otpAuthLabel(url: String): String =
+        URLDecoder.decode(url.substringAfter("otpauth://totp/").substringBefore("?"), Charsets.UTF_8)
+
+    @Test
+    fun `establish puts the supplied account name in the URI instead of the label`() = runBlocking {
+        TestUser.users.clear()
+        val userId = Uuid.random()
+        val user = TestUser(userId, "test@example.com")
+        TestUser.users[userId] = user
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
+
+            init {
+                register(TestUser)
+            }
+
+            val totpEndpoints = path.path("auth").path("totp") include TimeBasedOTPProofEndpoints(
+                database = database,
+                cache = cache,
+                proofSigner = RuntimeDeferred.Cached { testBasis.signer("proof") },
+                proofExpiration = 1.hours,
+                config = testConfig,
+                accountName = { (it as TestUser).email },
+            )
+        }.let { server ->
+            server.test({}) {
+                @Suppress("UNCHECKED_CAST")
+                val auth = TestUser.testAuth(user) as Authentication<HasId<*>>
+                val url = server.totpEndpoints.establish.test(auth, EstablishTotp("Work Phone"))
+
+                val label = otpAuthLabel(url)
+                assertTrue(label.endsWith(":test@example.com"), "Unexpected otpauth label: $label")
+                assertFalse("Work Phone" in label)
+
+                // The user's own name for the secret is still what gets stored
+                val stored = server.totpEndpoints.modelInfo.table().find(Condition.Always).toList().single()
+                assertEquals("Work Phone", stored.label)
+            }
+        }
+    }
+
+    @Test
+    fun `establish falls back to the label when no account name is supplied`() = runBlocking {
+        TestUser.users.clear()
+        val userId = Uuid.random()
+        val user = TestUser(userId, "test@example.com")
+        TestUser.users[userId] = user
+
+        object : ServerBuilder() {
+            val database = setting("database", Database.Settings("ram"))
+            val cache = setting("cache", Cache.Settings("ram"))
+
+            init {
+                register(TestUser)
+            }
+
+            val totpEndpoints = path.path("auth").path("totp") include TimeBasedOTPProofEndpoints(
+                database = database,
+                cache = cache,
+                proofSigner = RuntimeDeferred.Cached { testBasis.signer("proof") },
+                proofExpiration = 1.hours,
+                config = testConfig,
+            )
+        }.let { server ->
+            server.test({}) {
+                @Suppress("UNCHECKED_CAST")
+                val auth = TestUser.testAuth(user) as Authentication<HasId<*>>
+                val url = server.totpEndpoints.establish.test(auth, EstablishTotp("Work Phone"))
+
+                val label = otpAuthLabel(url)
+                assertTrue(label.endsWith(":Work Phone"), "Unexpected otpauth label: $label")
             }
         }
     }
