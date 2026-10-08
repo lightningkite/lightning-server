@@ -383,9 +383,9 @@ public data class HttpInstrumentationResult<out T>(
 /**
  * Wraps an HTTP request flow with the standard root-span attributes and metrics.
  *
- * Resolves the route pattern from the request (falling back to the literal target if the route
- * is not matched), opens a span named "$method $route", sets the standard `http.*` attributes,
- * runs the action, then records `http.status_code` on the span and the request to [HttpMetrics].
+ * Resolves the route pattern from the request, opens a span named "$method $route" (or "unmatched"
+ * when no route matches), sets the standard `http.*` attributes, runs the action, then records
+ * `http.status_code` on the span and the request to [HttpMetrics].
  *
  * Used both by [handle] for top-level HTTP request handling and by handlers that re-dispatch
  * inner requests (for example the bulk endpoint in `MetaEndpoints`), so that each sub-request
@@ -400,12 +400,16 @@ public suspend inline fun <T> instrumentHttpRequest(
     val method = request.path.method.toString()
     val route = try {
         request.path.match.path.pathSpec.toString()
-    } catch (_: Exception) {
-        "/" + request.path.pathSegments.toString()
+    } catch (_: RouteNotFoundException) {
+        null
     }
-    return instrument("$method $route") { span ->
+    // These become metric labels.  An unmatched request's path and method are whatever the client
+    // sent (scanners send thousands), so they must not appear in them.
+    val metricMethod = if (route == null) "unmatched" else method
+    val metricRoute = route ?: "unmatched"
+    return instrument(if (route == null) "unmatched" else "$method $route") { span ->
         span?.setAttribute("http.method", method)
-        span?.setAttribute("http.route", route)
+        route?.let { span?.setAttribute("http.route", it) }
         span?.setAttribute("http.target", "/" + request.path.pathSegments.toString())
         span?.setAttribute("http.scheme", request.protocol)
         span?.setAttribute("http.host", request.domain)
@@ -417,8 +421,8 @@ public suspend inline fun <T> instrumentHttpRequest(
 
         val durationMs = System.currentTimeMillis() - startTime
         (runtime as? ServerRuntimeBase)?.httpMetrics?.record(
-            method = method,
-            route = route,
+            method = metricMethod,
+            route = metricRoute,
             statusCode = result.statusCode,
             durationMs = durationMs,
             errorType = result.errorType,

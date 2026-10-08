@@ -17,8 +17,6 @@ import io.opentelemetry.api.trace.SpanId
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 import kotlin.test.fail
 
 /**
@@ -104,7 +102,7 @@ class HttpSpanTest {
             runBlocking {
                 serverRuntime.handle(
                     HttpRequest<PathSpec>(
-                        path = RawHttpEndpoint(asString = "/does/not/exist", method = HttpMethod.GET),
+                        path = RawHttpEndpoint(asString = "/does/not/exist", method = HttpMethod("SCAN")),
                         queryParameters = QueryParameters.EMPTY,
                         headers = HttpHeaders.EMPTY,
                         domain = "example.com",
@@ -118,16 +116,18 @@ class HttpSpanTest {
             val root = spans.firstOrNull { it.parentSpanContext.spanId == SpanId.getInvalid() }
                 ?: fail("Expected a root span even for unmatched routes. Got: ${spans.map { it.name }}")
 
-            // For unmatched paths we fall back to using the literal target as the route name —
-            // the important thing is that we still produce a single top-level HTTP span.
-            assertTrue(
-                root.name.startsWith("GET "),
-                "Root span should still start with the verb, was \"${root.name}\"",
-            )
-            assertNotNull(
-                root.attributes.asMap().entries.firstOrNull { it.key.key == "http.method" }?.value,
-                "Root span should carry http.method attribute",
-            )
+            assertEquals("unmatched", root.name)
+            val spanAttributes = root.attributes.asMap().mapKeys { it.key.key }
+            assertEquals(null, spanAttributes["http.route"])
+            assertEquals("/does/not/exist", spanAttributes["http.target"])
+            assertEquals("SCAN", spanAttributes["http.method"])
+
+            // Metric labels must not carry the client-supplied path or method: each distinct value is
+            // a new billed time series.
+            val requestCount = InMemoryTelemetry.metrics().single { it.name == "http.server.request.count" }
+            val labels = requestCount.longSumData.points.single().attributes.asMap().mapKeys { it.key.key }
+            assertEquals("unmatched", labels["http.route"])
+            assertEquals("unmatched", labels["http.method"])
         }
     }
 }
