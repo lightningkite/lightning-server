@@ -8,8 +8,7 @@ import io.opentelemetry.api.metrics.*
  * HTTP metrics registry for OpenTelemetry.
  *
  * Provides standard HTTP server metrics following OpenTelemetry semantic conventions:
- * - http.server.request.duration: Duration of HTTP requests (histogram)
- * - http.server.request.count: Total count of HTTP requests (counter)
+ * - http.server.request.duration: Duration of HTTP requests (histogram; its count is the request count)
  * - http.server.errors: Count of server errors (counter)
  *
  * Usage:
@@ -28,15 +27,6 @@ public class HttpMetrics(meter: Meter) {
         .setDescription("Duration of HTTP server requests in milliseconds")
         .setUnit("ms")
         .ofLongs()
-        .build()
-
-    /**
-     * Counter for total HTTP requests.
-     * Attributes: http.method, http.route, http.status_code
-     */
-    public val requestCount: LongCounter = meter.counterBuilder("http.server.request.count")
-        .setDescription("Total count of HTTP server requests")
-        .setUnit("{request}")
         .build()
 
     /**
@@ -70,11 +60,7 @@ public class HttpMetrics(meter: Meter) {
             HTTP_STATUS_CODE, statusCode.toLong()
         )
 
-        // Record request duration
         requestDuration.record(durationMs, attributes)
-
-        // Increment request count
-        requestCount.add(1, attributes)
 
         // Record errors (5xx)
         if (statusCode >= 500) {

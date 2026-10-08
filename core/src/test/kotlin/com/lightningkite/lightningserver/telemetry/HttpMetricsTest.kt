@@ -10,7 +10,6 @@ class HttpMetricsTest {
 
     @Test
     fun `record increments counters correctly`() {
-        val requestCountValue = AtomicLong(0)
         val errorCountValue = AtomicLong(0)
         val durationValue = AtomicLong(0)
 
@@ -28,7 +27,6 @@ class HttpMetricsTest {
                         return object : LongCounter {
                             override fun add(value: Long) {
                                 when (name) {
-                                    "http.server.request.count" -> requestCountValue.addAndGet(value)
                                     "http.server.errors" -> errorCountValue.addAndGet(value)
                                 }
                             }
@@ -94,7 +92,6 @@ class HttpMetricsTest {
             durationMs = 45
         )
 
-        assertEquals(1L, requestCountValue.get())
         assertEquals(0L, errorCountValue.get())
         assertEquals(45L, durationValue.get())
 
@@ -106,7 +103,6 @@ class HttpMetricsTest {
             durationMs = 100
         )
 
-        assertEquals(2L, requestCountValue.get())
         assertEquals(0L, errorCountValue.get())
         assertEquals(100L, durationValue.get())
 
@@ -119,7 +115,6 @@ class HttpMetricsTest {
             errorType = "NullPointerException"
         )
 
-        assertEquals(3L, requestCountValue.get())
         assertEquals(1L, errorCountValue.get())
         assertEquals(200L, durationValue.get())
     }

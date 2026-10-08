@@ -81,7 +81,6 @@ public abstract class ServerRuntimeBase(override val server: ServerDefinition) :
      * Lazily initialized when first accessed. Returns null if telemetry is not configured.
      * Provides metrics for:
      * - Request duration (histogram)
-     * - Request count (counter)
      * - Server errors (counter)
      */
     public val httpMetrics: HttpMetrics? by lazy {

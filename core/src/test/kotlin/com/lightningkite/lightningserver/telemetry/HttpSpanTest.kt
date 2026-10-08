@@ -124,8 +124,8 @@ class HttpSpanTest {
 
             // Metric labels must not carry the client-supplied path or method: each distinct value is
             // a new billed time series.
-            val requestCount = InMemoryTelemetry.metrics().single { it.name == "http.server.request.count" }
-            val labels = requestCount.longSumData.points.single().attributes.asMap().mapKeys { it.key.key }
+            val duration = InMemoryTelemetry.metrics().single { it.name == "http.server.request.duration" }
+            val labels = duration.histogramData.points.single().attributes.asMap().mapKeys { it.key.key }
             assertEquals("unmatched", labels["http.route"])
             assertEquals("unmatched", labels["http.method"])
         }
