@@ -106,7 +106,7 @@ class AuditLayerRuntimeIndependenceTest {
                 // thing the core supplies.
                 assertEquals(
                     listOf(requestId.originId),
-                    TestServer.audit.requests().find(Condition.Always).toList().map { it._id },
+                    TestServer.audit.originsTable().find(Condition.Always).toList().map { it._id },
                 )
             }
         }

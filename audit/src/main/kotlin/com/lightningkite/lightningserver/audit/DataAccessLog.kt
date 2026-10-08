@@ -75,7 +75,7 @@ public fun <T : Any> DataAccessLog.dataAccessLogged(table: Table<T>): Table<T> {
         nowMillis = { runtime.clock.now().toEpochMilliseconds() },
         write = {
             with(runtime) {
-                origins.ensureRecorded()
+                origins.flush()
                 dataAccess().insertOne(it)
             }
         },

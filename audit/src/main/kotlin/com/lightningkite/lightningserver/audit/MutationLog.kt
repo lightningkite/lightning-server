@@ -86,7 +86,7 @@ public fun <T : Any> MutationLog.mutationLogged(table: Table<T>): Table<T> {
         nowMillis = { runtime.clock.now().toEpochMilliseconds() },
         write = {
             with(runtime) {
-                origins.ensureRecorded()
+                origins.flush()
                 mutations().insertOne(it)
             }
         },

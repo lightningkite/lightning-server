@@ -87,7 +87,7 @@ class WebSocketMutationAttributionTest {
     }
 
     context(server: ServerRuntime)
-    private suspend fun requests() = TestServer.audit.requests().find(Condition.Always).toList()
+    private suspend fun requests() = TestServer.audit.originsTable().find(Condition.Always).toList()
 
     context(server: ServerRuntime)
     private suspend fun mutations() = TestServer.mutationLog.mutations().find(Condition.Always).toList()
@@ -121,8 +121,8 @@ class WebSocketMutationAttributionTest {
         val byAttribution = requests.rowFor(mutation.attributedTo)
         assertNotNull(byAttribution, "attributedTo ${mutation.attributedTo} names no request row")
         assertTrue(
-            byAttribution.request?.principal?.contains(user.toString()) == true,
-            "the request the change attributes to does not name the authenticated user: ${byAttribution.request?.principal}",
+            byAttribution.request?.subjectId == user.toString(),
+            "the request the change attributes to does not name the authenticated user: ${byAttribution.request?.subjectId}",
         )
         assertEquals(mutation.executionId, mutation.rootExecutionId, "a message phase nothing dispatched is its own root")
     }
@@ -149,8 +149,8 @@ class WebSocketMutationAttributionTest {
             "the task should attribute to the socket it descends from",
         )
         assertTrue(
-            byAttribution.request?.principal?.contains(user.toString()) == true,
-            "the request the change attributes to does not name the authenticated user: ${byAttribution.request?.principal}",
+            byAttribution.request?.subjectId == user.toString(),
+            "the request the change attributes to does not name the authenticated user: ${byAttribution.request?.subjectId}",
         )
         // The anchor survived the queue: it is carried in the serialized Execution.Task, not derived.
         // The root is the message phase that launched the task, which is its own root.
@@ -188,8 +188,8 @@ class WebSocketMutationAttributionTest {
         assertNotNull(byAttribution, "attributedTo ${mutation.attributedTo} names no request row")
         assertEquals("/socket", byAttribution.endpoint, "a sub-socket attributes to its own row, not the carrier's")
         assertTrue(
-            byAttribution.request?.principal?.contains(user.toString()) == true,
-            "the request the change attributes to does not name the authenticated user: ${byAttribution.request?.principal}",
+            byAttribution.request?.subjectId == user.toString(),
+            "the request the change attributes to does not name the authenticated user: ${byAttribution.request?.subjectId}",
         )
     }
 
@@ -218,8 +218,8 @@ class WebSocketMutationAttributionTest {
                 "the anchor a task inherits is the sub-socket's, not the carrier the root names",
             )
             assertTrue(
-                byAttribution.request?.principal?.contains(user.toString()) == true,
-                "the request the change attributes to does not name the authenticated user: ${byAttribution.request?.principal}",
+                byAttribution.request?.subjectId == user.toString(),
+                "the request the change attributes to does not name the authenticated user: ${byAttribution.request?.subjectId}",
             )
         }
 
@@ -244,12 +244,12 @@ class WebSocketMutationAttributionTest {
             val requests = requests()
             val carrier = requests.rowFor(physical.request.socketId.originId)
             assertNotNull(carrier)
-            assertNull(carrier.request?.principal, "the carrier was supposed to be anonymous")
+            assertNull(carrier.request?.subjectId, "the carrier was supposed to be anonymous")
 
             val sub = requests.single { it.endpoint == "/socket" }
             assertTrue(
-                sub.request?.principal?.contains(user.toString()) == true,
-                "the sub-socket did not authenticate on its own query parameters: ${sub.request?.principal}",
+                sub.request?.subjectId == user.toString(),
+                "the sub-socket did not authenticate on its own query parameters: ${sub.request?.subjectId}",
             )
         }
 
@@ -273,14 +273,14 @@ class WebSocketMutationAttributionTest {
             assertNotNull(byAttribution, "attributedTo ${mutation.attributedTo} names no request row")
             assertEquals("/socket", byAttribution.endpoint)
             assertTrue(
-                byAttribution.request?.principal?.contains(user.toString()) == true,
-                "the sub-socket's own row does not name the person: ${byAttribution.request?.principal}",
+                byAttribution.request?.subjectId == user.toString(),
+                "the sub-socket's own row does not name the person: ${byAttribution.request?.subjectId}",
             )
 
             val carrier = requests.rowFor(byAttribution.parent)
             assertNotNull(carrier, "the sub-socket's row names no parent row")
             assertEquals("/multiplex", carrier.endpoint)
-            assertNull(carrier.request?.principal, "the carrier is anonymous, so it must not be what names the person")
+            assertNull(carrier.request?.subjectId, "the carrier is anonymous, so it must not be what names the person")
         }
 
     /**
@@ -313,16 +313,16 @@ class WebSocketMutationAttributionTest {
             assertNotNull(byAttribution, "attributedTo ${mutation.attributedTo} names no request row")
             assertEquals("/socket", byAttribution.endpoint, "the task inherited the sub-socket's anchor")
             assertTrue(
-                byAttribution.request?.principal?.contains(user.toString()) == true,
+                byAttribution.request?.subjectId == user.toString(),
                 "a change a person made through a multiplexed socket must name that person: " +
-                    "${byAttribution.request?.principal}",
+                    "${byAttribution.request?.subjectId}",
             )
 
             // And the carrier, reached through the sub-socket's parent row, is still anonymous.
             val carrier = requests.rowFor(byAttribution.parent)
             assertNotNull(carrier)
             assertEquals("/multiplex", carrier.endpoint)
-            assertNull(carrier.request?.principal)
+            assertNull(carrier.request?.subjectId)
         }
 
     /**

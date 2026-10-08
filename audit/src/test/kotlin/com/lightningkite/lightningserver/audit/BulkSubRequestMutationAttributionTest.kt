@@ -78,7 +78,7 @@ class BulkSubRequestMutationAttributionTest {
     }
 
     context(server: ServerRuntime)
-    private suspend fun requests() = BulkTestServer.audit.requests().find(Condition.Always).toList()
+    private suspend fun requests() = BulkTestServer.audit.originsTable().find(Condition.Always).toList()
 
     context(server: ServerRuntime)
     private suspend fun mutations() = BulkTestServer.mutationLog.mutations().find(Condition.Always).toList()
@@ -128,12 +128,12 @@ class BulkSubRequestMutationAttributionTest {
 
             val requests = requests()
             val carrier = requests.single { it.endpoint == "/meta/bulk" }
-            assertNull(carrier.request?.principal, "the carrying bulk request was supposed to be anonymous")
+            assertNull(carrier.request?.subjectId, "the carrying bulk request was supposed to be anonymous")
 
             val sub = requests.single { it.endpoint == "/mutate" }
             assertTrue(
-                sub.request?.principal?.contains(user.toString()) == true,
-                "the sub-request did not authenticate on its own query parameters: ${sub.request?.principal}",
+                sub.request?.subjectId == user.toString(),
+                "the sub-request did not authenticate on its own query parameters: ${sub.request?.subjectId}",
             )
         }
 
@@ -160,15 +160,15 @@ class BulkSubRequestMutationAttributionTest {
             assertNotNull(byAttribution, "attributedTo ${mutation.attributedTo} names no request row")
             assertEquals("/mutate", byAttribution.endpoint, "attributedTo should name the sub-request's own row")
             assertTrue(
-                byAttribution.request?.principal?.contains(user.toString()) == true,
-                "the sub-request's own row does not name the person: ${byAttribution.request?.principal}",
+                byAttribution.request?.subjectId == user.toString(),
+                "the sub-request's own row does not name the person: ${byAttribution.request?.subjectId}",
             )
 
             val byRoot = requests.rowFor(mutation.rootExecutionId)
             assertNotNull(byRoot, "rootExecutionId ${mutation.rootExecutionId} names no request row")
             assertEquals("/meta/bulk", byRoot.endpoint, "the root should be the carrying bulk request")
             assertNull(
-                byRoot.request?.principal,
+                byRoot.request?.subjectId,
                 "the root is the causal head, which here is the anonymous carrier; it must not be " +
                     "what an auditor reads to name the person",
             )
@@ -234,9 +234,9 @@ class BulkSubRequestMutationAttributionTest {
             assertNotNull(byAttribution, "attributedTo ${mutation.attributedTo} names no request row")
             assertEquals("/mutate-task", byAttribution.endpoint, "the task inherited the sub-request's anchor")
             assertTrue(
-                byAttribution.request?.principal?.contains(user.toString()) == true,
+                byAttribution.request?.subjectId == user.toString(),
                 "a change a person made through a bulk sub-request must name that person: " +
-                    "${byAttribution.request?.principal}",
+                    "${byAttribution.request?.subjectId}",
             )
 
             // And the column that used to be the only handle still answers the causal question,
@@ -244,7 +244,7 @@ class BulkSubRequestMutationAttributionTest {
             val byRoot = requests.rowFor(mutation.rootExecutionId)
             assertNotNull(byRoot)
             assertEquals("/meta/bulk", byRoot.endpoint)
-            assertNull(byRoot.request?.principal)
+            assertNull(byRoot.request?.subjectId)
         }
 
     /** The control: with the credential on the carrier, the very same task traces back fine. */
@@ -274,14 +274,14 @@ class BulkSubRequestMutationAttributionTest {
             val byRoot = requests.rowFor(mutation.rootExecutionId)
             assertNotNull(byRoot)
             assertTrue(
-                byRoot.request?.principal?.contains(user.toString()) == true,
-                "an authenticated carrier should make the whole tree attributable: ${byRoot.request?.principal}",
+                byRoot.request?.subjectId == user.toString(),
+                "an authenticated carrier should make the whole tree attributable: ${byRoot.request?.subjectId}",
             )
             // With the credential on the carrier the two questions have the same answer, which is
             // why a single column looked sufficient until an inner execution held the credential.
             val byAttribution = requests.rowFor(mutation.attributedTo)
             assertNotNull(byAttribution)
-            assertTrue(byAttribution.request?.principal?.contains(user.toString()) == true)
+            assertTrue(byAttribution.request?.subjectId == user.toString())
         }
 }
 

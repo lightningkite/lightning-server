@@ -11,8 +11,6 @@ import com.lightningkite.services.database.Table
 import com.lightningkite.services.database.insertOne
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
 /**
  * Writes authentication events to the audit database and folds them into the tamper-evidence chain.
@@ -63,7 +61,7 @@ public class AuthEventLogReporter(
         )
         try {
             with(runtime) {
-                origins.ensureRecorded()
+                origins.flush()
                 table().insertOne(record)
             }
         } catch (e: Exception) {

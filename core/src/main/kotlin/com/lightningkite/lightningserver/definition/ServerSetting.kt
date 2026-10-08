@@ -11,7 +11,7 @@ import java.lang.ref.WeakReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 /**
- * Represents a computation that can be deferred until runtime and executed asynchronously.
+ * Represents a computation that can only be completed at runtime and executed asynchronously.
  *
  * This is similar to [Runtime] but supports suspend functions, allowing for async operations
  * like network calls or file I/O during initialization.
@@ -54,13 +54,13 @@ public fun interface RuntimeDeferred<out T> {
 }
 
 /**
- * Represents a computation that can be deferred until runtime and executed synchronously.
+ * Represents a computation that can only be completed at runtime and executed synchronously.
  *
  * Runtime is the core abstraction for lazy initialization and dependency injection in Lightning Server.
  * It allows values to be computed on-demand within an [Engine] context, providing access to
  * settings, services, and other runtime resources. Resolving one is process-wide work with no
  * execution behind it, which is why it takes an engine rather than a
- * [com.lightningkite.lightningserver.runtime.ServerRuntime].
+ * [ServerRuntime][com.lightningkite.lightningserver.runtime.ServerRuntime].
  *
  * Example:
  * ```kotlin
@@ -139,7 +139,7 @@ public fun interface Runtime<out T> : RuntimeDeferred<T> {
  * @param transform Function to apply to the Runtime's value
  * @return A new Runtime that applies the transformation
  */
-public fun <T, R> Runtime<T>.map(transform: context(Engine) (T) -> R): Runtime<R> = Runtime { transform(this()) }
+public inline fun <T, R> Runtime<T>.map(crossinline transform: context(Engine) (T) -> R): Runtime<R> = Runtime { transform(this()) }
 
 /**
  * Transforms the result of this RuntimeDeferred using an async function.
@@ -147,7 +147,7 @@ public fun <T, R> Runtime<T>.map(transform: context(Engine) (T) -> R): Runtime<R
  * @param transform Suspend function to apply to the RuntimeDeferred's value
  * @return A new RuntimeDeferred that applies the transformation
  */
-public fun <T, R> RuntimeDeferred<T>.mapSuspending(transform: suspend context(Engine) (T) -> R): RuntimeDeferred<R> =
+public inline fun <T, R> RuntimeDeferred<T>.mapSuspending(crossinline transform: suspend context(Engine) (T) -> R): RuntimeDeferred<R> =
     RuntimeDeferred { transform(this.await()) }
 
 /**

@@ -527,7 +527,7 @@ class ProofAuthEventWiringTest {
 
         val event = events().single()
         assertEquals(testId(21).originId, event.requestId)
-        val requests = TestServer.audit.requests().find(Condition.Always).toList()
+        val requests = TestServer.audit.originsTable().find(Condition.Always).toList()
         val row = requests.singleOrNull { it._id == testId(21).originId }
         assertEquals("203.0.113.7", row?.request?.sourceIp, "the issuance points at no request record")
     }

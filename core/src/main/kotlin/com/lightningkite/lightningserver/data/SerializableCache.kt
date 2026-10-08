@@ -122,8 +122,9 @@ public class SerializableCache<out SCOPE> private constructor(
      * @return The cached Expiring wrapper, or null if not found or expired
      */
     @Suppress("UNCHECKED_CAST")
+    @PublishedApi
     context(server: Engine)
-    private fun <T> retrieve(key: Key<*, T>): Expiring<T>? {
+    internal fun <T> retrieve(key: Key<*, T>): Expiring<T>? {
         cache[key.id]?.let {
             if (it.key != key) throw IllegalStateException("SerializableCache encountered keys with duplicate ids. ID: ${key.id}")
 
@@ -186,6 +187,12 @@ public class SerializableCache<out SCOPE> private constructor(
      */
     context(server: Engine)
     public operator fun <T> get(key: Key<SCOPE, T>): T? = retrieve(key)?.value
+
+    /**
+    * Retrieves a value from the cache, calling [default] if the key is not present.
+    * */
+    context(server: Engine)
+    public inline fun <T, R : T> getOrElse(key: Key<SCOPE, T>, default: () -> R): T = retrieve(key)?.value ?: default()
 
     /**
      * Retrieves the value for [key], storing the result of [default] if there is none.

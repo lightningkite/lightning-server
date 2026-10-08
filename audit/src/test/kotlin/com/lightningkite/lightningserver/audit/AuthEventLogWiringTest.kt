@@ -245,7 +245,7 @@ class AuthEventLogWiringTest {
     fun `a forged attempt is still visible in the request log`() = onServer {
         engine.handleRoot(tokenExchange(forgedToken()), testId(6))
 
-        val requests = TestServer.audit.requests().find(Condition.Always).toList()
+        val requests = TestServer.audit.originsTable().find(Condition.Always).toList()
         assertTrue(
             requests.any { it._id == testId(6).originId },
             "a forged attempt left no trace at all — it must still appear as a request",
@@ -263,7 +263,7 @@ class AuthEventLogWiringTest {
         engine.handleRoot(tokenExchange(token, userAgent = "probe/1.0"), testId(4))
 
         assertEquals(testId(4).originId, events().single().requestId)
-        val requests = TestServer.audit.requests().find(Condition.Always).toList()
+        val requests = TestServer.audit.originsTable().find(Condition.Always).toList()
         assertTrue(
             requests.any { it._id == testId(4).originId },
             "the auth event points at a request record that was never written",

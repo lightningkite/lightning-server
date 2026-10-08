@@ -106,7 +106,7 @@ class DisclosureLogEndToEndTest {
 
     private class Reader {
         context(server: ServerRuntime)
-        suspend fun requests() = TestServer.audit.requests().find(Condition.Always).toList()
+        suspend fun requests() = TestServer.audit.originsTable().find(Condition.Always).toList()
 
         context(server: ServerRuntime)
         suspend fun disclosures() = TestServer.disclosureLog.disclosures().find(Condition.Always).toList()

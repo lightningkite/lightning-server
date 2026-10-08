@@ -9,7 +9,6 @@ import com.lightningkite.services.data.UuidV7
 import com.lightningkite.services.database.Table
 import kotlinx.serialization.KSerializer
 import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
 /**
  * Writes one [DisclosureRecord] for every audited record that reaches a client.
@@ -61,7 +60,7 @@ public class DisclosureLogInterceptor(
                 disclosed = it.bits,
             )
         }
-        origins.ensureRecorded()
+        origins.flush()
         table().insert(rows)
     }
 }

@@ -1,8 +1,5 @@
 package com.lightningkite.lightningserver.audit
 
-import com.lightningkite.lightningserver.websockets.WebSocketInterceptor
-import com.lightningkite.lightningserver.http.HttpInterceptor
-import com.lightningkite.lightningserver.runtime.ExecutionInterceptor
 import com.lightningkite.lightningserver.definition.PreDeployTask
 import com.lightningkite.lightningserver.definition.Runtime
 import com.lightningkite.lightningserver.definition.RuntimeDeferred
@@ -50,17 +47,17 @@ import kotlin.uuid.Uuid
  * produced by then, so there is nothing left to prevent. Each layer documents its own behaviour; see
  * `plans/audit-logging.md` 5.6.
  *
- * @property requests Who asked, from where, and when. What every other layer's `requestId` refers to.
+ * @property originsTable Who asked, from where, and when. What every other layer's `requestId` refers to.
  * @property registry What every model id and every bit permanently mean. Needed to read a disclosure:
  *   a [DisclosureRecord]'s bits are meaningless without it.
  */
 public class AuditCore(
     internal val database: Runtime<Database>,
 ) : ServerBuilder() {
-    public val requests: DatabaseTableRegistration<OriginRecord> =
+    public val originsTable: DatabaseTableRegistration<OriginRecord> =
         database.registerTable("AuditRequest", OriginRecord.serializer())
 
-    private val registrations: DatabaseTableRegistration<AuditModelRegistration> =
+    private val modelRegistrations: DatabaseTableRegistration<AuditModelRegistration> =
         database.registerTable("AuditModelRegistration", AuditModelRegistration.serializer())
 
     private val fieldRegistrations: DatabaseTableRegistration<AuditFieldRegistration> =
@@ -74,9 +71,9 @@ public class AuditCore(
      * deploy — which is what the framework does — is a no-op.
      */
     private val assignBits: PreDeployTask = path.path("assign-audit-bits") bind PreDeployTask(
-        dependencies = { listOf(registrations.preDeployTask, fieldRegistrations.preDeployTask) },
+        dependencies = { listOf(modelRegistrations.preDeployTask, fieldRegistrations.preDeployTask) },
     ) {
-        reconcileAuditRegistry(registrations(), fieldRegistrations(), auditedModelsOnServer())
+        reconcileAuditRegistry(modelRegistrations(), fieldRegistrations(), auditedModelsOnServer())
     }
 
     /**
@@ -84,7 +81,7 @@ public class AuditCore(
      * because assignments only ever change during a deploy.
      */
     public val registry: RuntimeDeferred<AuditRegistry> =
-        RuntimeDeferred.Cached(RuntimeDeferred { loadAuditRegistry(registrations(), fieldRegistrations()) })
+        RuntimeDeferred.Cached(RuntimeDeferred { loadAuditRegistry(modelRegistrations(), fieldRegistrations()) })
 
     private val claimedLayers = mutableSetOf<String>()
 
@@ -106,13 +103,10 @@ public class AuditCore(
         )
     }
 
-    internal val origins: OriginRecordInterceptor = OriginRecordInterceptor(requests)
+    internal val origins: OriginRecordInterceptor = OriginRecordInterceptor(originsTable)
 
     init {
-        // It is all three kinds of interceptor, so each registration is named explicitly.
-        install<ExecutionInterceptor>(origins)
-        install<HttpInterceptor>(origins)
-        install<WebSocketInterceptor>(origins)
+        origins.install()
     }
 }
 
@@ -144,6 +138,3 @@ internal fun auditedModelsOnServer(): Map<String, SerialDescriptor> = buildMap {
         }
     }
 }
-
-/** The plain [Uuid] audit records store, since the records are multiplatform and cannot hold an [Execution.ID]. */
-internal val Execution.ID.uuid: Uuid get() = raw.raw
