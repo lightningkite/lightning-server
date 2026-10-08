@@ -71,7 +71,7 @@ public object LiveProofClientEndpoints {
         )
 
         override suspend fun confirmOneTimePassword(input: String): Unit = fetcher(
-            url = "$subpath/existing",
+            url = "$subpath/confirm",
             method = HttpMethod.POST,
             inSerializer = String.serializer(),
             body = input,
