@@ -433,9 +433,9 @@ public data class HttpInstrumentationResult<out T>(
 /**
  * Wraps an HTTP request flow with the standard root-span attributes and RED metrics.
  *
- * Resolves the route pattern from the request (falling back to the literal target if unmatched),
- * opens a span named "$method $route" with standard `http.*` attributes, runs the action, then
- * enriches the span with `http.status_code` and (when present) `error.type`.
+ * Resolves the route pattern from the request, opens a span named "$method $route" (or "unmatched"
+ * when no route matches) with standard `http.*` attributes, runs the action, then enriches the span
+ * with `http.status_code` and (when present) `error.type`.
  *
  * Used by [handle] for top-level requests and by bulk-endpoint handlers that re-dispatch inner
  * requests, giving each sub-request the same observability treatment as a normal request.
@@ -448,12 +448,15 @@ public suspend fun <T> instrumentHttpRequest(
     val method = request.path.method.toString()
     val route = try {
         request.path.match.path.pathSpec.toString()
-    } catch (_: Exception) {
-        "/" + request.path.pathSegments.toString()
+    } catch (_: RouteNotFoundException) {
+        null
     }
-    return runtime.telemetryTrace("$method $route", TelemetryAttributes {
+    // The operation name becomes a metric label.  An unmatched request's path and method are whatever
+    // the client sent (scanners send thousands), so they must not appear in it.
+    val operation = if (route == null) "unmatched" else "$method $route"
+    return runtime.telemetryTrace(operation, TelemetryAttributes {
         put(TelemetryKeys.Http.method, method)
-        put(TelemetryKeys.Http.route, route)
+        route?.let { put(TelemetryKeys.Http.route, it) }
         put(TelemetryKeys.Http.target, "/" + request.path.pathSegments.toString())
         put(TelemetryKeys.Http.scheme, request.protocol)
         put(TelemetryKeys.Http.host, request.domain)
