@@ -16,7 +16,7 @@ class DisclosureRecordTest {
         requestId = OriginRecord.ID(ExecutionId(UuidV7.generate())),
         recordType = ModelTypeId(1),
         recordId = Uuid.random(),
-        disclosed = fieldIndicesOf(),
+        disclosed = fieldIds(),
     )
 
     /**

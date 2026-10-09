@@ -23,10 +23,9 @@ import kotlin.uuid.ExperimentalUuidApi
  * The practical consequence is worth stating plainly: an outage of the audit database is an outage
  * of every endpoint that returns an audited model.
  */
-@OptIn(ExperimentalUuidApi::class)
 public class DisclosureLogInterceptor(
-    registry: RuntimeDeferred<AuditRegistry>,
-    private val origins: OriginRecordInterceptor,
+    registry: AuditRegistry,
+    private val origins: OriginRecordInterceptor<*>,
     private val table: Runtime<Table<DisclosureRecord>>,
 ) : TypedOutputInterceptor {
     override val name: String = "DisclosureLog"
@@ -35,7 +34,7 @@ public class DisclosureLogInterceptor(
      * Built once per process, since the registry it reads only changes during a deploy. Holding it
      * here is also what makes the extractor's path cache worth having.
      */
-    private val extractor = RuntimeDeferred.Cached { DisclosureExtractor(registry.await()) }
+    private val extractor = RuntimeDeferred.Cached { DisclosureExtractor(registry.assignments.await()) }
 
     context(runtime: ServerRuntime)
     override suspend fun <T> outputProduced(request: Request<*>, serializer: KSerializer<T>, value: T) {
@@ -48,14 +47,9 @@ public class DisclosureLogInterceptor(
 
         val rows = disclosures.map {
             DisclosureRecord(
-                // v7 so the row carries its own insert time; DisclosureRecord.at reads it back.
-                // Not Execution.ID.generate(): that mints execution ids, and this is a row id.
                 _id = DisclosureRecord.ID(UuidV7.generateNonMonotonicAt(runtime.clock.now())),
-                // The anchor, not this execution's own id. The request row itself for the http and
-                // websocket executions that actually disclose; anywhere else it names the request that
-                // led here rather than an id that joins to nothing.
                 requestId = OriginRecord.ID(runtime.execution.origin.toExternal()),
-                recordType = ModelTypeId(it.modelId),
+                recordType = it.modelId,
                 recordId = it.recordId,
                 disclosed = it.bits,
             )

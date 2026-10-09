@@ -83,8 +83,8 @@ class BulkSubRequestMutationAttributionTest {
     context(server: ServerRuntime)
     private suspend fun mutations() = BulkTestServer.mutationLog.mutations().find(Condition.Always).toList()
 
-    private fun List<OriginRecord>.rowFor(id: OriginRecord.ID?): OriginRecord? = firstOrNull { it._id == id }
-    private fun List<OriginRecord>.rowFor(id: ExecutionId?): OriginRecord? = firstOrNull { it._id.raw == id }
+    private fun List<OriginRecord<OriginRecord.StandardRequestInfo>>.rowFor(id: OriginRecord.ID?): OriginRecord<OriginRecord.StandardRequestInfo>? = firstOrNull { it._id == id }
+    private fun List<OriginRecord<OriginRecord.StandardRequestInfo>>.rowFor(id: ExecutionId?): OriginRecord<OriginRecord.StandardRequestInfo>? = firstOrNull { it._id.raw == id }
 
     /**
      * A bulk request carrying one sub-request, with no credential of its own.
@@ -132,7 +132,7 @@ class BulkSubRequestMutationAttributionTest {
 
             val sub = requests.single { it.endpoint == "/mutate" }
             assertTrue(
-                sub.request?.subjectId == user.toString(),
+                sub.request?.subjectId == user,
                 "the sub-request did not authenticate on its own query parameters: ${sub.request?.subjectId}",
             )
         }
@@ -160,7 +160,7 @@ class BulkSubRequestMutationAttributionTest {
             assertNotNull(byAttribution, "attributedTo ${mutation.attributedTo} names no request row")
             assertEquals("/mutate", byAttribution.endpoint, "attributedTo should name the sub-request's own row")
             assertTrue(
-                byAttribution.request?.subjectId == user.toString(),
+                byAttribution.request?.subjectId == user,
                 "the sub-request's own row does not name the person: ${byAttribution.request?.subjectId}",
             )
 
@@ -234,7 +234,7 @@ class BulkSubRequestMutationAttributionTest {
             assertNotNull(byAttribution, "attributedTo ${mutation.attributedTo} names no request row")
             assertEquals("/mutate-task", byAttribution.endpoint, "the task inherited the sub-request's anchor")
             assertTrue(
-                byAttribution.request?.subjectId == user.toString(),
+                byAttribution.request?.subjectId == user,
                 "a change a person made through a bulk sub-request must name that person: " +
                     "${byAttribution.request?.subjectId}",
             )
@@ -274,14 +274,14 @@ class BulkSubRequestMutationAttributionTest {
             val byRoot = requests.rowFor(mutation.rootExecutionId)
             assertNotNull(byRoot)
             assertTrue(
-                byRoot.request?.subjectId == user.toString(),
+                byRoot.request?.subjectId == user,
                 "an authenticated carrier should make the whole tree attributable: ${byRoot.request?.subjectId}",
             )
             // With the credential on the carrier the two questions have the same answer, which is
             // why a single column looked sufficient until an inner execution held the credential.
             val byAttribution = requests.rowFor(mutation.attributedTo)
             assertNotNull(byAttribution)
-            assertTrue(byAttribution.request?.subjectId == user.toString())
+            assertTrue(byAttribution.request?.subjectId == user)
         }
 }
 

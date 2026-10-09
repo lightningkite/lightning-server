@@ -29,7 +29,7 @@ import kotlinx.coroutines.ensureActive
 private val authEventLogger = KotlinLogging.logger("com.lightningkite.lightningserver.audit.AuthEventLog")
 
 public class AuthEventLogReporter(
-    private val origins: OriginRecordInterceptor,
+    private val origins: OriginRecordInterceptor<*>,
     private val table: Runtime<Table<AuthEventRecord>>,
 ) : AuthEventReporter {
     override val name: String = "AuthEventLog"

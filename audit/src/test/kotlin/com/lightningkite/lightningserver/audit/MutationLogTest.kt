@@ -601,7 +601,7 @@ class MutationLogTest {
         val underlying = TestServer.patients()
         val table = MutationLogTable(
             wraps = underlying,
-            modelId = { 1 },
+            modelId = { ModelTypeId(1) },
             requestId = null,
             executionId = randomExecutionId(),
             causedBy = null,
@@ -638,6 +638,6 @@ class MutationLogTest {
         val row = logged().single()
         // Keyed by the full serial name, which is what the walk records — not the class's short name.
         val serialName = Patient.serializer().descriptor.serialName
-        assertEquals(TestServer.audit.registry.await().modelId(serialName), row.modelType.raw)
+        assertEquals(TestServer.audit.registry.assignments.await().modelId(serialName), row.modelType)
     }
 }

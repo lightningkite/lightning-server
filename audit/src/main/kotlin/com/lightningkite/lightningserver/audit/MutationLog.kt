@@ -31,7 +31,7 @@ import kotlinx.serialization.json.jsonPrimitive
  *
  * ## An audited model with no registry entry fails
  * As with [DataAccessLog.dataAccessLogged], the id is resolved per operation through
- * [AuditRegistry.modelId], which **throws** when the model has no entry — and the registry is
+ * [AuditRegistry.Assignments.modelId], which **throws** when the model has no entry — and the registry is
  * populated by scanning *endpoints*, not tables. An `@Audited` model no endpoint's serializer reaches
  * therefore has no id. Here that throw is caught by the fail-open guard rather than failing the call,
  * so the symptom is a loud log line and an unrecorded mutation rather than a rejected write. Make the
@@ -69,7 +69,7 @@ public fun <T : Any> MutationLog.mutationLogged(table: Table<T>): Table<T> {
     val json = runtime.internalSerialization.json
     return MutationLogTable(
         wraps = table,
-        modelId = { registry.await().modelId(serialName) },
+        modelId = { registry.assignments.await().modelId(serialName) },
         // Exactly where a request record exists: a task or schedule tick is not part of a request,
         // so this is null rather than an id that joins to nothing.
         requestId = (initiator as? Execution.Requested)?.logicalId?.let { OriginRecord.ID(it.toExternal()) },

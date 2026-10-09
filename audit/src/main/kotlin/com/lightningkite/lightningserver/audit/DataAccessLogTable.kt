@@ -22,7 +22,7 @@ import kotlin.uuid.Uuid
 internal class DataAccessLogTable<T : Any>(
     override val wraps: Table<T>,
     /** Throws when the model is audited but has no registry entry; see [DataAccessLogTable]. */
-    private val modelId: suspend () -> Int,
+    private val modelId: suspend () -> ModelTypeId,
     private val requestId: OriginRecord.ID,
     private val executionId: ExecutionId,
     private val json: Json,
@@ -57,7 +57,7 @@ internal class DataAccessLogTable<T : Any>(
                 _id = DataAccessRecord.ID(UuidV7.generateNonMonotonicAt(kotlin.time.Instant.fromEpochMilliseconds(nowMillis()))),
                 requestId = requestId,
                 executionId = executionId,
-                modelType = ModelTypeId(modelId),
+                modelType = modelId,
                 operation = operation,
                 condition = conditionText(condition),
                 sort = sort,

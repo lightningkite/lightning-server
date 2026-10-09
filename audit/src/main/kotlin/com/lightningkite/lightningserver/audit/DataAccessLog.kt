@@ -25,11 +25,11 @@ import com.lightningkite.services.database.insertOne
  * ## An audited model with no registry entry fails
  * The id is resolved per operation rather than once at wrap time, because `ModelInfo`'s `log` slot is
  * not suspending while the registry loads asynchronously; the operations themselves are suspending.
- * Resolution uses [AuditRegistry.modelId], which **throws** when the model has no entry — the same
+ * Resolution uses [AuditRegistry.Assignments.modelId], which **throws** when the model has no entry — the same
  * fail-closed rule the disclosure log uses.
  *
  * That matters because the registry is populated by scanning **endpoints**, not tables (see
- * [AuditCore]'s bit assignment). An `@Audited` model that no endpoint's serializer reaches has no id,
+ * [AuditRegistry]'s bit assignment). An `@Audited` model that no endpoint's serializer reaches has no id,
  * and its reads will fail rather than go unrecorded. For a model that is only ever read internally
  * this is a real limitation: it must be reachable from some endpoint's serializer to be
  * data-access-logged at all. Recorded in `plans/audit-logging.md` 6.2.
@@ -65,7 +65,7 @@ public fun <T : Any> DataAccessLog.dataAccessLogged(table: Table<T>): Table<T> {
     val initiator = runtime.execution
     return DataAccessLogTable(
         wraps = table,
-        modelId = { registry.await().modelId(serialName) },
+        modelId = { registry.assignments.await().modelId(serialName) },
         // The anchor, not this execution's own id. A query run inside a task has no request row of
         // its own, so its own id would join to nothing; `attributedTo` names the row of whoever is
         // responsible. For http and websocket executions it is their own request row.

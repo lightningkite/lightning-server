@@ -18,7 +18,7 @@ import kotlin.uuid.Uuid
 
 /** One audited record that reached a client, and which of its fields carried a value. */
 internal data class Disclosure(
-    val modelId: Int,
+    val modelId: ModelTypeId,
     val recordId: Uuid,
     val bits: FieldIdentifierSet,
 )
@@ -33,7 +33,7 @@ internal data class Disclosure(
  * Safe to share across requests: the only mutable state is a cache of resolved bit indices, which is
  * a pure function of the registry.
  */
-internal class DisclosureExtractor(private val registry: AuditRegistry) {
+internal class DisclosureExtractor(private val registry: AuditRegistry.Assignments) {
     private val plans = ConcurrentHashMap<PlanKey, PathPlan>()
 
     fun <T> extract(
@@ -46,13 +46,10 @@ internal class DisclosureExtractor(private val registry: AuditRegistry) {
         return found
     }
 
-    /** Marks an element that is not itemised: it is walked, but sets no bit. */
-    private val NO_BIT: Int get() = -1
-
-    private data class PlanKey(val modelId: Int, val basePath: String, val descriptor: SerialDescriptor)
+    private data class PlanKey(val modelId: ModelTypeId, val basePath: String, val descriptor: SerialDescriptor)
 
     /**
-     * The resolved bit index and child path for every element of one descriptor at one position
+     * The resolved field id (null when not itemised) and child path for every element of one descriptor at one position
      * inside one audited model.
      *
      * Cached because a list of ten thousand records enters the same descriptor at the same path ten
@@ -60,12 +57,12 @@ internal class DisclosureExtractor(private val registry: AuditRegistry) {
      * hash it against the registry.
      */
     private class PathPlan(
-        val bitIndexes: IntArray,
+        val fieldIds: Array<ModelFieldId?>,
         val childPaths: Array<String>,
         val idElementIndex: Int,
     )
 
-    private fun planFor(modelId: Int, basePath: String, descriptor: SerialDescriptor): PathPlan =
+    private fun planFor(modelId: ModelTypeId, basePath: String, descriptor: SerialDescriptor): PathPlan =
         plans.getOrPut(PlanKey(modelId, basePath, descriptor)) {
             val count = descriptor.elementsCount
             val childPaths = Array(count) { index ->
@@ -73,15 +70,15 @@ internal class DisclosureExtractor(private val registry: AuditRegistry) {
                 if (basePath.isEmpty()) name else "$basePath.$name"
             }
             PathPlan(
-                bitIndexes = IntArray(count) { registry.bitIndexOrNull(modelId, childPaths[it]) ?: NO_BIT },
+                fieldIds = Array(count) { registry.bitIndexOrNull(modelId, childPaths[it]) },
                 childPaths = childPaths,
                 idElementIndex = (0 until count).firstOrNull { descriptor.getElementName(it) == "_id" } ?: -1,
             )
         }
 
     /** The record being assembled for one audited instance. */
-    private class RecordBuilder(val modelId: Int) {
-        var bits: FieldIdentifierSet = fieldIndicesOf()
+    private class RecordBuilder(val modelId: ModelTypeId) {
+        var bits: FieldIdentifierSet = FieldIdentifierSet.EMPTY
         var recordId: Uuid? = null
     }
 
@@ -113,11 +110,18 @@ internal class DisclosureExtractor(private val registry: AuditRegistry) {
 
         private val top: Frame? get() = frames.lastOrNull()
 
+        /** The record whose `_id` is being encoded. It takes the first Uuid encoded, however deeply wrapped. */
+        private var awaitingId: RecordBuilder? = null
+
         override fun encodeValue(value: Any) {}
 
         override fun encodeNull() {}
 
         override fun <T> encodeSerializableValue(serializer: SerializationStrategy<T>, value: T) {
+            if (value is Uuid) awaitingId?.let {
+                it.recordId = value
+                awaitingId = null
+            }
             (serializer as? PartialSerializer<*>)?.let { partialSource = it.source.descriptor }
             super.encodeSerializableValue(serializer, value)
         }
@@ -168,10 +172,8 @@ internal class DisclosureExtractor(private val registry: AuditRegistry) {
         private fun disclose(index: Int) {
             val frame = top ?: return
             val plan = frame.plan ?: return
-            if (index < 0 || index >= plan.bitIndexes.size) return
-            val bit = plan.bitIndexes[index]
-            if (bit == NO_BIT) return
-            frame.record?.let { it.bits += fieldIndicesOf(bit) }
+            val id = plan.fieldIds.getOrNull(index) ?: return
+            frame.record?.let { it.bits += id }
         }
 
         /**
@@ -244,9 +246,10 @@ internal class DisclosureExtractor(private val registry: AuditRegistry) {
             value: T,
         ) {
             encodeElement(descriptor, index)
-            captureId(index, value)
+            awaitIdAt(index)
             if (value.carriesAValue()) disclose(index)
             encodeSerializableValue(serializer, value)
+            awaitingId = null
         }
 
         override fun <T : Any> encodeNullableSerializableElement(
@@ -257,9 +260,10 @@ internal class DisclosureExtractor(private val registry: AuditRegistry) {
         ) {
             encodeElement(descriptor, index)
             if (value == null) return
-            captureId(index, value)
+            awaitIdAt(index)
             if (value.carriesAValue()) disclose(index)
             encodeSerializableValue(serializer, value)
+            awaitingId = null
         }
 
         /** An empty collection is a default, so it is not a disclosure — see section 5.5. */
@@ -270,10 +274,10 @@ internal class DisclosureExtractor(private val registry: AuditRegistry) {
             else -> true
         }
 
-        private fun captureId(index: Int, value: Any?) {
+        private fun awaitIdAt(index: Int) {
             val frame = top ?: return
             if (!frame.ownsRecord || index != frame.plan?.idElementIndex) return
-            frame.record?.recordId = value as? Uuid
+            awaitingId = frame.record
         }
     }
 }

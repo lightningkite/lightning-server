@@ -98,8 +98,8 @@ class WebSocketMutationAttributionTest {
     private fun tokenQuery() = mapOf(HttpHeader.Authorization to listOf(user.toString()))
 
     /** The join an auditor performs, as one call, so every test below asks the same question. */
-    private fun List<OriginRecord>.rowFor(id: OriginRecord.ID?): OriginRecord? = firstOrNull { it._id == id }
-    private fun List<OriginRecord>.rowFor(id: ExecutionId?): OriginRecord? = firstOrNull { it._id.raw == id }
+    private fun List<OriginRecord<OriginRecord.StandardRequestInfo>>.rowFor(id: OriginRecord.ID?): OriginRecord<OriginRecord.StandardRequestInfo>? = firstOrNull { it._id == id }
+    private fun List<OriginRecord<OriginRecord.StandardRequestInfo>>.rowFor(id: ExecutionId?): OriginRecord<OriginRecord.StandardRequestInfo>? = firstOrNull { it._id.raw == id }
 
     // ===================== 1. a plain socket, mutating directly =====================
 
@@ -121,7 +121,7 @@ class WebSocketMutationAttributionTest {
         val byAttribution = requests.rowFor(mutation.attributedTo)
         assertNotNull(byAttribution, "attributedTo ${mutation.attributedTo} names no request row")
         assertTrue(
-            byAttribution.request?.subjectId == user.toString(),
+            byAttribution.request?.subjectId == user,
             "the request the change attributes to does not name the authenticated user: ${byAttribution.request?.subjectId}",
         )
         assertEquals(mutation.executionId, mutation.rootExecutionId, "a message phase nothing dispatched is its own root")
@@ -149,7 +149,7 @@ class WebSocketMutationAttributionTest {
             "the task should attribute to the socket it descends from",
         )
         assertTrue(
-            byAttribution.request?.subjectId == user.toString(),
+            byAttribution.request?.subjectId == user,
             "the request the change attributes to does not name the authenticated user: ${byAttribution.request?.subjectId}",
         )
         // The anchor survived the queue: it is carried in the serialized Execution.Task, not derived.
@@ -188,7 +188,7 @@ class WebSocketMutationAttributionTest {
         assertNotNull(byAttribution, "attributedTo ${mutation.attributedTo} names no request row")
         assertEquals("/socket", byAttribution.endpoint, "a sub-socket attributes to its own row, not the carrier's")
         assertTrue(
-            byAttribution.request?.subjectId == user.toString(),
+            byAttribution.request?.subjectId == user,
             "the request the change attributes to does not name the authenticated user: ${byAttribution.request?.subjectId}",
         )
     }
@@ -218,7 +218,7 @@ class WebSocketMutationAttributionTest {
                 "the anchor a task inherits is the sub-socket's, not the carrier the root names",
             )
             assertTrue(
-                byAttribution.request?.subjectId == user.toString(),
+                byAttribution.request?.subjectId == user,
                 "the request the change attributes to does not name the authenticated user: ${byAttribution.request?.subjectId}",
             )
         }
@@ -248,7 +248,7 @@ class WebSocketMutationAttributionTest {
 
             val sub = requests.single { it.endpoint == "/socket" }
             assertTrue(
-                sub.request?.subjectId == user.toString(),
+                sub.request?.subjectId == user,
                 "the sub-socket did not authenticate on its own query parameters: ${sub.request?.subjectId}",
             )
         }
@@ -273,7 +273,7 @@ class WebSocketMutationAttributionTest {
             assertNotNull(byAttribution, "attributedTo ${mutation.attributedTo} names no request row")
             assertEquals("/socket", byAttribution.endpoint)
             assertTrue(
-                byAttribution.request?.subjectId == user.toString(),
+                byAttribution.request?.subjectId == user,
                 "the sub-socket's own row does not name the person: ${byAttribution.request?.subjectId}",
             )
 
@@ -313,7 +313,7 @@ class WebSocketMutationAttributionTest {
             assertNotNull(byAttribution, "attributedTo ${mutation.attributedTo} names no request row")
             assertEquals("/socket", byAttribution.endpoint, "the task inherited the sub-socket's anchor")
             assertTrue(
-                byAttribution.request?.subjectId == user.toString(),
+                byAttribution.request?.subjectId == user,
                 "a change a person made through a multiplexed socket must name that person: " +
                     "${byAttribution.request?.subjectId}",
             )

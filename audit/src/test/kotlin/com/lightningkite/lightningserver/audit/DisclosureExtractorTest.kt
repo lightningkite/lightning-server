@@ -34,6 +34,7 @@ class DisclosureExtractorTest {
         val database = setting("database", Database.Settings())
         val models = database.registerTable("AuditModelRegistration", AuditModelRegistration.serializer())
         val fields = database.registerTable("AuditFieldRegistration", AuditFieldRegistration.serializer())
+        val registry = path.path("registry") include AuditRegistry(models, fields)
     }
 
     private fun onServer(block: suspend context(ServerRuntime) Fixture.() -> Unit) = runBlocking {
@@ -43,17 +44,15 @@ class DisclosureExtractorTest {
     }
 
     private class Fixture {
-        lateinit var registry: AuditRegistry
+        lateinit var registry: AuditRegistry.Assignments
         lateinit var extractor: DisclosureExtractor
 
         context(server: ServerRuntime)
         suspend fun deploy(vararg serializers: KSerializer<*>) {
-            reconcileAuditRegistry(
-                TestServer.models(),
-                TestServer.fields(),
+            TestServer.registry.assign(
                 serializers.flatMap { it.descriptor.auditedModels().entries }.associate { it.key to it.value },
             )
-            registry = loadAuditRegistry(TestServer.models(), TestServer.fields())
+            registry = TestServer.registry.load()
             extractor = DisclosureExtractor(registry)
         }
 
@@ -66,7 +65,7 @@ class DisclosureExtractorTest {
             return disclosure.bits.map { byBit.getValue(it) }.toSet()
         }
 
-        fun modelIdOf(serializer: KSerializer<*>): Int = registry.modelId(serializer.descriptor.serialName)
+        fun modelIdOf(serializer: KSerializer<*>): ModelTypeId = registry.modelId(serializer.descriptor.serialName)
     }
 
     /** A `Patient` reduced to just the named fields, as `queryPartial` would return it. */
@@ -88,6 +87,21 @@ class DisclosureExtractorTest {
         assertEquals(modelIdOf(Patient.serializer()), disclosure.modelId)
         assertEquals(id, disclosure.recordId)
         assertEquals(setOf("name"), paths(disclosure), "an empty ssn is a default, not a disclosure")
+    }
+
+    @Test
+    fun `a record id wrapped in value classes is unwrapped to its Uuid`() = onServer {
+        deploy(TypedKeyed.serializer(), DoublyTypedKeyed.serializer())
+
+        val typed = extract(TypedKeyed.serializer(), TypedKeyed(TypedKeyed.ID(id), "a")).single()
+        assertEquals(id, typed.recordId)
+        assertEquals(setOf("value"), paths(typed))
+
+        val doubly = extract(
+            DoublyTypedKeyed.serializer(),
+            DoublyTypedKeyed(DoublyTypedKeyed.Outer(TypedKeyed.ID(otherId)), "b"),
+        ).single()
+        assertEquals(otherId, doubly.recordId)
     }
 
     @Test

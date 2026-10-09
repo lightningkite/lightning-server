@@ -113,8 +113,8 @@ class DisclosureLogEndToEndTest {
 
         context(server: ServerRuntime)
         suspend fun pathsOf(record: DisclosureRecord): Set<String> {
-            val registry = TestServer.audit.registry.await()
-            val byBit = registry.fields(record.recordType.raw).entries.associate { it.value to it.key }
+            val registry = TestServer.audit.registry.assignments.await()
+            val byBit = registry.fields(record.recordType).entries.associate { it.value to it.key }
             return record.disclosed.map { byBit.getValue(it) }.toSet()
         }
     }

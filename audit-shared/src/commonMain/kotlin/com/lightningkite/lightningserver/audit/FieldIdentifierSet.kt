@@ -15,7 +15,7 @@ import kotlinx.serialization.Serializable
 public data class FieldIdentifierSet(
     @SerialName("f0") public val fields0: Segment,
     @SerialName("f1") public val fields1: Segment,
-) : Set<Int> {
+) : Set<ModelFieldId> {
     public typealias Segment = BitIndices
 
     public fun segment(index: Int): Segment = when (index) {
@@ -42,13 +42,9 @@ public data class FieldIdentifierSet(
         return true
     }
 
-    public operator fun get(index: Int): Boolean {
-        ensureValidIndex(index)
-        return segment(index / Segment.CAPACITY)[index % Segment.CAPACITY]
-    }
+    public operator fun get(id: ModelFieldId): Boolean = segment(id.raw / Segment.CAPACITY)[id.raw % Segment.CAPACITY]
 
-    /** Unlike [get], returns `false` for an index outside the capacity rather than throwing. */
-    override fun contains(element: Int): Boolean = element in 0..<CAPACITY && get(element)
+    override fun contains(element: ModelFieldId): Boolean = get(element)
 
     public fun containsAll(indices: FieldIdentifierSet): Boolean {
         for (i in 0..<SEGMENTS) {
@@ -57,10 +53,9 @@ public data class FieldIdentifierSet(
         return true
     }
 
-    override fun containsAll(elements: Collection<Int>): Boolean =
-        elements.all { it in 0..<CAPACITY } && containsAll(FieldIdentifierSet.from(elements.iterator()))
+    override fun containsAll(elements: Collection<ModelFieldId>): Boolean = containsAll(FieldIdentifierSet.from(elements))
 
-    override fun iterator(): Iterator<Int> = object : Iterator<Int> {
+    override fun iterator(): Iterator<ModelFieldId> = object : Iterator<ModelFieldId> {
         var s = 0
         var iter = segment(s).iterator()
 
@@ -69,9 +64,9 @@ public data class FieldIdentifierSet(
             return iter.hasNext()
         }
 
-        override fun next(): Int {
+        override fun next(): ModelFieldId {
             if (!hasNext()) throw NoSuchElementException()
-            return iter.next() + s * Segment.CAPACITY
+            return ModelFieldId(iter.next() + s * Segment.CAPACITY)
         }
     }
 
@@ -79,22 +74,25 @@ public data class FieldIdentifierSet(
     public operator fun plus(other: FieldIdentifierSet): FieldIdentifierSet =
         FieldIdentifierSet(fields0 + other.fields0, fields1 + other.fields1)
 
+    public operator fun plus(id: ModelFieldId): FieldIdentifierSet = this + from(listOf(id))
+
     public companion object {
         public const val SEGMENTS: Int = 2
 
         public const val CAPACITY: Int = SEGMENTS * Segment.CAPACITY
 
+        public val EMPTY: FieldIdentifierSet = FieldIdentifierSet(Segment(0), Segment(0))
+
         internal val segmentProperties: Array<SerializableProperty<FieldIdentifierSet, Segment>> = arrayOf(fields0, fields1)
 
         /**
-         * Creates a [FieldIdentifierSet] set from a sequence of indices.
+         * Creates a [FieldIdentifierSet] set from a sequence of ids.
          * */
-        public fun from(indices: Iterator<Int>): FieldIdentifierSet {
+        public fun from(ids: Iterable<ModelFieldId>): FieldIdentifierSet {
             val segments = IntArray(SEGMENTS)
-            for (idx in indices) {
-                ensureValidIndex(idx)
-                val s = idx / Segment.CAPACITY
-                val i = idx % Segment.CAPACITY
+            for (id in ids) {
+                val s = id.raw / Segment.CAPACITY
+                val i = id.raw % Segment.CAPACITY
                 segments[s] = segments[s] or (1 shl (Segment.MAX_INDEX - i))
             }
             return FieldIdentifierSet(
@@ -102,15 +100,7 @@ public data class FieldIdentifierSet(
                 Segment(segments[1])
             )
         }
-
-        internal fun fromSegments(fields0: Segment, fields1: Segment): FieldIdentifierSet = FieldIdentifierSet(fields0, fields1)
     }
-}
-
-public fun fieldIndicesOf(vararg ids: Int): FieldIdentifierSet = FieldIdentifierSet.from(ids.iterator())
-
-private fun ensureValidIndex(index: Int) {
-    if (index !in 0..<FieldIdentifierSet.CAPACITY) throw IndexOutOfBoundsException("Index $index is out of bounds for range 0..${FieldIdentifierSet.CAPACITY-1}.")
 }
 
 private inline fun FieldIdentifierSet.mapSegmentConditions(transform: (Int) -> Condition<Int>): Array<Condition<FieldIdentifierSet>?> {

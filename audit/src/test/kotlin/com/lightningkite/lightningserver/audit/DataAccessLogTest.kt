@@ -160,7 +160,7 @@ class DataAccessLogTest {
         }
         val table = DataAccessLogTable(
             wraps = counting,
-            modelId = { 1 },
+            modelId = { ModelTypeId(1) },
             requestId = OriginRecord.ID(randomExecutionId()),
             executionId = randomExecutionId(),
             json = runtime.internalSerialization.json,

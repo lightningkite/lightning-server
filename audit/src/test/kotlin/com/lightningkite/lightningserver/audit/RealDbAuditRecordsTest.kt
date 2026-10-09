@@ -124,7 +124,7 @@ class RealDbAuditRecordsTest {
     fun `the declared indexes are created on the real table`() = runBlocking {
         table("RealDbIndexedAccess", DataAccessRecord.serializer())
         table(DISCLOSURES, DisclosureRecord.serializer())
-        table("RealDbIndexedRequest", OriginRecord.serializer())
+        table("RealDbIndexedRequest", OriginRecord.serializer(OriginRecord.StandardRequestInfo.serializer()))
 
         val access = indexedColumnSets("RealDbIndexedAccess")
         for (column in listOf("requestid", "executionid", "modeltype")) {
@@ -169,7 +169,7 @@ class RealDbAuditRecordsTest {
                     requestId = OriginRecord.ID(randomExecutionId()),
                     recordType = ModelTypeId(it % 8),
                     recordId = if (it == 7) target else Uuid.random(),
-                    disclosed = fieldIndicesOf(),
+                    disclosed = fieldIds(),
                 )
             }
         )
@@ -212,7 +212,7 @@ class RealDbAuditRecordsTest {
                 requestId = OriginRecord.ID(randomExecutionId()),
                 recordType = ModelTypeId(modelId),
                 recordId = Uuid.random(),
-                disclosed = fieldIndicesOf(*indices),
+                disclosed = fieldIds(*indices),
             )
         }
 
@@ -229,14 +229,14 @@ class RealDbAuditRecordsTest {
         suspend fun ids(bits: Condition<DisclosureRecord>) =
             table.find(mine(bits)).toList().map { it._id }.toSet()
 
-        assertEquals(setOf(both._id), ids(DisclosureRecord.path.disclosed.containsAll(fieldIndicesOf(ssn, dob))))
-        assertEquals(setOf(both._id, ssnOnly._id, farOnly._id), ids(DisclosureRecord.path.disclosed.containsAny(fieldIndicesOf(ssn, dob, far))))
+        assertEquals(setOf(both._id), ids(DisclosureRecord.path.disclosed.containsAll(fieldIds(ssn, dob))))
+        assertEquals(setOf(both._id, ssnOnly._id, farOnly._id), ids(DisclosureRecord.path.disclosed.containsAny(fieldIds(ssn, dob, far))))
         // Straddling the columns must be an AND across them, not a union of the two.
-        assertEquals(emptySet(), ids(DisclosureRecord.path.disclosed.containsAll(fieldIndicesOf(ssn, far))))
-        assertEquals(setOf(farOnly._id), ids(DisclosureRecord.path.disclosed.containsAll(fieldIndicesOf(far))))
+        assertEquals(emptySet(), ids(DisclosureRecord.path.disclosed.containsAll(fieldIds(ssn, far))))
+        assertEquals(setOf(farOnly._id), ids(DisclosureRecord.path.disclosed.containsAll(fieldIds(far))))
         // The documented degenerate cases: every set contains none of nothing, and none contains one.
-        assertEquals(4, table.count(mine(DisclosureRecord.path.disclosed.containsAll(fieldIndicesOf()))))
-        assertEquals(0, table.count(mine(DisclosureRecord.path.disclosed.containsAny(fieldIndicesOf()))))
+        assertEquals(4, table.count(mine(DisclosureRecord.path.disclosed.containsAll(fieldIds()))))
+        assertEquals(0, table.count(mine(DisclosureRecord.path.disclosed.containsAny(fieldIds()))))
     }
 
     // ---------------------------------------------------------------- 3. request lifecycle
@@ -250,7 +250,7 @@ class RealDbAuditRecordsTest {
     //  second write to test. Rework or delete.
     // @Test
     // fun `a request record's two-write lifecycle completes`() = runBlocking {
-    //     val table = table("RealDbRequestLifecycle", OriginRecord.serializer())
+    //     val table = table("RealDbRequestLifecycle", OriginRecord.serializer(OriginRecord.StandardRequestInfo.serializer()))
     //     val id = Uuid.generateV7NonMonotonicAt(Instant.fromEpochMilliseconds(1_700_000_123_456))
     //
     //     table.insert(listOf(request(id)))
@@ -279,7 +279,7 @@ class RealDbAuditRecordsTest {
      */
     @Test
     fun `a duplicate request id fails loudly`() = runBlocking {
-        val table = table("RealDbRequestDuplicate", OriginRecord.serializer())
+        val table = table("RealDbRequestDuplicate", OriginRecord.serializer(OriginRecord.StandardRequestInfo.serializer()))
         val id = randomExecutionId()
         table.insert(listOf(request(id)))
 
@@ -456,8 +456,7 @@ class RealDbAuditRecordsTest {
         root = id,
         kind = OriginRecord.ExecutionKind.Http,
         location = "GET $endpoint",
-        request = OriginRecord.RequestInfo(
-            principal = null,
+        request = OriginRecord.StandardRequestInfo(
             subjectId = null,
             sessionId = null,
             sourceIp = "1.2.3.4",

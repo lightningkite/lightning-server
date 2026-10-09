@@ -56,11 +56,15 @@ public class OriginRecordInterceptor<REQUEST_INFO>(
         fun markAsWritten(): SocketOrigin<REQUEST_INFO> = copy(queued = null)
     }
 
+    // Claude: built once because the cache compares keys by equality, and a generic class's
+    // serializer is a fresh, unequal instance on every call.
+    private val socketOriginSerializer = SocketOrigin.serializer(requestInfoSerializer)
+
     // Claude: a socket's phases don't share an execution context, only the connect request, so the
     // origin waits there. Keyed per socket because a virtual sub-socket shares its carrier's cache.
     private fun socketOriginKey(socketId: Execution.ID) = SerializableCache.Key<WebSocketConnectRequest<*>, SocketOrigin<REQUEST_INFO>>(
         "com.lightningkite.lightningserver.audit.OriginRecordInterceptor/${socketId.raw.raw}",
-        SocketOrigin.serializer(requestInfoSerializer),
+        socketOriginSerializer,
     )
 
     /**
@@ -215,3 +219,5 @@ public class OriginRecordInterceptor<REQUEST_INFO>(
         builder.install(this as ExecutionInterceptor)
     }
 }
+
+internal val Execution.originId: OriginRecord.ID get() = OriginRecord.ID(origin.toExternal())

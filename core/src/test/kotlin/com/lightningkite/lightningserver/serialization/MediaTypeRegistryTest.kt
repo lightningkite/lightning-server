@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.serialization
 
 import com.lightningkite.lightningserver.definition.builder.ServerBuilder
 import com.lightningkite.lightningserver.runtime.ServerRuntime
+import com.lightningkite.lightningserver.runtime.test.execute
 import com.lightningkite.lightningserver.runtime.test.test
 import com.lightningkite.services.data.MediaType
 import com.lightningkite.services.data.TypedData
@@ -44,7 +45,7 @@ class MediaTypeRegistryTest {
     }
 
     @Test
-    fun `encoder registry sorts by priority`() = runBlocking {
+    fun `encoder registry puts the highest priority first`() = runBlocking {
         TestServer.test({}) {
             val registry = MediaTypeEncoderRegistry()
             val lowPriority = TestEncoder(MediaType.Application.Json, priority = 1f)
@@ -56,8 +57,7 @@ class MediaTypeRegistryTest {
             val encoders = registry[MediaType.Application.Json]
             assertNotNull(encoders)
             assertEquals(2, encoders.size)
-            assertEquals(lowPriority, encoders[0])  // Lower priority value comes first
-            assertEquals(highPriority, encoders[1])
+            assertEquals(listOf(highPriority, lowPriority), encoders)
         }
     }
 
@@ -97,6 +97,32 @@ class MediaTypeRegistryTest {
     }
 
     @Test
+    fun `encoder registry keeps priority order across include`() {
+        val registry = MediaTypeEncoderRegistry()
+        val other = MediaTypeEncoderRegistry()
+        val lowPriority = TestEncoder(MediaType.Application.Json, priority = 1f)
+        val highPriority = TestEncoder(MediaType.Application.Json, priority = 10f)
+
+        registry.register(lowPriority)
+        other.register(highPriority)
+        registry.include(other)
+
+        assertEquals(listOf(highPriority, lowPriority), registry[MediaType.Application.Json])
+    }
+
+    @Test
+    fun `encoders of equal priority keep registration order`() {
+        val registry = MediaTypeEncoderRegistry()
+        val first = TestEncoder(MediaType.Application.Json)
+        val second = TestEncoder(MediaType.Application.Json)
+
+        registry.register(first)
+        registry.register(second)
+
+        assertEquals(listOf(first, second), registry[MediaType.Application.Json])
+    }
+
+    @Test
     fun `encoder registry returns null for unregistered media type`() {
         val registry = MediaTypeEncoderRegistry()
         assertNull(registry[MediaType.Application.Json])
@@ -124,7 +150,7 @@ class MediaTypeRegistryTest {
     }
 
     @Test
-    fun `decoder registry sorts by priority`() = runBlocking {
+    fun `decoder registry puts the highest priority first`() = runBlocking {
         TestServer.test({}) {
             val registry = MediaTypeDecoderRegistry()
             val lowPriority = TestDecoder(MediaType.Application.Json, priority = 1f)
@@ -136,8 +162,7 @@ class MediaTypeRegistryTest {
             val decoders = registry[MediaType.Application.Json]
             assertNotNull(decoders)
             assertEquals(2, decoders.size)
-            assertEquals(lowPriority, decoders[0])
-            assertEquals(highPriority, decoders[1])
+            assertEquals(listOf(highPriority, lowPriority), decoders)
         }
     }
 
@@ -177,9 +202,55 @@ class MediaTypeRegistryTest {
     }
 
     @Test
+    fun `decoder registry keeps priority order across include`() {
+        val registry = MediaTypeDecoderRegistry()
+        val other = MediaTypeDecoderRegistry()
+        val lowPriority = TestDecoder(MediaType.Application.Json, priority = 1f)
+        val highPriority = TestDecoder(MediaType.Application.Json, priority = 10f)
+
+        registry.register(lowPriority)
+        other.register(highPriority)
+        registry.include(other)
+
+        assertEquals(listOf(highPriority, lowPriority), registry[MediaType.Application.Json])
+    }
+
+    @Test
     fun `decoder registry returns null for unregistered media type`() {
         val registry = MediaTypeDecoderRegistry()
         assertNull(registry[MediaType.Application.Json])
+    }
+
+    // ========== Lookup through a server ==========
+
+    /** Registered in a module, so the server only sees it after its registry is merged with the root's. */
+    object PreferredCoders : ServerBuilder() {
+        val encoder: MediaTypeEncoder = TestEncoder(MediaType.Application.Json, priority = 10f)
+        val decoder: MediaTypeDecoder = TestDecoder(MediaType.Application.Json, priority = 10f)
+
+        init {
+            register(encoder)
+            register(decoder)
+        }
+    }
+
+    object PriorityServer : ServerBuilder() {
+        init {
+            registerBasicMediaTypeCoders()
+        }
+
+        val preferred = path.path("preferred") include PreferredCoders
+    }
+
+    @Test
+    fun `lookup picks the highest priority coder for a media type`() = runBlocking {
+        PriorityServer.test({}) {
+            execute {
+                assertSame(PreferredCoders.encoder, MediaType.Application.Json.encoder)
+                assertSame(PreferredCoders.encoder, listOf(MediaType.Application.Json).encoder?.second)
+                assertSame(PreferredCoders.decoder, MediaType.Application.Json.decoder)
+            }
+        }
     }
 
     // ========== Test Helpers ==========

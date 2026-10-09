@@ -39,7 +39,7 @@ private val mutationLogger = KotlinLogging.logger("com.lightningkite.lightningse
 internal class MutationLogTable<T : Any>(
     override val wraps: Table<T>,
     /** Throws when the model is audited but has no registry entry; see [mutationLogged]. */
-    private val modelId: suspend () -> Int,
+    private val modelId: suspend () -> ModelTypeId,
     private val requestId: OriginRecord.ID?,
     private val attributedTo: OriginRecord.ID,
     private val executionId: ExecutionId,
@@ -73,7 +73,7 @@ internal class MutationLogTable<T : Any>(
     }
 
     private fun row(
-        modelId: Int,
+        modelId: ModelTypeId,
         operation: MutationOperation,
         recordId: String?,
         old: JsonObject?,
@@ -88,7 +88,7 @@ internal class MutationLogTable<T : Any>(
         rootExecutionId = rootExecutionId,
         initiatorKind = initiatorKind,
         initiator = initiator,
-        modelType = ModelTypeId(modelId),
+        modelType = modelId,
         recordId = recordId,
         operation = operation,
         old = old?.toString(),
@@ -103,7 +103,7 @@ internal class MutationLogTable<T : Any>(
      * of ten will fail on the rest, and ten copies of the same error in the log obscures rather than
      * informs.
      */
-    private suspend fun audit(block: suspend (modelId: Int) -> Unit) {
+    private suspend fun audit(block: suspend (modelId: ModelTypeId) -> Unit) {
         try {
             block(modelId())
         } catch (e: Exception) {

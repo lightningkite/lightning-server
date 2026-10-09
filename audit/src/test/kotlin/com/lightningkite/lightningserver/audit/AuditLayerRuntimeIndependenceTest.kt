@@ -98,8 +98,8 @@ class AuditLayerRuntimeIndependenceTest {
 
                 // The bits are readable, which is the part that actually depends on the core: the
                 // registry the disclosure log resolves them through lives there, not here.
-                val registry = TestServer.audit.registry.await()
-                val byBit = registry.fields(disclosure.recordType.raw).entries.associate { it.value to it.key }
+                val registry = TestServer.audit.registry.assignments.await()
+                val byBit = registry.fields(disclosure.recordType).entries.associate { it.value to it.key }
                 assertEquals(setOf("name", "ssn"), disclosure.disclosed.map { byBit.getValue(it) }.toSet())
 
                 // And the request record the disclosure points at was written, which is the other

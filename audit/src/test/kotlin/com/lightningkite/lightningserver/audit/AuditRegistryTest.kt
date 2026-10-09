@@ -33,6 +33,7 @@ class AuditRegistryTest {
         val database = setting("database", Database.Settings())
         val models = database.registerTable("AuditModelRegistration", AuditModelRegistration.serializer())
         val fields = database.registerTable("AuditFieldRegistration", AuditFieldRegistration.serializer())
+        val registry = path.path("registry") include AuditRegistry(models, fields)
     }
 
     /** Runs [block] against a fresh in-memory database. */
@@ -44,14 +45,12 @@ class AuditRegistryTest {
 
     private class Fixture {
         context(server: ServerRuntime)
-        suspend fun deploy(vararg serializers: KSerializer<*>) = reconcileAuditRegistry(
-            TestServer.models(),
-            TestServer.fields(),
+        suspend fun deploy(vararg serializers: KSerializer<*>) = TestServer.registry.assign(
             serializers.flatMap { it.descriptor.auditedModels().entries }.associate { it.key to it.value },
         )
 
         context(server: ServerRuntime)
-        suspend fun registry() = loadAuditRegistry(TestServer.models(), TestServer.fields())
+        suspend fun registry() = TestServer.registry.load()
 
         context(server: ServerRuntime)
         suspend fun allFields() = TestServer.fields().find(Condition.Always).toList()
@@ -84,16 +83,16 @@ class AuditRegistryTest {
 
         val registry = registry()
         val modelId = registry.modelId("Versioned")
-        assertEquals(mapOf("a" to 0), registry.fields(modelId))
+        assertEquals(mapOf("a" to ModelFieldId(0)), registry.fields(modelId))
     }
 
     @Test
     fun `deploying the same model again changes nothing`() = onServer {
         deploy(VersionedV1.serializer())
-        val before = allFields().sortedBy { it.bitIndex }
+        val before = allFields().sortedBy { it.fieldId }
         deploy(VersionedV1.serializer())
 
-        assertEquals(before, allFields().sortedBy { it.bitIndex }, "a re-deploy must be a no-op")
+        assertEquals(before, allFields().sortedBy { it.fieldId }, "a re-deploy must be a no-op")
     }
 
     @Test
@@ -103,7 +102,7 @@ class AuditRegistryTest {
 
         val registry = registry()
         val modelId = registry.modelId("Versioned")
-        assertEquals(mapOf("a" to 0, "b" to 1), registry.fields(modelId))
+        assertEquals(mapOf("a" to ModelFieldId(0), "b" to ModelFieldId(1)), registry.fields(modelId))
     }
 
     /**
@@ -119,7 +118,7 @@ class AuditRegistryTest {
         val registry = registry()
         val modelId = registry.modelId("Versioned")
         assertEquals(
-            mapOf("a" to 0, "b" to 1, "renamed" to 2),
+            mapOf("a" to ModelFieldId(0), "b" to ModelFieldId(1), "renamed" to ModelFieldId(2)),
             registry.fields(modelId),
             "the retired name must still resolve, and the new one must not reuse its bit",
         )
@@ -154,6 +153,21 @@ class AuditRegistryTest {
             "Uuid" in failure.message.orEmpty(),
             "the message should name the required key type; was ${failure.message}",
         )
+    }
+
+    @Test
+    fun `an audited model keyed by value classes around a Uuid is accepted at deploy`() = onServer {
+        deploy(TypedKeyed.serializer(), DoublyTypedKeyed.serializer())
+
+        val registry = registry()
+        assertEquals(setOf("value"), registry.fields(registry.modelId(TypedKeyed.serializer().descriptor.serialName)).keys)
+        assertEquals(setOf("value"), registry.fields(registry.modelId(DoublyTypedKeyed.serializer().descriptor.serialName)).keys)
+    }
+
+    @Test
+    fun `an audited model keyed by a value class around a String is rejected at deploy`() = onServer {
+        val failure = assertFailsWith<IllegalStateException> { deploy(TypedStringKeyed.serializer()) }
+        assertTrue("Uuid" in failure.message.orEmpty(), "the message should name the required key type; was ${failure.message}")
     }
 
     @Test

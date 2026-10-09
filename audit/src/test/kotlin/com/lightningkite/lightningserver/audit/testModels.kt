@@ -2,8 +2,10 @@ package com.lightningkite.lightningserver.audit
 
 import com.lightningkite.services.data.GenerateDataClassPaths
 import com.lightningkite.services.database.HasId
+import com.lightningkite.services.database.TypedId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlin.jvm.JvmInline
 import kotlin.uuid.Uuid
 
 @Serializable
@@ -63,6 +65,31 @@ data class Anonymous(@Audited val value: String)
 @Serializable
 @Audited
 data class StringKeyed(override val _id: String, @Audited val value: String) : HasId<String>
+
+@Serializable
+@Audited
+data class TypedKeyed(override val _id: ID, @Audited val value: String) : HasId<TypedKeyed.ID> {
+    @Serializable
+    @JvmInline
+    value class ID(override val raw: Uuid) : TypedId<Uuid, ID>
+}
+
+/** Keyed by a value class around a [TypedKeyed.ID], so the Uuid is two wrappers down. */
+@Serializable
+@Audited
+data class DoublyTypedKeyed(val _id: Outer, @Audited val value: String) {
+    @Serializable
+    @JvmInline
+    value class Outer(val inner: TypedKeyed.ID)
+}
+
+@Serializable
+@Audited
+data class TypedStringKeyed(override val _id: ID, @Audited val value: String) : HasId<TypedStringKeyed.ID> {
+    @Serializable
+    @JvmInline
+    value class ID(override val raw: String) : TypedId<String, ID>
+}
 
 /** Exercises descent into map *values*, whose path separator differs from a list's. */
 @Serializable
@@ -217,9 +244,11 @@ internal val com.lightningkite.lightningserver.runtime.Execution.ID.originId: Or
     get() = OriginRecord.ID(toExternal())
 
 /** The route part of [OriginRecord.location], e.g. `/meta/bulk` for `POST /meta/bulk`. */
-internal val OriginRecord.endpoint: String
+internal val OriginRecord<*>.endpoint: String
     get() = location.substringAfter(' ')
 
 // SAFETY: Freshly generated v7, standing in for an execution that was never run.
 @OptIn(com.lightningkite.services.data.Unsafe::class)
 internal fun randomExecutionId(): ExecutionId = ExecutionId(com.lightningkite.services.data.UuidV7.generate())
+
+internal fun fieldIds(vararg raw: Int): FieldIdentifierSet = FieldIdentifierSet.from(raw.map(::ModelFieldId))

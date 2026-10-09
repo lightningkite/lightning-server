@@ -21,7 +21,7 @@ import com.lightningkite.services.database.Table
  *
  * @property disclosures One row per audited record that reached a client.
  */
-public class DisclosureLog(private val core: AuditCore) : ServerBuilder() {
+public class DisclosureLog(private val core: AuditCore<*>) : ServerBuilder() {
     public val disclosures: DatabaseTableRegistration<DisclosureRecord> =
         core.database.registerTable("AuditDisclosure", DisclosureRecord.serializer())
 
@@ -50,7 +50,7 @@ public class DisclosureLog(private val core: AuditCore) : ServerBuilder() {
  *
  * @property dataAccess One row per query against an audited model.
  */
-public class DataAccessLog(private val core: AuditCore) : ServerBuilder() {
+public class DataAccessLog(private val core: AuditCore<*>) : ServerBuilder() {
     public val dataAccess: DatabaseTableRegistration<DataAccessRecord> =
         core.database.registerTable("AuditDataAccess", DataAccessRecord.serializer())
 
@@ -79,7 +79,7 @@ public class DataAccessLog(private val core: AuditCore) : ServerBuilder() {
  *
  * @property authEvents One row per authentication event.
  */
-public class AuthEventLog(private val core: AuditCore) : ServerBuilder() {
+public class AuthEventLog(private val core: AuditCore<*>) : ServerBuilder() {
     public val authEvents: DatabaseTableRegistration<AuthEventRecord> =
         core.database.registerTable("AuditAuthEvent", AuthEventRecord.serializer())
 
@@ -115,7 +115,7 @@ public class AuthEventLog(private val core: AuditCore) : ServerBuilder() {
  * @property mutations One row per change to an audited record.
  */
 public class MutationLog(
-    private val core: AuditCore,
+    private val core: AuditCore<*>,
     internal val bulkDetail: BulkMutationDetail = BulkMutationDetail.RecordEveryRow,
 ) : ServerBuilder() {
     public val mutations: DatabaseTableRegistration<MutationRecord> =

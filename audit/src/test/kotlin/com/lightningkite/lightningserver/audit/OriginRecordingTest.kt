@@ -103,12 +103,12 @@ class OriginRecordingTest {
 
     /** Every origin row, except the pre-deploy ones every probe writes while deploying. */
     context(server: ServerRuntime)
-    private suspend fun rows(): List<OriginRecord> =
+    private suspend fun rows(): List<OriginRecord<OriginRecord.StandardRequestInfo>> =
         OriginTestServer.audit.originsTable().find(Condition.Always).toList()
             .filter { it.kind != OriginRecord.ExecutionKind.PreDeploy }
 
     context(server: ServerRuntime)
-    private suspend fun rowFor(id: Execution.ID): OriginRecord? =
+    private suspend fun rowFor(id: Execution.ID): OriginRecord<OriginRecord.StandardRequestInfo>? =
         OriginTestServer.audit.originsTable().find(condition { it._id eq id.originId }).toList().singleOrNull()
 
     /** Marks [id]'s row so that any later rewrite of it is visible. */
@@ -121,7 +121,7 @@ class OriginRecordingTest {
         assertNotNull(changed.new, "there was no row for $id to tamper with")
     }
 
-    private fun assertUnique(rows: List<OriginRecord>) {
+    private fun assertUnique(rows: List<OriginRecord<OriginRecord.StandardRequestInfo>>) {
         assertEquals(rows.map { it._id }.distinct(), rows.map { it._id }, "an origin was written twice: $rows")
     }
 
@@ -151,8 +151,7 @@ class OriginRecordingTest {
         assertEquals("10.0.0.5", request.sourceIp)
         assertEquals("engine-req", request.engineRequestId)
         assertEquals("upstream-req", request.upstreamRequestId)
-        assertNotNull(request.principal, "an authenticated request's origin must name the principal")
-        assertEquals(user.toString(), request.subjectId)
+        assertEquals(user, request.subjectId)
     }
 
     @Test
@@ -161,7 +160,6 @@ class OriginRecordingTest {
         engine.handleRoot(engine.get("/touch"), id)
 
         val request = assertNotNull(assertNotNull(rowFor(id)).request)
-        assertNull(request.principal)
         assertNull(request.subjectId)
     }
 
@@ -419,7 +417,7 @@ class OriginRecordingTest {
             assertNull(row.parent)
             assertEquals(socket.request.socketId.toExternal(), row.root)
             assertEquals("10.0.0.9", row.request?.sourceIp)
-            assertEquals(OriginProbeEngine.USER.toString(), row.request?.subjectId)
+            assertEquals(OriginProbeEngine.USER, row.request?.subjectId)
         }
 
     @Test
@@ -459,7 +457,7 @@ class OriginRecordingTest {
         val row = rows().single()
         assertEquals(socket.request.socketId.originId, row._id)
         assertEquals(OriginRecord.ExecutionKind.WebSocket, row.kind)
-        assertEquals(OriginProbeEngine.USER.toString(), row.request?.subjectId)
+        assertEquals(OriginProbeEngine.USER, row.request?.subjectId)
     }
 
     @Test
